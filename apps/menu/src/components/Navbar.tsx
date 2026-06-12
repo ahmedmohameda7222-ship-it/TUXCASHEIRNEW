@@ -41,11 +41,15 @@ export const Navbar = () => {
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
           <NavLink href="/" className="group flex items-center gap-2" data-testid="nav-logo">
-            <img
-              src={tuxLogo}
-              alt="TUX"
-              className="h-10 w-auto"
-              style={{ filter: "invert(1)", mixBlendMode: "screen" }}
+            <span
+              aria-label="TUX"
+              className="block h-10 w-[88px] bg-white [mask-repeat:no-repeat] [mask-position:center] [mask-size:contain] [-webkit-mask-repeat:no-repeat] [-webkit-mask-position:center] [-webkit-mask-size:contain]"
+              style={{
+                filter: "invert(1)",
+                mixBlendMode: "screen",
+                maskImage: `url(${tuxLogo})`,
+                WebkitMaskImage: `url(${tuxLogo})`,
+              }}
             />
           </NavLink>
 
