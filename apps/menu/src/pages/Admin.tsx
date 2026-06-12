@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useMenu, ProductSection, SupabaseProduct } from "@/context/MenuContext";
-import { Trash2, Edit2, Plus, Image as ImageIcon } from "lucide-react";
+import { Trash2, Edit2, Plus, Image as ImageIcon, X } from "lucide-react";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const REQUEST_TIMEOUT_MS = 30000;
@@ -53,6 +53,8 @@ const toSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const isStoragePath = (path?: string | null) => Boolean(path && !path.startsWith("/src"));
+
 export default function Admin() {
   const { sections, products, refreshMenu } = useMenu();
   const [session, setSession] = useState<any>(null);
@@ -69,6 +71,7 @@ export default function Admin() {
   const [productSaveError, setProductSaveError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [deletedImagePath, setDeletedImagePath] = useState<string | null>(null);
 
   const sortedSections = useMemo(
     () => [...sections].sort((a, b) => a.sort_order - b.sort_order),
@@ -115,6 +118,12 @@ export default function Admin() {
     window.setTimeout(() => setMessage(null), 4000);
   };
 
+  const resetImageState = () => {
+    setImageFile(null);
+    setDeletedImagePath(null);
+    setProductSaveError(null);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) {
@@ -146,8 +155,7 @@ export default function Admin() {
   };
 
   const openNewProductModal = (sectionId = sortedSections[0]?.id || "") => {
-    setImageFile(null);
-    setProductSaveError(null);
+    resetImageState();
     setEditingProduct({
       id: `prod-${Date.now()}`,
       section_id: sectionId,
@@ -163,6 +171,26 @@ export default function Admin() {
     setIsProductModalOpen(true);
   };
 
+  const openEditProductModal = (product: SupabaseProduct) => {
+    resetImageState();
+    setEditingProduct(product);
+    setIsProductModalOpen(true);
+  };
+
+  const handleRemoveProductImage = () => {
+    if (!editingProduct) return;
+    if (isStoragePath(editingProduct.image_path)) {
+      setDeletedImagePath(editingProduct.image_path || null);
+    }
+    setImageFile(null);
+    setEditingProduct({
+      ...editingProduct,
+      image_url: "",
+      image_path: undefined,
+    });
+    setProductSaveError(null);
+  };
+
   const saveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !editingCategory) return;
@@ -173,9 +201,11 @@ export default function Admin() {
         ...editingCategory,
         slug: editingCategory.slug || toSlug(editingCategory.name || editingCategory.id),
       };
-      const isNew = !sections.some((section) => section.id === categoryToSave.id);
+      const isExistingDatabaseCategory = sections.some(
+        (section) => section.id === categoryToSave.id && !section.is_fallback
+      );
 
-      if (isNew) {
+      if (!isExistingDatabaseCategory) {
         const { error } = await supabase.from("product_sections").insert([categoryToSave]);
         if (error) throw error;
         showMessage("Category added successfully.", "success");
@@ -223,8 +253,9 @@ export default function Admin() {
     setProductSaveError(null);
 
     try {
-      let finalImageUrl = editingProduct.image_url;
+      let finalImageUrl = editingProduct.image_url || "";
       let finalImagePath = editingProduct.image_path;
+      let imagePathToRemove = deletedImagePath;
 
       if (imageFile) {
         if (!imageFile.type.startsWith("image/")) {
@@ -258,14 +289,20 @@ export default function Admin() {
         finalImageUrl = publicUrlData.publicUrl;
         finalImagePath = filePath;
 
-        if (editingProduct.image_path && !editingProduct.image_path.startsWith("/src")) {
-          await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([editingProduct.image_path]);
+        if (!imagePathToRemove && isStoragePath(editingProduct.image_path)) {
+          imagePathToRemove = editingProduct.image_path || null;
         }
+      }
+
+      if (deletedImagePath && !imageFile) {
+        finalImageUrl = "";
+        finalImagePath = undefined;
       }
 
       const productToSave = {
         id: editingProduct.id,
         section_id: editingProduct.section_id,
+        category_id: editingProduct.section_id,
         name: editingProduct.name,
         description: editingProduct.description,
         price: editingProduct.price,
@@ -280,9 +317,11 @@ export default function Admin() {
         throw new Error("[PRODUCT-CATEGORY-001] Product save failed: choose a category before saving.");
       }
 
-      const isNew = !products.some((product) => product.id === productToSave.id);
+      const isExistingDatabaseProduct = products.some(
+        (product) => product.id === productToSave.id && !product.is_fallback
+      );
 
-      if (isNew) {
+      if (!isExistingDatabaseProduct) {
         const { error } = await supabase.from("products").insert([productToSave]);
         if (error) throw new Error(formatAdminError("DB-INSERT-001", "Product insert failed", error));
         showMessage("Product added successfully.", "success");
@@ -292,9 +331,12 @@ export default function Admin() {
         showMessage("Product updated successfully.", "success");
       }
 
+      if (imagePathToRemove && imagePathToRemove !== finalImagePath && isStoragePath(imagePathToRemove)) {
+        await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePathToRemove]);
+      }
+
       setIsProductModalOpen(false);
-      setImageFile(null);
-      setProductSaveError(null);
+      resetImageState();
       await refreshMenu();
     } catch (err: any) {
       const errorText = formatAdminError("SAVE-FAILED", "Product save failed", err);
@@ -310,8 +352,8 @@ export default function Admin() {
     if (!supabase || !window.confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      if (imagePath && !imagePath.startsWith("/src")) {
-        await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePath]);
+      if (isStoragePath(imagePath)) {
+        await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePath as string]);
       }
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
@@ -389,16 +431,12 @@ export default function Admin() {
           <span className="text-xs bg-white/10 px-2 py-1 rounded">Order: {product.sort_order}</span>
           {product.is_best_seller && <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">Best Seller</span>}
           {!product.is_active && <span className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded">Hidden</span>}
+          {product.is_fallback && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Default</span>}
         </div>
       </div>
       <div className="flex gap-2">
         <button
-          onClick={() => {
-            setImageFile(null);
-            setProductSaveError(null);
-            setEditingProduct(product);
-            setIsProductModalOpen(true);
-          }}
+          onClick={() => openEditProductModal(product)}
           className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-[#D4AF37] transition-colors"
         >
           <Edit2 className="w-5 h-5" />
@@ -463,6 +501,7 @@ export default function Admin() {
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       {section.name}
                       {!section.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Hidden</span>}
+                      {section.is_fallback && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Default</span>}
                     </h3>
                     <p className="text-xs text-gray-500">ID: {section.id}</p>
                     <p className="text-xs text-gray-500">Order: {section.sort_order}</p>
@@ -486,7 +525,7 @@ export default function Admin() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
               <div>
                 <h2 className="text-2xl font-bold">Products</h2>
-                <p className="text-sm text-gray-500">Products are grouped by category. Active products appear in both Our Products and Order Now.</p>
+                <p className="text-sm text-gray-500">Products are grouped by category. Inactive products stay visible publicly as unavailable.</p>
               </div>
               <button onClick={() => openNewProductModal()} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Add Product
@@ -498,7 +537,10 @@ export default function Admin() {
                 <section key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4 border-b border-white/10 pb-4">
                     <div>
-                      <h3 className="text-xl font-black text-[#D4AF37] uppercase tracking-wide">{section.name}</h3>
+                      <h3 className="text-xl font-black text-[#D4AF37] uppercase tracking-wide flex items-center gap-2">
+                        {section.name}
+                        {!section.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Hidden</span>}
+                      </h3>
                       <p className="text-xs text-gray-500">{sectionProducts.length} product{sectionProducts.length === 1 ? "" : "s"}</p>
                     </div>
                     <button onClick={() => openNewProductModal(section.id)} className="bg-[#D4AF37] hover:bg-[#F3D55B] text-black px-4 py-2 rounded font-bold flex items-center gap-2 w-fit">
@@ -532,7 +574,7 @@ export default function Admin() {
       {isCategoryModalOpen && editingCategory && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">{sections.some((section) => section.id === editingCategory.id) ? "Edit Category" : "Add Category"}</h2>
+            <h2 className="text-2xl font-bold mb-4">{sections.some((section) => section.id === editingCategory.id && !section.is_fallback) ? "Edit Category" : "Add Category"}</h2>
             <form onSubmit={saveCategory} className="space-y-4">
               <div>
                 <label className="text-sm text-gray-400">ID</label>
@@ -566,7 +608,7 @@ export default function Admin() {
       {isProductModalOpen && editingProduct && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">{products.some((product) => product.id === editingProduct.id) ? "Edit Product" : "Add Product"}</h2>
+            <h2 className="text-2xl font-bold mb-4">{products.some((product) => product.id === editingProduct.id && !product.is_fallback) ? "Edit Product" : "Add Product"}</h2>
             {productSaveError && (
               <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/15 p-3 text-sm font-semibold text-red-300 break-words">
                 {productSaveError}
@@ -601,13 +643,27 @@ export default function Admin() {
 
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Product Image</label>
-                <div className="flex items-center gap-4">
-                  {(imageFile || editingProduct.image_url) && (
-                    <div className="w-16 h-16 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-white/10 bg-black/30 p-3">
+                  {(imageFile || editingProduct.image_url) ? (
+                    <div className="w-20 h-20 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
                       <img src={imageFile ? URL.createObjectURL(imageFile) : editingProduct.image_url} alt="Preview" className="max-w-full max-h-full object-contain" />
                     </div>
+                  ) : (
+                    <div className="w-20 h-20 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
+                      <ImageIcon className="text-gray-600" />
+                    </div>
                   )}
-                  <input type="file" accept="image/*" onChange={(e) => { setImageFile(e.target.files?.[0] || null); setProductSaveError(null); }} className="flex-1 bg-black border border-white/20 rounded px-3 py-2 text-sm" />
+                  <div className="flex-1 space-y-3">
+                    <input type="file" accept="image/*" onChange={(e) => { setImageFile(e.target.files?.[0] || null); setDeletedImagePath(null); setProductSaveError(null); }} className="w-full bg-black border border-white/20 rounded px-3 py-2 text-sm" />
+                    {(imageFile || editingProduct.image_url) && (
+                      <button type="button" onClick={handleRemoveProductImage} className="inline-flex items-center gap-2 rounded bg-red-500/15 px-3 py-2 text-sm font-bold text-red-300 hover:bg-red-500/25">
+                        <X className="w-4 h-4" /> Delete Uploaded Picture
+                      </button>
+                    )}
+                    {deletedImagePath && (
+                      <p className="text-xs text-red-300">The current uploaded picture will be deleted after saving.</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -630,7 +686,7 @@ export default function Admin() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsProductModalOpen(false)} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold transition-colors">Cancel</button>
+                <button type="button" onClick={() => { setIsProductModalOpen(false); resetImageState(); }} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold transition-colors">Cancel</button>
                 <button type="submit" disabled={loadingAction} className="flex-1 py-3 bg-[#D4AF37] hover:bg-[#F3D55B] text-black rounded-lg font-bold disabled:opacity-50 transition-colors">
                   {loadingAction ? "Saving & Uploading..." : "Save Product"}
                 </button>
