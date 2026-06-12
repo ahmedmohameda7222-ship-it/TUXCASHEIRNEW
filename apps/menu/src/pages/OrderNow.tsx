@@ -20,24 +20,24 @@ export default function OrderNow() {
     [products]
   );
 
-  const activeSections = useMemo(
+  const menuSections = useMemo(
     () =>
       sections
-        .filter((section) => section.is_active && section.id !== EXTRAS_SECTION_ID)
+        .filter((section) => section.id !== EXTRAS_SECTION_ID)
         .sort((a, b) => a.sort_order - b.sort_order),
     [sections]
   );
 
   // Set initial active category once sections load
   useEffect(() => {
-    if (activeSections.length > 0 && !activeCategory) {
-      setActiveCategory(activeSections[0].id);
+    if (menuSections.length > 0 && !activeCategory) {
+      setActiveCategory(menuSections[0].id);
     }
-  }, [activeSections, activeCategory]);
+  }, [menuSections, activeCategory]);
 
   // Scroll-spy: observe which section is in view
   useEffect(() => {
-    if (activeSections.length === 0) return;
+    if (menuSections.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -67,7 +67,7 @@ export default function OrderNow() {
     });
 
     return () => observer.disconnect();
-  }, [activeSections, loading]);
+  }, [menuSections, loading]);
 
   const scrollToCategory = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
@@ -102,9 +102,9 @@ export default function OrderNow() {
         </motion.div>
 
         {/* Category Tabs (sticky + scroll-spy driven) */}
-        {activeSections.length > 0 && (
+        {menuSections.length > 0 && (
           <CategoryTabs
-            categories={activeSections}
+            categories={menuSections}
             activeCategory={activeCategory}
             onSelectCategory={scrollToCategory}
           />
@@ -120,7 +120,7 @@ export default function OrderNow() {
         )}
 
         {/* Empty State */}
-        {!loading && activeSections.length === 0 && (
+        {!loading && menuSections.length === 0 && (
           <div className="mt-20 text-center text-gray-600">
             <p className="text-xl">No menu items available yet.</p>
             <p className="text-sm mt-2">Check back soon!</p>
@@ -130,12 +130,11 @@ export default function OrderNow() {
         {/* Menu Sections */}
         {!loading && (
           <div className="mt-8 space-y-14">
-            {activeSections.map((section) => {
+            {menuSections.map((section) => {
               const sectionProducts = products
-                .filter((p) => p.section_id === section.id && p.is_active)
+                .filter((p) => p.section_id === section.id)
                 .sort((a, b) => a.sort_order - b.sort_order);
-
-              if (sectionProducts.length === 0) return null;
+              const categoryUnavailable = !section.is_active;
 
               return (
                 <div
@@ -144,17 +143,34 @@ export default function OrderNow() {
                   ref={(el) => {
                     categoryRefs.current[section.id] = el;
                   }}
-                  className="scroll-mt-32"
+                  className={`scroll-mt-32 rounded-2xl ${categoryUnavailable ? "bg-gray-900/40 p-4 border border-gray-700" : ""}`}
                 >
-                  <h2 className="text-2xl font-black text-[#D4AF37] uppercase tracking-wide mb-6 border-b border-white/10 pb-2">
+                  <h2 className={`text-2xl font-black uppercase tracking-wide mb-3 border-b pb-2 ${categoryUnavailable ? "text-gray-400 border-gray-700" : "text-[#D4AF37] border-white/10"}`}>
                     {section.name}
                   </h2>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {sectionProducts.map((product) => (
-                      <ProductOrderCard key={product.id} product={product} extras={extraProducts} />
-                    ))}
-                  </div>
+                  {categoryUnavailable && (
+                    <p className="mb-5 rounded-lg border border-gray-700 bg-gray-800/80 px-4 py-3 text-sm font-semibold text-gray-200">
+                      This categorie is currently not available.
+                    </p>
+                  )}
+
+                  {sectionProducts.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-gray-500">
+                      No products in this category yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {sectionProducts.map((product) => (
+                        <ProductOrderCard
+                          key={product.id}
+                          product={product}
+                          extras={extraProducts}
+                          categoryUnavailable={categoryUnavailable}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
