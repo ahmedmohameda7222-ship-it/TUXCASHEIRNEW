@@ -53,6 +53,7 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
     : undefined;
 
   const section = sections.find((s) => {
+    if (!s.is_active) return false;
     if (sectionId) return s.id === sectionId;
     return s.slug === routeSlug || s.id === routeSlug;
   });
