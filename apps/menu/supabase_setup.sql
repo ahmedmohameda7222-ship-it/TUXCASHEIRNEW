@@ -79,8 +79,32 @@ ON CONFLICT (id) DO NOTHING;
 -- Storage Policies
 -- Allow public read access to files
 DROP POLICY IF EXISTS "Public Access" ON storage.objects;
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'product-images' );
+DROP POLICY IF EXISTS "Allow public read product images" ON storage.objects;
+CREATE POLICY "Allow public read product images"
+ON storage.objects
+FOR SELECT
+USING (bucket_id = 'product-images');
 
--- Allow admin full access to files
+-- Allow authenticated admins to upload, replace, and delete product images
 DROP POLICY IF EXISTS "Admin Access" ON storage.objects;
-CREATE POLICY "Admin Access" ON storage.objects FOR ALL USING ( bucket_id = 'product-images' AND auth.role() = 'authenticated' );
+DROP POLICY IF EXISTS "Allow authenticated upload product images" ON storage.objects;
+CREATE POLICY "Allow authenticated upload product images"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'product-images');
+
+DROP POLICY IF EXISTS "Allow authenticated update product images" ON storage.objects;
+CREATE POLICY "Allow authenticated update product images"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (bucket_id = 'product-images')
+WITH CHECK (bucket_id = 'product-images');
+
+DROP POLICY IF EXISTS "Allow authenticated delete product images" ON storage.objects;
+CREATE POLICY "Allow authenticated delete product images"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (bucket_id = 'product-images');

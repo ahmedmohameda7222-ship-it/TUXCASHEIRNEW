@@ -11,7 +11,7 @@ export interface ProductSection {
   is_active: boolean;
 }
 
-export interface SupabaseProduct extends Omit<Product, 'category_id'> {
+export interface SupabaseProduct extends Omit<Product, 'category_id' | 'is_available'> {
   section_id: string;
   image_path?: string;
   is_active: boolean;
@@ -33,10 +33,10 @@ export function MenuProvider({ children }: { children: ReactNode }) {
   );
   
   const [products, setProducts] = useState<SupabaseProduct[]>(
-    fallbackProducts.map(p => ({
-      ...p,
-      section_id: p.category_id,
-      is_active: p.is_available,
+    fallbackProducts.map(({ category_id, is_available, ...product }) => ({
+      ...product,
+      section_id: category_id,
+      is_active: is_available,
     }))
   );
   

@@ -26,23 +26,43 @@ export function CartDrawer() {
   const mixedTotal = cashValue + instaPayValue;
   const isMixedValid = Math.abs(mixedTotal - totalPrice) < 0.01;
   const remainingMixed = totalPrice - mixedTotal;
+  const isCustomerNameMissing = !customerName.trim();
 
   const isCheckoutDisabled =
     items.length === 0 ||
+    isCustomerNameMissing ||
     !orderType ||
     !paymentMethod ||
     (paymentMethod === "Mixed" && !isMixedValid) ||
     (orderType === "Delivery" && !deliveryAddress.trim());
 
   const handleCheckout = () => {
-    if (isCheckoutDisabled) return;
+    if (items.length === 0) return;
+    if (!customerName.trim()) {
+      alert("Please enter your name.");
+      return;
+    }
+    if (!orderType) {
+      alert("Please select an order type.");
+      return;
+    }
+    if (orderType === "Delivery" && !deliveryAddress.trim()) {
+      alert("Please enter your delivery address.");
+      return;
+    }
+    if (!paymentMethod) {
+      alert("Please select a payment method.");
+      return;
+    }
+    if (paymentMethod === "Mixed" && !isMixedValid) {
+      alert("The cash amount and InstaPay amount must exactly equal the final total.");
+      return;
+    }
 
     // Build clean WhatsApp message (no per-item prices)
     let message = `Hello TUX Burger, I want to place an order.\n\n`;
     message += `*Order Type:* ${orderType}\n`;
-    if (customerName.trim()) {
-      message += `*Name:* ${customerName.trim()}\n`;
-    }
+    message += `*Name:* ${customerName.trim()}\n`;
     if (orderType === "Delivery" && deliveryAddress.trim()) {
       message += `*Address:* ${deliveryAddress.trim()}\n`;
     }
@@ -155,14 +175,20 @@ export function CartDrawer() {
 
             {/* Customer Name */}
             <div className="space-y-1">
-              <label className="text-sm text-gray-400 font-semibold">Your Name (optional)</label>
+              <label className="text-sm text-gray-400 font-semibold">
+                Your Name <span className="text-red-400">*</span>
+              </label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="e.g. Ahmed"
+                aria-required="true"
                 className="w-full bg-black border border-white/20 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
               />
+              {isCustomerNameMissing && (
+                <p className="text-xs font-semibold text-red-400">Name is required.</p>
+              )}
             </div>
 
             {/* Order Type */}

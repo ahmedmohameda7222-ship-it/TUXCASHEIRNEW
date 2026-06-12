@@ -3,6 +3,49 @@ import { supabase } from "@/lib/supabase";
 import { useMenu, ProductSection, SupabaseProduct } from "@/context/MenuContext";
 import { Trash2, Edit2, Plus, Image as ImageIcon, CheckCircle, XCircle } from "lucide-react";
 
+const PRODUCT_IMAGES_BUCKET = "product-images";
+const REQUEST_TIMEOUT_MS = 30000;
+
+type SupabaseErrorLike = {
+  code?: string;
+  details?: string;
+  hint?: string;
+  message?: string;
+  status?: number;
+  statusCode?: number | string;
+};
+
+const formatAdminError = (fallbackCode: string, fallbackMessage: string, err: unknown) => {
+  if (err instanceof Error && /^\[[A-Z0-9-]+/.test(err.message)) {
+    return err.message;
+  }
+
+  const error = err as SupabaseErrorLike;
+  const status = error?.status ?? error?.statusCode;
+  const codeParts = [fallbackCode];
+  if (error?.code) codeParts.push(`Supabase ${error.code}`);
+  if (status) codeParts.push(`HTTP ${status}`);
+
+  const message =
+    error?.message ||
+    (err instanceof Error ? err.message : "") ||
+    "No error message was returned.";
+  const extra = [error?.details, error?.hint].filter(Boolean).join(" ");
+
+  return `[${codeParts.join(" / ")}] ${fallbackMessage}: ${message}${extra ? ` ${extra}` : ""}`;
+};
+
+const withTimeout = <T,>(operation: PromiseLike<T>, timeoutMessage: string) =>
+  new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, REQUEST_TIMEOUT_MS);
+
+    Promise.resolve(operation)
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timeoutId));
+  });
+
 export default function Admin() {
   const { sections, products, refreshMenu } = useMenu();
   const [session, setSession] = useState<any>(null);
@@ -24,6 +67,7 @@ export default function Admin() {
   const [editingProduct, setEditingProduct] = useState<SupabaseProduct | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productSaveError, setProductSaveError] = useState<string | null>(null);
 
   // Form states
   const [loadingAction, setLoadingAction] = useState(false);
@@ -120,8 +164,14 @@ export default function Admin() {
 
   const saveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !editingProduct) return;
+    if (!supabase || !editingProduct) {
+      const errorText = "[SAVE-001] Cannot save product: Supabase is not connected or no product is selected.";
+      setProductSaveError(errorText);
+      showMessage(errorText, "error");
+      return;
+    }
     setLoadingAction(true);
+    setProductSaveError(null);
 
     try {
       let finalImageUrl = editingProduct.image_url;
@@ -129,20 +179,37 @@ export default function Admin() {
 
       // 1. Handle Image Upload if a new file is selected
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
+        if (!imageFile.type.startsWith("image/")) {
+          throw new Error("[UPLOAD-001] Image upload failed: Please choose a valid image file.");
+        }
+
+        const fileExt = imageFile.name.split('.').pop()?.toLowerCase() || "png";
         const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
         const filePath = `products/${fileName}`;
 
         // Upload to Storage
-        const { error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(filePath, imageFile);
+        const { error: uploadError } = await withTimeout(
+          supabase.storage
+            .from(PRODUCT_IMAGES_BUCKET)
+            .upload(filePath, imageFile, {
+              cacheControl: "3600",
+              contentType: imageFile.type,
+              upsert: true,
+            }),
+          `[UPLOAD-TIMEOUT] Image upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Check the "${PRODUCT_IMAGES_BUCKET}" bucket and storage policies.`
+        );
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          throw new Error(formatAdminError(
+            "UPLOAD-002",
+            `Image upload failed in bucket "${PRODUCT_IMAGES_BUCKET}"`,
+            uploadError
+          ));
+        }
 
         // Get Public URL
         const { data: publicUrlData } = supabase.storage
-          .from('product-images')
+          .from(PRODUCT_IMAGES_BUCKET)
           .getPublicUrl(filePath);
 
         finalImageUrl = publicUrlData.publicUrl;
@@ -150,36 +217,51 @@ export default function Admin() {
 
         // Optionally delete old image if it existed in storage
         if (editingProduct.image_path && !editingProduct.image_path.startsWith('/src')) {
-          await supabase.storage.from('product-images').remove([editingProduct.image_path]);
+          await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([editingProduct.image_path]);
         }
       }
 
       const productToSave = {
-        ...editingProduct,
+        id: editingProduct.id,
+        section_id: editingProduct.section_id,
+        name: editingProduct.name,
+        description: editingProduct.description,
+        price: editingProduct.price,
         image_url: finalImageUrl,
-        image_path: finalImagePath
+        image_path: finalImagePath || null,
+        is_best_seller: editingProduct.is_best_seller,
+        is_active: editingProduct.is_active,
+        sort_order: editingProduct.sort_order,
       };
 
       const isNew = !products.find(p => p.id === productToSave.id);
 
       if (isNew) {
         const { error } = await supabase.from('products').insert([productToSave]);
-        if (error) throw error;
+        if (error) {
+          throw new Error(formatAdminError("DB-INSERT-001", "Product insert failed", error));
+        }
         showMessage("Product added successfully!", "success");
       } else {
         const { error } = await supabase
           .from('products')
           .update(productToSave)
           .eq('id', productToSave.id);
-        if (error) throw error;
+        if (error) {
+          throw new Error(formatAdminError("DB-UPDATE-001", "Product update failed", error));
+        }
         showMessage("Product updated successfully!", "success");
       }
 
       setIsProductModalOpen(false);
       setImageFile(null);
+      setProductSaveError(null);
       refreshMenu();
     } catch (err: any) {
-      showMessage(err.message, "error");
+      const errorText = formatAdminError("SAVE-FAILED", "Product save failed", err);
+      console.error("Product save failed:", err);
+      setProductSaveError(errorText);
+      showMessage(errorText, "error");
     } finally {
       setLoadingAction(false);
     }
@@ -190,7 +272,7 @@ export default function Admin() {
     
     try {
       if (imagePath && !imagePath.startsWith('/src')) {
-        await supabase.storage.from('product-images').remove([imagePath]);
+        await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePath]);
       }
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
@@ -344,6 +426,7 @@ export default function Admin() {
               <button
                 onClick={() => {
                   setImageFile(null);
+                  setProductSaveError(null);
                   setEditingProduct({ 
                     id: `prod-${Date.now()}`, 
                     section_id: sections[0]?.id || "", 
@@ -352,7 +435,6 @@ export default function Admin() {
                     price: 0, 
                     image_url: "", 
                     is_best_seller: false, 
-                    is_available: true,
                     is_active: true, 
                     sort_order: products.length + 1 
                   });
@@ -385,7 +467,7 @@ export default function Admin() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setImageFile(null); setEditingProduct(product); setIsProductModalOpen(true); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-[#D4AF37] transition-colors"><Edit2 className="w-5 h-5" /></button>
+                    <button onClick={() => { setImageFile(null); setProductSaveError(null); setEditingProduct(product); setIsProductModalOpen(true); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-[#D4AF37] transition-colors"><Edit2 className="w-5 h-5" /></button>
                     <button onClick={() => deleteProduct(product.id, product.image_path)} className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5" /></button>
                   </div>
                 </div>
@@ -432,6 +514,11 @@ export default function Admin() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">{editingProduct.id.startsWith('prod-') ? "Add Product" : "Edit Product"}</h2>
+            {productSaveError && (
+              <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/15 p-3 text-sm font-semibold text-red-300 break-words">
+                {productSaveError}
+              </div>
+            )}
             <form onSubmit={saveProduct} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -467,7 +554,7 @@ export default function Admin() {
                       <img src={imageFile ? URL.createObjectURL(imageFile) : editingProduct.image_url} alt="Preview" className="max-w-full max-h-full object-contain" />
                     </div>
                   )}
-                  <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="flex-1 bg-black border border-white/20 rounded px-3 py-2 text-sm" />
+                  <input type="file" accept="image/*" onChange={e => { setImageFile(e.target.files?.[0] || null); setProductSaveError(null); }} className="flex-1 bg-black border border-white/20 rounded px-3 py-2 text-sm" />
                 </div>
               </div>
 
