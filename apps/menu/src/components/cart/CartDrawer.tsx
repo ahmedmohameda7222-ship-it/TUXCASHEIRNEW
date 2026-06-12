@@ -154,7 +154,7 @@ export function CartDrawer() {
                   <button
                     key={type}
                     onClick={() => setOrderType(type as "Pick up" | "Delivery")}
-                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all \${
+                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       orderType === type
                         ? "bg-[#D4AF37] text-black"
                         : "bg-white/10 text-white border border-white/5"
@@ -173,7 +173,7 @@ export function CartDrawer() {
                   <button
                     key={method}
                     onClick={() => setPaymentMethod(method as "Cash" | "InstaPay" | "Mixed")}
-                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all \${
+                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       paymentMethod === method
                         ? "bg-[#D4AF37] text-black"
                         : "bg-white/10 text-white border border-white/5"
@@ -215,7 +215,7 @@ export function CartDrawer() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-400">Remaining:</span>
-                  <span className={`font-bold \${remainingMixed === 0 ? "text-green-500" : remainingMixed < 0 ? "text-red-500" : "text-[#D4AF37]"}`}>
+                  <span className={`font-bold ${remainingMixed === 0 ? "text-green-500" : remainingMixed < 0 ? "text-red-500" : "text-[#D4AF37]"}`}>
                     {remainingMixed} EGP
                   </span>
                 </div>
@@ -234,7 +234,7 @@ export function CartDrawer() {
             <button
               onClick={handleCheckout}
               disabled={paymentMethod === "Mixed" && !isMixedValid}
-              className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all \${
+              className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${
                 (paymentMethod === "Mixed" && !isMixedValid)
                   ? "bg-gray-700 text-gray-400 cursor-not-allowed"
                   : "bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-[0_0_15px_rgba(37,211,102,0.3)]"
