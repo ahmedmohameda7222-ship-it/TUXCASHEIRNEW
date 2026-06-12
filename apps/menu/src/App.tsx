@@ -12,14 +12,9 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { StickyCartBar } from "@/components/cart/StickyCartBar";
 
 import Home from "@/pages/Home";
-import Tuxify from "@/pages/Tuxify";
 import OrderNow from "@/pages/OrderNow";
 import Admin from "@/pages/Admin";
-import TuxBurger from "@/pages/TuxBurger";
-import Hawawshi from "@/pages/Hawawshi";
-import Fries from "@/pages/Fries";
-import Combos from "@/pages/Combos";
-import Drinks from "@/pages/Drinks";
+import ProductCategoryPage from "@/pages/ProductCategoryPage";
 
 const queryClient = new QueryClient();
 
@@ -30,14 +25,15 @@ function Router() {
       <main className="flex-grow">
         <Switch>
           <Route path="/" component={Home} />
-          <Route path="/tuxify" component={Tuxify} />
           <Route path="/order-now" component={OrderNow} />
           <Route path="/admin" component={Admin} />
-          <Route path="/tux-burger" component={TuxBurger} />
-          <Route path="/hawawshi" component={Hawawshi} />
-          <Route path="/fries" component={Fries} />
-          <Route path="/combos" component={Combos} />
-          <Route path="/drinks" component={Drinks} />
+          <Route path="/tux-burger">{() => <ProductCategoryPage sectionId="tux-burger" />}</Route>
+          <Route path="/tuxify">{() => <ProductCategoryPage sectionId="tuxify" />}</Route>
+          <Route path="/hawawshi">{() => <ProductCategoryPage sectionId="hawawshi" />}</Route>
+          <Route path="/fries">{() => <ProductCategoryPage sectionId="fries" />}</Route>
+          <Route path="/combos">{() => <ProductCategoryPage sectionId="combos" />}</Route>
+          <Route path="/drinks">{() => <ProductCategoryPage sectionId="drinks" />}</Route>
+          <Route path="/products/:slug" component={ProductCategoryPage} />
           <Route component={NotFound} />
         </Switch>
       </main>
