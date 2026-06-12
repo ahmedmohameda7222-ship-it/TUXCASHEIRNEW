@@ -39,6 +39,55 @@ CREATE TABLE IF NOT EXISTS website_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 3b. Migrate existing tables from older setup versions
+-- CREATE TABLE IF NOT EXISTS does not add missing columns to existing tables.
+ALTER TABLE product_sections
+ADD COLUMN IF NOT EXISTS slug TEXT,
+ADD COLUMN IF NOT EXISTS description TEXT,
+ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS section_id TEXT,
+ADD COLUMN IF NOT EXISTS description TEXT,
+ADD COLUMN IF NOT EXISTS price NUMERIC NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS image_url TEXT,
+ADD COLUMN IF NOT EXISTS image_path TEXT,
+ADD COLUMN IF NOT EXISTS is_best_seller BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+UPDATE product_sections
+SET slug = id
+WHERE slug IS NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'category_id'
+  ) THEN
+    EXECUTE 'UPDATE products SET section_id = category_id WHERE section_id IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'is_available'
+  ) THEN
+    EXECUTE 'UPDATE products SET is_active = is_available';
+  END IF;
+END $$;
+
 -- 4. Initial Sections Data (Migration from old menu-data)
 INSERT INTO product_sections (id, name, slug, sort_order) VALUES
 ('tux-burger', 'Tux Burger', 'tux-burger', 1),
