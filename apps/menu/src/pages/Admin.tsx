@@ -352,6 +352,7 @@ export default function Admin() {
                     price: 0, 
                     image_url: "", 
                     is_best_seller: false, 
+                    is_available: true,
                     is_active: true, 
                     sort_order: products.length + 1 
                   });
