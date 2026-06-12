@@ -1,8 +1,16 @@
 import React from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { usePageTransition } from "./PageTransition";
 
-export const NavLink = ({ href, className, children, onClick }: { href: string; className?: string; children: React.ReactNode; onClick?: () => void }) => {
+type NavLinkProps = {
+  href: string;
+  className?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  "data-testid"?: string;
+};
+
+export const NavLink = ({ href, className, children, onClick, "data-testid": dataTestId }: NavLinkProps) => {
   const { triggerTransition } = usePageTransition();
   const [location] = useLocation();
 
@@ -15,7 +23,7 @@ export const NavLink = ({ href, className, children, onClick }: { href: string; 
   };
 
   return (
-    <a href={href} onClick={handleClick} className={className}>
+    <a href={href} onClick={handleClick} className={className} data-testid={dataTestId}>
       {children}
     </a>
   );
