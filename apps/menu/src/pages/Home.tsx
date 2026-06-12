@@ -9,26 +9,28 @@ import doubleImg from "@assets/tuxify_double.png";
 import tripleImg from "@assets/tuxify_triple.png";
 import quatroImg from "@assets/tuxify_quatro.png";
 
-import { PRODUCTS, Product } from "@/lib/menu-data";
-
-const bestSellers = PRODUCTS.filter((p) => p.is_best_seller);
+import { useMenu, SupabaseProduct } from "@/context/MenuContext";
 
 function BestSellersCarousel() {
+  const { products } = useMenu();
+  const bestSellers = products.filter((p) => p.is_best_seller);
   const [current, setCurrent] = useState(0);
   const [direction, setDirection] = useState<"left" | "right">("left");
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef<number | null>(null);
-  const total = bestSellers.length;
+  const total = bestSellers.length || 1;
 
   const next = useCallback(() => {
+    if (bestSellers.length <= 1) return;
     setDirection("left");
     setCurrent((prev) => (prev + 1) % total);
-  }, [total]);
+  }, [total, bestSellers.length]);
 
   const prev = useCallback(() => {
+    if (bestSellers.length <= 1) return;
     setDirection("right");
     setCurrent((prev) => (prev - 1 + total) % total);
-  }, [total]);
+  }, [total, bestSellers.length]);
 
   useEffect(() => {
     autoPlayRef.current = setInterval(next, 3800);
@@ -52,10 +54,21 @@ function BestSellersCarousel() {
     touchStartX.current = null;
   };
 
-  const getVisibleItems = () =>
-    [0, 1, 2].map((offset) => bestSellers[(current + offset) % total]);
+  const getVisibleItems = () => {
+    if (bestSellers.length === 0) return [];
+    if (bestSellers.length <= 3) return bestSellers;
+    return [0, 1, 2].map((offset) => bestSellers[(current + offset) % total]);
+  };
 
   const visibleItems = getVisibleItems();
+
+  if (bestSellers.length === 0) {
+    return (
+      <div className="text-center py-10 text-gray-500">
+        No best sellers found.
+      </div>
+    );
+  }
 
   return (
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
@@ -113,7 +126,7 @@ function BestSellersCarousel() {
   );
 }
 
-function BestSellerCard({ item }: { item: Product }) {
+function BestSellerCard({ item }: { item: SupabaseProduct }) {
   return (
     <div className="group rounded-xl overflow-hidden border border-[#2a2520] bg-[#111009] hover:border-[#C9A84C]/40 hover:scale-[1.02] transition-all duration-300 flex flex-col h-full">
       {/* Full product image — no cropping, object-contain */}

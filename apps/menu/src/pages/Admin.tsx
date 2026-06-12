@@ -1,88 +1,272 @@
-import { useState, useEffect } from "react";
-import { PRODUCTS, Category } from "@/lib/menu-data";
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useMenu, ProductSection, SupabaseProduct } from "@/context/MenuContext";
+import { Trash2, Edit2, Plus, Image as ImageIcon, CheckCircle, XCircle } from "lucide-react";
 
-// Fallback logic for admin using local state since Supabase isn't connected yet.
-// In a real app, this would fetch from and save to Supabase.
 export default function Admin() {
-  const [products, setProducts] = useState(PRODUCTS);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { sections, products, refreshMenu } = useMenu();
+  const [session, setSession] = useState<any>(null);
+  
+  // Auth state
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<"products" | "categories">("products");
+
+  // Notifications
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Modals state
+  const [editingCategory, setEditingCategory] = useState<ProductSection | null>(null);
+  const [editingProduct, setEditingProduct] = useState<SupabaseProduct | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // Form states
+  const [loadingAction, setLoadingAction] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const showMessage = (text: string, type: "success" | "error") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "tuxadmin123") {
-      setIsLoggedIn(true);
-    } else {
-      setMessage({ text: "Invalid password", type: "error" });
+    if (!supabase) {
+      setAuthError("Supabase is not connected.");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setAuthError(error.message);
+    }
+    setAuthLoading(false);
+  };
+
+  const handleLogout = async () => {
+    if (supabase) await supabase.auth.signOut();
+  };
+
+  // ================= CATEGORY CRUD =================
+
+  const saveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !editingCategory) return;
+    setLoadingAction(true);
+
+    try {
+      const isNew = !sections.find(s => s.id === editingCategory.id);
+      
+      if (isNew) {
+        const { error } = await supabase.from('product_sections').insert([editingCategory]);
+        if (error) throw error;
+        showMessage("Category added successfully!", "success");
+      } else {
+        const { error } = await supabase
+          .from('product_sections')
+          .update(editingCategory)
+          .eq('id', editingCategory.id);
+        if (error) throw error;
+        showMessage("Category updated successfully!", "success");
+      }
+      setIsCategoryModalOpen(false);
+      refreshMenu();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setLoadingAction(false);
     }
   };
 
-  const handlePriceChange = (id: string, newPrice: number) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, price: newPrice } : p))
-    );
+  const deleteCategory = async (id: string) => {
+    if (!supabase || !window.confirm("Are you sure? This will delete all products in this category too!")) return;
+    
+    try {
+      const { error } = await supabase.from('product_sections').delete().eq('id', id);
+      if (error) throw error;
+      showMessage("Category deleted.", "success");
+      refreshMenu();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
   };
 
-  const handleBestSellerToggle = (id: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, is_best_seller: !p.is_best_seller } : p))
-    );
+  // ================= PRODUCT CRUD =================
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const saveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !editingProduct) return;
+    setLoadingAction(true);
+
+    try {
+      let finalImageUrl = editingProduct.image_url;
+      let finalImagePath = editingProduct.image_path;
+
+      // 1. Handle Image Upload if a new file is selected
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        // Upload to Storage
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get Public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(filePath);
+
+        finalImageUrl = publicUrlData.publicUrl;
+        finalImagePath = filePath;
+
+        // Optionally delete old image if it existed in storage
+        if (editingProduct.image_path && !editingProduct.image_path.startsWith('/src')) {
+          await supabase.storage.from('product-images').remove([editingProduct.image_path]);
+        }
+      }
+
+      const productToSave = {
+        ...editingProduct,
+        image_url: finalImageUrl,
+        image_path: finalImagePath
+      };
+
+      const isNew = !products.find(p => p.id === productToSave.id);
+
+      if (isNew) {
+        const { error } = await supabase.from('products').insert([productToSave]);
+        if (error) throw error;
+        showMessage("Product added successfully!", "success");
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .update(productToSave)
+          .eq('id', productToSave.id);
+        if (error) throw error;
+        showMessage("Product updated successfully!", "success");
+      }
+
+      setIsProductModalOpen(false);
+      setImageFile(null);
+      refreshMenu();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
-  const handleSave = () => {
-    // Here we would sync with Supabase
-    // For now, it's just local UI state since it's a fallback
-    setMessage({ text: "Changes saved successfully! (Local fallback only)", type: "success" });
-    setTimeout(() => setMessage(null), 3000);
+  const deleteProduct = async (id: string, imagePath?: string) => {
+    if (!supabase || !window.confirm("Are you sure you want to delete this product?")) return;
+    
+    try {
+      if (imagePath && !imagePath.startsWith('/src')) {
+        await supabase.storage.from('product-images').remove([imagePath]);
+      }
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw error;
+      showMessage("Product deleted.", "success");
+      refreshMenu();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
   };
 
-  if (!isLoggedIn) {
+  // ================= RENDER LOGIC =================
+
+  if (!session) {
     return (
       <div className="min-h-screen bg-black pt-32 pb-20 flex items-center justify-center px-4">
         <div className="w-full max-w-md bg-[#111] p-8 rounded-2xl border border-white/10 shadow-2xl">
           <h2 className="text-3xl font-black text-[#D4AF37] mb-6 text-center">Admin Login</h2>
-          {message && (
+          {authError && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-500 rounded text-center text-sm font-semibold">
-              {message.text}
+              {authError}
             </div>
           )}
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="text-gray-400 text-sm mb-1 block">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
-                placeholder="Enter admin password..."
-              />
+          {!supabase ? (
+            <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 rounded text-center text-sm font-semibold">
+              Supabase Environment Variables are missing.
             </div>
-            <button
-              type="submit"
-              className="w-full bg-[#D4AF37] text-black font-bold py-3 rounded-lg hover:bg-[#F3D55B] transition-colors"
-            >
-              Login
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="text-gray-400 text-sm mb-1 block">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-gray-400 text-sm mb-1 block">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37]"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full bg-[#D4AF37] text-black font-bold py-3 rounded-lg hover:bg-[#F3D55B] transition-colors disabled:opacity-50"
+              >
+                {authLoading ? "Logging in..." : "Login"}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black pt-24 pb-32 font-sans text-white">
-      <div className="container mx-auto px-4 max-w-5xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+    <div className="min-h-screen bg-black pt-24 pb-32 font-sans text-white relative">
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-black uppercase text-[#D4AF37]">Admin Panel</h1>
-            <p className="text-gray-400 mt-2">Manage products, prices, and best sellers.</p>
+            <p className="text-gray-400 mt-1">Manage dynamic content on Supabase</p>
           </div>
           <button
-            onClick={handleSave}
-            className="bg-[#25D366] text-white px-6 py-3 rounded-lg font-bold shadow-[0_0_15px_rgba(37,211,102,0.3)] hover:bg-[#1EBE5D] transition-all"
+            onClick={handleLogout}
+            className="text-gray-400 hover:text-white transition-colors"
           >
-            Save Changes
+            Logout
           </button>
         </div>
 
@@ -96,44 +280,225 @@ export default function Admin() {
           </div>
         )}
 
-        <div className="space-y-6">
-          {products.map((product) => (
-            <div key={product.id} className="bg-[#111] border border-white/10 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
-              <div className="w-20 h-20 bg-black rounded flex items-center justify-center p-2 flex-shrink-0">
-                <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain" />
+        {/* Tabs */}
+        <div className="flex gap-4 border-b border-white/10 mb-8">
+          <button
+            onClick={() => setActiveTab("products")}
+            className={`pb-4 px-4 font-bold transition-colors ${
+              activeTab === "products" ? "text-[#D4AF37] border-b-2 border-[#D4AF37]" : "text-gray-500 hover:text-white"
+            }`}
+          >
+            Products
+          </button>
+          <button
+            onClick={() => setActiveTab("categories")}
+            className={`pb-4 px-4 font-bold transition-colors ${
+              activeTab === "categories" ? "text-[#D4AF37] border-b-2 border-[#D4AF37]" : "text-gray-500 hover:text-white"
+            }`}
+          >
+            Categories
+          </button>
+        </div>
+
+        {/* Categories Tab Content */}
+        {activeTab === "categories" && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Categories</h2>
+              <button
+                onClick={() => {
+                  setEditingCategory({ id: `cat-${Date.now()}`, name: "", slug: "", sort_order: sections.length + 1, is_active: true });
+                  setIsCategoryModalOpen(true);
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add Category
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sections.map(section => (
+                <div key={section.id} className="bg-[#111] p-5 rounded-xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      {section.name}
+                      {!section.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Hidden</span>}
+                    </h3>
+                    <p className="text-xs text-gray-500">Order: {section.sort_order}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setEditingCategory(section); setIsCategoryModalOpen(true); }} className="p-2 text-gray-400 hover:text-[#D4AF37]"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => deleteCategory(section.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Products Tab Content */}
+        {activeTab === "products" && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Products</h2>
+              <button
+                onClick={() => {
+                  setImageFile(null);
+                  setEditingProduct({ 
+                    id: `prod-${Date.now()}`, 
+                    section_id: sections[0]?.id || "", 
+                    name: "", 
+                    description: "", 
+                    price: 0, 
+                    image_url: "", 
+                    is_best_seller: false, 
+                    is_active: true, 
+                    sort_order: products.length + 1 
+                  });
+                  setIsProductModalOpen(true);
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add Product
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {products.map(product => (
+                <div key={product.id} className="bg-[#111] p-4 rounded-xl border border-white/10 flex flex-col md:flex-row items-center gap-4">
+                  <div className="w-20 h-20 bg-black rounded flex items-center justify-center p-2 flex-shrink-0">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain" />
+                    ) : (
+                      <ImageIcon className="text-gray-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    <h3 className="font-bold text-lg">{product.name}</h3>
+                    <p className="text-sm text-gray-400">{product.description}</p>
+                    <div className="flex gap-2 justify-center md:justify-start mt-2">
+                      <span className="text-xs bg-white/10 px-2 py-1 rounded text-[#D4AF37]">{product.price} EGP</span>
+                      <span className="text-xs bg-white/10 px-2 py-1 rounded">{sections.find(s => s.id === product.section_id)?.name}</span>
+                      {product.is_best_seller && <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">Best Seller</span>}
+                      {!product.is_active && <span className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded">Hidden</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setImageFile(null); setEditingProduct(product); setIsProductModalOpen(true); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-[#D4AF37] transition-colors"><Edit2 className="w-5 h-5" /></button>
+                    <button onClick={() => deleteProduct(product.id, product.image_path)} className="p-3 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Category Modal */}
+      {isCategoryModalOpen && editingCategory && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4">{editingCategory.id.startsWith('cat-') ? "Add Category" : "Edit Category"}</h2>
+            <form onSubmit={saveCategory} className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400">ID / Slug (Lowercase, no spaces)</label>
+                <input required type="text" value={editingCategory.id} onChange={e => setEditingCategory({...editingCategory, id: e.target.value, slug: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Name</label>
+                <input required type="text" value={editingCategory.name} onChange={e => setEditingCategory({...editingCategory, name: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Sort Order</label>
+                <input required type="number" value={editingCategory.sort_order} onChange={e => setEditingCategory({...editingCategory, sort_order: parseInt(e.target.value)})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input type="checkbox" id="cat-active" checked={editingCategory.is_active} onChange={e => setEditingCategory({...editingCategory, is_active: e.target.checked})} className="w-4 h-4" />
+                <label htmlFor="cat-active">Is Active (Visible)</label>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="flex-1 py-2 bg-white/10 rounded font-bold">Cancel</button>
+                <button type="submit" disabled={loadingAction} className="flex-1 py-2 bg-[#D4AF37] text-black rounded font-bold disabled:opacity-50">{loadingAction ? "Saving..." : "Save"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Product Modal */}
+      {isProductModalOpen && editingProduct && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">{editingProduct.id.startsWith('prod-') ? "Add Product" : "Edit Product"}</h2>
+            <form onSubmit={saveProduct} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400">ID / Slug</label>
+                  <input required type="text" value={editingProduct.id} onChange={e => setEditingProduct({...editingProduct, id: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Name</label>
+                  <input required type="text" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Price (EGP)</label>
+                  <input required type="number" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Category</label>
+                  <select required value={editingProduct.section_id} onChange={e => setEditingProduct({...editingProduct, section_id: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1">
+                    {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
               </div>
               
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="font-bold text-lg">{product.name}</h3>
-                <p className="text-xs text-gray-500 uppercase tracking-widest">{product.category_id}</p>
+              <div>
+                <label className="text-sm text-gray-400">Description</label>
+                <textarea required value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1 h-20" />
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-400 whitespace-nowrap">Price (EGP)</label>
-                  <input
-                    type="number"
-                    value={product.price}
-                    onChange={(e) => handlePriceChange(product.id, parseFloat(e.target.value) || 0)}
-                    className="w-24 bg-black border border-white/20 rounded px-3 py-2 text-center text-white focus:outline-none focus:border-[#D4AF37]"
-                  />
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Product Image</label>
+                <div className="flex items-center gap-4">
+                  {(imageFile || editingProduct.image_url) && (
+                    <div className="w-16 h-16 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
+                      <img src={imageFile ? URL.createObjectURL(imageFile) : editingProduct.image_url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="flex-1 bg-black border border-white/20 rounded px-3 py-2 text-sm" />
                 </div>
+              </div>
 
-                <button
-                  onClick={() => handleBestSellerToggle(product.id)}
-                  className={`px-4 py-2 rounded font-bold text-sm transition-all whitespace-nowrap w-full sm:w-auto ${
-                    product.is_best_seller 
-                      ? "bg-[#D4AF37] text-black" 
-                      : "bg-white/10 text-gray-400 hover:bg-white/20"
-                  }`}
-                >
-                  {product.is_best_seller ? "★ Best Seller" : "Set Best Seller"}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400">Sort Order</label>
+                  <input required type="number" value={editingProduct.sort_order} onChange={e => setEditingProduct({...editingProduct, sort_order: parseInt(e.target.value)})} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-6 mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="prod-active" checked={editingProduct.is_active} onChange={e => setEditingProduct({...editingProduct, is_active: e.target.checked})} className="w-4 h-4" />
+                  <label htmlFor="prod-active">Is Active</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="prod-best" checked={editingProduct.is_best_seller} onChange={e => setEditingProduct({...editingProduct, is_best_seller: e.target.checked})} className="w-4 h-4" />
+                  <label htmlFor="prod-best">Best Seller</label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsProductModalOpen(false)} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold transition-colors">Cancel</button>
+                <button type="submit" disabled={loadingAction} className="flex-1 py-3 bg-[#D4AF37] hover:bg-[#F3D55B] text-black rounded-lg font-bold disabled:opacity-50 transition-colors">
+                  {loadingAction ? "Saving & Uploading..." : "Save Product"}
                 </button>
               </div>
-            </div>
-          ))}
+            </form>
+          </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }

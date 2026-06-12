@@ -1,8 +1,8 @@
-import { Category } from "@/lib/menu-data";
+import { ProductSection } from "@/context/MenuContext";
 import { cn } from "@/lib/utils";
 
 interface CategoryTabsProps {
-  categories: Category[];
+  categories: ProductSection[];
   activeCategory: string;
   onSelectCategory: (categoryId: string) => void;
 }

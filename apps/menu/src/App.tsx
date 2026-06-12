@@ -7,6 +7,7 @@ import { PageTransitionProvider } from "@/components/PageTransition";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CartProvider } from "@/context/CartContext";
+import { MenuProvider } from "@/context/MenuContext";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { StickyCartBar } from "@/components/cart/StickyCartBar";
 
@@ -24,7 +25,7 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-black text-white selection:bg-[#D4AF37] selection:text-black">
       <Navbar />
       <main className="flex-grow">
         <Switch>
@@ -49,16 +50,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <CartProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <PageTransitionProvider>
-              <Router />
-            </PageTransitionProvider>
-          </WouterRouter>
-          <CartDrawer />
-          <StickyCartBar />
-          <Toaster />
-        </CartProvider>
+        <MenuProvider>
+          <CartProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <PageTransitionProvider>
+                <Router />
+              </PageTransitionProvider>
+            </WouterRouter>
+            <CartDrawer />
+            <StickyCartBar />
+            <Toaster />
+          </CartProvider>
+        </MenuProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

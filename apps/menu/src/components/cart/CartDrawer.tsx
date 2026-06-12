@@ -16,45 +16,47 @@ export function CartDrawer() {
 
   const [orderType, setOrderType] = useState<"Pick up" | "Delivery" | "">("");
   const [paymentMethod, setPaymentMethod] = useState<"Cash" | "InstaPay" | "Mixed" | "">("");
+  const [customerName, setCustomerName] = useState<string>("");
+  const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [cashAmount, setCashAmount] = useState<string>("");
   const [instaPayAmount, setInstaPayAmount] = useState<string>("");
 
   const cashValue = parseFloat(cashAmount) || 0;
   const instaPayValue = parseFloat(instaPayAmount) || 0;
   const mixedTotal = cashValue + instaPayValue;
-  const isMixedValid = mixedTotal === totalPrice;
+  const isMixedValid = Math.abs(mixedTotal - totalPrice) < 0.01;
   const remainingMixed = totalPrice - mixedTotal;
 
+  const isCheckoutDisabled =
+    items.length === 0 ||
+    !orderType ||
+    !paymentMethod ||
+    (paymentMethod === "Mixed" && !isMixedValid) ||
+    (orderType === "Delivery" && !deliveryAddress.trim());
+
   const handleCheckout = () => {
-    if (items.length === 0) return;
-    if (!orderType) {
-      alert("Please select an order type.");
-      return;
-    }
-    if (!paymentMethod) {
-      alert("Please select a payment method.");
-      return;
-    }
+    if (isCheckoutDisabled) return;
 
-    if (paymentMethod === "Mixed" && !isMixedValid) {
-      alert("The cash amount and InstaPay amount must exactly equal the final total.");
-      return;
+    // Build clean WhatsApp message (no per-item prices)
+    let message = `Hello TUX Burger, I want to place an order.\n\n`;
+    message += `*Order Type:* ${orderType}\n`;
+    if (customerName.trim()) {
+      message += `*Name:* ${customerName.trim()}\n`;
     }
+    if (orderType === "Delivery" && deliveryAddress.trim()) {
+      message += `*Address:* ${deliveryAddress.trim()}\n`;
+    }
+    message += `\n*Order:*\n`;
 
-    let message = `Hi TUX Burger, I want to order:\n\n*Order:*\n`;
-    
-    items.forEach((item, index) => {
-      message += `${index + 1}. ${item.quantity} x ${item.name} — ${item.price * item.quantity} EGP\n`;
+    items.forEach((item) => {
+      message += `• ${item.quantity}x ${item.name}\n`;
     });
 
-    message += `\n*Total:* ${totalPrice} EGP\n\n`;
-    message += `*Order type:* ${orderType}\n`;
-    message += `*Payment method:* ${paymentMethod}\n`;
-
+    message += `\n*Payment:* ${paymentMethod}`;
     if (paymentMethod === "Mixed") {
-      message += `*Cash amount:* ${cashValue} EGP\n`;
-      message += `*InstaPay amount:* ${instaPayValue} EGP\n`;
+      message += ` (Cash: ${cashValue} EGP + InstaPay: ${instaPayValue} EGP)`;
     }
+    message += `\n\n*Total: ${totalPrice} EGP*`;
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`, "_blank");
@@ -64,20 +66,19 @@ export function CartDrawer() {
 
   return (
     <>
-      <div 
+      <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
         onClick={() => setIsCartOpen(false)}
       />
-      <div 
-        className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#111] shadow-2xl flex flex-col border-l border-white/10 sm:rounded-l-2xl sm:inset-y-auto sm:h-auto sm:bottom-0 sm:top-0 md:h-screen md:rounded-none animate-in slide-in-from-right duration-300"
-      >
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#111] shadow-2xl flex flex-col border-l border-white/10 sm:rounded-l-2xl animate-in slide-in-from-right duration-300">
+
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
             Your Cart
           </h2>
-          <button 
+          <button
             onClick={() => setIsCartOpen(false)}
             className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
           >
@@ -91,7 +92,7 @@ export function CartDrawer() {
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
               <ShoppingBag className="w-16 h-16 opacity-20" />
               <p>Your cart is empty.</p>
-              <button 
+              <button
                 onClick={() => setIsCartOpen(false)}
                 className="text-[#D4AF37] hover:underline"
               >
@@ -103,12 +104,16 @@ export function CartDrawer() {
               {items.map((item) => (
                 <div key={item.id} className="flex gap-4 bg-black/40 p-3 rounded-xl border border-white/5">
                   <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
-                    <img src={item.image_url} alt={item.name} className="w-full h-full object-contain p-1" />
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <ShoppingBag className="w-6 h-6 text-gray-600" />
+                    )}
                   </div>
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                       <h4 className="text-white font-semibold text-sm line-clamp-2">{item.name}</h4>
-                      <button 
+                      <button
                         onClick={() => removeFromCart(item.id)}
                         className="text-gray-500 hover:text-red-500 transition-colors"
                       >
@@ -146,18 +151,33 @@ export function CartDrawer() {
 
         {/* Checkout Options */}
         {items.length > 0 && (
-          <div className="p-4 border-t border-white/10 bg-black/50 space-y-4">
+          <div className="p-4 border-t border-white/10 bg-black/50 space-y-4 overflow-y-auto max-h-[55vh] no-scrollbar">
+
+            {/* Customer Name */}
+            <div className="space-y-1">
+              <label className="text-sm text-gray-400 font-semibold">Your Name (optional)</label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="e.g. Ahmed"
+                className="w-full bg-black border border-white/20 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+
+            {/* Order Type */}
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Order Type</label>
               <div className="flex gap-2">
-                {["Pick up", "Delivery"].map((type) => (
+                {(["Pick up", "Delivery"] as const).map((type) => (
                   <button
                     key={type}
-                    onClick={() => setOrderType(type as "Pick up" | "Delivery")}
+                    type="button"
+                    onClick={() => setOrderType(type)}
                     className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       orderType === type
                         ? "bg-[#D4AF37] text-black"
-                        : "bg-white/10 text-white border border-white/5"
+                        : "bg-white/10 text-white border border-white/5 hover:bg-white/20"
                     }`}
                   >
                     {type}
@@ -166,17 +186,35 @@ export function CartDrawer() {
               </div>
             </div>
 
+            {/* Delivery Address (only if Delivery) */}
+            {orderType === "Delivery" && (
+              <div className="space-y-1">
+                <label className="text-sm text-gray-400 font-semibold">
+                  Delivery Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="Enter your full address"
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+            )}
+
+            {/* Payment Method */}
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Payment Method</label>
               <div className="flex gap-2">
-                {["Cash", "InstaPay", "Mixed"].map((method) => (
+                {(["Cash", "InstaPay", "Mixed"] as const).map((method) => (
                   <button
                     key={method}
-                    onClick={() => setPaymentMethod(method as "Cash" | "InstaPay" | "Mixed")}
+                    type="button"
+                    onClick={() => setPaymentMethod(method)}
                     className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       paymentMethod === method
                         ? "bg-[#D4AF37] text-black"
-                        : "bg-white/10 text-white border border-white/5"
+                        : "bg-white/10 text-white border border-white/5 hover:bg-white/20"
                     }`}
                   >
                     {method}
@@ -185,12 +223,13 @@ export function CartDrawer() {
               </div>
             </div>
 
+            {/* Mixed Payment Breakdown */}
             {paymentMethod === "Mixed" && (
-              <div className="bg-white/5 p-3 rounded-lg space-y-3 border border-white/10 animate-in fade-in zoom-in duration-200">
+              <div className="bg-white/5 p-3 rounded-lg space-y-3 border border-white/10">
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-1">
                     <label className="text-xs text-gray-400">Cash Amount</label>
-                    <input 
+                    <input
                       type="number"
                       inputMode="numeric"
                       min="0"
@@ -202,7 +241,7 @@ export function CartDrawer() {
                   </div>
                   <div className="flex-1 space-y-1">
                     <label className="text-xs text-gray-400">InstaPay Amount</label>
-                    <input 
+                    <input
                       type="number"
                       inputMode="numeric"
                       min="0"
@@ -216,7 +255,7 @@ export function CartDrawer() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-400">Remaining:</span>
                   <span className={`font-bold ${remainingMixed === 0 ? "text-green-500" : remainingMixed < 0 ? "text-red-500" : "text-[#D4AF37]"}`}>
-                    {remainingMixed} EGP
+                    {remainingMixed.toFixed(0)} EGP
                   </span>
                 </div>
               </div>
@@ -224,7 +263,7 @@ export function CartDrawer() {
           </div>
         )}
 
-        {/* Footer / Checkout Button */}
+        {/* Footer */}
         {items.length > 0 && (
           <div className="p-4 bg-[#111] border-t border-white/10">
             <div className="flex justify-between items-center mb-4 text-white">
@@ -233,16 +272,16 @@ export function CartDrawer() {
             </div>
             <button
               onClick={handleCheckout}
-              disabled={paymentMethod === "Mixed" && !isMixedValid}
+              disabled={isCheckoutDisabled}
               className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${
-                (paymentMethod === "Mixed" && !isMixedValid)
+                isCheckoutDisabled
                   ? "bg-gray-700 text-gray-400 cursor-not-allowed"
                   : "bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-[0_0_15px_rgba(37,211,102,0.3)]"
               }`}
             >
               Order on WhatsApp
             </button>
-            <button 
+            <button
               onClick={clearCart}
               className="w-full mt-3 py-2 text-sm text-gray-500 hover:text-white transition-colors"
             >

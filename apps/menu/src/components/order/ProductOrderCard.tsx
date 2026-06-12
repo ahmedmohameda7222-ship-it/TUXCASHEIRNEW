@@ -1,10 +1,10 @@
-import { Product } from "@/lib/menu-data";
+import { SupabaseProduct } from "@/context/MenuContext";
 import { useCart } from "@/context/CartContext";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, ImageOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProductOrderCardProps {
-  product: Product;
+  product: SupabaseProduct;
 }
 
 export function ProductOrderCard({ product }: ProductOrderCardProps) {
@@ -25,25 +25,37 @@ export function ProductOrderCard({ product }: ProductOrderCardProps) {
 
   return (
     <div className="flex bg-[#111] rounded-xl overflow-hidden border border-white/5 hover:border-[#D4AF37]/30 transition-all duration-300 shadow-md">
-      <div className="w-1/3 aspect-square max-w-[120px] bg-black/40 flex items-center justify-center p-2">
-        <img
-          src={product.image_url}
-          alt={product.name}
-          className="w-full h-full object-contain"
-          loading="lazy"
-        />
+      <div className="w-1/3 aspect-square max-w-[120px] bg-black/40 flex items-center justify-center p-2 flex-shrink-0">
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="w-full h-full object-contain"
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <ImageOff className="w-8 h-8 text-gray-700" />
+        )}
       </div>
-      <div className="w-2/3 p-4 flex flex-col justify-between">
+      <div className="flex-1 p-4 flex flex-col justify-between">
         <div>
-          <h3 className="text-white font-bold text-lg leading-tight mb-1">
+          <h3 className="text-white font-bold text-base leading-tight mb-1">
             {product.name}
           </h3>
+          {product.description && (
+            <p className="text-gray-500 text-xs leading-snug line-clamp-2 mb-1">
+              {product.description}
+            </p>
+          )}
           <p className="text-[#D4AF37] font-semibold">
             {product.price} <span className="text-sm text-gray-400">EGP</span>
           </p>
         </div>
         
-        <div className="mt-4 flex items-center justify-end">
+        <div className="mt-3 flex items-center justify-end">
           {quantity > 0 ? (
             <div className="flex items-center gap-3 bg-white/10 rounded-full px-1 py-1 border border-white/10">
               <button

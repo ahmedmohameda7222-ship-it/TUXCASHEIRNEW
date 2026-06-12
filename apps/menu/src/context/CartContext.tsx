@@ -1,13 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { Product } from "@/lib/menu-data";
 
-export interface CartItem extends Product {
+// A minimal product shape that any product (legacy or Supabase) can satisfy
+export interface CartProduct {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  image_url?: string;
+  is_best_seller?: boolean;
+}
+
+export interface CartItem extends CartProduct {
   quantity: number;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
+  addToCart: (product: CartProduct, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -39,7 +48,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("tux-cart", JSON.stringify(items));
   }, [items]);
 
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const addToCart = (product: CartProduct, quantity: number = 1) => {
     setItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === product.id);
       if (existingItem) {
