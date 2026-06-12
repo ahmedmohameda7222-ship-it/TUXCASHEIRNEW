@@ -3,6 +3,9 @@ import { useCart } from "@/context/CartContext";
 import { X, Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
 import { WHATSAPP_NUMBER } from "@/lib/constants";
 
+const DELIVERY_FEE_MESSAGE =
+  "Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.";
+
 const DELIVERY_MIXED_PAYMENT_MESSAGE =
   "Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.";
 
@@ -27,7 +30,9 @@ export function CartDrawer() {
   const [cashAmount, setCashAmount] = useState<string>("");
   const [instaPayAmount, setInstaPayAmount] = useState<string>("");
 
-  const isDeliveryMixedPayment = orderType === "Delivery" && paymentMethod === "Mixed Payment";
+  const isDelivery = orderType === "Delivery";
+  const isDeliveryMixedPayment = isDelivery && paymentMethod === "Mixed Payment";
+  const displayTotal = isDelivery ? `${totalPrice} EGP + Delivery Fee` : `${totalPrice} EGP`;
   const cashValue = parseFloat(cashAmount) || 0;
   const instaPayValue = parseFloat(instaPayAmount) || 0;
   const mixedTotal = cashValue + instaPayValue;
@@ -41,7 +46,7 @@ export function CartDrawer() {
     !orderType ||
     !paymentMethod ||
     (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) ||
-    (orderType === "Delivery" && !deliveryAddress.trim());
+    (isDelivery && !deliveryAddress.trim());
 
   const handleCheckout = () => {
     if (items.length === 0) return;
@@ -53,7 +58,7 @@ export function CartDrawer() {
       alert("Please select an order type.");
       return;
     }
-    if (orderType === "Delivery" && !deliveryAddress.trim()) {
+    if (isDelivery && !deliveryAddress.trim()) {
       alert("Please enter your delivery address.");
       return;
     }
@@ -70,7 +75,7 @@ export function CartDrawer() {
     let message = `Hello TUX Burger, I want to place an order.\n\n`;
     message += `*Order Type:* ${orderType}\n`;
     message += `*Name:* ${customerName.trim()}\n`;
-    if (orderType === "Delivery" && deliveryAddress.trim()) {
+    if (isDelivery && deliveryAddress.trim()) {
       message += `*Address:* ${deliveryAddress.trim()}\n`;
     }
     message += `\n*Order:*\n`;
@@ -83,10 +88,14 @@ export function CartDrawer() {
     if (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment) {
       message += ` (Cash: ${cashValue} EGP + InstaPay: ${instaPayValue} EGP)`;
     }
+
+    message += `\n\n*Total: ${displayTotal}*`;
+
     if (isDeliveryMixedPayment) {
-      message += `\n*Note:* Delivery fee and mixed payment details will be confirmed by phone after ordering.`;
+      message += `\n*Note:* ${DELIVERY_MIXED_PAYMENT_MESSAGE}`;
+    } else if (isDelivery) {
+      message += `\n*Note:* ${DELIVERY_FEE_MESSAGE}`;
     }
-    message += `\n\n*Total: ${totalPrice} EGP*`;
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`, "_blank");
@@ -223,7 +232,7 @@ export function CartDrawer() {
             </div>
 
             {/* Delivery Address (only if Delivery) */}
-            {orderType === "Delivery" && (
+            {isDelivery && (
               <div className="space-y-1">
                 <label className="text-sm text-gray-400 font-semibold">
                   Delivery Address <span className="text-red-400">*</span>
@@ -258,6 +267,14 @@ export function CartDrawer() {
                 ))}
               </div>
             </div>
+
+            {/* Delivery Fee Info */}
+            {isDelivery && !isDeliveryMixedPayment && (
+              <div className="rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3 text-sm leading-relaxed text-[#F5EDD8]">
+                <p className="font-bold text-[#D4AF37] mb-1">Delivery Fee</p>
+                <p>{DELIVERY_FEE_MESSAGE}</p>
+              </div>
+            )}
 
             {/* Delivery Mixed Payment Info */}
             {isDeliveryMixedPayment && (
@@ -310,10 +327,16 @@ export function CartDrawer() {
         {/* Footer */}
         {items.length > 0 && (
           <div className="p-4 bg-[#111] border-t border-white/10">
-            <div className="flex justify-between items-center mb-4 text-white">
+            <div className="flex justify-between items-center mb-2 text-white">
               <span className="font-bold text-gray-400">Total</span>
-              <span className="text-xl font-bold text-[#D4AF37]">{totalPrice} EGP</span>
+              <span className="text-xl font-bold text-[#D4AF37]">{displayTotal}</span>
             </div>
+            {isDelivery && (
+              <p className="mb-4 text-xs leading-relaxed text-[#F5EDD8]/80">
+                Delivery fee will be confirmed after placing the order.
+              </p>
+            )}
+            {!isDelivery && <div className="mb-4" />}
             <button
               onClick={handleCheckout}
               disabled={isCheckoutDisabled}
