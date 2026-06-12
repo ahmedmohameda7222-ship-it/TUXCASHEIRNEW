@@ -5,13 +5,16 @@ import { NavLink } from "./NavLink";
 import { Menu, X, ChevronDown, ShoppingBag } from "lucide-react";
 import tuxLogo from "@assets/tuxlogo.jpg";
 import { useCart } from "@/context/CartContext";
+import { useMenu } from "@/context/MenuContext";
 import { CONTACT_PHONE, LOCATION_URL } from "@/lib/constants";
+import { getProductSectionHref } from "@/lib/product-routes";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProductsDropdownOpen, setIsProductsDropdownOpen] = useState(false);
   const { totalItems, setIsCartOpen } = useCart();
+  const { sections } = useMenu();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,14 +24,13 @@ export const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const products = [
-    { name: "Tux Burger", href: "/tux-burger" },
-    { name: "Tuxify Burger", href: "/tuxify" },
-    { name: "Hawawshi", href: "/hawawshi" },
-    { name: "Fries", href: "/fries" },
-    { name: "Combos", href: "/combos" },
-    { name: "Drinks", href: "/drinks" },
-  ];
+  const products = sections
+    .filter((section) => section.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((section) => ({
+      name: section.name,
+      href: getProductSectionHref(section),
+    }));
 
   return (
     <>
