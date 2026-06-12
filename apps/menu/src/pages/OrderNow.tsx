@@ -4,22 +4,32 @@ import { CategoryTabs } from "@/components/order/CategoryTabs";
 import { ProductOrderCard } from "@/components/order/ProductOrderCard";
 import { motion } from "framer-motion";
 
+const EXTRAS_SECTION_ID = "extras";
+
 export default function OrderNow() {
   const { sections, products, loading } = useMenu();
   const [activeCategory, setActiveCategory] = useState<string>("");
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const isScrollingProgrammatically = useRef(false);
 
+  const extraProducts = products
+    .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const activeSections = sections
+    .filter((section) => section.is_active && section.id !== EXTRAS_SECTION_ID)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
   // Set initial active category once sections load
   useEffect(() => {
-    if (sections.length > 0 && !activeCategory) {
-      setActiveCategory(sections[0].id);
+    if (activeSections.length > 0 && !activeCategory) {
+      setActiveCategory(activeSections[0].id);
     }
-  }, [sections, activeCategory]);
+  }, [activeSections, activeCategory]);
 
   // Scroll-spy: observe which section is in view
   useEffect(() => {
-    if (sections.length === 0) return;
+    if (activeSections.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -49,7 +59,7 @@ export default function OrderNow() {
     });
 
     return () => observer.disconnect();
-  }, [sections, loading]);
+  }, [activeSections, loading]);
 
   const scrollToCategory = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
@@ -63,8 +73,6 @@ export default function OrderNow() {
       }, 800);
     }
   }, []);
-
-  const activeSections = sections.filter((s) => s.is_active);
 
   return (
     <div className="min-h-screen bg-black pt-24 pb-32 font-sans text-white relative">
@@ -136,7 +144,7 @@ export default function OrderNow() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {sectionProducts.map((product) => (
-                      <ProductOrderCard key={product.id} product={product} />
+                      <ProductOrderCard key={product.id} product={product} extras={extraProducts} />
                     ))}
                   </div>
                 </div>
