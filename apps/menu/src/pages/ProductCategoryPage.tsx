@@ -53,14 +53,15 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
     : undefined;
 
   const section = sections.find((s) => {
-    if (!s.is_active) return false;
     if (sectionId) return s.id === sectionId;
     return s.slug === routeSlug || s.id === routeSlug;
   });
 
+  const sectionUnavailable = Boolean(section && !section.is_active);
+
   const sectionProducts = section
     ? products
-        .filter((product) => product.section_id === section.id && product.is_active)
+        .filter((product) => product.section_id === section.id)
         .sort((a, b) => a.sort_order - b.sort_order)
     : [];
 
@@ -107,9 +108,9 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.7 }}
-          className="mb-12 md:mb-16"
+          className={`mb-12 md:mb-16 ${sectionUnavailable ? "grayscale opacity-75" : ""}`}
         >
-          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+          <span className={sectionUnavailable ? "text-gray-500 font-sans text-xs tracking-[0.3em] uppercase" : "text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase"}>
             Our Products Showroom
           </span>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">
@@ -118,6 +119,11 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
           <p className="text-[#999080] font-sans text-base sm:text-lg max-w-2xl leading-relaxed">
             {section?.description || "A closer look at our products before you order."}
           </p>
+          {sectionUnavailable && (
+            <p className="mt-5 max-w-xl rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-sm font-semibold text-gray-200">
+              This categorie is currently not available.
+            </p>
+          )}
         </motion.div>
 
         {loading && (
@@ -156,6 +162,7 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
             {sectionProducts.map((product, index) => {
               const isReversed = index % 2 === 1;
               const details = getProductDetails(product);
+              const productUnavailable = sectionUnavailable || !product.is_active;
 
               return (
                 <motion.section
@@ -165,9 +172,13 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                   whileInView="visible"
                   viewport={{ once: true, amount: 0.22 }}
                   transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: "easeOut" }}
-                  className={`group overflow-hidden rounded-[1.75rem] md:rounded-[2.5rem] border border-[#2a2520] bg-[linear-gradient(135deg,#111009_0%,#181108_55%,#0B0900_100%)] shadow-[0_24px_90px_rgba(0,0,0,0.35)] ${
+                  className={`group overflow-hidden rounded-[1.75rem] md:rounded-[2.5rem] border shadow-[0_24px_90px_rgba(0,0,0,0.35)] ${
                     isReversed ? "md:flex-row-reverse" : "md:flex-row"
-                  } flex flex-col md:flex`}
+                  } flex flex-col md:flex ${
+                    productUnavailable
+                      ? "border-gray-700 bg-gray-900/70 grayscale opacity-75"
+                      : "border-[#2a2520] bg-[linear-gradient(135deg,#111009_0%,#181108_55%,#0B0900_100%)]"
+                  }`}
                 >
                   <motion.div
                     variants={imageVariants}
@@ -186,11 +197,11 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                     transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: "easeOut", delay: shouldReduceMotion ? 0 : 0.08 }}
                     className="flex flex-1 flex-col justify-center px-5 py-8 sm:px-8 md:w-[46%] md:px-10 lg:px-14 md:py-12"
                   >
-                    <span className="mb-4 font-sans text-xs font-bold uppercase tracking-[0.28em] text-[#C9A84C]">
+                    <span className={`mb-4 font-sans text-xs font-bold uppercase tracking-[0.28em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
                       {section?.name} • {String(index + 1).padStart(2, "0")}
                     </span>
 
-                    <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-white mb-5 group-hover:text-[#C9A84C] transition-colors duration-300">
+                    <h2 className={`font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5 transition-colors duration-300 ${productUnavailable ? "text-gray-300" : "text-white group-hover:text-[#C9A84C]"}`}>
                       {product.name}
                     </h2>
 
@@ -198,9 +209,15 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                       {product.description}
                     </p>
 
+                    {productUnavailable && (
+                      <p className="mb-6 rounded-xl border border-gray-700 bg-gray-800/80 px-4 py-3 text-sm font-semibold text-gray-200">
+                        This product is currently not available.
+                      </p>
+                    )}
+
                     {details && (
                       <div className="mb-7 rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-                        <p className="mb-2 font-sans text-[11px] font-bold uppercase tracking-[0.24em] text-[#C9A84C]">
+                        <p className={`mb-2 font-sans text-[11px] font-bold uppercase tracking-[0.24em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
                           Ingredients / Details
                         </p>
                         <p className="font-sans text-sm sm:text-base leading-7 text-[#D6CCBC]">
@@ -210,15 +227,17 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                     )}
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                      <NavLink
-                        href="/order-now"
-                        className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-[#8B1A1A] px-6 py-3 text-center font-sans text-xs font-bold uppercase tracking-[0.22em] text-white transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
-                      >
-                        Order Now
-                      </NavLink>
+                      {!productUnavailable && (
+                        <NavLink
+                          href="/order-now"
+                          className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-[#8B1A1A] px-6 py-3 text-center font-sans text-xs font-bold uppercase tracking-[0.22em] text-white transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+                        >
+                          Order Now
+                        </NavLink>
+                      )}
 
                       <span className="font-sans text-sm text-[#777064]">
-                        Available from the order menu
+                        {productUnavailable ? "Unavailable from the order menu" : "Available from the order menu"}
                       </span>
                     </div>
                   </motion.div>
