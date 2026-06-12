@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { NavLink } from "./NavLink";
 
 import { Menu, X, ChevronDown, ShoppingBag } from "lucide-react";
-import tuxLogo from "@assets/tuxlogo-transparent.svg";
+import tuxLogo from "@assets/tuxlogo.jpg";
 import { useCart } from "@/context/CartContext";
 import { useMenu } from "@/context/MenuContext";
 import { CONTACT_PHONE, LOCATION_URL } from "@/lib/constants";
@@ -44,7 +44,8 @@ export const Navbar = () => {
             <img
               src={tuxLogo}
               alt="TUX"
-              className="h-12 w-auto object-contain"
+              className="h-10 w-auto"
+              style={{ filter: "invert(1)", mixBlendMode: "screen" }}
             />
           </NavLink>
 
