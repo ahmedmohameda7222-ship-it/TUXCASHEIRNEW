@@ -3,6 +3,12 @@ import { useCart } from "@/context/CartContext";
 import { X, Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
 import { WHATSAPP_NUMBER } from "@/lib/constants";
 
+const DELIVERY_MIXED_PAYMENT_MESSAGE =
+  "Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.";
+
+type OrderType = "Pick up" | "Delivery" | "";
+type PaymentMethod = "Cash" | "InstaPay" | "Mixed Payment" | "";
+
 export function CartDrawer() {
   const {
     items,
@@ -14,13 +20,14 @@ export function CartDrawer() {
     totalPrice,
   } = useCart();
 
-  const [orderType, setOrderType] = useState<"Pick up" | "Delivery" | "">("");
-  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "InstaPay" | "Mixed" | "">("");
+  const [orderType, setOrderType] = useState<OrderType>("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("");
   const [customerName, setCustomerName] = useState<string>("");
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const [cashAmount, setCashAmount] = useState<string>("");
   const [instaPayAmount, setInstaPayAmount] = useState<string>("");
 
+  const isDeliveryMixedPayment = orderType === "Delivery" && paymentMethod === "Mixed Payment";
   const cashValue = parseFloat(cashAmount) || 0;
   const instaPayValue = parseFloat(instaPayAmount) || 0;
   const mixedTotal = cashValue + instaPayValue;
@@ -33,7 +40,7 @@ export function CartDrawer() {
     isCustomerNameMissing ||
     !orderType ||
     !paymentMethod ||
-    (paymentMethod === "Mixed" && !isMixedValid) ||
+    (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) ||
     (orderType === "Delivery" && !deliveryAddress.trim());
 
   const handleCheckout = () => {
@@ -54,7 +61,7 @@ export function CartDrawer() {
       alert("Please select a payment method.");
       return;
     }
-    if (paymentMethod === "Mixed" && !isMixedValid) {
+    if (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) {
       alert("The cash amount and InstaPay amount must exactly equal the final total.");
       return;
     }
@@ -72,9 +79,12 @@ export function CartDrawer() {
       message += `• ${item.quantity}x ${item.name}\n`;
     });
 
-    message += `\n*Payment:* ${paymentMethod}`;
-    if (paymentMethod === "Mixed") {
+    message += `\n*Payment Method:* ${paymentMethod}`;
+    if (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment) {
       message += ` (Cash: ${cashValue} EGP + InstaPay: ${instaPayValue} EGP)`;
+    }
+    if (isDeliveryMixedPayment) {
+      message += `\n*Note:* Delivery fee and mixed payment details will be confirmed by phone after ordering.`;
     }
     message += `\n\n*Total: ${totalPrice} EGP*`;
 
@@ -232,7 +242,7 @@ export function CartDrawer() {
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Payment Method</label>
               <div className="flex gap-2">
-                {(["Cash", "InstaPay", "Mixed"] as const).map((method) => (
+                {(["Cash", "InstaPay", "Mixed Payment"] as const).map((method) => (
                   <button
                     key={method}
                     type="button"
@@ -249,8 +259,16 @@ export function CartDrawer() {
               </div>
             </div>
 
+            {/* Delivery Mixed Payment Info */}
+            {isDeliveryMixedPayment && (
+              <div className="rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3 text-sm leading-relaxed text-[#F5EDD8]">
+                <p className="font-bold text-[#D4AF37] mb-1">Mixed Payment for Delivery</p>
+                <p>{DELIVERY_MIXED_PAYMENT_MESSAGE}</p>
+              </div>
+            )}
+
             {/* Mixed Payment Breakdown */}
-            {paymentMethod === "Mixed" && (
+            {paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && (
               <div className="bg-white/5 p-3 rounded-lg space-y-3 border border-white/10">
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-1">
