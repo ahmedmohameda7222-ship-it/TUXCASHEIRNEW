@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMenu } from "@/context/MenuContext";
 import { CategoryTabs } from "@/components/order/CategoryTabs";
 import { ProductOrderCard } from "@/components/order/ProductOrderCard";
@@ -12,13 +12,21 @@ export default function OrderNow() {
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const isScrollingProgrammatically = useRef(false);
 
-  const extraProducts = products
-    .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const extraProducts = useMemo(
+    () =>
+      products
+        .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)
+        .sort((a, b) => a.sort_order - b.sort_order),
+    [products]
+  );
 
-  const activeSections = sections
-    .filter((section) => section.is_active && section.id !== EXTRAS_SECTION_ID)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const activeSections = useMemo(
+    () =>
+      sections
+        .filter((section) => section.is_active && section.id !== EXTRAS_SECTION_ID)
+        .sort((a, b) => a.sort_order - b.sort_order),
+    [sections]
+  );
 
   // Set initial active category once sections load
   useEffect(() => {
