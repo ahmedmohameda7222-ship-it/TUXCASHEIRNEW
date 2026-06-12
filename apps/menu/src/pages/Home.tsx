@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NavLink } from "@/components/NavLink";
-import { WHATSAPP_URL } from "@/lib/constants";
+
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import truckImg from "@assets/TUX-Truck.png";
 import singleImg from "@assets/tuxify_single.png";

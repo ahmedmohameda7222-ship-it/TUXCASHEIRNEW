@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-import { WHATSAPP_URL } from "@/lib/constants";
+
 
 const products = [
   {
@@ -71,9 +71,7 @@ export default function Drinks() {
                 <h3 className="text-white font-serif text-xl mb-2">{product.name}</h3>
                 <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">{product.description}</p>
                 <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/order-now"
                   className="block w-full text-center py-3 rounded bg-[#8B1A1A] text-white font-sans font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all"
                   data-testid={`order-now-${i}`}
                 >

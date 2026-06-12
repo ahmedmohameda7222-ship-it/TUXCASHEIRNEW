@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NavLink } from "./NavLink";
-import { WHATSAPP_URL } from "@/lib/constants";
+
 import { Menu, X, ChevronDown, ShoppingBag } from "lucide-react";
 import tuxLogo from "@assets/tuxlogo.jpg";
 import { useCart } from "@/context/CartContext";
