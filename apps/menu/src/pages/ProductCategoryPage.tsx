@@ -116,7 +116,6 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: index * 0.08 }}
                 className="group rounded-xl overflow-hidden border border-[#2a2520] bg-[#111009] hover:border-[#C9A84C]/30 hover:scale-[1.02] transition-all duration-300 flex flex-col"
-                data-testid={`product-card-${index}`}
               >
                 <div className="p-4 bg-[#0B0900] flex items-center justify-center" style={{ aspectRatio: "4 / 3" }}>
                   <ProductImage product={product} index={index} />
@@ -131,7 +130,6 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                   <NavLink
                     href="/order-now"
                     className="block w-full text-center py-3 rounded bg-[#8B1A1A] text-white font-sans font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all"
-                    data-testid={`order-now-${index}`}
                   >
                     Order Now
                   </NavLink>
