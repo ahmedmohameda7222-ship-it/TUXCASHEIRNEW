@@ -87,11 +87,11 @@ export default function Admin() {
         </div>
 
         {message && (
-          <div className={\`mb-6 p-4 rounded-lg font-semibold text-center border \${
+          <div className={`mb-6 p-4 rounded-lg font-semibold text-center border \${
             message.type === "success" 
               ? "bg-green-500/20 border-green-500/50 text-green-400" 
               : "bg-red-500/20 border-red-500/50 text-red-400"
-          }\`}>
+          }`}>
             {message.text}
           </div>
         )}
@@ -121,11 +121,11 @@ export default function Admin() {
 
                 <button
                   onClick={() => handleBestSellerToggle(product.id)}
-                  className={\`px-4 py-2 rounded font-bold text-sm transition-all whitespace-nowrap w-full sm:w-auto \${
+                  className={`px-4 py-2 rounded font-bold text-sm transition-all whitespace-nowrap w-full sm:w-auto \${
                     product.is_best_seller 
                       ? "bg-[#D4AF37] text-black" 
                       : "bg-white/10 text-gray-400 hover:bg-white/20"
-                  }\`}
+                  }`}
                 >
                   {product.is_best_seller ? "★ Best Seller" : "Set Best Seller"}
                 </button>
