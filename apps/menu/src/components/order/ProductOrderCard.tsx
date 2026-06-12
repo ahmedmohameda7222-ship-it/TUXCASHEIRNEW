@@ -7,18 +7,21 @@ import { useToast } from "@/hooks/use-toast";
 interface ProductOrderCardProps {
   product: SupabaseProduct;
   extras?: SupabaseProduct[];
+  categoryUnavailable?: boolean;
 }
 
-export function ProductOrderCard({ product, extras = [] }: ProductOrderCardProps) {
+export function ProductOrderCard({ product, extras = [], categoryUnavailable = false }: ProductOrderCardProps) {
   const { addToCart, items, updateQuantity } = useCart();
   const { toast } = useToast();
   const [isExtrasOpen, setIsExtrasOpen] = useState(false);
 
+  const unavailable = categoryUnavailable || !product.is_active;
   const cartItem = items.find((item) => item.id === product.id);
   const quantity = cartItem?.quantity || 0;
-  const canAddExtras = product.section_id !== "extras" && extras.length > 0;
+  const canAddExtras = !unavailable && product.section_id !== "extras" && extras.length > 0;
 
   const handleAdd = () => {
+    if (unavailable) return;
     addToCart(product, 1);
     toast({
       title: "Added to Cart",
@@ -28,6 +31,7 @@ export function ProductOrderCard({ product, extras = [] }: ProductOrderCardProps
   };
 
   const handleAddWithExtra = (extra: SupabaseProduct) => {
+    if (unavailable) return;
     const productWithExtra = {
       id: `${product.id}__extra__${extra.id}`,
       name: `${product.name} + ${extra.name}`,
@@ -47,7 +51,13 @@ export function ProductOrderCard({ product, extras = [] }: ProductOrderCardProps
   };
 
   return (
-    <div className="flex flex-col bg-[#111] rounded-xl overflow-hidden border border-white/5 hover:border-[#D4AF37]/30 transition-all duration-300 shadow-md">
+    <div
+      className={`flex flex-col rounded-xl overflow-hidden border transition-all duration-300 shadow-md ${
+        unavailable
+          ? "bg-gray-900/70 border-gray-700 grayscale opacity-70"
+          : "bg-[#111] border-white/5 hover:border-[#D4AF37]/30"
+      }`}
+    >
       <div className="flex">
         <div className="w-1/3 aspect-square max-w-[120px] bg-black/40 flex items-center justify-center p-2 flex-shrink-0">
           {product.image_url ? (
@@ -66,7 +76,7 @@ export function ProductOrderCard({ product, extras = [] }: ProductOrderCardProps
         </div>
         <div className="flex-1 p-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-white font-bold text-base leading-tight mb-1">
+            <h3 className={`font-bold text-base leading-tight mb-1 ${unavailable ? "text-gray-300" : "text-white"}`}>
               {product.name}
             </h3>
             {product.description && (
@@ -74,50 +84,57 @@ export function ProductOrderCard({ product, extras = [] }: ProductOrderCardProps
                 {product.description}
               </p>
             )}
-            <p className="text-[#D4AF37] font-semibold">
+            <p className={`font-semibold ${unavailable ? "text-gray-400" : "text-[#D4AF37]"}`}>
               {product.price} <span className="text-sm text-gray-400">EGP</span>
             </p>
+            {unavailable && (
+              <p className="mt-2 rounded-lg border border-gray-600 bg-gray-800/80 px-3 py-2 text-xs font-semibold text-gray-200">
+                This product is currently not available.
+              </p>
+            )}
           </div>
           
-          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-            {quantity > 0 ? (
-              <div className="flex items-center gap-3 bg-white/10 rounded-full px-1 py-1 border border-white/10">
+          {!unavailable && (
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              {quantity > 0 ? (
+                <div className="flex items-center gap-3 bg-white/10 rounded-full px-1 py-1 border border-white/10">
+                  <button
+                    onClick={() => updateQuantity(product.id, quantity - 1)}
+                    className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black transition-colors"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-white font-bold w-4 text-center">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => updateQuantity(product.id, quantity + 1)}
+                    className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black transition-colors"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={() => updateQuantity(product.id, quantity - 1)}
-                  className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black transition-colors"
-                  aria-label="Decrease quantity"
+                  onClick={handleAdd}
+                  className="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold text-sm hover:bg-[#F3D55B] transition-colors shadow-[0_0_10px_rgba(212,175,55,0.2)]"
                 >
-                  <Minus className="w-4 h-4" />
+                  Add to Cart
                 </button>
-                <span className="text-white font-bold w-4 text-center">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => updateQuantity(product.id, quantity + 1)}
-                  className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black transition-colors"
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAdd}
-                className="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold text-sm hover:bg-[#F3D55B] transition-colors shadow-[0_0_10px_rgba(212,175,55,0.2)]"
-              >
-                Add to Cart
-              </button>
-            )}
+              )}
 
-            {canAddExtras && (
-              <button
-                onClick={() => setIsExtrasOpen((open) => !open)}
-                className="border border-[#D4AF37]/50 text-[#D4AF37] px-4 py-2 rounded-full font-bold text-sm hover:bg-[#D4AF37] hover:text-black transition-colors"
-              >
-                Add Extras
-              </button>
-            )}
-          </div>
+              {canAddExtras && (
+                <button
+                  onClick={() => setIsExtrasOpen((open) => !open)}
+                  className="border border-[#D4AF37]/50 text-[#D4AF37] px-4 py-2 rounded-full font-bold text-sm hover:bg-[#D4AF37] hover:text-black transition-colors"
+                >
+                  Add Extras
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
