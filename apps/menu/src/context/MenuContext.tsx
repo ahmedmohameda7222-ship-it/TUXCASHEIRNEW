@@ -77,18 +77,20 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
+      // Fetch all sections, including inactive ones.
+      // Public pages filter by is_active, while the admin panel needs inactive rows to edit/reactivate them.
       const { data: sectionsData, error: sectionsError } = await supabase
         .from('product_sections')
         .select('*')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       if (sectionsError) throw sectionsError;
 
+      // Fetch all products, including inactive ones.
+      // This prevents fallback products from reappearing after a matching database row is set inactive.
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       if (productsError) throw productsError;
