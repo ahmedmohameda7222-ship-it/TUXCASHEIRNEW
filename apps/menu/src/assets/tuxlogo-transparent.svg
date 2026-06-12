@@ -1,9 +1,0 @@
-<svg width="420" height="160" viewBox="0 0 420 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M82 32C48 32 24 50 22 78H142C140 50 116 32 82 32Z" fill="#050505"/>
-  <path d="M30 88H134C140 88 144 92 144 97C144 102 140 106 134 106H30C24 106 20 102 20 97C20 92 24 88 30 88Z" fill="#050505"/>
-  <path d="M36 114H128C134 114 138 118 138 123C138 128 134 132 128 132H36C30 132 26 128 26 123C26 118 30 114 36 114Z" fill="#050505"/>
-  <path d="M53 46L82 96L111 46L98 136H66L53 46Z" fill="#050505"/>
-  <path d="M82 96L67 46H97L82 96Z" fill="#F5F0E8"/>
-  <path d="M75 88L82 80L89 88L82 101L75 88Z" fill="#050505"/>
-  <text x="166" y="110" fill="#050505" font-family="Arial Black, Impact, sans-serif" font-size="78" font-weight="900" letter-spacing="8">TUX</text>
-</svg>
