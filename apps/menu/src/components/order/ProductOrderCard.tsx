@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SupabaseProduct } from "@/context/MenuContext";
-import { useCart } from "@/context/CartContext";
+import { CartExtra, useCart } from "@/context/CartContext";
 import { Plus, Minus, ImageOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,15 +10,37 @@ interface ProductOrderCardProps {
   categoryUnavailable?: boolean;
 }
 
+const buildVariantId = (productId: string, selectedExtraIds: string[]) => {
+  const extrasKey = [...selectedExtraIds].sort().join("__");
+  return extrasKey ? `${productId}__extras__${extrasKey}` : productId;
+};
+
 export function ProductOrderCard({ product, extras = [], categoryUnavailable = false }: ProductOrderCardProps) {
   const { addToCart, items, updateQuantity } = useCart();
   const { toast } = useToast();
   const [isExtrasOpen, setIsExtrasOpen] = useState(false);
+  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);
 
   const unavailable = categoryUnavailable || !product.is_active;
   const cartItem = items.find((item) => item.id === product.id);
   const quantity = cartItem?.quantity || 0;
   const canAddExtras = !unavailable && product.section_id !== "extras" && extras.length > 0;
+
+  const selectedExtras = useMemo(
+    () => extras.filter((extra) => selectedExtraIds.includes(extra.id)),
+    [extras, selectedExtraIds]
+  );
+
+  const selectedExtrasTotal = selectedExtras.reduce((sum, extra) => sum + extra.price, 0);
+  const totalWithExtras = product.price + selectedExtrasTotal;
+
+  const toggleExtra = (extraId: string) => {
+    setSelectedExtraIds((current) =>
+      current.includes(extraId)
+        ? current.filter((id) => id !== extraId)
+        : [...current, extraId]
+    );
+  };
 
   const handleAdd = () => {
     if (unavailable) return;
@@ -30,23 +52,35 @@ export function ProductOrderCard({ product, extras = [], categoryUnavailable = f
     });
   };
 
-  const handleAddWithExtra = (extra: SupabaseProduct) => {
-    if (unavailable) return;
-    const productWithExtra = {
-      id: `${product.id}__extra__${extra.id}`,
-      name: `${product.name} + ${extra.name}`,
-      description: `${product.description || ""}${product.description ? " " : ""}Extra: ${extra.name}.`,
-      price: product.price + extra.price,
+  const handleAddWithExtras = () => {
+    if (unavailable || selectedExtras.length === 0) return;
+
+    const sortedExtras = [...selectedExtras].sort((a, b) => a.id.localeCompare(b.id));
+    const cartExtras: CartExtra[] = sortedExtras.map((extra) => ({
+      id: extra.id,
+      name: extra.name,
+      price: extra.price,
+    }));
+
+    const productWithExtras = {
+      id: buildVariantId(product.id, cartExtras.map((extra) => extra.id)),
+      name: product.name,
+      baseProductId: product.id,
+      baseProductName: product.name,
+      description: product.description,
+      price: product.price + cartExtras.reduce((sum, extra) => sum + extra.price, 0),
       image_url: product.image_url,
       is_best_seller: product.is_best_seller,
+      extras: cartExtras,
     };
 
-    addToCart(productWithExtra, 1);
+    addToCart(productWithExtras, 1);
+    setSelectedExtraIds([]);
     setIsExtrasOpen(false);
     toast({
-      title: "Added with Extra",
-      description: `${product.name} with ${extra.name} has been added to your cart.`,
-      duration: 2000,
+      title: "Added with Extras",
+      description: `${product.name} with ${cartExtras.map((extra) => extra.name).join(", ")} has been added to your cart.`,
+      duration: 2500,
     });
   };
 
@@ -140,20 +174,65 @@ export function ProductOrderCard({ product, extras = [], categoryUnavailable = f
 
       {canAddExtras && isExtrasOpen && (
         <div className="border-t border-white/10 bg-black/40 p-3">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D4AF37] mb-3">
-            Choose one extra
-          </p>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D4AF37]">
+              Choose Extras
+            </p>
+            <p className="text-sm font-bold text-white">
+              Total: <span className="text-[#D4AF37]">{totalWithExtras} EGP</span>
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1 no-scrollbar">
-            {extras.map((extra) => (
-              <button
-                key={extra.id}
-                onClick={() => handleAddWithExtra(extra)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 transition-colors"
-              >
-                <span className="text-sm font-semibold text-white leading-snug">{extra.name}</span>
-                <span className="text-sm font-bold text-[#D4AF37] whitespace-nowrap">+{extra.price} EGP</span>
-              </button>
-            ))}
+            {extras.map((extra) => {
+              const checked = selectedExtraIds.includes(extra.id);
+              return (
+                <label
+                  key={extra.id}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                    checked
+                      ? "border-[#D4AF37]/70 bg-[#D4AF37]/15"
+                      : "border-white/10 bg-white/5 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleExtra(extra.id)}
+                      className="h-4 w-4 accent-[#D4AF37]"
+                    />
+                    <span className="text-sm font-semibold text-white leading-snug">{extra.name}</span>
+                  </span>
+                  <span className="text-sm font-bold text-[#D4AF37] whitespace-nowrap">+{extra.price} EGP</span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedExtraIds([]);
+                setIsExtrasOpen(false);
+              }}
+              className="flex-1 rounded-lg bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAddWithExtras}
+              disabled={selectedExtras.length === 0}
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
+                selectedExtras.length === 0
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : "bg-[#D4AF37] text-black hover:bg-[#F3D55B]"
+              }`}
+            >
+              Add with Extras
+            </button>
           </div>
         </div>
       )}
