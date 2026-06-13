@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-// A minimal product shape that any product (legacy or Supabase) can satisfy
+export interface CartExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface CartProduct {
   id: string;
   name: string;
@@ -8,6 +13,9 @@ export interface CartProduct {
   price: number;
   image_url?: string;
   is_best_seller?: boolean;
+  baseProductId?: string;
+  baseProductName?: string;
+  extras?: CartExtra[];
 }
 
 export interface CartItem extends CartProduct {
@@ -53,9 +61,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const existingItem = prevItems.find((item) => item.id === product.id);
       if (existingItem) {
         return prevItems.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
       return [...prevItems, { ...product, quantity }];
@@ -72,9 +78,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === productId ? { ...item, quantity } : item
-      )
+      prevItems.map((item) => (item.id === productId ? { ...item, quantity } : item))
     );
   };
 
@@ -83,10 +87,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <CartContext.Provider
