@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useCart } from "@/context/CartContext";
 import { X, Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
 import { WHATSAPP_NUMBER } from "@/lib/constants";
@@ -22,6 +23,7 @@ export function CartDrawer() {
     clearCart,
     totalPrice,
   } = useCart();
+  const [, navigate] = useLocation();
 
   const [orderType, setOrderType] = useState<OrderType>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("");
@@ -47,6 +49,11 @@ export function CartDrawer() {
     !paymentMethod ||
     (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) ||
     (isDelivery && !deliveryAddress.trim());
+
+  const handleStartOrdering = () => {
+    setIsCartOpen(false);
+    navigate("/order-now");
+  };
 
   const handleCheckout = () => {
     if (items.length === 0) return;
@@ -132,7 +139,7 @@ export function CartDrawer() {
               <ShoppingBag className="w-16 h-16 opacity-20" />
               <p>Your cart is empty.</p>
               <button
-                onClick={() => setIsCartOpen(false)}
+                onClick={handleStartOrdering}
                 className="text-[#D4AF37] hover:underline"
               >
                 Start Ordering
