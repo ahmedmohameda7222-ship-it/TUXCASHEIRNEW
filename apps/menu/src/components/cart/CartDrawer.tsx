@@ -78,7 +78,6 @@ export function CartDrawer() {
       return;
     }
 
-    // Build clean WhatsApp message (no per-item prices)
     let message = `Hello TUX Burger, I want to place an order.\n\n`;
     message += `*Order Type:* ${orderType}\n`;
     message += `*Name:* ${customerName.trim()}\n`;
@@ -88,7 +87,10 @@ export function CartDrawer() {
     message += `\n*Order:*\n`;
 
     items.forEach((item) => {
-      message += `• ${item.quantity}x ${item.name}\n`;
+      message += `• ${item.quantity}x ${item.baseProductName || item.name}\n`;
+      if (item.extras && item.extras.length > 0) {
+        message += `  Extras: ${item.extras.map((extra) => extra.name).join(", ")}\n`;
+      }
     });
 
     message += `\n*Payment Method:* ${paymentMethod}`;
@@ -118,7 +120,6 @@ export function CartDrawer() {
       />
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#111] shadow-2xl flex flex-col border-l border-white/10 sm:rounded-l-2xl animate-in slide-in-from-right duration-300">
 
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
@@ -132,7 +133,6 @@ export function CartDrawer() {
           </button>
         </div>
 
-        {/* Cart Items */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
           {items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
@@ -157,8 +157,17 @@ export function CartDrawer() {
                     )}
                   </div>
                   <div className="flex-1 flex flex-col justify-between">
-                    <div className="flex justify-between items-start">
-                      <h4 className="text-white font-semibold text-sm line-clamp-2">{item.name}</h4>
+                    <div className="flex justify-between items-start gap-3">
+                      <div>
+                        <h4 className="text-white font-semibold text-sm line-clamp-2">
+                          {item.baseProductName || item.name}
+                        </h4>
+                        {item.extras && item.extras.length > 0 && (
+                          <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                            Extras: <span className="text-[#D4AF37]">{item.extras.map((extra) => extra.name).join(", ")}</span>
+                          </p>
+                        )}
+                      </div>
                       <button
                         onClick={() => removeFromCart(item.id)}
                         className="text-gray-500 hover:text-red-500 transition-colors"
@@ -195,11 +204,8 @@ export function CartDrawer() {
           )}
         </div>
 
-        {/* Checkout Options */}
         {items.length > 0 && (
           <div className="p-4 border-t border-white/10 bg-black/50 space-y-4 overflow-y-auto max-h-[55vh] no-scrollbar">
-
-            {/* Customer Name */}
             <div className="space-y-1">
               <label className="text-sm text-gray-400 font-semibold">
                 Your Name <span className="text-red-400">*</span>
@@ -217,7 +223,6 @@ export function CartDrawer() {
               )}
             </div>
 
-            {/* Order Type */}
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Order Type</label>
               <div className="flex gap-2">
@@ -238,7 +243,6 @@ export function CartDrawer() {
               </div>
             </div>
 
-            {/* Delivery Address (only if Delivery) */}
             {isDelivery && (
               <div className="space-y-1">
                 <label className="text-sm text-gray-400 font-semibold">
@@ -254,7 +258,6 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* Payment Method */}
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Payment Method</label>
               <div className="flex gap-2">
@@ -275,7 +278,6 @@ export function CartDrawer() {
               </div>
             </div>
 
-            {/* Delivery Fee Info */}
             {isDelivery && !isDeliveryMixedPayment && (
               <div className="rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3 text-sm leading-relaxed text-[#F5EDD8]">
                 <p className="font-bold text-[#D4AF37] mb-1">Delivery Fee</p>
@@ -283,7 +285,6 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* Delivery Mixed Payment Info */}
             {isDeliveryMixedPayment && (
               <div className="rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3 text-sm leading-relaxed text-[#F5EDD8]">
                 <p className="font-bold text-[#D4AF37] mb-1">Mixed Payment for Delivery</p>
@@ -291,7 +292,6 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* Mixed Payment Breakdown */}
             {paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && (
               <div className="bg-white/5 p-3 rounded-lg space-y-3 border border-white/10">
                 <div className="flex gap-3">
@@ -331,7 +331,6 @@ export function CartDrawer() {
           </div>
         )}
 
-        {/* Footer */}
         {items.length > 0 && (
           <div className="p-4 bg-[#111] border-t border-white/10">
             <div className="flex justify-between items-center mb-2 text-white">
