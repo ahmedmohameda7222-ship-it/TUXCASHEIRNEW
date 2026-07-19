@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
+import tuxLogo from "@assets/tuxlogowithoutbackground";
 
 type PageTransitionContextType = {
   triggerTransition: (to: string) => void;
@@ -45,14 +46,19 @@ export const PageTransitionProvider = ({ children }: { children: React.ReactNode
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="absolute inset-0 z-0 bg-[url('https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm mix-blend-overlay"></div>
-            <motion.h1
-              initial={{ scale: 0.9, opacity: 0 }}
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
-              className="z-10 text-6xl md:text-8xl font-serif font-bold tracking-tighter"
+              className="relative z-10 flex items-center justify-center"
             >
-              TUX<span className="text-primary">.</span>
-            </motion.h1>
+              <img
+                src={tuxLogo}
+                alt="TUX"
+                className="h-auto w-[220px] max-w-[70vw] object-contain sm:w-[260px] md:w-[310px] lg:w-[340px]"
+                style={{ filter: "invert(1)", mixBlendMode: "screen" }}
+              />
+            </motion.div>
             <motion.p
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
