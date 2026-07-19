@@ -20,6 +20,7 @@ export const ProductCategoryNav = () => {
             <NavLink
               key={section.id}
               href={href}
+              withPageTransition={false}
               className={`font-sans text-sm tracking-wide transition-all h-full flex items-center border-b-2 ${
                 isActive && !unavailable
                   ? "text-primary border-primary font-semibold"
