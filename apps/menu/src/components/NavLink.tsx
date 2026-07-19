@@ -7,18 +7,30 @@ type NavLinkProps = {
   className?: string;
   children: React.ReactNode;
   onClick?: () => void;
+  withPageTransition?: boolean;
   "data-testid"?: string;
 };
 
-export const NavLink = ({ href, className, children, onClick, "data-testid": dataTestId }: NavLinkProps) => {
+export const NavLink = ({
+  href,
+  className,
+  children,
+  onClick,
+  withPageTransition = true,
+  "data-testid": dataTestId,
+}: NavLinkProps) => {
   const { triggerTransition } = usePageTransition();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (onClick) onClick();
     if (location !== href) {
-      triggerTransition(href);
+      if (withPageTransition) {
+        triggerTransition(href);
+      } else {
+        setLocation(href);
+      }
     }
   };
 
