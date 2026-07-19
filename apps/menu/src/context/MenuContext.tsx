@@ -28,23 +28,44 @@ interface MenuContextType {
   refreshMenu: () => Promise<void>;
 }
 
-const defaultSections: ProductSection[] = [...fallbackCategories, EXTRA_CATEGORY].map((category) => ({
-  ...category,
-  is_active: true,
-  is_fallback: true,
-}));
+const normalizeQualityCopy = (value: string) =>
+  value
+    .replace(/\bPremium\b/g, "High quality")
+    .replace(/\bpremium\b/g, "high quality");
 
-const defaultProducts: SupabaseProduct[] = [...fallbackProducts, ...EXTRA_PRODUCTS].map(({ category_id, is_available, ...product }) => ({
+const normalizeSectionCopy = (section: ProductSection): ProductSection => ({
+  ...section,
+  description: section.description
+    ? normalizeQualityCopy(section.description)
+    : section.description,
+});
+
+const normalizeProductCopy = (product: SupabaseProduct): SupabaseProduct => ({
   ...product,
-  section_id: category_id,
-  is_active: is_available,
-  is_fallback: true,
-}));
+  description: normalizeQualityCopy(product.description),
+});
+
+const defaultSections: ProductSection[] = [...fallbackCategories, EXTRA_CATEGORY].map((category) =>
+  normalizeSectionCopy({
+    ...category,
+    is_active: true,
+    is_fallback: true,
+  })
+);
+
+const defaultProducts: SupabaseProduct[] = [...fallbackProducts, ...EXTRA_PRODUCTS].map(({ category_id, is_available, ...product }) =>
+  normalizeProductCopy({
+    ...product,
+    section_id: category_id,
+    is_active: is_available,
+    is_fallback: true,
+  })
+);
 
 const mergeSections = (remoteSections: ProductSection[] = []) => {
   const remoteIds = new Set(remoteSections.map((section) => section.id));
   return [
-    ...remoteSections.map((section) => ({ ...section, is_fallback: false })),
+    ...remoteSections.map((section) => ({ ...normalizeSectionCopy(section), is_fallback: false })),
     ...defaultSections.filter((section) => !remoteIds.has(section.id)),
   ].sort((a, b) => a.sort_order - b.sort_order);
 };
@@ -52,7 +73,7 @@ const mergeSections = (remoteSections: ProductSection[] = []) => {
 const mergeProducts = (remoteProducts: SupabaseProduct[] = []) => {
   const remoteIds = new Set(remoteProducts.map((product) => product.id));
   return [
-    ...remoteProducts.map((product) => ({ ...product, is_fallback: false })),
+    ...remoteProducts.map((product) => ({ ...normalizeProductCopy(product), is_fallback: false })),
     ...defaultProducts.filter((product) => !remoteIds.has(product.id)),
   ].sort((a, b) => a.sort_order - b.sort_order);
 };
