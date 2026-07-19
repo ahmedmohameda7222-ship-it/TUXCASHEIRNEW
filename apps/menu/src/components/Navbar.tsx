@@ -35,11 +35,11 @@ export const Navbar = () => {
   return (
     <>
       <nav
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-          isScrolled ? "bg-[#0D0D0D]/95 backdrop-blur-md py-3 border-b border-border/50" : "bg-transparent py-3 md:py-5"
+        className={`fixed top-0 inset-x-0 z-50 h-16 md:h-20 transition-all duration-300 ${
+          isScrolled ? "bg-[#0D0D0D]/95 backdrop-blur-md border-b border-border/50" : "bg-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto h-full px-6 md:px-12 flex items-center justify-between">
           <NavLink href="/" className="group flex items-center gap-2" data-testid="nav-logo">
             <img
               src={tuxLogo}
