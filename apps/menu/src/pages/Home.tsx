@@ -177,16 +177,6 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 text-center px-6 max-w-4xl mx-auto flex flex-col items-center mt-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <span className="inline-block border border-[#C9A84C]/40 bg-black/30 backdrop-blur-sm text-[#C9A84C] px-4 py-1.5 rounded-full text-xs font-bold tracking-widest mb-6">
-              PREMIUM BURGER TRUCK · EGYPT
-            </span>
-          </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
