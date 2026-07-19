@@ -8,6 +8,8 @@ interface ProductOrderCardProps {
   product: SupabaseProduct;
   extras?: SupabaseProduct[];
   categoryUnavailable?: boolean;
+  elementId?: string;
+  isTargeted?: boolean;
 }
 
 const buildVariantId = (productId: string, selectedExtraIds: string[]) => {
@@ -15,7 +17,13 @@ const buildVariantId = (productId: string, selectedExtraIds: string[]) => {
   return extrasKey ? `${productId}__extras__${extrasKey}` : productId;
 };
 
-export function ProductOrderCard({ product, extras = [], categoryUnavailable = false }: ProductOrderCardProps) {
+export function ProductOrderCard({
+  product,
+  extras = [],
+  categoryUnavailable = false,
+  elementId,
+  isTargeted = false,
+}: ProductOrderCardProps) {
   const { addToCart, items, updateQuantity } = useCart();
   const { toast } = useToast();
   const [isExtrasOpen, setIsExtrasOpen] = useState(false);
@@ -86,11 +94,13 @@ export function ProductOrderCard({ product, extras = [], categoryUnavailable = f
 
   return (
     <div
-      className={`flex flex-col rounded-xl overflow-hidden border transition-all duration-300 shadow-md ${
+      id={elementId}
+      tabIndex={-1}
+      className={`scroll-mt-36 flex flex-col rounded-xl overflow-hidden border transition-all duration-300 shadow-md outline-none ${
         unavailable
           ? "bg-gray-900/70 border-gray-700 grayscale opacity-70"
           : "bg-[#111] border-white/5 hover:border-[#D4AF37]/30"
-      }`}
+      } ${isTargeted ? "ring-2 ring-[#D4AF37] ring-offset-4 ring-offset-black" : ""}`}
     >
       <div className="flex">
         <div className="w-1/3 aspect-square max-w-[120px] bg-black/40 flex items-center justify-center p-2 flex-shrink-0">
@@ -127,7 +137,7 @@ export function ProductOrderCard({ product, extras = [], categoryUnavailable = f
               </p>
             )}
           </div>
-          
+
           {!unavailable && (
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               {quantity > 0 ? (
