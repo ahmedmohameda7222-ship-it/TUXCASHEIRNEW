@@ -192,7 +192,7 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="text-[#F5EDD8]/90 text-lg md:text-xl font-sans max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            Premium smashed burgers, bold sauces, fresh ingredients, and a burger truck experience built to change the taste of burgers in Egypt.
+            High quality smashed burgers, bold sauces, fresh ingredients, and a burger truck experience built to change the taste of burgers in Egypt.
           </motion.p>
 
           <motion.div
@@ -247,7 +247,7 @@ export default function Home() {
             <span className="text-[#C9A84C] font-sans text-xs tracking-[0.35em] uppercase mb-4 block">
               Best Sellers
             </span>
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white">Fan Favorites</h2>
+            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white">Customers Favorites</h2>
             <p className="text-[#999080] mt-4 font-sans text-base max-w-md mx-auto">
               The most-ordered items. Every one a reason to come back.
             </p>
@@ -281,7 +281,7 @@ export default function Home() {
               </span>
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">Our Goal</h2>
               <p className="text-white text-lg leading-relaxed font-sans font-light">
-                Our goal is to serve clean, fresh, high-quality burgers with bold flavor, premium ingredients, and a taste people remember.
+                Our goal is to serve clean, fresh, high-quality burgers with bold flavor, high-quality ingredients, and a taste people remember.
               </p>
             </motion.div>
 
@@ -298,7 +298,7 @@ export default function Home() {
               </span>
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">Our Vision</h2>
               <p className="text-white text-lg leading-relaxed font-sans font-light">
-                At TUX, we want to change the idea of burgers in Egypt. We are not just selling fast food. We are building a premium burger truck experience with fresh ingredients, clean preparation, strong branding, and unforgettable taste.
+                At TUX, we want to change the idea of burgers in Egypt. We are not just selling fast food. We are building a high-quality burger truck experience with fresh ingredients, clean preparation, strong branding, and unforgettable taste.
               </p>
             </motion.div>
           </div>
