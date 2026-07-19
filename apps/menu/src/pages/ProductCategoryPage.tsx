@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ProductCategoryNav } from "@/components/ProductCategoryNav";
 import { useMenu, SupabaseProduct } from "@/context/MenuContext";
 import { NavLink } from "@/components/NavLink";
+import { getOrderProductHref } from "@/lib/product-routes";
 
 function ProductImage({ product, index }: { product: SupabaseProduct; index: number }) {
   if (product.image_url) {
@@ -33,15 +34,6 @@ function ProductImage({ product, index }: { product: SupabaseProduct; index: num
       </div>
     </div>
   );
-}
-
-function getProductDetails(product: SupabaseProduct) {
-  const extendedProduct = product as SupabaseProduct & {
-    ingredients?: string | null;
-    details?: string | null;
-  };
-
-  return extendedProduct.ingredients || extendedProduct.details || product.description;
 }
 
 export default function ProductCategoryPage({ sectionId }: { sectionId?: string }) {
@@ -161,7 +153,6 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
           <div className="space-y-12 md:space-y-16">
             {sectionProducts.map((product, index) => {
               const isReversed = index % 2 === 1;
-              const details = getProductDetails(product);
               const productUnavailable = sectionUnavailable || !product.is_active;
 
               return (
@@ -195,50 +186,48 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                   <motion.div
                     variants={textVariants}
                     transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: "easeOut", delay: shouldReduceMotion ? 0 : 0.08 }}
-                    className="flex flex-1 flex-col justify-center px-5 py-8 sm:px-8 md:w-[46%] md:px-10 lg:px-14 md:py-12"
+                    className="flex flex-1 flex-col justify-between px-5 py-8 sm:px-8 md:w-[46%] md:px-10 lg:px-14 md:py-12"
                   >
-                    <span className={`mb-4 font-sans text-xs font-bold uppercase tracking-[0.28em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
-                      {section?.name} • {String(index + 1).padStart(2, "0")}
-                    </span>
+                    <div>
+                      <span className={`mb-4 block font-sans text-xs font-bold uppercase tracking-[0.28em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
+                        {section?.name} • {String(index + 1).padStart(2, "0")}
+                      </span>
 
-                    <h2 className={`font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5 transition-colors duration-300 ${productUnavailable ? "text-gray-300" : "text-white group-hover:text-[#C9A84C]"}`}>
-                      {product.name}
-                    </h2>
+                      <h2 className={`font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5 transition-colors duration-300 ${productUnavailable ? "text-gray-300" : "text-white group-hover:text-[#C9A84C]"}`}>
+                        {product.name}
+                      </h2>
 
-                    <p className="font-sans text-base sm:text-lg leading-8 text-[#B8AEA0] mb-6">
-                      {product.description}
-                    </p>
-
-                    {productUnavailable && (
-                      <p className="mb-6 rounded-xl border border-gray-700 bg-gray-800/80 px-4 py-3 text-sm font-semibold text-gray-200">
-                        This product is currently not available.
-                      </p>
-                    )}
-
-                    {details && (
-                      <div className="mb-7 rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-                        <p className={`mb-2 font-sans text-[11px] font-bold uppercase tracking-[0.24em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
-                          Ingredients / Details
+                      {product.description && (
+                        <p className="max-w-xl font-sans text-base sm:text-lg leading-8 text-[#B8AEA0]">
+                          {product.description}
                         </p>
-                        <p className="font-sans text-sm sm:text-base leading-7 text-[#D6CCBC]">
-                          {details}
-                        </p>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      {productUnavailable && (
+                        <p className="mt-6 rounded-xl border border-gray-700 bg-gray-800/80 px-4 py-3 text-sm font-semibold text-gray-200">
+                          This product is currently not available.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch">
                       {!productUnavailable && (
                         <NavLink
-                          href="/order-now"
-                          className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-[#8B1A1A] px-6 py-3 text-center font-sans text-xs font-bold uppercase tracking-[0.22em] text-white transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+                          href={getOrderProductHref(product.id)}
+                          className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#8B1A1A] px-6 py-3 text-center font-sans text-xs font-bold uppercase tracking-[0.22em] text-white transition-all duration-300 hover:brightness-110 active:scale-[0.98] sm:w-auto"
                         >
                           Order Now
                         </NavLink>
                       )}
 
-                      <span className="font-sans text-sm text-[#777064]">
-                        {productUnavailable ? "Unavailable from the order menu" : "Available from the order menu"}
-                      </span>
+                      <div className="inline-flex min-h-12 min-w-[142px] items-center justify-between gap-4 rounded-full border border-[#C9A84C]/35 bg-black/25 px-5 py-3 sm:justify-center">
+                        <span className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-[#8F877A]">
+                          Price
+                        </span>
+                        <span className={`whitespace-nowrap font-sans text-sm font-bold ${productUnavailable ? "text-gray-400" : "text-[#C9A84C]"}`}>
+                          {product.price} EGP
+                        </span>
+                      </div>
                     </div>
                   </motion.div>
                 </motion.section>
