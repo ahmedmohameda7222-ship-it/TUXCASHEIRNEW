@@ -57,7 +57,7 @@ export const Navbar = () => {
               onMouseLeave={() => setIsProductsDropdownOpen(false)}
             >
               <button className="flex items-center gap-1 font-sans text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
-                Our Products <ChevronDown className="w-4 h-4" />
+                Our Menu <ChevronDown className="w-4 h-4" />
               </button>
 
               <AnimatePresence>
@@ -158,7 +158,7 @@ export const Navbar = () => {
 
               <div className="border-t border-border/50 pt-4">
                 <p className="text-muted text-sm font-sans mb-4 uppercase tracking-widest">
-                  Our Products
+                  Our Menu
                 </p>
                 <div className="flex flex-col gap-4 pl-4">
                   {products.map((p) => (
