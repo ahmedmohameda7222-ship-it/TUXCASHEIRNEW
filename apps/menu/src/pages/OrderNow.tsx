@@ -3,12 +3,14 @@ import { useMenu } from "@/context/MenuContext";
 import { CategoryTabs } from "@/components/order/CategoryTabs";
 import { ProductOrderCard } from "@/components/order/ProductOrderCard";
 import { motion } from "framer-motion";
+import { getOrderProductElementId, isOrderProductElementId } from "@/lib/product-routes";
 
 const EXTRAS_SECTION_ID = "extras";
 
 export default function OrderNow() {
   const { sections, products, loading } = useMenu();
   const [activeCategory, setActiveCategory] = useState<string>("");
+  const [targetProductElementId, setTargetProductElementId] = useState<string>("");
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const isScrollingProgrammatically = useRef(false);
 
@@ -28,21 +30,65 @@ export default function OrderNow() {
     [sections]
   );
 
-  // Set initial active category once sections load
+  // Set initial active category once sections load.
   useEffect(() => {
     if (menuSections.length > 0 && !activeCategory) {
       setActiveCategory(menuSections[0].id);
     }
   }, [menuSections, activeCategory]);
 
-  // Scroll-spy: observe which section is in view
+  // Resolve product deep links after menu data and product cards are rendered.
+  useEffect(() => {
+    if (loading) return;
+
+    const elementId = window.location.hash.slice(1);
+    if (!elementId || !isOrderProductElementId(elementId)) {
+      setTargetProductElementId("");
+      return;
+    }
+
+    const targetProduct = products.find(
+      (product) => getOrderProductElementId(product.id) === elementId
+    );
+
+    if (!targetProduct) {
+      setTargetProductElementId("");
+      return;
+    }
+
+    setTargetProductElementId(elementId);
+    setActiveCategory(targetProduct.section_id);
+
+    let releaseScrollLockTimer: number | undefined;
+    const scrollTimer = window.setTimeout(() => {
+      const targetElement = document.getElementById(elementId);
+      if (!targetElement) return;
+
+      isScrollingProgrammatically.current = true;
+      const y = targetElement.getBoundingClientRect().top + window.scrollY - 150;
+      window.scrollTo({ top: y, behavior: "smooth" });
+      targetElement.focus({ preventScroll: true });
+
+      releaseScrollLockTimer = window.setTimeout(() => {
+        isScrollingProgrammatically.current = false;
+      }, 900);
+    }, 120);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      if (releaseScrollLockTimer !== undefined) {
+        window.clearTimeout(releaseScrollLockTimer);
+      }
+    };
+  }, [loading, products]);
+
+  // Scroll-spy: observe which section is in view.
   useEffect(() => {
     if (menuSections.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (isScrollingProgrammatically.current) return;
-        // Find the most visible section
         let maxRatio = 0;
         let topCandidateId = "";
         entries.forEach((entry) => {
@@ -71,6 +117,7 @@ export default function OrderNow() {
 
   const scrollToCategory = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
+    setTargetProductElementId("");
     const element = categoryRefs.current[categoryId];
     if (element) {
       isScrollingProgrammatically.current = true;
@@ -85,7 +132,7 @@ export default function OrderNow() {
   return (
     <div className="min-h-screen bg-black pt-24 pb-32 font-sans text-white relative">
       <div className="container mx-auto px-4 max-w-4xl relative z-10">
-        
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -161,14 +208,20 @@ export default function OrderNow() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {sectionProducts.map((product) => (
-                        <ProductOrderCard
-                          key={product.id}
-                          product={product}
-                          extras={extraProducts}
-                          categoryUnavailable={categoryUnavailable}
-                        />
-                      ))}
+                      {sectionProducts.map((product) => {
+                        const elementId = getOrderProductElementId(product.id);
+
+                        return (
+                          <ProductOrderCard
+                            key={product.id}
+                            product={product}
+                            extras={extraProducts}
+                            categoryUnavailable={categoryUnavailable}
+                            elementId={elementId}
+                            isTargeted={targetProductElementId === elementId}
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </div>
