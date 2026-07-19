@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
-import tuxLogo from "@assets/tuxlogowithoutbackground";
+import tuxLogo from "@assets/tux-logo-vector.svg";
 
 type PageTransitionContextType = {
   triggerTransition: (to: string) => void;
@@ -55,8 +55,7 @@ export const PageTransitionProvider = ({ children }: { children: React.ReactNode
               <img
                 src={tuxLogo}
                 alt="TUX"
-                className="h-auto w-[220px] max-w-[70vw] object-contain sm:w-[260px] md:w-[310px] lg:w-[340px]"
-                style={{ filter: "invert(1)", mixBlendMode: "screen" }}
+                className="h-[260px] w-auto max-h-[52vh] max-w-[70vw] object-contain sm:h-[300px] md:h-[340px] lg:h-[380px]"
               />
             </motion.div>
             <motion.p
