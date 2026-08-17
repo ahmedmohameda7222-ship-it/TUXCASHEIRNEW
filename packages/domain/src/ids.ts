@@ -15,6 +15,7 @@ export type InventoryMovementId = Brand<string, 'InventoryMovementId'>;
 export type ReconciliationId = Brand<string, 'ReconciliationId'>;
 export type AuditEventId = Brand<string, 'AuditEventId'>;
 export type OutboxEventId = Brand<string, 'OutboxEventId'>;
+export type MenuCategoryId = Brand<string, 'MenuCategoryId'>;
 export type ProductId = Brand<string, 'ProductId'>;
 export type ModifierId = Brand<string, 'ModifierId'>;
 export type PaymentMethodId = Brand<string, 'PaymentMethodId'>;
@@ -37,6 +38,7 @@ export type EntityId =
   | ReconciliationId
   | AuditEventId
   | OutboxEventId
+  | MenuCategoryId
   | ProductId
   | ModifierId
   | PaymentMethodId
