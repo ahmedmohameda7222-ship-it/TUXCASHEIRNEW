@@ -24,8 +24,20 @@ export {
 export type { MoneyMinor } from './money';
 export { assertOrderSnapshotIntegrity } from './order';
 export type * from './orderDraft';
+export {
+  parseWholePoundsToMinor,
+  preparePaymentParts,
+  type PreparedPaymentPart,
+} from './payment';
 export { normalizeEgyptianPhone, type EgyptianPhoneNormalization } from './phone';
 export { calculateDraftLineTotal, calculateOrderPricing, type OrderPricing } from './pricing';
+export {
+  validateOrderDraft,
+  type OrderDraftValidationResult,
+  type OrderValidationIssue,
+  type OrderValidationPath,
+  type ValidatedOrderDraft,
+} from './orderValidation';
 export {
   addStockQuantities,
   STOCK_QUANTITY_SCALE,
