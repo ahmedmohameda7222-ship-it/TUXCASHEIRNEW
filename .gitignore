@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+
+# build outputs
+dist/
+build/
+out/
+release/
+coverage/
+.playwright/
+test-results/
+
+# environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# local databases / runtime state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# logs
+*.log
+logs/
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# temporary
+.tmp/
+temp/
