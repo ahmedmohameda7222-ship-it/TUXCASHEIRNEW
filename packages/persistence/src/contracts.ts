@@ -2,9 +2,13 @@ import type {
   AuditEvent,
   BusinessDay,
   BusinessDayId,
+  CustomerContact,
+  Device,
+  DeviceId,
   Expense,
   InventoryItem,
   InventoryMovement,
+  OperationsConfigurationSnapshot,
   OrderId,
   OrderSnapshot,
   OutboxEvent,
@@ -23,6 +27,11 @@ export interface ShopRepository {
   put(shop: Shop): Promise<void>;
 }
 
+export interface DeviceRepository {
+  getById(id: DeviceId): Promise<Device | null>;
+  put(device: Device): Promise<void>;
+}
+
 export interface WorkerRepository {
   getById(id: WorkerId): Promise<Worker | null>;
   put(worker: Worker): Promise<void>;
@@ -30,6 +39,16 @@ export interface WorkerRepository {
 
 export interface WorkerSessionRepository {
   put(session: WorkerSession): Promise<void>;
+}
+
+export interface ConfigurationRepository {
+  getForShop(shopId: ShopId): Promise<OperationsConfigurationSnapshot | null>;
+  put(snapshot: OperationsConfigurationSnapshot): Promise<void>;
+}
+
+export interface CustomerContactRepository {
+  getByNormalizedPhone(shopId: ShopId, normalizedPhone: string): Promise<CustomerContact | null>;
+  put(contact: CustomerContact): Promise<void>;
 }
 
 export interface BusinessDayRepository {
@@ -75,8 +94,11 @@ export interface OutboxRepository {
 
 export interface OperationsTransaction {
   readonly shops: ShopRepository;
+  readonly devices: DeviceRepository;
   readonly workers: WorkerRepository;
   readonly workerSessions: WorkerSessionRepository;
+  readonly configuration: ConfigurationRepository;
+  readonly customerContacts: CustomerContactRepository;
   readonly businessDays: BusinessDayRepository;
   readonly orders: OrderRepository;
   readonly expenses: ExpenseRepository;
