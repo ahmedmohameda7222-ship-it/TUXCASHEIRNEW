@@ -7,7 +7,7 @@ This is the concise execution map for the approved build sequence. The canonical
 | 0 | `feat/ops-00-bootstrap` | Repository governance, canonical spec, compliance/log docs | Empty repository / no Git history | PASS |
 | 1 | `feat/ops-01-foundation` | TypeScript monorepo, React, Electron shell, CI, tokens, test harness | Not built | PASS |
 | 2 | `feat/ops-02-domain-persistence` | Domain, Money, local DB, browser persistence, outbox, SQL migrations | Not built | PASS |
-| 3 | `feat/ops-03-business-day-operator` | Locked screen, PIN abstraction, Business Day, operator, greeting | Not built | IMPLEMENTED_NOT_VALIDATED |
+| 3 | `feat/ops-03-business-day-operator` | Locked screen, PIN abstraction, Business Day, operator, greeting | Not built | PASS |
 | 4 | `feat/ops-04-orders` | Full Orders / checkout contract | Not built | NOT_STARTED |
 | 5 | `feat/ops-05-orders-board` | Approved order lifecycle and operational board | Not built | NOT_STARTED |
 | 6 | `feat/ops-06-expenses` | Current Business Day expense ledger | Not built | NOT_STARTED |
@@ -25,4 +25,5 @@ This is the concise execution map for the approved build sequence. The canonical
 - No remote Supabase project is configured; remote migration application remains forbidden until explicitly authorized.
 - Phase 1 established the strict TypeScript workspace, shared React renderer, secure Electron boundary, design tokens, runtime-config validation, lockfile, tests, and permanent CI quality gate.
 - Phase 2 established the domain/local-first persistence foundation and was squash-merged through PR #4 into integration as `10f15a057f5371987a4e2f7fb119fedfdd901a9d`.
-- Phase 3 implements Business Day/operator behavior, narrow PIN/session runtime adapters, worker-session persistence, greeting transition, and SQLite worker-session uniqueness. Its code head passed permanent CI run `32068287692`; final status remains `IMPLEMENTED_NOT_VALIDATED` until the documentation head and PR merge gate also pass.
+- Phase 3 implements Business Day/operator behavior, narrow PIN/session runtime adapters, worker-session persistence, greeting transition, and SQLite worker-session uniqueness. Permanent CI run `32068544454` passed install, format, lint, strict typecheck, unit/integration tests, browser build, and Electron main/preload builds on the PR documentation head.
+- Phase 3 PASS does not mean START-001 is visually complete: the approved graphic TUX logo asset is still absent, so the locked screen uses a typographic fallback and that atomic visual requirement remains a known gap for final compliance.
