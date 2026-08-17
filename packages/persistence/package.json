@@ -1,0 +1,17 @@
+{
+  "name": "@tux/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./browser": "./src/browser/index.ts",
+    "./sqlite": "./src/sqlite/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tux/domain": "0.0.0"
+  }
+}
