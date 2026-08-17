@@ -8,7 +8,7 @@ on:
   push:
     branches:
       - integration/tux-operations-v2
-      - feat/ops-01-foundation
+      - 'feat/ops-*'
 
 permissions:
   contents: read
