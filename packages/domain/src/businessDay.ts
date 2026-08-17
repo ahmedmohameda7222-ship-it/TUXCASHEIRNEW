@@ -2,6 +2,8 @@ import { DomainInvariantError } from './errors';
 import type { BusinessDayId, ShopId, WorkerId } from './ids';
 import type { Instant } from './time';
 
+export type { BusinessDayId } from './ids';
+
 interface BusinessDayBase {
   readonly id: BusinessDayId;
   readonly shopId: ShopId;
