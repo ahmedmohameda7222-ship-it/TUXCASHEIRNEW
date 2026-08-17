@@ -8,6 +8,7 @@ export type WorkerSessionId = Brand<string, 'WorkerSessionId'>;
 export type BusinessDayId = Brand<string, 'BusinessDayId'>;
 export type OrderId = Brand<string, 'OrderId'>;
 export type OrderItemId = Brand<string, 'OrderItemId'>;
+export type DraftLineId = Brand<string, 'DraftLineId'>;
 export type PaymentId = Brand<string, 'PaymentId'>;
 export type ExpenseId = Brand<string, 'ExpenseId'>;
 export type InventoryItemId = Brand<string, 'InventoryItemId'>;
@@ -31,6 +32,7 @@ export type EntityId =
   | BusinessDayId
   | OrderId
   | OrderItemId
+  | DraftLineId
   | PaymentId
   | ExpenseId
   | InventoryItemId
