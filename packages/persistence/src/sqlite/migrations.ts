@@ -18,10 +18,20 @@ CREATE TABLE shops (
   payload_json TEXT NOT NULL
 );
 
+CREATE TABLE devices (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL REFERENCES shops(id),
+  label TEXT NOT NULL,
+  active INTEGER NOT NULL CHECK (active IN (0, 1)),
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_devices_shop ON devices(shop_id, active);
+
 CREATE TABLE workers (
   id TEXT PRIMARY KEY,
   shop_id TEXT NOT NULL REFERENCES shops(id),
   display_name TEXT NOT NULL,
+  pin_hash TEXT NOT NULL,
   active INTEGER NOT NULL CHECK (active IN (0, 1)),
   payload_json TEXT NOT NULL
 );
@@ -52,6 +62,25 @@ CREATE TABLE worker_sessions (
   payload_json TEXT NOT NULL
 );
 CREATE INDEX idx_worker_sessions_business_day ON worker_sessions(business_day_id);
+
+CREATE TABLE configuration_snapshots (
+  shop_id TEXT PRIMARY KEY REFERENCES shops(id),
+  version INTEGER NOT NULL CHECK (version > 0),
+  updated_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+
+CREATE TABLE customer_contacts (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL REFERENCES shops(id),
+  normalized_phone TEXT NOT NULL,
+  display_phone TEXT NOT NULL,
+  name TEXT NOT NULL,
+  last_order_at TEXT,
+  payload_json TEXT NOT NULL,
+  UNIQUE (shop_id, normalized_phone)
+);
+CREATE INDEX idx_customer_contacts_shop_phone ON customer_contacts(shop_id, normalized_phone);
 
 CREATE TABLE orders (
   id TEXT PRIMARY KEY,
