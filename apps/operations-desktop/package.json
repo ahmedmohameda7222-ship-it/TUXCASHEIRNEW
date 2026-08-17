@@ -4,11 +4,14 @@
   "private": true,
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "vite build --config vite.main.config.ts && vite build --config vite.preload.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "electron ."
   },
   "dependencies": {
+    "@tux/application": "*",
+    "@tux/domain": "*",
+    "@tux/persistence": "*",
     "@tux/platform-contracts": "*"
   }
 }

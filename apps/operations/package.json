@@ -9,7 +9,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@tux/application": "*",
     "@tux/config": "*",
+    "@tux/domain": "*",
+    "@tux/persistence": "*",
     "@tux/ui": "*",
     "react": "19.2.8",
     "react-dom": "19.2.8"

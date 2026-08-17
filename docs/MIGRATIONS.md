@@ -1,24 +1,42 @@
 # TUX V2 Migration Discipline
 
-## Two migration chains
+## Durable migration chains
 
-TUX Operations has two durable database targets with different physical schemas and one shared domain contract.
+TUX Operations has different physical stores behind one shared domain/persistence contract.
 
 ```text
 Desktop local SQLite
   packages/persistence/src/sqlite/migrations.ts
 
+Browser IndexedDB
+  versioned inside the browser persistence adapter
+
 Remote Postgres/Supabase
   supabase/migrations/*.sql
 ```
 
-Browser IndexedDB schema evolution is versioned inside the browser persistence adapter and must evolve in lockstep with the local domain semantics.
-
 ## SQLite
 
-The current baseline migration is version `1` / `operations_foundation`.
+SQLite migrations are append-only once integrated. Phase 3 does not rewrite the Phase 2 foundation migration.
 
-It creates the local operational transaction store and is executed by `applySqliteMigrations`.
+Current chain:
+
+```text
+1  operations_foundation
+2  one_open_worker_session_per_business_day
+```
+
+Migration v1 creates the local operational transaction store.
+
+Migration v2 adds:
+
+```sql
+CREATE UNIQUE INDEX ux_worker_sessions_one_open_per_business_day
+ON worker_sessions(business_day_id)
+WHERE ended_at IS NULL;
+```
+
+This means the durable desktop store permits at most one currently open worker session for a Business Day. Switching workers closes the old session before inserting the new one in the same application transaction.
 
 The migration runner:
 
@@ -28,7 +46,7 @@ The migration runner:
 4. records its version/name/applied timestamp only after the migration SQL succeeds;
 5. rolls back on failure.
 
-Phase 2 is still before a released production database, so the version-1 baseline may be refined on its feature branch. After a schema version is integrated/released, future changes must add a new migration rather than silently rewriting historical migration meaning.
+Future integrated schema changes must add a new migration rather than silently rewriting historical migration meaning.
 
 ## IndexedDB
 
@@ -36,37 +54,22 @@ The browser adapter currently uses database version `1`.
 
 Any future schema change must increment the IndexedDB version and perform deterministic `upgradeneeded` transformations. Never delete/recreate production stores simply to avoid writing a migration.
 
-The browser schema is not expected to mirror normalized Postgres table-for-table. It must preserve the same domain facts and transaction semantics required by Operations.
+The browser schema is not expected to mirror normalized Postgres table-for-table. It preserves the same domain facts required by Operations. Phase 3 serializes session commands within the browser service, but does not claim the SQLite v2 uniqueness constraint has an equivalent cross-tab IndexedDB database constraint.
 
 ## Postgres / Supabase
 
-The repository contains:
+The repository remote chain contains:
 
 ```text
 supabase/migrations/20260817195000_operations_foundation.sql
+supabase/migrations/20260817195500_tenant_integrity.sql
 ```
 
-It is the first remote V2 schema migration and has not been remotely applied.
+The first migration establishes the normalized remote V2 foundation. The second hardens same-shop composite relationships and removes duplicated mutable revenue/collection facts that should be derived from authoritative status/payment history.
 
-The remote migration includes:
+The remote schema includes shop/tenant scope, future authenticated memberships/devices, workers with PIN hash fields only, Business Days/sessions, normalized configuration, exact numeric storage, Orders/history snapshots, customer contacts, Expenses, inventory movement ledger, reconciliation, audit, constraints/indexes, and RLS enabled on exposed `public` tables.
 
-- shop/tenant scope;
-- future authenticated memberships/devices;
-- workers with PIN hash fields only;
-- Business Days and sessions;
-- normalized menu/configuration;
-- exact money columns;
-- exact fixed-point inventory quantities;
-- Orders/items/customizations/payments with historical snapshots;
-- customer contacts;
-- Expenses including non-financial Delivery Failed semantics;
-- inventory movement ledger;
-- reconciliation facts;
-- audit events;
-- relational constraints/indexes;
-- RLS enabled on exposed public tables.
-
-No permissive RLS policy is created yet. The real V2 remote authorization model must be reviewed before client data access is opened.
+No permissive RLS policy is created yet. The real V2 remote authorization model must be reviewed before client row access is opened.
 
 ## Remote application rule
 
@@ -77,7 +80,7 @@ When that target exists:
 1. verify it is not the legacy Tuxcashier project;
 2. inspect the complete repository migration chain;
 3. run the chain against a local/ephemeral Postgres/Supabase environment first;
-4. verify constraints/indexes/RLS;
+4. verify constraints, indexes and RLS;
 5. only then apply to the authorized target;
 6. verify the resulting remote schema matches Git history.
 
@@ -85,6 +88,6 @@ No secret or project reference belongs in a migration file.
 
 ## Current validation status
 
-SQLite migrations are executable in automated tests against `node:sqlite` and exercise initialization/transaction behavior.
+SQLite migrations are executed by automated tests against `node:sqlite`. Phase 3 specifically verifies that the v2 index rejects a second simultaneous open worker session for the same Business Day.
 
-The Postgres migration is repository-reviewed but Phase 2 does **not** claim engine application yet because no approved V2 Supabase target or local Supabase stack is connected in this workflow. That distinction must remain explicit in release reporting.
+The Postgres migration chain remains repository-reviewed but unapplied because no approved V2 Supabase target or local Supabase stack is connected. That distinction remains explicit in release reporting.

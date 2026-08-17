@@ -185,6 +185,15 @@ CREATE TABLE outbox_events (
 CREATE INDEX idx_outbox_pending ON outbox_events(delivered_at, next_attempt_at, created_at);
 `,
   },
+  {
+    version: 2,
+    name: 'one_open_worker_session_per_business_day',
+    sql: `
+CREATE UNIQUE INDEX ux_worker_sessions_one_open_per_business_day
+ON worker_sessions(business_day_id)
+WHERE ended_at IS NULL;
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {
