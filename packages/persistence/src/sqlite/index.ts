@@ -1,2 +1,2 @@
 export { SQLITE_MIGRATIONS, applySqliteMigrations, type SqliteMigration } from './migrations';
-export { SqliteOperationsDatabase } from './SqliteOperationsDatabase';
+export { SqliteOperationsDatabase } from './SafeSqliteOperationsDatabase';
