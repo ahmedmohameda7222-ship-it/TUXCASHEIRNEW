@@ -22,6 +22,7 @@ import type {
 } from './ids';
 import type { JsonValue } from './json';
 import type { MoneyMinor } from './money';
+import type { StockQuantityMicros } from './quantity';
 import type { Instant } from './time';
 
 export interface Shop {
@@ -219,7 +220,7 @@ export interface InventoryMovement {
   readonly businessDayId: BusinessDayId | null;
   readonly itemId: InventoryItemId;
   readonly movementType: InventoryMovementType;
-  readonly quantityDelta: number;
+  readonly quantityDeltaMicros: StockQuantityMicros;
   readonly idempotencyKey: string;
   readonly workerId: WorkerId;
   readonly orderId: OrderId | null;
