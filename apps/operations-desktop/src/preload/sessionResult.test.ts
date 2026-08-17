@@ -29,9 +29,7 @@ describe('assertSessionResult', () => {
   });
 
   it('rejects malformed success and error payloads', () => {
-    expect(() => assertSessionResult({ ok: true, value: { status: 'ACTIVE' } })).toThrow(
-      TypeError,
-    );
+    expect(() => assertSessionResult({ ok: true, value: { status: 'ACTIVE' } })).toThrow(TypeError);
     expect(() =>
       assertSessionResult({ ok: false, error: { code: 'MADE_UP', message: 'x' } }),
     ).toThrow(TypeError);

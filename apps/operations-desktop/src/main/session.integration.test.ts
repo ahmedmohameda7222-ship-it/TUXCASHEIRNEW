@@ -16,9 +16,7 @@ import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/p
 const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const AHMED_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
 const MAYA_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000002');
-const SECOND_SESSION_ID = parseEntityId<WorkerSessionId>(
-  '30000000-0000-4000-8000-000000000002',
-);
+const SECOND_SESSION_ID = parseEntityId<WorkerSessionId>('30000000-0000-4000-8000-000000000002');
 
 class FixturePinVerifier implements PinVerifier {
   async verify(pin: string, storedHash: string): Promise<boolean> {
