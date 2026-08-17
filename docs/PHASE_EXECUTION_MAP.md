@@ -6,8 +6,8 @@ This is the concise execution map for the approved build sequence. The canonical
 |---|---|---|---|---|
 | 0 | `feat/ops-00-bootstrap` | Repository governance, canonical spec, compliance/log docs | Empty repository / no Git history | PASS |
 | 1 | `feat/ops-01-foundation` | TypeScript monorepo, React, Electron shell, CI, tokens, test harness | Not built | PASS |
-| 2 | `feat/ops-02-domain-persistence` | Domain, Money, local DB, browser persistence, outbox, SQL migrations | Not built | NOT_STARTED |
-| 3 | `feat/ops-03-business-day-operator` | Locked screen, PIN abstraction, Business Day, operator, greeting | Not built | NOT_STARTED |
+| 2 | `feat/ops-02-domain-persistence` | Domain, Money, local DB, browser persistence, outbox, SQL migrations | Not built | PASS |
+| 3 | `feat/ops-03-business-day-operator` | Locked screen, PIN abstraction, Business Day, operator, greeting | Not built | IMPLEMENTED_NOT_VALIDATED |
 | 4 | `feat/ops-04-orders` | Full Orders / checkout contract | Not built | NOT_STARTED |
 | 5 | `feat/ops-05-orders-board` | Approved order lifecycle and operational board | Not built | NOT_STARTED |
 | 6 | `feat/ops-06-expenses` | Current Business Day expense ledger | Not built | NOT_STARTED |
@@ -19,9 +19,10 @@ This is the concise execution map for the approved build sequence. The canonical
 ## Repository observations
 
 - `TUXCASHEIRNEW` was confirmed empty before Phase 0.
-- One minimal bootstrap commit on `main` is allowed by the execution prompt.
-- All product implementation must target `integration/tux-operations-v2` through phase branches.
+- One minimal bootstrap commit on `main` is allowed by the execution prompt; product implementation remains isolated from `main`.
+- All product implementation targets `integration/tux-operations-v2` through phase branches.
 - Legacy `Tuxcashier` is read-only reference. Its large `src/AppCore.js` monolith is specifically not a V2 architecture template.
-- No remote Supabase project is configured or required now; remote migration application is forbidden until explicitly authorized.
+- No remote Supabase project is configured; remote migration application remains forbidden until explicitly authorized.
 - Phase 1 established the strict TypeScript workspace, shared React renderer, secure Electron boundary, design tokens, runtime-config validation, lockfile, tests, and permanent CI quality gate.
-- Phase 1 CI evidence: GitHub Actions run `32060021587` passed install, format, lint, typecheck, unit tests, and production builds.
+- Phase 2 established the domain/local-first persistence foundation and was squash-merged through PR #4 into integration as `10f15a057f5371987a4e2f7fb119fedfdd901a9d`.
+- Phase 3 implements Business Day/operator behavior, narrow PIN/session runtime adapters, worker-session persistence, greeting transition, and SQLite worker-session uniqueness. Its code head passed permanent CI run `32068287692`; final status remains `IMPLEMENTED_NOT_VALIDATED` until the documentation head and PR merge gate also pass.
