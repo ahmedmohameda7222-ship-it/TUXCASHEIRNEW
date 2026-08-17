@@ -40,11 +40,19 @@ renderer UI
   -X-> privileged secrets
 ```
 
+## Electron security boundary
+
 The Electron renderer is treated as untrusted web content. Native capability must cross a narrow typed preload bridge.
+
+The desktop window uses context isolation and sandboxing with renderer Node integration disabled, `webSecurity` enabled, and webviews disabled. New windows and arbitrary renderer navigation are denied. Development content is restricted to `http://localhost:5173` or `http://127.0.0.1:5173`; packaged content loads from the local Operations build. IPC handlers validate the expected renderer `webContents` and its main frame before servicing a call. The preload exposes only the typed TUX desktop API and never raw `ipcRenderer`.
+
+The renderer HTML carries a restrictive Content Security Policy for packaged/local-development content.
 
 ## TypeScript
 
 The shared compiler baseline enables strict checking plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`, and unknown catch variables. TypeScript 6.0.x is deliberately pinned during Phase 1 because the current stable typescript-eslint line officially supports TypeScript `<6.1.0`.
+
+Third-party declaration checking is isolated where current Node/Vite/Electron declaration sets overlap; strict checking remains enabled for all TUX source code.
 
 ## Local-first status
 
