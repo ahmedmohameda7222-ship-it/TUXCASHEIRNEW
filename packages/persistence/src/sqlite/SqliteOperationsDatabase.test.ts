@@ -7,6 +7,7 @@ import {
   instant,
   parseEntityId,
   type BusinessDayId,
+  type OperationsConfigurationSnapshot,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -26,6 +27,7 @@ async function seedFoundation(database: SqliteOperationsDatabase): Promise<void>
       id: workerId,
       shopId,
       displayName: 'Test Worker',
+      pinHash: '$test-only-non-production-hash$',
       active: true,
     });
     await transaction.businessDays.put(
@@ -37,6 +39,23 @@ async function seedFoundation(database: SqliteOperationsDatabase): Promise<void>
       }),
     );
   });
+}
+
+function configurationSnapshot(): OperationsConfigurationSnapshot {
+  return {
+    shopId,
+    version: 1,
+    updatedAt: instant('2026-08-17T12:00:00Z'),
+    categories: [],
+    products: [],
+    modifiers: [],
+    productModifierLinks: [],
+    comboBeverageOptions: [],
+    recipeLines: [],
+    orderTypes: [],
+    paymentMethods: [],
+    deliveryZones: [],
+  };
 }
 
 function outboxEvent(): OutboxEvent {
@@ -77,23 +96,29 @@ describe('SqliteOperationsDatabase', () => {
     await database.close();
   });
 
-  it('persists pending outbox work across database restart', async () => {
+  it('persists configuration and pending outbox work across database restart', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'tux-v2-'));
     const path = join(directory, 'operations.sqlite');
 
     const first = new SqliteOperationsDatabase(path);
     await first.initialize();
     await seedFoundation(first);
-    await first.transaction((transaction) => transaction.outbox.append(outboxEvent()));
+    await first.transaction(async (transaction) => {
+      await transaction.configuration.put(configurationSnapshot());
+      await transaction.outbox.append(outboxEvent());
+    });
     await first.close();
 
     const second = new SqliteOperationsDatabase(path);
     await second.initialize();
-    const pending = await second.transaction((transaction) =>
-      transaction.outbox.listPending(instant('2026-08-17T14:00:00Z'), 10),
-    );
-    expect(pending).toHaveLength(1);
-    expect(pending[0]?.id).toBe(outboxId);
+    const result = await second.transaction(async (transaction) => ({
+      configuration: await transaction.configuration.getForShop(shopId),
+      pending: await transaction.outbox.listPending(instant('2026-08-17T14:00:00Z'), 10),
+    }));
+
+    expect(result.configuration?.version).toBe(1);
+    expect(result.pending).toHaveLength(1);
+    expect(result.pending[0]?.id).toBe(outboxId);
     await second.close();
     rmSync(directory, { recursive: true, force: true });
   });
