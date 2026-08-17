@@ -92,13 +92,14 @@ describe('OperationsSessionService with SQLite', () => {
     const started = await service.submitPin('1234');
     if (!started.ok || started.value.status !== 'ACTIVE')
       throw new Error('Expected active session.');
+    const businessDayId = started.value.businessDayId;
 
     await expect(
       database.transaction(async (transaction) => {
         await transaction.workerSessions.put({
           id: SECOND_SESSION_ID,
           shopId: SHOP_ID,
-          businessDayId: started.value.businessDayId,
+          businessDayId,
           workerId: MAYA_ID,
           startedAt: instant('2026-08-17T13:30:00.000Z'),
           endedAt: null,
