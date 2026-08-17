@@ -13,12 +13,8 @@ describe('Electron security foundation', () => {
   });
 
   it('accepts only loopback HTTP development URLs', () => {
-    expect(parseLoopbackDevelopmentUrl('http://127.0.0.1:5173')).toBe(
-      'http://127.0.0.1:5173/',
-    );
-    expect(parseLoopbackDevelopmentUrl('http://localhost:5173')).toBe(
-      'http://localhost:5173/',
-    );
+    expect(parseLoopbackDevelopmentUrl('http://127.0.0.1:5173')).toBe('http://127.0.0.1:5173/');
+    expect(parseLoopbackDevelopmentUrl('http://localhost:5173')).toBe('http://localhost:5173/');
     expect(() => parseLoopbackDevelopmentUrl('https://example.com')).toThrow();
     expect(() => parseLoopbackDevelopmentUrl('http://example.com')).toThrow();
   });
