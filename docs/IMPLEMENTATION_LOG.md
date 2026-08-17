@@ -18,7 +18,7 @@
 
 The attached canonical source used for this phase has SHA-256 `8cad80ed1faa57f03da98a00710da5fac885755140e949a65bb2eb2e3fe2054a` and 5,376 lines. The GitHub connector-generated text blob has the same 5,376-line document structure and approved decision content, but its Git blob SHA differs from the source file's locally calculated Git blob SHA. This is recorded explicitly rather than falsely claiming binary identity; implementation authority remains the approved Master Plan content.
 
-## 2026-08-17 — Phase 1 in progress
+## 2026-08-17 — Phase 1 completed
 
 - Created `feat/ops-01-foundation` from the Phase 0 integration head.
 - Verified current maintained dependency lines before selection.
@@ -29,6 +29,9 @@ The attached canonical source used for this phase has SHA-256 `8cad80ed1faa57f03
 - Added a narrow typed desktop capability contract instead of a generic IPC bridge.
 - Added runtime config validation with the remote backend disabled by default.
 - Added TUX light/dark design tokens and minimal foundation renderer styling; no approved feature workflow is claimed implemented.
-- Added permanent CI quality gates using the committed lockfile.
+- Added permanent CI quality gates using the committed lockfile and current Node-24-compatible GitHub Actions.
 - Added Architecture/Test Strategy docs and ADRs for repository and Electron boundaries.
-- Remote Supabase remains entirely unconfigured.
+- Third-party declaration checking is skipped at the compiler boundary because Electron/Node/browser declaration packages currently overlap; strict checking remains enabled for all TUX source code.
+- Removed the temporary lockfile/formatter workflows and stale type-contract source files before phase completion.
+- GitHub Actions run `32060021587` passed: locked install, format check, ESLint, strict TypeScript typecheck, Vitest unit tests, Operations Vite build, and Electron TypeScript build.
+- Remote Supabase remains entirely unconfigured and no remote migration was applied.
