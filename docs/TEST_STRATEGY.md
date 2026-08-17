@@ -10,12 +10,19 @@ Every pull request into `integration/tux-operations-v2` runs, from the committed
 
 1. formatting check;
 2. ESLint;
-3. strict TypeScript typecheck;
+3. strict TypeScript source typecheck;
 4. Vitest unit tests;
 5. Operations production build;
 6. Electron main/preload TypeScript build.
 
-Phase 1 unit coverage is intentionally small: it validates the shared Result primitive and runtime configuration parser because feature-domain behavior has not been implemented yet.
+Phase 1 unit coverage is intentionally small because feature-domain behavior has not been implemented yet. It validates:
+
+- the shared Result primitive;
+- runtime configuration parsing;
+- Electron window security preferences;
+- rejection of non-approved Electron development origins.
+
+The production Electron wiring is also reviewed structurally for narrow preload exposure, main-frame IPC sender validation, navigation/new-window denial, and renderer CSP. Third-party declaration conflicts may use project-level `skipLibCheck`; this does not disable strict checking of TUX source.
 
 ## Later high-risk coverage
 
