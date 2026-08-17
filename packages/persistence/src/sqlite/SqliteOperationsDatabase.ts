@@ -3,9 +3,13 @@ import type {
   AuditEvent,
   BusinessDay,
   BusinessDayId,
+  CustomerContact,
+  Device,
+  DeviceId,
   Expense,
   InventoryItem,
   InventoryMovement,
+  OperationsConfigurationSnapshot,
   OrderId,
   OrderSnapshot,
   OutboxEvent,
@@ -56,6 +60,27 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .run(shop.id, shop.name, shop.active ? 1 : 0, serialize(shop));
       },
     },
+    devices: {
+      async getById(id: DeviceId) {
+        return parsePayload<Device>(
+          database.prepare('SELECT payload_json FROM devices WHERE id = ?').get(id),
+        );
+      },
+      async put(device: Device) {
+        database
+          .prepare(
+            `INSERT INTO devices(id, shop_id, label, active, payload_json) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET label = excluded.label, active = excluded.active, payload_json = excluded.payload_json`,
+          )
+          .run(
+            device.id,
+            device.shopId,
+            device.label,
+            device.active ? 1 : 0,
+            serialize(device),
+          );
+      },
+    },
     workers: {
       async getById(id: WorkerId) {
         return parsePayload<Worker>(
@@ -65,13 +90,14 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
       async put(worker: Worker) {
         database
           .prepare(
-            `INSERT INTO workers(id, shop_id, display_name, active, payload_json) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, active = excluded.active, payload_json = excluded.payload_json`,
+            `INSERT INTO workers(id, shop_id, display_name, pin_hash, active, payload_json) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, pin_hash = excluded.pin_hash, active = excluded.active, payload_json = excluded.payload_json`,
           )
           .run(
             worker.id,
             worker.shopId,
             worker.displayName,
+            worker.pinHash,
             worker.active ? 1 : 0,
             serialize(worker),
           );
@@ -93,6 +119,60 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             session.startedAt,
             session.endedAt,
             serialize(session),
+          );
+      },
+    },
+    configuration: {
+      async getForShop(shopId: ShopId) {
+        return parsePayload<OperationsConfigurationSnapshot>(
+          database
+            .prepare('SELECT payload_json FROM configuration_snapshots WHERE shop_id = ?')
+            .get(shopId),
+        );
+      },
+      async put(snapshot: OperationsConfigurationSnapshot) {
+        if (!Number.isSafeInteger(snapshot.version) || snapshot.version <= 0) {
+          throw new RangeError('Configuration snapshot version must be a positive safe integer.');
+        }
+        database
+          .prepare(
+            `INSERT INTO configuration_snapshots(shop_id, version, updated_at, payload_json) VALUES (?, ?, ?, ?)
+            ON CONFLICT(shop_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at, payload_json = excluded.payload_json`,
+          )
+          .run(snapshot.shopId, snapshot.version, snapshot.updatedAt, serialize(snapshot));
+      },
+    },
+    customerContacts: {
+      async getByNormalizedPhone(shopId: ShopId, normalizedPhone: string) {
+        return parsePayload<CustomerContact>(
+          database
+            .prepare(
+              'SELECT payload_json FROM customer_contacts WHERE shop_id = ? AND normalized_phone = ?',
+            )
+            .get(shopId, normalizedPhone),
+        );
+      },
+      async put(contact: CustomerContact) {
+        database
+          .prepare(
+            `INSERT INTO customer_contacts(
+              id, shop_id, normalized_phone, display_phone, name, last_order_at, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(shop_id, normalized_phone) DO UPDATE SET
+              id = excluded.id,
+              display_phone = excluded.display_phone,
+              name = excluded.name,
+              last_order_at = excluded.last_order_at,
+              payload_json = excluded.payload_json`,
+          )
+          .run(
+            contact.id,
+            contact.shopId,
+            contact.normalizedPhone,
+            contact.displayPhone,
+            contact.name,
+            contact.lastOrderAt,
+            serialize(contact),
           );
       },
     },
