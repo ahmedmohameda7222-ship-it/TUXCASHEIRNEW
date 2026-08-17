@@ -4,12 +4,21 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { OperationsSessionService, type PinVerifier } from '@tux/application';
-import { instant, parseEntityId, type ShopId, type WorkerId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type ShopId,
+  type WorkerId,
+  type WorkerSessionId,
+} from '@tux/domain';
 import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
 
 const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const AHMED_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
 const MAYA_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000002');
+const SECOND_SESSION_ID = parseEntityId<WorkerSessionId>(
+  '30000000-0000-4000-8000-000000000002',
+);
 
 class FixturePinVerifier implements PinVerifier {
   async verify(pin: string, storedHash: string): Promise<boolean> {
@@ -76,6 +85,29 @@ describe('OperationsSessionService with SQLite', () => {
       transaction.businessDays.getOpenForShop(SHOP_ID),
     );
     expect(openDay).toBeNull();
+    await readModel.close();
+    await database.close();
+  });
+
+  it('enforces one open worker session per Business Day at the database boundary', async () => {
+    const { database, readModel, service } = await fixture();
+    const started = await service.submitPin('1234');
+    if (!started.ok || started.value.status !== 'ACTIVE')
+      throw new Error('Expected active session.');
+
+    await expect(
+      database.transaction(async (transaction) => {
+        await transaction.workerSessions.put({
+          id: SECOND_SESSION_ID,
+          shopId: SHOP_ID,
+          businessDayId: started.value.businessDayId,
+          workerId: MAYA_ID,
+          startedAt: instant('2026-08-17T13:30:00.000Z'),
+          endedAt: null,
+        });
+      }),
+    ).rejects.toThrow();
+
     await readModel.close();
     await database.close();
   });
