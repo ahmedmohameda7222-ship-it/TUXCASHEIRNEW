@@ -39,13 +39,20 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
 
   for (const payment of order.payments) {
     assertNonNegativeMoney(payment.allocatedMinor, 'Payment allocation');
+
     if (payment.method.logicType === 'CASH') {
-      if (payment.receivedMinor < payment.allocatedMinor) {
+      const receivedMinor = payment.receivedMinor;
+      const changeMinor = payment.changeMinor;
+
+      if (receivedMinor === null || changeMinor === null) {
+        throw new DomainInvariantError('Cash payment requires received and change amounts.');
+      }
+      if (receivedMinor < payment.allocatedMinor) {
         throw new DomainInvariantError(
           'Cash received cannot be less than its allocated payment amount.',
         );
       }
-      if (subtractMoney(payment.receivedMinor, payment.allocatedMinor) !== payment.changeMinor) {
+      if (subtractMoney(receivedMinor, payment.allocatedMinor) !== changeMinor) {
         throw new DomainInvariantError(
           'Cash change does not match received minus allocated amount.',
         );
