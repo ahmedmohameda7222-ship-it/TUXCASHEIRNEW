@@ -72,13 +72,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             `INSERT INTO devices(id, shop_id, label, active, payload_json) VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET label = excluded.label, active = excluded.active, payload_json = excluded.payload_json`,
           )
-          .run(
-            device.id,
-            device.shopId,
-            device.label,
-            device.active ? 1 : 0,
-            serialize(device),
-          );
+          .run(device.id, device.shopId, device.label, device.active ? 1 : 0, serialize(device));
       },
     },
     workers: {

@@ -23,9 +23,7 @@ export function wholeStockUnits(units: number): StockQuantityMicros {
   return stockQuantityMicros(units * STOCK_QUANTITY_SCALE);
 }
 
-export function addStockQuantities(
-  ...values: readonly StockQuantityMicros[]
-): StockQuantityMicros {
+export function addStockQuantities(...values: readonly StockQuantityMicros[]): StockQuantityMicros {
   return values.reduce<StockQuantityMicros>(
     (total, value) => stockQuantityMicros(total + value),
     stockQuantityMicros(0),
