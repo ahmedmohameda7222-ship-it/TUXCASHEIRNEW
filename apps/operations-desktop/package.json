@@ -9,6 +9,9 @@
     "start": "electron ."
   },
   "dependencies": {
+    "@tux/application": "*",
+    "@tux/domain": "*",
+    "@tux/persistence": "*",
     "@tux/platform-contracts": "*"
   }
 }
