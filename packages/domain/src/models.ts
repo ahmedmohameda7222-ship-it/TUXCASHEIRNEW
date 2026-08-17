@@ -80,7 +80,9 @@ export type CashPaymentPart = {
 
 export type NonCashPaymentPart = {
   readonly id: PaymentId;
-  readonly method: PaymentMethodSnapshot & { readonly logicType: Exclude<PaymentLogicType, 'CASH'> };
+  readonly method: PaymentMethodSnapshot & {
+    readonly logicType: Exclude<PaymentLogicType, 'CASH'>;
+  };
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: null;
   readonly changeMinor: null;

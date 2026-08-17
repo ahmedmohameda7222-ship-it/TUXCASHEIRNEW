@@ -94,8 +94,12 @@ function openDatabase(name: string): Promise<IDBDatabase> {
       const inventoryItems = database.createObjectStore('inventoryItems', { keyPath: 'id' });
       inventoryItems.createIndex('shopTrackingMode', ['shopId', 'trackingMode']);
 
-      const inventoryMovements = database.createObjectStore('inventoryMovements', { keyPath: 'id' });
-      inventoryMovements.createIndex('shopIdempotency', ['shopId', 'idempotencyKey'], { unique: true });
+      const inventoryMovements = database.createObjectStore('inventoryMovements', {
+        keyPath: 'id',
+      });
+      inventoryMovements.createIndex('shopIdempotency', ['shopId', 'idempotencyKey'], {
+        unique: true,
+      });
 
       const reconciliations = database.createObjectStore('reconciliations', { keyPath: 'id' });
       reconciliations.createIndex('shopBusinessDay', ['shopId', 'businessDayId'], { unique: true });
@@ -236,7 +240,9 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         if (existing === null) {
           throw new Error(`Outbox event ${id} was not found.`);
         }
-        await requestResult(objectStore.put({ ...existing, attemptCount, nextAttemptAt, lastError }));
+        await requestResult(
+          objectStore.put({ ...existing, attemptCount, nextAttemptAt, lastError }),
+        );
       },
     },
   };

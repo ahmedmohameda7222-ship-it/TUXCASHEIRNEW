@@ -88,6 +88,8 @@ export interface OperationsTransaction {
 
 export interface OperationsDatabase {
   initialize(): Promise<void>;
-  transaction<Result>(work: (transaction: OperationsTransaction) => Promise<Result>): Promise<Result>;
+  transaction<Result>(
+    work: (transaction: OperationsTransaction) => Promise<Result>,
+  ): Promise<Result>;
   close(): Promise<void>;
 }

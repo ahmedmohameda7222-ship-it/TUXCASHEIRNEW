@@ -43,32 +43,48 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
   return {
     shops: {
       async getById(id: ShopId) {
-        return parsePayload<Shop>(database.prepare('SELECT payload_json FROM shops WHERE id = ?').get(id));
+        return parsePayload<Shop>(
+          database.prepare('SELECT payload_json FROM shops WHERE id = ?').get(id),
+        );
       },
       async put(shop: Shop) {
         database
-          .prepare(`INSERT INTO shops(id, name, active, payload_json) VALUES (?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET name = excluded.name, active = excluded.active, payload_json = excluded.payload_json`)
+          .prepare(
+            `INSERT INTO shops(id, name, active, payload_json) VALUES (?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name, active = excluded.active, payload_json = excluded.payload_json`,
+          )
           .run(shop.id, shop.name, shop.active ? 1 : 0, serialize(shop));
       },
     },
     workers: {
       async getById(id: WorkerId) {
-        return parsePayload<Worker>(database.prepare('SELECT payload_json FROM workers WHERE id = ?').get(id));
+        return parsePayload<Worker>(
+          database.prepare('SELECT payload_json FROM workers WHERE id = ?').get(id),
+        );
       },
       async put(worker: Worker) {
         database
-          .prepare(`INSERT INTO workers(id, shop_id, display_name, active, payload_json) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, active = excluded.active, payload_json = excluded.payload_json`)
-          .run(worker.id, worker.shopId, worker.displayName, worker.active ? 1 : 0, serialize(worker));
+          .prepare(
+            `INSERT INTO workers(id, shop_id, display_name, active, payload_json) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, active = excluded.active, payload_json = excluded.payload_json`,
+          )
+          .run(
+            worker.id,
+            worker.shopId,
+            worker.displayName,
+            worker.active ? 1 : 0,
+            serialize(worker),
+          );
       },
     },
     workerSessions: {
       async put(session: WorkerSession) {
         database
-          .prepare(`INSERT INTO worker_sessions(id, shop_id, business_day_id, worker_id, started_at, ended_at, payload_json)
+          .prepare(
+            `INSERT INTO worker_sessions(id, shop_id, business_day_id, worker_id, started_at, ended_at, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET ended_at = excluded.ended_at, payload_json = excluded.payload_json`)
+            ON CONFLICT(id) DO UPDATE SET ended_at = excluded.ended_at, payload_json = excluded.payload_json`,
+          )
           .run(
             session.id,
             session.shopId,
@@ -89,13 +105,16 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
       async getOpenForShop(shopId: ShopId) {
         return parsePayload<BusinessDay>(
           database
-            .prepare("SELECT payload_json FROM business_days WHERE shop_id = ? AND status = 'OPEN' LIMIT 1")
+            .prepare(
+              "SELECT payload_json FROM business_days WHERE shop_id = ? AND status = 'OPEN' LIMIT 1",
+            )
             .get(shopId),
         );
       },
       async put(day: BusinessDay) {
         database
-          .prepare(`INSERT INTO business_days(
+          .prepare(
+            `INSERT INTO business_days(
               id, shop_id, status, started_at, ended_at, started_by_worker_id, ended_by_worker_id,
               last_allocated_display_order_no, payload_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -104,7 +123,8 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
               ended_at = excluded.ended_at,
               ended_by_worker_id = excluded.ended_by_worker_id,
               last_allocated_display_order_no = excluded.last_allocated_display_order_no,
-              payload_json = excluded.payload_json`)
+              payload_json = excluded.payload_json`,
+          )
           .run(
             day.id,
             day.shopId,
@@ -120,7 +140,9 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     },
     orders: {
       async getById(id: OrderId) {
-        return parsePayload<OrderSnapshot>(database.prepare('SELECT payload_json FROM orders WHERE id = ?').get(id));
+        return parsePayload<OrderSnapshot>(
+          database.prepare('SELECT payload_json FROM orders WHERE id = ?').get(id),
+        );
       },
       async getByIdempotencyKey(shopId: ShopId, idempotencyKey: string) {
         return parsePayload<OrderSnapshot>(
@@ -131,10 +153,12 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
       },
       async insert(order: OrderSnapshot) {
         database
-          .prepare(`INSERT INTO orders(
+          .prepare(
+            `INSERT INTO orders(
               id, shop_id, business_day_id, display_order_no, idempotency_key, status, source,
               operator_worker_id, created_at, total_minor, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
           .run(
             order.id,
             order.shopId,
@@ -153,9 +177,11 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     expenses: {
       async put(expense: Expense) {
         database
-          .prepare(`INSERT INTO expenses(id, shop_id, business_day_id, kind, amount_minor, paid_from, order_id, created_at, payload_json)
+          .prepare(
+            `INSERT INTO expenses(id, shop_id, business_day_id, kind, amount_minor, paid_from, order_id, created_at, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET amount_minor = excluded.amount_minor, paid_from = excluded.paid_from, payload_json = excluded.payload_json`)
+            ON CONFLICT(id) DO UPDATE SET amount_minor = excluded.amount_minor, paid_from = excluded.paid_from, payload_json = excluded.payload_json`,
+          )
           .run(
             expense.id,
             expense.shopId,
@@ -172,16 +198,27 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     inventory: {
       async putItem(item: InventoryItem) {
         database
-          .prepare(`INSERT INTO inventory_items(id, shop_id, name, tracking_mode, active, payload_json) VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET name = excluded.name, tracking_mode = excluded.tracking_mode, active = excluded.active, payload_json = excluded.payload_json`)
-          .run(item.id, item.shopId, item.name, item.trackingMode, item.active ? 1 : 0, serialize(item));
+          .prepare(
+            `INSERT INTO inventory_items(id, shop_id, name, tracking_mode, active, payload_json) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name, tracking_mode = excluded.tracking_mode, active = excluded.active, payload_json = excluded.payload_json`,
+          )
+          .run(
+            item.id,
+            item.shopId,
+            item.name,
+            item.trackingMode,
+            item.active ? 1 : 0,
+            serialize(item),
+          );
       },
       async appendMovement(movement: InventoryMovement) {
         database
-          .prepare(`INSERT INTO inventory_movements(
+          .prepare(
+            `INSERT INTO inventory_movements(
               id, shop_id, business_day_id, item_id, movement_type, quantity_delta, idempotency_key,
               worker_id, order_id, created_at, compensates_movement_id, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
           .run(
             movement.id,
             movement.shopId,
@@ -201,13 +238,15 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     reconciliations: {
       async put(reconciliation: Reconciliation) {
         database
-          .prepare(`INSERT INTO reconciliations(id, shop_id, business_day_id, created_by_worker_id, created_at, payload_json)
+          .prepare(
+            `INSERT INTO reconciliations(id, shop_id, business_day_id, created_by_worker_id, created_at, payload_json)
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(shop_id, business_day_id) DO UPDATE SET
               id = excluded.id,
               created_by_worker_id = excluded.created_by_worker_id,
               created_at = excluded.created_at,
-              payload_json = excluded.payload_json`)
+              payload_json = excluded.payload_json`,
+          )
           .run(
             reconciliation.id,
             reconciliation.shopId,
@@ -221,9 +260,11 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     audit: {
       async append(event: AuditEvent) {
         database
-          .prepare(`INSERT INTO audit_events(
+          .prepare(
+            `INSERT INTO audit_events(
               id, shop_id, business_day_id, aggregate_type, aggregate_id, event_type, worker_id, created_at, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
           .run(
             event.id,
             event.shopId,
@@ -240,10 +281,12 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
     outbox: {
       async append(event: OutboxEvent) {
         database
-          .prepare(`INSERT INTO outbox_events(
+          .prepare(
+            `INSERT INTO outbox_events(
               id, shop_id, business_day_id, aggregate_type, aggregate_id, event_type, idempotency_key,
               payload_version, payload_json, created_at, attempt_count, next_attempt_at, last_error, delivered_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
           .run(
             event.id,
             event.shopId,
@@ -266,11 +309,15 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           throw new RangeError('Outbox pending limit must be a positive safe integer.');
         }
         const rows = database
-          .prepare(`SELECT payload_json FROM outbox_events
+          .prepare(
+            `SELECT payload_json FROM outbox_events
             WHERE delivered_at IS NULL AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-            ORDER BY created_at ASC LIMIT ?`)
+            ORDER BY created_at ASC LIMIT ?`,
+          )
           .all(now, limit);
-        return rows.map((row) => parsePayload<OutboxEvent>(row)).filter((event): event is OutboxEvent => event !== null);
+        return rows
+          .map((row) => parsePayload<OutboxEvent>(row))
+          .filter((event): event is OutboxEvent => event !== null);
       },
       async markDelivered(id: OutboxEventId, deliveredAt: Instant) {
         const existing = parsePayload<OutboxEvent>(
@@ -279,12 +326,24 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         if (existing === null) {
           throw new Error(`Outbox event ${id} was not found.`);
         }
-        const updated: OutboxEvent = { ...existing, deliveredAt, lastError: null, nextAttemptAt: null };
+        const updated: OutboxEvent = {
+          ...existing,
+          deliveredAt,
+          lastError: null,
+          nextAttemptAt: null,
+        };
         database
-          .prepare('UPDATE outbox_events SET delivered_at = ?, last_error = NULL, next_attempt_at = NULL, payload_json = ? WHERE id = ?')
+          .prepare(
+            'UPDATE outbox_events SET delivered_at = ?, last_error = NULL, next_attempt_at = NULL, payload_json = ? WHERE id = ?',
+          )
           .run(deliveredAt, serialize(updated), id);
       },
-      async recordFailure(id: OutboxEventId, attemptCount: number, nextAttemptAt: Instant, lastError: string) {
+      async recordFailure(
+        id: OutboxEventId,
+        attemptCount: number,
+        nextAttemptAt: Instant,
+        lastError: string,
+      ) {
         const existing = parsePayload<OutboxEvent>(
           database.prepare('SELECT payload_json FROM outbox_events WHERE id = ?').get(id),
         );
@@ -293,7 +352,9 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         }
         const updated: OutboxEvent = { ...existing, attemptCount, nextAttemptAt, lastError };
         database
-          .prepare(`UPDATE outbox_events SET attempt_count = ?, next_attempt_at = ?, last_error = ?, payload_json = ? WHERE id = ?`)
+          .prepare(
+            `UPDATE outbox_events SET attempt_count = ?, next_attempt_at = ?, last_error = ?, payload_json = ? WHERE id = ?`,
+          )
           .run(attemptCount, nextAttemptAt, lastError, serialize(updated), id);
       },
     },

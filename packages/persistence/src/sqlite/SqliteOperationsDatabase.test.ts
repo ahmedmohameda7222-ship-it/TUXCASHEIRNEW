@@ -22,7 +22,12 @@ const outboxId = parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444
 async function seedFoundation(database: SqliteOperationsDatabase): Promise<void> {
   await database.transaction(async (transaction) => {
     await transaction.shops.put({ id: shopId, name: 'TUX Test Shop', active: true });
-    await transaction.workers.put({ id: workerId, shopId, displayName: 'Test Worker', active: true });
+    await transaction.workers.put({
+      id: workerId,
+      shopId,
+      displayName: 'Test Worker',
+      active: true,
+    });
     await transaction.businessDays.put(
       createOpenBusinessDay({
         id: businessDayId,
@@ -65,7 +70,9 @@ describe('SqliteOperationsDatabase', () => {
       }),
     ).rejects.toThrow('injected failure');
 
-    const persisted = await database.transaction((transaction) => transaction.shops.getById(shopId));
+    const persisted = await database.transaction((transaction) =>
+      transaction.shops.getById(shopId),
+    );
     expect(persisted).toBeNull();
     await database.close();
   });

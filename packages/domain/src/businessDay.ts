@@ -27,7 +27,10 @@ export interface ClosedBusinessDay extends BusinessDayBase {
 export type BusinessDay = OpenBusinessDay | ClosedBusinessDay;
 
 export function createOpenBusinessDay(
-  input: Omit<OpenBusinessDay, 'status' | 'endedAt' | 'endedByWorkerId' | 'lastAllocatedDisplayOrderNo'>,
+  input: Omit<
+    OpenBusinessDay,
+    'status' | 'endedAt' | 'endedByWorkerId' | 'lastAllocatedDisplayOrderNo'
+  >,
 ): OpenBusinessDay {
   return {
     ...input,

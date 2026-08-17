@@ -27,7 +27,9 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     order.deliveryFeeMinor,
   );
   if (expectedTotal !== order.totalMinor) {
-    throw new DomainInvariantError('Order total does not match subtotal, discount, and delivery fee.');
+    throw new DomainInvariantError(
+      'Order total does not match subtotal, discount, and delivery fee.',
+    );
   }
 
   const allocated = addMoney(...order.payments.map((payment) => payment.allocatedMinor));
@@ -39,10 +41,14 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     assertNonNegativeMoney(payment.allocatedMinor, 'Payment allocation');
     if (payment.method.logicType === 'CASH') {
       if (payment.receivedMinor < payment.allocatedMinor) {
-        throw new DomainInvariantError('Cash received cannot be less than its allocated payment amount.');
+        throw new DomainInvariantError(
+          'Cash received cannot be less than its allocated payment amount.',
+        );
       }
       if (subtractMoney(payment.receivedMinor, payment.allocatedMinor) !== payment.changeMinor) {
-        throw new DomainInvariantError('Cash change does not match received minus allocated amount.');
+        throw new DomainInvariantError(
+          'Cash change does not match received minus allocated amount.',
+        );
       }
     }
   }
