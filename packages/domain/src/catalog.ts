@@ -96,6 +96,21 @@ export interface DeliveryZone {
   readonly sortOrder: number;
 }
 
+export interface OperationsConfigurationSnapshot {
+  readonly shopId: ShopId;
+  readonly version: number;
+  readonly updatedAt: Instant;
+  readonly categories: readonly MenuCategory[];
+  readonly products: readonly Product[];
+  readonly modifiers: readonly Modifier[];
+  readonly productModifierLinks: readonly ProductModifierLink[];
+  readonly comboBeverageOptions: readonly ComboBeverageOption[];
+  readonly recipeLines: readonly RecipeLine[];
+  readonly orderTypes: readonly OrderType[];
+  readonly paymentMethods: readonly PaymentMethod[];
+  readonly deliveryZones: readonly DeliveryZone[];
+}
+
 export interface CustomerContact {
   readonly id: CustomerContactId;
   readonly shopId: ShopId;
