@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import path from 'node:path';
+import * as path from 'node:path';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
 

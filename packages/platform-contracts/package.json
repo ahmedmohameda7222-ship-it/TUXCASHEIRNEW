@@ -2,11 +2,10 @@
   "name": "@tux/platform-contracts",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "types": "./index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    ".": {
+      "types": "./index.d.ts"
+    }
   }
 }
