@@ -1,0 +1,14 @@
+{
+  "name": "@tux/operations-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@tux/platform-contracts": "*"
+  }
+}
