@@ -3,11 +3,12 @@ import type { PinVerifier } from '@tux/application';
 const HASH_PREFIX = 'pbkdf2-sha256';
 const DERIVED_KEY_BYTES = 32;
 
-function hexToBytes(hex: string): Uint8Array | null {
+function hexToArrayBuffer(hex: string): ArrayBuffer | null {
   if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) {
     return null;
   }
-  const bytes = new Uint8Array(hex.length / 2);
+  const buffer = new ArrayBuffer(hex.length / 2);
+  const bytes = new Uint8Array(buffer);
   for (let index = 0; index < bytes.length; index += 1) {
     const value = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
     if (!Number.isFinite(value)) {
@@ -15,7 +16,7 @@ function hexToBytes(hex: string): Uint8Array | null {
     }
     bytes[index] = value;
   }
-  return bytes;
+  return buffer;
 }
 
 function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
@@ -42,14 +43,14 @@ export class BrowserPbkdf2PinVerifier implements PinVerifier {
       return false;
     }
     const iterations = Number(iterationsText);
-    const salt = hexToBytes(saltHex);
-    const expected = hexToBytes(digestHex);
+    const salt = hexToArrayBuffer(saltHex);
+    const expectedBuffer = hexToArrayBuffer(digestHex);
     if (
       !Number.isSafeInteger(iterations) ||
       iterations < 100_000 ||
       salt === null ||
-      expected === null ||
-      expected.length !== DERIVED_KEY_BYTES
+      expectedBuffer === null ||
+      expectedBuffer.byteLength !== DERIVED_KEY_BYTES
     ) {
       return false;
     }
@@ -68,6 +69,6 @@ export class BrowserPbkdf2PinVerifier implements PinVerifier {
         DERIVED_KEY_BYTES * 8,
       ),
     );
-    return constantTimeEqual(derived, expected);
+    return constantTimeEqual(derived, new Uint8Array(expectedBuffer));
   }
 }
