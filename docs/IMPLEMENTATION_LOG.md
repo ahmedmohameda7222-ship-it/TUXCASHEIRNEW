@@ -35,3 +35,20 @@ The attached canonical source used for this phase has SHA-256 `8cad80ed1faa57f03
 - Removed the temporary lockfile/formatter workflows and stale type-contract source files before phase completion.
 - Security-hardened Phase 1 code and synchronized Architecture/Test Strategy docs passed GitHub Actions run `32060584932`; the documentation-only closeout branch was revalidated before integration.
 - Remote Supabase remains entirely unconfigured and no remote migration was applied.
+
+## 2026-08-17 — Phase 2 in progress
+
+- Created `feat/ops-02-domain-persistence` from the Phase 1 integration head.
+- Added strict domain value types for branded UUID identities, exact `MoneyMinor`, canonical `Instant`, and exact fixed-point `StockQuantityMicros` (`1 whole unit = 1,000,000 micros`).
+- Added Business Day OPEN/CLOSED identity and Business-Day-scoped display-order allocation with no calendar-date reset logic.
+- Added typed models for worker/device/session identity, menu/configuration, Orders/payments, Expenses, customer contacts, inventory, reconciliation, audit, and durable outbox.
+- Worker durable records contain a PIN hash field only; no plaintext production PIN is introduced.
+- Added one runtime-independent `OperationsDatabase` transaction/repository contract.
+- Added Node `node:sqlite` desktop persistence with versioned migrations, foreign keys, `synchronous = FULL`, explicit `BEGIN IMMEDIATE`, rollback on failure, constrained order/idempotency/Business-Day/Expense/inventory/outbox data, and atomic versioned configuration snapshots.
+- Added browser IndexedDB persistence behind the same contract with versioned stores, strict durability hint, persistent-storage request, Business Day uniqueness guard, atomic configuration snapshot, customer contacts, and outbox state.
+- Added SQLite integration tests for rollback, one-open-Business-Day enforcement, and configuration/outbox survival across database restart.
+- Added normalized remote Postgres/Supabase foundation migration with shop tenancy, configuration, Orders/history snapshots, payments, inventory, Expenses, reconciliation, audit, constraints/indexes, and RLS enabled.
+- The Supabase migration is repository-only and remains unapplied. No V2 Supabase URL/key/project ref was added.
+- Added Phase 2 data model, offline/sync, migrations docs and ADRs for local-first storage, Money, Business Day identity, outbox, inventory ledger, and immutable Order snapshots.
+- Temporary lockfile/formatter workflows used during branch construction were removed; final validation must run through permanent CI only.
+- Phase 2 is not complete until format/lint/typecheck/tests/build pass on the final branch head and the phase PR is reviewed/squash-merged.
