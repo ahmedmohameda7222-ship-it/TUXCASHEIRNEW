@@ -10,6 +10,7 @@ import {
   type OutboxEvent,
   type OutboxEventId,
   type Shop,
+  type ShopId,
   type Worker,
   type WorkerId,
   type WorkerSession,
@@ -40,17 +41,17 @@ export type OperationsSessionState =
     }
   | {
       readonly status: 'NO_ACTIVE_DAY';
-      readonly shopId: Shop['id'];
+      readonly shopId: ShopId;
     }
   | {
       readonly status: 'SIGN_IN_REQUIRED';
-      readonly shopId: Shop['id'];
+      readonly shopId: ShopId;
       readonly businessDayId: BusinessDayId;
       readonly businessDayStartedAt: Instant;
     }
   | {
       readonly status: 'ACTIVE';
-      readonly shopId: Shop['id'];
+      readonly shopId: ShopId;
       readonly businessDayId: BusinessDayId;
       readonly businessDayStartedAt: Instant;
       readonly operator: OperatorSummary;
@@ -104,12 +105,12 @@ export class OperationsSessionService {
       }
 
       try {
-        const shopResolution = await this.#resolveShop();
-        if (shopResolution === null) {
+        const shop = await this.#resolveShop();
+        if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
 
-        const workers = await this.#readModel.listActiveWorkers(shopResolution.id);
+        const workers = await this.#readModel.listActiveWorkers(shop.id);
         let authenticatedWorker: Worker | null = null;
         for (const worker of workers) {
           const matches = await this.#pinVerifier.verify(pin, worker.pinHash);
@@ -122,7 +123,7 @@ export class OperationsSessionService {
         }
 
         const initialDay = await this.#database.transaction((transaction) =>
-          transaction.businessDays.getOpenForShop(shopResolution.id),
+          transaction.businessDays.getOpenForShop(shop.id),
         );
         const existingSession =
           initialDay?.status === 'OPEN'
@@ -133,20 +134,16 @@ export class OperationsSessionService {
         const worker = authenticatedWorker;
         const activeState = await this.#database.transaction(async (transaction) => {
           const persistedWorker = await transaction.workers.getById(worker.id);
-          if (
-            persistedWorker === null ||
-            !persistedWorker.active ||
-            persistedWorker.shopId !== shopResolution.id
-          ) {
+          if (persistedWorker === null || !persistedWorker.active || persistedWorker.shopId !== shop.id) {
             throw new Error('Authenticated worker is no longer active for this shop.');
           }
 
-          const currentDay = await transaction.businessDays.getOpenForShop(shopResolution.id);
+          const currentDay = await transaction.businessDays.getOpenForShop(shop.id);
           const day: OpenBusinessDay =
             currentDay === null
               ? createOpenBusinessDay({
                   id: this.#id<BusinessDayId>(),
-                  shopId: shopResolution.id,
+                  shopId: shop.id,
                   startedAt: now,
                   startedByWorkerId: worker.id,
                 })
@@ -156,39 +153,39 @@ export class OperationsSessionService {
                     throw new Error('Closed Business Day returned from open-day query.');
                   })();
 
-          const dayWasCreated = currentDay === null;
-          if (dayWasCreated) {
+          if (currentDay === null) {
             await transaction.businessDays.put(day);
             await transaction.audit.append(
-              this.#audit('BUSINESS_DAY_STARTED', day.id, day.id, worker.id, now, {
+              this.#audit(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, worker.id, now, {
                 startedByWorkerId: worker.id,
               }),
             );
             await transaction.outbox.append(
-              this.#outbox('BUSINESS_DAY_STARTED', day.id, day.id, now, {
+              this.#outbox(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, now, {
                 businessDayId: day.id,
                 startedByWorkerId: worker.id,
               }),
             );
           }
 
-          const sessionBelongsToCurrentDay =
-            existingSession !== null && existingSession.businessDayId === day.id;
-          if (
-            sessionBelongsToCurrentDay &&
-            existingSession.endedAt === null &&
-            existingSession.workerId === worker.id
-          ) {
-            return this.#activeState(shopResolution, day, worker);
+          const openExistingSession =
+            existingSession !== null &&
+            existingSession.businessDayId === day.id &&
+            existingSession.endedAt === null
+              ? existingSession
+              : null;
+
+          if (openExistingSession?.workerId === worker.id) {
+            return this.#activeState(shop, day, worker);
           }
 
-          if (sessionBelongsToCurrentDay && existingSession.endedAt === null) {
-            await transaction.workerSessions.put({ ...existingSession, endedAt: now });
+          if (openExistingSession !== null) {
+            await transaction.workerSessions.put({ ...openExistingSession, endedAt: now });
           }
 
           const newSession: WorkerSession = {
             id: this.#id<WorkerSessionId>(),
-            shopId: shopResolution.id,
+            shopId: shop.id,
             businessDayId: day.id,
             workerId: worker.id,
             startedAt: now,
@@ -196,23 +193,23 @@ export class OperationsSessionService {
           };
           await transaction.workerSessions.put(newSession);
 
-          const switched = sessionBelongsToCurrentDay && existingSession.workerId !== worker.id;
+          const switched = openExistingSession !== null && openExistingSession.workerId !== worker.id;
           const eventType = switched ? 'WORKER_SWITCHED' : 'WORKER_SIGNED_IN';
           await transaction.audit.append(
-            this.#audit(eventType, day.id, newSession.id, worker.id, now, {
+            this.#audit(shop.id, eventType, day.id, newSession.id, worker.id, now, {
               workerId: worker.id,
-              previousWorkerId: switched ? existingSession.workerId : null,
+              previousWorkerId: switched ? openExistingSession.workerId : null,
             }),
           );
           await transaction.outbox.append(
-            this.#outbox(eventType, day.id, newSession.id, now, {
+            this.#outbox(shop.id, eventType, day.id, newSession.id, now, {
               businessDayId: day.id,
               workerId: worker.id,
-              previousWorkerId: switched ? existingSession.workerId : null,
+              previousWorkerId: switched ? openExistingSession.workerId : null,
             }),
           );
 
-          return this.#activeState(shopResolution, day, worker);
+          return this.#activeState(shop, day, worker);
         });
 
         return ok(activeState);
@@ -249,12 +246,12 @@ export class OperationsSessionService {
         await this.#database.transaction(async (transaction) => {
           await transaction.workerSessions.put({ ...session, endedAt: now });
           await transaction.audit.append(
-            this.#audit('WORKER_SIGNED_OUT', day.id, session.id, session.workerId, now, {
+            this.#audit(shop.id, 'WORKER_SIGNED_OUT', day.id, session.id, session.workerId, now, {
               workerId: session.workerId,
             }),
           );
           await transaction.outbox.append(
-            this.#outbox('WORKER_SIGNED_OUT', day.id, session.id, now, {
+            this.#outbox(shop.id, 'WORKER_SIGNED_OUT', day.id, session.id, now, {
               businessDayId: day.id,
               workerId: session.workerId,
             }),
@@ -326,6 +323,7 @@ export class OperationsSessionService {
   }
 
   #audit(
+    shopId: ShopId,
     eventType: AuditEvent['eventType'],
     businessDayId: BusinessDayId,
     aggregateId: EntityId,
@@ -335,7 +333,7 @@ export class OperationsSessionService {
   ): AuditEvent {
     return {
       id: this.#id<AuditEventId>(),
-      shopId: businessDayId === aggregateId ? undefinedShopIdNever() : undefinedShopIdNever(),
+      shopId,
       businessDayId,
       aggregateType: eventType.startsWith('BUSINESS_DAY') ? 'BUSINESS_DAY' : 'WORKER_SESSION',
       aggregateId,
@@ -347,6 +345,7 @@ export class OperationsSessionService {
   }
 
   #outbox(
+    shopId: ShopId,
     eventType: string,
     businessDayId: BusinessDayId,
     aggregateId: EntityId,
@@ -355,7 +354,7 @@ export class OperationsSessionService {
   ): OutboxEvent {
     return {
       id: this.#id<OutboxEventId>(),
-      shopId: undefinedShopIdNever(),
+      shopId,
       businessDayId,
       aggregateType: eventType.startsWith('BUSINESS_DAY') ? 'BUSINESS_DAY' : 'WORKER_SESSION',
       aggregateId,
@@ -384,8 +383,4 @@ export class OperationsSessionService {
       release();
     }
   }
-}
-
-function undefinedShopIdNever(): never {
-  throw new Error('Internal shopId placeholder must be replaced before runtime.');
 }
