@@ -1,7 +1,18 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import type { OperationsSessionResult } from '@tux/application';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
+import { contextBridge, ipcRenderer } from 'electron';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
+const IPC_SESSION_GET_STATE = 'tux:session:get-state';
+const IPC_SESSION_SUBMIT_PIN = 'tux:session:submit-pin';
+const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
+
+function assertSessionResult(value: unknown): OperationsSessionResult {
+  if (typeof value !== 'object' || value === null || !('ok' in value)) {
+    throw new TypeError('Invalid session response from Electron main process.');
+  }
+  return value as OperationsSessionResult;
+}
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -12,6 +23,14 @@ const api: TuxDesktopApi = Object.freeze({
       }
       return version;
     },
+  }),
+  session: Object.freeze({
+    getState: async () =>
+      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_GET_STATE) as unknown),
+    submitPin: async (pin: string) =>
+      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_SUBMIT_PIN, pin) as unknown),
+    signOut: async () =>
+      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_SIGN_OUT) as unknown),
   }),
 });
 
