@@ -8,5 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tux/domain": "0.0.0",
+    "@tux/persistence": "0.0.0"
   }
 }
