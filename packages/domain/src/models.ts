@@ -42,6 +42,7 @@ export interface Worker {
   readonly id: WorkerId;
   readonly shopId: ShopId;
   readonly displayName: string;
+  readonly pinHash: string;
   readonly active: boolean;
 }
 
