@@ -7,6 +7,7 @@ export {
   type ClosedBusinessDay,
   type OpenBusinessDay,
 } from './businessDay';
+export type * from './catalog';
 export { DomainInvariantError } from './errors';
 export { parseEntityId } from './ids';
 export type * from './ids';
