@@ -190,7 +190,9 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           contacts.index('shopPhone').get([contact.shopId, contact.normalizedPhone]),
         );
         if (existing !== null && existing.id !== contact.id) {
-          await requestResult(contacts.delete(existing.id));
+          throw new Error(
+            `Customer contact identity mismatch for normalized phone ${contact.normalizedPhone}.`,
+          );
         }
         await requestResult(contacts.put(contact));
       },
