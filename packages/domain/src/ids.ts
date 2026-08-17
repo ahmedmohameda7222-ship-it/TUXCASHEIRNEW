@@ -1,4 +1,4 @@
-import { brandValue, type Brand } from './brand';
+import type { Brand } from './brand';
 import { DomainInvariantError } from './errors';
 
 export type ShopId = Brand<string, 'ShopId'>;
@@ -52,5 +52,6 @@ export function parseEntityId<Id extends EntityId>(value: string): Id {
   if (!UUID_PATTERN.test(value)) {
     throw new DomainInvariantError(`Invalid UUID entity identifier: ${value}`);
   }
-  return brandValue<string, Id extends Brand<string, infer Name> ? Name : never>(value) as Id;
+
+  return value as unknown as Id;
 }
