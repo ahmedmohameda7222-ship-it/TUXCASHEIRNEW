@@ -1,7 +1,4 @@
-import {
-  OperationsSessionService,
-  type OperationsSessionResult,
-} from '@tux/application';
+import { OperationsSessionService, type OperationsSessionResult } from '@tux/application';
 import { instant } from '@tux/domain';
 import {
   IndexedDbOperationsDatabase,

@@ -21,10 +21,7 @@ describe('NodePbkdf2PinVerifier', () => {
     const verifier = new NodePbkdf2PinVerifier();
     await expect(verifier.verify('1234', 'plaintext:1234')).resolves.toBe(false);
     await expect(
-      verifier.verify(
-        '1234',
-        `pbkdf2-sha256$99999$0011223344556677$${'00'.repeat(32)}`,
-      ),
+      verifier.verify('1234', `pbkdf2-sha256$99999$0011223344556677$${'00'.repeat(32)}`),
     ).resolves.toBe(false);
   });
 });

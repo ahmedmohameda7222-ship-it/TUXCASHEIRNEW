@@ -4,12 +4,7 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { OperationsSessionService, type PinVerifier } from '@tux/application';
-import {
-  instant,
-  parseEntityId,
-  type ShopId,
-  type WorkerId,
-} from '@tux/domain';
+import { instant, parseEntityId, type ShopId, type WorkerId } from '@tux/domain';
 import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
 
 const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
@@ -25,7 +20,9 @@ class FixturePinVerifier implements PinVerifier {
 const cleanupDirectories: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(cleanupDirectories.splice(0).map((directory) => rm(directory, { recursive: true })));
+  await Promise.all(
+    cleanupDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+  );
 });
 
 async function fixture() {
@@ -88,7 +85,8 @@ describe('OperationsSessionService with SQLite', () => {
 
     const started = await service.submitPin('1234');
     expect(started.ok).toBe(true);
-    if (!started.ok || started.value.status !== 'ACTIVE') throw new Error('Expected active session.');
+    if (!started.ok || started.value.status !== 'ACTIVE')
+      throw new Error('Expected active session.');
     const businessDayId = started.value.businessDayId;
     expect(started.value.operator.displayName).toBe('Ahmed');
 
@@ -100,7 +98,8 @@ describe('OperationsSessionService with SQLite', () => {
     setNow('2026-08-17T14:00:00.000Z');
     const switched = await service.submitPin('5678');
     expect(switched.ok).toBe(true);
-    if (!switched.ok || switched.value.status !== 'ACTIVE') throw new Error('Expected switched session.');
+    if (!switched.ok || switched.value.status !== 'ACTIVE')
+      throw new Error('Expected switched session.');
     expect(switched.value.businessDayId).toBe(businessDayId);
     expect(switched.value.operator.id).toBe(MAYA_ID);
 

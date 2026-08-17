@@ -134,7 +134,11 @@ export class OperationsSessionService {
         const worker = authenticatedWorker;
         const activeState = await this.#database.transaction(async (transaction) => {
           const persistedWorker = await transaction.workers.getById(worker.id);
-          if (persistedWorker === null || !persistedWorker.active || persistedWorker.shopId !== shop.id) {
+          if (
+            persistedWorker === null ||
+            !persistedWorker.active ||
+            persistedWorker.shopId !== shop.id
+          ) {
             throw new Error('Authenticated worker is no longer active for this shop.');
           }
 
@@ -193,7 +197,8 @@ export class OperationsSessionService {
           };
           await transaction.workerSessions.put(newSession);
 
-          const switched = openExistingSession !== null && openExistingSession.workerId !== worker.id;
+          const switched =
+            openExistingSession !== null && openExistingSession.workerId !== worker.id;
           const eventType = switched ? 'WORKER_SWITCHED' : 'WORKER_SIGNED_IN';
           await transaction.audit.append(
             this.#audit(shop.id, eventType, day.id, newSession.id, worker.id, now, {

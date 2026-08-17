@@ -49,7 +49,10 @@ export class IndexedDbOperatorSessionReadModel implements OperatorSessionReadMod
   async listActiveShops(): Promise<readonly Shop[]> {
     const transaction = this.#db().transaction('shops', 'readonly');
     const shops = (await requestResult(transaction.objectStore('shops').getAll())) as Shop[];
-    return shops.filter((shop) => shop.active).sort((left, right) => left.id.localeCompare(right.id)).slice(0, 2);
+    return shops
+      .filter((shop) => shop.active)
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .slice(0, 2);
   }
 
   async listActiveWorkers(shopId: ShopId): Promise<readonly Worker[]> {
@@ -57,7 +60,10 @@ export class IndexedDbOperatorSessionReadModel implements OperatorSessionReadMod
     const workers = (await requestResult(transaction.objectStore('workers').getAll())) as Worker[];
     return workers
       .filter((worker) => worker.shopId === shopId && worker.active)
-      .sort((left, right) => left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id));
+      .sort(
+        (left, right) =>
+          left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id),
+      );
   }
 
   async getOpenWorkerSession(businessDayId: BusinessDayId): Promise<WorkerSession | null> {

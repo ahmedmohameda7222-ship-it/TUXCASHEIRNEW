@@ -26,11 +26,11 @@ const api: TuxDesktopApi = Object.freeze({
   }),
   session: Object.freeze({
     getState: async () =>
-      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_GET_STATE) as unknown),
+      assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_GET_STATE)) as unknown),
     submitPin: async (pin: string) =>
-      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_SUBMIT_PIN, pin) as unknown),
+      assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_SUBMIT_PIN, pin)) as unknown),
     signOut: async () =>
-      assertSessionResult(await ipcRenderer.invoke(IPC_SESSION_SIGN_OUT) as unknown),
+      assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_SIGN_OUT)) as unknown),
   }),
 });
 

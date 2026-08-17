@@ -5,7 +5,10 @@ import { createOperationsSessionClient } from './sessionClient';
 type ScreenState =
   | { readonly kind: 'LOADING' }
   | { readonly kind: 'SESSION'; readonly session: OperationsSessionState }
-  | { readonly kind: 'GREETING'; readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }> };
+  | {
+      readonly kind: 'GREETING';
+      readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+    };
 
 function Brand() {
   return (
@@ -69,7 +72,10 @@ function EntryScreen({
   error,
   onPin,
 }: {
-  readonly session: Extract<OperationsSessionState, { status: 'NO_ACTIVE_DAY' | 'SIGN_IN_REQUIRED' }>;
+  readonly session: Extract<
+    OperationsSessionState,
+    { status: 'NO_ACTIVE_DAY' | 'SIGN_IN_REQUIRED' }
+  >;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onPin: (pin: string) => Promise<void>;
@@ -83,7 +89,12 @@ function EntryScreen({
         <p className="entry-state">
           {starting ? 'No active Business Day' : 'Business Day active — operator sign-in required'}
         </p>
-        <PinForm purpose={starting ? 'START_DAY' : 'SIGN_IN'} busy={busy} error={error} onSubmit={onPin} />
+        <PinForm
+          purpose={starting ? 'START_DAY' : 'SIGN_IN'}
+          busy={busy}
+          error={error}
+          onSubmit={onPin}
+        />
       </section>
     </main>
   );
@@ -133,13 +144,23 @@ function ActiveShell({
       <header className="operations-header">
         <Brand />
         <nav className="operations-nav" aria-label="Operations">
-          <button type="button" className="nav-item nav-item-active">Orders</button>
-          <button type="button" className="nav-item" disabled>Orders Board</button>
-          <button type="button" className="nav-item" disabled>Expenses</button>
-          <button type="button" className="nav-item" disabled>Bulk Stock</button>
+          <button type="button" className="nav-item nav-item-active">
+            Orders
+          </button>
+          <button type="button" className="nav-item" disabled>
+            Orders Board
+          </button>
+          <button type="button" className="nav-item" disabled>
+            Expenses
+          </button>
+          <button type="button" className="nav-item" disabled>
+            Bulk Stock
+          </button>
         </nav>
         <div className="header-actions">
-          <span className="sync-status" aria-label="Local-first status">Local</span>
+          <span className="sync-status" aria-label="Local-first status">
+            Local
+          </span>
           <div className="operator-menu-wrap">
             <button
               className="operator-trigger"
@@ -165,7 +186,12 @@ function ActiveShell({
                 >
                   Switch / Sign in worker
                 </button>
-                <button type="button" role="menuitem" disabled={busy} onClick={() => void onSignOut()}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => void onSignOut()}
+                >
                   Sign out
                 </button>
                 <div className="menu-divider" />
@@ -181,14 +207,25 @@ function ActiveShell({
       <main className="orders-phase-placeholder" aria-labelledby="orders-title">
         <p className="eyebrow">Current Business Day</p>
         <h1 id="orders-title">Orders</h1>
-        <p>The worker session is active. The complete Orders workspace is implemented in Phase 4.</p>
+        <p>
+          The worker session is active. The complete Orders workspace is implemented in Phase 4.
+        </p>
       </main>
 
-      {error === null ? null : <div className="global-error" role="alert">{error}</div>}
+      {error === null ? null : (
+        <div className="global-error" role="alert">
+          {error}
+        </div>
+      )}
 
       {switchOpen ? (
         <div className="modal-backdrop" role="presentation">
-          <section className="switch-dialog" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+          <section
+            className="switch-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="switch-title"
+          >
             <div className="dialog-heading">
               <div>
                 <p className="eyebrow">Current operator</p>
@@ -282,7 +319,16 @@ export function App() {
     );
   }
   if (screen.session.status === 'NO_ACTIVE_DAY' || screen.session.status === 'SIGN_IN_REQUIRED') {
-    return <EntryScreen session={screen.session} busy={busy} error={error} onPin={async (pin) => { void (await applyPin(pin)); }} />;
+    return (
+      <EntryScreen
+        session={screen.session}
+        busy={busy}
+        error={error}
+        onPin={async (pin) => {
+          void (await applyPin(pin));
+        }}
+      />
+    );
   }
   return (
     <ActiveShell
