@@ -25,7 +25,7 @@ The attached canonical source used for this phase has SHA-256 `8cad80ed1faa57f03
 - Chose TypeScript 6.0.3 rather than TypeScript 7 because the current stable typescript-eslint support range is `<6.1.0`.
 - Added npm workspaces, strict compiler baseline, ESLint, Prettier, Vitest, and a generated npm lockfile.
 - Added the shared React Operations renderer and a secure Electron main/preload shell.
-- Electron window security is explicit: context isolation on, renderer Node integration off, sandbox on.
+- Hardened the Electron trust boundary: context isolation and sandbox on; renderer Node integration off; `webSecurity` on; webviews, new windows, and renderer navigation denied; development content limited to the fixed local Vite origin; IPC calls validated against the expected renderer main frame; renderer CSP added.
 - Added a narrow typed desktop capability contract instead of a generic IPC bridge.
 - Added runtime config validation with the remote backend disabled by default.
 - Added TUX light/dark design tokens and minimal foundation renderer styling; no approved feature workflow is claimed implemented.
@@ -33,5 +33,5 @@ The attached canonical source used for this phase has SHA-256 `8cad80ed1faa57f03
 - Added Architecture/Test Strategy docs and ADRs for repository and Electron boundaries.
 - Third-party declaration checking is skipped at the compiler boundary because Electron/Node/browser declaration packages currently overlap; strict checking remains enabled for all TUX source code.
 - Removed the temporary lockfile/formatter workflows and stale type-contract source files before phase completion.
-- GitHub Actions run `32060021587` passed: locked install, format check, ESLint, strict TypeScript typecheck, Vitest unit tests, Operations Vite build, and Electron TypeScript build.
+- Security-hardened code and synchronized Architecture/Test Strategy docs passed GitHub Actions run `32060584932`: locked install, format check, ESLint, strict TUX source typecheck, Vitest unit tests, Operations Vite build, and Electron TypeScript build.
 - Remote Supabase remains entirely unconfigured and no remote migration was applied.
