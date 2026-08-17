@@ -39,7 +39,7 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Removed temporary write-capable helper workflows before closeout.
 - PR #4 was squash-merged into `integration/tux-operations-v2` as `10f15a057f5371987a4e2f7fb119fedfdd901a9d`.
 
-## 2026-08-17 — Phase 3 in closeout
+## 2026-08-17 — Phase 3 completed
 
 - Created `feat/ops-03-business-day-operator` from the Phase 2 integration squash commit.
 - Added a narrow `OperatorSessionReadModel`; desktop uses a read-only SQLite query connection and browser fallback reads the current IndexedDB stores.
@@ -54,6 +54,7 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Replaced Electron's raw TypeScript emit with strict bundler-resolution typecheck plus Vite-bundled CommonJS main/preload outputs so ESM workspace source is not consumed incorrectly by CommonJS at runtime.
 - Added tests for invalid-PIN no-mutation behavior, Business Day start/recovery/switch/sign-out, one-open-session database enforcement, greeting boundaries, PBKDF2 verification, and preload response validation.
 - Removed all temporary Phase 3 lockfile/formatter helper workflows before clean validation.
-- Permanent CI run `32068287692` passed install, format, lint, strict typecheck, unit/integration tests, browser build, and Electron main/preload builds on code head `46f8eb3bc1968a1842414fdb92ce702dfae3e332`.
-- The approved graphic TUX logo asset is not present in the V2 repository; the locked screen currently uses a typographic `TUX` fallback and the visual-logo requirement is not claimed fully compliant.
-- Final Phase 3 status remains pending the documentation-head PR validation and squash merge into integration.
+- Permanent code-head CI run `32068287692` passed install, format, lint, strict typecheck, unit/integration tests, browser build, and Electron main/preload builds.
+- PR #5 exact documentation head then passed the same permanent gate on run `32068544454`.
+- The approved graphic TUX logo asset is not present in the V2 repository; the locked screen currently uses a typographic `TUX` fallback and START-001 is not claimed fully compliant.
+- Phase 3 is ready for squash merge into `integration/tux-operations-v2`; `main` remains untouched.
