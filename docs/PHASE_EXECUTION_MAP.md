@@ -5,7 +5,7 @@ This is the concise execution map for the approved build sequence. The canonical
 | Phase | Branch | Scope | Initial gap | Status |
 |---|---|---|---|---|
 | 0 | `feat/ops-00-bootstrap` | Repository governance, canonical spec, compliance/log docs | Empty repository / no Git history | PASS |
-| 1 | `feat/ops-01-foundation` | TypeScript monorepo, React, Electron shell, CI, tokens, test harness | Not built | NOT_STARTED |
+| 1 | `feat/ops-01-foundation` | TypeScript monorepo, React, Electron shell, CI, tokens, test harness | Not built | PASS |
 | 2 | `feat/ops-02-domain-persistence` | Domain, Money, local DB, browser persistence, outbox, SQL migrations | Not built | NOT_STARTED |
 | 3 | `feat/ops-03-business-day-operator` | Locked screen, PIN abstraction, Business Day, operator, greeting | Not built | NOT_STARTED |
 | 4 | `feat/ops-04-orders` | Full Orders / checkout contract | Not built | NOT_STARTED |
@@ -23,4 +23,5 @@ This is the concise execution map for the approved build sequence. The canonical
 - All product implementation must target `integration/tux-operations-v2` through phase branches.
 - Legacy `Tuxcashier` is read-only reference. Its large `src/AppCore.js` monolith is specifically not a V2 architecture template.
 - No remote Supabase project is configured or required now; remote migration application is forbidden until explicitly authorized.
-- Phase 0 deliberately contains no application implementation; Phase 1 owns the engineering foundation.
+- Phase 1 established the strict TypeScript workspace, shared React renderer, secure Electron boundary, design tokens, runtime-config validation, lockfile, tests, and permanent CI quality gate.
+- Phase 1 CI evidence: GitHub Actions run `32060021587` passed install, format, lint, typecheck, unit tests, and production builds.
