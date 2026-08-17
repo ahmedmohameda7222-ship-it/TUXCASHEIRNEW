@@ -1,5 +1,5 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { createOperationsSessionClient } from './sessionClient';
 
 type ScreenState =
@@ -122,7 +122,7 @@ function ActiveShell({
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
   readonly busy: boolean;
   readonly error: string | null;
-  readonly onSwitch: (pin: string) => Promise<void>;
+  readonly onSwitch: (pin: string) => Promise<boolean>;
   readonly onSignOut: () => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -203,8 +203,8 @@ function ActiveShell({
               busy={busy}
               error={error}
               onSubmit={async (pin) => {
-                await onSwitch(pin);
-                setSwitchOpen(false);
+                const switched = await onSwitch(pin);
+                if (switched) setSwitchOpen(false);
               }}
             />
           </section>
@@ -232,22 +232,23 @@ export function App() {
     };
   }, [client]);
 
-  async function applyPin(pin: string): Promise<void> {
+  async function applyPin(pin: string): Promise<boolean> {
     setBusy(true);
     setError(null);
     const result = await client.submitPin(pin);
     setBusy(false);
     if (!result.ok) {
       setError(result.error.message);
-      return;
+      return false;
     }
     if (result.value.status === 'ACTIVE') {
       const active = result.value;
       setScreen({ kind: 'GREETING', session: active });
       window.setTimeout(() => setScreen({ kind: 'SESSION', session: active }), 1_250);
-      return;
+      return true;
     }
     setScreen({ kind: 'SESSION', session: result.value });
+    return true;
   }
 
   async function signOut(): Promise<void> {
@@ -281,7 +282,7 @@ export function App() {
     );
   }
   if (screen.session.status === 'NO_ACTIVE_DAY' || screen.session.status === 'SIGN_IN_REQUIRED') {
-    return <EntryScreen session={screen.session} busy={busy} error={error} onPin={applyPin} />;
+    return <EntryScreen session={screen.session} busy={busy} error={error} onPin={async (pin) => { void (await applyPin(pin)); }} />;
   }
   return (
     <ActiveShell
