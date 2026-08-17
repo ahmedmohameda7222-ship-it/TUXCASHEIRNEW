@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import {
-  instant,
-  parseEntityId,
-  type CustomerContactId,
-  type ShopId,
-} from '@tux/domain';
+import { instant, parseEntityId, type CustomerContactId, type ShopId } from '@tux/domain';
 import { SqliteOperationsDatabase } from './index';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
-const firstContactId = parseEntityId<CustomerContactId>(
-  '66666666-6666-4666-8666-666666666666',
-);
+const firstContactId = parseEntityId<CustomerContactId>('66666666-6666-4666-8666-666666666666');
 const conflictingContactId = parseEntityId<CustomerContactId>(
   '77777777-7777-4777-8777-777777777777',
 );
