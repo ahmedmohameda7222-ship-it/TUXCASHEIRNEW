@@ -2,9 +2,13 @@ import type {
   AuditEvent,
   BusinessDay,
   BusinessDayId,
+  CustomerContact,
+  Device,
+  DeviceId,
   Expense,
   InventoryItem,
   InventoryMovement,
+  OperationsConfigurationSnapshot,
   OrderId,
   OrderSnapshot,
   OutboxEvent,
@@ -22,8 +26,11 @@ import type { OperationsDatabase, OperationsTransaction } from '../contracts';
 const DATABASE_VERSION = 1;
 const STORES = [
   'shops',
+  'devices',
   'workers',
   'workerSessions',
+  'configurationSnapshots',
+  'customerContacts',
   'businessDays',
   'orders',
   'expenses',
@@ -76,10 +83,17 @@ function openDatabase(name: string): Promise<IDBDatabase> {
       const shops = database.createObjectStore('shops', { keyPath: 'id' });
       shops.createIndex('active', 'active');
 
+      const devices = database.createObjectStore('devices', { keyPath: 'id' });
+      devices.createIndex('shopId', 'shopId');
+
       const workers = database.createObjectStore('workers', { keyPath: 'id' });
       workers.createIndex('shopId', 'shopId');
 
       database.createObjectStore('workerSessions', { keyPath: 'id' });
+      database.createObjectStore('configurationSnapshots', { keyPath: 'shopId' });
+
+      const customerContacts = database.createObjectStore('customerContacts', { keyPath: 'id' });
+      customerContacts.createIndex('shopPhone', ['shopId', 'normalizedPhone'], { unique: true });
 
       const businessDays = database.createObjectStore('businessDays', { keyPath: 'id' });
       businessDays.createIndex('shopStatus', ['shopId', 'status']);
@@ -130,6 +144,14 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         await requestResult(store('shops').put(shop));
       },
     },
+    devices: {
+      async getById(id: DeviceId) {
+        return recordOrNull<Device>(store('devices').get(id));
+      },
+      async put(device: Device) {
+        await requestResult(store('devices').put(device));
+      },
+    },
     workers: {
       async getById(id: WorkerId) {
         return recordOrNull<Worker>(store('workers').get(id));
@@ -141,6 +163,36 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
     workerSessions: {
       async put(session: WorkerSession) {
         await requestResult(store('workerSessions').put(session));
+      },
+    },
+    configuration: {
+      async getForShop(shopId: ShopId) {
+        return recordOrNull<OperationsConfigurationSnapshot>(
+          store('configurationSnapshots').get(shopId),
+        );
+      },
+      async put(snapshot: OperationsConfigurationSnapshot) {
+        if (!Number.isSafeInteger(snapshot.version) || snapshot.version <= 0) {
+          throw new RangeError('Configuration snapshot version must be a positive safe integer.');
+        }
+        await requestResult(store('configurationSnapshots').put(snapshot));
+      },
+    },
+    customerContacts: {
+      async getByNormalizedPhone(shopId: ShopId, normalizedPhone: string) {
+        return recordOrNull<CustomerContact>(
+          store('customerContacts').index('shopPhone').get([shopId, normalizedPhone]),
+        );
+      },
+      async put(contact: CustomerContact) {
+        const contacts = store('customerContacts');
+        const existing = await recordOrNull<CustomerContact>(
+          contacts.index('shopPhone').get([contact.shopId, contact.normalizedPhone]),
+        );
+        if (existing !== null && existing.id !== contact.id) {
+          await requestResult(contacts.delete(existing.id));
+        }
+        await requestResult(contacts.put(contact));
       },
     },
     businessDays: {
