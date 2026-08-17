@@ -12,6 +12,6 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": false
+    "skipLibCheck": true
   }
 }
