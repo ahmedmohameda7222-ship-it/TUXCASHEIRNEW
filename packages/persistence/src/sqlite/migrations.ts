@@ -101,7 +101,7 @@ CREATE TABLE inventory_movements (
   business_day_id TEXT REFERENCES business_days(id),
   item_id TEXT NOT NULL REFERENCES inventory_items(id),
   movement_type TEXT NOT NULL,
-  quantity_delta INTEGER NOT NULL CHECK (quantity_delta <> 0),
+  quantity_delta_micros INTEGER NOT NULL CHECK (quantity_delta_micros <> 0),
   idempotency_key TEXT NOT NULL,
   worker_id TEXT NOT NULL REFERENCES workers(id),
   order_id TEXT REFERENCES orders(id),
