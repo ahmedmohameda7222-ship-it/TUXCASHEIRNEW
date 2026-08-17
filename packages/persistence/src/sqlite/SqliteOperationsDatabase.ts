@@ -215,7 +215,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         database
           .prepare(
             `INSERT INTO inventory_movements(
-              id, shop_id, business_day_id, item_id, movement_type, quantity_delta, idempotency_key,
+              id, shop_id, business_day_id, item_id, movement_type, quantity_delta_micros, idempotency_key,
               worker_id, order_id, created_at, compensates_movement_id, payload_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
@@ -225,7 +225,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             movement.businessDayId,
             movement.itemId,
             movement.movementType,
-            movement.quantityDelta,
+            movement.quantityDeltaMicros,
             movement.idempotencyKey,
             movement.workerId,
             movement.orderId,
