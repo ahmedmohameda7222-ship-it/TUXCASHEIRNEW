@@ -97,3 +97,17 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Validation run `32129946499` passed locked install, Prettier, ESLint, strict TypeScript, all 75 unit/integration tests (21 files), Operations browser production build, and Electron main/preload production builds. Its final helper-commit push raced a concurrent branch update; the validated source was committed by the concurrent run and the temporary bytecode artifact was removed separately.
 - Renderer-only visual/interaction rows remain `IMPLEMENTED_NOT_VALIDATED`; Phase 5 does not claim manual/E2E UI evidence that was not performed.
 - No remote Supabase project was linked or mutated; all Board corrections are local-first and queue durable outbox work for the later sync phase.
+
+## 2026-08-18 — Phase 6 Expenses implementation
+
+- Created `feat/ops-06-expenses` from the clean Phase 5 Orders Board head and kept the work stacked; `main` and remote Supabase remain untouched.
+- Added the current-open-Business-Day Expenses ledger with exact `MoneyMinor` manual Description/Amount/Paid From Cash|Other/optional Note semantics.
+- Added explicit manual expense lifecycle revisions for audited edit and soft-delete. Delete removes the entry from the current operational ledger/totals without destructively deleting the durable database fact.
+- Added exact `totalExpensesMinor` and separate `cashExpensesMinor` projections. Cash and Other both count as Expenses; only Cash is carried forward as a drawer deduction for later End Day Expected Cash. Delivery Failed and soft-deleted entries are excluded.
+- Added a dedicated `ExpenseLedgerStore` boundary with SQLite and IndexedDB adapters. Manual Expense mutation, audit and durable outbox intent commit atomically with Business Day/operator/revision revalidation.
+- Kept `DELIVERY_FAILED` system records locked, `amount = null`, non-financial and visible in the current ledger; no manual edit/delete path is exposed.
+- Added typed browser client, validated Electron preload IPC, isolated Electron-main Expenses IPC runtime, and the worker-facing Expenses page with Add/Edit/Delete dialogs, top Total Expenses and newest-first compact rows.
+- Added domain tests and SQLite integration covering current-vs-historical Business Day scope, exact Cash/Other totals, edit identity/revision behavior, durable soft-delete history, locked Delivery Failed semantics, historical mutation rejection and injected outbox-failure rollback.
+- Permanent clean code-head CI run `32133776774` on `83a422af1b5f69e38287883a350bc0b20a668a69` passed locked install, Prettier, ESLint, strict TypeScript, all unit/integration tests, browser production build, and Electron main/preload production builds before documentation synchronization.
+- Renderer-only visual/interaction requirements remain `IMPLEMENTED_NOT_VALIDATED`; End Day archival/removal from the operational view remains the later End Day phase and is not claimed here.
+

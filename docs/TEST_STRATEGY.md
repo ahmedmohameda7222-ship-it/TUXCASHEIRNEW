@@ -148,6 +148,24 @@ Automated tests protect:
 
 Strict TypeScript and production builds cover the browser/Electron typed Board clients, IPC validation and React renderer wiring. Sorting, responsive card/row layout, search interaction, details drawer, modal decisions, waiting-age display and the visible Undo toast remain `IMPLEMENTED_NOT_VALIDATED` until rendered browser/Electron interaction QA or dedicated E2E evidence exists.
 
+## Phase 6 Expenses coverage
+
+Phase 6 adds domain and SQLite integration coverage for the current-Business-Day operational ledger.
+
+Automated tests protect:
+
+- manual Description/Amount/Paid From/optional Note validation using exact minor units;
+- legacy manual rows upgrading to revision-zero lifecycle metadata;
+- exact Total Expenses across Cash + Other and a separate exact Cash-only subtotal for later Expected Cash;
+- current open Business Day isolation and newest-first ledger ordering independent of calendar date;
+- edit preserving Expense identity/original creation time while incrementing revision and changing totals correctly;
+- audited soft-delete removing a manual row from current ledger/totals while preserving its database payload;
+- Delivery Failed remaining visible, locked and excluded from both financial totals;
+- historical Business Day mutation rejection without audit/outbox side effects;
+- atomic rollback when outbox persistence fails after expense/audit work has begun.
+
+Strict TypeScript and production builds cover the typed browser/Electron Expenses client, preload validation, dedicated native IPC boundary and renderer wiring. Add/Edit/Delete dialog interaction, responsive ledger presentation, visible Total Expenses, and newest-first rendered ordering remain `IMPLEMENTED_NOT_VALIDATED` until rendered browser/Electron QA or dedicated E2E evidence exists.
+
 ## Migration validation
 
 SQLite migrations are executed by automated persistence/session tests.
@@ -158,8 +176,6 @@ The remote Postgres/Supabase migration chain is reviewed and versioned in Git bu
 
 As the corresponding later phases land, tests must prioritize:
 
-- Expenses Cash vs Other reconciliation effect and manual expense editing/deletion;
-- Delivery Failed presentation/lock behavior inside the future Expenses screen;
 - Bulk Stock compensating movements;
 - blind reconciliation;
 - offline End Day close;

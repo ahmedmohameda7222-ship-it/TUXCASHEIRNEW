@@ -22,7 +22,11 @@ Formatting is presentation only. Business arithmetic never depends on binary flo
 
 Editable Orders money fields are parsed from decimal strings directly into minor units. Inputs with more than two decimal places, malformed values, negative values where not allowed, or values outside the safe-integer range are rejected instead of being coerced through floating-point arithmetic.
 
-### Inventory quantities
+#Phase 6 projects manual Expenses through `ExpenseLedgerRecord`. Manual rows carry operational lifecycle metadata (`revision`, last edit attribution/time, soft-delete attribution/time). Legacy manual rows without lifecycle metadata are upgraded in memory to revision zero. Editing preserves immutable identity and original creation time. Delete is a soft-delete: it removes the row from the current operational ledger/totals while preserving the durable database fact and audit history.
+
+`calculateExpenseTotals()` returns two exact projections: `totalExpensesMinor` includes every active manual Cash/Other expense, while `cashExpensesMinor` includes only active manual Cash expenses for later Expected Cash calculation. `DELIVERY_FAILED` and soft-deleted manual rows contribute to neither projection. System Delivery Failed rows remain locked from manual edit/delete.
+
+## Inventory quantities
 
 Inventory uses fixed-point integer micro-units through `StockQuantityMicros`.
 
@@ -253,6 +257,8 @@ The local outbox stores:
 Business writes and their outgoing sync intent can be written in the same local transaction.
 
 Placed Orders append `ORDER_PLACED` audit/outbox records inside the same transaction as Order/inventory/customer facts. Phase 5 Board transitions similarly append `ORDER_MARKED_DONE`, `ORDER_DONE_UNDONE`, `ORDER_CANCELLED`, or `DELIVERY_RETURNED` audit/outbox work in the same local transaction as the corresponding lifecycle, compensation, or Delivery Failed expense facts. Operational outbox idempotency keys include order lifecycle revision so retries do not ambiguously identify different corrections.
+
+Phase 6 manual Expense create/edit/delete commits its audit and outbox intent atomically with the revision-checked expense mutation. Expense outbox identity includes immutable Expense ID, lifecycle revision, and event type so separate corrections cannot collapse into one sync identity.
 
 ## Receipt projection
 
