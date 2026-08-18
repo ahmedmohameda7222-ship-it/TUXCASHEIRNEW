@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { ApplicationCommandCoordinator } from '@tux/application';
-import { instant, parseEntityId, type OutboxEvent, type OutboxEventId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type OutboxEvent,
+  type OutboxEventId,
+  type ShopId,
+} from '@tux/domain';
 import { SqliteOperationsDatabase } from '@tux/persistence/sqlite';
 import { OutboxSyncService, type OutboxTransport } from '@tux/sync';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -111,10 +117,7 @@ describe('automatic outbox sync SQLite integration', () => {
     now = instant('2026-08-18T11:00:02.000Z');
     const succeeded = await service.syncOnce();
     expect(succeeded).toMatchObject({ attempted: 1, delivered: 1, failed: 0 });
-    expect(deliveredKeys).toEqual([
-      'order-placed:order-fixture',
-      'order-placed:order-fixture',
-    ]);
+    expect(deliveredKeys).toEqual(['order-placed:order-fixture', 'order-placed:order-fixture']);
     expect(rawRow(databasePath)).toMatchObject({
       idempotency_key: 'order-placed:order-fixture',
       attempt_count: 1,
