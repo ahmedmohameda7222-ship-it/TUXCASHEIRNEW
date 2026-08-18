@@ -3,7 +3,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { afterEach, describe, expect, it } from 'vitest';
 import { OperationsOrdersService } from '@tux/application';
 import {
   createOpenBusinessDay,
@@ -12,6 +11,7 @@ import {
   parseEntityId,
   stockQuantityMicros,
   type BusinessDayId,
+  type DeliveryZoneId,
   type DraftLineId,
   type InventoryItemId,
   type MenuCategoryId,
@@ -23,7 +23,6 @@ import {
   type ShopId,
   type WorkerId,
   type WorkerSessionId,
-  type DeliveryZoneId,
 } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 import {
@@ -31,6 +30,7 @@ import {
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const WORKER_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
@@ -50,7 +50,6 @@ const DRAFT_LINE_ID = parseEntityId<DraftLineId>('b0000000-0000-4000-8000-000000
 
 const DRAFT_SCOPE = 'desktop-main-window';
 const STARTED_AT = instant('2026-08-18T13:00:00.000Z');
-
 const cleanup: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
@@ -150,14 +149,6 @@ function configuration(): OperationsConfigurationSnapshot {
   };
 }
 
-interface Fixture {
-  readonly databasePath: string;
-  readonly database: SqliteOperationsDatabase;
-  readonly readModel: SqliteOperatorSessionReadModel;
-  readonly draftStore: SqliteOrderDraftStore;
-  readonly service: OperationsOrdersService;
-}
-
 async function fixture(databaseOverride?: (base: SqliteOperationsDatabase) => OperationsDatabase) {
   const directory = await mkdtemp(path.join(tmpdir(), 'tux-orders-'));
   const databasePath = path.join(directory, 'operations.sqlite3');
@@ -220,7 +211,6 @@ async function fixture(databaseOverride?: (base: SqliteOperationsDatabase) => Op
   return {
     databasePath,
     database,
-    readModel,
     draftStore,
     service,
     setNow(value: string) {
@@ -270,17 +260,8 @@ async function saveDraft(service: OperationsOrdersService, draft: OrderDraft): P
 function scalar(databasePath: string, sql: string): number {
   const inspector = new DatabaseSync(databasePath, { readOnly: true });
   try {
-    const row = inspector.prepare(sql).get() as Record<string, unknown> | undefined;
-    return Number(row?.['value'] ?? 0);
-  } finally {
-    inspector.close();
-  }
-}
-
-function row(databasePath: string, sql: string): Record<string, unknown> | undefined {
-  const inspector = new DatabaseSync(databasePath, { readOnly: true });
-  try {
-    return inspector.prepare(sql).get() as Record<string, unknown> | undefined;
+    const result = inspector.prepare(sql).get() as Record<string, unknown> | undefined;
+    return Number(result?.['value'] ?? 0);
   } finally {
     inspector.close();
   }
@@ -390,10 +371,9 @@ describe('OperationsOrdersService with SQLite', () => {
       ),
     ).toBe(1);
     expect(
-      Number(
-        row(databasePath, 'SELECT quantity_delta_micros AS value FROM inventory_movements')?.[
-          'value'
-        ],
+      scalar(
+        databasePath,
+        'SELECT quantity_delta_micros AS value FROM inventory_movements LIMIT 1',
       ),
     ).toBe(-500_000);
     expect(result.value.nextDraft.lines).toHaveLength(0);
