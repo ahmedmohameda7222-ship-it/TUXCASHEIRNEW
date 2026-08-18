@@ -472,7 +472,10 @@ export function OrdersBoardWorkspace({
       () => client.markDone(order.id),
       `Order #${order.displayOrderNo} marked Done.`,
     );
-    if (changed) setUndo({ orderId: order.id, expiresAt: Date.now() + 7_000 });
+    if (changed) {
+      setSelected(null);
+      setUndo({ orderId: order.id, expiresAt: Date.now() + 7_000 });
+    }
   }
 
   async function undoDone(): Promise<void> {

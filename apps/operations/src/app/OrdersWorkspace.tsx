@@ -724,7 +724,10 @@ export function OrdersWorkspace({
             )
           }
           onClose={() => setQuickInfoProductId(null)}
-          onCustomize={() => setCustomizer({ kind: 'ADD', productId: quickInfoProduct.id })}
+          onCustomize={() => {
+            setQuickInfoProductId(null);
+            setCustomizer({ kind: 'ADD', productId: quickInfoProduct.id });
+          }}
         />
       )}
 
