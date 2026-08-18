@@ -2,7 +2,7 @@ import type { OperationsOrdersService, OperationsSessionResult } from '@tux/appl
 
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
-  'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder'
+  'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
 >;
 
 export interface TuxDesktopApi {
