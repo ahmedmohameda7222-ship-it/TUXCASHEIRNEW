@@ -6,6 +6,10 @@ on:
       - feat/ops-05-orders-board
     paths:
       - .github/workflows/phase5-orders-board-bootstrap.yml
+  pull_request:
+    branches:
+      - feat/ops-04-orders
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
