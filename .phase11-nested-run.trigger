@@ -1,1 +1,1 @@
-synchronize Phase 11 compliance and remove temporary QA infrastructure
+run YAML-safe Phase 11 closeout
