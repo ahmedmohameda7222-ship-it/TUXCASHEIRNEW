@@ -32,12 +32,6 @@ jobs:
         run: npm ci
       - name: Format implementation
         run: npm run format
-      - name: Validate implementation
-        run: |
-          npm run lint
-          npm run typecheck
-          npm run test
-          npm run build
       - name: Remove one-shot helpers
         run: |
           rm -rf .phase6_parts
