@@ -1,0 +1,570 @@
+from pathlib import Path
+
+
+def replace(path: str, old: str, new: str) -> None:
+    p = Path(path)
+    text = p.read_text()
+    if old not in text:
+        raise SystemExit(f'Expected snippet not found in {path}: {old[:160]!r}')
+    p.write_text(text.replace(old, new, 1))
+
+
+def write(path: str, content: str) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content)
+
+
+# Domain expense lifecycle and exact totals.
+old_expense_block = '''export type ExpensePaidFrom = 'CASH' | 'OTHER';
+
+export type Expense =
+  | {
+      readonly id: ExpenseId;
+      readonly shopId: ShopId;
+      readonly businessDayId: BusinessDayId;
+      readonly kind: 'MANUAL';
+      readonly description: string;
+      readonly amountMinor: MoneyMinor;
+      readonly paidFrom: ExpensePaidFrom;
+      readonly note: string | null;
+      readonly orderId: null;
+      readonly createdByWorkerId: WorkerId;
+      readonly createdAt: Instant;
+    }
+  | {
+      readonly id: ExpenseId;
+      readonly shopId: ShopId;
+      readonly businessDayId: BusinessDayId;
+      readonly kind: 'DELIVERY_FAILED';
+      readonly description: string;
+      readonly amountMinor: null;
+      readonly paidFrom: null;
+      readonly note: string | null;
+      readonly orderId: OrderId;
+      readonly createdByWorkerId: WorkerId;
+      readonly createdAt: Instant;
+    };
+'''
+new_expense_block = '''export type ExpensePaidFrom = 'CASH' | 'OTHER';
+
+export interface ManualExpenseLifecycleSnapshot {
+  readonly revision: number;
+  readonly updatedAt: Instant | null;
+  readonly updatedByWorkerId: WorkerId | null;
+  readonly deletedAt: Instant | null;
+  readonly deletedByWorkerId: WorkerId | null;
+}
+
+export type ManualExpense = {
+  readonly id: ExpenseId;
+  readonly shopId: ShopId;
+  readonly businessDayId: BusinessDayId;
+  readonly kind: 'MANUAL';
+  readonly description: string;
+  readonly amountMinor: MoneyMinor;
+  readonly paidFrom: ExpensePaidFrom;
+  readonly note: string | null;
+  readonly orderId: null;
+  readonly createdByWorkerId: WorkerId;
+  readonly createdAt: Instant;
+  readonly lifecycle?: ManualExpenseLifecycleSnapshot;
+};
+
+export type DeliveryFailedExpense = {
+  readonly id: ExpenseId;
+  readonly shopId: ShopId;
+  readonly businessDayId: BusinessDayId;
+  readonly kind: 'DELIVERY_FAILED';
+  readonly description: string;
+  readonly amountMinor: null;
+  readonly paidFrom: null;
+  readonly note: string | null;
+  readonly orderId: OrderId;
+  readonly createdByWorkerId: WorkerId;
+  readonly createdAt: Instant;
+};
+
+export type Expense = ManualExpense | DeliveryFailedExpense;
+'''
+replace('packages/domain/src/models.ts', old_expense_block, new_expense_block)
+
+write('packages/domain/src/expense.ts', r'''import { DomainInvariantError } from './errors';
+import type { BusinessDayId, ExpenseId, ShopId, WorkerId } from './ids';
+import type {
+  Expense,
+  ExpensePaidFrom,
+  ManualExpense,
+  ManualExpenseLifecycleSnapshot,
+} from './models';
+import { addMoney, ZERO_MONEY, type MoneyMinor } from './money';
+import type { Instant } from './time';
+
+export interface ManualExpenseValues {
+  readonly description: string;
+  readonly amountMinor: MoneyMinor;
+  readonly paidFrom: ExpensePaidFrom;
+  readonly note: string | null;
+}
+
+export interface ExpenseTotals {
+  readonly totalExpensesMinor: MoneyMinor;
+  readonly cashExpensesMinor: MoneyMinor;
+}
+
+export function manualExpenseLifecycle(expense: ManualExpense): ManualExpenseLifecycleSnapshot {
+  return (
+    expense.lifecycle ?? {
+      revision: 0,
+      updatedAt: null,
+      updatedByWorkerId: null,
+      deletedAt: null,
+      deletedByWorkerId: null,
+    }
+  );
+}
+
+export function isExpenseDeleted(expense: Expense): boolean {
+  return expense.kind === 'MANUAL' && manualExpenseLifecycle(expense).deletedAt !== null;
+}
+
+function nextRevision(expense: ManualExpense): number {
+  const next = manualExpenseLifecycle(expense).revision + 1;
+  if (!Number.isSafeInteger(next) || next <= 0) {
+    throw new DomainInvariantError('Expense revision overflowed its safe range.');
+  }
+  return next;
+}
+
+export function normalizeManualExpenseValues(values: ManualExpenseValues): ManualExpenseValues {
+  const description = values.description.trim();
+  if (description.length === 0) {
+    throw new DomainInvariantError('Expense description is required.');
+  }
+  if (description.length > 160) {
+    throw new DomainInvariantError('Expense description cannot exceed 160 characters.');
+  }
+  if (values.amountMinor <= ZERO_MONEY) {
+    throw new DomainInvariantError('Expense amount must be greater than zero.');
+  }
+  if (values.paidFrom !== 'CASH' && values.paidFrom !== 'OTHER') {
+    throw new DomainInvariantError('Expense Paid From must be Cash or Other.');
+  }
+  const trimmedNote = values.note?.trim() ?? '';
+  if (trimmedNote.length > 500) {
+    throw new DomainInvariantError('Expense note cannot exceed 500 characters.');
+  }
+  return {
+    description,
+    amountMinor: values.amountMinor,
+    paidFrom: values.paidFrom,
+    note: trimmedNote.length === 0 ? null : trimmedNote,
+  };
+}
+
+export function createManualExpense(
+  identity: {
+    readonly id: ExpenseId;
+    readonly shopId: ShopId;
+    readonly businessDayId: BusinessDayId;
+    readonly createdByWorkerId: WorkerId;
+    readonly createdAt: Instant;
+  },
+  values: ManualExpenseValues,
+): ManualExpense {
+  const normalized = normalizeManualExpenseValues(values);
+  return {
+    ...identity,
+    kind: 'MANUAL',
+    ...normalized,
+    orderId: null,
+    lifecycle: {
+      revision: 0,
+      updatedAt: null,
+      updatedByWorkerId: null,
+      deletedAt: null,
+      deletedByWorkerId: null,
+    },
+  };
+}
+
+export function editManualExpense(
+  expense: Expense,
+  values: ManualExpenseValues,
+  updatedAt: Instant,
+  updatedByWorkerId: WorkerId,
+): ManualExpense {
+  if (expense.kind !== 'MANUAL') {
+    throw new DomainInvariantError('System Delivery Failed expenses are locked.');
+  }
+  const lifecycle = manualExpenseLifecycle(expense);
+  if (lifecycle.deletedAt !== null) {
+    throw new DomainInvariantError('Deleted expenses cannot be edited.');
+  }
+  const normalized = normalizeManualExpenseValues(values);
+  return {
+    ...expense,
+    ...normalized,
+    lifecycle: {
+      ...lifecycle,
+      revision: nextRevision(expense),
+      updatedAt,
+      updatedByWorkerId,
+    },
+  };
+}
+
+export function deleteManualExpense(
+  expense: Expense,
+  deletedAt: Instant,
+  deletedByWorkerId: WorkerId,
+): ManualExpense {
+  if (expense.kind !== 'MANUAL') {
+    throw new DomainInvariantError('System Delivery Failed expenses are locked.');
+  }
+  const lifecycle = manualExpenseLifecycle(expense);
+  if (lifecycle.deletedAt !== null) {
+    throw new DomainInvariantError('Expense is already deleted.');
+  }
+  return {
+    ...expense,
+    lifecycle: {
+      ...lifecycle,
+      revision: nextRevision(expense),
+      deletedAt,
+      deletedByWorkerId,
+    },
+  };
+}
+
+export function calculateExpenseTotals(expenses: readonly Expense[]): ExpenseTotals {
+  let totalExpensesMinor = ZERO_MONEY;
+  let cashExpensesMinor = ZERO_MONEY;
+  for (const expense of expenses) {
+    if (expense.kind !== 'MANUAL' || isExpenseDeleted(expense)) continue;
+    totalExpensesMinor = addMoney(totalExpensesMinor, expense.amountMinor);
+    if (expense.paidFrom === 'CASH') {
+      cashExpensesMinor = addMoney(cashExpensesMinor, expense.amountMinor);
+    }
+  }
+  return { totalExpensesMinor, cashExpensesMinor };
+}
+''')
+
+write('packages/domain/src/expense.test.ts', r'''import { describe, expect, it } from 'vitest';
+import {
+  calculateExpenseTotals,
+  createManualExpense,
+  deleteManualExpense,
+  editManualExpense,
+  isExpenseDeleted,
+  manualExpenseLifecycle,
+} from './expense';
+import { parseEntityId } from './ids';
+import { moneyMinor } from './money';
+import { instant } from './time';
+import type {
+  BusinessDayId,
+  ExpenseId,
+  OrderId,
+  ShopId,
+  WorkerId,
+} from './ids';
+import type { Expense } from './models';
+
+const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
+const DAY_ID = parseEntityId<BusinessDayId>('20000000-0000-4000-8000-000000000001');
+const WORKER_ID = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000001');
+const OTHER_WORKER_ID = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000002');
+
+function manual(id: string, amount: number, paidFrom: 'CASH' | 'OTHER') {
+  return createManualExpense(
+    {
+      id: parseEntityId<ExpenseId>(id),
+      shopId: SHOP_ID,
+      businessDayId: DAY_ID,
+      createdByWorkerId: WORKER_ID,
+      createdAt: instant('2026-08-18T10:00:00.000Z'),
+    },
+    { description: ' Taxi ', amountMinor: moneyMinor(amount), paidFrom, note: ' shift ride ' },
+  );
+}
+
+describe('expense domain', () => {
+  it('normalizes manual expense values and tracks audited edit/delete lifecycle', () => {
+    const created = manual('40000000-0000-4000-8000-000000000001', 15_000, 'CASH');
+    expect(created.description).toBe('Taxi');
+    expect(created.note).toBe('shift ride');
+    expect(manualExpenseLifecycle(created).revision).toBe(0);
+
+    const edited = editManualExpense(
+      created,
+      { description: 'Fuel', amountMinor: moneyMinor(20_000), paidFrom: 'OTHER', note: '  ' },
+      instant('2026-08-18T11:00:00.000Z'),
+      OTHER_WORKER_ID,
+    );
+    expect(edited.note).toBeNull();
+    expect(edited.amountMinor).toBe(moneyMinor(20_000));
+    expect(manualExpenseLifecycle(edited).revision).toBe(1);
+    expect(manualExpenseLifecycle(edited).updatedByWorkerId).toBe(OTHER_WORKER_ID);
+
+    const deleted = deleteManualExpense(
+      edited,
+      instant('2026-08-18T12:00:00.000Z'),
+      WORKER_ID,
+    );
+    expect(isExpenseDeleted(deleted)).toBe(true);
+    expect(manualExpenseLifecycle(deleted).revision).toBe(2);
+  });
+
+  it('totals only active financial expenses and separates drawer Cash impact', () => {
+    const cash = manual('40000000-0000-4000-8000-000000000002', 15_000, 'CASH');
+    const other = manual('40000000-0000-4000-8000-000000000003', 20_000, 'OTHER');
+    const deleted = deleteManualExpense(
+      manual('40000000-0000-4000-8000-000000000004', 99_000, 'CASH'),
+      instant('2026-08-18T12:00:00.000Z'),
+      WORKER_ID,
+    );
+    const deliveryFailed: Expense = {
+      id: parseEntityId<ExpenseId>('40000000-0000-4000-8000-000000000005'),
+      shopId: SHOP_ID,
+      businessDayId: DAY_ID,
+      kind: 'DELIVERY_FAILED',
+      description: 'Delivery Failed — Order #12',
+      amountMinor: null,
+      paidFrom: null,
+      note: 'Customer unavailable',
+      orderId: parseEntityId<OrderId>('50000000-0000-4000-8000-000000000001'),
+      createdByWorkerId: WORKER_ID,
+      createdAt: instant('2026-08-18T12:30:00.000Z'),
+    };
+
+    expect(calculateExpenseTotals([cash, other, deleted, deliveryFailed])).toEqual({
+      totalExpensesMinor: moneyMinor(35_000),
+      cashExpensesMinor: moneyMinor(15_000),
+    });
+  });
+
+  it('locks Delivery Failed and rejects zero-value manual expenses', () => {
+    const deliveryFailed: Expense = {
+      id: parseEntityId<ExpenseId>('40000000-0000-4000-8000-000000000006'),
+      shopId: SHOP_ID,
+      businessDayId: DAY_ID,
+      kind: 'DELIVERY_FAILED',
+      description: 'Delivery Failed',
+      amountMinor: null,
+      paidFrom: null,
+      note: null,
+      orderId: parseEntityId<OrderId>('50000000-0000-4000-8000-000000000002'),
+      createdByWorkerId: WORKER_ID,
+      createdAt: instant('2026-08-18T12:30:00.000Z'),
+    };
+    expect(() => deleteManualExpense(deliveryFailed, instant('2026-08-18T13:00:00.000Z'), WORKER_ID)).toThrow(
+      /locked/,
+    );
+    expect(() =>
+      createManualExpense(
+        {
+          id: parseEntityId<ExpenseId>('40000000-0000-4000-8000-000000000007'),
+          shopId: SHOP_ID,
+          businessDayId: DAY_ID,
+          createdByWorkerId: WORKER_ID,
+          createdAt: instant('2026-08-18T13:00:00.000Z'),
+        },
+        { description: 'Zero', amountMinor: moneyMinor(0), paidFrom: 'CASH', note: null },
+      ),
+    ).toThrow(/greater than zero/);
+  });
+});
+''')
+
+replace(
+    'packages/domain/src/index.ts',
+    "export { DomainInvariantError } from './errors';\n",
+    """export { DomainInvariantError } from './errors';
+export {
+  calculateExpenseTotals,
+  createManualExpense,
+  deleteManualExpense,
+  editManualExpense,
+  isExpenseDeleted,
+  manualExpenseLifecycle,
+  normalizeManualExpenseValues,
+  type ExpenseTotals,
+  type ManualExpenseValues,
+} from './expense';
+""",
+)
+
+# Persistence contract.
+replace(
+    'packages/persistence/src/contracts.ts',
+    "  Expense,\n  InventoryItem,",
+    "  Expense,\n  ExpenseId,\n  InventoryItem,",
+)
+replace(
+    'packages/persistence/src/contracts.ts',
+    '''export interface ExpenseRepository {
+  put(expense: Expense): Promise<void>;
+}''',
+    '''export interface ExpenseRepository {
+  getById(id: ExpenseId): Promise<Expense | null>;
+  listByBusinessDay(businessDayId: BusinessDayId): Promise<readonly Expense[]>;
+  put(expense: Expense): Promise<void>;
+}''',
+)
+
+# SQLite expense repository and uniqueness guard for Delivery Failed.
+replace(
+    'packages/persistence/src/sqlite/SqliteOperationsDatabase.ts',
+    "  Expense,\n  InventoryItem,",
+    "  Expense,\n  ExpenseId,\n  InventoryItem,",
+)
+old_sqlite_expenses = '''    expenses: {
+      async put(expense: Expense) {
+        database
+          .prepare(
+            `INSERT INTO expenses(id, shop_id, business_day_id, kind, amount_minor, paid_from, order_id, created_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET amount_minor = excluded.amount_minor, paid_from = excluded.paid_from, payload_json = excluded.payload_json`,
+          )
+          .run(
+            expense.id,
+            expense.shopId,
+            expense.businessDayId,
+            expense.kind,
+            expense.amountMinor,
+            expense.paidFrom,
+            expense.orderId,
+            expense.createdAt,
+            serialize(expense),
+          );
+      },
+    },'''
+new_sqlite_expenses = '''    expenses: {
+      async getById(id: ExpenseId) {
+        return parsePayload<Expense>(
+          database.prepare('SELECT payload_json FROM expenses WHERE id = ?').get(id),
+        );
+      },
+      async listByBusinessDay(businessDayId: BusinessDayId) {
+        return database
+          .prepare(
+            'SELECT payload_json FROM expenses WHERE business_day_id = ? ORDER BY created_at DESC, id DESC',
+          )
+          .all(businessDayId)
+          .map((row) => parsePayload<Expense>(row))
+          .filter((expense): expense is Expense => expense !== null);
+      },
+      async put(expense: Expense) {
+        const existing = parsePayload<Expense>(
+          database.prepare('SELECT payload_json FROM expenses WHERE id = ?').get(expense.id),
+        );
+        if (existing !== null && existing.kind !== expense.kind) {
+          throw new Error(`Expense ${expense.id} cannot change kind.`);
+        }
+        if (existing?.kind === 'DELIVERY_FAILED') {
+          throw new Error(`Delivery Failed expense ${expense.id} is locked.`);
+        }
+        database
+          .prepare(
+            `INSERT INTO expenses(id, shop_id, business_day_id, kind, amount_minor, paid_from, order_id, created_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET amount_minor = excluded.amount_minor, paid_from = excluded.paid_from, payload_json = excluded.payload_json`,
+          )
+          .run(
+            expense.id,
+            expense.shopId,
+            expense.businessDayId,
+            expense.kind,
+            expense.amountMinor,
+            expense.paidFrom,
+            expense.orderId,
+            expense.createdAt,
+            serialize(expense),
+          );
+      },
+    },'''
+replace('packages/persistence/src/sqlite/SqliteOperationsDatabase.ts', old_sqlite_expenses, new_sqlite_expenses)
+
+replace(
+    'packages/persistence/src/sqlite/migrations.ts',
+    '''  {
+    version: 3,
+    name: 'orders_board_lookup_indexes',
+    sql: `
+CREATE INDEX idx_inventory_movements_order ON inventory_movements(order_id, created_at);
+`,
+  },
+];''',
+    '''  {
+    version: 3,
+    name: 'orders_board_lookup_indexes',
+    sql: `
+CREATE INDEX idx_inventory_movements_order ON inventory_movements(order_id, created_at);
+`,
+  },
+  {
+    version: 4,
+    name: 'expenses_delivery_failed_identity',
+    sql: `
+CREATE UNIQUE INDEX ux_expenses_delivery_failed_order
+ON expenses(order_id)
+WHERE kind = 'DELIVERY_FAILED';
+`,
+  },
+];''',
+)
+
+# IndexedDB expense repository. Existing browser DB stays schema-compatible because businessDayId index already exists.
+replace(
+    'packages/persistence/src/browser/IndexedDbOperationsDatabase.ts',
+    "  Expense,\n  InventoryItem,",
+    "  Expense,\n  ExpenseId,\n  InventoryItem,",
+)
+replace(
+    'packages/persistence/src/browser/IndexedDbOperationsDatabase.ts',
+    '''    expenses: {
+      async put(expense: Expense) {
+        await requestResult(store('expenses').put(expense));
+      },
+    },''',
+    '''    expenses: {
+      async getById(id: ExpenseId) {
+        return recordOrNull<Expense>(store('expenses').get(id));
+      },
+      async listByBusinessDay(businessDayId: BusinessDayId) {
+        const all = (await requestResult(
+          store('expenses').index('businessDayId').getAll(businessDayId),
+        )) as Expense[];
+        return all.sort(
+          (left, right) =>
+            right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+        );
+      },
+      async put(expense: Expense) {
+        const expenses = store('expenses');
+        const existing = await recordOrNull<Expense>(expenses.get(expense.id));
+        if (existing !== null && existing.kind !== expense.kind) {
+          throw new Error(`Expense ${expense.id} cannot change kind.`);
+        }
+        if (existing?.kind === 'DELIVERY_FAILED') {
+          throw new Error(`Delivery Failed expense ${expense.id} is locked.`);
+        }
+        if (expense.kind === 'DELIVERY_FAILED' && expense.orderId !== null) {
+          const all = (await requestResult(expenses.getAll())) as Expense[];
+          if (
+            all.some(
+              (candidate) =>
+                candidate.kind === 'DELIVERY_FAILED' &&
+                candidate.orderId === expense.orderId &&
+                candidate.id !== expense.id,
+            )
+          ) {
+            throw new Error(`Delivery Failed expense already exists for order ${expense.orderId}.`);
+          }
+        }
+        await requestResult(expenses.put(expense));
+      },
+    },''',
+)
