@@ -69,7 +69,6 @@ export function assertEndDayCloseResult(value: unknown): EndDayCloseResult {
   assertResult(value, 'End Day close result');
   if (value['ok']) {
     assertObject(value['value'], 'End Day close value');
-    assertObject(value['value']['reconciliation'], 'End Day reconciliation');
     if (
       typeof value['value']['businessDayId'] !== 'string' ||
       typeof value['value']['closedAt'] !== 'string' ||
