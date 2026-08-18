@@ -1,0 +1,56 @@
+name: Phase 11 Product Polish
+
+on:
+  pull_request:
+    branches:
+      - test/ops-11-rendered-qa
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: test/ops-11-rendered-qa
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Fix Board Undo path and desktop product legibility
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          board = Path('apps/operations/src/app/OrdersBoardWorkspace.tsx')
+          text = board.read_text()
+          old = """    if (changed) setUndo({ orderId: order.id, expiresAt: Date.now() + 7_000 });
+"""
+          new = """    if (changed) {
+      setSelected(null);
+      setUndo({ orderId: order.id, expiresAt: Date.now() + 7_000 });
+    }
+"""
+          if old not in text:
+              raise SystemExit('Mark Done success target not found')
+          board.write_text(text.replace(old, new, 1))
+
+          css = Path('apps/operations/src/styles/orders.css')
+          text = css.read_text()
+          old = '  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));\n'
+          new = '  grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));\n'
+          if old not in text:
+              raise SystemExit('Product-grid sizing target not found')
+          css.write_text(text.replace(old, new, 1))
+          PY
+          rm .github/workflows/phase11-product-polish.yml
+      - name: Format product changes
+        run: npx prettier --write apps/operations/src/app/OrdersBoardWorkspace.tsx apps/operations/src/styles/orders.css
+      - name: Commit product polish
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/operations/src/app/OrdersBoardWorkspace.tsx apps/operations/src/styles/orders.css .github/workflows/phase11-product-polish.yml
+          git commit -m "fix(operations): keep Board Undo reachable"
+          git push origin HEAD:test/ops-11-rendered-qa
