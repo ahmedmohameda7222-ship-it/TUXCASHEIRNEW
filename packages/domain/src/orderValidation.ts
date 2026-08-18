@@ -1,5 +1,6 @@
 import type { OperationsConfigurationSnapshot, OrderType } from './catalog';
 import { DomainInvariantError } from './errors';
+import { ZERO_MONEY } from './money';
 import type { OrderDraft } from './orderDraft';
 import { preparePaymentParts } from './payment';
 import { normalizeEgyptianPhone } from './phone';
@@ -31,7 +32,7 @@ export interface ValidatedOrderDraft {
 }
 
 export type OrderDraftValidationResult =
-  | { readonly valid: true; readonly value: ValidatedOrderDraft }
+  | { readonly valid: true; readonly value: ValidatedOrderDraft; readonly issues: readonly [] }
   | { readonly valid: false; readonly issues: readonly OrderValidationIssue[] };
 
 export function validateOrderDraft(
@@ -40,16 +41,6 @@ export function validateOrderDraft(
 ): OrderDraftValidationResult {
   const issues: OrderValidationIssue[] = [];
 
-  if (draft.shopId !== configuration.shopId) {
-    issues.push({
-      path: 'cart',
-      code: 'SHOP_MISMATCH',
-      message: 'Draft shop does not match configuration.',
-    });
-  }
-  if (draft.checkoutIntentKey.trim().length === 0) {
-    issues.push({ path: 'cart', code: 'MISSING_INTENT', message: 'Checkout intent is missing.' });
-  }
   if (draft.lines.length === 0) {
     issues.push({ path: 'cart', code: 'EMPTY_CART', message: 'Choose at least one item.' });
   }
@@ -61,56 +52,67 @@ export function validateOrderDraft(
     issues.push({
       path: 'orderType',
       code: 'ORDER_TYPE_REQUIRED',
-      message: 'Select an available order type.',
+      message: 'Choose an available order type.',
     });
   }
 
   for (const line of draft.lines) {
-    const product = configuration.products.find((candidate) => candidate.id === line.productId);
-    if (product === undefined) {
-      issues.push({
-        path: `line:${line.id}`,
-        code: 'PRODUCT_MISSING',
-        message: `${line.productName} is no longer available in the local catalog.`,
-      });
-      continue;
-    }
     if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) {
       issues.push({
         path: `line:${line.id}`,
         code: 'INVALID_QUANTITY',
         message: `${line.productName} has an invalid quantity.`,
       });
+      continue;
     }
+
+    const product = configuration.products.find((candidate) => candidate.id === line.productId);
+    if (product === undefined || !product.active) {
+      issues.push({
+        path: `line:${line.id}`,
+        code: 'PRODUCT_UNAVAILABLE',
+        message: `${line.productName} is no longer available.`,
+      });
+      continue;
+    }
+
     if (product.isCombo && line.comboBeverages.length !== line.quantity) {
       issues.push({
         path: `line:${line.id}`,
         code: 'COMBO_BEVERAGE_REQUIRED',
-        message: `Choose one included beverage for each ${line.productName} combo.`,
+        message: `${line.productName} requires one included beverage for each combo.`,
       });
     }
-    if (!product.isCombo && line.comboBeverages.length !== 0) {
-      issues.push({
-        path: `line:${line.id}`,
-        code: 'UNEXPECTED_COMBO_BEVERAGE',
-        message: `${line.productName} cannot contain combo beverage selections.`,
-      });
+
+    for (const beverage of line.comboBeverages) {
+      const allowed = configuration.comboBeverageOptions.some(
+        (option) =>
+          option.comboProductId === product.id && option.beverageProductId === beverage.productId,
+      );
+      const beverageProduct = configuration.products.find(
+        (candidate) => candidate.id === beverage.productId,
+      );
+      if (!allowed || beverageProduct === undefined || !beverageProduct.active || beverageProduct.soldOut) {
+        issues.push({
+          path: `line:${line.id}`,
+          code: 'COMBO_BEVERAGE_UNAVAILABLE',
+          message: `${line.productName} has an unavailable included beverage.`,
+        });
+      }
     }
   }
 
   let normalizedDeliveryPhone: string | null = null;
   if (orderType?.behavior === 'DELIVERY') {
-    const phone = normalizeEgyptianPhone(
-      draft.delivery.displayPhone || draft.delivery.normalizedPhone,
-    );
-    if (!phone.valid) {
+    const normalized = normalizeEgyptianPhone(draft.delivery.displayPhone);
+    if (!normalized.valid) {
       issues.push({
         path: 'delivery.phone',
-        code: 'DELIVERY_PHONE_REQUIRED',
-        message: 'Enter a valid Egyptian phone number.',
+        code: 'DELIVERY_PHONE_INVALID',
+        message: 'Enter a valid Egyptian mobile number.',
       });
     } else {
-      normalizedDeliveryPhone = phone.normalizedPhone;
+      normalizedDeliveryPhone = normalized.canonical;
     }
     if (draft.delivery.customerName.trim().length === 0) {
       issues.push({
@@ -136,9 +138,7 @@ export function validateOrderDraft(
   }
 
   const deliveryFeeMinor =
-    orderType?.behavior === 'DELIVERY'
-      ? draft.delivery.finalFeeMinor
-      : draft.delivery.finalFeeMinor - draft.delivery.finalFeeMinor;
+    orderType?.behavior === 'DELIVERY' ? draft.delivery.finalFeeMinor : ZERO_MONEY;
   let pricing: OrderPricing | null = null;
   try {
     pricing = calculateOrderPricing({
@@ -169,5 +169,10 @@ export function validateOrderDraft(
   if (issues.length > 0 || orderType === undefined || pricing === null) {
     return { valid: false, issues };
   }
-  return { valid: true, value: { orderType, pricing, normalizedDeliveryPhone } };
+
+  return {
+    valid: true,
+    value: { orderType, pricing, normalizedDeliveryPhone },
+    issues: [],
+  };
 }
