@@ -1,6 +1,11 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { createOperationsSessionClient } from './sessionClient';
+import { OrdersWorkspace } from './OrdersWorkspace';
+import {
+  createOperationsOrdersClient,
+  createOperationsSessionClient,
+  type OperationsOrdersClient,
+} from './sessionClient';
 
 type ScreenState =
   | { readonly kind: 'LOADING' }
@@ -9,6 +14,18 @@ type ScreenState =
       readonly kind: 'GREETING';
       readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
     };
+
+type ThemePreference = 'system' | 'light' | 'dark';
+const THEME_STORAGE_KEY = 'tux.operations.theme';
+
+function initialTheme(): ThemePreference {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+  } catch {
+    return 'system';
+  }
+}
 
 function Brand() {
   return (
@@ -125,12 +142,14 @@ function formatShiftTime(value: string): string {
 
 function ActiveShell({
   session,
+  ordersClient,
   busy,
   error,
   onSwitch,
   onSignOut,
 }: {
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+  readonly ordersClient: OperationsOrdersClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
@@ -138,6 +157,24 @@ function ActiveShell({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemePreference>(initialTheme);
+
+  useEffect(() => {
+    if (theme === 'system') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.dataset['theme'] = theme;
+    }
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Theme preference is non-critical UI state.
+    }
+  }, [theme]);
+
+  function cycleTheme(): void {
+    setTheme((current) => (current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'));
+  }
 
   return (
     <div className="operations-shell">
@@ -159,8 +196,11 @@ function ActiveShell({
         </nav>
         <div className="header-actions">
           <span className="sync-status" aria-label="Local-first status">
-            Local
+            Saved locally
           </span>
+          <button type="button" className="theme-trigger" onClick={cycleTheme}>
+            Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
+          </button>
           <div className="operator-menu-wrap">
             <button
               className="operator-trigger"
@@ -204,13 +244,7 @@ function ActiveShell({
         </div>
       </header>
 
-      <main className="orders-phase-placeholder" aria-labelledby="orders-title">
-        <p className="eyebrow">Current Business Day</p>
-        <h1 id="orders-title">Orders</h1>
-        <p>
-          The worker session is active. The complete Orders workspace is implemented in Phase 4.
-        </p>
-      </main>
+      <OrdersWorkspace session={session} client={ordersClient} />
 
       {error === null ? null : (
         <div className="global-error" role="alert">
@@ -253,6 +287,7 @@ function ActiveShell({
 
 export function App() {
   const client = useMemo(() => createOperationsSessionClient(), []);
+  const ordersClient = useMemo(() => createOperationsOrdersClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -333,6 +368,7 @@ export function App() {
   return (
     <ActiveShell
       session={screen.session}
+      ordersClient={ordersClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}
