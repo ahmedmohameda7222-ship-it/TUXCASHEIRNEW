@@ -148,7 +148,7 @@ async function fixture(uuidSequence: string[] = []) {
   };
 }
 
-function systemExpense(id: string): Expense {
+function systemExpense(id: string): Extract<Expense, { kind: 'DELIVERY_FAILED' }> {
   return {
     id: parseEntityId<ExpenseId>(id),
     shopId: SHOP_ID,
