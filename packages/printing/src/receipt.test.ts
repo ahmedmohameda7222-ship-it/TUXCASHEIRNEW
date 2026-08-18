@@ -69,7 +69,7 @@ describe('renderOrderReceiptHtml', () => {
   it('renders immutable order, payment and operator snapshots with exact money', () => {
     const html = renderOrderReceiptHtml(order);
     expect(html).toContain('Order #42');
-    expect(html).toContain('12.55');
+    expect(html).toContain('125.50');
     expect(html).toContain('Total EGP');
     expect(html).toContain('120.00');
     expect(html).toContain('received 200.00');
