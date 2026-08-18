@@ -45,30 +45,25 @@ jobs:
 
           preload = Path('apps/operations-desktop/src/preload/index.ts')
           text = preload.read_text()
-          text = text.replace(
-              'cancelOrder: async (input) =>',
-              "cancelOrder: async (input: Parameters<TuxDesktopApi['ordersBoard']['cancelOrder']>[0]) =>",
-          )
-          text = text.replace(
-              'returnDelivery: async (input) =>',
-              "returnDelivery: async (input: Parameters<TuxDesktopApi['ordersBoard']['returnDelivery']>[0]) =>",
-          )
+          text = text.replace('cancelOrder: async (input) =>', "cancelOrder: async (input: Parameters<TuxDesktopApi['ordersBoard']['cancelOrder']>[0]) =>")
+          text = text.replace('returnDelivery: async (input) =>', "returnDelivery: async (input: Parameters<TuxDesktopApi['ordersBoard']['returnDelivery']>[0]) =>")
           preload.write_text(text)
 
           sqlite = Path('packages/persistence/src/sqlite/SqliteOperationsDatabase.ts')
           text = sqlite.read_text()
-          old = '''        const updated: OrderSnapshot = {
-          ...existing,
-          status: order.status,
-          lifecycle: order.lifecycle,
-        };'''
-          new = '''        const updated: OrderSnapshot =
-          order.lifecycle === undefined
-            ? { ...existing, status: order.status }
-            : { ...existing, status: order.status, lifecycle: order.lifecycle };'''
+          old = "        const updated: OrderSnapshot = {\n          ...existing,\n          status: order.status,\n          lifecycle: order.lifecycle,\n        };"
+          new = "        const updated: OrderSnapshot =\n          order.lifecycle === undefined\n            ? { ...existing, status: order.status }\n            : { ...existing, status: order.status, lifecycle: order.lifecycle };"
           if old not in text:
               raise SystemExit('SQLite operational-state correction target not found')
           sqlite.write_text(text.replace(old, new, 1))
+
+          indexed = Path('packages/persistence/src/browser/IndexedDbOperationsDatabase.ts')
+          text = indexed.read_text()
+          old = "        await requestResult(\n          orders.put({ ...existing, status: order.status, lifecycle: order.lifecycle }),\n        );"
+          new = "        const updated =\n          order.lifecycle === undefined\n            ? { ...existing, status: order.status }\n            : { ...existing, status: order.status, lifecycle: order.lifecycle };\n        await requestResult(orders.put(updated));"
+          if old not in text:
+              raise SystemExit('IndexedDB operational-state correction target not found')
+          indexed.write_text(text.replace(old, new, 1))
           PY
 
       - name: Install locked dependencies
