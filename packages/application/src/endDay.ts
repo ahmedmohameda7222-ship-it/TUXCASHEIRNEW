@@ -8,7 +8,6 @@ import {
   parseEntityId,
   type AuditEvent,
   type AuditEventId,
-  type BusinessDay,
   type BusinessDayId,
   type EndDayActualPayment,
   type EntityId,
@@ -90,7 +89,6 @@ export interface EndDayPreview {
 export interface EndDayCloseResultValue {
   readonly businessDayId: BusinessDayId;
   readonly closedAt: Instant;
-  readonly reconciliation: Reconciliation;
   readonly replayed: boolean;
 }
 
@@ -160,15 +158,11 @@ export class OperationsEndDayService {
   async beginEndDay(draftScopeId: string): Promise<EndDayGateResult> {
     return this.#coordinator.runExclusive(async () => {
       try {
-        const scope = normalizedDraftScopeId(draftScopeId);
         const context = await this.#resolveCurrentContext();
         if (!context.ok) return context;
-        return ok(await this.#gate(context.value, scope));
+        return ok(await this.#gate(context.value, normalizedDraftScopeId(draftScopeId)));
       } catch (cause) {
-        if (cause instanceof DomainInvariantError) {
-          return err({ code: 'VALIDATION_ERROR', message: cause.message, cause });
-        }
-        return err(persistenceError('Could not start the local End Day workflow.', cause));
+        return this.#validationOrPersistence(cause, 'Could not start the local End Day workflow.');
       }
     });
   }
@@ -176,20 +170,19 @@ export class OperationsEndDayService {
   async discardDraft(draftScopeId: string): Promise<Result<true, ApplicationError>> {
     return this.#coordinator.runExclusive(async () => {
       try {
-        const scope = normalizedDraftScopeId(draftScopeId);
         const context = await this.#resolveCurrentContext();
         if (!context.ok) return context;
         await this.#draftStore.delete({
           shopId: context.value.shopId,
           businessDayId: context.value.day.id,
-          draftScopeId: scope,
+          draftScopeId: normalizedDraftScopeId(draftScopeId),
         });
         return ok(true as const);
       } catch (cause) {
-        if (cause instanceof DomainInvariantError) {
-          return err({ code: 'VALIDATION_ERROR', message: cause.message, cause });
-        }
-        return err(persistenceError('The unfinished draft could not be discarded locally.', cause));
+        return this.#validationOrPersistence(
+          cause,
+          'The unfinished draft could not be discarded locally.',
+        );
       }
     });
   }
@@ -201,17 +194,19 @@ export class OperationsEndDayService {
   }): Promise<EndDayPreviewResult> {
     return this.#coordinator.runExclusive(async () => {
       try {
-        const contextResult = await this.#resolveExpectedOpenContext(input.businessDayId);
-        if (!contextResult.ok) return contextResult;
-        const context = contextResult.value;
-        const gate = await this.#gate(context, normalizedDraftScopeId(input.draftScopeId));
+        const context = await this.#resolveExpectedOpenContext(input.businessDayId);
+        if (!context.ok) return context;
+        const gate = await this.#gate(
+          context.value,
+          normalizedDraftScopeId(input.draftScopeId),
+        );
         if (gate.kind !== 'READY') return err(this.#gateError(gate));
-        return ok(await this.#preview(context, input.actualPayments, [], false));
+        return ok(await this.#preview(context.value, input.actualPayments, [], false));
       } catch (cause) {
-        if (cause instanceof DomainInvariantError) {
-          return err({ code: 'VALIDATION_ERROR', message: cause.message, cause });
-        }
-        return err(persistenceError('Could not calculate local End Day reconciliation.', cause));
+        return this.#validationOrPersistence(
+          cause,
+          'Could not calculate local End Day reconciliation.',
+        );
       }
     });
   }
@@ -227,85 +222,67 @@ export class OperationsEndDayService {
         const existingDay = await this.#database.transaction((transaction) =>
           transaction.businessDays.getById(input.businessDayId),
         );
-        if (existingDay?.status === 'CLOSED') {
-          const reconciliation = await this.#database.transaction((transaction) =>
-            transaction.reconciliations.getByBusinessDay(input.businessDayId),
-          );
-          if (reconciliation === null) {
-            return err({
-              code: 'LOCAL_PERSISTENCE_ERROR',
-              message: 'The Business Day is closed but its reconciliation could not be recovered.',
-            });
-          }
+        if (existingDay === null) {
+          return err({ code: 'NOT_FOUND', message: 'The Business Day was not found.' });
+        }
+        if (existingDay.status === 'CLOSED') {
           return ok({
             businessDayId: existingDay.id,
             closedAt: existingDay.endedAt,
-            reconciliation,
             replayed: true,
           });
         }
 
-        const contextResult = await this.#resolveExpectedOpenContext(input.businessDayId);
-        if (!contextResult.ok) return contextResult;
-        const context = contextResult.value;
+        const context = await this.#resolveExpectedOpenContext(input.businessDayId);
+        if (!context.ok) return context;
         const draftScopeId = normalizedDraftScopeId(input.draftScopeId);
-        const gate = await this.#gate(context, draftScopeId);
+        const gate = await this.#gate(context.value, draftScopeId);
         if (gate.kind !== 'READY') return err(this.#gateError(gate));
 
         const preview = await this.#preview(
-          context,
+          context.value,
           input.actualPayments,
           input.varianceReasons,
           true,
         );
         const closedAt = this.#runtime.now();
-        const reconciliation: Reconciliation = {
-          id: this.#id<ReconciliationId>(),
-          shopId: context.shopId,
-          businessDayId: context.day.id,
-          createdByWorkerId: context.operator.id,
-          createdAt: closedAt,
-          lines: preview.lines.map(
-            (line): ReconciliationLine => ({
-              paymentMethod: {
-                id: line.paymentMethod.id,
-                label: line.paymentMethod.label,
-                logicType: line.paymentMethod.logicType,
-              },
-              expectedMinor: line.expectedMinor,
-              actualMinor: line.actualMinor,
-              differenceMinor: line.differenceMinor,
-              varianceReason: line.varianceReason,
-            }),
-          ),
-        };
-        const closedDay = closeBusinessDay(context.day, closedAt, context.operator.id);
-        const closedSession: WorkerSession = { ...context.session, endedAt: closedAt };
-        const auditEvents = this.#auditEvents(context, reconciliation, preview, closedAt);
-        const outboxEvents = this.#outboxEvents(context, reconciliation, preview, closedAt);
+        const reconciliation = this.#buildReconciliation(context.value, preview, closedAt);
+        const closedDay = closeBusinessDay(
+          context.value.day,
+          closedAt,
+          context.value.operator.id,
+        );
+        const closedSession: WorkerSession = { ...context.value.session, endedAt: closedAt };
+        const auditEvents = this.#auditEvents(
+          context.value,
+          reconciliation,
+          preview,
+          closedAt,
+        );
+        const outboxEvents = this.#outboxEvents(
+          context.value,
+          reconciliation,
+          preview,
+          closedAt,
+        );
 
         await this.#database.transaction(async (transaction) => {
-          const currentDay = await transaction.businessDays.getById(context.day.id);
+          const currentDay = await transaction.businessDays.getById(context.value.day.id);
+          const currentOpen = await transaction.businessDays.getOpenForShop(context.value.shopId);
           if (
             currentDay === null ||
             currentDay.status !== 'OPEN' ||
-            currentDay.shopId !== context.shopId
+            currentOpen === null ||
+            currentOpen.id !== context.value.day.id
           ) {
             throw new Error('The Business Day changed before End Day could commit.');
           }
-          const currentOpen = await transaction.businessDays.getOpenForShop(context.shopId);
-          if (currentOpen === null || currentOpen.id !== context.day.id) {
-            throw new Error('The open Business Day changed before End Day could commit.');
-          }
           if (
-            (await transaction.orders.listByBusinessDay(context.day.id)).some(
+            (await transaction.orders.listByBusinessDay(context.value.day.id)).some(
               (order) => order.status === 'ACTIVE',
             )
           ) {
             throw new Error('An Active order appeared before End Day could commit.');
-          }
-          if ((await transaction.reconciliations.getByBusinessDay(context.day.id)) !== null) {
-            throw new Error('The Business Day already has a reconciliation.');
           }
 
           await transaction.reconciliations.put(reconciliation);
@@ -317,19 +294,18 @@ export class OperationsEndDayService {
 
         try {
           await this.#draftStore.delete({
-            shopId: context.shopId,
-            businessDayId: context.day.id,
+            shopId: context.value.shopId,
+            businessDayId: context.value.day.id,
             draftScopeId,
           });
         } catch {
-          // The Business Day is already durably closed. A stale closed-day draft is harmless and cannot
-          // become a placed order because checkout requires an OPEN Business Day.
+          // Closed-day draft cleanup is best-effort after the atomic close. Checkout itself requires
+          // an OPEN Business Day, so a stale closed-day draft cannot become a placed order.
         }
 
         return ok({
-          businessDayId: context.day.id,
+          businessDayId: context.value.day.id,
           closedAt,
-          reconciliation,
           replayed: false,
         });
       } catch (cause) {
@@ -388,7 +364,9 @@ export class OperationsEndDayService {
     requireReasons: boolean,
   ): Promise<EndDayPreview> {
     const [orders, expenses] = await Promise.all([
-      this.#database.transaction((transaction) => transaction.orders.listByBusinessDay(context.day.id)),
+      this.#database.transaction((transaction) =>
+        transaction.orders.listByBusinessDay(context.day.id),
+      ),
       this.#expenseStore.listByBusinessDay(context.day.id),
     ]);
     if (orders.some((order) => order.status === 'ACTIVE')) {
@@ -404,7 +382,7 @@ export class OperationsEndDayService {
       actualPayments,
     );
     const reasonByMethod = new Map(
-      varianceReasons.map((reason) => [reason.paymentMethodId, reason.reason] as const),
+      varianceReasons.map((entry) => [entry.paymentMethodId, entry.reason] as const),
     );
     return {
       businessDayId: context.day.id,
@@ -430,17 +408,43 @@ export class OperationsEndDayService {
     };
   }
 
-  #gateError(gate: Exclude<EndDayGate, { kind: 'READY' }>): ApplicationError {
-    if (gate.kind === 'ACTIVE_ORDERS_BLOCKED') {
-      return {
-        code: 'CONFLICT_ERROR',
-        message: `End Day is blocked by Active orders: ${gate.activeOrderNos.map((number) => `#${number}`).join(', ')}.`,
-      };
-    }
+  #buildReconciliation(
+    context: EndDayContext,
+    preview: EndDayPreview,
+    createdAt: Instant,
+  ): Reconciliation {
     return {
-      code: 'CONFLICT_ERROR',
-      message: 'End Day is blocked by an unfinished order draft.',
+      id: this.#id<ReconciliationId>(),
+      shopId: context.shopId,
+      businessDayId: context.day.id,
+      createdByWorkerId: context.operator.id,
+      createdAt,
+      lines: preview.lines.map(
+        (line): ReconciliationLine => ({
+          paymentMethod: {
+            id: line.paymentMethod.id,
+            label: line.paymentMethod.label,
+            logicType: line.paymentMethod.logicType,
+          },
+          expectedMinor: line.expectedMinor,
+          actualMinor: line.actualMinor,
+          differenceMinor: line.differenceMinor,
+          varianceReason: line.varianceReason,
+        }),
+      ),
     };
+  }
+
+  #gateError(gate: Exclude<EndDayGate, { kind: 'READY' }>): ApplicationError {
+    return gate.kind === 'ACTIVE_ORDERS_BLOCKED'
+      ? {
+          code: 'CONFLICT_ERROR',
+          message: `End Day is blocked by Active orders: ${gate.activeOrderNos.map((number) => `#${number}`).join(', ')}.`,
+        }
+      : {
+          code: 'CONFLICT_ERROR',
+          message: 'End Day is blocked by an unfinished order draft.',
+        };
   }
 
   async #resolveCurrentContext(): Promise<Result<EndDayContext, ApplicationError>> {
@@ -498,7 +502,10 @@ export class OperationsEndDayService {
       this.#readModel.getOpenWorkerSession(day.id),
     ]);
     if (configuration === null) {
-      return err({ code: 'CONFLICT_ERROR', message: 'Local Operations configuration is unavailable.' });
+      return err({
+        code: 'CONFLICT_ERROR',
+        message: 'Local Operations configuration is unavailable.',
+      });
     }
     if (session === null || session.endedAt !== null) {
       return err({ code: 'CONFLICT_ERROR', message: 'A Current Operator is required.' });
@@ -571,22 +578,22 @@ export class OperationsEndDayService {
     createdAt: Instant,
   ): readonly OutboxEvent[] {
     return [
-      this.#outbox({
+      this.#outboxEvent(
         context,
-        aggregateType: 'RECONCILIATION',
-        aggregateId: reconciliation.id,
-        eventType: 'RECONCILIATION_RECORDED',
-        idempotencyKey: `reconciliation-recorded:${context.day.id}`,
-        payload: this.#reconciliationPayload(reconciliation, preview),
+        reconciliation.id,
+        'RECONCILIATION',
+        'RECONCILIATION_RECORDED',
+        `reconciliation-recorded:${context.day.id}`,
+        this.#reconciliationPayload(reconciliation, preview),
         createdAt,
-      }),
-      this.#outbox({
+      ),
+      this.#outboxEvent(
         context,
-        aggregateType: 'BUSINESS_DAY',
-        aggregateId: context.day.id,
-        eventType: 'BUSINESS_DAY_CLOSED',
-        idempotencyKey: `business-day-closed:${context.day.id}`,
-        payload: {
+        context.day.id,
+        'BUSINESS_DAY',
+        'BUSINESS_DAY_CLOSED',
+        `business-day-closed:${context.day.id}`,
+        {
           businessDayId: context.day.id,
           endedByWorkerId: context.operator.id,
           endedAt: createdAt,
@@ -594,43 +601,43 @@ export class OperationsEndDayService {
           totalExpensesMinor: preview.totalExpensesMinor,
         },
         createdAt,
-      }),
-      this.#outbox({
+      ),
+      this.#outboxEvent(
         context,
-        aggregateType: 'WORKER_SESSION',
-        aggregateId: context.session.id,
-        eventType: 'WORKER_SIGNED_OUT',
-        idempotencyKey: `worker-session-end-day:${context.session.id}`,
-        payload: {
+        context.session.id,
+        'WORKER_SESSION',
+        'WORKER_SIGNED_OUT',
+        `worker-session-end-day:${context.session.id}`,
+        {
           workerSessionId: context.session.id,
           workerId: context.operator.id,
           endedAt: createdAt,
         },
         createdAt,
-      }),
+      ),
     ];
   }
 
-  #outbox(input: {
-    readonly context: EndDayContext;
-    readonly aggregateType: string;
-    readonly aggregateId: string;
-    readonly eventType: string;
-    readonly idempotencyKey: string;
-    readonly payload: JsonValue;
-    readonly createdAt: Instant;
-  }): OutboxEvent {
+  #outboxEvent(
+    context: EndDayContext,
+    aggregateId: string,
+    aggregateType: string,
+    eventType: string,
+    idempotencyKey: string,
+    payload: JsonValue,
+    createdAt: Instant,
+  ): OutboxEvent {
     return {
       id: this.#id<OutboxEventId>(),
-      shopId: input.context.shopId,
-      businessDayId: input.context.day.id,
-      aggregateType: input.aggregateType,
-      aggregateId: input.aggregateId,
-      eventType: input.eventType,
-      idempotencyKey: input.idempotencyKey,
+      shopId: context.shopId,
+      businessDayId: context.day.id,
+      aggregateType,
+      aggregateId,
+      eventType,
+      idempotencyKey,
       payloadVersion: 1,
-      payload: input.payload,
-      createdAt: input.createdAt,
+      payload,
+      createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
       lastError: null,
@@ -653,6 +660,16 @@ export class OperationsEndDayService {
         varianceReason: line.varianceReason,
       })),
     };
+  }
+
+  #validationOrPersistence<ResultValue>(
+    cause: unknown,
+    fallback: string,
+  ): Result<ResultValue, ApplicationError> {
+    if (cause instanceof DomainInvariantError) {
+      return err({ code: 'VALIDATION_ERROR', message: cause.message, cause });
+    }
+    return err(persistenceError(fallback, cause));
   }
 
   #id<Id extends EntityId>(): Id {
