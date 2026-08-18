@@ -2,6 +2,12 @@ import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 import { assertBulkStockBoardResult, assertBulkStockMutationResult } from './bulkStockResult';
+import {
+  assertEndDayCloseResult,
+  assertEndDayDiscardResult,
+  assertEndDayGateResult,
+  assertEndDayPreviewResult,
+} from './endDayResult';
 import { assertExpenseMutationResult, assertExpensesLedgerResult } from './expensesResult';
 import {
   assertCustomerLookupResult,
@@ -35,6 +41,10 @@ const IPC_BULK_LOAD = 'tux:bulk-stock:load';
 const IPC_BULK_FINISH_ONE = 'tux:bulk-stock:finish-one';
 const IPC_BULK_ADD = 'tux:bulk-stock:add';
 const IPC_BULK_UNDO = 'tux:bulk-stock:undo';
+const IPC_END_DAY_BEGIN = 'tux:end-day:begin';
+const IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';
+const IPC_END_DAY_PREVIEW = 'tux:end-day:preview';
+const IPC_END_DAY_CLOSE = 'tux:end-day:close';
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -111,6 +121,20 @@ const api: TuxDesktopApi = Object.freeze({
       assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_ADD, input)) as unknown),
     undoMovement: async (input: Parameters<TuxDesktopApi['bulkStock']['undoMovement']>[0]) =>
       assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_UNDO, input)) as unknown),
+  }),
+  endDay: Object.freeze({
+    beginEndDay: async (draftScopeId: string) =>
+      assertEndDayGateResult((await ipcRenderer.invoke(IPC_END_DAY_BEGIN, draftScopeId)) as unknown),
+    discardDraft: async (draftScopeId: string) =>
+      assertEndDayDiscardResult(
+        (await ipcRenderer.invoke(IPC_END_DAY_DISCARD_DRAFT, draftScopeId)) as unknown,
+      ),
+    previewReconciliation: async (
+      input: Parameters<TuxDesktopApi['endDay']['previewReconciliation']>[0],
+    ) =>
+      assertEndDayPreviewResult((await ipcRenderer.invoke(IPC_END_DAY_PREVIEW, input)) as unknown),
+    closeDay: async (input: Parameters<TuxDesktopApi['endDay']['closeDay']>[0]) =>
+      assertEndDayCloseResult((await ipcRenderer.invoke(IPC_END_DAY_CLOSE, input)) as unknown),
   }),
 });
 
