@@ -1,0 +1,64 @@
+name: Phase 5 Orders Board Bootstrap
+
+on:
+  push:
+    branches:
+      - feat/ops-05-orders-board
+    paths:
+      - .github/workflows/phase5-orders-board-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Phase 5 branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/ops-05-orders-board
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Assemble and apply Phase 5 patch
+        run: |
+          cat .phase5_parts/part_*.txt > .phase5_orders_board_patch.py
+          python -m py_compile .phase5_orders_board_patch.py
+          python .phase5_orders_board_patch.py
+          rm -rf .phase5_parts
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Format
+        run: npm run format
+
+      - name: Verify formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Strict typecheck
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Production builds
+        run: npm run build --workspaces --if-present
+
+      - name: Commit validated Phase 5 implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 1
+          git commit -m "feat: implement operations orders board"
+          git push origin HEAD:feat/ops-05-orders-board
