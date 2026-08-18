@@ -17,7 +17,7 @@ packages/domain
 
 packages/application
   serialized application commands, typed Results/errors,
-  Orders/session services and native capability ports
+  Orders/Orders Board/session services and native capability ports
 
 packages/persistence
   shared repository/transaction contract
@@ -83,7 +83,7 @@ BusinessDayId / OrderId / WorkerId / ...
 
 Business Day is a first-class OPEN/CLOSED entity. Display order numbering is Business-Day scoped and independent from immutable Order UUIDs.
 
-Placed orders are structured immutable snapshots. Payment business behavior uses stable logic types rather than display-name comparisons. Delivery Failed Expenses use `amount = null` semantics. Inventory uses an append-only movement ledger with exact signed quantity micro-units.
+Placed orders are structured historical snapshots. Commercial/payment/fulfillment/item facts remain immutable after checkout; Phase 5 adds explicit operational lifecycle metadata (`revision`, `doneAt`, cancellation, return) updated only through narrow audited transitions. Payment business behavior uses stable logic types rather than display-name comparisons. Delivery Failed Expenses use `amount = null` semantics. Inventory uses an append-only movement ledger with exact signed quantity micro-units.
 
 Phase 4 adds a durable `OrderDraft` model with a runtime-local draft scope, revision, and stable checkout intent key. Product quantity/customization, combo beverages, delivery-zone fee snapshots, exact discount/payment calculations, phone normalization, and smart Cash tenders are domain/application concerns rather than JSX calculations.
 
@@ -111,6 +111,16 @@ validate complete draft
 A local transaction failure returns a blocking application error and leaves the durable draft available. An idempotent replay returns the already committed Order without repeating order, inventory, audit, outbox, or automatic printing effects.
 
 Renderer draft edits are serialized through one save queue. Desktop stores drafts in SQLite; browser fallback stores them in IndexedDB. Stale revisions are rejected rather than silently overwriting a newer draft.
+
+## Orders Board command boundary
+
+`OperationsOrdersBoardService` owns current-Business-Day Board loading and the approved operational transitions only: `ACTIVE → DONE`, bounded Done Undo back to `ACTIVE`, `ACTIVE → CANCELLED`, and `DONE Delivery → RETURNED`. There is no general edit/reopen API and no multi-stage kitchen state model.
+
+Every Board transition re-reads the current open Business Day and target order inside the local command boundary. The persistence update is intentionally narrow: it starts from the already saved order and replaces only `status`/lifecycle metadata, preserving items, fulfillment, operator, prices, totals, payments, numbering and receipt history.
+
+Cancellation is compensating rather than destructive. A not-prepared cancellation appends positive `CANCEL_RESTOCK` movements linked to the original negative `ORDER_CONSUMPTION` movements. A prepared cancellation leaves consumption unchanged. Delivery Failed never restores inventory; it atomically writes RETURNED lifecycle state, a linked `DELIVERY_FAILED` expense with `amount = null`, audit facts, and a durable outbox event while the historical order total/payment snapshot stays intact.
+
+The Orders Board renderer uses the same typed application boundary in browser fallback and narrow validated Electron IPC on desktop. It never receives raw storage/native access.
 
 ## Receipt printing boundary
 
