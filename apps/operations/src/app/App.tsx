@@ -1,16 +1,19 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
+import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
 import {
   createOperationsBulkStockClient,
+  createOperationsEndDayClient,
   createOperationsExpensesClient,
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
   type OperationsBulkStockClient,
+  type OperationsEndDayClient,
   type OperationsExpensesClient,
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
@@ -156,32 +159,34 @@ function ActiveShell({
   ordersBoardClient,
   expensesClient,
   bulkStockClient,
+  endDayClient,
   busy,
   error,
   onSwitch,
   onSignOut,
+  onBusinessDayClosed,
 }: {
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
   readonly ordersClient: OperationsOrdersClient;
   readonly ordersBoardClient: OperationsOrdersBoardClient;
   readonly expensesClient: OperationsExpensesClient;
   readonly bulkStockClient: OperationsBulkStockClient;
+  readonly endDayClient: OperationsEndDayClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
   readonly onSignOut: () => Promise<void>;
+  readonly onBusinessDayClosed: () => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
 
   useEffect(() => {
-    if (theme === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.dataset['theme'] = theme;
-    }
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.dataset['theme'] = theme;
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
@@ -200,49 +205,26 @@ function ActiveShell({
       <header className="operations-header">
         <Brand />
         <nav className="operations-nav" aria-label="Operations">
-          <button
-            type="button"
-            className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('ORDERS')}
-          >
+          <button type="button" className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('ORDERS')}>
             Orders
           </button>
-          <button
-            type="button"
-            className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('ORDERS_BOARD')}
-          >
+          <button type="button" className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('ORDERS_BOARD')}>
             Orders Board
           </button>
-          <button
-            type="button"
-            className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('EXPENSES')}
-          >
+          <button type="button" className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('EXPENSES')}>
             Expenses
           </button>
-          <button
-            type="button"
-            className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('BULK_STOCK')}
-          >
+          <button type="button" className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('BULK_STOCK')}>
             Bulk Stock
           </button>
         </nav>
         <div className="header-actions">
-          <span className="sync-status" aria-label="Local-first status">
-            Saved locally
-          </span>
+          <span className="sync-status" aria-label="Local-first status">Saved locally</span>
           <button type="button" className="theme-trigger" onClick={cycleTheme}>
             Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
           </button>
           <div className="operator-menu-wrap">
-            <button
-              className="operator-trigger"
-              type="button"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((open) => !open)}
-            >
+            <button className="operator-trigger" type="button" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
               {session.operator.displayName} <span aria-hidden="true">▾</span>
             </button>
             {menuOpen ? (
@@ -251,26 +233,14 @@ function ActiveShell({
                   <strong>{session.operator.displayName}</strong>
                   <span>Shift started: {formatShiftTime(session.businessDayStartedAt)}</span>
                 </div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setSwitchOpen(true);
-                    setMenuOpen(false);
-                  }}
-                >
+                <button type="button" role="menuitem" onClick={() => { setSwitchOpen(true); setMenuOpen(false); }}>
                   Switch / Sign in worker
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={busy}
-                  onClick={() => void onSignOut()}
-                >
+                <button type="button" role="menuitem" disabled={busy} onClick={() => void onSignOut()}>
                   Sign out
                 </button>
                 <div className="menu-divider" />
-                <button type="button" role="menuitem" disabled>
+                <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); setEndDayOpen(true); }}>
                   End Day
                 </button>
               </div>
@@ -289,28 +259,27 @@ function ActiveShell({
         <BulkStockWorkspace client={bulkStockClient} />
       )}
 
-      {error === null ? null : (
-        <div className="global-error" role="alert">
-          {error}
-        </div>
-      )}
+      {error === null ? null : <div className="global-error" role="alert">{error}</div>}
+
+      {endDayOpen ? (
+        <EndDayFlow
+          client={endDayClient}
+          onCancel={() => setEndDayOpen(false)}
+          onReturnToOrders={() => { setArea('ORDERS'); setEndDayOpen(false); }}
+          onReturnToBoard={() => { setArea('ORDERS_BOARD'); setEndDayOpen(false); }}
+          onClosed={async () => { setEndDayOpen(false); await onBusinessDayClosed(); }}
+        />
+      ) : null}
 
       {switchOpen ? (
         <div className="modal-backdrop" role="presentation">
-          <section
-            className="switch-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="switch-title"
-          >
+          <section className="switch-dialog" role="dialog" aria-modal="true" aria-labelledby="switch-title">
             <div className="dialog-heading">
               <div>
                 <p className="eyebrow">Current operator</p>
                 <h2 id="switch-title">Switch worker</h2>
               </div>
-              <button type="button" className="quiet-action" onClick={() => setSwitchOpen(false)}>
-                Cancel
-              </button>
+              <button type="button" className="quiet-action" onClick={() => setSwitchOpen(false)}>Cancel</button>
             </div>
             <PinForm
               purpose="SIGN_IN"
@@ -334,6 +303,7 @@ export function App() {
   const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
   const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
   const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);
+  const endDayClient = useMemo(() => createOperationsEndDayClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -345,9 +315,7 @@ export function App() {
       if (result.ok) setScreen({ kind: 'SESSION', session: result.value });
       else setError(result.error.message);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [client]);
 
   async function applyPin(pin: string): Promise<boolean> {
@@ -381,12 +349,20 @@ export function App() {
     setScreen({ kind: 'SESSION', session: result.value });
   }
 
-  if (screen.kind === 'LOADING') {
-    return <main className="loading-shell" aria-label="Loading TUX Operations" />;
+  async function refreshAfterEndDay(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    const result = await client.getState();
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
   }
-  if (screen.kind === 'GREETING') {
-    return <GreetingScreen session={screen.session} />;
-  }
+
+  if (screen.kind === 'LOADING') return <main className="loading-shell" aria-label="Loading TUX Operations" />;
+  if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
     return (
       <main className="entry-shell">
@@ -405,9 +381,7 @@ export function App() {
         session={screen.session}
         busy={busy}
         error={error}
-        onPin={async (pin) => {
-          void (await applyPin(pin));
-        }}
+        onPin={async (pin) => { void (await applyPin(pin)); }}
       />
     );
   }
@@ -418,10 +392,12 @@ export function App() {
       ordersBoardClient={ordersBoardClient}
       expensesClient={expensesClient}
       bulkStockClient={bulkStockClient}
+      endDayClient={endDayClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}
       onSignOut={signOut}
+      onBusinessDayClosed={refreshAfterEndDay}
     />
   );
 }
