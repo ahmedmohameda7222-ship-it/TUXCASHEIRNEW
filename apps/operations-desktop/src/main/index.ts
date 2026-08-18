@@ -12,7 +12,9 @@ import {
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
+import type { AutomaticOutboxScheduler } from '@tux/sync';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { startDesktopAutomaticSync } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
@@ -48,6 +50,7 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -114,6 +117,11 @@ async function initializeOperationsServices(): Promise<void> {
     draftStore: orderDraftStore,
     runtime,
     coordinator,
+  });
+  automaticSyncScheduler = startDesktopAutomaticSync({
+    database: operationsDatabase,
+    coordinator,
+    now: runtime.now,
   });
 }
 
@@ -302,12 +310,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
   void expensesIpcRuntime?.close();
   void operatorReadModel?.close();
   void orderDraftStore?.close();
   void operationsDatabase?.close();
+  automaticSyncScheduler = null;
   endDayIpcRuntime = null;
   bulkStockIpcRuntime = null;
   expensesIpcRuntime = null;

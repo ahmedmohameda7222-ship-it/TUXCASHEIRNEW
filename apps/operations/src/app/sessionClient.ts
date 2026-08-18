@@ -23,6 +23,7 @@ import type {
   TuxOrdersApi,
   TuxOrdersBoardApi,
 } from '@tux/platform-contracts';
+import { startBrowserAutomaticSync } from './automaticSync';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
@@ -67,6 +68,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         now: () => instant(new Date()),
         createUuid: () => crypto.randomUUID(),
       };
+      startBrowserAutomaticSync({ database, coordinator, now: runtime.now });
       return {
         session: new CoordinatedOperationsSessionService(
           database,

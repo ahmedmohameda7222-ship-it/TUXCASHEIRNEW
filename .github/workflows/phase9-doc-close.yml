@@ -1,0 +1,50 @@
+name: Phase 9 Documentation Closeout
+
+on:
+  push:
+    branches:
+      - feat/ops-09-sync
+    paths:
+      - '.phase9-doc-close.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-09-sync
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply Phase 9 documentation evidence
+        run: python scripts/phase9_finalize.py
+      - name: Install and normalize formatting
+        run: |
+          npm ci
+          npm run format
+      - name: Remove temporary Phase 9 closeout files
+        run: |
+          rm -f .phase9-doc-close.trigger scripts/phase9_finalize.py .github/workflows/phase9-doc-close.yml
+      - name: Validate final clean Phase 9 tree
+        run: |
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run test
+          npm run build
+      - name: Commit final Phase 9 tree and passed gate
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Close Phase 9 automatic sync evidence'
+          git push origin HEAD:feat/ops-09-sync
+          git push --force origin HEAD:refs/heads/gate/ops-09-sync-final
