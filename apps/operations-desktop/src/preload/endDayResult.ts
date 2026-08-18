@@ -80,9 +80,7 @@ export function assertEndDayCloseResult(value: unknown): EndDayCloseResult {
   return value as unknown as EndDayCloseResult;
 }
 
-export function assertEndDayDiscardResult(
-  value: unknown,
-): Result<true, ApplicationError> {
+export function assertEndDayDiscardResult(value: unknown): Result<true, ApplicationError> {
   assertResult(value, 'End Day discard result');
   if (value['ok'] && value['value'] !== true) {
     throw new TypeError('End Day discard result value must be true.');

@@ -196,10 +196,7 @@ export class OperationsEndDayService {
       try {
         const context = await this.#resolveExpectedOpenContext(input.businessDayId);
         if (!context.ok) return context;
-        const gate = await this.#gate(
-          context.value,
-          normalizedDraftScopeId(input.draftScopeId),
-        );
+        const gate = await this.#gate(context.value, normalizedDraftScopeId(input.draftScopeId));
         if (gate.kind !== 'READY') return err(this.#gateError(gate));
         return ok(await this.#preview(context.value, input.actualPayments, [], false));
       } catch (cause) {
@@ -247,24 +244,10 @@ export class OperationsEndDayService {
         );
         const closedAt = this.#runtime.now();
         const reconciliation = this.#buildReconciliation(context.value, preview, closedAt);
-        const closedDay = closeBusinessDay(
-          context.value.day,
-          closedAt,
-          context.value.operator.id,
-        );
+        const closedDay = closeBusinessDay(context.value.day, closedAt, context.value.operator.id);
         const closedSession: WorkerSession = { ...context.value.session, endedAt: closedAt };
-        const auditEvents = this.#auditEvents(
-          context.value,
-          reconciliation,
-          preview,
-          closedAt,
-        );
-        const outboxEvents = this.#outboxEvents(
-          context.value,
-          reconciliation,
-          preview,
-          closedAt,
-        );
+        const auditEvents = this.#auditEvents(context.value, reconciliation, preview, closedAt);
+        const outboxEvents = this.#outboxEvents(context.value, reconciliation, preview, closedAt);
 
         await this.#database.transaction(async (transaction) => {
           const currentDay = await transaction.businessDays.getById(context.value.day.id);
@@ -419,19 +402,17 @@ export class OperationsEndDayService {
       businessDayId: context.day.id,
       createdByWorkerId: context.operator.id,
       createdAt,
-      lines: preview.lines.map(
-        (line): ReconciliationLine => ({
-          paymentMethod: {
-            id: line.paymentMethod.id,
-            label: line.paymentMethod.label,
-            logicType: line.paymentMethod.logicType,
-          },
-          expectedMinor: line.expectedMinor,
-          actualMinor: line.actualMinor,
-          differenceMinor: line.differenceMinor,
-          varianceReason: line.varianceReason,
-        }),
-      ),
+      lines: preview.lines.map((line): ReconciliationLine => ({
+        paymentMethod: {
+          id: line.paymentMethod.id,
+          label: line.paymentMethod.label,
+          logicType: line.paymentMethod.logicType,
+        },
+        expectedMinor: line.expectedMinor,
+        actualMinor: line.actualMinor,
+        differenceMinor: line.differenceMinor,
+        varianceReason: line.varianceReason,
+      })),
     };
   }
 
@@ -494,9 +475,7 @@ export class OperationsEndDayService {
     }
   }
 
-  async #contextForOpenDay(
-    day: OpenBusinessDay,
-  ): Promise<Result<EndDayContext, ApplicationError>> {
+  async #contextForOpenDay(day: OpenBusinessDay): Promise<Result<EndDayContext, ApplicationError>> {
     const [configuration, session] = await Promise.all([
       this.#database.transaction((transaction) => transaction.configuration.getForShop(day.shopId)),
       this.#readModel.getOpenWorkerSession(day.id),

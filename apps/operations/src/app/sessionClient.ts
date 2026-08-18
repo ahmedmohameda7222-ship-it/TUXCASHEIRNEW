@@ -175,7 +175,8 @@ export function createOperationsEndDayClient(): OperationsEndDayClient {
   if (desktop !== undefined) return desktop.endDay;
   return {
     beginEndDay: async (draftScopeId) => (await browserRuntime()).endDay.beginEndDay(draftScopeId),
-    discardDraft: async (draftScopeId) => (await browserRuntime()).endDay.discardDraft(draftScopeId),
+    discardDraft: async (draftScopeId) =>
+      (await browserRuntime()).endDay.discardDraft(draftScopeId),
     previewReconciliation: async (input) =>
       (await browserRuntime()).endDay.previewReconciliation(input),
     closeDay: async (input) => (await browserRuntime()).endDay.closeDay(input),

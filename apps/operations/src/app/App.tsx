@@ -205,26 +205,49 @@ function ActiveShell({
       <header className="operations-header">
         <Brand />
         <nav className="operations-nav" aria-label="Operations">
-          <button type="button" className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('ORDERS')}>
+          <button
+            type="button"
+            className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('ORDERS')}
+          >
             Orders
           </button>
-          <button type="button" className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('ORDERS_BOARD')}>
+          <button
+            type="button"
+            className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('ORDERS_BOARD')}
+          >
             Orders Board
           </button>
-          <button type="button" className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('EXPENSES')}>
+          <button
+            type="button"
+            className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('EXPENSES')}
+          >
             Expenses
           </button>
-          <button type="button" className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'} onClick={() => setArea('BULK_STOCK')}>
+          <button
+            type="button"
+            className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('BULK_STOCK')}
+          >
             Bulk Stock
           </button>
         </nav>
         <div className="header-actions">
-          <span className="sync-status" aria-label="Local-first status">Saved locally</span>
+          <span className="sync-status" aria-label="Local-first status">
+            Saved locally
+          </span>
           <button type="button" className="theme-trigger" onClick={cycleTheme}>
             Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
           </button>
           <div className="operator-menu-wrap">
-            <button className="operator-trigger" type="button" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
+            <button
+              className="operator-trigger"
+              type="button"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
               {session.operator.displayName} <span aria-hidden="true">▾</span>
             </button>
             {menuOpen ? (
@@ -233,14 +256,34 @@ function ActiveShell({
                   <strong>{session.operator.displayName}</strong>
                   <span>Shift started: {formatShiftTime(session.businessDayStartedAt)}</span>
                 </div>
-                <button type="button" role="menuitem" onClick={() => { setSwitchOpen(true); setMenuOpen(false); }}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSwitchOpen(true);
+                    setMenuOpen(false);
+                  }}
+                >
                   Switch / Sign in worker
                 </button>
-                <button type="button" role="menuitem" disabled={busy} onClick={() => void onSignOut()}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => void onSignOut()}
+                >
                   Sign out
                 </button>
                 <div className="menu-divider" />
-                <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); setEndDayOpen(true); }}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEndDayOpen(true);
+                  }}
+                >
                   End Day
                 </button>
               </div>
@@ -259,27 +302,47 @@ function ActiveShell({
         <BulkStockWorkspace client={bulkStockClient} />
       )}
 
-      {error === null ? null : <div className="global-error" role="alert">{error}</div>}
+      {error === null ? null : (
+        <div className="global-error" role="alert">
+          {error}
+        </div>
+      )}
 
       {endDayOpen ? (
         <EndDayFlow
           client={endDayClient}
           onCancel={() => setEndDayOpen(false)}
-          onReturnToOrders={() => { setArea('ORDERS'); setEndDayOpen(false); }}
-          onReturnToBoard={() => { setArea('ORDERS_BOARD'); setEndDayOpen(false); }}
-          onClosed={async () => { setEndDayOpen(false); await onBusinessDayClosed(); }}
+          onReturnToOrders={() => {
+            setArea('ORDERS');
+            setEndDayOpen(false);
+          }}
+          onReturnToBoard={() => {
+            setArea('ORDERS_BOARD');
+            setEndDayOpen(false);
+          }}
+          onClosed={async () => {
+            setEndDayOpen(false);
+            await onBusinessDayClosed();
+          }}
         />
       ) : null}
 
       {switchOpen ? (
         <div className="modal-backdrop" role="presentation">
-          <section className="switch-dialog" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+          <section
+            className="switch-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="switch-title"
+          >
             <div className="dialog-heading">
               <div>
                 <p className="eyebrow">Current operator</p>
                 <h2 id="switch-title">Switch worker</h2>
               </div>
-              <button type="button" className="quiet-action" onClick={() => setSwitchOpen(false)}>Cancel</button>
+              <button type="button" className="quiet-action" onClick={() => setSwitchOpen(false)}>
+                Cancel
+              </button>
             </div>
             <PinForm
               purpose="SIGN_IN"
@@ -315,7 +378,9 @@ export function App() {
       if (result.ok) setScreen({ kind: 'SESSION', session: result.value });
       else setError(result.error.message);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [client]);
 
   async function applyPin(pin: string): Promise<boolean> {
@@ -361,7 +426,8 @@ export function App() {
     setScreen({ kind: 'SESSION', session: result.value });
   }
 
-  if (screen.kind === 'LOADING') return <main className="loading-shell" aria-label="Loading TUX Operations" />;
+  if (screen.kind === 'LOADING')
+    return <main className="loading-shell" aria-label="Loading TUX Operations" />;
   if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
     return (
@@ -381,7 +447,9 @@ export function App() {
         session={screen.session}
         busy={busy}
         error={error}
-        onPin={async (pin) => { void (await applyPin(pin)); }}
+        onPin={async (pin) => {
+          void (await applyPin(pin));
+        }}
       />
     );
   }

@@ -59,7 +59,9 @@ export function calculateEndDayFinancialProjection(input: {
 }): EndDayFinancialProjection {
   const methods = endDayReconciliationMethods(input.configuration);
   if (methods.length === 0) {
-    throw new DomainInvariantError('At least one active reconciliation payment method is required.');
+    throw new DomainInvariantError(
+      'At least one active reconciliation payment method is required.',
+    );
   }
   const expectedByMethod = new Map<PaymentMethodId, MoneyMinor>(
     methods.map((method) => [method.id, ZERO_MONEY]),
@@ -114,7 +116,9 @@ export function buildEndDayReconciliationProjection(
   actualPayments: readonly EndDayActualPayment[],
 ): readonly EndDayReconciliationProjectionLine[] {
   if (actualPayments.length !== expectations.length) {
-    throw new DomainInvariantError('Every reconciliation payment method requires one actual amount.');
+    throw new DomainInvariantError(
+      'Every reconciliation payment method requires one actual amount.',
+    );
   }
   const actualByMethod = new Map<PaymentMethodId, MoneyMinor>();
   for (const actual of actualPayments) {
@@ -127,7 +131,9 @@ export function buildEndDayReconciliationProjection(
   return expectations.map((expectation) => {
     const actualMinor = actualByMethod.get(expectation.paymentMethodId);
     if (actualMinor === undefined) {
-      throw new DomainInvariantError('Every reconciliation payment method requires one actual amount.');
+      throw new DomainInvariantError(
+        'Every reconciliation payment method requires one actual amount.',
+      );
     }
     return {
       ...expectation,

@@ -81,9 +81,7 @@ export function EndDayFlow({
     await loadGate();
   }
 
-  async function revealExpected(
-    gate: Extract<EndDayGate, { kind: 'READY' }>,
-  ): Promise<void> {
+  async function revealExpected(gate: Extract<EndDayGate, { kind: 'READY' }>): Promise<void> {
     setBusy(true);
     setError(null);
     const result = await client.previewReconciliation({
@@ -157,8 +155,8 @@ export function EndDayFlow({
           <div className="end-day-blocked">
             <h3>Resolve Active orders first</h3>
             <p>
-              {stage.gate.activeOrderNos.map((number) => `#${number}`).join(', ')} still need Done or
-              Cancel before reconciliation can start.
+              {stage.gate.activeOrderNos.map((number) => `#${number}`).join(', ')} still need Done
+              or Cancel before reconciliation can start.
             </p>
             <button type="button" className="primary-action" onClick={onReturnToBoard}>
               Go to Orders Board
@@ -208,8 +206,8 @@ export function EndDayFlow({
                     </div>
                     <h3>Enter actual {method.label}</h3>
                     <p className="end-day-muted">
-                      Count what is actually present. Expected values remain hidden until every actual
-                      amount is submitted.
+                      Count what is actually present. Expected values remain hidden until every
+                      actual amount is submitted.
                     </p>
                     <MoneyInput
                       id={`end-day-actual-${method.id}`}
@@ -262,8 +260,8 @@ export function EndDayFlow({
               <p className="eyebrow">Final Closing Summary</p>
               <h3>Review before closing</h3>
               <p className="end-day-muted">
-                Variance is allowed, but every non-zero difference needs a reason. Closing writes the
-                Business Day locally and does not depend on cloud or printing.
+                Variance is allowed, but every non-zero difference needs a reason. Closing writes
+                the Business Day locally and does not depend on cloud or printing.
               </p>
             </div>
 

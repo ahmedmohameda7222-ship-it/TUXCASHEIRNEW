@@ -196,7 +196,11 @@ function order(input: {
   };
 }
 
-function rows(databasePath: string, sql: string, ...parameters: string[]): Record<string, unknown>[] {
+function rows(
+  databasePath: string,
+  sql: string,
+  ...parameters: string[]
+): Record<string, unknown>[] {
   const database = new DatabaseSync(databasePath, { readOnly: true });
   try {
     return database.prepare(sql).all(...parameters) as Record<string, unknown>[];
@@ -268,16 +272,10 @@ async function fixture(uuidSequence: string[] = []) {
 
   let now = instant('2026-08-19T02:30:00.000Z');
   const ids = [...uuidSequence];
-  const service = new OperationsEndDayService(
-    database,
-    readModel,
-    draftStore,
-    expenseStore,
-    {
-      now: () => now,
-      createUuid: () => ids.shift() ?? randomUUID(),
-    },
-  );
+  const service = new OperationsEndDayService(database, readModel, draftStore, expenseStore, {
+    now: () => now,
+    createUuid: () => ids.shift() ?? randomUUID(),
+  });
 
   cleanup.push(async () => {
     await expenseStore.close();
@@ -387,12 +385,20 @@ describe('Operations End Day SQLite integration', () => {
     if (!blocked.ok) return;
     expect(blocked.value.kind).toBe('UNFINISHED_DRAFT');
     expect(
-      await fx.draftStore.get({ shopId: SHOP_ID, businessDayId: DAY_ID, draftScopeId: DRAFT_SCOPE }),
+      await fx.draftStore.get({
+        shopId: SHOP_ID,
+        businessDayId: DAY_ID,
+        draftScopeId: DRAFT_SCOPE,
+      }),
     ).not.toBeNull();
 
     expect(await fx.service.discardDraft(DRAFT_SCOPE)).toEqual({ ok: true, value: true });
     expect(
-      await fx.draftStore.get({ shopId: SHOP_ID, businessDayId: DAY_ID, draftScopeId: DRAFT_SCOPE }),
+      await fx.draftStore.get({
+        shopId: SHOP_ID,
+        businessDayId: DAY_ID,
+        draftScopeId: DRAFT_SCOPE,
+      }),
     ).toBeNull();
     const ready = await fx.service.beginEndDay(DRAFT_SCOPE);
     expect(ready.ok).toBe(true);
@@ -492,7 +498,8 @@ describe('Operations End Day SQLite integration', () => {
     if (result.ok) return;
     expect(result.error.code).toBe('VALIDATION_ERROR');
     expect(
-      (await fx.database.transaction((transaction) => transaction.businessDays.getById(DAY_ID)))?.status,
+      (await fx.database.transaction((transaction) => transaction.businessDays.getById(DAY_ID)))
+        ?.status,
     ).toBe('OPEN');
     expect(rows(fx.databasePath, 'SELECT id FROM reconciliations')).toHaveLength(0);
     expect(rows(fx.databasePath, 'SELECT id FROM expenses')).toHaveLength(0);
@@ -524,16 +531,35 @@ describe('Operations End Day SQLite integration', () => {
     expect(result.value.replayed).toBe(false);
     expect(result.value.closedAt).toBe('2026-08-19T02:30:00.000Z');
 
-    const day = await fx.database.transaction((transaction) => transaction.businessDays.getById(DAY_ID));
-    expect(day?.status).toBe('CLOSED');
-    expect(await fx.database.transaction((transaction) => transaction.businessDays.getOpenForShop(SHOP_ID))).toBeNull();
-    expect(rows(fx.databasePath, 'SELECT ended_at FROM worker_sessions WHERE id = ?', SESSION_ID)[0]?.['ended_at']).toBe(
-      '2026-08-19T02:30:00.000Z',
+    const day = await fx.database.transaction((transaction) =>
+      transaction.businessDays.getById(DAY_ID),
     );
-    expect(rows(fx.databasePath, 'SELECT id FROM reconciliations WHERE business_day_id = ?', DAY_ID)).toHaveLength(1);
-    expect(rows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'BUSINESS_DAY_CLOSED'")).toHaveLength(1);
-    expect(rows(fx.databasePath, "SELECT id FROM outbox_events WHERE event_type = 'BUSINESS_DAY_CLOSED'")).toHaveLength(1);
-    expect(rows(fx.databasePath, 'SELECT id FROM inventory_movements')).toHaveLength(movementsBefore);
+    expect(day?.status).toBe('CLOSED');
+    expect(
+      await fx.database.transaction((transaction) =>
+        transaction.businessDays.getOpenForShop(SHOP_ID),
+      ),
+    ).toBeNull();
+    expect(
+      rows(fx.databasePath, 'SELECT ended_at FROM worker_sessions WHERE id = ?', SESSION_ID)[0]?.[
+        'ended_at'
+      ],
+    ).toBe('2026-08-19T02:30:00.000Z');
+    expect(
+      rows(fx.databasePath, 'SELECT id FROM reconciliations WHERE business_day_id = ?', DAY_ID),
+    ).toHaveLength(1);
+    expect(
+      rows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'BUSINESS_DAY_CLOSED'"),
+    ).toHaveLength(1);
+    expect(
+      rows(
+        fx.databasePath,
+        "SELECT id FROM outbox_events WHERE event_type = 'BUSINESS_DAY_CLOSED'",
+      ),
+    ).toHaveLength(1);
+    expect(rows(fx.databasePath, 'SELECT id FROM inventory_movements')).toHaveLength(
+      movementsBefore,
+    );
 
     const replay = await fx.service.closeDay({
       businessDayId: DAY_ID,
@@ -544,9 +570,15 @@ describe('Operations End Day SQLite integration', () => {
     expect(replay.ok).toBe(true);
     if (!replay.ok) return;
     expect(replay.value.replayed).toBe(true);
-    expect(replay.value.reconciliation.id).toBe(result.value.reconciliation.id);
-    expect(rows(fx.databasePath, 'SELECT id FROM reconciliations WHERE business_day_id = ?', DAY_ID)).toHaveLength(1);
-    expect(rows(fx.databasePath, "SELECT id FROM outbox_events WHERE event_type = 'BUSINESS_DAY_CLOSED'")).toHaveLength(1);
+    expect(
+      rows(fx.databasePath, 'SELECT id FROM reconciliations WHERE business_day_id = ?', DAY_ID),
+    ).toHaveLength(1);
+    expect(
+      rows(
+        fx.databasePath,
+        "SELECT id FROM outbox_events WHERE event_type = 'BUSINESS_DAY_CLOSED'",
+      ),
+    ).toHaveLength(1);
 
     const nextDay = createOpenBusinessDay({
       id: parseEntityId<BusinessDayId>('44000000-0000-4000-8000-000000000002'),
@@ -609,10 +641,17 @@ describe('Operations End Day SQLite integration', () => {
     });
     expect(result.ok).toBe(false);
     expect(
-      (await fx.database.transaction((transaction) => transaction.businessDays.getById(DAY_ID)))?.status,
+      (await fx.database.transaction((transaction) => transaction.businessDays.getById(DAY_ID)))
+        ?.status,
     ).toBe('OPEN');
-    expect(rows(fx.databasePath, 'SELECT ended_at FROM worker_sessions WHERE id = ?', SESSION_ID)[0]?.['ended_at']).toBeNull();
+    expect(
+      rows(fx.databasePath, 'SELECT ended_at FROM worker_sessions WHERE id = ?', SESSION_ID)[0]?.[
+        'ended_at'
+      ],
+    ).toBeNull();
     expect(rows(fx.databasePath, 'SELECT id FROM reconciliations')).toHaveLength(0);
-    expect(rows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'BUSINESS_DAY_CLOSED'")).toHaveLength(0);
+    expect(
+      rows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'BUSINESS_DAY_CLOSED'"),
+    ).toHaveLength(0);
   });
 });

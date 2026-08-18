@@ -124,7 +124,9 @@ const api: TuxDesktopApi = Object.freeze({
   }),
   endDay: Object.freeze({
     beginEndDay: async (draftScopeId: string) =>
-      assertEndDayGateResult((await ipcRenderer.invoke(IPC_END_DAY_BEGIN, draftScopeId)) as unknown),
+      assertEndDayGateResult(
+        (await ipcRenderer.invoke(IPC_END_DAY_BEGIN, draftScopeId)) as unknown,
+      ),
     discardDraft: async (draftScopeId: string) =>
       assertEndDayDiscardResult(
         (await ipcRenderer.invoke(IPC_END_DAY_DISCARD_DRAFT, draftScopeId)) as unknown,

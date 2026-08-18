@@ -1,7 +1,4 @@
-import {
-  OperationsEndDayService,
-  type ApplicationCommandCoordinator,
-} from '@tux/application';
+import { OperationsEndDayService, type ApplicationCommandCoordinator } from '@tux/application';
 import {
   moneyMinor,
   parseEntityId,

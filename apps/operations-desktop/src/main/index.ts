@@ -118,12 +118,14 @@ async function initializeOperationsServices(): Promise<void> {
 }
 
 function currentSessionService(): CoordinatedOperationsSessionService {
-  if (sessionService === null) throw new Error('Operations session service has not been initialized.');
+  if (sessionService === null)
+    throw new Error('Operations session service has not been initialized.');
   return sessionService;
 }
 
 function currentOrdersService(): OperationsOrdersService {
-  if (ordersService === null) throw new Error('Operations Orders service has not been initialized.');
+  if (ordersService === null)
+    throw new Error('Operations Orders service has not been initialized.');
   return ordersService;
 }
 
