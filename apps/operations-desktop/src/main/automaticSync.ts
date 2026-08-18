@@ -12,15 +12,16 @@ export function startDesktopAutomaticSync(input: {
   if (endpoint === undefined || endpoint.length === 0) return null;
 
   const token = process.env['TUX_SYNC_BEARER_TOKEN']?.trim();
+  const transport =
+    token === undefined || token.length === 0
+      ? new HttpOutboxTransport({ endpoint })
+      : new HttpOutboxTransport({
+          endpoint,
+          headers: { authorization: `Bearer ${token}` },
+        });
   const service = new OutboxSyncService(
     input.database,
-    new HttpOutboxTransport({
-      endpoint,
-      headers:
-        token === undefined || token.length === 0
-          ? undefined
-          : { authorization: `Bearer ${token}` },
-    }),
+    transport,
     { now: input.now },
     input.coordinator,
   );
