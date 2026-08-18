@@ -1,3 +1,15 @@
+export { OperationsBulkStockService } from './bulkStock';
+export type {
+  AddBulkStockInput,
+  BulkStockBoard,
+  BulkStockBoardItem,
+  BulkStockBoardResult,
+  BulkStockMovementInput,
+  BulkStockMutation,
+  BulkStockMutationResult,
+  BulkStockRuntime,
+  UndoBulkStockInput,
+} from './bulkStock';
 export { ApplicationCommandCoordinator } from './commandCoordinator';
 export { CoordinatedOperationsSessionService } from './coordinatedSession';
 export type { ApplicationError, ApplicationErrorCode } from './errors';

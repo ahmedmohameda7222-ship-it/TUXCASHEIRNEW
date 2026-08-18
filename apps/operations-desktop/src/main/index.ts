@@ -13,6 +13,7 @@ import {
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
 import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
@@ -44,6 +45,7 @@ let sessionService: CoordinatedOperationsSessionService | null = null;
 let ordersService: OperationsOrdersService | null = null;
 let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
+let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -90,6 +92,13 @@ async function initializeOperationsServices(): Promise<void> {
     coordinator,
   );
   expensesIpcRuntime = await ExpensesIpcRuntime.create({
+    databasePath,
+    database: operationsDatabase,
+    readModel: operatorReadModel,
+    runtime,
+    coordinator,
+  });
+  bulkStockIpcRuntime = await BulkStockIpcRuntime.create({
     databasePath,
     database: operationsDatabase,
     readModel: operatorReadModel,
@@ -240,7 +249,11 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (expensesIpcRuntime === null) {
     throw new Error('Operations Expenses IPC runtime has not been initialized.');
   }
+  if (bulkStockIpcRuntime === null) {
+    throw new Error('Operations Bulk Stock IPC runtime has not been initialized.');
+  }
   expensesIpcRuntime.register(window);
+  bulkStockIpcRuntime.register(window);
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -281,10 +294,12 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  void bulkStockIpcRuntime?.close();
   void expensesIpcRuntime?.close();
   void operatorReadModel?.close();
   void orderDraftStore?.close();
   void operationsDatabase?.close();
+  bulkStockIpcRuntime = null;
   expensesIpcRuntime = null;
   operatorReadModel = null;
   orderDraftStore = null;

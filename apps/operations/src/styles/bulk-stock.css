@@ -1,0 +1,225 @@
+.bulk-stock-workspace {
+  width: min(100% - 3rem, 78rem);
+  margin: 0 auto;
+  padding: var(--tux-space-6) 0 var(--tux-space-12);
+}
+
+.bulk-stock-page-heading {
+  margin-bottom: var(--tux-space-6);
+}
+
+.bulk-stock-page-heading h1,
+.bulk-stock-card h2,
+.bulk-stock-dialog h2,
+.bulk-stock-empty h2 {
+  margin: 0;
+  line-height: 1.1;
+}
+
+.bulk-stock-page-heading h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.bulk-stock-page-heading > div > p:last-child,
+.bulk-stock-empty p,
+.bulk-stock-quantity-field span {
+  color: var(--tux-text-secondary);
+}
+
+.bulk-stock-page-heading > div > p:last-child {
+  margin: var(--tux-space-2) 0 0;
+}
+
+.bulk-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tux-space-4);
+}
+
+.bulk-stock-card,
+.bulk-stock-dialog,
+.bulk-stock-empty {
+  border: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-sm);
+}
+
+.bulk-stock-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--tux-space-5);
+  align-items: end;
+  padding: var(--tux-space-5);
+}
+
+.bulk-stock-card-main {
+  min-width: 0;
+}
+
+.bulk-stock-card-main > span {
+  display: block;
+  margin-top: var(--tux-space-5);
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bulk-stock-balance {
+  display: block;
+  margin-top: var(--tux-space-1);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-stock-balance small {
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
+  font-weight: 700;
+}
+
+.bulk-stock-card-actions {
+  display: grid;
+  gap: var(--tux-space-2);
+  min-width: 9.5rem;
+}
+
+.bulk-stock-finished-action,
+.bulk-stock-add-action {
+  min-height: var(--tux-touch-target);
+  border-radius: var(--tux-radius-sm);
+  padding: 0 var(--tux-space-4);
+  font-weight: 800;
+}
+
+.bulk-stock-finished-action {
+  border: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+}
+
+.bulk-stock-add-action {
+  border: 1px solid var(--tux-accent);
+  background: var(--tux-accent);
+  color: var(--tux-surface-raised);
+}
+
+.bulk-stock-finished-action:disabled,
+.bulk-stock-add-action:disabled,
+.bulk-stock-undo button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bulk-stock-empty {
+  padding: var(--tux-space-7);
+  text-align: center;
+}
+
+.bulk-stock-page-error {
+  margin-bottom: var(--tux-space-4);
+}
+
+.bulk-stock-dialog {
+  width: min(100% - 2rem, 30rem);
+  padding: var(--tux-space-6);
+}
+
+.bulk-stock-dialog-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--tux-space-4);
+  margin-bottom: var(--tux-space-5);
+}
+
+.bulk-stock-quantity-field {
+  display: grid;
+  gap: var(--tux-space-2);
+  margin-bottom: var(--tux-space-5);
+  font-size: var(--tux-font-size-sm);
+  font-weight: 700;
+}
+
+.bulk-stock-quantity-field input {
+  width: 100%;
+  min-height: var(--tux-touch-target);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: var(--tux-space-3);
+  font-size: var(--tux-font-size-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-stock-quantity-field span {
+  font-size: var(--tux-font-size-xs);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.bulk-stock-dialog > .primary-action {
+  width: 100%;
+}
+
+.bulk-stock-undo {
+  position: fixed;
+  right: var(--tux-space-5);
+  bottom: var(--tux-space-5);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--tux-space-4);
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: var(--tux-space-3) var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-raised);
+  box-shadow: var(--tux-shadow-sm);
+}
+
+.bulk-stock-undo span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-stock-undo button {
+  min-height: var(--tux-touch-target);
+  border: 0;
+  background: transparent;
+  color: var(--tux-accent-strong);
+  font-weight: 800;
+}
+
+@media (max-width: 58rem) {
+  .bulk-stock-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 40rem) {
+  .bulk-stock-workspace {
+    width: min(100% - 1.5rem, 78rem);
+    padding-top: var(--tux-space-4);
+  }
+
+  .bulk-stock-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .bulk-stock-card-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bulk-stock-undo {
+    right: var(--tux-space-3);
+    bottom: var(--tux-space-3);
+    left: var(--tux-space-3);
+    max-width: none;
+    justify-content: space-between;
+  }
+}

@@ -1,5 +1,17 @@
 export { brandValue, type Brand } from './brand';
 export {
+  BULK_STOCK_UNDO_WINDOW_MS,
+  bulkStockBalance,
+  bulkStockWholeUnitCount,
+  canUndoBulkMovement,
+  finishedBulkUnitDelta,
+  isBulkStockMovementType,
+  receivedBulkStockDelta,
+  undoBulkMovementDelta,
+  undoBulkMovementType,
+  type BulkStockMovementType,
+} from './bulkStock';
+export {
   allocateDisplayOrderNo,
   closeBusinessDay,
   createOpenBusinessDay,

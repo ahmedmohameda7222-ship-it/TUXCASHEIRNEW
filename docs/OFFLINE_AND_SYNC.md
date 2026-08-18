@@ -207,3 +207,20 @@ A remote or print failure must never be reported as if the local business transa
 Automated SQLite tests verify transaction rollback and that pending outbox/configuration data survive closing and reopening the database file.
 
 Phase 4 adds durable draft restart/idempotency design plus integration tests proving that a stale committed checkout intent cannot duplicate order/inventory/outbox effects or delete a newer draft. Later phases add workflow-level restart tests for Business Day close and sync retry.
+
+## Bulk Stock local-first mutations
+
+`Finished 1`, `Add Stock`, and short Undo are local-first operations and do not depend on cloud availability.
+
+```text
+resolve open Business Day + Current Operator
+→ validate active BULK_MANUAL item / whole-unit input / command identity
+→ append inventory movement
+→ append audit event
+→ append durable outbox event
+→ one local commit
+```
+
+A retry with the same command UUID resolves to the already committed movement rather than creating another movement. Undo appends the exact opposite movement and the persistence boundary prevents a second compensation. If movement/audit/outbox persistence cannot commit atomically, the worker command fails locally and the movement is not acknowledged.
+
+Balance is derived from durable movement history across Business Days. Phase 7 adds no End Day reset path; the actual End Day phase must still prove that closing a Business Day does not mutate Bulk Stock.

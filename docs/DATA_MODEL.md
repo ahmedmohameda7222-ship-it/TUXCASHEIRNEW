@@ -275,3 +275,11 @@ SQLite is the device transaction store. It keeps essential indexed/constrained c
 Remote Postgres is normalized for relational integrity, reporting, future Admin workflows, RLS, and cross-device synchronization.
 
 The shared TypeScript domain contract—not physical table parity—is the semantic source of truth between adapters.
+
+## Bulk Stock movement projection
+
+Bulk Stock has no mutable worker-facing count field. The balance is the exact sum of append-only `InventoryMovement.quantityDeltaMicros` for a `BULK_MANUAL` item, including movements from earlier closed Business Days. Worker-originated Bulk Stock quantities are exact whole units represented with the existing stock micro-unit scale.
+
+Worker movement types are `BULK_UNIT_FINISHED`, `BULK_STOCK_RECEIVED`, `UNDO_BULK_UNIT_FINISHED`, and `UNDO_BULK_STOCK_RECEIVED`. A compensating Undo preserves the original historical fact and links the opposite movement through `compensatesMovementId`.
+
+`Add Stock` is an inventory-only physical receipt event. It has no price/cost/Paid From field and creates no Expense or Purchase financial record. Every committed worker movement carries immutable Business Day, worker, timestamp, command/idempotency identity, audit and outbox attribution.

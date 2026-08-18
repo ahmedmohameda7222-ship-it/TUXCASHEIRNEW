@@ -111,3 +111,15 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Permanent clean code-head CI run `32133776774` on `83a422af1b5f69e38287883a350bc0b20a668a69` passed locked install, Prettier, ESLint, strict TypeScript, all unit/integration tests, browser production build, and Electron main/preload production builds before documentation synchronization.
 - Renderer-only visual/interaction requirements remain `IMPLEMENTED_NOT_VALIDATED`; End Day archival/removal from the operational view remains the later End Day phase and is not claimed here.
 
+## 2026-08-18 — Phase 7 Bulk Stock implementation
+
+- Implemented the approved active-`BULK_MANUAL` whole-unit worker ledger on `feat/ops-07-bulk-stock`, stacked on Phase 6 Expenses.
+- Enabled final Operations `Bulk Stock` navigation and added Current Stock cards with `Finished 1`, positive whole-unit `Add Stock`, and short compensating Undo only.
+- Current Stock is derived from append-only inventory movement history across Business Days; there is no worker balance overwrite or Reset path.
+- Added exact `BULK_UNIT_FINISHED`, `BULK_STOCK_RECEIVED` and compensating Undo semantics with stable command UUID idempotency.
+- Added SQLite and IndexedDB `BulkStockStore` adapters. Movement + audit + durable outbox commit atomically after Business Day/operator/item checks.
+- `Add Stock` is intentionally non-financial: no cost, Paid From, Expense, or Purchase record is created.
+- Added typed browser and secure Electron-main/preload boundaries plus the responsive worker-facing page.
+- Added domain and SQLite integration tests for cross-Business-Day balance, exact movements, idempotent replay, compensation, expiry/duplicate rejection, non-financial stock receiving, and injected outbox-failure rollback.
+- Full repository validation passed locked install, Prettier, ESLint, strict TypeScript, all tests, and production builds before documentation closeout.
+- Renderer-only interaction/visual evidence remains pending. End Day itself remains the next phase and must prove that closing does not reset Bulk Stock.
