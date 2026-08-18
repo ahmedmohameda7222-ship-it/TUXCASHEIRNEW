@@ -1,6 +1,8 @@
 export { ApplicationCommandCoordinator } from './commandCoordinator';
 export { CoordinatedOperationsSessionService } from './coordinatedSession';
 export type { ApplicationError, ApplicationErrorCode } from './errors';
+export { unavailableOrderPrinter } from './orderPrinter';
+export type { OrderPrintAttempt, OrderPrinter } from './orderPrinter';
 export { createEmptyOrderDraft, OperationsOrdersService } from './orders';
 export type {
   OrderPlacement,
