@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PaymentMethod } from './catalog';
 import { parseEntityId, type PaymentMethodId, type ShopId } from './ids';
 import { moneyMinor } from './money';
-import { preparePaymentParts } from './payment';
+import { parsePoundsToMinor, parseWholePoundsToMinor, preparePaymentParts } from './payment';
 
 const SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const CASH_ID = parseEntityId<PaymentMethodId>('20000000-0000-4000-8000-000000000001');
@@ -88,5 +88,27 @@ describe('preparePaymentParts', () => {
         moneyMinor(18_000),
       ),
     ).toThrow('Split payment methods must be different.');
+  });
+});
+
+describe('money input parsing', () => {
+  it('parses whole and two-decimal pound inputs exactly into minor units', () => {
+    expect(parsePoundsToMinor('160')).toBe(moneyMinor(16_000));
+    expect(parsePoundsToMinor('160.5')).toBe(moneyMinor(16_050));
+    expect(parsePoundsToMinor('160.05')).toBe(moneyMinor(16_005));
+    expect(parsePoundsToMinor(' 0.75 ')).toBe(moneyMinor(75));
+  });
+
+  it('rejects malformed, over-precision and unsafe values without floating point coercion', () => {
+    expect(parsePoundsToMinor('')).toBeNull();
+    expect(parsePoundsToMinor('.5')).toBeNull();
+    expect(parsePoundsToMinor('1.234')).toBeNull();
+    expect(parsePoundsToMinor('-1')).toBeNull();
+    expect(parsePoundsToMinor('90071992547410')).toBeNull();
+  });
+
+  it('keeps the legacy whole-pound parser strict', () => {
+    expect(parseWholePoundsToMinor('125')).toBe(moneyMinor(12_500));
+    expect(parseWholePoundsToMinor('125.00')).toBeNull();
   });
 });
