@@ -1,11 +1,11 @@
-import { ApplicationCommandCoordinator } from './commandCoordinator';
+import type { OperationsDatabase, OperatorSessionReadModel } from '@tux/persistence';
+import type { ApplicationCommandCoordinator } from './commandCoordinator';
 import {
   OperationsSessionService,
   type OperationsSessionResult,
   type PinVerifier,
   type SessionRuntime,
 } from './session';
-import type { OperationsDatabase, OperatorSessionReadModel } from '@tux/persistence';
 
 /**
  * Wraps the Phase 3 session service in the same device-local command queue used
