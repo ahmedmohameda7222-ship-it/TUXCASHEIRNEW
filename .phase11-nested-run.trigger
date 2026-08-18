@@ -1,1 +1,1 @@
-run authoritative Phase 11 gate after Board drawer-close fix
+synchronize Phase 11 compliance and remove temporary QA infrastructure
