@@ -1,8 +1,7 @@
 import type { OrderSnapshot } from '@tux/domain';
 
 export type OrderPrintAttempt =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly message: string };
+  { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 export interface OrderPrinter {
   print(order: OrderSnapshot): Promise<OrderPrintAttempt>;

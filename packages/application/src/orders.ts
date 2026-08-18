@@ -38,6 +38,7 @@ import type {
 } from '@tux/persistence';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import type { ApplicationError } from './errors';
+import { unavailableOrderPrinter, type OrderPrinter } from './orderPrinter';
 import { err, ok, type Result } from './result';
 
 export interface OrdersRuntime {
@@ -197,6 +198,7 @@ export class OperationsOrdersService {
   readonly #draftStore: OrderDraftStore;
   readonly #runtime: OrdersRuntime;
   readonly #coordinator: ApplicationCommandCoordinator;
+  readonly #printer: OrderPrinter;
 
   constructor(
     database: OperationsDatabase,
@@ -204,12 +206,14 @@ export class OperationsOrdersService {
     draftStore: OrderDraftStore,
     runtime: OrdersRuntime,
     coordinator = new ApplicationCommandCoordinator(),
+    printer: OrderPrinter = unavailableOrderPrinter,
   ) {
     this.#database = database;
     this.#readModel = readModel;
     this.#draftStore = draftStore;
     this.#runtime = runtime;
     this.#coordinator = coordinator;
+    this.#printer = printer;
   }
 
   async loadWorkspace(draftScopeId: string): Promise<OrdersWorkspaceResult> {
@@ -471,6 +475,19 @@ export class OperationsOrdersService {
           }
         }
 
+        if (!commitResult.replayed) {
+          try {
+            const printed = await this.#printer.print(commitResult.order);
+            if (!printed.ok) {
+              warnings.push('PRINT_FAILED');
+            }
+          } catch {
+            warnings.push('PRINT_FAILED');
+          }
+        } else {
+          warnings.push('PRINT_STATUS_UNKNOWN');
+        }
+
         const reset = await this.#resetDraftAfterCommit(draft, context.configuration, warnings);
         return ok({
           order: commitResult.order,
@@ -488,6 +505,31 @@ export class OperationsOrdersService {
     });
   }
 
+  async reprintOrder(orderId: OrderId): Promise<Result<OrderSnapshot, ApplicationError>> {
+    return this.#coordinator.runExclusive(async () => {
+      try {
+        const order = await this.#database.transaction((transaction) =>
+          transaction.orders.getById(orderId),
+        );
+        if (order === null) {
+          return err({ code: 'NOT_FOUND', message: 'The saved order could not be found.' });
+        }
+
+        const printed = await this.#printer.print(order);
+        if (!printed.ok) {
+          return err({ code: 'PRINT_ERROR', message: printed.message });
+        }
+        return ok(order);
+      } catch (cause) {
+        return err({
+          code: 'PRINT_ERROR',
+          message: 'The saved order is intact, but the receipt could not be printed.',
+          cause,
+        });
+      }
+    });
+  }
+
   async #recoverCommittedDraft(draft: OrderDraft, order: OrderSnapshot): Promise<OrderPlacement> {
     const configuration = await this.#database.transaction((transaction) =>
       transaction.configuration.getForShop(order.shopId),
@@ -496,7 +538,7 @@ export class OperationsOrdersService {
       throw new Error('Local configuration is unavailable while recovering a committed order.');
     }
 
-    const reset = await this.#resetDraftAfterCommit(draft, configuration, []);
+    const reset = await this.#resetDraftAfterCommit(draft, configuration, ['PRINT_STATUS_UNKNOWN']);
     return {
       order,
       replayed: true,
