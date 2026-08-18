@@ -1,9 +1,16 @@
-import { OperationsSessionService, type OperationsSessionResult } from '@tux/application';
+import {
+  ApplicationCommandCoordinator,
+  CoordinatedOperationsSessionService,
+  OperationsOrdersService,
+  type OperationsSessionResult,
+} from '@tux/application';
 import { instant } from '@tux/domain';
 import {
   IndexedDbOperationsDatabase,
   IndexedDbOperatorSessionReadModel,
+  IndexedDbOrderDraftStore,
 } from '@tux/persistence/browser';
+import type { TuxOrdersApi } from '@tux/platform-contracts';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
 export interface OperationsSessionClient {
@@ -12,22 +19,48 @@ export interface OperationsSessionClient {
   signOut(): Promise<OperationsSessionResult>;
 }
 
-let browserServicePromise: Promise<OperationsSessionService> | null = null;
+export type OperationsOrdersClient = TuxOrdersApi;
 
-async function browserService(): Promise<OperationsSessionService> {
-  if (browserServicePromise === null) {
-    browserServicePromise = (async () => {
+interface BrowserRuntime {
+  readonly session: CoordinatedOperationsSessionService;
+  readonly orders: OperationsOrdersService;
+}
+
+let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
+
+async function browserRuntime(): Promise<BrowserRuntime> {
+  if (browserRuntimePromise === null) {
+    browserRuntimePromise = (async () => {
       const database = new IndexedDbOperationsDatabase();
       await database.initialize();
       const readModel = new IndexedDbOperatorSessionReadModel();
       await readModel.initialize();
-      return new OperationsSessionService(database, readModel, new BrowserPbkdf2PinVerifier(), {
+      const draftStore = new IndexedDbOrderDraftStore();
+      await draftStore.initialize();
+      const coordinator = new ApplicationCommandCoordinator();
+      const runtime = {
         now: () => instant(new Date()),
         createUuid: () => crypto.randomUUID(),
-      });
+      };
+      return {
+        session: new CoordinatedOperationsSessionService(
+          database,
+          readModel,
+          new BrowserPbkdf2PinVerifier(),
+          runtime,
+          coordinator,
+        ),
+        orders: new OperationsOrdersService(
+          database,
+          readModel,
+          draftStore,
+          runtime,
+          coordinator,
+        ),
+      };
     })();
   }
-  return browserServicePromise;
+  return browserRuntimePromise;
 }
 
 export function createOperationsSessionClient(): OperationsSessionClient {
@@ -36,8 +69,22 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     return desktop.session;
   }
   return {
-    getState: async () => (await browserService()).getState(),
-    submitPin: async (pin: string) => (await browserService()).submitPin(pin),
-    signOut: async () => (await browserService()).signOut(),
+    getState: async () => (await browserRuntime()).session.getState(),
+    submitPin: async (pin: string) => (await browserRuntime()).session.submitPin(pin),
+    signOut: async () => (await browserRuntime()).session.signOut(),
+  };
+}
+
+export function createOperationsOrdersClient(): OperationsOrdersClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) {
+    return desktop.orders;
+  }
+  return {
+    loadWorkspace: async (draftScopeId) => (await browserRuntime()).orders.loadWorkspace(draftScopeId),
+    saveDraft: async (draft) => (await browserRuntime()).orders.saveDraft(draft),
+    findCustomerByPhone: async (shopId, normalizedPhone) =>
+      (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),
+    placeOrder: async (draft) => (await browserRuntime()).orders.placeOrder(draft),
   };
 }
