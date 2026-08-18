@@ -1,0 +1,86 @@
+name: Phase 6 Fixture Repair
+
+on:
+  push:
+    branches:
+      - feat/ops-06-expenses
+    paths:
+      - '.phase6-fix.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-06-expenses
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Repair Delivery Failed fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/operations-desktop/src/main/expenses.integration.test.ts')
+          text = path.read_text()
+          marker = '''async function fixture(uuidSequence: string[] = []) {'''
+          helper = '''function seedOrderForeignKey(databasePath: string, orderId: OrderId): void {
+            const raw = new DatabaseSync(databasePath);
+            try {
+              raw.prepare(
+                `INSERT INTO orders(
+                  id, shop_id, business_day_id, display_order_no, idempotency_key, status, source,
+                  operator_worker_id, created_at, total_minor, payload_json
+                ) VALUES (?, ?, ?, ?, ?, 'DONE', 'POS', ?, ?, ?, ?)`,
+              ).run(
+                orderId,
+                SHOP_ID,
+                DAY_ID,
+                12,
+                `fixture-order:${orderId}`,
+                WORKER_ID,
+                '2026-08-18T14:00:00.000Z',
+                0,
+                JSON.stringify({ fixtureOnly: true, orderId }),
+              );
+            } finally {
+              raw.close();
+            }
+          }
+
+          async function fixture(uuidSequence: string[] = []) {'''
+          if marker not in text:
+              raise SystemExit('fixture marker not found')
+          text = text.replace(marker, helper, 1)
+          old = '''    const system = systemExpense('62000000-0000-4000-8000-000000000010');
+              await fx.database.transaction((transaction) => transaction.expenses.put(system));'''.replace('              ', '    ')
+          new = '''    const system = systemExpense('62000000-0000-4000-8000-000000000010');
+              seedOrderForeignKey(fx.databasePath, system.orderId);
+              await fx.database.transaction((transaction) => transaction.expenses.put(system));'''.replace('              ', '    ')
+          if old not in text:
+              raise SystemExit('system expense fixture block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format repair
+        run: npm run format
+      - name: Remove temporary validation helpers
+        run: |
+          rm -f .phase6-fix.trigger
+          rm -f .phase6-ci2.trigger
+          rm -f .github/workflows/phase6-fix.yml
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix Phase 6 Delivery Failed fixture'
+          git push origin HEAD:feat/ops-06-expenses
