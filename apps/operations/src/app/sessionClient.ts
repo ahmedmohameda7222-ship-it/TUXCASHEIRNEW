@@ -1,6 +1,7 @@
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
+  OperationsBulkStockService,
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -8,12 +9,18 @@ import {
 } from '@tux/application';
 import { instant } from '@tux/domain';
 import {
+  IndexedDbBulkStockStore,
   IndexedDbExpenseLedgerStore,
   IndexedDbOperationsDatabase,
   IndexedDbOperatorSessionReadModel,
   IndexedDbOrderDraftStore,
 } from '@tux/persistence/browser';
-import type { TuxExpensesApi, TuxOrdersApi, TuxOrdersBoardApi } from '@tux/platform-contracts';
+import type {
+  TuxBulkStockApi,
+  TuxExpensesApi,
+  TuxOrdersApi,
+  TuxOrdersBoardApi,
+} from '@tux/platform-contracts';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
@@ -26,12 +33,14 @@ export interface OperationsSessionClient {
 export type OperationsOrdersClient = TuxOrdersApi;
 export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 export type OperationsExpensesClient = TuxExpensesApi;
+export type OperationsBulkStockClient = TuxBulkStockApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
   readonly orders: OperationsOrdersService;
   readonly ordersBoard: OperationsOrdersBoardService;
   readonly expenses: OperationsExpensesService;
+  readonly bulkStock: OperationsBulkStockService;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -47,6 +56,8 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       await draftStore.initialize();
       const expenseStore = new IndexedDbExpenseLedgerStore();
       await expenseStore.initialize();
+      const bulkStockStore = new IndexedDbBulkStockStore();
+      await bulkStockStore.initialize();
       const coordinator = new ApplicationCommandCoordinator();
       const runtime = {
         now: () => instant(new Date()),
@@ -73,6 +84,13 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           database,
           readModel,
           expenseStore,
+          runtime,
+          coordinator,
+        ),
+        bulkStock: new OperationsBulkStockService(
+          database,
+          readModel,
+          bulkStockStore,
           runtime,
           coordinator,
         ),
@@ -126,5 +144,16 @@ export function createOperationsExpensesClient(): OperationsExpensesClient {
     createExpense: async (input) => (await browserRuntime()).expenses.createExpense(input),
     editExpense: async (input) => (await browserRuntime()).expenses.editExpense(input),
     deleteExpense: async (expenseId) => (await browserRuntime()).expenses.deleteExpense(expenseId),
+  };
+}
+
+export function createOperationsBulkStockClient(): OperationsBulkStockClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.bulkStock;
+  return {
+    loadBoard: async () => (await browserRuntime()).bulkStock.loadBoard(),
+    finishOne: async (input) => (await browserRuntime()).bulkStock.finishOne(input),
+    addStock: async (input) => (await browserRuntime()).bulkStock.addStock(input),
+    undoMovement: async (input) => (await browserRuntime()).bulkStock.undoMovement(input),
   };
 }
