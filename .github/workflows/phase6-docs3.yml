@@ -1,0 +1,38 @@
+name: Phase 6 Documentation Sync v3
+
+on:
+  push:
+    branches:
+      - feat/ops-06-expenses
+    paths:
+      - '.phase6-docs3.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-06-expenses
+          fetch-depth: 0
+      - name: Apply documentation patch
+        run: python .phase6-docs.py
+      - name: Remove documentation helpers
+        run: |
+          rm -f .phase6-docs.py
+          rm -f .phase6-docs.trigger
+          rm -f .phase6-docs2.trigger
+          rm -f .phase6-docs3.trigger
+          rm -f .github/workflows/phase6-docs.yml
+          rm -f .github/workflows/phase6-docs2.yml
+          rm -f .github/workflows/phase6-docs3.yml
+      - name: Commit documentation sync
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Document Phase 6 Expenses'
+          git push origin HEAD:feat/ops-06-expenses
