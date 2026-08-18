@@ -109,6 +109,7 @@ export function ProductCustomizer({
   }
 
   function submit(): void {
+    if (product === null) return;
     if (product.isCombo && beverages.some((beverage) => beverage === null)) {
       setError('Choose one included drink for each combo.');
       return;
