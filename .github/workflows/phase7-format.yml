@@ -1,0 +1,41 @@
+name: Phase 7 Format
+
+on:
+  push:
+    branches:
+      - feat/ops-07-bulk-stock
+    paths:
+      - '.phase7-format.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-07-bulk-stock
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format Phase 7 code
+        run: npm run format
+      - name: Remove formatter helpers
+        run: |
+          rm -f .phase7-format.trigger
+          rm -f .github/workflows/phase7-format.yml
+      - name: Commit formatted implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Format Phase 7 Bulk Stock'
+          git push origin HEAD:feat/ops-07-bulk-stock
