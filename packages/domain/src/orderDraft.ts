@@ -56,8 +56,15 @@ export type PaymentDraft =
 export interface OrderDraft {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
+  /**
+   * Opaque local-runtime scope. Desktop currently has one primary renderer scope;
+   * browser fallback creates one stable scope per tab/session. This prevents two
+   * live renderer contexts from silently overwriting the same draft.
+   */
+  readonly draftScopeId: string;
   readonly revision: number;
   readonly updatedAt: Instant;
+  /** Stable across retries of the same checkout intent, including restart recovery. */
   readonly checkoutIntentKey: string;
   readonly orderTypeId: OrderTypeId | null;
   readonly lines: readonly DraftOrderLine[];
