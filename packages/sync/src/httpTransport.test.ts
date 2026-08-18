@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   instant,
   parseEntityId,
@@ -29,14 +29,18 @@ const event: OutboxEvent = {
 
 describe('HttpOutboxTransport', () => {
   it('sends immutable event identity and idempotency headers', async () => {
-    const fetcher = vi.fn(async () => new Response(null, { status: 204 }));
+    const calls: Array<Parameters<typeof fetch>> = [];
+    const fetcher: typeof fetch = async (...args) => {
+      calls.push(args);
+      return new Response(null, { status: 204 });
+    };
     const transport = new HttpOutboxTransport({
       endpoint: 'https://sync.example.test/events',
       headers: { authorization: 'Bearer test-only' },
-      fetcher: fetcher as typeof fetch,
+      fetcher,
     });
     await transport.deliver(event);
-    const [url, init] = fetcher.mock.calls[0]!;
+    const [url, init] = calls[0]!;
     expect(url).toBe('https://sync.example.test/events');
     expect(init?.headers).toMatchObject({
       'x-tux-event-id': EVENT_ID,
