@@ -8,6 +8,14 @@ export {
   type OpenBusinessDay,
 } from './businessDay';
 export type * from './catalog';
+export {
+  addProductUnit,
+  applyDeliveryZone,
+  decrementDraftLine,
+  decrementProductUnit,
+  productQuantityInDraft,
+  replaceDraftLineCustomization,
+} from './draftOperations';
 export { DomainInvariantError } from './errors';
 export { parseEntityId } from './ids';
 export type * from './ids';
