@@ -173,7 +173,9 @@ function ActiveShell({
   }, [theme]);
 
   function cycleTheme(): void {
-    setTheme((current) => (current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'));
+    setTheme((current) =>
+      current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
+    );
   }
 
   return (

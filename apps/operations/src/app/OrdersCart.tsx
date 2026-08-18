@@ -253,7 +253,11 @@ export function OrdersCart({
       <div className="cart-heading">
         <div>
           <span>Current order</span>
-          <strong>{totalQuantity === 0 ? 'Empty' : `${totalQuantity} item${totalQuantity === 1 ? '' : 's'}`}</strong>
+          <strong>
+            {totalQuantity === 0
+              ? 'Empty'
+              : `${totalQuantity} item${totalQuantity === 1 ? '' : 's'}`}
+          </strong>
         </div>
         <button
           type="button"
@@ -456,9 +460,7 @@ export function OrdersCart({
               label="Discount"
               value={draft.discountMinor}
               disabled={busy}
-              onCommit={(discountMinor) =>
-                onMutate((current) => ({ ...current, discountMinor }))
-              }
+              onCommit={(discountMinor) => onMutate((current) => ({ ...current, discountMinor }))}
             />
             <SectionIssues issues={issues} paths={['discount']} />
           </section>
@@ -642,10 +644,7 @@ export function OrdersCart({
                     <CashEditor
                       idPrefix="split-b"
                       label="Cash received B"
-                      allocatedMinor={subtractMoney(
-                        pricing.totalMinor,
-                        draft.payment.amountAMinor,
-                      )}
+                      allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}
                       receivedMinor={draft.payment.methodBCashReceivedMinor}
                       busy={busy}
                       onCommit={(methodBCashReceivedMinor) =>
@@ -707,9 +706,7 @@ export function OrdersCart({
           <p className="payment-summary">
             Change:{' '}
             {formatMoneyMinor(
-              addMoney(
-                ...preparedPayments.map((part) => part.changeMinor ?? ZERO_MONEY),
-              ),
+              addMoney(...preparedPayments.map((part) => part.changeMinor ?? ZERO_MONEY)),
             )}
           </p>
         ) : null}

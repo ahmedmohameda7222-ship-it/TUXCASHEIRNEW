@@ -21,10 +21,7 @@ export function moneyMinorInputValue(value: MoneyMinor): string {
 }
 
 export function nextDraftAddedSequence(draft: OrderDraft): number {
-  const latest = draft.lines.reduce(
-    (maximum, line) => Math.max(maximum, line.addedSequence),
-    0,
-  );
+  const latest = draft.lines.reduce((maximum, line) => Math.max(maximum, line.addedSequence), 0);
   const next = latest + 1;
   if (!Number.isSafeInteger(next)) {
     throw new RangeError('Draft addition sequence exceeded the safe integer range.');

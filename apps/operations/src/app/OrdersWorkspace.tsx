@@ -1,4 +1,7 @@
-import type { OperationsSessionState, OrdersWorkspace as OrdersWorkspaceData } from '@tux/application';
+import type {
+  OperationsSessionState,
+  OrdersWorkspace as OrdersWorkspaceData,
+} from '@tux/application';
 import {
   ZERO_MONEY,
   addProductUnit,
@@ -87,7 +90,12 @@ function QuickInfo({
         if (event.currentTarget === event.target && !busy) onClose();
       }}
     >
-      <section className="quick-info" role="dialog" aria-modal="true" aria-labelledby="quick-info-title">
+      <section
+        className="quick-info"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-info-title"
+      >
         <div className="quick-info-media">
           <ProductImage product={product} />
         </div>
@@ -230,7 +238,9 @@ export function OrdersWorkspace({
       try {
         proposed = mutation(current);
       } catch (error) {
-        setGlobalError(error instanceof Error ? error.message : 'Could not update the order draft.');
+        setGlobalError(
+          error instanceof Error ? error.message : 'Could not update the order draft.',
+        );
         return;
       }
       if (proposed === current) return;
@@ -415,9 +425,9 @@ export function OrdersWorkspace({
         const zone =
           contact.latestZoneId === null
             ? null
-            : configuration.deliveryZones.find(
+            : (configuration.deliveryZones.find(
                 (candidate) => candidate.id === contact.latestZoneId && candidate.active,
-              ) ?? null;
+              ) ?? null);
         const withContact: OrderDraft = {
           ...current,
           delivery: {
@@ -501,7 +511,9 @@ export function OrdersWorkspace({
               <button
                 type="button"
                 key={category.id}
-                className={selectedCategoryId === category.id && search.length === 0 ? 'selected' : undefined}
+                className={
+                  selectedCategoryId === category.id && search.length === 0 ? 'selected' : undefined
+                }
                 onClick={() => {
                   setSelectedCategoryId(category.id);
                   setSearch('');
@@ -532,7 +544,11 @@ export function OrdersWorkspace({
           {products.length === 0 ? (
             <div className="menu-empty">
               <strong>No products found</strong>
-              <span>{search.length > 0 ? 'Try another search.' : 'This category has no active products.'}</span>
+              <span>
+                {search.length > 0
+                  ? 'Try another search.'
+                  : 'This category has no active products.'}
+              </span>
             </div>
           ) : (
             products.map((product) => {
@@ -635,7 +651,9 @@ export function OrdersWorkspace({
 
       {customizer === null ? null : (
         <ProductCustomizer
-          key={customizer.kind === 'ADD' ? `add:${customizer.productId}` : `edit:${customizer.lineId}`}
+          key={
+            customizer.kind === 'ADD' ? `add:${customizer.productId}` : `edit:${customizer.lineId}`
+          }
           target={customizer}
           draft={draft}
           configuration={configuration}
@@ -651,7 +669,9 @@ export function OrdersWorkspace({
           busy={busy}
           canCustomize={
             quickInfoProduct.isCombo ||
-            configuration.productModifierLinks.some((link) => link.productId === quickInfoProduct.id)
+            configuration.productModifierLinks.some(
+              (link) => link.productId === quickInfoProduct.id,
+            )
           }
           onClose={() => setQuickInfoProductId(null)}
           onCustomize={() => setCustomizer({ kind: 'ADD', productId: quickInfoProduct.id })}
@@ -660,11 +680,20 @@ export function OrdersWorkspace({
 
       {clearConfirmOpen ? (
         <div className="orders-overlay" role="presentation">
-          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-title">
+          <section
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-title"
+          >
             <h2 id="clear-title">Clear this order?</h2>
             <p>This only clears the current draft. No placed order is changed.</p>
             <div className="dialog-actions">
-              <button type="button" className="secondary-action" onClick={() => setClearConfirmOpen(false)}>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setClearConfirmOpen(false)}
+              >
                 Keep order
               </button>
               <button type="button" className="destructive-action" onClick={confirmClear}>
@@ -683,7 +712,11 @@ export function OrdersWorkspace({
           </button>
         </div>
       )}
-      {successMessage === null ? null : <div className="success-toast" role="status">{successMessage}</div>}
+      {successMessage === null ? null : (
+        <div className="success-toast" role="status">
+          {successMessage}
+        </div>
+      )}
       {globalError === null ? null : (
         <div className="global-error orders-error" role="alert">
           <span>{globalError}</span>

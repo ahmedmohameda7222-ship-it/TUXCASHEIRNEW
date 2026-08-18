@@ -32,7 +32,7 @@ export function ProductCustomizer({
 }) {
   const line =
     target.kind === 'EDIT'
-      ? draft.lines.find((candidate) => candidate.id === target.lineId) ?? null
+      ? (draft.lines.find((candidate) => candidate.id === target.lineId) ?? null)
       : null;
   const productId = target.kind === 'ADD' ? target.productId : line?.productId;
   const product = configuration.products.find((candidate) => candidate.id === productId) ?? null;
@@ -50,7 +50,9 @@ export function ProductCustomizer({
           ) ?? null,
       }))
       .filter(
-        (entry): entry is typeof entry & { readonly modifier: NonNullable<typeof entry.modifier> } =>
+        (
+          entry,
+        ): entry is typeof entry & { readonly modifier: NonNullable<typeof entry.modifier> } =>
           entry.modifier !== null,
       );
   }, [configuration, product]);
@@ -89,7 +91,9 @@ export function ProductCustomizer({
   }
 
   function modifierQuantity(modifierId: ModifierId): number {
-    return modifierSelections.find((selection) => selection.modifierId === modifierId)?.quantity ?? 0;
+    return (
+      modifierSelections.find((selection) => selection.modifierId === modifierId)?.quantity ?? 0
+    );
   }
 
   function setModifierQuantity(modifierId: ModifierId, quantity: number): void {
@@ -122,9 +126,13 @@ export function ProductCustomizer({
   }
 
   return (
-    <div className="orders-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.currentTarget === event.target && !busy) onCancel();
-    }}>
+    <div
+      className="orders-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !busy) onCancel();
+      }}
+    >
       <section
         className="product-customizer"
         role="dialog"
@@ -133,7 +141,9 @@ export function ProductCustomizer({
       >
         <div className="drawer-heading">
           <div>
-            <span className="drawer-kicker">{target.kind === 'ADD' ? 'Add item' : 'Edit item'}</span>
+            <span className="drawer-kicker">
+              {target.kind === 'ADD' ? 'Add item' : 'Edit item'}
+            </span>
             <h2 id="customizer-title">{product.name}</h2>
           </div>
           <button type="button" className="quiet-action" disabled={busy} onClick={onCancel}>

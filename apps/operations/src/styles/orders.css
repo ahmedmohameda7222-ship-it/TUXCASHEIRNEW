@@ -24,8 +24,8 @@
 
 .orders-loading {
   background:
-    linear-gradient(var(--tux-surface-panel), var(--tux-surface-panel)) 2rem 2rem / calc(100% - 30rem)
-      3.5rem no-repeat,
+    linear-gradient(var(--tux-surface-panel), var(--tux-surface-panel)) 2rem 2rem /
+      calc(100% - 30rem) 3.5rem no-repeat,
     var(--tux-surface-canvas);
 }
 
