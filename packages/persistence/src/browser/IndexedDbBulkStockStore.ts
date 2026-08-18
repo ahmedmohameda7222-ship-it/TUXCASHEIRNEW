@@ -54,7 +54,9 @@ function openExistingDatabase(name: string): Promise<IDBDatabase> {
       () => {
         if (unexpectedUpgrade) {
           request.result.close();
-          reject(new Error('Operations IndexedDB must be initialized before the Bulk Stock store.'));
+          reject(
+            new Error('Operations IndexedDB must be initialized before the Bulk Stock store.'),
+          );
           return;
         }
         resolve(request.result);
@@ -86,11 +88,16 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
     const database = this.#requiredDatabase();
     const transaction = database.transaction(['inventoryItems'], 'readonly');
     const items = (await requestResult(
-      transaction.objectStore('inventoryItems').index('shopTrackingMode').getAll([shopId, 'BULK_MANUAL']),
+      transaction
+        .objectStore('inventoryItems')
+        .index('shopTrackingMode')
+        .getAll([shopId, 'BULK_MANUAL']),
     )) as InventoryItem[];
     return items
       .filter((item) => item.active)
-      .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+      .sort(
+        (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+      );
   }
 
   async listMovements(itemId: InventoryItemId): Promise<readonly InventoryMovement[]> {

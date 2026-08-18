@@ -30,9 +30,7 @@ export function isBulkStockMovementType(
   );
 }
 
-export function bulkStockBalance(
-  movements: readonly InventoryMovement[],
-): StockQuantityMicros {
+export function bulkStockBalance(movements: readonly InventoryMovement[]): StockQuantityMicros {
   return addStockQuantities(
     ...movements
       .filter((movement) => isBulkStockMovementType(movement.movementType))
@@ -63,7 +61,9 @@ export function undoBulkMovementDelta(original: InventoryMovement): StockQuantit
     original.movementType !== 'BULK_UNIT_FINISHED' &&
     original.movementType !== 'BULK_STOCK_RECEIVED'
   ) {
-    throw new DomainInvariantError('Only a newly recorded Bulk Stock worker movement can be undone.');
+    throw new DomainInvariantError(
+      'Only a newly recorded Bulk Stock worker movement can be undone.',
+    );
   }
   return stockQuantityMicros(-original.quantityDeltaMicros);
 }

@@ -1,7 +1,4 @@
-import {
-  OperationsBulkStockService,
-  type ApplicationCommandCoordinator,
-} from '@tux/application';
+import { OperationsBulkStockService, type ApplicationCommandCoordinator } from '@tux/application';
 import {
   parseEntityId,
   type Instant,

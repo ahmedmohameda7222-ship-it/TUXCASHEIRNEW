@@ -134,9 +134,7 @@ export class SqliteBulkStockStore implements BulkStockStore {
 
   #assertItem(commit: BulkStockMovementCommit): void {
     const item = this.#database
-      .prepare(
-        `SELECT shop_id, tracking_mode, active FROM inventory_items WHERE id = ?`,
-      )
+      .prepare(`SELECT shop_id, tracking_mode, active FROM inventory_items WHERE id = ?`)
       .get(commit.movement.itemId) as Record<string, unknown> | undefined;
     if (
       item === undefined ||

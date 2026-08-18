@@ -1,8 +1,4 @@
-import type {
-  BulkStockBoard,
-  BulkStockBoardItem,
-  BulkStockMutation,
-} from '@tux/application';
+import type { BulkStockBoard, BulkStockBoardItem, BulkStockMutation } from '@tux/application';
 import type { InventoryMovementId } from '@tux/domain';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { OperationsBulkStockClient } from './sessionClient';

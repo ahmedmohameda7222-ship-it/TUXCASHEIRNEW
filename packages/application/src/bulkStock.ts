@@ -96,7 +96,8 @@ function commandMovementId(commandId: string): InventoryMovementId {
 
 function addMilliseconds(value: Instant, milliseconds: number): Instant {
   const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) throw new DomainInvariantError('Invalid Bulk Stock movement time.');
+  if (!Number.isFinite(timestamp))
+    throw new DomainInvariantError('Invalid Bulk Stock movement time.');
   return new Date(timestamp + milliseconds).toISOString() as Instant;
 }
 
@@ -173,7 +174,10 @@ export class OperationsBulkStockService {
           undoUntil: addMilliseconds(now, BULK_STOCK_UNDO_WINDOW_MS),
         });
       } catch (cause) {
-        return this.#mutationError(cause, 'The Finished 1 movement could not be committed locally.');
+        return this.#mutationError(
+          cause,
+          'The Finished 1 movement could not be committed locally.',
+        );
       }
     });
   }

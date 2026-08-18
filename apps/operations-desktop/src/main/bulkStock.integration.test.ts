@@ -40,7 +40,11 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-function sqlRows(databasePath: string, sql: string, ...params: string[]): Record<string, unknown>[] {
+function sqlRows(
+  databasePath: string,
+  sql: string,
+  ...params: string[]
+): Record<string, unknown>[] {
   const raw = new DatabaseSync(databasePath, { readOnly: true });
   try {
     return raw.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -197,7 +201,11 @@ describe('Operations Bulk Stock SQLite integration', () => {
     const finished = await fx.service.finishOne({ itemId: BULK_ITEM_ID, commandId: finishCommand });
     expect(finished.ok).toBe(true);
     fx.setNow('2026-08-18T14:00:01.000Z');
-    const added = await fx.service.addStock({ itemId: BULK_ITEM_ID, units: 3, commandId: addCommand });
+    const added = await fx.service.addStock({
+      itemId: BULK_ITEM_ID,
+      units: 3,
+      commandId: addCommand,
+    });
     expect(added.ok).toBe(true);
 
     const board = await fx.service.loadBoard();
@@ -207,7 +215,7 @@ describe('Operations Bulk Stock SQLite integration', () => {
     expect(
       sqlRows(
         fx.databasePath,
-        "SELECT movement_type FROM inventory_movements WHERE business_day_id = ? ORDER BY created_at ASC",
+        'SELECT movement_type FROM inventory_movements WHERE business_day_id = ? ORDER BY created_at ASC',
         DAY_ID,
       ).map((row) => row['movement_type']),
     ).toEqual(['BULK_UNIT_FINISHED', 'BULK_STOCK_RECEIVED']);
@@ -225,7 +233,9 @@ describe('Operations Bulk Stock SQLite integration', () => {
         DAY_ID,
       ),
     ).toHaveLength(2);
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM expenses WHERE business_day_id = ?', DAY_ID)).toHaveLength(0);
+    expect(
+      sqlRows(fx.databasePath, 'SELECT id FROM expenses WHERE business_day_id = ?', DAY_ID),
+    ).toHaveLength(0);
   });
 
   it('makes movement commands idempotent by stable command UUID', async () => {
@@ -244,7 +254,11 @@ describe('Operations Bulk Stock SQLite integration', () => {
     const fx = await fixture();
     const originalId = '73000000-0000-4000-8000-000000000004';
     const undoId = '73000000-0000-4000-8000-000000000005';
-    const created = await fx.service.addStock({ itemId: BULK_ITEM_ID, units: 5, commandId: originalId });
+    const created = await fx.service.addStock({
+      itemId: BULK_ITEM_ID,
+      units: 5,
+      commandId: originalId,
+    });
     expect(created.ok).toBe(true);
     fx.setNow('2026-08-18T14:00:07.000Z');
     const undone = await fx.service.undoMovement({
@@ -272,7 +286,9 @@ describe('Operations Bulk Stock SQLite integration', () => {
     fx.setNow('2026-08-18T14:01:00.000Z');
     const lateOriginal = '73000000-0000-4000-8000-000000000007';
     fx.setNow('2026-08-18T14:01:00.000Z');
-    expect((await fx.service.finishOne({ itemId: BULK_ITEM_ID, commandId: lateOriginal })).ok).toBe(true);
+    expect((await fx.service.finishOne({ itemId: BULK_ITEM_ID, commandId: lateOriginal })).ok).toBe(
+      true,
+    );
     fx.setNow('2026-08-18T14:01:08.001Z');
     const lateUndo = await fx.service.undoMovement({
       movementId: parseEntityId<InventoryMovementId>(lateOriginal),
@@ -282,11 +298,10 @@ describe('Operations Bulk Stock SQLite integration', () => {
   });
 
   it('rolls back movement and audit when outbox persistence fails', async () => {
-    const conflictingOutboxId = parseEntityId<OutboxEventId>('83000000-0000-4000-8000-000000000002');
-    const fx = await fixture([
-      '83000000-0000-4000-8000-000000000001',
-      conflictingOutboxId,
-    ]);
+    const conflictingOutboxId = parseEntityId<OutboxEventId>(
+      '83000000-0000-4000-8000-000000000002',
+    );
+    const fx = await fixture(['83000000-0000-4000-8000-000000000001', conflictingOutboxId]);
     await fx.database.transaction((transaction) =>
       transaction.outbox.append({
         id: conflictingOutboxId,
@@ -309,7 +324,9 @@ describe('Operations Bulk Stock SQLite integration', () => {
     const commandId = '73000000-0000-4000-8000-000000000009';
     const result = await fx.service.addStock({ itemId: BULK_ITEM_ID, units: 2, commandId });
     expect(result.ok).toBe(false);
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM inventory_movements WHERE id = ?', commandId)).toHaveLength(0);
+    expect(
+      sqlRows(fx.databasePath, 'SELECT id FROM inventory_movements WHERE id = ?', commandId),
+    ).toHaveLength(0);
     expect(
       sqlRows(
         fx.databasePath,

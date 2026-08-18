@@ -10,13 +10,7 @@ import {
   undoBulkMovementType,
 } from './bulkStock';
 import { parseEntityId } from './ids';
-import type {
-  BusinessDayId,
-  InventoryItemId,
-  InventoryMovementId,
-  ShopId,
-  WorkerId,
-} from './ids';
+import type { BusinessDayId, InventoryItemId, InventoryMovementId, ShopId, WorkerId } from './ids';
 import type { InventoryMovement } from './models';
 import { wholeStockUnits } from './quantity';
 import { instant } from './time';
@@ -66,16 +60,8 @@ describe('Bulk Stock domain rules', () => {
   });
 
   it('creates the exact opposite compensation for a recent worker movement', () => {
-    const finished = movement(
-      '51000000-0000-4000-8000-000000000005',
-      'BULK_UNIT_FINISHED',
-      -1,
-    );
-    const received = movement(
-      '51000000-0000-4000-8000-000000000006',
-      'BULK_STOCK_RECEIVED',
-      5,
-    );
+    const finished = movement('51000000-0000-4000-8000-000000000005', 'BULK_UNIT_FINISHED', -1);
+    const received = movement('51000000-0000-4000-8000-000000000006', 'BULK_STOCK_RECEIVED', 5);
     expect(undoBulkMovementDelta(finished)).toBe(wholeStockUnits(1));
     expect(undoBulkMovementType(finished)).toBe('UNDO_BULK_UNIT_FINISHED');
     expect(undoBulkMovementDelta(received)).toBe(wholeStockUnits(-5));
@@ -83,11 +69,7 @@ describe('Bulk Stock domain rules', () => {
   });
 
   it('allows Undo only inside the short window and only once', () => {
-    const original = movement(
-      '51000000-0000-4000-8000-000000000007',
-      'BULK_STOCK_RECEIVED',
-      3,
-    );
+    const original = movement('51000000-0000-4000-8000-000000000007', 'BULK_STOCK_RECEIVED', 3);
     expect(
       canUndoBulkMovement(
         original,
@@ -95,11 +77,7 @@ describe('Bulk Stock domain rules', () => {
         false,
       ),
     ).toBe(true);
-    expect(
-      canUndoBulkMovement(original, instant('2026-08-18T10:00:08.001Z'), false),
-    ).toBe(false);
-    expect(
-      canUndoBulkMovement(original, instant('2026-08-18T10:00:01.000Z'), true),
-    ).toBe(false);
+    expect(canUndoBulkMovement(original, instant('2026-08-18T10:00:08.001Z'), false)).toBe(false);
+    expect(canUndoBulkMovement(original, instant('2026-08-18T10:00:01.000Z'), true)).toBe(false);
   });
 });
