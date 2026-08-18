@@ -102,7 +102,7 @@
 .bulk-stock-add-action {
   border: 1px solid var(--tux-accent);
   background: var(--tux-accent);
-  color: var(--tux-on-accent);
+  color: var(--tux-surface-raised);
 }
 
 .bulk-stock-finished-action:disabled,
