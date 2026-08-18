@@ -118,6 +118,21 @@ DONE Delivery → Delivery Failed
 
 The historical order items/fulfillment/total/payment snapshot is never rewritten by these corrections. If any local write in a correction fails, the transaction rolls back as a unit. Cloud availability is not part of success.
 
+## Expenses local ledger mutations
+
+Manual Expense create/edit/delete is local-first. The application resolves the current open Business Day and Current Operator, then `ExpenseLedgerStore` re-validates both inside the durable mutation boundary.
+
+```text
+manual expense create/edit/soft-delete
+→ revision/context check
+→ write manual expense state
+→ append audit event
+→ append durable outbox event
+→ one local commit
+```
+
+If audit/outbox persistence fails, the manual expense mutation rolls back with it. SQLite integration injects an outbox primary-key collision and proves that neither the Expense nor its audit row partially survives. `DELIVERY_FAILED` records remain read-only/non-financial. Soft-deleted manual rows remain stored but are excluded from the operational list and exact Cash/Total projections.
+
 ## Printing after local commit
 
 Receipt printing is explicitly post-commit.
@@ -151,7 +166,7 @@ deliveredAt
 
 A critical application command writes both its business mutation and outgoing sync intent in one local transaction. If the transaction rolls back, neither survives. If it commits and the app closes immediately afterward, the outbox entry remains available after restart.
 
-Phase 4 checkout writes `ORDER_PLACED` outbox work inside the same transaction as the order/inventory/audit mutation. Phase 5 Board transitions likewise write their audit/outbox work atomically with status/lifecycle and any cancellation-restock or Delivery Failed expense effects. No remote network call is needed for checkout or Board-transition success.
+Phase 4 checkout writes `ORDER_PLACED` outbox work inside the same transaction as the order/inventory/audit mutation. Phase 5 Board transitions likewise write their audit/outbox work atomically with status/lifecycle and any cancellation-restock or Delivery Failed expense effects. Phase 6 manual Expense create/edit/delete writes the corresponding expense revision plus audit/outbox work atomically. No remote network call is needed for checkout, Board-transition, or Expense-ledger success.
 
 ## Retry semantics
 
