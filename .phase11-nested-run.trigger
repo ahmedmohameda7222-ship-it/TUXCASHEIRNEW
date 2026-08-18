@@ -1,1 +1,1 @@
-run final authoritative Phase 11 gate on patched product tree
+apply Board drawer-close fix and rerun Phase 11
