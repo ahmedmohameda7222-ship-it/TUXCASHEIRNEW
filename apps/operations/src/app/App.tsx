@@ -1,16 +1,19 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
+import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
 import {
   createOperationsBulkStockClient,
+  createOperationsEndDayClient,
   createOperationsExpensesClient,
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
   type OperationsBulkStockClient,
+  type OperationsEndDayClient,
   type OperationsExpensesClient,
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
@@ -156,32 +159,34 @@ function ActiveShell({
   ordersBoardClient,
   expensesClient,
   bulkStockClient,
+  endDayClient,
   busy,
   error,
   onSwitch,
   onSignOut,
+  onBusinessDayClosed,
 }: {
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
   readonly ordersClient: OperationsOrdersClient;
   readonly ordersBoardClient: OperationsOrdersBoardClient;
   readonly expensesClient: OperationsExpensesClient;
   readonly bulkStockClient: OperationsBulkStockClient;
+  readonly endDayClient: OperationsEndDayClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
   readonly onSignOut: () => Promise<void>;
+  readonly onBusinessDayClosed: () => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
 
   useEffect(() => {
-    if (theme === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.dataset['theme'] = theme;
-    }
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.dataset['theme'] = theme;
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
@@ -270,7 +275,15 @@ function ActiveShell({
                   Sign out
                 </button>
                 <div className="menu-divider" />
-                <button type="button" role="menuitem" disabled>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEndDayOpen(true);
+                  }}
+                >
                   End Day
                 </button>
               </div>
@@ -294,6 +307,25 @@ function ActiveShell({
           {error}
         </div>
       )}
+
+      {endDayOpen ? (
+        <EndDayFlow
+          client={endDayClient}
+          onCancel={() => setEndDayOpen(false)}
+          onReturnToOrders={() => {
+            setArea('ORDERS');
+            setEndDayOpen(false);
+          }}
+          onReturnToBoard={() => {
+            setArea('ORDERS_BOARD');
+            setEndDayOpen(false);
+          }}
+          onClosed={async () => {
+            setEndDayOpen(false);
+            await onBusinessDayClosed();
+          }}
+        />
+      ) : null}
 
       {switchOpen ? (
         <div className="modal-backdrop" role="presentation">
@@ -334,6 +366,7 @@ export function App() {
   const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
   const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
   const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);
+  const endDayClient = useMemo(() => createOperationsEndDayClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -381,12 +414,21 @@ export function App() {
     setScreen({ kind: 'SESSION', session: result.value });
   }
 
-  if (screen.kind === 'LOADING') {
+  async function refreshAfterEndDay(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    const result = await client.getState();
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
+  }
+
+  if (screen.kind === 'LOADING')
     return <main className="loading-shell" aria-label="Loading TUX Operations" />;
-  }
-  if (screen.kind === 'GREETING') {
-    return <GreetingScreen session={screen.session} />;
-  }
+  if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
     return (
       <main className="entry-shell">
@@ -418,10 +460,12 @@ export function App() {
       ordersBoardClient={ordersBoardClient}
       expensesClient={expensesClient}
       bulkStockClient={bulkStockClient}
+      endDayClient={endDayClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}
       onSignOut={signOut}
+      onBusinessDayClosed={refreshAfterEndDay}
     />
   );
 }

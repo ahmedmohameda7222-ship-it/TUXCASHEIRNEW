@@ -123,3 +123,17 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Added domain and SQLite integration tests for cross-Business-Day balance, exact movements, idempotent replay, compensation, expiry/duplicate rejection, non-financial stock receiving, and injected outbox-failure rollback.
 - Full repository validation passed locked install, Prettier, ESLint, strict TypeScript, all tests, and production builds before documentation closeout.
 - Renderer-only interaction/visual evidence remains pending. End Day itself remains the next phase and must prove that closing does not reset Bulk Stock.
+
+## 2026-08-18 — Phase 8 End Day / reconciliation implementation
+
+- Implemented Profile → End Day on `feat/ops-08-end-day`, stacked on the completed Phase 7 Bulk Stock branch.
+- Added ACTIVE-order hard block and explicit durable-draft Return/Discard resolution; no silent draft loss.
+- Added blind Cash-first then Digital actual counting. Expected values remain absent from the READY gate and are revealed only after all actual entries are submitted.
+- Added exact DONE-only recognized sales/payment projection, Returned/Cancelled exclusion, Cash-expense deduction and signed variance calculation.
+- Non-zero variance requires a reason but does not block a valid close; variance remains a reconciliation fact and creates no automatic Expense/Revenue.
+- Added Final Closing Summary without Profit/Margin/COGS.
+- Added one durable local close transaction for reconciliation + Worker Session end + Business Day CLOSED state + audit + outbox. Local failure rolls back; cloud/printing are not dependencies.
+- Added no-write idempotent replay for an already-closed Business Day, no automatic next day, and verified next-day order numbering starts at #1.
+- Added browser + secure Electron End Day APIs and responsive worker flow. Successful close refreshes session state back to the existing no-active-day screen.
+- Integration coverage proves cross-midnight close, Bulk Stock carry-forward, successful variance close, no variance Expense, and injected outbox-failure rollback.
+- Repository-side Supabase remains intentionally unlinked; migrations stay versioned for the user to apply manually after planner completion.

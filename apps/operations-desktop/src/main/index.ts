@@ -14,6 +14,7 @@ import {
 } from '@tux/persistence/sqlite';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
+import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
 import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
@@ -46,6 +47,7 @@ let ordersService: OperationsOrdersService | null = null;
 let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
+let endDayIpcRuntime: EndDayIpcRuntime | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -105,19 +107,25 @@ async function initializeOperationsServices(): Promise<void> {
     runtime,
     coordinator,
   });
+  endDayIpcRuntime = await EndDayIpcRuntime.create({
+    databasePath,
+    database: operationsDatabase,
+    readModel: operatorReadModel,
+    draftStore: orderDraftStore,
+    runtime,
+    coordinator,
+  });
 }
 
 function currentSessionService(): CoordinatedOperationsSessionService {
-  if (sessionService === null) {
+  if (sessionService === null)
     throw new Error('Operations session service has not been initialized.');
-  }
   return sessionService;
 }
 
 function currentOrdersService(): OperationsOrdersService {
-  if (ordersService === null) {
+  if (ordersService === null)
     throw new Error('Operations Orders service has not been initialized.');
-  }
   return ordersService;
 }
 
@@ -158,9 +166,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   });
   ipcMain.handle(IPC_SESSION_SUBMIT_PIN, async (event, pin: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    if (typeof pin !== 'string') {
-      throw new TypeError('PIN IPC payload must be a string.');
-    }
+    if (typeof pin !== 'string') throw new TypeError('PIN IPC payload must be a string.');
     return currentSessionService().submitPin(pin);
   });
   ipcMain.handle(IPC_SESSION_SIGN_OUT, async (event) => {
@@ -252,8 +258,12 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (bulkStockIpcRuntime === null) {
     throw new Error('Operations Bulk Stock IPC runtime has not been initialized.');
   }
+  if (endDayIpcRuntime === null) {
+    throw new Error('Operations End Day IPC runtime has not been initialized.');
+  }
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
+  endDayIpcRuntime.register(window);
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -287,18 +297,18 @@ app.whenReady().then(async () => {
   await createMainWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      void createMainWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();
   });
 });
 
 app.on('before-quit', () => {
+  void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
   void expensesIpcRuntime?.close();
   void operatorReadModel?.close();
   void orderDraftStore?.close();
   void operationsDatabase?.close();
+  endDayIpcRuntime = null;
   bulkStockIpcRuntime = null;
   expensesIpcRuntime = null;
   operatorReadModel = null;
@@ -310,7 +320,5 @@ app.on('before-quit', () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });

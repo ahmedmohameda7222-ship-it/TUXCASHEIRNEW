@@ -212,3 +212,13 @@ Third-party declaration checking is isolated where current Node/Vite/Electron de
 Current Stock is derived from append-only `InventoryMovement` history across Business Days. `BULK_UNIT_FINISHED` appends exactly one negative whole unit; `BULK_STOCK_RECEIVED` appends the received positive whole-unit quantity. Undo never rewrites either movement: it appends `UNDO_BULK_UNIT_FINISHED` or `UNDO_BULK_STOCK_RECEIVED` with `compensatesMovementId` pointing at the original.
 
 `BulkStockStore` has SQLite and IndexedDB adapters. Each worker mutation re-validates the open Business Day, Current Operator, active `BULK_MANUAL` item, command identity, and compensation eligibility before atomically appending movement + audit + durable outbox. The renderer receives only the typed browser/Electron Bulk Stock capability.
+
+## End Day / reconciliation boundary
+
+`OperationsEndDayService` owns the mandatory Business Day closing command and is reachable only from the Current Operator/profile menu. It shares the application command coordinator with normal operational writes, so checkout, order corrections, Expenses, Bulk Stock and closing cannot interleave unsafe local transactions.
+
+End Day first gates the current OPEN Business Day. Any ACTIVE placed order hard-blocks reconciliation. A meaningful durable `OrderDraft` also blocks until the worker explicitly returns to Orders or chooses `Discard Draft & Continue`; the service never silently destroys draft state.
+
+The READY gate exposes only active reconciliation payment identities and labels. Expected values are deliberately absent. The worker enters actual Cash first and then active Digital methods. Only after all actual amounts are supplied does the service derive Expected values from durable current-Business-Day facts: DONE orders contribute recognized sales/payment allocations, Cancelled and Returned Delivery orders do not, and active manual Cash expenses reduce Expected Cash. Other expenses do not reduce the drawer.
+
+Final close builds an immutable reconciliation and commits reconciliation + Worker Session end + Business Day CLOSED transition + audit + durable outbox facts in one local database transaction. A local failure rolls back the close and leaves the Business Day open. An already-closed Business Day returns an idempotent replay result without new close writes. No cloud, PDF or printer call participates in the close transaction.

@@ -12,6 +12,19 @@ export type {
 } from './bulkStock';
 export { ApplicationCommandCoordinator } from './commandCoordinator';
 export { CoordinatedOperationsSessionService } from './coordinatedSession';
+export { OperationsEndDayService } from './endDay';
+export type {
+  EndDayCloseResult,
+  EndDayCloseResultValue,
+  EndDayGate,
+  EndDayGateResult,
+  EndDayPaymentMethod,
+  EndDayPreview,
+  EndDayPreviewLine,
+  EndDayPreviewResult,
+  EndDayRuntime,
+  EndDayVarianceInput,
+} from './endDay';
 export type { ApplicationError, ApplicationErrorCode } from './errors';
 export { OperationsExpensesService } from './expenses';
 export type {
