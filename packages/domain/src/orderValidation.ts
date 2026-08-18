@@ -117,7 +117,7 @@ export function validateOrderDraft(
         message: 'Enter a valid Egyptian mobile number.',
       });
     } else {
-      normalizedDeliveryPhone = normalized.canonical;
+      normalizedDeliveryPhone = normalized.normalizedPhone;
     }
     if (draft.delivery.customerName.trim().length === 0) {
       issues.push({
