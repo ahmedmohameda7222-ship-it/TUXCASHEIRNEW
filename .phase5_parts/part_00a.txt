@@ -1,0 +1,193 @@
+from pathlib import Path
+
+
+def replace(path: str, old: str, new: str) -> None:
+    p = Path(path)
+    text = p.read_text()
+    if old not in text:
+        raise SystemExit(f'Expected snippet not found in {path}: {old[:120]!r}')
+    p.write_text(text.replace(old, new, 1))
+
+
+def write(path: str, content: str) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content)
+
+# Domain lifecycle metadata + pure transition helpers.
+replace(
+    'packages/domain/src/models.ts',
+    "export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';\nexport type OrderSource = 'POS' | 'ONLINE';\n\nexport interface OrderSnapshot {",
+    """export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
+export type OrderSource = 'POS' | 'ONLINE';
+
+export interface OrderCancellationSnapshot {
+  readonly at: Instant;
+  readonly workerId: WorkerId;
+  readonly workerName: string;
+  readonly foodPrepared: boolean;
+  readonly stockRestored: boolean;
+  readonly reason: string;
+}
+
+export interface OrderReturnSnapshot {
+  readonly at: Instant;
+  readonly workerId: WorkerId;
+  readonly workerName: string;
+  readonly reason: string;
+}
+
+export interface OrderLifecycleSnapshot {
+  readonly revision: number;
+  readonly doneAt: Instant | null;
+  readonly cancellation: OrderCancellationSnapshot | null;
+  readonly returned: OrderReturnSnapshot | null;
+}
+
+export interface OrderSnapshot {""",
+)
+replace(
+    'packages/domain/src/models.ts',
+    "  readonly status: OrderStatus;\n  readonly source: OrderSource;",
+    "  readonly status: OrderStatus;\n  readonly lifecycle?: OrderLifecycleSnapshot;\n  readonly source: OrderSource;",
+)
+
+write('packages/domain/src/orderLifecycle.ts', r'''import { DomainInvariantError } from './errors';
+import type { WorkerId } from './ids';
+import type { OrderLifecycleSnapshot, OrderSnapshot } from './models';
+import type { Instant } from './time';
+
+export const DONE_UNDO_WINDOW_MS = 8_000;
+
+export function orderLifecycle(order: OrderSnapshot): OrderLifecycleSnapshot {
+  return (
+    order.lifecycle ?? {
+      revision: 0,
+      doneAt: null,
+      cancellation: null,
+      returned: null,
+    }
+  );
+}
+
+function nextRevision(order: OrderSnapshot): number {
+  const next = orderLifecycle(order).revision + 1;
+  if (!Number.isSafeInteger(next) || next <= 0) {
+    throw new DomainInvariantError('Order operational revision overflowed its safe range.');
+  }
+  return next;
+}
+
+export function markOrderDone(order: OrderSnapshot, at: Instant): OrderSnapshot {
+  if (order.status !== 'ACTIVE') {
+    throw new DomainInvariantError('Only an ACTIVE order can be marked Done.');
+  }
+  const current = orderLifecycle(order);
+  return {
+    ...order,
+    status: 'DONE',
+    lifecycle: {
+      ...current,
+      revision: nextRevision(order),
+      doneAt: at,
+    },
+  };
+}
+
+export function canUndoOrderDone(order: OrderSnapshot, now: Instant): boolean {
+  if (order.status !== 'DONE') return false;
+  const doneAt = orderLifecycle(order).doneAt;
+  if (doneAt === null) return false;
+  const elapsed = Date.parse(now) - Date.parse(doneAt);
+  return Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= DONE_UNDO_WINDOW_MS;
+}
+
+export function undoOrderDone(order: OrderSnapshot): OrderSnapshot {
+  if (order.status !== 'DONE' || orderLifecycle(order).doneAt === null) {
+    throw new DomainInvariantError('Only a recently completed order can be returned to ACTIVE.');
+  }
+  const current = orderLifecycle(order);
+  return {
+    ...order,
+    status: 'ACTIVE',
+    lifecycle: {
+      ...current,
+      revision: nextRevision(order),
+      doneAt: null,
+    },
+  };
+}
+
+export function cancelActiveOrder(
+  order: OrderSnapshot,
+  input: {
+    readonly at: Instant;
+    readonly workerId: WorkerId;
+    readonly workerName: string;
+    readonly foodPrepared: boolean;
+    readonly reason: string;
+  },
+): OrderSnapshot {
+  if (order.status !== 'ACTIVE') {
+    throw new DomainInvariantError('Only an ACTIVE order can be cancelled.');
+  }
+  const reason = input.reason.trim();
+  if (reason.length === 0) {
+    throw new DomainInvariantError('Cancellation reason is required.');
+  }
+  const current = orderLifecycle(order);
+  return {
+    ...order,
+    status: 'CANCELLED',
+    lifecycle: {
+      ...current,
+      revision: nextRevision(order),
+      doneAt: null,
+      cancellation: {
+        at: input.at,
+        workerId: input.workerId,
+        workerName: input.workerName,
+        foodPrepared: input.foodPrepared,
+        stockRestored: !input.foodPrepared,
+        reason,
+      },
+    },
+  };
+}
+
+export function returnFailedDelivery(
+  order: OrderSnapshot,
+  input: {
+    readonly at: Instant;
+    readonly workerId: WorkerId;
+    readonly workerName: string;
+    readonly reason: string;
+  },
+): OrderSnapshot {
+  if (order.status !== 'DONE' || order.fulfillment.behavior !== 'DELIVERY') {
+    throw new DomainInvariantError('Only a DONE Delivery order can be marked Delivery Failed.');
+  }
+  const reason = input.reason.trim();
+  if (reason.length === 0) {
+    throw new DomainInvariantError('Delivery Failed reason is required.');
+  }
+  const current = orderLifecycle(order);
+  return {
+    ...order,
+    status: 'RETURNED',
+    lifecycle: {
+      ...current,
+      revision: nextRevision(order),
+      doneAt: current.doneAt,
+      returned: {
+        at: input.at,
+        workerId: input.workerId,
+        workerName: input.workerName,
+        reason,
+      },
+    },
+  };
+}
+''')
+
+write('packages/domain/src/or
