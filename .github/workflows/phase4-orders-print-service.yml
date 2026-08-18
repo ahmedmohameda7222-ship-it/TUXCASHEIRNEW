@@ -1,0 +1,114 @@
+name: Phase 4 Orders print service patch
+
+on:
+  push:
+    branches:
+      - feat/ops-04-orders
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-04-orders
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Patch Orders service print boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/application/src/orders.ts')
+          text = path.read_text()
+          text = text.replace(
+              "import type { ApplicationError } from './errors';\n",
+              "import type { ApplicationError } from './errors';\nimport { unavailableOrderPrinter, type OrderPrinter } from './orderPrinter';\n",
+          )
+          text = text.replace(
+              "  readonly #runtime: OrdersRuntime;\n  readonly #coordinator: ApplicationCommandCoordinator;\n",
+              "  readonly #runtime: OrdersRuntime;\n  readonly #coordinator: ApplicationCommandCoordinator;\n  readonly #printer: OrderPrinter;\n",
+          )
+          text = text.replace(
+              "    runtime: OrdersRuntime,\n    coordinator = new ApplicationCommandCoordinator(),\n  ) {\n",
+              "    runtime: OrdersRuntime,\n    coordinator = new ApplicationCommandCoordinator(),\n    printer: OrderPrinter = unavailableOrderPrinter,\n  ) {\n",
+          )
+          text = text.replace(
+              "    this.#runtime = runtime;\n    this.#coordinator = coordinator;\n  }\n",
+              "    this.#runtime = runtime;\n    this.#coordinator = coordinator;\n    this.#printer = printer;\n  }\n",
+          )
+          marker = "        const reset = await this.#resetDraftAfterCommit(draft, context.configuration, warnings);\n"
+          replacement = """        if (!commitResult.replayed) {
+          try {
+            const printed = await this.#printer.print(commitResult.order);
+            if (!printed.ok) {
+              warnings.push('PRINT_FAILED');
+            }
+          } catch {
+            warnings.push('PRINT_FAILED');
+          }
+        } else {
+          warnings.push('PRINT_STATUS_UNKNOWN');
+        }
+
+        const reset = await this.#resetDraftAfterCommit(draft, context.configuration, warnings);
+"""
+          if marker not in text:
+              raise SystemExit('print insertion marker not found')
+          text = text.replace(marker, replacement, 1)
+          marker = "  async #recoverCommittedDraft(draft: OrderDraft, order: OrderSnapshot): Promise<OrderPlacement> {\n"
+          method = """  async reprintOrder(orderId: OrderId): Promise<Result<OrderSnapshot, ApplicationError>> {
+    return this.#coordinator.runExclusive(async () => {
+      try {
+        const order = await this.#database.transaction((transaction) =>
+          transaction.orders.getById(orderId),
+        );
+        if (order === null) {
+          return err({ code: 'NOT_FOUND', message: 'The saved order could not be found.' });
+        }
+
+        const printed = await this.#printer.print(order);
+        if (!printed.ok) {
+          return err({ code: 'PRINT_ERROR', message: printed.message });
+        }
+        return ok(order);
+      } catch (cause) {
+        return err({
+          code: 'PRINT_ERROR',
+          message: 'The saved order is intact, but the receipt could not be printed.',
+          cause,
+        });
+      }
+    });
+  }
+
+"""
+          if marker not in text:
+              raise SystemExit('reprint insertion marker not found')
+          text = text.replace(marker, method + marker, 1)
+          text = text.replace(
+              "    const reset = await this.#resetDraftAfterCommit(draft, configuration, []);\n",
+              "    const reset = await this.#resetDraftAfterCommit(draft, configuration, [\n      'PRINT_STATUS_UNKNOWN',\n    ]);\n",
+              1,
+          )
+          path.write_text(text)
+          PY
+      - run: npx prettier --write packages/application/src/orders.ts packages/application/src/index.ts packages/application/src/orderPrinter.ts
+      - name: Commit service patch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/application/src/orders.ts packages/application/src/index.ts packages/application/src/orderPrinter.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Add post-commit receipt printing contract"
+          git push origin HEAD:feat/ops-04-orders
