@@ -16,6 +16,7 @@ import {
   type DraftLineId,
   type MenuCategoryId,
   type OrderDraft,
+  type OrderId,
   type OrderValidationIssue,
   type Product,
   type ProductId,
@@ -30,6 +31,13 @@ type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
 interface UndoState {
   readonly snapshot: OrderDraft;
+  readonly message: string;
+}
+
+interface PrintNoticeState {
+  readonly orderId: OrderId;
+  readonly displayOrderNo: number;
+  readonly kind: 'FAILED' | 'UNKNOWN';
   readonly message: string;
 }
 
@@ -140,6 +148,8 @@ export function OrdersWorkspace({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [reprinting, setReprinting] = useState(false);
+  const [printNotice, setPrintNotice] = useState<PrintNoticeState | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
@@ -481,11 +491,51 @@ export function OrdersWorkspace({
     const prefix = result.value.replayed ? 'Recovered' : 'Placed';
     setSuccessMessage(`${prefix} order #${result.value.order.displayOrderNo}`);
     window.setTimeout(() => setSuccessMessage(null), 4_500);
-    if (result.value.postCommitWarnings.length > 0) {
+
+    const printFailed = result.value.postCommitWarnings.includes('PRINT_FAILED');
+    const printUnknown = result.value.postCommitWarnings.includes('PRINT_STATUS_UNKNOWN');
+    if (printFailed || printUnknown) {
+      setPrintNotice({
+        orderId: result.value.order.id,
+        displayOrderNo: result.value.order.displayOrderNo,
+        kind: printFailed ? 'FAILED' : 'UNKNOWN',
+        message: printFailed
+          ? 'The order is saved locally, but the receipt did not print.'
+          : 'The order was recovered safely. Receipt print status is unknown, so it was not printed again automatically.',
+      });
+    } else {
+      setPrintNotice(null);
+    }
+
+    const otherWarnings = result.value.postCommitWarnings.filter(
+      (warning) => warning !== 'PRINT_FAILED' && warning !== 'PRINT_STATUS_UNKNOWN',
+    );
+    if (otherWarnings.length > 0) {
       setGlobalError(
-        `Order saved locally. Follow-up warning: ${result.value.postCommitWarnings.join(', ')}`,
+        `Order #${result.value.order.displayOrderNo} is saved locally. Follow-up issue: ${otherWarnings.join(', ')}`,
       );
     }
+  }
+
+  async function reprintReceipt(): Promise<void> {
+    const notice = printNotice;
+    if (notice === null || reprinting) return;
+
+    setReprinting(true);
+    const result = await client.reprintOrder(notice.orderId);
+    setReprinting(false);
+    if (!result.ok) {
+      setPrintNotice({
+        ...notice,
+        kind: 'FAILED',
+        message: `Order #${notice.displayOrderNo} is still saved locally. ${result.error.message}`,
+      });
+      return;
+    }
+
+    setPrintNotice(null);
+    setSuccessMessage(`Receipt reprinted for order #${result.value.displayOrderNo}`);
+    window.setTimeout(() => setSuccessMessage(null), 4_500);
   }
 
   if (loading) {
@@ -715,6 +765,36 @@ export function OrdersWorkspace({
       {successMessage === null ? null : (
         <div className="success-toast" role="status">
           {successMessage}
+        </div>
+      )}
+      {printNotice === null ? null : (
+        <div className="print-notice" role="status">
+          <div>
+            <strong>Order #{printNotice.displayOrderNo} saved locally</strong>
+            <span>{printNotice.message}</span>
+          </div>
+          <div className="print-notice-actions">
+            <button
+              type="button"
+              className="secondary-action"
+              disabled={reprinting}
+              onClick={() => void reprintReceipt()}
+            >
+              {reprinting
+                ? 'Printing…'
+                : printNotice.kind === 'FAILED'
+                  ? 'Retry print'
+                  : 'Reprint receipt'}
+            </button>
+            <button
+              type="button"
+              className="quiet-action"
+              disabled={reprinting}
+              onClick={() => setPrintNotice(null)}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
       {globalError === null ? null : (
