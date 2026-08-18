@@ -137,3 +137,14 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Added browser + secure Electron End Day APIs and responsive worker flow. Successful close refreshes session state back to the existing no-active-day screen.
 - Integration coverage proves cross-midnight close, Bulk Stock carry-forward, successful variance close, no variance Expense, and injected outbox-failure rollback.
 - Repository-side Supabase remains intentionally unlinked; migrations stay versioned for the user to apply manually after planner completion.
+
+## 2026-08-18 — Phase 11 rendered Operations QA completed
+
+- Browser plugin was unavailable in this session, so rendered validation used the approved Playwright fallback against the production-built React renderer with the typed desktop API boundary injected before boot.
+- Final authoritative run `32188417130` passed all five scenarios: Start/PIN/greeting + exact shell navigation, desktop Orders, Orders Board + Expenses + Bulk Stock, End Day through post-close lock, and 390×844 mobile Orders/cart.
+- The final suite also asserted no relevant console/page errors, no horizontal overflow, direct product `+ / −`, Sold Out disablement, image fallback, Quick Info/modifiers, separate notes, Delivery validation/autofill, Board search/orderings/dialogs/Done Undo, Expenses dialogs, Bulk Stock actions, blind reconciliation, and post-close locked state.
+- Rendered QA found and fixed three real product issues before the passing run: Quick Info remained mounted over Product Customizer; Board Done Undo was obscured by the details drawer flow; desktop product cards compressed names too aggressively at wide desktop widths.
+- The final screenshots show legible desktop product names, preserved two-panel Orders/cart composition, responsive mobile cart, clean Board/Expenses/Bulk Stock views, Final Closing Summary, and the locked No Active Business Day state.
+- `START-001` remains `BLOCKED` only for the missing approved graphic TUX logo asset; the approved copy and screen behavior are rendered and validated with the existing typographic fallback.
+- `OPS-001` remains outside the completed Operations implementation because the canonical plan explicitly defers detailed TUX Admin information architecture to a separate design phase after Operations is frozen.
+- No Supabase project was linked and no remote migration was applied.

@@ -220,3 +220,12 @@ Automated Phase 8 coverage protects:
 - new Business Day display-order allocation beginning at #1.
 
 Strict TypeScript and production builds validate browser/Electron End Day boundaries. Profile-menu interaction, blind-count presentation, Final Closing Summary rendering and post-close locked-screen transition remain `IMPLEMENTED_NOT_VALIDATED` until rendered QA/E2E evidence exists.
+
+## Phase 11 rendered Operations QA
+
+- Renderer validation uses Playwright only because the Browser plugin was not available in the implementation session.
+- Business/domain correctness remains proven by the existing domain and SQLite integration suites; the Playwright fixture injects only the typed desktop capability boundary and exercises the real React components/CSS.
+- Authoritative rendered run: `32188417130` — five scenarios passed on the final Board-fixed product tree.
+- Desktop evidence covers Start/locked shell, Orders, Orders Board, Expenses, Bulk Stock and End Day; mobile evidence covers the 390×844 Orders/cart-sheet flow.
+- Every rendered scenario guards relevant console warnings/errors and page errors; desktop/mobile flows assert no document-level horizontal overflow.
+- Phase 11 deliberately leaves the missing approved graphic TUX logo asset visible as `START-001 = BLOCKED` rather than treating the typographic fallback as equivalent evidence.
