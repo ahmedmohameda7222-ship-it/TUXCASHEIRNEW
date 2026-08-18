@@ -1,3 +1,4 @@
+import type { OrderDraft, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -36,17 +37,17 @@ const api: TuxDesktopApi = Object.freeze({
       assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_SIGN_OUT)) as unknown),
   }),
   orders: Object.freeze({
-    loadWorkspace: async (draftScopeId) =>
+    loadWorkspace: async (draftScopeId: string) =>
       assertOrdersWorkspaceResult(
         (await ipcRenderer.invoke(IPC_ORDERS_LOAD_WORKSPACE, draftScopeId)) as unknown,
       ),
-    saveDraft: async (draft) =>
+    saveDraft: async (draft: OrderDraft) =>
       assertSaveDraftResult((await ipcRenderer.invoke(IPC_ORDERS_SAVE_DRAFT, draft)) as unknown),
-    findCustomerByPhone: async (shopId, normalizedPhone) =>
+    findCustomerByPhone: async (shopId: ShopId, normalizedPhone: string) =>
       assertCustomerLookupResult(
         (await ipcRenderer.invoke(IPC_ORDERS_FIND_CUSTOMER, shopId, normalizedPhone)) as unknown,
       ),
-    placeOrder: async (draft) =>
+    placeOrder: async (draft: OrderDraft) =>
       assertOrderPlacementResult((await ipcRenderer.invoke(IPC_ORDERS_PLACE, draft)) as unknown),
   }),
 });
