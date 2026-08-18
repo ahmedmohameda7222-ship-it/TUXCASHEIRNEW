@@ -11,6 +11,7 @@ import {
   IndexedDbOrderDraftStore,
 } from '@tux/persistence/browser';
 import type { TuxOrdersApi } from '@tux/platform-contracts';
+import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
 export interface OperationsSessionClient {
@@ -50,7 +51,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
-        orders: new OperationsOrdersService(database, readModel, draftStore, runtime, coordinator),
+        orders: new OperationsOrdersService(
+          database,
+          readModel,
+          draftStore,
+          runtime,
+          coordinator,
+          new BrowserOrderPrinter(),
+        ),
       };
     })();
   }
@@ -81,5 +89,6 @@ export function createOperationsOrdersClient(): OperationsOrdersClient {
     findCustomerByPhone: async (shopId, normalizedPhone) =>
       (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),
     placeOrder: async (draft) => (await browserRuntime()).orders.placeOrder(draft),
+    reprintOrder: async (orderId) => (await browserRuntime()).orders.reprintOrder(orderId),
   };
 }
