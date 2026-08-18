@@ -1,1 +1,1 @@
-apply Phase 11 product polish then rerun authoritative gate
+materialize read-only Phase 11 product polish files
