@@ -16,7 +16,10 @@ export class BrowserOrderPrinter implements OrderPrinter {
 
     try {
       const loaded = new Promise<void>((resolve, reject) => {
-        const timeout = window.setTimeout(() => reject(new Error('Receipt document did not load.')), 5_000);
+        const timeout = window.setTimeout(
+          () => reject(new Error('Receipt document did not load.')),
+          5_000,
+        );
         frame.addEventListener(
           'load',
           () => {

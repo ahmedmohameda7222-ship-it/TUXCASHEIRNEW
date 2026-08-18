@@ -5,13 +5,7 @@ import {
   CoordinatedOperationsSessionService,
   OperationsOrdersService,
 } from '@tux/application';
-import {
-  instant,
-  parseEntityId,
-  type OrderDraft,
-  type OrderId,
-  type ShopId,
-} from '@tux/domain';
+import { instant, parseEntityId, type OrderDraft, type OrderId, type ShopId } from '@tux/domain';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,

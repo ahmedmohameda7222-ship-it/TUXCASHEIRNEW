@@ -52,9 +52,7 @@ const api: TuxDesktopApi = Object.freeze({
     placeOrder: async (draft: OrderDraft) =>
       assertOrderPlacementResult((await ipcRenderer.invoke(IPC_ORDERS_PLACE, draft)) as unknown),
     reprintOrder: async (orderId: OrderId) =>
-      assertReprintOrderResult(
-        (await ipcRenderer.invoke(IPC_ORDERS_REPRINT, orderId)) as unknown,
-      ),
+      assertReprintOrderResult((await ipcRenderer.invoke(IPC_ORDERS_REPRINT, orderId)) as unknown),
   }),
 });
 
