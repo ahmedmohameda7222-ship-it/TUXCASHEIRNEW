@@ -58,3 +58,24 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - PR #5 exact documentation head then passed the same permanent gate on run `32068544454`.
 - The approved graphic TUX logo asset is not present in the V2 repository; the locked screen currently uses a typographic `TUX` fallback and START-001 is not claimed fully compliant.
 - Phase 3 is ready for squash merge into `integration/tux-operations-v2`; `main` remains untouched.
+
+## 2026-08-18 — Phase 4 Orders implementation completed, closeout in progress
+
+- Created `feat/ops-04-orders` from the Phase 3 integration baseline and kept PR #6 targeted at `integration/tux-operations-v2`; `main` remains untouched.
+- Added exact Orders draft primitives for pricing, fixed discounts, Cash/Instapay payment behavior, two-way split payments, Egyptian phone normalization, and smart Cash tender suggestions.
+- Added durable `OrderDraftStore` adapters for SQLite desktop and IndexedDB browser fallback with revision conflict protection and stable checkout-intent identity for retry/crash recovery.
+- Added domain draft operations for direct product +/- behavior, deterministic most-recent decrement, Sold Out enforcement, modifier eligibility/max quantities, required combo beverage selection, item-note customization, and delivery-zone fee snapshots.
+- Added `OperationsOrdersService` with serialized workspace loading, durable draft saves, customer lookup, local-first checkout, idempotent replay recovery, and immutable-order reprint.
+- Checkout validation occurs before business mutation. One local transaction allocates the Business-Day display number, writes immutable order/payment snapshots, appends inventory consumption, learns successful Delivery contacts, writes the audit event, and writes the durable `ORDER_PLACED` outbox event.
+- Added integration coverage proving validation failure and injected local inventory persistence failure are mutation-free/rolled back and preserve the durable draft.
+- Added idempotency coverage proving stale committed intents do not duplicate order/inventory/outbox effects and do not delete a newer draft.
+- Added the real Orders renderer: dynamic category rail with no `All`, global search shortcuts, compact direct +/- product cards, optional images/fallbacks, Quick Info, modifier/combo customizer, separate item/order notes, Delivery-only customer fields, zone/manual fee, exact discount/payment forms, Cash received/change, smart tenders, split payment, desktop persistent cart, and mobile cart sheet.
+- Added local source validation and draft save serialization in the renderer; React dispatches typed domain/application operations rather than owning money/inventory business rules.
+- Added `@tux/printing`, a pure immutable receipt renderer with HTML escaping and exact-money rendering.
+- Added post-commit receipt printing through an application `OrderPrinter` port. Desktop uses a sandboxed Electron-main receipt window and `webContents.print()`; browser fallback uses the same receipt document through an isolated iframe/browser print dialog.
+- Print failure does not roll back the placed order. Retry/Reprint works by immutable `OrderId` and creates no order/inventory/audit/outbox side effects. Idempotent checkout recovery never auto-prints a possible duplicate receipt and instead reports unknown print status.
+- Added strict preload validation and narrow reprint IPC; the renderer never receives a native printer or raw IPC/SQLite capability.
+- Added tests for exact decimal money input, payment logic, phone normalization, pricing, tenders, direct draft operations, SQLite checkout/rollback/idempotency/customer behavior, print-once/replay/failure/reprint behavior, and receipt escaping/rendering.
+- Permanent CI on code head `b36081c017948aefb7122bca2c490ddca9671ca4` passed locked install, Prettier, ESLint, strict TypeScript, all unit/integration tests, browser production build, and Electron main/preload production builds before documentation synchronization.
+- No remote Supabase project was linked or mutated; Phase 4 remains fully local-first with remote outbox delivery deferred to the later sync phase.
+- Orders Board lifecycle actions, Cancel/Returned Delivery workflow, End Day draft resolution, Expenses, and Bulk Stock remain outside this Orders phase and are not claimed complete here.
