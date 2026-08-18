@@ -183,3 +183,20 @@ As the corresponding later phases land, tests must prioritize:
 - renderer interaction/responsive/accessibility E2E across Orders and later screens.
 
 Phase 10 owns the complete approved end-to-end scenario and final responsive/accessibility audit.
+
+## Phase 7 Bulk Stock coverage
+
+Automated Phase 7 coverage protects:
+
+- exact positive whole-unit `Add Stock` validation;
+- exact one-whole-unit `Finished 1` decrement;
+- current balance derived from movements across a closed and current Business Day;
+- exposure of active `BULK_MANUAL` items only;
+- stable command UUID replay producing no duplicate movement;
+- short Undo as an exact compensating movement with the original history preserved;
+- duplicate and expired Undo rejection;
+- `Add Stock` creating no Expense/Purchase financial mutation;
+- atomic rollback when durable outbox persistence is forced to fail after the movement command begins;
+- typed browser/IndexedDB and Electron/SQLite capability wiring through strict TypeScript and production builds.
+
+Rendered card layout, Add Stock dialog interaction, direct `Finished 1`, visible short Undo and responsive behavior remain `IMPLEMENTED_NOT_VALIDATED` until rendered browser/Electron QA or dedicated E2E evidence exists.

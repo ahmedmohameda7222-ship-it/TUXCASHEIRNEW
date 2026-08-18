@@ -204,3 +204,11 @@ RLS is enabled on exposed `public` tables, but no permissive policies are create
 The shared compiler baseline enables strict checking plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`, and unknown catch variables.
 
 Third-party declaration checking is isolated where current Node/Vite/Electron declarations overlap; strict checking remains enabled for TUX source code.
+
+## Bulk Stock command boundary
+
+`OperationsBulkStockService` owns the worker-facing physical whole-unit ledger for active `BULK_MANUAL` items. Its worker API contains only board loading, `Finished 1`, positive whole-unit `Add Stock`, and short compensating Undo. There is no worker Reset, direct balance setter, item creation/rename/delete/configuration, cost/purchase entry, or analytics/history management command.
+
+Current Stock is derived from append-only `InventoryMovement` history across Business Days. `BULK_UNIT_FINISHED` appends exactly one negative whole unit; `BULK_STOCK_RECEIVED` appends the received positive whole-unit quantity. Undo never rewrites either movement: it appends `UNDO_BULK_UNIT_FINISHED` or `UNDO_BULK_STOCK_RECEIVED` with `compensatesMovementId` pointing at the original.
+
+`BulkStockStore` has SQLite and IndexedDB adapters. Each worker mutation re-validates the open Business Day, Current Operator, active `BULK_MANUAL` item, command identity, and compensation eligibility before atomically appending movement + audit + durable outbox. The renderer receives only the typed browser/Electron Bulk Stock capability.
