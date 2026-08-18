@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - feat/ops-09-sync
+      - test/ops-11-rendered-qa
 
 permissions:
   contents: read
