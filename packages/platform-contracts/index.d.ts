@@ -1,5 +1,6 @@
 import type {
   OperationsBulkStockService,
+  OperationsEndDayService,
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -26,6 +27,11 @@ export type TuxBulkStockApi = Pick<
   'loadBoard' | 'finishOne' | 'addStock' | 'undoMovement'
 >;
 
+export type TuxEndDayApi = Pick<
+  OperationsEndDayService,
+  'beginEndDay' | 'discardDraft' | 'previewReconciliation' | 'closeDay'
+>;
+
 export interface TuxDesktopApi {
   readonly app: {
     readonly getVersion: () => Promise<string>;
@@ -39,4 +45,5 @@ export interface TuxDesktopApi {
   readonly ordersBoard: TuxOrdersBoardApi;
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
+  readonly endDay: TuxEndDayApi;
 }
