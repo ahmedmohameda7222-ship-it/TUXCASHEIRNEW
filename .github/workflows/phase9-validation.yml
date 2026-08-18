@@ -1,0 +1,59 @@
+name: Phase 9 Validation Gate
+
+on:
+  push:
+    branches:
+      - feat/ops-09-sync
+    paths:
+      - '.phase9-validation.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-09-sync
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Run all permanent checks and capture result
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/phase9.log
+          failed=0
+          for command in 'npm ci' 'npm run format:check' 'npm run lint' 'npm run typecheck' 'npm run test' 'npm run build'
+          do
+            echo "===== $command =====" >> /tmp/phase9.log
+            bash -lc "$command" >> /tmp/phase9.log 2>&1
+            status=$?
+            echo "exit=$status" >> /tmp/phase9.log
+            if [ "$status" -ne 0 ]; then
+              failed=1
+              break
+            fi
+          done
+          if [ "$failed" -eq 0 ]; then
+            printf 'PASS\n' > .phase9-validation-result.txt
+          else
+            { printf 'FAIL\n\n'; tail -n 360 /tmp/phase9.log; } > .phase9-validation-result.txt
+          fi
+      - name: Remove temporary validation helpers
+        run: |
+          rm -f .phase9-ci.trigger .phase9-validation.trigger
+          rm -f .github/workflows/phase9-validation.yml
+      - name: Commit validation result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Record Phase 9 validation result'
+          git push origin HEAD:feat/ops-09-sync
