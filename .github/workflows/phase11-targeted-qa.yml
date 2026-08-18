@@ -1,0 +1,108 @@
+name: Phase 11 Targeted Rendered QA
+
+on:
+  pull_request:
+    branches:
+      - feat/ops-09-sync
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-rendered-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build -w @tux/operations
+          npm install --no-save --no-package-lock @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start built renderer
+        run: |
+          cd apps/operations
+          npm exec -- vite preview --host 127.0.0.1 --port 4173 > /tmp/tux-vite.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 0.5
+          done
+          cat /tmp/tux-vite.log
+          exit 1
+      - name: Materialize corrected targeted tests from canonical Phase 11 fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          source = Path('.github/workflows/phase11-rendered-qa.yml').read_text()
+          start_marker = "          cat > .qa-runtime/renderer.spec.cjs <<'EOF'\n"
+          end_marker = "\n          EOF\n\n          cat > .qa-runtime/playwright.config.cjs"
+          start = source.index(start_marker) + len(start_marker)
+          end = source.index(end_marker, start)
+          spec = dedent(source[start:end])
+
+          old_validation = """  await expect(page.getByText('Enter a valid Egyptian mobile number.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Customer Name is required.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Delivery Zone is required.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Full address is required.', { exact: true })).toBeVisible();
+"""
+          new_validation = """  const currentOrder = page.getByLabel('Current order');
+  await expect(currentOrder.getByText('Enter a valid Egyptian mobile number.', { exact: true }).first()).toBeVisible();
+  await expect(currentOrder.getByText('Customer Name is required.', { exact: true }).first()).toBeVisible();
+  await expect(currentOrder.getByText('Delivery Zone is required.', { exact: true }).first()).toBeVisible();
+  await expect(currentOrder.getByText('Full address is required.', { exact: true }).first()).toBeVisible();
+"""
+          if old_validation not in spec:
+              raise SystemExit('delivery validation target missing')
+          spec = spec.replace(old_validation, new_validation, 1)
+
+          old_done = "  await page.getByRole('button', { name: 'Mark Done' }).click();\n"
+          new_done = "  await orderDialog.getByRole('button', { name: 'Mark Done' }).click();\n"
+          if old_done not in spec:
+              raise SystemExit('Mark Done target missing')
+          spec = spec.replace(old_done, new_done, 1)
+
+          direct_anchor = "  await expect(page.getByText('Add to Cart', { exact: true })).toHaveCount(0);\n"
+          direct_checks = """  await expect(page.locator('.product-image-fallback').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await expect(page.getByLabel('Classic Smash quantity').locator('output')).toHaveText('1');
+  await page.getByRole('button', { name: 'Remove one Classic Smash' }).click();
+  await expect(page.getByLabel('Classic Smash quantity').locator('output')).toHaveText('0');
+"""
+          if direct_anchor not in spec:
+              raise SystemExit('direct quantity anchor missing')
+          spec = spec.replace(direct_anchor, direct_anchor + direct_checks, 1)
+
+          Path('.qa-runtime').mkdir(exist_ok=True)
+          Path('qa-artifacts-targeted').mkdir(exist_ok=True)
+          Path('.qa-runtime/renderer.spec.cjs').write_text(spec)
+          Path('.qa-runtime/playwright.config.cjs').write_text("""const { defineConfig } = require('@playwright/test');
+module.exports = defineConfig({
+  testDir: '.',
+  testMatch: /renderer\\.spec\\.cjs/,
+  timeout: 30000,
+  expect: { timeout: 7000 },
+  retries: 0,
+  workers: 1,
+  reporter: [['line']],
+  use: { browserName: 'chromium', headless: true, viewport: { width: 1440, height: 960 } },
+});
+""")
+          PY
+      - name: Run corrected Orders + Board/Expenses/Bulk rendered flows
+        run: npx playwright test --config=.qa-runtime/playwright.config.cjs --grep "desktop Orders interactions|Orders Board, Expenses and Bulk Stock"
+      - name: Upload targeted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase11-targeted-rendered-qa
+          path: |
+            qa-artifacts
+            qa-artifacts-targeted
+          if-no-files-found: warn
