@@ -6,6 +6,7 @@ import './styles/orders.css';
 import './styles/orders-board.css';
 import './styles/expenses.css';
 import './styles/bulk-stock.css';
+import './styles/end-day.css';
 import { App } from './app/App';
 
 const rootElement = document.getElementById('root');
