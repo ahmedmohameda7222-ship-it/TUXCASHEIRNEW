@@ -19,7 +19,7 @@ function formatMoney(value: MoneyMinor): string {
 }
 
 function paymentDescription(payment: PaymentPart): string {
-  if (payment.method.logicType === 'CASH') {
+  if (payment.receivedMinor !== null && payment.changeMinor !== null) {
     return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)} · received ${formatMoney(payment.receivedMinor)} · change ${formatMoney(payment.changeMinor)}`;
   }
   return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)}`;
