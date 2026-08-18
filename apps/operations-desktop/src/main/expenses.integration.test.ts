@@ -51,6 +51,32 @@ function sqlRows(
   }
 }
 
+function seedOrderForeignKey(databasePath: string, orderId: OrderId): void {
+  const raw = new DatabaseSync(databasePath);
+  try {
+    raw
+      .prepare(
+        `INSERT INTO orders(
+        id, shop_id, business_day_id, display_order_no, idempotency_key, status, source,
+        operator_worker_id, created_at, total_minor, payload_json
+      ) VALUES (?, ?, ?, ?, ?, 'DONE', 'POS', ?, ?, ?, ?)`,
+      )
+      .run(
+        orderId,
+        SHOP_ID,
+        DAY_ID,
+        12,
+        `fixture-order:${orderId}`,
+        WORKER_ID,
+        '2026-08-18T14:00:00.000Z',
+        0,
+        JSON.stringify({ fixtureOnly: true, orderId }),
+      );
+  } finally {
+    raw.close();
+  }
+}
+
 async function fixture(uuidSequence: string[] = []) {
   const directory = await mkdtemp(path.join(tmpdir(), 'tux-expenses-'));
   const databasePath = path.join(directory, 'operations.sqlite3');
@@ -305,6 +331,7 @@ describe('Operations Expenses SQLite integration', () => {
   it('shows Delivery Failed as locked and non-financial', async () => {
     const fx = await fixture();
     const system = systemExpense('62000000-0000-4000-8000-000000000010');
+    seedOrderForeignKey(fx.databasePath, system.orderId);
     await fx.database.transaction((transaction) => transaction.expenses.put(system));
 
     const ledger = await fx.service.loadLedger();
