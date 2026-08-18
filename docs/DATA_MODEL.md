@@ -151,7 +151,9 @@ Draft persistence has no placed-order side effects. Inventory, customer learning
 - subtotal, discount, delivery fee, total;
 - structured payment parts.
 
-Placed order content is not modeled as an editable configuration blob. The persistence `OrderRepository` exposes insert/read operations for placed snapshots rather than a general edit API. Later corrections use explicit state transitions/events.
+Placed order commercial content is not modeled as an editable configuration blob. Phase 5 adds optional `OrderLifecycleSnapshot` metadata so orders written before the lifecycle field existed remain readable. Lifecycle metadata carries an operational revision, `doneAt`, cancellation decision/worker/reason, and Delivery Failed return worker/reason.
+
+The persistence `OrderRepository` has no general order editor. Its narrow `updateOperationalState()` starts from the durable saved snapshot and changes only status/lifecycle metadata. Items, fulfillment/customer snapshot, operator, prices, discount, Delivery fee, total, payments, Business Day/display number and idempotency identity are preserved. Corrections therefore remain explicit audited transitions rather than history rewrites.
 
 ## Payments
 
@@ -200,6 +202,8 @@ orderId = original Delivery order
 
 `null` is intentional and means there is no financial expense amount. It is not equivalent to zero.
 
+A DONE Delivery marked Delivery Failed keeps its historical order total/payment snapshot for audit/receipt history, while the return audit/outbox facts explicitly state zero recognized revenue, zero collected payment, reconciliation exclusion, and no inventory restoration. The linked `DELIVERY_FAILED` Expense remains non-financial.
+
 ## Inventory
 
 Inventory is a movement ledger, never a normal direct-overwrite model.
@@ -215,7 +219,7 @@ Movement types include order consumption, cancellation restock, Bulk Stock recei
 
 Every movement has an immutable ID, exact signed `quantityDeltaMicros`, worker attribution, timestamp, and idempotency key. Compensating movements reference the movement they correct where applicable.
 
-Order checkout appends exact `ORDER_CONSUMPTION` movements after validation inside the same local transaction as the immutable Order. Calculated shortage is not modeled as a reason to mutate or reject the draft by itself; human-controlled Sold Out configuration owns sellability blocking.
+Order checkout appends exact `ORDER_CONSUMPTION` movements after validation inside the same local transaction as the historical Order. If an ACTIVE order is later cancelled before food was prepared, Phase 5 appends a positive `CANCEL_RESTOCK` for each original consumption movement and links it through `compensatesMovementId`; the original movement is never edited/deleted. If food was already prepared, no restock movement is created. Calculated shortage is not modeled as a reason to mutate or reject the draft by itself; human-controlled Sold Out configuration owns sellability blocking.
 
 ## Reconciliation
 
@@ -248,7 +252,7 @@ The local outbox stores:
 
 Business writes and their outgoing sync intent can be written in the same local transaction.
 
-Placed Orders already append their `ORDER_PLACED` audit and outbox records inside the same transaction as Order/inventory/customer facts.
+Placed Orders append `ORDER_PLACED` audit/outbox records inside the same transaction as Order/inventory/customer facts. Phase 5 Board transitions similarly append `ORDER_MARKED_DONE`, `ORDER_DONE_UNDONE`, `ORDER_CANCELLED`, or `DELIVERY_RETURNED` audit/outbox work in the same local transaction as the corresponding lifecycle, compensation, or Delivery Failed expense facts. Operational outbox idempotency keys include order lifecycle revision so retries do not ambiguously identify different corrections.
 
 ## Receipt projection
 

@@ -1,6 +1,7 @@
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
+  OperationsOrdersBoardService,
   OperationsOrdersService,
   type OperationsSessionResult,
 } from '@tux/application';
@@ -10,7 +11,7 @@ import {
   IndexedDbOperatorSessionReadModel,
   IndexedDbOrderDraftStore,
 } from '@tux/persistence/browser';
-import type { TuxOrdersApi } from '@tux/platform-contracts';
+import type { TuxOrdersApi, TuxOrdersBoardApi } from '@tux/platform-contracts';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
@@ -21,10 +22,12 @@ export interface OperationsSessionClient {
 }
 
 export type OperationsOrdersClient = TuxOrdersApi;
+export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
   readonly orders: OperationsOrdersService;
+  readonly ordersBoard: OperationsOrdersBoardService;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -59,6 +62,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           coordinator,
           new BrowserOrderPrinter(),
         ),
+        ordersBoard: new OperationsOrdersBoardService(database, readModel, runtime, coordinator),
       };
     })();
   }
@@ -90,5 +94,19 @@ export function createOperationsOrdersClient(): OperationsOrdersClient {
       (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),
     placeOrder: async (draft) => (await browserRuntime()).orders.placeOrder(draft),
     reprintOrder: async (orderId) => (await browserRuntime()).orders.reprintOrder(orderId),
+  };
+}
+
+export function createOperationsOrdersBoardClient(): OperationsOrdersBoardClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) {
+    return desktop.ordersBoard;
+  }
+  return {
+    loadBoard: async () => (await browserRuntime()).ordersBoard.loadBoard(),
+    markDone: async (orderId) => (await browserRuntime()).ordersBoard.markDone(orderId),
+    undoDone: async (orderId) => (await browserRuntime()).ordersBoard.undoDone(orderId),
+    cancelOrder: async (input) => (await browserRuntime()).ordersBoard.cancelOrder(input),
+    returnDelivery: async (input) => (await browserRuntime()).ordersBoard.returnDelivery(input),
   };
 }

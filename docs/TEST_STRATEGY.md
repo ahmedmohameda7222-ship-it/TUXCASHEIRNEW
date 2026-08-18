@@ -131,6 +131,23 @@ SQLite/application integration with an injected recording printer protects:
 
 Electron/browser printer adapters, preload IPC validation and the React renderer are covered by strict typechecking and production builds. Manual or dedicated browser/Electron interaction E2E is still required before renderer-only compliance rows are promoted from `IMPLEMENTED_NOT_VALIDATED` to `PASS`.
 
+## Phase 5 Orders Board coverage
+
+Phase 5 adds pure-domain lifecycle tests plus seven SQLite/application integration scenarios for the correction paths most likely to corrupt historical or reconciliation facts.
+
+Automated tests protect:
+
+- the approved state machine (`ACTIVE → DONE`, `ACTIVE → CANCELLED`, `DONE Delivery → RETURNED`) and invalid-transition rejection;
+- an eight-second authoritative Done Undo boundary, including rejection after 8.001 seconds without an extra mutation;
+- Board loading from the currently open Business Day only, even when historical orders exist on another calendar/closed day;
+- Mark Done/Undo creating audit/outbox revisions without changing payments or inventory;
+- not-prepared cancellation creating an exact positive `CANCEL_RESTOCK` linked to the original negative `ORDER_CONSUMPTION` movement while preserving order financial facts;
+- prepared cancellation creating no restock;
+- Delivery Failed preserving the historical order/payment snapshot, creating no stock restoration, inserting exactly one linked `DELIVERY_FAILED` Expense with null amount/payer, and writing audit/outbox return facts;
+- terminal/invalid corrections creating no audit, outbox, expense, or inventory side effects.
+
+Strict TypeScript and production builds cover the browser/Electron typed Board clients, IPC validation and React renderer wiring. Sorting, responsive card/row layout, search interaction, details drawer, modal decisions, waiting-age display and the visible Undo toast remain `IMPLEMENTED_NOT_VALIDATED` until rendered browser/Electron interaction QA or dedicated E2E evidence exists.
+
 ## Migration validation
 
 SQLite migrations are executed by automated persistence/session tests.
@@ -141,9 +158,8 @@ The remote Postgres/Supabase migration chain is reviewed and versioned in Git bu
 
 As the corresponding later phases land, tests must prioritize:
 
-- cancellation stock compensation;
-- Returned Delivery zero-revenue/non-financial Expense semantics;
-- Expenses Cash vs Other reconciliation effect;
+- Expenses Cash vs Other reconciliation effect and manual expense editing/deletion;
+- Delivery Failed presentation/lock behavior inside the future Expenses screen;
 - Bulk Stock compensating movements;
 - blind reconciliation;
 - offline End Day close;

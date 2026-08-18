@@ -225,6 +225,15 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             .get(shopId, idempotencyKey),
         );
       },
+      async listByBusinessDay(businessDayId: BusinessDayId) {
+        return database
+          .prepare(
+            'SELECT payload_json FROM orders WHERE business_day_id = ? ORDER BY created_at ASC, display_order_no ASC',
+          )
+          .all(businessDayId)
+          .map((row) => parsePayload<OrderSnapshot>(row))
+          .filter((order): order is OrderSnapshot => order !== null);
+      },
       async insert(order: OrderSnapshot) {
         database
           .prepare(
@@ -246,6 +255,21 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             order.totalMinor,
             serialize(order),
           );
+      },
+      async updateOperationalState(order: OrderSnapshot) {
+        const existing = parsePayload<OrderSnapshot>(
+          database.prepare('SELECT payload_json FROM orders WHERE id = ?').get(order.id),
+        );
+        if (existing === null) {
+          throw new Error(`Order ${order.id} was not found.`);
+        }
+        const updated: OrderSnapshot =
+          order.lifecycle === undefined
+            ? { ...existing, status: order.status }
+            : { ...existing, status: order.status, lifecycle: order.lifecycle };
+        database
+          .prepare('UPDATE orders SET status = ?, payload_json = ? WHERE id = ?')
+          .run(updated.status, serialize(updated), updated.id);
       },
     },
     expenses: {
@@ -307,6 +331,15 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             movement.compensatesMovementId,
             serialize(movement),
           );
+      },
+      async listMovementsForOrder(orderId: OrderId) {
+        return database
+          .prepare(
+            'SELECT payload_json FROM inventory_movements WHERE order_id = ? ORDER BY created_at ASC, id ASC',
+          )
+          .all(orderId)
+          .map((row) => parsePayload<InventoryMovement>(row))
+          .filter((movement): movement is InventoryMovement => movement !== null);
       },
     },
     reconciliations: {

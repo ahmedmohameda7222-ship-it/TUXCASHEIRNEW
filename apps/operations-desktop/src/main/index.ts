@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
+  OperationsOrdersBoardService,
   OperationsOrdersService,
 } from '@tux/application';
 import { instant, parseEntityId, type OrderDraft, type OrderId, type ShopId } from '@tux/domain';
@@ -29,12 +30,18 @@ const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
 const IPC_ORDERS_REPRINT = 'tux:orders:reprint';
+const IPC_BOARD_LOAD = 'tux:orders-board:load';
+const IPC_BOARD_MARK_DONE = 'tux:orders-board:mark-done';
+const IPC_BOARD_UNDO_DONE = 'tux:orders-board:undo-done';
+const IPC_BOARD_CANCEL = 'tux:orders-board:cancel';
+const IPC_BOARD_RETURN = 'tux:orders-board:return';
 
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
 let orderDraftStore: SqliteOrderDraftStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
 let ordersService: OperationsOrdersService | null = null;
+let ordersBoardService: OperationsOrdersBoardService | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -74,6 +81,12 @@ async function initializeOperationsServices(): Promise<void> {
     coordinator,
     new ElectronOrderPrinter(),
   );
+  ordersBoardService = new OperationsOrdersBoardService(
+    operationsDatabase,
+    operatorReadModel,
+    runtime,
+    coordinator,
+  );
 }
 
 function currentSessionService(): CoordinatedOperationsSessionService {
@@ -90,6 +103,13 @@ function currentOrdersService(): OperationsOrdersService {
   return ordersService;
 }
 
+function currentOrdersBoardService(): OperationsOrdersBoardService {
+  if (ordersBoardService === null) {
+    throw new Error('Operations Orders Board service has not been initialized.');
+  }
+  return ordersBoardService;
+}
+
 function registerIpcHandlers(window: BrowserWindow): void {
   for (const channel of [
     IPC_GET_APP_VERSION,
@@ -101,6 +121,11 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_ORDERS_FIND_CUSTOMER,
     IPC_ORDERS_PLACE,
     IPC_ORDERS_REPRINT,
+    IPC_BOARD_LOAD,
+    IPC_BOARD_MARK_DONE,
+    IPC_BOARD_UNDO_DONE,
+    IPC_BOARD_CANCEL,
+    IPC_BOARD_RETURN,
   ]) {
     ipcMain.removeHandler(channel);
   }
@@ -161,6 +186,47 @@ function registerIpcHandlers(window: BrowserWindow): void {
     }
     return currentOrdersService().reprintOrder(parseEntityId<OrderId>(orderId));
   });
+  ipcMain.handle(IPC_BOARD_LOAD, async (event) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    return currentOrdersBoardService().loadBoard();
+  });
+  ipcMain.handle(IPC_BOARD_MARK_DONE, async (event, orderId: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    if (typeof orderId !== 'string') throw new TypeError('Order ID must be a string.');
+    return currentOrdersBoardService().markDone(parseEntityId<OrderId>(orderId));
+  });
+  ipcMain.handle(IPC_BOARD_UNDO_DONE, async (event, orderId: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    if (typeof orderId !== 'string') throw new TypeError('Order ID must be a string.');
+    return currentOrdersBoardService().undoDone(parseEntityId<OrderId>(orderId));
+  });
+  ipcMain.handle(IPC_BOARD_CANCEL, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Cancel order');
+    if (
+      typeof input['orderId'] !== 'string' ||
+      typeof input['foodPrepared'] !== 'boolean' ||
+      typeof input['reason'] !== 'string'
+    ) {
+      throw new TypeError('Cancel order IPC payload is invalid.');
+    }
+    return currentOrdersBoardService().cancelOrder({
+      orderId: parseEntityId<OrderId>(input['orderId']),
+      foodPrepared: input['foodPrepared'],
+      reason: input['reason'],
+    });
+  });
+  ipcMain.handle(IPC_BOARD_RETURN, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Return Delivery');
+    if (typeof input['orderId'] !== 'string' || typeof input['reason'] !== 'string') {
+      throw new TypeError('Return Delivery IPC payload is invalid.');
+    }
+    return currentOrdersBoardService().returnDelivery({
+      orderId: parseEntityId<OrderId>(input['orderId']),
+      reason: input['reason'],
+    });
+  });
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -209,6 +275,7 @@ app.on('before-quit', () => {
   operationsDatabase = null;
   sessionService = null;
   ordersService = null;
+  ordersBoardService = null;
 });
 
 app.on('window-all-closed', () => {

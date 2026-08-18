@@ -85,6 +85,39 @@ If any local write fails, the transaction rolls back. The order number allocatio
 
 The draft checkout-intent key becomes the order idempotency key. Retrying an already committed intent returns the saved order rather than creating a second order or repeating inventory/outbox effects. If the current draft scope has already advanced, recovery preserves that newer draft.
 
+## Orders Board local corrections
+
+Orders Board reads and mutates only the currently open Business Day. A Board action is serialized through the shared application coordinator and re-validates the open Business Day plus target order before committing.
+
+`Mark Done` updates operational lifecycle metadata plus audit/outbox only. Its Undo is authoritative for at most eight seconds and creates a new lifecycle revision; after that window the service rejects reopening.
+
+Cancellation and Delivery Failed remain local-first atomic corrections:
+
+```text
+Cancel, food not prepared
+→ status/lifecycle CANCELLED
+→ append compensating CANCEL_RESTOCK movement(s)
+→ audit
+→ outbox
+→ one commit
+
+Cancel, food prepared
+→ status/lifecycle CANCELLED
+→ no inventory restoration
+→ audit
+→ outbox
+→ one commit
+
+DONE Delivery → Delivery Failed
+→ status/lifecycle RETURNED
+→ no inventory restoration
+→ linked DELIVERY_FAILED Expense with amount = null
+→ audit/outbox zero-revenue + zero-collected-payment + reconciliation-exclusion facts
+→ one commit
+```
+
+The historical order items/fulfillment/total/payment snapshot is never rewritten by these corrections. If any local write in a correction fails, the transaction rolls back as a unit. Cloud availability is not part of success.
+
 ## Printing after local commit
 
 Receipt printing is explicitly post-commit.
@@ -118,7 +151,7 @@ deliveredAt
 
 A critical application command writes both its business mutation and outgoing sync intent in one local transaction. If the transaction rolls back, neither survives. If it commits and the app closes immediately afterward, the outbox entry remains available after restart.
 
-Phase 4 checkout already writes `ORDER_PLACED` outbox work inside the same transaction as the order/inventory/audit mutation. No remote network call is needed for checkout success.
+Phase 4 checkout writes `ORDER_PLACED` outbox work inside the same transaction as the order/inventory/audit mutation. Phase 5 Board transitions likewise write their audit/outbox work atomically with status/lifecycle and any cancellation-restock or Delivery Failed expense effects. No remote network call is needed for checkout or Board-transition success.
 
 ## Retry semantics
 

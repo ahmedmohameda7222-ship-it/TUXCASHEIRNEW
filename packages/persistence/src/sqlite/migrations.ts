@@ -194,6 +194,13 @@ ON worker_sessions(business_day_id)
 WHERE ended_at IS NULL;
 `,
   },
+  {
+    version: 3,
+    name: 'orders_board_lookup_indexes',
+    sql: `
+CREATE INDEX idx_inventory_movements_order ON inventory_movements(order_id, created_at);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

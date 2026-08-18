@@ -4,6 +4,15 @@ export type { ApplicationError, ApplicationErrorCode } from './errors';
 export { unavailableOrderPrinter } from './orderPrinter';
 export type { OrderPrintAttempt, OrderPrinter } from './orderPrinter';
 export { createEmptyOrderDraft, OperationsOrdersService } from './orders';
+export { OperationsOrdersBoardService } from './ordersBoard';
+export type {
+  CancelOrderInput,
+  OrderTransitionResult,
+  OrdersBoardResult,
+  OrdersBoardRuntime,
+  OrdersBoardSnapshot,
+  ReturnDeliveryInput,
+} from './ordersBoard';
 export type {
   OrderPlacement,
   OrderPlacementError,
