@@ -4,7 +4,6 @@ import {
   applyDeliveryZone,
   calculateDraftLineTotal,
   calculateOrderPricing,
-  normalizeEgyptianPhone,
   parseEntityId,
   preparePaymentParts,
   subtractMoney,
