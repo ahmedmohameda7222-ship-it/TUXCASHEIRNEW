@@ -34,7 +34,10 @@ let orderDraftStore: SqliteOrderDraftStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
 let ordersService: OperationsOrdersService | null = null;
 
-function assertObjectPayload(value: unknown, label: string): asserts value is Record<string, unknown> {
+function assertObjectPayload(
+  value: unknown,
+  label: string,
+): asserts value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new TypeError(`${label} IPC payload must be an object.`);
   }

@@ -50,13 +50,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
-        orders: new OperationsOrdersService(
-          database,
-          readModel,
-          draftStore,
-          runtime,
-          coordinator,
-        ),
+        orders: new OperationsOrdersService(database, readModel, draftStore, runtime, coordinator),
       };
     })();
   }
@@ -81,7 +75,8 @@ export function createOperationsOrdersClient(): OperationsOrdersClient {
     return desktop.orders;
   }
   return {
-    loadWorkspace: async (draftScopeId) => (await browserRuntime()).orders.loadWorkspace(draftScopeId),
+    loadWorkspace: async (draftScopeId) =>
+      (await browserRuntime()).orders.loadWorkspace(draftScopeId),
     saveDraft: async (draft) => (await browserRuntime()).orders.saveDraft(draft),
     findCustomerByPhone: async (shopId, normalizedPhone) =>
       (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),

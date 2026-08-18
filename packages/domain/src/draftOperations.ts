@@ -1,8 +1,4 @@
-import type {
-  DeliveryZone,
-  OperationsConfigurationSnapshot,
-  Product,
-} from './catalog';
+import type { DeliveryZone, OperationsConfigurationSnapshot, Product } from './catalog';
 import { DomainInvariantError } from './errors';
 import type { DraftLineId, ProductId } from './ids';
 import type {
@@ -50,7 +46,9 @@ function buildModifierSnapshots(
         throw new DomainInvariantError('Selected modifier is not allowed for this product.');
       }
       if (link.maxQuantity !== null && selection.quantity > link.maxQuantity) {
-        throw new DomainInvariantError('Selected modifier quantity exceeds its configured maximum.');
+        throw new DomainInvariantError(
+          'Selected modifier quantity exceeds its configured maximum.',
+        );
       }
       const modifier = configuration.modifiers.find(
         (candidate) => candidate.id === selection.modifierId && candidate.active,
@@ -98,8 +96,7 @@ function buildComboBeverageSnapshots(
       throw new DomainInvariantError('Selected beverage is not allowed for this combo.');
     }
     const beverage = configuration.products.find(
-      (candidate) =>
-        candidate.id === beverageProductId && candidate.active && !candidate.soldOut,
+      (candidate) => candidate.id === beverageProductId && candidate.active && !candidate.soldOut,
     );
     if (beverage === undefined) {
       throw new DomainInvariantError('Selected combo beverage is unavailable.');
