@@ -76,7 +76,6 @@ export interface InventoryRepository {
 }
 
 export interface ReconciliationRepository {
-  getByBusinessDay(businessDayId: BusinessDayId): Promise<Reconciliation | null>;
   put(reconciliation: Reconciliation): Promise<void>;
 }
 
