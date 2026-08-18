@@ -28,6 +28,16 @@ export {
   productQuantityInDraft,
   replaceDraftLineCustomization,
 } from './draftOperations';
+export {
+  buildEndDayReconciliationProjection,
+  calculateEndDayFinancialProjection,
+  endDayReconciliationMethods,
+  normalizeEndDayVarianceReason,
+  type EndDayActualPayment,
+  type EndDayFinancialProjection,
+  type EndDayPaymentExpectation,
+  type EndDayReconciliationProjectionLine,
+} from './endDay';
 export { DomainInvariantError } from './errors';
 export {
   calculateExpenseTotals,
