@@ -11,7 +11,10 @@ function assertResult(value: unknown, label: string): asserts value is Record<st
   if (typeof value['ok'] !== 'boolean') throw new TypeError(`${label}.ok must be boolean.`);
   if (!value['ok']) {
     assertObject(value['error'], `${label}.error`);
-    if (typeof value['error']['code'] !== 'string' || typeof value['error']['message'] !== 'string') {
+    if (
+      typeof value['error']['code'] !== 'string' ||
+      typeof value['error']['message'] !== 'string'
+    ) {
       throw new TypeError(`${label}.error is invalid.`);
     }
   }

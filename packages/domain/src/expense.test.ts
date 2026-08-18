@@ -49,11 +49,7 @@ describe('expense domain', () => {
     expect(edited.lifecycle.revision).toBe(1);
     expect(edited.lifecycle.updatedByWorkerId).toBe(OTHER_WORKER_ID);
 
-    const deleted = deleteManualExpense(
-      edited,
-      instant('2026-08-18T12:00:00.000Z'),
-      WORKER_ID,
-    );
+    const deleted = deleteManualExpense(edited, instant('2026-08-18T12:00:00.000Z'), WORKER_ID);
     expect(isExpenseDeleted(deleted)).toBe(true);
     expect(deleted.lifecycle.revision).toBe(2);
   });

@@ -140,12 +140,23 @@ function EditExpenseDialog({
             Cancel
           </button>
         </header>
-        <ExpenseFields prefix={`edit-${expense.id}`} values={values} disabled={busy} onChange={setValues} />
-        {error === null ? null : <p className="form-error" role="alert">{error}</p>}
+        <ExpenseFields
+          prefix={`edit-${expense.id}`}
+          values={values}
+          disabled={busy}
+          onChange={setValues}
+        />
+        {error === null ? null : (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
         <button
           type="submit"
           className="primary-action expense-submit"
-          disabled={busy || values.description.trim().length === 0 || values.amountMinor <= ZERO_MONEY}
+          disabled={
+            busy || values.description.trim().length === 0 || values.amountMinor <= ZERO_MONEY
+          }
         >
           {busy ? 'Saving…' : 'Save Changes'}
         </button>
@@ -169,20 +180,38 @@ function DeleteExpenseDialog({
 }) {
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="expense-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-expense-title">
+      <section
+        className="expense-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-expense-title"
+      >
         <header className="expense-dialog-heading">
           <div>
             <p className="eyebrow">Remove mistaken entry</p>
             <h2 id="delete-expense-title">Delete expense?</h2>
           </div>
-          <button type="button" className="quiet-action" onClick={onClose} disabled={busy}>Keep</button>
+          <button type="button" className="quiet-action" onClick={onClose} disabled={busy}>
+            Keep
+          </button>
         </header>
-        <p><strong>{expense.description}</strong> · {formatMoneyMinor(expense.amountMinor)}</p>
+        <p>
+          <strong>{expense.description}</strong> · {formatMoneyMinor(expense.amountMinor)}
+        </p>
         <p className="expense-dialog-copy">
           It leaves the current ledger and totals while the audited database history is kept.
         </p>
-        {error === null ? null : <p className="form-error" role="alert">{error}</p>}
-        <button type="button" className="expense-danger-action" disabled={busy} onClick={() => void onDelete()}>
+        {error === null ? null : (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          className="expense-danger-action"
+          disabled={busy}
+          onClick={() => void onDelete()}
+        >
           {busy ? 'Deleting…' : 'Delete Expense'}
         </button>
       </section>
@@ -205,14 +234,24 @@ function ManualExpenseRow({
       <div className="expense-row-main">
         <div className="expense-row-title">
           <strong>{expense.description}</strong>
-          <span className="expense-paid-badge">{expense.paidFrom === 'CASH' ? 'Cash' : 'Other'}</span>
+          <span className="expense-paid-badge">
+            {expense.paidFrom === 'CASH' ? 'Cash' : 'Other'}
+          </span>
         </div>
         {expense.note === null ? null : <p>{expense.note}</p>}
       </div>
       <strong className="expense-row-amount">{formatMoneyMinor(expense.amountMinor)}</strong>
       <div className="expense-row-actions">
-        <button type="button" className="expense-text-action" onClick={() => onEdit(expense)}>Edit</button>
-        <button type="button" className="expense-text-action expense-text-danger" onClick={() => onDelete(expense)}>Delete</button>
+        <button type="button" className="expense-text-action" onClick={() => onEdit(expense)}>
+          Edit
+        </button>
+        <button
+          type="button"
+          className="expense-text-action expense-text-danger"
+          onClick={() => onDelete(expense)}
+        >
+          Delete
+        </button>
       </div>
     </article>
   );
@@ -234,7 +273,9 @@ function DeliveryFailedRow({
         <p>{expense.note ?? 'Delivery Failed operational exception'}</p>
       </div>
       <strong className="expense-row-amount expense-nonfinancial">Non-financial</strong>
-      <div className="expense-row-actions"><span>System record</span></div>
+      <div className="expense-row-actions">
+        <span>System record</span>
+      </div>
     </article>
   );
 }
@@ -303,11 +344,18 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
 
       <form className="expense-add-card" onSubmit={(event) => void addExpense(event)}>
         <div className="expense-add-heading">
-          <div><p className="eyebrow">Manual expense</p><h2>Add Expense</h2></div>
+          <div>
+            <p className="eyebrow">Manual expense</p>
+            <h2>Add Expense</h2>
+          </div>
           <p>Cash reduces drawer Expected Cash at End Day; Other does not.</p>
         </div>
         <ExpenseFields prefix="add-expense" values={form} disabled={busy} onChange={setForm} />
-        {error === null ? null : <p className="form-error" role="alert">{error}</p>}
+        {error === null ? null : (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
         <button
           type="submit"
           className="primary-action expense-submit"
@@ -317,15 +365,25 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
         </button>
       </form>
 
-      {message === null ? null : <div className="expense-message" role="status">{message}</div>}
+      {message === null ? null : (
+        <div className="expense-message" role="status">
+          {message}
+        </div>
+      )}
 
       <section className="expense-ledger" aria-labelledby="expense-ledger-title">
         <div className="expense-ledger-heading">
-          <div><p className="eyebrow">Newest first</p><h2 id="expense-ledger-title">Current ledger</h2></div>
+          <div>
+            <p className="eyebrow">Newest first</p>
+            <h2 id="expense-ledger-title">Current ledger</h2>
+          </div>
           <span>{expenses.length} entries</span>
         </div>
         {expenses.length === 0 ? (
-          <div className="expense-empty"><strong>No expenses yet.</strong><span>This Business Day’s ledger is empty.</span></div>
+          <div className="expense-empty">
+            <strong>No expenses yet.</strong>
+            <span>This Business Day’s ledger is empty.</span>
+          </div>
         ) : (
           <div className="expense-list">
             {expenses.map((expense) =>
@@ -333,8 +391,14 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
                 <ManualExpenseRow
                   key={expense.id}
                   expense={expense}
-                  onEdit={(target) => { setDialogError(null); setEditTarget(target); }}
-                  onDelete={(target) => { setDialogError(null); setDeleteTarget(target); }}
+                  onEdit={(target) => {
+                    setDialogError(null);
+                    setEditTarget(target);
+                  }}
+                  onDelete={(target) => {
+                    setDialogError(null);
+                    setDeleteTarget(target);
+                  }}
                 />
               ) : (
                 <DeliveryFailedRow key={expense.id} expense={expense} />
@@ -349,7 +413,9 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
           expense={editTarget}
           busy={busy}
           error={dialogError}
-          onClose={() => { if (!busy) setEditTarget(null); }}
+          onClose={() => {
+            if (!busy) setEditTarget(null);
+          }}
           onSave={async (values) => {
             setBusy(true);
             setDialogError(null);
@@ -361,7 +427,10 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
               note: values.note.trim().length === 0 ? null : values.note,
             });
             setBusy(false);
-            if (!result.ok) { setDialogError(result.error.message); return; }
+            if (!result.ok) {
+              setDialogError(result.error.message);
+              return;
+            }
             setEditTarget(null);
             setMessage('Expense changes saved locally.');
             await refresh();
@@ -374,13 +443,18 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
           expense={deleteTarget}
           busy={busy}
           error={dialogError}
-          onClose={() => { if (!busy) setDeleteTarget(null); }}
+          onClose={() => {
+            if (!busy) setDeleteTarget(null);
+          }}
           onDelete={async () => {
             setBusy(true);
             setDialogError(null);
             const result = await client.deleteExpense(deleteTarget.id);
             setBusy(false);
-            if (!result.ok) { setDialogError(result.error.message); return; }
+            if (!result.ok) {
+              setDialogError(result.error.message);
+              return;
+            }
             setDeleteTarget(null);
             setMessage('Expense removed from the current ledger.');
             await refresh();

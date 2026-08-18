@@ -85,11 +85,15 @@ const api: TuxDesktopApi = Object.freeze({
     loadLedger: async () =>
       assertExpensesLedgerResult((await ipcRenderer.invoke(IPC_EXPENSES_LOAD)) as unknown),
     createExpense: async (input: Parameters<TuxDesktopApi['expenses']['createExpense']>[0]) =>
-      assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_CREATE, input)) as unknown),
+      assertExpenseMutationResult(
+        (await ipcRenderer.invoke(IPC_EXPENSES_CREATE, input)) as unknown,
+      ),
     editExpense: async (input: Parameters<TuxDesktopApi['expenses']['editExpense']>[0]) =>
       assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_EDIT, input)) as unknown),
     deleteExpense: async (expenseId: Parameters<TuxDesktopApi['expenses']['deleteExpense']>[0]) =>
-      assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_DELETE, expenseId)) as unknown),
+      assertExpenseMutationResult(
+        (await ipcRenderer.invoke(IPC_EXPENSES_DELETE, expenseId)) as unknown,
+      ),
   }),
 });
 

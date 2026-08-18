@@ -96,7 +96,8 @@ export function createOperationsOrdersClient(): OperationsOrdersClient {
   const desktop = window.tuxDesktop;
   if (desktop !== undefined) return desktop.orders;
   return {
-    loadWorkspace: async (draftScopeId) => (await browserRuntime()).orders.loadWorkspace(draftScopeId),
+    loadWorkspace: async (draftScopeId) =>
+      (await browserRuntime()).orders.loadWorkspace(draftScopeId),
     saveDraft: async (draft) => (await browserRuntime()).orders.saveDraft(draft),
     findCustomerByPhone: async (shopId, normalizedPhone) =>
       (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),

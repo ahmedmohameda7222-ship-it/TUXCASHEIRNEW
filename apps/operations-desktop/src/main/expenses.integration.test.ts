@@ -38,7 +38,11 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-function sqlRows(databasePath: string, sql: string, ...params: string[]): Record<string, unknown>[] {
+function sqlRows(
+  databasePath: string,
+  sql: string,
+  ...params: string[]
+): Record<string, unknown>[] {
   const raw = new DatabaseSync(databasePath, { readOnly: true });
   try {
     return raw.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -154,28 +158,35 @@ describe('Operations Expenses SQLite integration', () => {
 
     fx.setNow('2026-08-18T14:01:00.000Z');
     expect(
-      (await fx.service.createExpense({
-        description: 'Taxi',
-        amountMinor: moneyMinor(15_000),
-        paidFrom: 'CASH',
-        note: null,
-      })).ok,
+      (
+        await fx.service.createExpense({
+          description: 'Taxi',
+          amountMinor: moneyMinor(15_000),
+          paidFrom: 'CASH',
+          note: null,
+        })
+      ).ok,
     ).toBe(true);
     fx.setNow('2026-08-18T14:02:00.000Z');
     expect(
-      (await fx.service.createExpense({
-        description: 'Packaging',
-        amountMinor: moneyMinor(20_000),
-        paidFrom: 'OTHER',
-        note: 'Owner paid',
-      })).ok,
+      (
+        await fx.service.createExpense({
+          description: 'Packaging',
+          amountMinor: moneyMinor(20_000),
+          paidFrom: 'OTHER',
+          note: 'Owner paid',
+        })
+      ).ok,
     ).toBe(true);
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
     expect(ledger.value.businessDayId).toBe(DAY_ID);
-    expect(ledger.value.expenses.map((expense) => expense.description)).toEqual(['Packaging', 'Taxi']);
+    expect(ledger.value.expenses.map((expense) => expense.description)).toEqual([
+      'Packaging',
+      'Taxi',
+    ]);
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(35_000));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(15_000));
   });
@@ -183,21 +194,25 @@ describe('Operations Expenses SQLite integration', () => {
   it('creates Cash and Other with exact totals plus audit/outbox', async () => {
     const fx = await fixture();
     expect(
-      (await fx.service.createExpense({
-        description: 'Taxi',
-        amountMinor: moneyMinor(15_050),
-        paidFrom: 'CASH',
-        note: 'Late pickup',
-      })).ok,
+      (
+        await fx.service.createExpense({
+          description: 'Taxi',
+          amountMinor: moneyMinor(15_050),
+          paidFrom: 'CASH',
+          note: 'Late pickup',
+        })
+      ).ok,
     ).toBe(true);
     fx.setNow('2026-08-18T14:01:00.000Z');
     expect(
-      (await fx.service.createExpense({
-        description: 'Ice',
-        amountMinor: moneyMinor(9_975),
-        paidFrom: 'OTHER',
-        note: null,
-      })).ok,
+      (
+        await fx.service.createExpense({
+          description: 'Ice',
+          amountMinor: moneyMinor(9_975),
+          paidFrom: 'OTHER',
+          note: null,
+        })
+      ).ok,
     ).toBe(true);
 
     const ledger = await fx.service.loadLedger();
@@ -205,8 +220,12 @@ describe('Operations Expenses SQLite integration', () => {
     if (!ledger.ok) return;
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(25_025));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(15_050));
-    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_CREATED'")).toHaveLength(2);
-    expect(sqlRows(fx.databasePath, "SELECT id FROM outbox_events WHERE event_type = 'EXPENSE_CREATED'")).toHaveLength(2);
+    expect(
+      sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_CREATED'"),
+    ).toHaveLength(2);
+    expect(
+      sqlRows(fx.databasePath, "SELECT id FROM outbox_events WHERE event_type = 'EXPENSE_CREATED'"),
+    ).toHaveLength(2);
   });
 
   it('edits in place while preserving identity/creation and updating exact totals', async () => {
@@ -240,7 +259,9 @@ describe('Operations Expenses SQLite integration', () => {
     if (!ledger.ok) return;
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(22_500));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(0));
-    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_EDITED'")).toHaveLength(1);
+    expect(
+      sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_EDITED'"),
+    ).toHaveLength(1);
   });
 
   it('soft-deletes from the operational ledger while preserving the database fact', async () => {
@@ -266,11 +287,19 @@ describe('Operations Expenses SQLite integration', () => {
     expect(ledger.value.expenses).toHaveLength(0);
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(0));
 
-    const rows = sqlRows(fx.databasePath, 'SELECT payload_json FROM expenses WHERE id = ?', created.value.id);
+    const rows = sqlRows(
+      fx.databasePath,
+      'SELECT payload_json FROM expenses WHERE id = ?',
+      created.value.id,
+    );
     expect(rows).toHaveLength(1);
-    const payload = JSON.parse(String(rows[0]?.['payload_json'])) as { lifecycle?: { deletedAt?: unknown } };
+    const payload = JSON.parse(String(rows[0]?.['payload_json'])) as {
+      lifecycle?: { deletedAt?: unknown };
+    };
     expect(payload.lifecycle?.deletedAt).toBe('2026-08-18T14:20:00.000Z');
-    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_DELETED'")).toHaveLength(1);
+    expect(
+      sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_DELETED'"),
+    ).toHaveLength(1);
   });
 
   it('shows Delivery Failed as locked and non-financial', async () => {
@@ -286,13 +315,15 @@ describe('Operations Expenses SQLite integration', () => {
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(0));
 
     expect(
-      (await fx.service.editExpense({
-        expenseId: system.id,
-        description: 'Try edit',
-        amountMinor: moneyMinor(1),
-        paidFrom: 'CASH',
-        note: null,
-      })).ok,
+      (
+        await fx.service.editExpense({
+          expenseId: system.id,
+          description: 'Try edit',
+          amountMinor: moneyMinor(1),
+          paidFrom: 'CASH',
+          note: null,
+        })
+      ).ok,
     ).toBe(false);
     expect((await fx.service.deleteExpense(system.id)).ok).toBe(false);
   });
@@ -317,8 +348,16 @@ describe('Operations Expenses SQLite integration', () => {
     expect(deleted.ok).toBe(false);
     if (deleted.ok) return;
     expect(deleted.error.code).toBe('CONFLICT_ERROR');
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE aggregate_id = ?', historical.id)).toHaveLength(0);
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM outbox_events WHERE aggregate_id = ?', historical.id)).toHaveLength(0);
+    expect(
+      sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE aggregate_id = ?', historical.id),
+    ).toHaveLength(0);
+    expect(
+      sqlRows(
+        fx.databasePath,
+        'SELECT id FROM outbox_events WHERE aggregate_id = ?',
+        historical.id,
+      ),
+    ).toHaveLength(0);
   });
 
   it('rolls back expense and audit when the outbox insert fails', async () => {
@@ -352,7 +391,11 @@ describe('Operations Expenses SQLite integration', () => {
       note: null,
     });
     expect(result.ok).toBe(false);
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM expenses WHERE id = ?', EXPENSE_UUID)).toHaveLength(0);
-    expect(sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE id = ?', AUDIT_UUID)).toHaveLength(0);
+    expect(
+      sqlRows(fx.databasePath, 'SELECT id FROM expenses WHERE id = ?', EXPENSE_UUID),
+    ).toHaveLength(0);
+    expect(
+      sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE id = ?', AUDIT_UUID),
+    ).toHaveLength(0);
   });
 });

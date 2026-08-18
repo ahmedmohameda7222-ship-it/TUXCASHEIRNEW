@@ -66,7 +66,9 @@ export class SqliteExpenseLedgerStore implements ExpenseLedgerStore {
     try {
       this.#assertContext(mutation);
       const existing = parsePayload<Expense>(
-        this.#database.prepare('SELECT payload_json FROM expenses WHERE id = ?').get(mutation.expense.id),
+        this.#database
+          .prepare('SELECT payload_json FROM expenses WHERE id = ?')
+          .get(mutation.expense.id),
       );
       if (mutation.action === 'CREATE') {
         if (existing !== null || mutation.expectedRevision !== null) {
@@ -86,7 +88,9 @@ export class SqliteExpenseLedgerStore implements ExpenseLedgerStore {
           throw new Error('Expense update conflicted with newer local state.');
         }
         this.#database
-          .prepare('UPDATE expenses SET amount_minor = ?, paid_from = ?, payload_json = ? WHERE id = ?')
+          .prepare(
+            'UPDATE expenses SET amount_minor = ?, paid_from = ?, payload_json = ? WHERE id = ?',
+          )
           .run(
             mutation.expense.amountMinor,
             mutation.expense.paidFrom,
@@ -109,7 +113,8 @@ export class SqliteExpenseLedgerStore implements ExpenseLedgerStore {
   }
 
   #assertInitialized(): void {
-    if (!this.#initialized) throw new Error('SQLite Expense ledger store must be initialized before use.');
+    if (!this.#initialized)
+      throw new Error('SQLite Expense ledger store must be initialized before use.');
   }
 
   #assertContext(mutation: ExpenseLedgerMutation): void {
@@ -129,7 +134,8 @@ export class SqliteExpenseLedgerStore implements ExpenseLedgerStore {
         'SELECT id FROM worker_sessions WHERE business_day_id = ? AND worker_id = ? AND ended_at IS NULL LIMIT 1',
       )
       .get(mutation.expectedBusinessDayId, mutation.expectedWorkerId);
-    if (session === undefined) throw new Error('The Current Operator changed before the expense mutation committed.');
+    if (session === undefined)
+      throw new Error('The Current Operator changed before the expense mutation committed.');
   }
 
   #insertExpense(expense: ExpenseLedgerMutation['expense']): void {

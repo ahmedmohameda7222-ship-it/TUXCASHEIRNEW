@@ -54,7 +54,9 @@ function openExistingDatabase(name: string): Promise<IDBDatabase> {
       () => {
         if (unexpectedUpgrade) {
           request.result.close();
-          reject(new Error('Operations IndexedDB must be initialized before the Expense ledger store.'));
+          reject(
+            new Error('Operations IndexedDB must be initialized before the Expense ledger store.'),
+          );
           return;
         }
         resolve(request.result);

@@ -41,9 +41,11 @@ const INITIAL_LIFECYCLE: ManualExpenseLifecycleSnapshot = {
 
 export function toExpenseLedgerRecord(expense: Expense | ExpenseLedgerRecord): ExpenseLedgerRecord {
   if (expense.kind === 'DELIVERY_FAILED') return expense;
-  const lifecycle = (expense as Extract<Expense, { kind: 'MANUAL' }> & {
-    readonly lifecycle?: ManualExpenseLifecycleSnapshot;
-  }).lifecycle;
+  const lifecycle = (
+    expense as Extract<Expense, { kind: 'MANUAL' }> & {
+      readonly lifecycle?: ManualExpenseLifecycleSnapshot;
+    }
+  ).lifecycle;
   return { ...expense, lifecycle: lifecycle ?? INITIAL_LIFECYCLE };
 }
 
