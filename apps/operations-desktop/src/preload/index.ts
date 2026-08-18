@@ -1,6 +1,7 @@
 import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
+import { assertBulkStockBoardResult, assertBulkStockMutationResult } from './bulkStockResult';
 import { assertExpenseMutationResult, assertExpensesLedgerResult } from './expensesResult';
 import {
   assertCustomerLookupResult,
@@ -30,6 +31,10 @@ const IPC_EXPENSES_LOAD = 'tux:expenses:load';
 const IPC_EXPENSES_CREATE = 'tux:expenses:create';
 const IPC_EXPENSES_EDIT = 'tux:expenses:edit';
 const IPC_EXPENSES_DELETE = 'tux:expenses:delete';
+const IPC_BULK_LOAD = 'tux:bulk-stock:load';
+const IPC_BULK_FINISH_ONE = 'tux:bulk-stock:finish-one';
+const IPC_BULK_ADD = 'tux:bulk-stock:add';
+const IPC_BULK_UNDO = 'tux:bulk-stock:undo';
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -94,6 +99,18 @@ const api: TuxDesktopApi = Object.freeze({
       assertExpenseMutationResult(
         (await ipcRenderer.invoke(IPC_EXPENSES_DELETE, expenseId)) as unknown,
       ),
+  }),
+  bulkStock: Object.freeze({
+    loadBoard: async () =>
+      assertBulkStockBoardResult((await ipcRenderer.invoke(IPC_BULK_LOAD)) as unknown),
+    finishOne: async (input: Parameters<TuxDesktopApi['bulkStock']['finishOne']>[0]) =>
+      assertBulkStockMutationResult(
+        (await ipcRenderer.invoke(IPC_BULK_FINISH_ONE, input)) as unknown,
+      ),
+    addStock: async (input: Parameters<TuxDesktopApi['bulkStock']['addStock']>[0]) =>
+      assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_ADD, input)) as unknown),
+    undoMovement: async (input: Parameters<TuxDesktopApi['bulkStock']['undoMovement']>[0]) =>
+      assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_UNDO, input)) as unknown),
   }),
 });
 
