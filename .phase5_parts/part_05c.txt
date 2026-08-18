@@ -1,0 +1,91 @@
+, setReason] = useState('');
+  return (
+    <div className="modal-backdrop">
+      <section className="board-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-order-title">
+        <header><div><p className="eyebrow">Cancel order</p><h2 id="cancel-order-title">Order #{order.displayOrderNo}</h2></div><button className="board-quiet-button" type="button" onClick={onClose}>Close</button></header>
+        <fieldset>
+          <legend>Was food already prepared?</legend>
+          <div className="board-choice-row">
+            <button className={foodPrepared === false ? 'board-choice active' : 'board-choice'} type="button" onClick={() => setFoodPrepared(false)}>No · Restore Stock</button>
+            <button className={foodPrepared === true ? 'board-choice active' : 'board-choice'} type="button" onClick={() => setFoodPrepared(true)}>Yes · Don’t Restore Stock</button>
+          </div>
+        </fieldset>
+        <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} /></label>
+        <button className="board-danger-button" type="button" disabled={busy || foodPrepared === null || reason.trim().length === 0} onClick={() => { if (foodPrepared !== null) void onConfirm(foodPrepared, reason); }}>Confirm Cancellation</button>
+      </section>
+    </div>
+  );
+}
+
+function ReturnDialog({ order, busy, onClose, onConfirm }: {
+  readonly order: OrderSnapshot;
+  readonly busy: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="modal-backdrop">
+      <section className="board-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="return-order-title">
+        <header><div><p className="eyebrow">Delivery Failed</p><h2 id="return-order-title">Order #{order.displayOrderNo}</h2></div><button className="board-quiet-button" type="button" onClick={onClose}>Close</button></header>
+        <p>This records no collected payment, no recognized revenue, no inventory restoration, and creates the locked Delivery Failed expense event.</p>
+        <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} /></label>
+        <button className="board-danger-button" type="button" disabled={busy || reason.trim().length === 0} onClick={() => void onConfirm(reason)}>Confirm Delivery Failed</button>
+      </section>
+    </div>
+  );
+}
+
+export function OrdersBoardWorkspace({ client, ordersClient }: {
+  readonly client: OperationsOrdersBoardClient;
+  readonly ordersClient: OperationsOrdersClient;
+}) {
+  const [orders, setOrders] = useState<readonly OrderSnapshot[]>([]);
+  const [tab, setTab] = useState<BoardTab>('ACTIVE');
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [selected, setSelected] = useState<OrderSnapshot | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<OrderSnapshot | null>(null);
+  const [returnTarget, setReturnTarget] = useState<OrderSnapshot | null>(null);
+  const [undo, setUndo] = useState<{ orderId: OrderId; expiresAt: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refresh(): Promise<void> {
+    const result = await client.loadBoard();
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setOrders(result.value.orders);
+    setError(null);
+    setSelected((current) => current === null ? null : result.value.orders.find((order) => order.id === current.id) ?? null);
+  }
+
+  useEffect(() => { void refresh(); }, [client]);
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    if (undo === null) return;
+    const timeout = window.setTimeout(() => setUndo(null), Math.max(0, undo.expiresAt - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [undo]);
+
+  const counts = useMemo(() => Object.fromEntries(TABS.map(({ status }) => [status, orders.filter((order) => order.status === status).length])) as Record<BoardTab, number>, [orders]);
+  const searching = deferredQuery.trim().length > 0;
+  const visible = useMemo(() => {
+    const matching = orders.filter((order) => orderNoMatches(order, deferredQuery));
+    if (deferredQuery.trim().length > 0) {
+      return [...matching].sort(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) || right.displayOrderNo - left.displayOrderNo,
+      );
+    }
+    const filtered = matching.filter((order) => order.status === tab);
+    return [...filtered].sort((left, right) =>
+      tab === 'ACTIVE'
+        ? left.createdAt.localeCompare(right.createdAt) || left.displayOrderNo - right.displayOr
