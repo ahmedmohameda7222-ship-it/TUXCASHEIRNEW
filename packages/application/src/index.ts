@@ -1,4 +1,5 @@
 export { ApplicationCommandCoordinator } from './commandCoordinator';
+export { CoordinatedOperationsSessionService } from './coordinatedSession';
 export type { ApplicationError, ApplicationErrorCode } from './errors';
 export {
   createEmptyOrderDraft,
