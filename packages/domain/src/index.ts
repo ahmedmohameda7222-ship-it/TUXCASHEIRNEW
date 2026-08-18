@@ -17,6 +17,21 @@ export {
   replaceDraftLineCustomization,
 } from './draftOperations';
 export { DomainInvariantError } from './errors';
+export {
+  calculateExpenseTotals,
+  createManualExpense,
+  deleteManualExpense,
+  editManualExpense,
+  isExpenseDeleted,
+  normalizeManualExpenseValues,
+  toExpenseLedgerRecord,
+  type DeliveryFailedExpenseRecord,
+  type ExpenseLedgerRecord,
+  type ExpenseTotals,
+  type ManualExpenseLifecycleSnapshot,
+  type ManualExpenseRecord,
+  type ManualExpenseValues,
+} from './expense';
 export { parseEntityId } from './ids';
 export type * from './ids';
 export type { JsonPrimitive, JsonValue } from './json';

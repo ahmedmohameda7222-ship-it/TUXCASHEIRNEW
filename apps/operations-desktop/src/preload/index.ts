@@ -1,6 +1,7 @@
 import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
+import { assertExpenseMutationResult, assertExpensesLedgerResult } from './expensesResult';
 import {
   assertCustomerLookupResult,
   assertOrderPlacementResult,
@@ -25,6 +26,10 @@ const IPC_BOARD_MARK_DONE = 'tux:orders-board:mark-done';
 const IPC_BOARD_UNDO_DONE = 'tux:orders-board:undo-done';
 const IPC_BOARD_CANCEL = 'tux:orders-board:cancel';
 const IPC_BOARD_RETURN = 'tux:orders-board:return';
+const IPC_EXPENSES_LOAD = 'tux:expenses:load';
+const IPC_EXPENSES_CREATE = 'tux:expenses:create';
+const IPC_EXPENSES_EDIT = 'tux:expenses:edit';
+const IPC_EXPENSES_DELETE = 'tux:expenses:delete';
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -75,6 +80,16 @@ const api: TuxDesktopApi = Object.freeze({
       assertOrderTransitionResult((await ipcRenderer.invoke(IPC_BOARD_CANCEL, input)) as unknown),
     returnDelivery: async (input: Parameters<TuxDesktopApi['ordersBoard']['returnDelivery']>[0]) =>
       assertOrderTransitionResult((await ipcRenderer.invoke(IPC_BOARD_RETURN, input)) as unknown),
+  }),
+  expenses: Object.freeze({
+    loadLedger: async () =>
+      assertExpensesLedgerResult((await ipcRenderer.invoke(IPC_EXPENSES_LOAD)) as unknown),
+    createExpense: async (input: Parameters<TuxDesktopApi['expenses']['createExpense']>[0]) =>
+      assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_CREATE, input)) as unknown),
+    editExpense: async (input: Parameters<TuxDesktopApi['expenses']['editExpense']>[0]) =>
+      assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_EDIT, input)) as unknown),
+    deleteExpense: async (expenseId: Parameters<TuxDesktopApi['expenses']['deleteExpense']>[0]) =>
+      assertExpenseMutationResult((await ipcRenderer.invoke(IPC_EXPENSES_DELETE, expenseId)) as unknown),
   }),
 });
 

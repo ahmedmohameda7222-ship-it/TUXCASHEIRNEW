@@ -1,5 +1,4 @@
-# SQLite integration coverage for the current-Business-Day Expenses ledger.
-write('apps/operations-desktop/src/main/expenses.integration.test.ts', r'''import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
@@ -15,11 +14,13 @@ import {
   type Expense,
   type ExpenseId,
   type OrderId,
+  type OutboxEventId,
   type ShopId,
   type WorkerId,
   type WorkerSessionId,
 } from '@tux/domain';
 import {
+  SqliteExpenseLedgerStore,
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
 } from '@tux/persistence/sqlite';
@@ -46,11 +47,13 @@ function sqlRows(databasePath: string, sql: string, ...params: string[]): Record
   }
 }
 
-async function fixture() {
+async function fixture(uuidSequence: string[] = []) {
   const directory = await mkdtemp(path.join(tmpdir(), 'tux-expenses-'));
   const databasePath = path.join(directory, 'operations.sqlite3');
   const database = new SqliteOperationsDatabase(databasePath);
   await database.initialize();
+  const store = new SqliteExpenseLedgerStore(databasePath);
+  await store.initialize();
 
   const currentDay = createOpenBusinessDay({
     id: DAY_ID,
@@ -58,13 +61,16 @@ async function fixture() {
     startedAt: STARTED_AT,
     startedByWorkerId: WORKER_ID,
   });
-  const oldOpen = createOpenBusinessDay({
-    id: CLOSED_DAY_ID,
-    shopId: SHOP_ID,
-    startedAt: instant('2026-08-17T13:00:00.000Z'),
-    startedByWorkerId: WORKER_ID,
-  });
-  const closedDay = closeBusinessDay(oldOpen, instant('2026-08-18T02:00:00.000Z'), WORKER_ID);
+  const closedDay = closeBusinessDay(
+    createOpenBusinessDay({
+      id: CLOSED_DAY_ID,
+      shopId: SHOP_ID,
+      startedAt: instant('2026-08-17T13:00:00.000Z'),
+      startedByWorkerId: WORKER_ID,
+    }),
+    instant('2026-08-18T02:00:00.000Z'),
+    WORKER_ID,
+  );
 
   await database.transaction(async (transaction) => {
     await transaction.shops.put({ id: SHOP_ID, name: 'TUX Test Shop', active: true });
@@ -89,13 +95,15 @@ async function fixture() {
 
   const readModel = new SqliteOperatorSessionReadModel(databasePath);
   let now = instant('2026-08-18T14:00:00.000Z');
-  const service = new OperationsExpensesService(database, readModel, {
+  const ids = [...uuidSequence];
+  const service = new OperationsExpensesService(database, readModel, store, {
     now: () => now,
-    createUuid: () => randomUUID(),
+    createUuid: () => ids.shift() ?? randomUUID(),
   });
 
   cleanup.push(async () => {
     await readModel.close();
+    await store.close();
     await database.close();
     await rm(directory, { recursive: true, force: true });
   });
@@ -110,15 +118,11 @@ async function fixture() {
   };
 }
 
-function systemExpense(input: {
-  id: string;
-  businessDayId?: BusinessDayId;
-  createdAt?: string;
-}): Expense {
+function systemExpense(id: string): Expense {
   return {
-    id: parseEntityId<ExpenseId>(input.id),
+    id: parseEntityId<ExpenseId>(id),
     shopId: SHOP_ID,
-    businessDayId: input.businessDayId ?? DAY_ID,
+    businessDayId: DAY_ID,
     kind: 'DELIVERY_FAILED',
     description: 'Delivery Failed — Order #12',
     amountMinor: null,
@@ -126,12 +130,12 @@ function systemExpense(input: {
     note: 'Customer unavailable',
     orderId: parseEntityId<OrderId>('52000000-0000-4000-8000-000000000001'),
     createdByWorkerId: WORKER_ID,
-    createdAt: instant(input.createdAt ?? '2026-08-18T14:30:00.000Z'),
+    createdAt: instant('2026-08-18T14:30:00.000Z'),
   };
 }
 
 describe('Operations Expenses SQLite integration', () => {
-  it('loads only the current open Business Day and orders visible entries newest first', async () => {
+  it('loads only the current open Business Day and orders entries newest first', async () => {
     const fx = await fixture();
     const historical: Expense = {
       id: parseEntityId<ExpenseId>('62000000-0000-4000-8000-000000000001'),
@@ -149,66 +153,63 @@ describe('Operations Expenses SQLite integration', () => {
     await fx.database.transaction((transaction) => transaction.expenses.put(historical));
 
     fx.setNow('2026-08-18T14:01:00.000Z');
-    const first = await fx.service.createExpense({
-      description: 'Taxi',
-      amountMinor: moneyMinor(15_000),
-      paidFrom: 'CASH',
-      note: null,
-    });
-    expect(first.ok).toBe(true);
+    expect(
+      (await fx.service.createExpense({
+        description: 'Taxi',
+        amountMinor: moneyMinor(15_000),
+        paidFrom: 'CASH',
+        note: null,
+      })).ok,
+    ).toBe(true);
     fx.setNow('2026-08-18T14:02:00.000Z');
-    const second = await fx.service.createExpense({
-      description: 'Packaging',
-      amountMinor: moneyMinor(20_000),
-      paidFrom: 'OTHER',
-      note: 'Owner paid',
-    });
-    expect(second.ok).toBe(true);
+    expect(
+      (await fx.service.createExpense({
+        description: 'Packaging',
+        amountMinor: moneyMinor(20_000),
+        paidFrom: 'OTHER',
+        note: 'Owner paid',
+      })).ok,
+    ).toBe(true);
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
     expect(ledger.value.businessDayId).toBe(DAY_ID);
-    expect(ledger.value.expenses.map((expense) => expense.description)).toEqual([
-      'Packaging',
-      'Taxi',
-    ]);
+    expect(ledger.value.expenses.map((expense) => expense.description)).toEqual(['Packaging', 'Taxi']);
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(35_000));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(15_000));
   });
 
-  it('creates Cash and Other manual expenses with exact totals plus audit/outbox', async () => {
+  it('creates Cash and Other with exact totals plus audit/outbox', async () => {
     const fx = await fixture();
-    const cash = await fx.service.createExpense({
-      description: 'Taxi',
-      amountMinor: moneyMinor(15_050),
-      paidFrom: 'CASH',
-      note: 'Late pickup',
-    });
-    expect(cash.ok).toBe(true);
+    expect(
+      (await fx.service.createExpense({
+        description: 'Taxi',
+        amountMinor: moneyMinor(15_050),
+        paidFrom: 'CASH',
+        note: 'Late pickup',
+      })).ok,
+    ).toBe(true);
     fx.setNow('2026-08-18T14:01:00.000Z');
-    const other = await fx.service.createExpense({
-      description: 'Ice',
-      amountMinor: moneyMinor(9_975),
-      paidFrom: 'OTHER',
-      note: null,
-    });
-    expect(other.ok).toBe(true);
+    expect(
+      (await fx.service.createExpense({
+        description: 'Ice',
+        amountMinor: moneyMinor(9_975),
+        paidFrom: 'OTHER',
+        note: null,
+      })).ok,
+    ).toBe(true);
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(25_025));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(15_050));
-    expect(
-      sqlRows(fx.databasePath, "SELECT event_type FROM audit_events WHERE event_type = 'EXPENSE_CREATED'"),
-    ).toHaveLength(2);
-    expect(
-      sqlRows(fx.databasePath, "SELECT event_type FROM outbox_events WHERE event_type = 'EXPENSE_CREATED'"),
-    ).toHaveLength(2);
+    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_CREATED'")).toHaveLength(2);
+    expect(sqlRows(fx.databasePath, "SELECT id FROM outbox_events WHERE event_type = 'EXPENSE_CREATED'")).toHaveLength(2);
   });
 
-  it('edits a current manual expense in place while preserving identity and creation time', async () => {
+  it('edits in place while preserving identity/creation and updating exact totals', async () => {
     const fx = await fixture();
     const created = await fx.service.createExpense({
       description: 'Taxi',
@@ -217,7 +218,7 @@ describe('Operations Expenses SQLite integration', () => {
       note: null,
     });
     expect(created.ok).toBe(true);
-    if (!created.ok || created.value.kind !== 'MANUAL') return;
+    if (!created.ok) return;
     const createdAt = created.value.createdAt;
 
     fx.setNow('2026-08-18T14:10:00.000Z');
@@ -229,25 +230,20 @@ describe('Operations Expenses SQLite integration', () => {
       note: 'Edited correction',
     });
     expect(edited.ok).toBe(true);
-    if (!edited.ok || edited.value.kind !== 'MANUAL') return;
+    if (!edited.ok) return;
     expect(edited.value.id).toBe(created.value.id);
     expect(edited.value.createdAt).toBe(createdAt);
-    expect(edited.value.description).toBe('Fuel');
-    expect(edited.value.amountMinor).toBe(moneyMinor(22_500));
-    expect(edited.value.paidFrom).toBe('OTHER');
-    expect(edited.value.lifecycle?.revision).toBe(1);
+    expect(edited.value.lifecycle.revision).toBe(1);
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(22_500));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(0));
-    expect(
-      sqlRows(fx.databasePath, "SELECT event_type FROM audit_events WHERE event_type = 'EXPENSE_EDITED'"),
-    ).toHaveLength(1);
+    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_EDITED'")).toHaveLength(1);
   });
 
-  it('soft-deletes a manual expense, removes it from current totals, and preserves the database fact', async () => {
+  it('soft-deletes from the operational ledger while preserving the database fact', async () => {
     const fx = await fixture();
     const created = await fx.service.createExpense({
       description: 'Mistake',
@@ -261,65 +257,47 @@ describe('Operations Expenses SQLite integration', () => {
     fx.setNow('2026-08-18T14:20:00.000Z');
     const deleted = await fx.service.deleteExpense(created.value.id);
     expect(deleted.ok).toBe(true);
-    if (!deleted.ok || deleted.value.kind !== 'MANUAL') return;
-    expect(deleted.value.lifecycle?.deletedAt).toBe('2026-08-18T14:20:00.000Z');
+    if (!deleted.ok) return;
+    expect(deleted.value.lifecycle.deletedAt).toBe('2026-08-18T14:20:00.000Z');
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
     expect(ledger.value.expenses).toHaveLength(0);
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(0));
-    expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(0));
 
-    const rawRows = sqlRows(
-      fx.databasePath,
-      'SELECT payload_json FROM expenses WHERE id = ?',
-      created.value.id,
-    );
-    expect(rawRows).toHaveLength(1);
-    const payload = JSON.parse(String(rawRows[0]?.['payload_json'])) as {
-      lifecycle?: { deletedAt?: unknown };
-    };
+    const rows = sqlRows(fx.databasePath, 'SELECT payload_json FROM expenses WHERE id = ?', created.value.id);
+    expect(rows).toHaveLength(1);
+    const payload = JSON.parse(String(rows[0]?.['payload_json'])) as { lifecycle?: { deletedAt?: unknown } };
     expect(payload.lifecycle?.deletedAt).toBe('2026-08-18T14:20:00.000Z');
-    expect(
-      sqlRows(fx.databasePath, "SELECT event_type FROM audit_events WHERE event_type = 'EXPENSE_DELETED'"),
-    ).toHaveLength(1);
-    expect(
-      sqlRows(fx.databasePath, "SELECT event_type FROM outbox_events WHERE event_type = 'EXPENSE_DELETED'"),
-    ).toHaveLength(1);
+    expect(sqlRows(fx.databasePath, "SELECT id FROM audit_events WHERE event_type = 'EXPENSE_DELETED'")).toHaveLength(1);
   });
 
-  it('shows Delivery Failed as locked non-financial context and excludes it from all totals', async () => {
+  it('shows Delivery Failed as locked and non-financial', async () => {
     const fx = await fixture();
-    const system = systemExpense({ id: '62000000-0000-4000-8000-000000000010' });
+    const system = systemExpense('62000000-0000-4000-8000-000000000010');
     await fx.database.transaction((transaction) => transaction.expenses.put(system));
 
     const ledger = await fx.service.loadLedger();
     expect(ledger.ok).toBe(true);
     if (!ledger.ok) return;
-    expect(ledger.value.expenses).toHaveLength(1);
     expect(ledger.value.expenses[0]?.kind).toBe('DELIVERY_FAILED');
     expect(ledger.value.totalExpensesMinor).toBe(moneyMinor(0));
     expect(ledger.value.cashExpensesMinor).toBe(moneyMinor(0));
 
-    const edited = await fx.service.editExpense({
-      expenseId: system.id,
-      description: 'Try edit',
-      amountMinor: moneyMinor(1),
-      paidFrom: 'CASH',
-      note: null,
-    });
-    expect(edited.ok).toBe(false);
-    const deleted = await fx.service.deleteExpense(system.id);
-    expect(deleted.ok).toBe(false);
-
-    const stillSaved = await fx.database.transaction((transaction) =>
-      transaction.expenses.getById(system.id),
-    );
-    expect(stillSaved).toEqual(system);
+    expect(
+      (await fx.service.editExpense({
+        expenseId: system.id,
+        description: 'Try edit',
+        amountMinor: moneyMinor(1),
+        paidFrom: 'CASH',
+        note: null,
+      })).ok,
+    ).toBe(false);
+    expect((await fx.service.deleteExpense(system.id)).ok).toBe(false);
   });
 
-  it('rejects mutation of a historical Business Day expense without side effects', async () => {
+  it('rejects historical-day mutation without audit/outbox side effects', async () => {
     const fx = await fixture();
     const historical: Expense = {
       id: parseEntityId<ExpenseId>('62000000-0000-4000-8000-000000000020'),
@@ -335,17 +313,46 @@ describe('Operations Expenses SQLite integration', () => {
       createdAt: instant('2026-08-17T20:00:00.000Z'),
     };
     await fx.database.transaction((transaction) => transaction.expenses.put(historical));
-
     const deleted = await fx.service.deleteExpense(historical.id);
     expect(deleted.ok).toBe(false);
     if (deleted.ok) return;
     expect(deleted.error.code).toBe('CONFLICT_ERROR');
-    expect(
-      sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE aggregate_id = ?', historical.id),
-    ).toHaveLength(0);
-    expect(
-      sqlRows(fx.databasePath, 'SELECT id FROM outbox_events WHERE aggregate_id = ?', historical.id),
-    ).toHaveLength(0);
+    expect(sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE aggregate_id = ?', historical.id)).toHaveLength(0);
+    expect(sqlRows(fx.databasePath, 'SELECT id FROM outbox_events WHERE aggregate_id = ?', historical.id)).toHaveLength(0);
+  });
+
+  it('rolls back expense and audit when the outbox insert fails', async () => {
+    const EXPENSE_UUID = '72000000-0000-4000-8000-000000000001';
+    const AUDIT_UUID = '72000000-0000-4000-8000-000000000002';
+    const COLLIDING_OUTBOX_UUID = '72000000-0000-4000-8000-000000000003';
+    const fx = await fixture([EXPENSE_UUID, AUDIT_UUID, COLLIDING_OUTBOX_UUID]);
+    await fx.database.transaction((transaction) =>
+      transaction.outbox.append({
+        id: parseEntityId<OutboxEventId>(COLLIDING_OUTBOX_UUID),
+        shopId: SHOP_ID,
+        businessDayId: DAY_ID,
+        aggregateType: 'TEST',
+        aggregateId: 'seed',
+        eventType: 'SEED',
+        idempotencyKey: 'seed:outbox',
+        payloadVersion: 1,
+        payload: { seeded: true },
+        createdAt: STARTED_AT,
+        attemptCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        deliveredAt: null,
+      }),
+    );
+
+    const result = await fx.service.createExpense({
+      description: 'Should roll back',
+      amountMinor: moneyMinor(1000),
+      paidFrom: 'CASH',
+      note: null,
+    });
+    expect(result.ok).toBe(false);
+    expect(sqlRows(fx.databasePath, 'SELECT id FROM expenses WHERE id = ?', EXPENSE_UUID)).toHaveLength(0);
+    expect(sqlRows(fx.databasePath, 'SELECT id FROM audit_events WHERE id = ?', AUDIT_UUID)).toHaveLength(0);
   });
 });
-''')

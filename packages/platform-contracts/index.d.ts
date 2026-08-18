@@ -1,4 +1,5 @@
 import type {
+  OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsSessionResult,
@@ -14,6 +15,11 @@ export type TuxOrdersBoardApi = Pick<
   'loadBoard' | 'markDone' | 'undoDone' | 'cancelOrder' | 'returnDelivery'
 >;
 
+export type TuxExpensesApi = Pick<
+  OperationsExpensesService,
+  'loadLedger' | 'createExpense' | 'editExpense' | 'deleteExpense'
+>;
+
 export interface TuxDesktopApi {
   readonly app: {
     readonly getVersion: () => Promise<string>;
@@ -25,4 +31,5 @@ export interface TuxDesktopApi {
   };
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
+  readonly expenses: TuxExpensesApi;
 }

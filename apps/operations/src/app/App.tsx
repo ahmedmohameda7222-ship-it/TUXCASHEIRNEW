@@ -1,11 +1,14 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
 import {
+  createOperationsExpensesClient,
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
+  type OperationsExpensesClient,
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
 } from './sessionClient';
@@ -19,7 +22,7 @@ type ScreenState =
     };
 
 type ThemePreference = 'system' | 'light' | 'dark';
-type OperationsArea = 'ORDERS' | 'ORDERS_BOARD';
+type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 
 function initialTheme(): ThemePreference {
@@ -148,6 +151,7 @@ function ActiveShell({
   session,
   ordersClient,
   ordersBoardClient,
+  expensesClient,
   busy,
   error,
   onSwitch,
@@ -156,6 +160,7 @@ function ActiveShell({
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
   readonly ordersClient: OperationsOrdersClient;
   readonly ordersBoardClient: OperationsOrdersBoardClient;
+  readonly expensesClient: OperationsExpensesClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
@@ -204,7 +209,11 @@ function ActiveShell({
           >
             Orders Board
           </button>
-          <button type="button" className="nav-item" disabled>
+          <button
+            type="button"
+            className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('EXPENSES')}
+          >
             Expenses
           </button>
           <button type="button" className="nav-item" disabled>
@@ -263,8 +272,10 @@ function ActiveShell({
 
       {area === 'ORDERS' ? (
         <OrdersWorkspace session={session} client={ordersClient} />
-      ) : (
+      ) : area === 'ORDERS_BOARD' ? (
         <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
+      ) : (
+        <ExpensesWorkspace client={expensesClient} />
       )}
 
       {error === null ? null : (
@@ -310,6 +321,7 @@ export function App() {
   const client = useMemo(() => createOperationsSessionClient(), []);
   const ordersClient = useMemo(() => createOperationsOrdersClient(), []);
   const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
+  const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -392,6 +404,7 @@ export function App() {
       session={screen.session}
       ordersClient={ordersClient}
       ordersBoardClient={ordersBoardClient}
+      expensesClient={expensesClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}

@@ -13,6 +13,7 @@ import {
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { ExpensesIpcRuntime } from './expensesIpc';
 import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
@@ -42,6 +43,7 @@ let orderDraftStore: SqliteOrderDraftStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
 let ordersService: OperationsOrdersService | null = null;
 let ordersBoardService: OperationsOrdersBoardService | null = null;
+let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -87,6 +89,13 @@ async function initializeOperationsServices(): Promise<void> {
     runtime,
     coordinator,
   );
+  expensesIpcRuntime = await ExpensesIpcRuntime.create({
+    databasePath,
+    database: operationsDatabase,
+    readModel: operatorReadModel,
+    runtime,
+    coordinator,
+  });
 }
 
 function currentSessionService(): CoordinatedOperationsSessionService {
@@ -227,6 +236,11 @@ function registerIpcHandlers(window: BrowserWindow): void {
       reason: input['reason'],
     });
   });
+
+  if (expensesIpcRuntime === null) {
+    throw new Error('Operations Expenses IPC runtime has not been initialized.');
+  }
+  expensesIpcRuntime.register(window);
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -267,9 +281,11 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  void expensesIpcRuntime?.close();
   void operatorReadModel?.close();
   void orderDraftStore?.close();
   void operationsDatabase?.close();
+  expensesIpcRuntime = null;
   operatorReadModel = null;
   orderDraftStore = null;
   operationsDatabase = null;

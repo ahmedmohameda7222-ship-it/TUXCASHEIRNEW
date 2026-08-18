@@ -4,6 +4,7 @@ import '@tux/ui/tokens.css';
 import './styles/global.css';
 import './styles/orders.css';
 import './styles/orders-board.css';
+import './styles/expenses.css';
 import { App } from './app/App';
 
 const rootElement = document.getElementById('root');
