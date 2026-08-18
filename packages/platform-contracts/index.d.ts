@@ -1,4 +1,5 @@
 import type {
+  OperationsBulkStockService,
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -20,6 +21,11 @@ export type TuxExpensesApi = Pick<
   'loadLedger' | 'createExpense' | 'editExpense' | 'deleteExpense'
 >;
 
+export type TuxBulkStockApi = Pick<
+  OperationsBulkStockService,
+  'loadBoard' | 'finishOne' | 'addStock' | 'undoMovement'
+>;
+
 export interface TuxDesktopApi {
   readonly app: {
     readonly getVersion: () => Promise<string>;
@@ -32,4 +38,5 @@ export interface TuxDesktopApi {
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
   readonly expenses: TuxExpensesApi;
+  readonly bulkStock: TuxBulkStockApi;
 }
