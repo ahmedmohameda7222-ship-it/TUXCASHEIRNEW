@@ -54,20 +54,93 @@ The renderer explicitly uses a 1,250 ms greeting transition, within the approved
 
 Browser fallback is typechecked against the same application/persistence contracts and uses WebCrypto PBKDF2 plus IndexedDB. Phase 3 does not claim cross-tab IndexedDB enforcement equivalent to the SQLite open-worker-session unique index.
 
+## Phase 4 Orders coverage
+
+Phase 4 adds focused domain, persistence, application and receipt tests for the highest-risk checkout invariants.
+
+### Exact money, payment and tender
+
+Automated tests protect:
+
+- exact decimal-string to `MoneyMinor` parsing without `parseFloat` or binary floating-point accounting;
+- malformed/over-precision/unsafe money input rejection;
+- discount and Delivery-fee pricing semantics;
+- stable payment `logicType` behavior independent from display label;
+- Cash Received minimum and exact Change;
+- two-way split with Method B as exact remainder and duplicate-method rejection;
+- smart Cash tender suggestions from common Egyptian denominations.
+
+### Phone and Delivery identity
+
+Automated tests protect Egyptian phone normalization across supported input forms and reject invalid identities.
+
+SQLite Orders integration verifies that a successful Delivery checkout:
+
+- persists normalized phone identity;
+- snapshots configured and final Delivery fees separately;
+- learns/updates the customer contact only after the local Order transaction succeeds.
+
+### Draft operations
+
+Domain tests protect:
+
+- identical non-combo additions merging without losing total quantity;
+- deterministic decrement of the most-recent product configuration;
+- Sold Out products rejecting new draft units;
+- exactly one allowed available beverage per combo unit;
+- configured modifier eligibility/max quantity;
+- Delivery-zone selection snapshotting configured and initial final fee.
+
+The renderer consumes these domain operations rather than reimplementing them in JSX.
+
+### Local checkout transaction
+
+SQLite integration tests protect:
+
+- validation failure creates no Order, inventory movement, audit, outbox, or display-number mutation and preserves the durable draft;
+- successful Cash checkout writes exact payment snapshot, exact recipe inventory consumption, audit, outbox and Business-Day display allocation exactly once;
+- injected inventory persistence failure rolls the complete checkout transaction back and preserves the durable checkout intent;
+- checkout succeeds without a positive preloaded inventory balance, proving calculated shortage alone does not block sellability;
+- successful checkout rotates the draft, resets payment, and restores the first active order type.
+
+### Idempotency and restart-style recovery
+
+SQLite integration verifies that replaying a stale already-committed checkout intent:
+
+- returns the same immutable Order;
+- does not create a duplicate Order;
+- does not repeat inventory or outbox effects;
+- does not advance the Business-Day display counter again;
+- does not delete/replace a newer draft that already advanced.
+
+### Receipt and printing semantics
+
+Receipt tests protect:
+
+- exact minor-unit rendering;
+- immutable operator/order/payment snapshot projection;
+- HTML escaping of order-controlled text.
+
+SQLite/application integration with an injected recording printer protects:
+
+- a fresh durable checkout invokes printing once only after commit;
+- idempotent replay never automatically prints a second possible receipt and reports unknown print status;
+- print failure leaves the Order/inventory/outbox durable;
+- failed and later successful `reprintOrder()` calls read the same immutable Order;
+- reprint does not create new Order, inventory, audit, outbox, or numbering effects.
+
+Electron/browser printer adapters, preload IPC validation and the React renderer are covered by strict typechecking and production builds. Manual or dedicated browser/Electron interaction E2E is still required before renderer-only compliance rows are promoted from `IMPLEMENTED_NOT_VALIDATED` to `PASS`.
+
 ## Migration validation
 
 SQLite migrations are executed by automated persistence/session tests.
 
 The remote Postgres/Supabase migration chain is reviewed and versioned in Git but remains unapplied because no authorized V2 Supabase project/local stack is connected. The first real target setup must validate the complete chain before remote application connectivity is enabled.
 
-## Later high-risk coverage
+## Remaining high-risk coverage
 
-As the corresponding phases land, tests must prioritize:
+As the corresponding later phases land, tests must prioritize:
 
-- checkout transaction rollback;
-- order idempotency/double-click/restart;
-- payment/split/tender calculations;
-- Egyptian phone normalization/customer update timing;
 - cancellation stock compensation;
 - Returned Delivery zero-revenue/non-financial Expense semantics;
 - Expenses Cash vs Other reconciliation effect;
@@ -75,6 +148,6 @@ As the corresponding phases land, tests must prioritize:
 - blind reconciliation;
 - offline End Day close;
 - restart/outbox retry;
-- printing failure after successful save.
+- renderer interaction/responsive/accessibility E2E across Orders and later screens.
 
-Phase 10 owns the complete approved end-to-end scenario and responsive/accessibility audit.
+Phase 10 owns the complete approved end-to-end scenario and final responsive/accessibility audit.
