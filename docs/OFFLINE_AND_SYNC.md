@@ -19,7 +19,7 @@ Local durable failure is different from remote sync failure and must remain a bl
 
 Desktop Operations uses SQLite behind the native application boundary.
 
-Current Phase 2 storage characteristics:
+Current storage characteristics:
 
 - Node/Electron main-process ownership;
 - one local SQLite connection;
@@ -46,15 +46,52 @@ Browser storage cannot be represented as having the same operating-system durabi
 
 ### IndexedDB transaction discipline
 
-Work executed inside an IndexedDB transaction must remain within the transaction's repository requests. Application code must not await unrelated network calls, timers, dialogs, or other external async work inside that callback because the browser may make the transaction inactive/commit it between requests.
+Work executed inside an IndexedDB transaction must remain within the transaction's repository requests. Application code must not await unrelated network calls, timers, dialogs, printing, or other external async work inside that callback because the browser may make the transaction inactive/commit it between requests.
 
-Remote synchronization always occurs after the local transaction, never inside it.
+Remote synchronization and receipt printing always occur after the local business transaction, never inside it.
+
+## Durable Orders drafts
+
+Order editing is locally durable before checkout.
+
+A draft is identified by shop, Business Day, and an opaque runtime-local draft scope. Each saved draft has a revision and a stable checkout-intent key. Desktop persists drafts in SQLite and browser fallback persists them in IndexedDB.
+
+Draft saves use stale-revision protection. Two live contexts must not silently overwrite each other. A restart can therefore recover the latest durable draft without creating order, payment, inventory, customer, audit, or outbox effects before checkout.
+
+Successful checkout rotates the draft to a new checkout-intent key and clears business content according to the approved reset rules. An older committed intent cannot delete or replace a newer draft that already advanced.
 
 ## Atomic local configuration
 
 Operations configuration is stored locally as one versioned snapshot per shop.
 
 This prevents startup from rendering a half-old/half-new menu while background synchronization is replacing configuration. A future sync operation can validate a complete configuration version and replace it atomically.
+
+## Durable checkout and idempotency
+
+A valid checkout is serialized through the application coordinator and performs all business effects inside one local transaction:
+
+```text
+allocate Business-Day display number
+write immutable order snapshot
+write payment snapshots
+append inventory movements
+learn successful Delivery contact
+append audit event
+append outbox event
+commit
+```
+
+If any local write fails, the transaction rolls back. The order number allocation, order, inventory movement, audit event, outbox event, and successful-customer learning do not partially survive. The durable draft remains available for retry.
+
+The draft checkout-intent key becomes the order idempotency key. Retrying an already committed intent returns the saved order rather than creating a second order or repeating inventory/outbox effects. If the current draft scope has already advanced, recovery preserves that newer draft.
+
+## Printing after local commit
+
+Receipt printing is explicitly post-commit.
+
+Fresh checkout attempts printing only after the durable local order transaction succeeds. Print failure therefore cannot roll back or corrupt a valid placed order. The renderer reports that the order is saved locally and offers Retry Print using the immutable saved `OrderId`.
+
+An idempotent/recovered checkout does not automatically print again because prior print completion cannot be proven safely after a retry or crash. It reports unknown print status and offers intentional Reprint instead. Reprint reads the immutable saved order and has no order, inventory, audit, numbering, or outbox mutation side effects.
 
 ## Durable outbox
 
@@ -79,7 +116,9 @@ lastError
 deliveredAt
 ```
 
-A critical application command should write both its business mutation and outgoing sync intent in one local transaction. If the transaction rolls back, neither survives. If it commits and the app closes immediately afterward, the outbox entry remains available after restart.
+A critical application command writes both its business mutation and outgoing sync intent in one local transaction. If the transaction rolls back, neither survives. If it commits and the app closes immediately afterward, the outbox entry remains available after restart.
+
+Phase 4 checkout already writes `ORDER_PLACED` outbox work inside the same transaction as the order/inventory/audit mutation. No remote network call is needed for checkout success.
 
 ## Retry semantics
 
@@ -101,21 +140,22 @@ The remote adapter therefore remains disabled/unconfigured while all local Opera
 
 ## Failure categories
 
-Later application commands must distinguish at minimum:
+Current application behavior distinguishes at minimum:
 
 ```text
 validation failed
 local durable save failed
 saved locally but print failed
-saved locally and cloud sync pending
+saved locally with print status unknown after idempotent recovery
+remote sync pending
 remote conflict
 idempotent replay
 ```
 
-A remote failure must never be reported as if the local business transaction failed after it already committed.
+A remote or print failure must never be reported as if the local business transaction failed after it already committed.
 
 ## Restart recovery
 
-Phase 2 automated SQLite tests verify transaction rollback and that pending outbox/configuration data survive closing and reopening the database file.
+Automated SQLite tests verify transaction rollback and that pending outbox/configuration data survive closing and reopening the database file.
 
-Later phases add workflow-level restart tests for drafts, orders, Business Day close, and sync retry.
+Phase 4 adds durable draft restart/idempotency design plus integration tests proving that a stale committed checkout intent cannot duplicate order/inventory/outbox effects or delete a newer draft. Later phases add workflow-level restart tests for Business Day close and sync retry.

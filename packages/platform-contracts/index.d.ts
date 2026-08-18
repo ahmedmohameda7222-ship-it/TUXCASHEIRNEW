@@ -1,4 +1,9 @@
-import type { OperationsSessionResult } from '@tux/application';
+import type { OperationsOrdersService, OperationsSessionResult } from '@tux/application';
+
+export type TuxOrdersApi = Pick<
+  OperationsOrdersService,
+  'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
+>;
 
 export interface TuxDesktopApi {
   readonly app: {
@@ -9,4 +14,5 @@ export interface TuxDesktopApi {
     readonly submitPin: (pin: string) => Promise<OperationsSessionResult>;
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
+  readonly orders: TuxOrdersApi;
 }

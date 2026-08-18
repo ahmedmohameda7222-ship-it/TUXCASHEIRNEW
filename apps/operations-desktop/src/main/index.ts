@@ -1,9 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { OperationsSessionService } from '@tux/application';
-import { instant } from '@tux/domain';
-import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
+import {
+  ApplicationCommandCoordinator,
+  CoordinatedOperationsSessionService,
+  OperationsOrdersService,
+} from '@tux/application';
+import { instant, parseEntityId, type OrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import {
+  SqliteOperationsDatabase,
+  SqliteOperatorSessionReadModel,
+  SqliteOrderDraftStore,
+} from '@tux/persistence/sqlite';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
   assertTrustedIpcSender,
@@ -15,32 +24,70 @@ const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
 const IPC_SESSION_SUBMIT_PIN = 'tux:session:submit-pin';
 const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
+const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
+const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
+const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
+const IPC_ORDERS_PLACE = 'tux:orders:place';
+const IPC_ORDERS_REPRINT = 'tux:orders:reprint';
 
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
-let sessionService: OperationsSessionService | null = null;
+let orderDraftStore: SqliteOrderDraftStore | null = null;
+let sessionService: CoordinatedOperationsSessionService | null = null;
+let ordersService: OperationsOrdersService | null = null;
+
+function assertObjectPayload(
+  value: unknown,
+  label: string,
+): asserts value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`${label} IPC payload must be an object.`);
+  }
+}
 
 async function initializeOperationsServices(): Promise<void> {
   const databasePath = path.join(app.getPath('userData'), 'tux-operations-v2.sqlite3');
   operationsDatabase = new SqliteOperationsDatabase(databasePath);
   await operationsDatabase.initialize();
+
+  orderDraftStore = new SqliteOrderDraftStore(databasePath);
+  await orderDraftStore.initialize();
   operatorReadModel = new SqliteOperatorSessionReadModel(databasePath);
-  sessionService = new OperationsSessionService(
+
+  const runtime = {
+    now: () => instant(new Date()),
+    createUuid: () => randomUUID(),
+  };
+  const coordinator = new ApplicationCommandCoordinator();
+  sessionService = new CoordinatedOperationsSessionService(
     operationsDatabase,
     operatorReadModel,
     new NodePbkdf2PinVerifier(),
-    {
-      now: () => instant(new Date()),
-      createUuid: () => randomUUID(),
-    },
+    runtime,
+    coordinator,
+  );
+  ordersService = new OperationsOrdersService(
+    operationsDatabase,
+    operatorReadModel,
+    orderDraftStore,
+    runtime,
+    coordinator,
+    new ElectronOrderPrinter(),
   );
 }
 
-function currentSessionService(): OperationsSessionService {
+function currentSessionService(): CoordinatedOperationsSessionService {
   if (sessionService === null) {
     throw new Error('Operations session service has not been initialized.');
   }
   return sessionService;
+}
+
+function currentOrdersService(): OperationsOrdersService {
+  if (ordersService === null) {
+    throw new Error('Operations Orders service has not been initialized.');
+  }
+  return ordersService;
 }
 
 function registerIpcHandlers(window: BrowserWindow): void {
@@ -49,6 +96,11 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_SESSION_GET_STATE,
     IPC_SESSION_SUBMIT_PIN,
     IPC_SESSION_SIGN_OUT,
+    IPC_ORDERS_LOAD_WORKSPACE,
+    IPC_ORDERS_SAVE_DRAFT,
+    IPC_ORDERS_FIND_CUSTOMER,
+    IPC_ORDERS_PLACE,
+    IPC_ORDERS_REPRINT,
   ]) {
     ipcMain.removeHandler(channel);
   }
@@ -71,6 +123,43 @@ function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_SESSION_SIGN_OUT, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
     return currentSessionService().signOut();
+  });
+  ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    if (typeof draftScopeId !== 'string') {
+      throw new TypeError('Orders draft-scope IPC payload must be a string.');
+    }
+    return currentOrdersService().loadWorkspace(draftScopeId);
+  });
+  ipcMain.handle(IPC_ORDERS_SAVE_DRAFT, async (event, draft: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(draft, 'Order draft');
+    return currentOrdersService().saveDraft(draft as unknown as OrderDraft);
+  });
+  ipcMain.handle(
+    IPC_ORDERS_FIND_CUSTOMER,
+    async (event, shopId: unknown, normalizedPhone: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      if (typeof shopId !== 'string' || typeof normalizedPhone !== 'string') {
+        throw new TypeError('Customer lookup IPC payload is invalid.');
+      }
+      return currentOrdersService().findCustomerByPhone(
+        parseEntityId<ShopId>(shopId),
+        normalizedPhone,
+      );
+    },
+  );
+  ipcMain.handle(IPC_ORDERS_PLACE, async (event, draft: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(draft, 'Order draft');
+    return currentOrdersService().placeOrder(draft as unknown as OrderDraft);
+  });
+  ipcMain.handle(IPC_ORDERS_REPRINT, async (event, orderId: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    if (typeof orderId !== 'string') {
+      throw new TypeError('Order reprint IPC payload must be an Order ID string.');
+    }
+    return currentOrdersService().reprintOrder(parseEntityId<OrderId>(orderId));
   });
 }
 
@@ -113,10 +202,13 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   void operatorReadModel?.close();
+  void orderDraftStore?.close();
   void operationsDatabase?.close();
   operatorReadModel = null;
+  orderDraftStore = null;
   operationsDatabase = null;
   sessionService = null;
+  ordersService = null;
 });
 
 app.on('window-all-closed', () => {

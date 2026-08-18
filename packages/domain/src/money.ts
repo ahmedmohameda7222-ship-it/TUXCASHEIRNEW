@@ -20,6 +20,13 @@ export function subtractMoney(left: MoneyMinor, right: MoneyMinor): MoneyMinor {
   return moneyMinor(left - right);
 }
 
+export function multiplyMoney(value: MoneyMinor, quantity: number): MoneyMinor {
+  if (!Number.isSafeInteger(quantity)) {
+    throw new DomainInvariantError(`Money quantity must be a safe integer, received ${quantity}.`);
+  }
+  return moneyMinor(value * quantity);
+}
+
 export function assertNonNegativeMoney(value: MoneyMinor, label: string): void {
   if (value < 0) {
     throw new DomainInvariantError(`${label} cannot be negative.`);
