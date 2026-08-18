@@ -83,11 +83,20 @@ export function preparePaymentParts(
   ];
 }
 
-export function parseWholePoundsToMinor(raw: string): MoneyMinor | null {
+export function parsePoundsToMinor(raw: string): MoneyMinor | null {
   const trimmed = raw.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const pounds = Number(trimmed);
-  if (!Number.isSafeInteger(pounds)) return null;
-  const minor = pounds * 100;
-  return Number.isSafeInteger(minor) ? moneyMinor(minor) : null;
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(trimmed);
+  if (match === null) return null;
+
+  const poundsPart = match[1];
+  if (poundsPart === undefined) return null;
+  const fractionPart = (match[2] ?? '').padEnd(2, '0');
+  const minor = BigInt(poundsPart) * 100n + BigInt(fractionPart || '0');
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return moneyMinor(Number(minor));
+}
+
+export function parseWholePoundsToMinor(raw: string): MoneyMinor | null {
+  if (!/^\d+$/.test(raw.trim())) return null;
+  return parsePoundsToMinor(raw);
 }
