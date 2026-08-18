@@ -1,0 +1,130 @@
+onMarkDone,
+  onCancel,
+  onReturn,
+  onReprint,
+}: {
+  readonly order: OrderSnapshot;
+  readonly busy: boolean;
+  readonly onClose: () => void;
+  readonly onMarkDone: (order: OrderSnapshot) => Promise<void>;
+  readonly onCancel: (order: OrderSnapshot) => void;
+  readonly onReturn: (order: OrderSnapshot) => void;
+  readonly onReprint: (orderId: OrderId) => Promise<void>;
+}) {
+  const [receiptPreview, setReceiptPreview] = useState(false);
+  const lifecycle = orderLifecycle(order);
+  const cancellation = lifecycle.cancellation;
+  const returned = lifecycle.returned;
+  return (
+    <div className="board-drawer-backdrop" role="presentation" onMouseDown={onClose}>
+      <aside
+        className="board-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="board-details-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="board-drawer-heading">
+          <div>
+            <p className="eyebrow">{order.status}</p>
+            <h2 id="board-details-title">Order #{order.displayOrderNo}</h2>
+            <p>{order.fulfillment.orderTypeLabel} · {timeLabel(order.createdAt)}</p>
+          </div>
+          <button type="button" className="board-quiet-button" onClick={onClose}>Close</button>
+        </header>
+
+        <section className="board-detail-section">
+          <h3>Items</h3>
+          <ul className="board-items board-items-detailed">{productConfiguration(order)}</ul>
+          {order.orderNote === null ? null : <p className="board-note">Order note: {order.orderNote}</p>}
+        </section>
+
+        {order.fulfillment.behavior === 'DELIVERY' ? (
+          <section className="board-detail-section">
+            <h3>Delivery</h3>
+            <dl className="board-detail-grid">
+              <dt>Customer</dt><dd>{order.fulfillment.delivery.customerName}</dd>
+              <dt>Phone</dt><dd>{order.fulfillment.delivery.normalizedPhone}</dd>
+              <dt>Zone</dt><dd>{order.fulfillment.delivery.zoneLabel}</dd>
+              <dt>Address</dt><dd>{order.fulfillment.delivery.address}</dd>
+              <dt>Delivery fee</dt><dd>{money(order.deliveryFeeMinor)}</dd>
+            </dl>
+          </section>
+        ) : null}
+
+        <section className="board-detail-section">
+          <h3>Payment</h3>
+          <dl className="board-detail-grid">
+            {order.payments.map((payment) => (
+              <div className="board-detail-pair" key={payment.id}>
+                <dt>{payment.method.label}</dt><dd>{money(payment.allocatedMinor)}</dd>
+              </div>
+            ))}
+            <dt>Total</dt><dd><strong>{money(order.totalMinor)}</strong></dd>
+            <dt>Worker</dt><dd>{order.operatorName}</dd>
+          </dl>
+        </section>
+
+        {cancellation === null ? null : (
+          <section className="board-detail-section board-exception-detail">
+            <h3>Cancellation</h3>
+            <p>{cancellation.reason}</p>
+            <p>{cancellation.foodPrepared ? "Food was prepared · stock wasn't restored" : 'Food was not prepared · stock restored'}</p>
+            <p>By {cancellation.workerName} · {timeLabel(cancellation.at)}</p>
+          </section>
+        )}
+
+        {returned === null ? null : (
+          <section className="board-detail-section board-exception-detail">
+            <h3>Delivery Failed</h3>
+            <p>{returned.reason}</p>
+            <dl className="board-detail-grid">
+              <dt>Historical order total</dt><dd>{money(order.totalMinor)}</dd>
+              <dt>Recognized revenue</dt><dd>E£0</dd>
+              <dt>Payment collected</dt><dd>E£0</dd>
+              <dt>Inventory restored</dt><dd>No</dd>
+            </dl>
+          </section>
+        )}
+
+        <section className="board-detail-actions">
+          <button type="button" className="board-secondary-button" onClick={() => setReceiptPreview((open) => !open)}>
+            {receiptPreview ? 'Hide Receipt Preview' : 'Preview Receipt'}
+          </button>
+          {order.status === 'DONE' || order.status === 'RETURNED' ? (
+            <button type="button" className="board-secondary-button" disabled={busy} onClick={() => void onReprint(order.id)}>
+              Reprint
+            </button>
+          ) : null}
+          {order.status === 'ACTIVE' ? (
+            <>
+              <button type="button" className="board-primary-button" disabled={busy} onClick={() => void onMarkDone(order)}>Mark Done</button>
+              <button type="button" className="board-danger-button" disabled={busy} onClick={() => onCancel(order)}>Cancel</button>
+            </>
+          ) : null}
+          {order.status === 'DONE' && order.fulfillment.behavior === 'DELIVERY' ? (
+            <button type="button" className="board-danger-button" disabled={busy} onClick={() => onReturn(order)}>Delivery Failed</button>
+          ) : null}
+        </section>
+
+        {receiptPreview ? (
+          <iframe
+            className="board-receipt-preview"
+            title={`Receipt preview for order ${order.displayOrderNo}`}
+            sandbox=""
+            srcDoc={renderOrderReceiptHtml(order)}
+          />
+        ) : null}
+      </aside>
+    </div>
+  );
+}
+
+function CancelDialog({ order, busy, onClose, onConfirm }: {
+  readonly order: OrderSnapshot;
+  readonly busy: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: (foodPrepared: boolean, reason: string) => Promise<void>;
+}) {
+  const [foodPrepared, setFoodPrepared] = useState<boolean | null>(null);
+  const [reason
