@@ -1,0 +1,495 @@
+name: Phase 11 Rendered QA
+
+on:
+  pull_request:
+    branches:
+      - feat/ops-09-sync
+  push:
+    branches:
+      - test/ops-11-rendered-qa
+
+permissions:
+  contents: read
+
+jobs:
+  rendered-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked app dependencies
+        run: npm ci
+      - name: Build Operations renderer
+        run: npm run build -w @tux/operations
+      - name: Install ephemeral Playwright runtime
+        run: |
+          npm install --no-save --no-package-lock @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start built renderer
+        run: |
+          cd apps/operations
+          npm exec -- vite preview --host 127.0.0.1 --port 4173 > /tmp/tux-vite.log 2>&1 &
+          echo $! > /tmp/tux-vite.pid
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 0.5
+          done
+          cat /tmp/tux-vite.log
+          exit 1
+      - name: Generate ephemeral renderer tests
+        run: |
+          mkdir -p .qa-runtime qa-artifacts
+          cat > .qa-runtime/renderer.spec.cjs <<'EOF'
+          const { test, expect } = require('@playwright/test');
+
+          const BASE = 'http://127.0.0.1:4173';
+
+          async function installFixture(page, mode = 'ACTIVE') {
+            await page.addInitScript((fixtureMode) => {
+              const SHOP = '10000000-0000-4000-8000-000000000001';
+              const DAY = '20000000-0000-4000-8000-000000000001';
+              const WORKER = '30000000-0000-4000-8000-000000000001';
+              const CAT_BURGERS = '40000000-0000-4000-8000-000000000001';
+              const CAT_EXTRAS = '40000000-0000-4000-8000-000000000002';
+              const CAT_HIDDEN = '40000000-0000-4000-8000-000000000003';
+              const P_CLASSIC = '50000000-0000-4000-8000-000000000001';
+              const P_COMBO = '50000000-0000-4000-8000-000000000002';
+              const P_FRIES = '50000000-0000-4000-8000-000000000003';
+              const P_COLA = '50000000-0000-4000-8000-000000000004';
+              const P_SOLD = '50000000-0000-4000-8000-000000000005';
+              const M_CHEESE = '60000000-0000-4000-8000-000000000001';
+              const OT_TAKE = '70000000-0000-4000-8000-000000000001';
+              const OT_DELIVERY = '70000000-0000-4000-8000-000000000002';
+              const PAY_CASH = '80000000-0000-4000-8000-000000000001';
+              const PAY_DIGITAL = '80000000-0000-4000-8000-000000000002';
+              const ZONE = '90000000-0000-4000-8000-000000000001';
+              const CUSTOMER = '91000000-0000-4000-8000-000000000001';
+              const EXP_NEW = '92000000-0000-4000-8000-000000000001';
+              const EXP_OLD = '92000000-0000-4000-8000-000000000002';
+              const EXP_FAILED = '92000000-0000-4000-8000-000000000003';
+              const BULK = '93000000-0000-4000-8000-000000000001';
+              const clone = (value) => structuredClone(value);
+              const ok = (value) => ({ ok: true, value });
+              const now = () => new Date().toISOString();
+              const ago = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
+              const baseLifecycle = () => ({ revision: 0, doneAt: null, cancellation: null, returned: null });
+
+              const configuration = {
+                shopId: SHOP,
+                version: 1,
+                updatedAt: now(),
+                categories: [
+                  { id: CAT_BURGERS, shopId: SHOP, name: 'Burgers', sortOrder: 0, active: true },
+                  { id: CAT_EXTRAS, shopId: SHOP, name: 'Extras', sortOrder: 1, active: true },
+                  { id: CAT_HIDDEN, shopId: SHOP, name: 'Hidden', sortOrder: 2, active: false },
+                ],
+                products: [
+                  { id: P_CLASSIC, shopId: SHOP, categoryId: CAT_BURGERS, name: 'Classic Smash', description: 'Thin smashed beef, cheddar and TUX sauce.', priceMinor: 12000, imageKey: null, active: true, soldOut: false, isCombo: false, sortOrder: 0 },
+                  { id: P_COMBO, shopId: SHOP, categoryId: CAT_BURGERS, name: 'Combo Smash', description: 'Burger combo with one included drink.', priceMinor: 18000, imageKey: null, active: true, soldOut: false, isCombo: true, sortOrder: 1 },
+                  { id: P_SOLD, shopId: SHOP, categoryId: CAT_BURGERS, name: 'Sold Out Burger', description: 'Unavailable today.', priceMinor: 15000, imageKey: null, active: true, soldOut: true, isCombo: false, sortOrder: 2 },
+                  { id: P_FRIES, shopId: SHOP, categoryId: CAT_EXTRAS, name: 'Fries', description: 'Crispy fries.', priceMinor: 5000, imageKey: null, active: true, soldOut: false, isCombo: false, sortOrder: 0 },
+                  { id: P_COLA, shopId: SHOP, categoryId: CAT_EXTRAS, name: 'Cola', description: 'Cold drink.', priceMinor: 3000, imageKey: null, active: true, soldOut: false, isCombo: false, sortOrder: 1 },
+                ],
+                modifiers: [
+                  { id: M_CHEESE, shopId: SHOP, name: 'Extra Cheese', priceMinor: 2000, standaloneProductId: null, active: true, sortOrder: 0 },
+                ],
+                productModifierLinks: [
+                  { shopId: SHOP, productId: P_CLASSIC, modifierId: M_CHEESE, maxQuantity: 2, sortOrder: 0 },
+                ],
+                comboBeverageOptions: [
+                  { shopId: SHOP, comboProductId: P_COMBO, beverageProductId: P_COLA, sortOrder: 0 },
+                ],
+                recipeLines: [],
+                orderTypes: [
+                  { id: OT_TAKE, shopId: SHOP, name: 'Take Away', behavior: 'TAKE_AWAY', active: true, sortOrder: 0 },
+                  { id: OT_DELIVERY, shopId: SHOP, name: 'Delivery', behavior: 'DELIVERY', active: true, sortOrder: 1 },
+                ],
+                paymentMethods: [
+                  { id: PAY_CASH, shopId: SHOP, displayName: 'Cash', logicType: 'CASH', requiresReconciliation: true, active: true, sortOrder: 0 },
+                  { id: PAY_DIGITAL, shopId: SHOP, displayName: 'Instapay', logicType: 'DIGITAL', requiresReconciliation: true, active: true, sortOrder: 1 },
+                ],
+                deliveryZones: [
+                  { id: ZONE, shopId: SHOP, name: 'Downtown', feeMinor: 3500, active: true, sortOrder: 0 },
+                ],
+              };
+
+              const emptyDelivery = () => ({ displayPhone: '', normalizedPhone: '', customerName: '', address: '', zoneId: null, zoneLabel: '', configuredFeeMinor: 0, finalFeeMinor: 0 });
+              const freshDraft = (scope = 'desktop-main-window') => ({
+                shopId: SHOP,
+                businessDayId: DAY,
+                draftScopeId: scope,
+                revision: 0,
+                updatedAt: now(),
+                checkoutIntentKey: crypto.randomUUID(),
+                orderTypeId: OT_TAKE,
+                lines: [],
+                orderNote: null,
+                discountMinor: 0,
+                delivery: emptyDelivery(),
+                payment: { mode: 'NONE' },
+              });
+
+              function makeOrder({ id, no, status, minutesAgo, delivery = false, total = 12000, customer = 'Mona Adel', zone = 'Downtown' }) {
+                const lifecycle = baseLifecycle();
+                if (status === 'DONE' || status === 'RETURNED') lifecycle.doneAt = ago(Math.max(1, minutesAgo - 1));
+                if (status === 'CANCELLED') lifecycle.cancellation = { at: ago(Math.max(1, minutesAgo - 1)), workerId: WORKER, workerName: 'Ahmed', foodPrepared: false, stockRestored: true, reason: 'Customer changed mind' };
+                if (status === 'RETURNED') lifecycle.returned = { at: ago(1), workerId: WORKER, workerName: 'Ahmed', reason: 'Customer unavailable' };
+                return {
+                  id, shopId: SHOP, businessDayId: DAY, displayOrderNo: no, idempotencyKey: `qa-order-${no}`, status, lifecycle,
+                  source: 'POS', operatorWorkerId: WORKER, operatorName: 'Ahmed', createdAt: ago(minutesAgo),
+                  fulfillment: delivery
+                    ? { orderTypeId: OT_DELIVERY, orderTypeLabel: 'Delivery', behavior: 'DELIVERY', delivery: { customerContactId: CUSTOMER, customerName: customer, normalizedPhone: '+201012345678', address: '12 Nile Street', zoneId: ZONE, zoneLabel: zone, configuredFeeMinor: 3500, finalFeeMinor: 3500 } }
+                    : { orderTypeId: OT_TAKE, orderTypeLabel: 'Take Away', behavior: 'TAKE_AWAY', delivery: null },
+                  items: [{ id: `a${String(no).padStart(7, '0')}-0000-4000-8000-000000000001`, productId: P_CLASSIC, productName: 'Classic Smash', unitPriceMinor: total, quantity: 1, modifiers: [], comboBeverages: [], itemNote: no === 3 ? 'No onions' : null }],
+                  orderNote: no === 3 ? 'Call on arrival' : null,
+                  itemsSubtotalMinor: total,
+                  discountMinor: 0,
+                  deliveryFeeMinor: delivery ? 3500 : 0,
+                  totalMinor: total + (delivery ? 3500 : 0),
+                  payments: [{ id: `b${String(no).padStart(7, '0')}-0000-4000-8000-000000000001`, method: { id: PAY_CASH, label: 'Cash', logicType: 'CASH' }, allocatedMinor: total + (delivery ? 3500 : 0), receivedMinor: total + (delivery ? 3500 : 0), changeMinor: 0 }],
+                };
+              }
+
+              const state = {
+                fixtureMode,
+                closed: false,
+                discardedDraft: false,
+                draft: freshDraft(),
+                orders: [
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000001', no: 3, status: 'ACTIVE', minutesAgo: 32, delivery: true }),
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000002', no: 1, status: 'ACTIVE', minutesAgo: 12 }),
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000003', no: 7, status: 'DONE', minutesAgo: 4, delivery: true }),
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000004', no: 4, status: 'DONE', minutesAgo: 50 }),
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000005', no: 8, status: 'CANCELLED', minutesAgo: 8 }),
+                  makeOrder({ id: 'a1000000-0000-4000-8000-000000000006', no: 9, status: 'RETURNED', minutesAgo: 6, delivery: true }),
+                ],
+                expenses: [
+                  { id: EXP_NEW, shopId: SHOP, businessDayId: DAY, kind: 'MANUAL', description: 'Packaging', amountMinor: 7500, paidFrom: 'CASH', note: 'Paper bags', orderId: null, createdByWorkerId: WORKER, createdAt: ago(2), lifecycle: { revision: 0, updatedAt: null, updatedByWorkerId: null, deletedAt: null, deletedByWorkerId: null } },
+                  { id: EXP_FAILED, shopId: SHOP, businessDayId: DAY, kind: 'DELIVERY_FAILED', description: 'Delivery Failed — Order #9', amountMinor: null, paidFrom: null, note: 'Customer unavailable', orderId: 'a1000000-0000-4000-8000-000000000006', createdByWorkerId: WORKER, createdAt: ago(5) },
+                  { id: EXP_OLD, shopId: SHOP, businessDayId: DAY, kind: 'MANUAL', description: 'Taxi', amountMinor: 2500, paidFrom: 'OTHER', note: null, orderId: null, createdByWorkerId: WORKER, createdAt: ago(25), lifecycle: { revision: 0, updatedAt: null, updatedByWorkerId: null, deletedAt: null, deletedByWorkerId: null } },
+                ],
+                bulkUnits: 8,
+                bulkMovements: new Map(),
+              };
+
+              function activeSession() {
+                return { status: 'ACTIVE', shopId: SHOP, businessDayId: DAY, businessDayStartedAt: ago(180), operator: { id: WORKER, displayName: 'Ahmed' } };
+              }
+              function noDay() { return { status: 'NO_ACTIVE_DAY', shopId: SHOP }; }
+              function recalcExpenseTotals() {
+                return state.expenses.filter((e) => e.kind === 'MANUAL').reduce((s, e) => s + e.amountMinor, 0);
+              }
+              function setOrder(id, change) {
+                const index = state.orders.findIndex((order) => order.id === id);
+                if (index < 0) return null;
+                const updated = change(clone(state.orders[index]));
+                state.orders[index] = updated;
+                return clone(updated);
+              }
+
+              window.tuxDesktop = {
+                app: { getVersion: async () => 'qa' },
+                session: {
+                  getState: async () => ok(state.closed || fixtureMode === 'NO_DAY' && !state.started ? noDay() : activeSession()),
+                  submitPin: async () => { state.started = true; return ok(activeSession()); },
+                  signOut: async () => ok({ status: 'SIGN_IN_REQUIRED', shopId: SHOP, businessDayId: DAY, businessDayStartedAt: ago(180) }),
+                },
+                orders: {
+                  loadWorkspace: async (scope) => { state.draft = { ...state.draft, draftScopeId: scope }; return ok({ shopId: SHOP, businessDayId: DAY, configuration: clone(configuration), operator: { id: WORKER, displayName: 'Ahmed' }, draft: clone(state.draft) }); },
+                  saveDraft: async (draft) => { state.draft = { ...clone(draft), revision: draft.revision + 1, updatedAt: now() }; return ok(clone(state.draft)); },
+                  findCustomerByPhone: async () => ok({ id: CUSTOMER, shopId: SHOP, normalizedPhone: '+201012345678', displayPhone: '01012345678', name: 'Mona Adel', latestAddress: '12 Nile Street', latestZoneId: ZONE, lastOrderAt: ago(60) }),
+                  placeOrder: async (draft) => {
+                    const placed = makeOrder({ id: crypto.randomUUID(), no: 10, status: 'ACTIVE', minutesAgo: 0, delivery: draft.orderTypeId === OT_DELIVERY });
+                    const nextDraft = freshDraft(draft.draftScopeId);
+                    state.draft = nextDraft;
+                    state.orders.unshift(placed);
+                    return ok({ order: clone(placed), replayed: false, nextDraft: clone(nextDraft), postCommitWarnings: [] });
+                  },
+                  reprintOrder: async () => ok({ status: 'PRINTED' }),
+                },
+                ordersBoard: {
+                  loadBoard: async () => ok({ shopId: SHOP, businessDayId: DAY, loadedAt: now(), orders: clone(state.orders) }),
+                  markDone: async (id) => ok(setOrder(id, (order) => ({ ...order, status: 'DONE', lifecycle: { ...order.lifecycle, revision: order.lifecycle.revision + 1, doneAt: now() } }))),
+                  undoDone: async (id) => ok(setOrder(id, (order) => ({ ...order, status: 'ACTIVE', lifecycle: { ...order.lifecycle, revision: order.lifecycle.revision + 1, doneAt: null } }))),
+                  cancelOrder: async (input) => ok(setOrder(input.orderId, (order) => ({ ...order, status: 'CANCELLED', lifecycle: { ...order.lifecycle, revision: order.lifecycle.revision + 1, cancellation: { at: now(), workerId: WORKER, workerName: 'Ahmed', foodPrepared: input.foodPrepared, stockRestored: !input.foodPrepared, reason: input.reason } } }))),
+                  returnDelivery: async (input) => ok(setOrder(input.orderId, (order) => ({ ...order, status: 'RETURNED', lifecycle: { ...order.lifecycle, revision: order.lifecycle.revision + 1, returned: { at: now(), workerId: WORKER, workerName: 'Ahmed', reason: input.reason } } }))),
+                },
+                expenses: {
+                  loadLedger: async () => ok({ shopId: SHOP, businessDayId: DAY, loadedAt: now(), expenses: clone(state.expenses), totalExpensesMinor: recalcExpenseTotals(), cashExpensesMinor: state.expenses.filter((e) => e.kind === 'MANUAL' && e.paidFrom === 'CASH').reduce((s, e) => s + e.amountMinor, 0) }),
+                  createExpense: async (input) => { const expense = { id: crypto.randomUUID(), shopId: SHOP, businessDayId: DAY, kind: 'MANUAL', ...clone(input), orderId: null, createdByWorkerId: WORKER, createdAt: now(), lifecycle: { revision: 0, updatedAt: null, updatedByWorkerId: null, deletedAt: null, deletedByWorkerId: null } }; state.expenses.unshift(expense); return ok(clone(expense)); },
+                  editExpense: async (input) => { const index = state.expenses.findIndex((e) => e.id === input.expenseId); const current = state.expenses[index]; const updated = { ...current, description: input.description, amountMinor: input.amountMinor, paidFrom: input.paidFrom, note: input.note, lifecycle: { ...current.lifecycle, revision: current.lifecycle.revision + 1, updatedAt: now(), updatedByWorkerId: WORKER } }; state.expenses[index] = updated; return ok(clone(updated)); },
+                  deleteExpense: async (id) => { const index = state.expenses.findIndex((e) => e.id === id); const current = state.expenses[index]; state.expenses.splice(index, 1); return ok({ ...clone(current), lifecycle: { ...current.lifecycle, revision: current.lifecycle.revision + 1, deletedAt: now(), deletedByWorkerId: WORKER } }); },
+                },
+                bulkStock: {
+                  loadBoard: async () => ok({ shopId: SHOP, businessDayId: DAY, loadedAt: now(), items: [{ id: BULK, name: 'Frozen Fries Bags', unitLabel: 'bags', balanceMicros: state.bulkUnits * 1000000, currentWholeUnits: state.bulkUnits }] }),
+                  finishOne: async (input) => { state.bulkUnits -= 1; const movement = { id: input.commandId, shopId: SHOP, businessDayId: DAY, itemId: BULK, movementType: 'BULK_UNIT_FINISHED', quantityDeltaMicros: -1000000, idempotencyKey: `bulk:${input.commandId}`, workerId: WORKER, orderId: null, createdAt: now(), compensatesMovementId: null }; state.bulkMovements.set(movement.id, -1); return ok({ movement, undoUntil: new Date(Date.now() + 8000).toISOString() }); },
+                  addStock: async (input) => { state.bulkUnits += input.units; const movement = { id: input.commandId, shopId: SHOP, businessDayId: DAY, itemId: BULK, movementType: 'BULK_STOCK_RECEIVED', quantityDeltaMicros: input.units * 1000000, idempotencyKey: `bulk:${input.commandId}`, workerId: WORKER, orderId: null, createdAt: now(), compensatesMovementId: null }; state.bulkMovements.set(movement.id, input.units); return ok({ movement, undoUntil: new Date(Date.now() + 8000).toISOString() }); },
+                  undoMovement: async (input) => { const delta = state.bulkMovements.get(input.movementId) || 0; state.bulkUnits -= delta; const movement = { id: input.commandId, shopId: SHOP, businessDayId: DAY, itemId: BULK, movementType: delta < 0 ? 'UNDO_BULK_UNIT_FINISHED' : 'UNDO_BULK_STOCK_RECEIVED', quantityDeltaMicros: -delta * 1000000, idempotencyKey: `bulk:${input.commandId}`, workerId: WORKER, orderId: null, createdAt: now(), compensatesMovementId: input.movementId }; return ok({ movement, undoUntil: null }); },
+                },
+                endDay: {
+                  beginEndDay: async () => {
+                    if (fixtureMode === 'DRAFT' && !state.discardedDraft) return ok({ kind: 'UNFINISHED_DRAFT', businessDayId: DAY });
+                    if (fixtureMode === 'ACTIVE_BLOCK') return ok({ kind: 'ACTIVE_ORDERS_BLOCKED', businessDayId: DAY, activeOrderNos: [3, 1] });
+                    return ok({ kind: 'READY', businessDayId: DAY, paymentMethods: [{ id: PAY_CASH, label: 'Cash', logicType: 'CASH' }, { id: PAY_DIGITAL, label: 'Instapay', logicType: 'DIGITAL' }] });
+                  },
+                  discardDraft: async () => { state.discardedDraft = true; state.draft = freshDraft(state.draft.draftScopeId); return ok(true); },
+                  previewReconciliation: async (input) => {
+                    const expected = new Map([[PAY_CASH, 10000], [PAY_DIGITAL, 5000]]);
+                    return ok({ businessDayId: DAY, recognizedSalesMinor: 15000, totalExpensesMinor: 1000, cashExpensesMinor: 1000, lines: input.actualPayments.map((part) => ({ paymentMethod: part.paymentMethodId === PAY_CASH ? { id: PAY_CASH, label: 'Cash', logicType: 'CASH' } : { id: PAY_DIGITAL, label: 'Instapay', logicType: 'DIGITAL' }, expectedMinor: expected.get(part.paymentMethodId), actualMinor: part.actualMinor, differenceMinor: part.actualMinor - expected.get(part.paymentMethodId), varianceReason: null })) });
+                  },
+                  closeDay: async () => { state.closed = true; return ok({ businessDayId: DAY, closedAt: now(), replayed: false }); },
+                },
+              };
+            }, mode);
+          }
+
+          function consoleGuard(page) {
+            const issues = [];
+            page.on('console', (message) => {
+              if (message.type() === 'error' || message.type() === 'warning') issues.push(`${message.type()}: ${message.text()}`);
+            });
+            page.on('pageerror', (error) => issues.push(`pageerror: ${error.message}`));
+            return issues;
+          }
+
+          async function expectNoHorizontalOverflow(page) {
+            const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+            expect(overflow).toBeLessThanOrEqual(1);
+          }
+
+          test('start screen greeting and exact Operations shell', async ({ page }) => {
+            const issues = consoleGuard(page);
+            await installFixture(page, 'NO_DAY');
+            await page.goto(BASE);
+            await expect(page).toHaveTitle(/TUX/i);
+            await expect(page.getByRole('heading', { name: 'TUX Operations' })).toBeVisible();
+            await expect(page.getByText('No active Business Day', { exact: true })).toBeVisible();
+            await expect(page.getByText('Enter PIN to Start Day', { exact: true })).toBeVisible();
+            await page.locator('#worker-pin').fill('1234');
+            await page.getByRole('button', { name: 'Start Day' }).click();
+            await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Ahmed\./ })).toBeVisible();
+            await expect(page.getByText('Glad you made it in safely.', { exact: true })).toBeVisible();
+            await expect(page.getByText('Have a great shift.', { exact: true })).toBeVisible();
+            await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible({ timeout: 2500 });
+            const nav = page.getByRole('navigation', { name: 'Operations' });
+            await expect(nav.getByRole('button')).toHaveCount(4);
+            expect(await nav.getByRole('button').allTextContents()).toEqual(['Orders', 'Orders Board', 'Expenses', 'Bulk Stock']);
+            await expect(page.getByText('Admin', { exact: true })).toHaveCount(0);
+            await expect(page.getByText('Inventory Usage', { exact: true })).toHaveCount(0);
+            await expect(page.getByText('Reconcile', { exact: true })).toHaveCount(0);
+            await page.getByRole('button', { name: /Ahmed/ }).click();
+            await expect(page.getByRole('menuitem', { name: 'End Day' })).toBeVisible();
+            await page.screenshot({ path: 'qa-artifacts/start-and-shell.png', fullPage: false });
+            await expectNoHorizontalOverflow(page);
+            expect(issues).toEqual([]);
+          });
+
+          test('desktop Orders interactions and Delivery validation/autofill', async ({ page }) => {
+            const issues = consoleGuard(page);
+            await page.setViewportSize({ width: 1440, height: 960 });
+            await installFixture(page, 'ACTIVE');
+            await page.goto(BASE);
+            await expect(page.getByLabel('Current order')).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Burgers', exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Extras', exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveCount(0);
+            await expect(page.getByRole('button', { name: 'Add one Classic Smash' })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Add one Sold Out Burger' })).toBeDisabled();
+            await expect(page.getByText('Add to Cart', { exact: true })).toHaveCount(0);
+
+            await page.getByRole('button', { name: 'Quick Info for Classic Smash' }).click();
+            await expect(page.getByRole('dialog')).toContainText('Thin smashed beef, cheddar and TUX sauce.');
+            await page.getByRole('button', { name: 'Customize & add' }).click();
+            await expect(page.getByRole('heading', { name: 'Extras' })).toBeVisible();
+            await page.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+            await page.getByPlaceholder('Only for this item').fill('No pickles');
+            await page.getByRole('button', { name: 'Add to order' }).click();
+            await expect(page.getByLabel('Current order')).toContainText('1 item');
+            await expect(page.getByLabel('Current order')).toContainText('Extra Cheese');
+            await expect(page.getByLabel('Current order')).toContainText('No pickles');
+            await page.locator('#order-note').fill('Whole-order note');
+            await page.locator('#order-note').blur();
+            await expect(page.locator('#order-note')).toHaveValue('Whole-order note');
+
+            await page.getByRole('button', { name: 'Extras', exact: true }).click();
+            await expect(page.getByRole('button', { name: 'Add one Fries' })).toBeVisible();
+            await page.getByRole('button', { name: 'Burgers', exact: true }).click();
+            await page.getByRole('button', { name: 'Delivery', exact: true }).click();
+            await expect(page.locator('#delivery-phone')).toBeVisible();
+            await page.getByRole('button', { name: 'Place Order' }).click();
+            await expect(page.getByText('Enter a valid Egyptian mobile number.', { exact: true })).toBeVisible();
+            await expect(page.getByText('Customer Name is required.', { exact: true })).toBeVisible();
+            await expect(page.getByText('Delivery Zone is required.', { exact: true })).toBeVisible();
+            await expect(page.getByText('Full address is required.', { exact: true })).toBeVisible();
+
+            await page.locator('#delivery-phone').fill('01012345678');
+            await page.locator('#delivery-phone').blur();
+            await expect(page.locator('#delivery-name')).toHaveValue('Mona Adel');
+            await expect(page.locator('#delivery-address')).toHaveValue('12 Nile Street');
+            await expect(page.locator('#delivery-zone')).toHaveValue('90000000-0000-4000-8000-000000000001');
+            await expect(page.locator('#delivery-fee')).toHaveValue('35.00');
+
+            await page.keyboard.press('Control+K');
+            const search = page.locator('input[type="search"]').first();
+            await expect(search).toBeFocused();
+            await search.fill('Fries');
+            await expect(page.getByRole('button', { name: 'Add one Fries' })).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(search).toHaveValue('');
+            await page.screenshot({ path: 'qa-artifacts/orders-desktop.png', fullPage: false });
+            await expectNoHorizontalOverflow(page);
+            expect(issues).toEqual([]);
+          });
+
+          test('Orders Board, Expenses and Bulk Stock renderer interactions', async ({ page }) => {
+            const issues = consoleGuard(page);
+            await page.setViewportSize({ width: 1366, height: 900 });
+            await installFixture(page, 'ACTIVE');
+            await page.goto(BASE);
+            await page.getByRole('navigation', { name: 'Operations' }).getByRole('button', { name: 'Orders Board' }).click();
+            const tabs = page.getByRole('tablist', { name: 'Order status' }).getByRole('tab');
+            await expect(tabs).toHaveCount(4);
+            const tabText = (await tabs.allTextContents()).map((text) => text.trim());
+            expect(tabText.every((text, index) => text.startsWith(['Active', 'Done', 'Cancelled', 'Returned'][index]))).toBeTruthy();
+            await expect(page.getByText('On-site', { exact: true })).toHaveCount(0);
+            await expect(page.getByText('Source', { exact: true })).toHaveCount(0);
+            const cards = page.locator('.active-order-card');
+            await expect(cards).toHaveCount(2);
+            await expect(cards.nth(0)).toContainText('#3');
+            await expect(cards.nth(1)).toContainText('#1');
+            await expect(cards.nth(0)).toContainText('Mona Adel');
+            await expect(cards.nth(0)).toContainText('Downtown');
+            await expect(cards.nth(0)).toContainText(/\d+ min/);
+            await cards.nth(0).locator('.active-card-main').click();
+            await expect(page.getByRole('dialog', { name: 'Order #3' })).toContainText('12 Nile Street');
+            await expect(page.getByRole('button', { name: 'Preview Receipt' })).toBeVisible();
+            await page.getByRole('button', { name: 'Cancel' }).click();
+            await expect(page.getByText('Was food already prepared?', { exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'No · Restore Stock' })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Yes · Don’t Restore Stock' })).toBeVisible();
+            await page.getByRole('button', { name: 'Close' }).last().click();
+            await page.getByRole('button', { name: 'Mark Done' }).click();
+            await expect(page.getByText('Order marked Done.', { exact: true })).toBeVisible();
+            await page.getByRole('button', { name: 'Undo' }).click();
+            await expect(page.getByText(/returned to Active/)).toBeVisible();
+
+            await page.getByPlaceholder('Search order #').fill('7');
+            await expect(page.getByText('#7', { exact: true })).toBeVisible();
+            await page.getByPlaceholder('Search order #').fill('');
+            await page.getByRole('tab', { name: /Done/ }).click();
+            const doneText = await page.locator('main').innerText();
+            expect(doneText.indexOf('#7')).toBeLessThan(doneText.indexOf('#4'));
+            await page.screenshot({ path: 'qa-artifacts/orders-board.png', fullPage: false });
+
+            await page.getByRole('navigation', { name: 'Operations' }).getByRole('button', { name: 'Expenses' }).click();
+            await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();
+            await expect(page.getByLabel('Total Expenses')).toContainText('EGP 100.00');
+            const expenseRows = page.locator('.expense-row');
+            await expect(expenseRows.nth(0)).toContainText('Packaging');
+            await expect(page.getByText('Non-financial', { exact: true })).toBeVisible();
+            await expenseRows.nth(0).getByRole('button', { name: 'Edit' }).click();
+            await expect(page.getByRole('dialog', { name: 'Edit expense' })).toBeVisible();
+            await page.getByRole('button', { name: 'Cancel' }).click();
+            await expenseRows.nth(0).getByRole('button', { name: 'Delete' }).click();
+            await expect(page.getByRole('dialog', { name: 'Delete expense?' })).toBeVisible();
+            await page.getByRole('button', { name: 'Keep' }).click();
+            await page.screenshot({ path: 'qa-artifacts/expenses.png', fullPage: false });
+
+            await page.getByRole('navigation', { name: 'Operations' }).getByRole('button', { name: 'Bulk Stock' }).click();
+            await expect(page.getByRole('heading', { name: 'Bulk Stock' })).toBeVisible();
+            await expect(page.locator('.bulk-stock-balance')).toContainText('8');
+            await page.getByRole('button', { name: 'Finished 1' }).click();
+            await expect(page.locator('.bulk-stock-balance')).toContainText('7');
+            await page.getByRole('button', { name: 'Undo' }).click();
+            await expect(page.locator('.bulk-stock-balance')).toContainText('8');
+            await page.getByRole('button', { name: 'Add Stock' }).click();
+            await page.locator('#bulk-stock-add-units').fill('3');
+            await page.getByRole('dialog').getByRole('button', { name: 'Add Stock' }).click();
+            await expect(page.locator('.bulk-stock-balance')).toContainText('11');
+            await page.screenshot({ path: 'qa-artifacts/bulk-stock.png', fullPage: false });
+            await expectNoHorizontalOverflow(page);
+            expect(issues).toEqual([]);
+          });
+
+          test('End Day draft choice, blind reconciliation, final summary and post-close lock', async ({ page }) => {
+            const issues = consoleGuard(page);
+            await installFixture(page, 'DRAFT');
+            await page.goto(BASE);
+            await page.getByRole('button', { name: /Ahmed/ }).click();
+            await page.getByRole('menuitem', { name: 'End Day' }).click();
+            await expect(page.getByRole('dialog', { name: 'End Day' })).toBeVisible();
+            await expect(page.getByText('You have an unfinished order.', { exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Return to Order' })).toBeVisible();
+            await page.getByRole('button', { name: 'Discard Draft & Continue' }).click();
+            await expect(page.getByText('Enter actual Cash', { exact: true })).toBeVisible();
+            await expect(page.getByText('Expected', { exact: true })).toHaveCount(0);
+            await page.getByLabel('Actual Cash').fill('100.00');
+            await page.getByLabel('Actual Cash').blur();
+            await page.getByRole('button', { name: 'Next' }).click();
+            await page.getByLabel('Actual Instapay').fill('50.00');
+            await page.getByLabel('Actual Instapay').blur();
+            await page.getByRole('button', { name: 'Reveal Reconciliation' }).click();
+            await expect(page.getByText('Final Closing Summary', { exact: true })).toBeVisible();
+            await expect(page.getByText('Expected', { exact: true }).first()).toBeVisible();
+            await expect(page.getByText('Recognized Sales', { exact: true })).toBeVisible();
+            await expect(page.getByText('Profit', { exact: true })).toHaveCount(0);
+            await expect(page.getByText('Margin', { exact: true })).toHaveCount(0);
+            await expect(page.getByText('COGS', { exact: true })).toHaveCount(0);
+            await page.screenshot({ path: 'qa-artifacts/end-day-summary.png', fullPage: false });
+            await page.getByRole('button', { name: 'Close Business Day' }).click();
+            await expect(page.getByText('No active Business Day', { exact: true })).toBeVisible();
+            await expect(page.getByText('Enter PIN to Start Day', { exact: true })).toBeVisible();
+            await page.screenshot({ path: 'qa-artifacts/post-close.png', fullPage: false });
+            await expectNoHorizontalOverflow(page);
+            expect(issues).toEqual([]);
+          });
+
+          test('mobile Orders cart sheet and responsive overflow', async ({ page }) => {
+            const issues = consoleGuard(page);
+            await page.setViewportSize({ width: 390, height: 844 });
+            await installFixture(page, 'ACTIVE');
+            await page.goto(BASE);
+            await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+            const trigger = page.locator('.mobile-cart-trigger');
+            await expect(trigger).toBeVisible();
+            await expect(trigger).toContainText('Order · 1');
+            await trigger.click();
+            await expect(page.locator('.mobile-cart-overlay')).toBeVisible();
+            await expect(page.locator('.mobile-cart-overlay')).toContainText('Current order');
+            await expect(page.locator('.mobile-cart-overlay')).toContainText('Classic Smash');
+            await page.screenshot({ path: 'qa-artifacts/orders-mobile.png', fullPage: false });
+            await expectNoHorizontalOverflow(page);
+            expect(issues).toEqual([]);
+          });
+          EOF
+
+          cat > .qa-runtime/playwright.config.cjs <<'EOF'
+          const { defineConfig } = require('@playwright/test');
+          module.exports = defineConfig({
+            testDir: '.',
+            testMatch: /renderer\.spec\.cjs/,
+            timeout: 30000,
+            expect: { timeout: 7000 },
+            retries: 0,
+            workers: 1,
+            reporter: [['line']],
+            use: {
+              browserName: 'chromium',
+              headless: true,
+              viewport: { width: 1440, height: 960 },
+            },
+          });
+          EOF
+      - name: Run rendered Playwright QA
+        run: npx playwright test --config=.qa-runtime/playwright.config.cjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase11-rendered-qa
+          path: qa-artifacts
+          if-no-files-found: warn
