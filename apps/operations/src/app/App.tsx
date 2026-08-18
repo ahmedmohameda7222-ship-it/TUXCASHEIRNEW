@@ -1,13 +1,16 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { BulkStockWorkspace } from './BulkStockWorkspace';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
 import {
+  createOperationsBulkStockClient,
   createOperationsExpensesClient,
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
+  type OperationsBulkStockClient,
   type OperationsExpensesClient,
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
@@ -22,7 +25,7 @@ type ScreenState =
     };
 
 type ThemePreference = 'system' | 'light' | 'dark';
-type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES';
+type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES' | 'BULK_STOCK';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 
 function initialTheme(): ThemePreference {
@@ -152,6 +155,7 @@ function ActiveShell({
   ordersClient,
   ordersBoardClient,
   expensesClient,
+  bulkStockClient,
   busy,
   error,
   onSwitch,
@@ -161,6 +165,7 @@ function ActiveShell({
   readonly ordersClient: OperationsOrdersClient;
   readonly ordersBoardClient: OperationsOrdersBoardClient;
   readonly expensesClient: OperationsExpensesClient;
+  readonly bulkStockClient: OperationsBulkStockClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
@@ -216,7 +221,11 @@ function ActiveShell({
           >
             Expenses
           </button>
-          <button type="button" className="nav-item" disabled>
+          <button
+            type="button"
+            className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('BULK_STOCK')}
+          >
             Bulk Stock
           </button>
         </nav>
@@ -274,8 +283,10 @@ function ActiveShell({
         <OrdersWorkspace session={session} client={ordersClient} />
       ) : area === 'ORDERS_BOARD' ? (
         <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
-      ) : (
+      ) : area === 'EXPENSES' ? (
         <ExpensesWorkspace client={expensesClient} />
+      ) : (
+        <BulkStockWorkspace client={bulkStockClient} />
       )}
 
       {error === null ? null : (
@@ -322,6 +333,7 @@ export function App() {
   const ordersClient = useMemo(() => createOperationsOrdersClient(), []);
   const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
   const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
+  const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -405,6 +417,7 @@ export function App() {
       ordersClient={ordersClient}
       ordersBoardClient={ordersBoardClient}
       expensesClient={expensesClient}
+      bulkStockClient={bulkStockClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}
