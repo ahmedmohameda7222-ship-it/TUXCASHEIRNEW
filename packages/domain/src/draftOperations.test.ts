@@ -51,12 +51,15 @@ function configuration(): OperationsConfigurationSnapshot {
     shopId: SHOP_ID,
     version: 1,
     updatedAt: instant('2026-08-18T10:00:00.000Z'),
-    categories: [
-      { id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true },
-    ],
+    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true }],
     products: [
       product({ id: BURGER_ID, name: 'Single Burger' }),
-      product({ id: COMBO_ID, name: 'Burger Combo', isCombo: true, priceMinor: moneyMinor(22_000) }),
+      product({
+        id: COMBO_ID,
+        name: 'Burger Combo',
+        isCombo: true,
+        priceMinor: moneyMinor(22_000),
+      }),
       product({ id: DRINK_ID, name: 'Cola', priceMinor: ZERO_MONEY }),
       product({ id: SOLD_OUT_ID, name: 'Sold Out Burger', soldOut: true }),
     ],
@@ -126,7 +129,9 @@ function emptyDraft(): OrderDraft {
 }
 
 function lineId(value: number): DraftLineId {
-  return parseEntityId<DraftLineId>(`70000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
+  return parseEntityId<DraftLineId>(
+    `70000000-0000-4000-8000-${value.toString().padStart(12, '0')}`,
+  );
 }
 
 describe('draft operations', () => {
