@@ -1,5 +1,6 @@
 name: Phase 5 Orders Board Bootstrap
 
+# Temporary branch-only bootstrap. Removed by the validated implementation commit.
 on:
   push:
     branches:
