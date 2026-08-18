@@ -1,10 +1,11 @@
-import type { OrderDraft, ShopId } from '@tux/domain';
+import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   assertCustomerLookupResult,
   assertOrderPlacementResult,
   assertOrdersWorkspaceResult,
+  assertReprintOrderResult,
   assertSaveDraftResult,
 } from './ordersResult';
 import { assertSessionResult } from './sessionResult';
@@ -17,6 +18,7 @@ const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
+const IPC_ORDERS_REPRINT = 'tux:orders:reprint';
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -49,6 +51,10 @@ const api: TuxDesktopApi = Object.freeze({
       ),
     placeOrder: async (draft: OrderDraft) =>
       assertOrderPlacementResult((await ipcRenderer.invoke(IPC_ORDERS_PLACE, draft)) as unknown),
+    reprintOrder: async (orderId: OrderId) =>
+      assertReprintOrderResult(
+        (await ipcRenderer.invoke(IPC_ORDERS_REPRINT, orderId)) as unknown,
+      ),
   }),
 });
 
