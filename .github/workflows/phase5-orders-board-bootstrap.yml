@@ -37,6 +37,39 @@ jobs:
           python .phase5_orders_board_patch.py
           rm -rf .phase5_parts
 
+      - name: Apply strict-type corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          preload = Path('apps/operations-desktop/src/preload/index.ts')
+          text = preload.read_text()
+          text = text.replace(
+              'cancelOrder: async (input) =>',
+              "cancelOrder: async (input: Parameters<TuxDesktopApi['ordersBoard']['cancelOrder']>[0]) =>",
+          )
+          text = text.replace(
+              'returnDelivery: async (input) =>',
+              "returnDelivery: async (input: Parameters<TuxDesktopApi['ordersBoard']['returnDelivery']>[0]) =>",
+          )
+          preload.write_text(text)
+
+          sqlite = Path('packages/persistence/src/sqlite/SqliteOperationsDatabase.ts')
+          text = sqlite.read_text()
+          old = '''        const updated: OrderSnapshot = {
+          ...existing,
+          status: order.status,
+          lifecycle: order.lifecycle,
+        };'''
+          new = '''        const updated: OrderSnapshot =
+          order.lifecycle === undefined
+            ? { ...existing, status: order.status }
+            : { ...existing, status: order.status, lifecycle: order.lifecycle };'''
+          if old not in text:
+              raise SystemExit('SQLite operational-state correction target not found')
+          sqlite.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Install locked dependencies
         run: npm ci
 
