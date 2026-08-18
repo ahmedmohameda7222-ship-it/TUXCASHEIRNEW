@@ -7,8 +7,7 @@ import type {
 import { ZERO_MONEY, type MoneyMinor, type PaymentMethodId } from '@tux/domain';
 import { useEffect, useMemo, useState } from 'react';
 import { MoneyInput } from './MoneyInput';
-import { resolveOrdersDraftScopeId } from './OrdersWorkspace';
-import { formatMoneyMinor } from './ordersView';
+import { formatMoneyMinor, resolveOrdersDraftScopeId } from './ordersView';
 import type { OperationsEndDayClient } from './sessionClient';
 
 type FlowStage =
@@ -226,7 +225,9 @@ export function EndDayFlow({
                       }}
                     />
                     <div className="end-day-navigation-actions">
-                      {methodIndex === 0 ? <span /> : (
+                      {methodIndex === 0 ? (
+                        <span />
+                      ) : (
                         <button
                           type="button"
                           className="end-day-secondary-action"
