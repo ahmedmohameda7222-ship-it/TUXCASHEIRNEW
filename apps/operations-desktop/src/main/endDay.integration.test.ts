@@ -327,6 +327,16 @@ const noVarianceReasons = [
   { paymentMethodId: DIGITAL_ID, reason: null },
 ] as const;
 
+const successfulVarianceActuals = [
+  { paymentMethodId: CASH_ID, actualMinor: moneyMinor(7_000) },
+  { paymentMethodId: DIGITAL_ID, actualMinor: moneyMinor(5_000) },
+] as const;
+
+const successfulVarianceReasons = [
+  { paymentMethodId: CASH_ID, reason: 'Cash drawer recount' },
+  { paymentMethodId: DIGITAL_ID, reason: null },
+] as const;
+
 describe('Operations End Day SQLite integration', () => {
   it('hard-blocks Active orders before reconciliation and leaks no expected values', async () => {
     const fx = await fixture();
@@ -523,8 +533,8 @@ describe('Operations End Day SQLite integration', () => {
     const result = await fx.service.closeDay({
       businessDayId: DAY_ID,
       draftScopeId: DRAFT_SCOPE,
-      actualPayments: exactActuals,
-      varianceReasons: noVarianceReasons,
+      actualPayments: successfulVarianceActuals,
+      varianceReasons: successfulVarianceReasons,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -560,12 +570,26 @@ describe('Operations End Day SQLite integration', () => {
     expect(rows(fx.databasePath, 'SELECT id FROM inventory_movements')).toHaveLength(
       movementsBefore,
     );
+    expect(rows(fx.databasePath, 'SELECT id FROM expenses')).toHaveLength(1);
+    const persistedReconciliation = JSON.parse(
+      String(
+        rows(
+          fx.databasePath,
+          'SELECT payload_json FROM reconciliations WHERE business_day_id = ?',
+          DAY_ID,
+        )[0]?.['payload_json'],
+      ),
+    ) as { lines: Array<{ differenceMinor: number; varianceReason: string | null }> };
+    expect(persistedReconciliation.lines[0]).toMatchObject({
+      differenceMinor: -500,
+      varianceReason: 'Cash drawer recount',
+    });
 
     const replay = await fx.service.closeDay({
       businessDayId: DAY_ID,
       draftScopeId: DRAFT_SCOPE,
-      actualPayments: exactActuals,
-      varianceReasons: noVarianceReasons,
+      actualPayments: successfulVarianceActuals,
+      varianceReasons: successfulVarianceReasons,
     });
     expect(replay.ok).toBe(true);
     if (!replay.ok) return;

@@ -224,3 +224,23 @@ resolve open Business Day + Current Operator
 A retry with the same command UUID resolves to the already committed movement rather than creating another movement. Undo appends the exact opposite movement and the persistence boundary prevents a second compensation. If movement/audit/outbox persistence cannot commit atomically, the worker command fails locally and the movement is not acknowledged.
 
 Balance is derived from durable movement history across Business Days. Phase 7 adds no End Day reset path; the actual End Day phase must still prove that closing a Business Day does not mutate Bulk Stock.
+
+## End Day local close
+
+End Day is offline-first and has no remote success dependency.
+
+```text
+resolve current OPEN Business Day + Current Operator
+→ block ACTIVE orders
+→ require explicit durable-draft resolution
+→ collect blind actual reconciliation values
+→ reveal exact Expected / Actual / Difference
+→ require reason for every non-zero variance
+→ final closing summary
+→ one local transaction:
+   Reconciliation + Worker Session end + Business Day close + audit + outbox
+→ return Operations to no-active-Business-Day state
+→ cloud outbox delivery may happen later
+```
+
+A local persistence failure blocks closing and the transaction rolls back. Network/Supabase availability cannot block a valid local close because no remote request is made. Repeating `closeDay` for the same already-closed Business Day is a no-write idempotent replay. No automatic PDF, print or next-day creation occurs.

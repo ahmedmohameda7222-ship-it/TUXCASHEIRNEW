@@ -283,3 +283,11 @@ Bulk Stock has no mutable worker-facing count field. The balance is the exact su
 Worker movement types are `BULK_UNIT_FINISHED`, `BULK_STOCK_RECEIVED`, `UNDO_BULK_UNIT_FINISHED`, and `UNDO_BULK_STOCK_RECEIVED`. A compensating Undo preserves the original historical fact and links the opposite movement through `compensatesMovementId`.
 
 `Add Stock` is an inventory-only physical receipt event. It has no price/cost/Paid From field and creates no Expense or Purchase financial record. Every committed worker movement carries immutable Business Day, worker, timestamp, command/idempotency identity, audit and outbox attribution.
+
+## End Day reconciliation snapshot
+
+A successful End Day persists the existing `Reconciliation` aggregate for the closing Business Day. Each line snapshots payment method identity/label/logic type together with exact `expectedMinor`, blind-entered `actualMinor`, signed `differenceMinor = actual - expected`, and `varianceReason` when the difference is non-zero.
+
+Expected collection is derived from immutable order/payment snapshots but recognizes only `DONE` orders. `CANCELLED` and `RETURNED` orders remain historical records and contribute zero to expected collection. Current manual Cash expenses are deducted from the Cash expectation; Other expenses and non-financial Delivery Failed expense rows do not reduce expected drawer Cash.
+
+Closing changes the existing Business Day from OPEN to CLOSED and ends the current Worker Session. It does not create the next Business Day, reset Bulk Stock, delete orders/expenses, or rewrite historical commercial/payment facts. A new Business Day receives a new identity and starts its display order counter at zero so its first allocation is #1.

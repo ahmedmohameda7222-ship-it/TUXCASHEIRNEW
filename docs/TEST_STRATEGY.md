@@ -200,3 +200,23 @@ Automated Phase 7 coverage protects:
 - typed browser/IndexedDB and Electron/SQLite capability wiring through strict TypeScript and production builds.
 
 Rendered card layout, Add Stock dialog interaction, direct `Finished 1`, visible short Undo and responsive behavior remain `IMPLEMENTED_NOT_VALIDATED` until rendered browser/Electron QA or dedicated E2E evidence exists.
+
+## Phase 8 End Day coverage
+
+Automated Phase 8 coverage protects:
+
+- Cash-first reconciliation ordering with current Cash/Digital methods and no Card reconciliation path;
+- ACTIVE orders hard-blocking End Day before reconciliation mutation;
+- meaningful durable drafts remaining intact until explicit discard;
+- READY gate returning payment method identity only, with no Expected-value leakage;
+- DONE-only recognized sales/payment collection, with Cancelled and Returned Delivery excluded;
+- exact Cash expectation after Cash-paid Expenses;
+- exact signed variance and mandatory reason for non-zero difference;
+- successful close with a non-zero variance reason and no automatic variance Expense;
+- cross-midnight Business Day close, current Worker Session end, reconciliation/audit/outbox persistence;
+- Bulk Stock movement history remaining unchanged by End Day;
+- replaying close on an already-closed Business Day producing no duplicate reconciliation/close outbox;
+- injected outbox persistence failure rolling back reconciliation, session end, Business Day close and close audit;
+- new Business Day display-order allocation beginning at #1.
+
+Strict TypeScript and production builds validate browser/Electron End Day boundaries. Profile-menu interaction, blind-count presentation, Final Closing Summary rendering and post-close locked-screen transition remain `IMPLEMENTED_NOT_VALIDATED` until rendered QA/E2E evidence exists.
