@@ -2,6 +2,7 @@ import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
   OperationsBulkStockService,
+  OperationsEndDayService,
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -17,6 +18,7 @@ import {
 } from '@tux/persistence/browser';
 import type {
   TuxBulkStockApi,
+  TuxEndDayApi,
   TuxExpensesApi,
   TuxOrdersApi,
   TuxOrdersBoardApi,
@@ -34,6 +36,7 @@ export type OperationsOrdersClient = TuxOrdersApi;
 export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 export type OperationsExpensesClient = TuxExpensesApi;
 export type OperationsBulkStockClient = TuxBulkStockApi;
+export type OperationsEndDayClient = TuxEndDayApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
@@ -41,6 +44,7 @@ interface BrowserRuntime {
   readonly ordersBoard: OperationsOrdersBoardService;
   readonly expenses: OperationsExpensesService;
   readonly bulkStock: OperationsBulkStockService;
+  readonly endDay: OperationsEndDayService;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -91,6 +95,14 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           database,
           readModel,
           bulkStockStore,
+          runtime,
+          coordinator,
+        ),
+        endDay: new OperationsEndDayService(
+          database,
+          readModel,
+          draftStore,
+          expenseStore,
           runtime,
           coordinator,
         ),
@@ -155,5 +167,17 @@ export function createOperationsBulkStockClient(): OperationsBulkStockClient {
     finishOne: async (input) => (await browserRuntime()).bulkStock.finishOne(input),
     addStock: async (input) => (await browserRuntime()).bulkStock.addStock(input),
     undoMovement: async (input) => (await browserRuntime()).bulkStock.undoMovement(input),
+  };
+}
+
+export function createOperationsEndDayClient(): OperationsEndDayClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.endDay;
+  return {
+    beginEndDay: async (draftScopeId) => (await browserRuntime()).endDay.beginEndDay(draftScopeId),
+    discardDraft: async (draftScopeId) => (await browserRuntime()).endDay.discardDraft(draftScopeId),
+    previewReconciliation: async (input) =>
+      (await browserRuntime()).endDay.previewReconciliation(input),
+    closeDay: async (input) => (await browserRuntime()).endDay.closeDay(input),
   };
 }
