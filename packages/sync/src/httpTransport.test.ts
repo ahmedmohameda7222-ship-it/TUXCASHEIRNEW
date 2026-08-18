@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { instant, parseEntityId, type OutboxEvent, type OutboxEventId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type OutboxEvent,
+  type OutboxEventId,
+  type ShopId,
+} from '@tux/domain';
 import { HttpOutboxTransport } from './httpTransport';
 
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
@@ -53,7 +59,11 @@ describe('HttpOutboxTransport', () => {
   });
 
   it('requires HTTPS outside loopback development', () => {
-    expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(/HTTPS/);
-    expect(() => new HttpOutboxTransport({ endpoint: 'http://localhost:8787/events' })).not.toThrow();
+    expect(() => new HttpOutboxTransport({ endpoint: 'http://example.test/events' })).toThrow(
+      /HTTPS/,
+    );
+    expect(
+      () => new HttpOutboxTransport({ endpoint: 'http://localhost:8787/events' }),
+    ).not.toThrow();
   });
 });

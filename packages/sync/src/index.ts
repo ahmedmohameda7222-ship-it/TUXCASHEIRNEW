@@ -8,7 +8,4 @@ export {
   type OutboxSyncSummary,
   type OutboxTransport,
 } from './outboxSync';
-export {
-  AutomaticOutboxScheduler,
-  type AutomaticOutboxSchedulerOptions,
-} from './scheduler';
+export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';

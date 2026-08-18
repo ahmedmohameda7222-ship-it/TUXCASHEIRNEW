@@ -88,12 +88,7 @@ export class OutboxSyncService {
           const nextAttemptAt = nextOutboxRetryAt(failedAt, attemptCount);
           const lastError = normalizedError(error);
           await this.#database.transaction((transaction) =>
-            transaction.outbox.recordFailure(
-              event.id,
-              attemptCount,
-              nextAttemptAt,
-              lastError,
-            ),
+            transaction.outbox.recordFailure(event.id, attemptCount, nextAttemptAt, lastError),
           );
           return {
             attempted: delivered + 1,

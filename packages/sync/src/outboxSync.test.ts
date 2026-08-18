@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { instant, parseEntityId, type OutboxEvent, type OutboxEventId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type OutboxEvent,
+  type OutboxEventId,
+  type ShopId,
+} from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 import { nextOutboxRetryAt, outboxRetryDelayMs, OutboxSyncService } from './outboxSync';
 
@@ -29,13 +35,21 @@ class MemoryDatabase implements OperationsDatabase {
   readonly events = new Map<OutboxEventId, OutboxEvent>();
   async initialize(): Promise<void> {}
   async close(): Promise<void> {}
-  async transaction<Result>(work: (transaction: OperationsTransaction) => Promise<Result>): Promise<Result> {
+  async transaction<Result>(
+    work: (transaction: OperationsTransaction) => Promise<Result>,
+  ): Promise<Result> {
     const transaction = {
       outbox: {
-        append: async (event: OutboxEvent) => { this.events.set(event.id, event); },
+        append: async (event: OutboxEvent) => {
+          this.events.set(event.id, event);
+        },
         listPending: async (now: ReturnType<typeof instant>, limit: number) =>
           [...this.events.values()]
-            .filter((event) => event.deliveredAt === null && (event.nextAttemptAt === null || event.nextAttemptAt <= now))
+            .filter(
+              (event) =>
+                event.deliveredAt === null &&
+                (event.nextAttemptAt === null || event.nextAttemptAt <= now),
+            )
             .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
             .slice(0, limit),
         markDelivered: async (id: OutboxEventId, deliveredAt: ReturnType<typeof instant>) => {
@@ -43,7 +57,12 @@ class MemoryDatabase implements OperationsDatabase {
           if (current === undefined) throw new Error('Missing event');
           this.events.set(id, { ...current, deliveredAt, nextAttemptAt: null, lastError: null });
         },
-        recordFailure: async (id: OutboxEventId, attemptCount: number, nextAttemptAt: ReturnType<typeof instant>, lastError: string) => {
+        recordFailure: async (
+          id: OutboxEventId,
+          attemptCount: number,
+          nextAttemptAt: ReturnType<typeof instant>,
+          lastError: string,
+        ) => {
           const current = this.events.get(id);
           if (current === undefined) throw new Error('Missing event');
           this.events.set(id, { ...current, attemptCount, nextAttemptAt, lastError });
@@ -66,11 +85,22 @@ describe('OutboxSyncService', () => {
     const delivered: string[] = [];
     const service = new OutboxSyncService(
       database,
-      { deliver: async (event) => { delivered.push(event.idempotencyKey); expect(database.events.get(event.id)?.deliveredAt).toBeNull(); } },
+      {
+        deliver: async (event) => {
+          delivered.push(event.idempotencyKey);
+          expect(database.events.get(event.id)?.deliveredAt).toBeNull();
+        },
+      },
       { now: () => instant('2026-08-18T11:00:00.000Z') },
       coordinator,
     );
-    expect(await service.syncOnce()).toEqual({ attempted: 2, delivered: 2, failed: 0, blockedUntil: null, lastError: null });
+    expect(await service.syncOnce()).toEqual({
+      attempted: 2,
+      delivered: 2,
+      failed: 0,
+      blockedUntil: null,
+      lastError: null,
+    });
     expect(delivered).toEqual([first.idempotencyKey, second.idempotencyKey]);
   });
 
@@ -83,14 +113,29 @@ describe('OutboxSyncService', () => {
     const attempted: string[] = [];
     const service = new OutboxSyncService(
       database,
-      { deliver: async (event) => { attempted.push(event.id); throw new Error('offline'); } },
+      {
+        deliver: async (event) => {
+          attempted.push(event.id);
+          throw new Error('offline');
+        },
+      },
       { now: () => instant('2026-08-18T11:00:00.000Z') },
       coordinator,
     );
     const result = await service.syncOnce();
     expect(attempted).toEqual([first.id]);
-    expect(result).toMatchObject({ attempted: 1, delivered: 0, failed: 1, blockedUntil: '2026-08-18T11:00:02.000Z', lastError: 'offline' });
-    expect(database.events.get(first.id)).toMatchObject({ attemptCount: 1, nextAttemptAt: '2026-08-18T11:00:02.000Z', deliveredAt: null });
+    expect(result).toMatchObject({
+      attempted: 1,
+      delivered: 0,
+      failed: 1,
+      blockedUntil: '2026-08-18T11:00:02.000Z',
+      lastError: 'offline',
+    });
+    expect(database.events.get(first.id)).toMatchObject({
+      attemptCount: 1,
+      nextAttemptAt: '2026-08-18T11:00:02.000Z',
+      deliveredAt: null,
+    });
     expect(database.events.get(second.id)?.attemptCount).toBe(0);
   });
 
@@ -98,6 +143,8 @@ describe('OutboxSyncService', () => {
     expect(outboxRetryDelayMs(1)).toBe(2_000);
     expect(outboxRetryDelayMs(2)).toBe(4_000);
     expect(outboxRetryDelayMs(20)).toBe(300_000);
-    expect(nextOutboxRetryAt(instant('2026-08-18T10:00:00.000Z'), 2)).toBe('2026-08-18T10:00:04.000Z');
+    expect(nextOutboxRetryAt(instant('2026-08-18T10:00:00.000Z'), 2)).toBe(
+      '2026-08-18T10:00:04.000Z',
+    );
   });
 });
