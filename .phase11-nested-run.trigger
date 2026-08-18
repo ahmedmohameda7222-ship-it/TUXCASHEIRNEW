@@ -1,1 +1,1 @@
-materialize read-only Phase 11 product polish files
+run final authoritative Phase 11 gate on patched product tree
