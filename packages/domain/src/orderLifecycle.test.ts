@@ -1,4 +1,4 @@
-derLifecycle.test.ts', r'''import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   cancelActiveOrder,
   canUndoOrderDone,
@@ -136,31 +136,3 @@ describe('order lifecycle', () => {
     expect(orderLifecycle(returned).returned?.reason).toBe('Customer unreachable');
   });
 });
-''')
-
-replace(
-    'packages/domain/src/index.ts',
-    "export { assertOrderSnapshotIntegrity } from './order';\n",
-    """export { assertOrderSnapshotIntegrity } from './order';
-export {
-  cancelActiveOrder,
-  canUndoOrderDone,
-  DONE_UNDO_WINDOW_MS,
-  markOrderDone,
-  orderLifecycle,
-  returnFailedDelivery,
-  undoOrderDone,
-} from './orderLifecycle';
-""",
-)
-
-replace(
-    'packages/application/src/orders.ts',
-    "            status: 'ACTIVE',\n            source: 'POS',",
-    """            status: 'ACTIVE',
-            lifecycle: {
-              revision: 0,
-              doneAt: null,
-              cancellation: null,
-              returned: null,
-      

@@ -1,9 +1,12 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
 import {
+  createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
+  type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
 } from './sessionClient';
 
@@ -16,6 +19,7 @@ type ScreenState =
     };
 
 type ThemePreference = 'system' | 'light' | 'dark';
+type OperationsArea = 'ORDERS' | 'ORDERS_BOARD';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 
 function initialTheme(): ThemePreference {
@@ -143,6 +147,7 @@ function formatShiftTime(value: string): string {
 function ActiveShell({
   session,
   ordersClient,
+  ordersBoardClient,
   busy,
   error,
   onSwitch,
@@ -150,6 +155,7 @@ function ActiveShell({
 }: {
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
   readonly ordersClient: OperationsOrdersClient;
+  readonly ordersBoardClient: OperationsOrdersBoardClient;
   readonly busy: boolean;
   readonly error: string | null;
   readonly onSwitch: (pin: string) => Promise<boolean>;
@@ -158,6 +164,7 @@ function ActiveShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
+  const [area, setArea] = useState<OperationsArea>('ORDERS');
 
   useEffect(() => {
     if (theme === 'system') {
@@ -183,10 +190,18 @@ function ActiveShell({
       <header className="operations-header">
         <Brand />
         <nav className="operations-nav" aria-label="Operations">
-          <button type="button" className="nav-item nav-item-active">
+          <button
+            type="button"
+            className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('ORDERS')}
+          >
             Orders
           </button>
-          <button type="button" className="nav-item" disabled>
+          <button
+            type="button"
+            className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setArea('ORDERS_BOARD')}
+          >
             Orders Board
           </button>
           <button type="button" className="nav-item" disabled>
@@ -246,7 +261,11 @@ function ActiveShell({
         </div>
       </header>
 
-      <OrdersWorkspace session={session} client={ordersClient} />
+      {area === 'ORDERS' ? (
+        <OrdersWorkspace session={session} client={ordersClient} />
+      ) : (
+        <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
+      )}
 
       {error === null ? null : (
         <div className="global-error" role="alert">
@@ -290,6 +309,7 @@ function ActiveShell({
 export function App() {
   const client = useMemo(() => createOperationsSessionClient(), []);
   const ordersClient = useMemo(() => createOperationsOrdersClient(), []);
+  const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -371,6 +391,7 @@ export function App() {
     <ActiveShell
       session={screen.session}
       ordersClient={ordersClient}
+      ordersBoardClient={ordersBoardClient}
       busy={busy}
       error={error}
       onSwitch={applyPin}

@@ -411,6 +411,12 @@ export class OperationsOrdersService {
             displayOrderNo: allocated.displayOrderNo,
             idempotencyKey: draft.checkoutIntentKey,
             status: 'ACTIVE',
+            lifecycle: {
+              revision: 0,
+              doneAt: null,
+              cancellation: null,
+              returned: null,
+            },
             source: 'POS',
             operatorWorkerId: currentWorker.id,
             operatorName: currentWorker.displayName,

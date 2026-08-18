@@ -1,58 +1,4 @@
-from pathlib import Path
-
-
-def replace(path: str, old: str, new: str) -> None:
-    p = Path(path)
-    text = p.read_text()
-    if old not in text:
-        raise SystemExit(f'Expected snippet not found in {path}: {old[:120]!r}')
-    p.write_text(text.replace(old, new, 1))
-
-
-def write(path: str, content: str) -> None:
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content)
-
-# Domain lifecycle metadata + pure transition helpers.
-replace(
-    'packages/domain/src/models.ts',
-    "export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';\nexport type OrderSource = 'POS' | 'ONLINE';\n\nexport interface OrderSnapshot {",
-    """export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
-export type OrderSource = 'POS' | 'ONLINE';
-
-export interface OrderCancellationSnapshot {
-  readonly at: Instant;
-  readonly workerId: WorkerId;
-  readonly workerName: string;
-  readonly foodPrepared: boolean;
-  readonly stockRestored: boolean;
-  readonly reason: string;
-}
-
-export interface OrderReturnSnapshot {
-  readonly at: Instant;
-  readonly workerId: WorkerId;
-  readonly workerName: string;
-  readonly reason: string;
-}
-
-export interface OrderLifecycleSnapshot {
-  readonly revision: number;
-  readonly doneAt: Instant | null;
-  readonly cancellation: OrderCancellationSnapshot | null;
-  readonly returned: OrderReturnSnapshot | null;
-}
-
-export interface OrderSnapshot {""",
-)
-replace(
-    'packages/domain/src/models.ts',
-    "  readonly status: OrderStatus;\n  readonly source: OrderSource;",
-    "  readonly status: OrderStatus;\n  readonly lifecycle?: OrderLifecycleSnapshot;\n  readonly source: OrderSource;",
-)
-
-write('packages/domain/src/orderLifecycle.ts', r'''import { DomainInvariantError } from './errors';
+import { DomainInvariantError } from './errors';
 import type { WorkerId } from './ids';
 import type { OrderLifecycleSnapshot, OrderSnapshot } from './models';
 import type { Instant } from './time';
@@ -188,6 +134,3 @@ export function returnFailedDelivery(
     },
   };
 }
-''')
-
-write('packages/domain/src/or

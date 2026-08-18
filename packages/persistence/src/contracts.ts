@@ -60,7 +60,9 @@ export interface BusinessDayRepository {
 export interface OrderRepository {
   getById(id: OrderId): Promise<OrderSnapshot | null>;
   getByIdempotencyKey(shopId: ShopId, idempotencyKey: string): Promise<OrderSnapshot | null>;
+  listByBusinessDay(businessDayId: BusinessDayId): Promise<readonly OrderSnapshot[]>;
   insert(order: OrderSnapshot): Promise<void>;
+  updateOperationalState(order: OrderSnapshot): Promise<void>;
 }
 
 export interface ExpenseRepository {
@@ -70,6 +72,7 @@ export interface ExpenseRepository {
 export interface InventoryRepository {
   putItem(item: InventoryItem): Promise<void>;
   appendMovement(movement: InventoryMovement): Promise<void>;
+  listMovementsForOrder(orderId: OrderId): Promise<readonly InventoryMovement[]>;
 }
 
 export interface ReconciliationRepository {

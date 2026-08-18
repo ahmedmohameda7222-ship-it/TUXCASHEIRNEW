@@ -228,8 +228,30 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           store('orders').index('shopIdempotency').get([shopId, idempotencyKey]),
         );
       },
+      async listByBusinessDay(businessDayId: BusinessDayId) {
+        const all = (await requestResult(store('orders').getAll())) as OrderSnapshot[];
+        return all
+          .filter((order) => order.businessDayId === businessDayId)
+          .sort(
+            (left, right) =>
+              left.createdAt.localeCompare(right.createdAt) ||
+              left.displayOrderNo - right.displayOrderNo,
+          );
+      },
       async insert(order: OrderSnapshot) {
         await requestResult(store('orders').add(order));
+      },
+      async updateOperationalState(order: OrderSnapshot) {
+        const orders = store('orders');
+        const existing = await recordOrNull<OrderSnapshot>(orders.get(order.id));
+        if (existing === null) {
+          throw new Error(`Order ${order.id} was not found.`);
+        }
+        const updated =
+          order.lifecycle === undefined
+            ? { ...existing, status: order.status }
+            : { ...existing, status: order.status, lifecycle: order.lifecycle };
+        await requestResult(orders.put(updated));
       },
     },
     expenses: {
@@ -243,6 +265,14 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       },
       async appendMovement(movement: InventoryMovement) {
         await requestResult(store('inventoryMovements').add(movement));
+      },
+      async listMovementsForOrder(orderId: OrderId) {
+        const all = (await requestResult(
+          store('inventoryMovements').getAll(),
+        )) as InventoryMovement[];
+        return all
+          .filter((movement) => movement.orderId === orderId)
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
       },
     },
     reconciliations: {

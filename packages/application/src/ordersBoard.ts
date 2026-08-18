@@ -1,129 +1,4 @@
- inventory_movements(
-              id, shop_id, business_day_id, item_id, movement_type, quantity_delta_micros, idempotency_key,
-              worker_id, order_id, created_at, compensates_movement_id, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            movement.id,
-            movement.shopId,
-            movement.businessDayId,
-            movement.itemId,
-            movement.movementType,
-            movement.quantityDeltaMicros,
-            movement.idempotencyKey,
-            movement.workerId,
-            movement.orderId,
-            movement.createdAt,
-            movement.compensatesMovementId,
-            serialize(movement),
-          );
-      },
-      async listMovementsForOrder(orderId: OrderId) {
-        return database
-          .prepare(
-            'SELECT payload_json FROM inventory_movements WHERE order_id = ? ORDER BY created_at ASC, id ASC',
-          )
-          .all(orderId)
-          .map((row) => parsePayload<InventoryMovement>(row))
-          .filter((movement): movement is InventoryMovement => movement !== null);
-      },
-    },""",
-)
-
-replace(
-    'packages/persistence/src/sqlite/migrations.ts',
-    """  {
-    version: 2,
-    name: 'one_open_worker_session_per_business_day',
-    sql: `
-CREATE UNIQUE INDEX ux_worker_sessions_one_open_per_business_day
-ON worker_sessions(business_day_id)
-WHERE ended_at IS NULL;
-`,
-  },
-];""",
-    """  {
-    version: 2,
-    name: 'one_open_worker_session_per_business_day',
-    sql: `
-CREATE UNIQUE INDEX ux_worker_sessions_one_open_per_business_day
-ON worker_sessions(business_day_id)
-WHERE ended_at IS NULL;
-`,
-  },
-  {
-    version: 3,
-    name: 'orders_board_lookup_indexes',
-    sql: `
-CREATE INDEX idx_inventory_movements_order ON inventory_movements(order_id, created_at);
-`,
-  },
-];""",
-)
-
-replace(
-    'packages/persistence/src/browser/IndexedDbOperationsDatabase.ts',
-    """      async getByIdempotencyKey(shopId: ShopId, idempotencyKey: string) {
-        return recordOrNull<OrderSnapshot>(
-          store('orders').index('shopIdempotency').get([shopId, idempotencyKey]),
-        );
-      },
-      async insert(order: OrderSnapshot) {
-        await requestResult(store('orders').add(order));
-      },
-    },""",
-    """      async getByIdempotencyKey(shopId: ShopId, idempotencyKey: string) {
-        return recordOrNull<OrderSnapshot>(
-          store('orders').index('shopIdempotency').get([shopId, idempotencyKey]),
-        );
-      },
-      async listByBusinessDay(businessDayId: BusinessDayId) {
-        const all = (await requestResult(store('orders').getAll())) as OrderSnapshot[];
-        return all
-          .filter((order) => order.businessDayId === businessDayId)
-          .sort(
-            (left, right) =>
-              left.createdAt.localeCompare(right.createdAt) ||
-              left.displayOrderNo - right.displayOrderNo,
-          );
-      },
-      async insert(order: OrderSnapshot) {
-        await requestResult(store('orders').add(order));
-      },
-      async updateOperationalState(order: OrderSnapshot) {
-        const orders = store('orders');
-        const existing = await recordOrNull<OrderSnapshot>(orders.get(order.id));
-        if (existing === null) {
-          throw new Error(`Order ${order.id} was not found.`);
-        }
-        await requestResult(
-          orders.put({ ...existing, status: order.status, lifecycle: order.lifecycle }),
-        );
-      },
-    },""",
-)
-replace(
-    'packages/persistence/src/browser/IndexedDbOperationsDatabase.ts',
-    """      async appendMovement(movement: InventoryMovement) {
-        await requestResult(store('inventoryMovements').add(movement));
-      },
-    },""",
-    """      async appendMovement(movement: InventoryMovement) {
-        await requestResult(store('inventoryMovements').add(movement));
-      },
-      async listMovementsForOrder(orderId: OrderId) {
-        const all = (await requestResult(
-          store('inventoryMovements').getAll(),
-        )) as InventoryMovement[];
-        return all
-          .filter((movement) => movement.orderId === orderId)
-          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-      },
-    },""",
-)
-
-# Application Orders Board service.
-write('packages/application/src/ordersBoard.ts', r'''import {
+import {
   DomainInvariantError,
   ZERO_MONEY,
   canUndoOrderDone,
@@ -151,7 +26,11 @@ write('packages/application/src/ordersBoard.ts', r'''import {
   type ShopId,
   type Worker,
 } from '@tux/domain';
-import type { OperationsDatabase, OperationsTransaction, OperatorSessionReadModel } from '@tux/persistence';
+import type {
+  OperationsDatabase,
+  OperationsTransaction,
+  OperatorSessionReadModel,
+} from '@tux/persistence';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import type { ApplicationError } from './errors';
 import { err, ok, type Result } from './result';
@@ -336,7 +215,8 @@ export class OperationsOrdersBoardService {
 
       await transaction.orders.updateOperationalState(updated);
       const cancellation = orderLifecycle(updated).cancellation;
-      if (cancellation === null) throw new Error('Cancelled order is missing cancellation metadata.');
+      if (cancellation === null)
+        throw new Error('Cancelled order is missing cancellation metadata.');
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'ORDER_CANCELLED', {
           reason: cancellation.reason,
@@ -451,4 +331,91 @@ export class OperationsOrdersBoardService {
       transaction.businessDays.getOpenForShop(shop.id),
     );
     if (day === null || day.status !== 'OPEN') {
-      return err({ code
+      return err({ code: 'CONFLICT_ERROR', message: 'No active Business Day.' });
+    }
+    const session = await this.#readModel.getOpenWorkerSession(day.id);
+    if (session === null || session.endedAt !== null) {
+      return err({ code: 'CONFLICT_ERROR', message: 'A Current Operator is required.' });
+    }
+    const worker = await this.#database.transaction((transaction) =>
+      transaction.workers.getById(session.workerId),
+    );
+    if (worker === null || !worker.active || worker.shopId !== shop.id) {
+      return err({ code: 'CONFLICT_ERROR', message: 'The Current Operator is unavailable.' });
+    }
+    return ok({ shopId: shop.id, businessDayId: day.id, operator: worker });
+  }
+
+  async #currentOrder(
+    transaction: OperationsTransaction,
+    context: MutationContext,
+    orderId: OrderId,
+  ): Promise<OrderSnapshot> {
+    const day = await transaction.businessDays.getOpenForShop(context.shopId);
+    if (day === null || day.status !== 'OPEN' || day.id !== context.businessDayId) {
+      throw new DomainInvariantError('The Business Day changed before the order action committed.');
+    }
+    const order = await transaction.orders.getById(orderId);
+    if (order === null || order.shopId !== context.shopId || order.businessDayId !== day.id) {
+      throw new DomainInvariantError('The order is not part of the current Business Day.');
+    }
+    return order;
+  }
+
+  #audit(
+    order: OrderSnapshot,
+    worker: Worker,
+    createdAt: Instant,
+    eventType: Extract<
+      AuditEvent['eventType'],
+      'ORDER_MARKED_DONE' | 'ORDER_DONE_UNDONE' | 'ORDER_CANCELLED' | 'DELIVERY_RETURNED'
+    >,
+    details: Readonly<Record<string, JsonValue>>,
+  ): AuditEvent {
+    return {
+      id: this.#id<AuditEventId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      aggregateType: 'ORDER',
+      aggregateId: order.id,
+      eventType,
+      workerId: worker.id,
+      createdAt,
+      details,
+    };
+  }
+
+  #outbox(
+    order: OrderSnapshot,
+    createdAt: Instant,
+    eventType: 'ORDER_MARKED_DONE' | 'ORDER_DONE_UNDONE' | 'ORDER_CANCELLED' | 'DELIVERY_RETURNED',
+    payload: Readonly<Record<string, JsonValue>>,
+  ): OutboxEvent {
+    const revision = orderLifecycle(order).revision;
+    return {
+      id: this.#id<OutboxEventId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      aggregateType: 'ORDER',
+      aggregateId: order.id,
+      eventType,
+      idempotencyKey: `order-operational:${order.id}:${revision}:${eventType}`,
+      payloadVersion: 1,
+      payload: {
+        orderId: order.id,
+        businessDayId: order.businessDayId,
+        displayOrderNo: order.displayOrderNo,
+        ...payload,
+      },
+      createdAt,
+      attemptCount: 0,
+      nextAttemptAt: null,
+      lastError: null,
+      deliveredAt: null,
+    };
+  }
+
+  #id<Id extends EntityId>(): Id {
+    return parseEntityId<Id>(this.#runtime.createUuid());
+  }
+}

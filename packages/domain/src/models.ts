@@ -144,6 +144,29 @@ export type OrderFulfillmentSnapshot =
 export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
 export type OrderSource = 'POS' | 'ONLINE';
 
+export interface OrderCancellationSnapshot {
+  readonly at: Instant;
+  readonly workerId: WorkerId;
+  readonly workerName: string;
+  readonly foodPrepared: boolean;
+  readonly stockRestored: boolean;
+  readonly reason: string;
+}
+
+export interface OrderReturnSnapshot {
+  readonly at: Instant;
+  readonly workerId: WorkerId;
+  readonly workerName: string;
+  readonly reason: string;
+}
+
+export interface OrderLifecycleSnapshot {
+  readonly revision: number;
+  readonly doneAt: Instant | null;
+  readonly cancellation: OrderCancellationSnapshot | null;
+  readonly returned: OrderReturnSnapshot | null;
+}
+
 export interface OrderSnapshot {
   readonly id: OrderId;
   readonly shopId: ShopId;
@@ -151,6 +174,7 @@ export interface OrderSnapshot {
   readonly displayOrderNo: number;
   readonly idempotencyKey: string;
   readonly status: OrderStatus;
+  readonly lifecycle?: OrderLifecycleSnapshot;
   readonly source: OrderSource;
   readonly operatorWorkerId: WorkerId;
   readonly operatorName: string;

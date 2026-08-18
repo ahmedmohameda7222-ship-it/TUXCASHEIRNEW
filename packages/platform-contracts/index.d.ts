@@ -1,8 +1,17 @@
-import type { OperationsOrdersService, OperationsSessionResult } from '@tux/application';
+import type {
+  OperationsOrdersBoardService,
+  OperationsOrdersService,
+  OperationsSessionResult,
+} from '@tux/application';
 
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
   'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
+>;
+
+export type TuxOrdersBoardApi = Pick<
+  OperationsOrdersBoardService,
+  'loadBoard' | 'markDone' | 'undoDone' | 'cancelOrder' | 'returnDelivery'
 >;
 
 export interface TuxDesktopApi {
@@ -15,4 +24,5 @@ export interface TuxDesktopApi {
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
   readonly orders: TuxOrdersApi;
+  readonly ordersBoard: TuxOrdersBoardApi;
 }

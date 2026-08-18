@@ -31,6 +31,15 @@ export {
 } from './money';
 export type { MoneyMinor } from './money';
 export { assertOrderSnapshotIntegrity } from './order';
+export {
+  cancelActiveOrder,
+  canUndoOrderDone,
+  DONE_UNDO_WINDOW_MS,
+  markOrderDone,
+  orderLifecycle,
+  returnFailedDelivery,
+  undoOrderDone,
+} from './orderLifecycle';
 export type * from './orderDraft';
 export {
   parsePoundsToMinor,

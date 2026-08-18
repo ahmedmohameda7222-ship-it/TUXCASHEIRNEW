@@ -8,6 +8,7 @@ import {
   assertReprintOrderResult,
   assertSaveDraftResult,
 } from './ordersResult';
+import { assertOrderTransitionResult, assertOrdersBoardResult } from './ordersBoardResult';
 import { assertSessionResult } from './sessionResult';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
@@ -19,6 +20,11 @@ const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
 const IPC_ORDERS_REPRINT = 'tux:orders:reprint';
+const IPC_BOARD_LOAD = 'tux:orders-board:load';
+const IPC_BOARD_MARK_DONE = 'tux:orders-board:mark-done';
+const IPC_BOARD_UNDO_DONE = 'tux:orders-board:undo-done';
+const IPC_BOARD_CANCEL = 'tux:orders-board:cancel';
+const IPC_BOARD_RETURN = 'tux:orders-board:return';
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -53,6 +59,22 @@ const api: TuxDesktopApi = Object.freeze({
       assertOrderPlacementResult((await ipcRenderer.invoke(IPC_ORDERS_PLACE, draft)) as unknown),
     reprintOrder: async (orderId: OrderId) =>
       assertReprintOrderResult((await ipcRenderer.invoke(IPC_ORDERS_REPRINT, orderId)) as unknown),
+  }),
+  ordersBoard: Object.freeze({
+    loadBoard: async () =>
+      assertOrdersBoardResult((await ipcRenderer.invoke(IPC_BOARD_LOAD)) as unknown),
+    markDone: async (orderId: OrderId) =>
+      assertOrderTransitionResult(
+        (await ipcRenderer.invoke(IPC_BOARD_MARK_DONE, orderId)) as unknown,
+      ),
+    undoDone: async (orderId: OrderId) =>
+      assertOrderTransitionResult(
+        (await ipcRenderer.invoke(IPC_BOARD_UNDO_DONE, orderId)) as unknown,
+      ),
+    cancelOrder: async (input: Parameters<TuxDesktopApi['ordersBoard']['cancelOrder']>[0]) =>
+      assertOrderTransitionResult((await ipcRenderer.invoke(IPC_BOARD_CANCEL, input)) as unknown),
+    returnDelivery: async (input: Parameters<TuxDesktopApi['ordersBoard']['returnDelivery']>[0]) =>
+      assertOrderTransitionResult((await ipcRenderer.invoke(IPC_BOARD_RETURN, input)) as unknown),
   }),
 });
 

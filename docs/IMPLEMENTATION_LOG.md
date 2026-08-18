@@ -79,3 +79,16 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - Permanent CI on code head `b36081c017948aefb7122bca2c490ddca9671ca4` passed locked install, Prettier, ESLint, strict TypeScript, all unit/integration tests, browser production build, and Electron main/preload production builds before documentation synchronization.
 - No remote Supabase project was linked or mutated; Phase 4 remains fully local-first with remote outbox delivery deferred to the later sync phase.
 - Orders Board lifecycle actions, Cancel/Returned Delivery workflow, End Day draft resolution, Expenses, and Bulk Stock remain outside this Orders phase and are not claimed complete here.
+
+## 2026-08-18 — Phase 5 Orders Board implementation
+
+- Added the current-Business-Day Orders Board read model and worker-facing renderer.
+- Implemented the approved lifecycle only: `ACTIVE → DONE`, `ACTIVE → CANCELLED`, and `DONE Delivery → RETURNED`.
+- Added a time-bounded Done Undo; there is no general Reopen action.
+- Active queue is oldest-first with waiting age and rich preparation cards; history views are newest-first compact rows.
+- Search is deliberately limited to Order # across the current Business Day.
+- Details drawer exposes immutable order/payment/delivery facts, receipt preview/reprint, and state-specific actions.
+- Cancellation records the required prepared/restock decision. If food was not prepared, original `ORDER_CONSUMPTION` movements receive explicit compensating `CANCEL_RESTOCK` movements; prepared food is never restocked.
+- Delivery Failed is Delivery-only from DONE, preserves the historical order total, creates no inventory restoration, records zero recognized revenue/collection semantics in audit/outbox, and creates the locked `DELIVERY_FAILED` expense record with `amount = null`.
+- Every operational transition is one local transaction with order status/lifecycle metadata, audit, outbox, and any required inventory/expense side effect committed atomically.
+- Electron renderer receives typed Orders Board IPC only; no raw SQLite/Node access was introduced.
