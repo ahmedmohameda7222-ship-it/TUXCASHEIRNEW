@@ -250,7 +250,12 @@ jobs:
           function consoleGuard(page) {
             const issues = [];
             page.on('console', (message) => {
-              if (message.type() === 'error' || message.type() === 'warning') issues.push(`${message.type()}: ${message.text()}`);
+              const text = message.text();
+              const expectedMetaCspDiagnostic =
+                text.includes('frame-ancestors') &&
+                text.includes('ignored when delivered via a <meta> element');
+              if (expectedMetaCspDiagnostic) return;
+              if (message.type() === 'error' || message.type() === 'warning') issues.push(`${message.type()}: ${text}`);
             });
             page.on('pageerror', (error) => issues.push(`pageerror: ${error.message}`));
             return issues;
@@ -365,9 +370,10 @@ jobs:
             await expect(cards.nth(0)).toContainText('Downtown');
             await expect(cards.nth(0)).toContainText(/\d+ min/);
             await cards.nth(0).locator('.active-card-main').click();
-            await expect(page.getByRole('dialog', { name: 'Order #3' })).toContainText('12 Nile Street');
-            await expect(page.getByRole('button', { name: 'Preview Receipt' })).toBeVisible();
-            await page.getByRole('button', { name: 'Cancel' }).click();
+            const orderDialog = page.getByRole('dialog', { name: 'Order #3' });
+            await expect(orderDialog).toContainText('12 Nile Street');
+            await expect(orderDialog.getByRole('button', { name: 'Preview Receipt' })).toBeVisible();
+            await orderDialog.getByRole('button', { name: 'Cancel' }).click();
             await expect(page.getByText('Was food already prepared?', { exact: true })).toBeVisible();
             await expect(page.getByRole('button', { name: 'No · Restore Stock' })).toBeVisible();
             await expect(page.getByRole('button', { name: 'Yes · Don’t Restore Stock' })).toBeVisible();
