@@ -1,12 +1,15 @@
 name: Phase 11 Targeted Rendered QA
 
 on:
+  push:
+    branches:
+      - test/ops-11-rendered-qa
   pull_request:
     branches:
       - feat/ops-09-sync
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   targeted-rendered-qa:
@@ -14,6 +17,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: test/ops-11-rendered-qa
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -96,6 +101,8 @@ module.exports = defineConfig({
 """)
           PY
       - name: Run corrected Orders + Board/Expenses/Bulk rendered flows
+        id: targeted
+        continue-on-error: true
         run: npx playwright test --config=.qa-runtime/playwright.config.cjs --grep "desktop Orders interactions|Orders Board, Expenses and Bulk Stock"
       - name: Upload targeted evidence
         if: always()
@@ -106,3 +113,21 @@ module.exports = defineConfig({
             qa-artifacts
             qa-artifacts-targeted
           if-no-files-found: warn
+      - name: Record targeted result on QA branch
+        if: always()
+        run: |
+          if [ "${{ steps.targeted.outcome }}" = "success" ]; then
+            printf 'PASS\n' > .phase11-targeted-result.txt
+          else
+            printf 'FAIL\n' > .phase11-targeted-result.txt
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .phase11-targeted-result.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "qa: record Phase 11 targeted rendered result"
+            git push origin HEAD:test/ops-11-rendered-qa
+          fi
+      - name: Fail job when targeted QA failed
+        if: steps.targeted.outcome != 'success'
+        run: exit 1
