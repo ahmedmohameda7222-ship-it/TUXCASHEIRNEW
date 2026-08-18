@@ -1,7 +1,6 @@
 import {
   allocateDisplayOrderNo,
   assertOrderSnapshotIntegrity,
-  moneyMinor,
   parseEntityId,
   preparePaymentParts,
   stockQuantityMicros,
@@ -17,7 +16,6 @@ import {
   type InventoryItemId,
   type InventoryMovement,
   type InventoryMovementId,
-  type MoneyMinor,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
@@ -25,6 +23,7 @@ import {
   type OrderId,
   type OrderItemId,
   type OrderSnapshot,
+  type OrderValidationIssue,
   type OutboxEvent,
   type OutboxEventId,
   type PaymentId,
@@ -37,8 +36,8 @@ import type {
   OperatorSessionReadModel,
   OrderDraftStore,
 } from '@tux/persistence';
-import type { ApplicationError } from './errors';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
+import type { ApplicationError } from './errors';
 import { err, ok, type Result } from './result';
 
 export interface OrdersRuntime {
@@ -65,11 +64,7 @@ export interface OrderPlacement {
 }
 
 export interface OrderPlacementError extends ApplicationError {
-  readonly validationIssues?: ReturnType<typeof validateOrderDraft> extends infer Validation
-    ? Validation extends { readonly valid: false; readonly issues: infer Issues }
-      ? Issues
-      : never
-    : never;
+  readonly validationIssues?: readonly OrderValidationIssue[];
 }
 
 export type OrdersWorkspaceResult = Result<OrdersWorkspace, ApplicationError>;
@@ -80,6 +75,11 @@ interface ResolvedContext {
   readonly day: OpenBusinessDay;
   readonly configuration: OperationsConfigurationSnapshot;
   readonly operator: Worker;
+}
+
+interface DraftResetResult {
+  readonly nextDraft: OrderDraft;
+  readonly warnings: readonly string[];
 }
 
 function persistenceError(message: string, cause: unknown): ApplicationError {
@@ -153,12 +153,16 @@ function calculateInventoryConsumption(
   configuration: OperationsConfigurationSnapshot,
 ): ReadonlyMap<InventoryItemId, number> {
   const usage = new Map<InventoryItemId, number>();
+
   const addProductRecipe = (productId: string, multiplier: number): void => {
     if (!Number.isSafeInteger(multiplier) || multiplier <= 0) {
       throw new RangeError('Inventory recipe multiplier must be a positive safe integer.');
     }
+
     for (const recipe of configuration.recipeLines) {
-      if (recipe.productId !== productId) continue;
+      if (recipe.productId !== productId) {
+        continue;
+      }
       const quantity = recipe.quantityMicros * multiplier;
       if (!Number.isSafeInteger(quantity)) {
         throw new RangeError('Inventory recipe consumption exceeded the safe integer range.');
@@ -183,6 +187,7 @@ function calculateInventoryConsumption(
       }
     }
   }
+
   return usage;
 }
 
@@ -213,8 +218,11 @@ export class OperationsOrdersService {
         if (draftScopeId.trim().length === 0) {
           return err({ code: 'VALIDATION_ERROR', message: 'Draft scope is required.' });
         }
+
         const context = await this.#resolveContext();
-        if (!context.ok) return context;
+        if (!context.ok) {
+          return context;
+        }
 
         const { shopId, day, configuration, operator } = context.value;
         const key = { shopId, businessDayId: day.id, draftScopeId };
@@ -230,6 +238,7 @@ export class OperationsOrdersService {
           });
           await this.#draftStore.put(draft);
         }
+
         return ok({
           shopId,
           businessDayId: day.id,
@@ -247,7 +256,9 @@ export class OperationsOrdersService {
     return this.#coordinator.runExclusive(async () => {
       try {
         const context = await this.#resolveContext();
-        if (!context.ok) return context;
+        if (!context.ok) {
+          return context;
+        }
         if (
           draft.shopId !== context.value.shopId ||
           draft.businessDayId !== context.value.day.id ||
@@ -258,6 +269,7 @@ export class OperationsOrdersService {
             message: 'This draft no longer belongs to the active Business Day.',
           });
         }
+
         const updated: OrderDraft = {
           ...draft,
           revision: draft.revision + 1,
@@ -266,6 +278,7 @@ export class OperationsOrdersService {
         if (!Number.isSafeInteger(updated.revision)) {
           return err({ code: 'VALIDATION_ERROR', message: 'Draft revision overflowed.' });
         }
+
         await this.#draftStore.put(updated);
         return ok(updated);
       } catch (cause) {
@@ -420,8 +433,11 @@ export class OperationsOrdersService {
 
           await transaction.businessDays.put(allocated.businessDay);
           await transaction.orders.insert(order);
+
           for (const [itemId, consumedMicros] of inventoryUsage) {
-            if (consumedMicros === 0) continue;
+            if (consumedMicros === 0) {
+              continue;
+            }
             const movement: InventoryMovement = {
               id: this.#id<InventoryMovementId>(),
               shopId: context.shopId,
@@ -437,10 +453,12 @@ export class OperationsOrdersService {
             };
             await transaction.inventory.appendMovement(movement);
           }
+
           await transaction.audit.append(this.#orderAudit(order, committedAt));
           await transaction.outbox.append(
             this.#orderOutbox(order, context.configuration.version, committedAt),
           );
+
           return { order, replayed: false } as const;
         });
 
@@ -453,26 +471,12 @@ export class OperationsOrdersService {
           }
         }
 
-        const nextDraft = createEmptyOrderDraft({
-          shopId: context.shopId,
-          businessDayId: context.day.id,
-          draftScopeId: draft.draftScopeId,
-          configuration: context.configuration,
-          now: this.#runtime.now(),
-          checkoutIntentKey: this.#runtime.createUuid(),
-        });
-        try {
-          await this.#draftStore.delete(orderDraftKey(draft));
-          await this.#draftStore.put(nextDraft);
-        } catch {
-          warnings.push('DRAFT_RESET_FAILED');
-        }
-
+        const reset = await this.#resetDraftAfterCommit(draft, context.configuration, warnings);
         return ok({
           order: commitResult.order,
           replayed: commitResult.replayed,
-          nextDraft,
-          postCommitWarnings: warnings,
+          nextDraft: reset.nextDraft,
+          postCommitWarnings: reset.warnings,
         });
       } catch (cause) {
         return err({
@@ -485,28 +489,54 @@ export class OperationsOrdersService {
   }
 
   async #recoverCommittedDraft(draft: OrderDraft, order: OrderSnapshot): Promise<OrderPlacement> {
-    const warnings: string[] = [];
     const configuration = await this.#database.transaction((transaction) =>
       transaction.configuration.getForShop(order.shopId),
     );
     if (configuration === null) {
       throw new Error('Local configuration is unavailable while recovering a committed order.');
     }
-    const nextDraft = createEmptyOrderDraft({
-      shopId: order.shopId,
-      businessDayId: order.businessDayId,
-      draftScopeId: draft.draftScopeId,
+
+    const reset = await this.#resetDraftAfterCommit(draft, configuration, []);
+    return {
+      order,
+      replayed: true,
+      nextDraft: reset.nextDraft,
+      postCommitWarnings: reset.warnings,
+    };
+  }
+
+  async #resetDraftAfterCommit(
+    committedDraft: OrderDraft,
+    configuration: OperationsConfigurationSnapshot,
+    initialWarnings: readonly string[],
+  ): Promise<DraftResetResult> {
+    const warnings = [...initialWarnings];
+    const key = orderDraftKey(committedDraft);
+    const candidate = createEmptyOrderDraft({
+      shopId: committedDraft.shopId,
+      businessDayId: committedDraft.businessDayId,
+      draftScopeId: committedDraft.draftScopeId,
       configuration,
       now: this.#runtime.now(),
       checkoutIntentKey: this.#runtime.createUuid(),
     });
+
     try {
-      await this.#draftStore.delete(orderDraftKey(draft));
-      await this.#draftStore.put(nextDraft);
+      const current = await this.#draftStore.get(key);
+      if (current !== null && current.checkoutIntentKey !== committedDraft.checkoutIntentKey) {
+        warnings.push('DRAFT_SCOPE_ADVANCED');
+        return { nextDraft: current, warnings };
+      }
+
+      if (current !== null) {
+        await this.#draftStore.delete(key);
+      }
+      await this.#draftStore.put(candidate);
+      return { nextDraft: candidate, warnings };
     } catch {
       warnings.push('DRAFT_RESET_FAILED');
+      return { nextDraft: candidate, warnings };
     }
-    return { order, replayed: true, nextDraft, postCommitWarnings: warnings };
   }
 
   async #resolveContext(): Promise<Result<ResolvedContext, ApplicationError>> {
@@ -518,6 +548,7 @@ export class OperationsOrdersService {
         message: 'This device is not assigned to exactly one active shop.',
       });
     }
+
     const state = await this.#database.transaction(async (transaction) => {
       const day = await transaction.businessDays.getOpenForShop(shop.id);
       const configuration = await transaction.configuration.getForShop(shop.id);
@@ -532,16 +563,19 @@ export class OperationsOrdersService {
         message: 'A valid local menu configuration is required before taking orders.',
       });
     }
+
     const session = await this.#readModel.getOpenWorkerSession(state.day.id);
     if (session === null || session.endedAt !== null) {
       return err({ code: 'CONFLICT_ERROR', message: 'A Current Operator is required.' });
     }
+
     const worker = await this.#database.transaction((transaction) =>
       transaction.workers.getById(session.workerId),
     );
     if (worker === null || !worker.active || worker.shopId !== shop.id) {
       return err({ code: 'CONFLICT_ERROR', message: 'The Current Operator is unavailable.' });
     }
+
     return ok({
       shopId: shop.id,
       day: state.day,
@@ -567,6 +601,7 @@ export class OperationsOrdersService {
     if (draft.delivery.zoneId === null || normalizedDeliveryPhone === null) {
       throw new Error('Validated Delivery order is missing its zone or normalized phone.');
     }
+
     return {
       orderTypeId: orderType.id,
       orderTypeLabel: orderType.name,
@@ -598,6 +633,7 @@ export class OperationsOrdersService {
           changeMinor: part.changeMinor,
         };
       }
+
       return {
         id: this.#id<PaymentId>(),
         method: { ...part.method, logicType: part.method.logicType },
@@ -609,7 +645,10 @@ export class OperationsOrdersService {
   }
 
   async #updateDeliveryCustomer(order: OrderSnapshot): Promise<void> {
-    if (order.fulfillment.behavior !== 'DELIVERY') return;
+    if (order.fulfillment.behavior !== 'DELIVERY') {
+      return;
+    }
+
     const delivery = order.fulfillment.delivery;
     await this.#database.transaction(async (transaction) => {
       const existing = await transaction.customerContacts.getByNormalizedPhone(
