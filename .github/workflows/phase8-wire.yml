@@ -1,0 +1,435 @@
+name: Phase 8 Wire End Day
+
+on:
+  push:
+    branches:
+      - feat/ops-08-end-day
+    paths:
+      - '.phase8-wire.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ops-08-end-day
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply End Day wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'marker missing in {path}: {old[:180]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          # SQLite reconciliation is immutable and readable by Business Day.
+          p = Path('packages/persistence/src/sqlite/SqliteOperationsDatabase.ts')
+          text = p.read_text()
+          old = '''    reconciliations: {
+      async put(reconciliation: Reconciliation) {
+        database
+          .prepare(
+            `INSERT INTO reconciliations(id, shop_id, business_day_id, created_by_worker_id, created_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(shop_id, business_day_id) DO UPDATE SET
+              id = excluded.id,
+              created_by_worker_id = excluded.created_by_worker_id,
+              created_at = excluded.created_at,
+              payload_json = excluded.payload_json`,
+          )'''
+          new = '''    reconciliations: {
+      async getByBusinessDay(businessDayId: BusinessDayId) {
+        return parsePayload<Reconciliation>(
+          database
+            .prepare('SELECT payload_json FROM reconciliations WHERE business_day_id = ? LIMIT 1')
+            .get(businessDayId),
+        );
+      },
+      async put(reconciliation: Reconciliation) {
+        database
+          .prepare(
+            `INSERT INTO reconciliations(id, shop_id, business_day_id, created_by_worker_id, created_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+          )'''
+          if old not in text:
+              raise SystemExit('SQLite reconciliation marker missing')
+          p.write_text(text.replace(old, new, 1))
+
+          # IndexedDB reconciliation is immutable and readable by Business Day.
+          p = Path('packages/persistence/src/browser/IndexedDbOperationsDatabase.ts')
+          text = p.read_text()
+          old = '''    reconciliations: {
+      async put(reconciliation: Reconciliation) {
+        await requestResult(store('reconciliations').put(reconciliation));
+      },
+    },'''
+          new = '''    reconciliations: {
+      async getByBusinessDay(businessDayId: BusinessDayId) {
+        const all = (await requestResult(store('reconciliations').getAll())) as Reconciliation[];
+        return all.find((reconciliation) => reconciliation.businessDayId === businessDayId) ?? null;
+      },
+      async put(reconciliation: Reconciliation) {
+        await requestResult(store('reconciliations').add(reconciliation));
+      },
+    },'''
+          if old not in text:
+              raise SystemExit('IndexedDB reconciliation marker missing')
+          p.write_text(text.replace(old, new, 1))
+
+          # End Day must use exactly the same durable Order draft scope as Orders.
+          replace(
+              'apps/operations/src/app/OrdersWorkspace.tsx',
+              'function resolveOrdersDraftScopeId(): string {',
+              'export function resolveOrdersDraftScopeId(): string {',
+          )
+
+          # Browser runtime/client.
+          p = Path('apps/operations/src/app/sessionClient.ts')
+          text = p.read_text()
+          text = text.replace(
+              '  OperationsBulkStockService,\n',
+              '  OperationsBulkStockService,\n  OperationsEndDayService,\n',
+              1,
+          )
+          text = text.replace(
+              '  TuxBulkStockApi,\n',
+              '  TuxBulkStockApi,\n  TuxEndDayApi,\n',
+              1,
+          )
+          text = text.replace(
+              'export type OperationsBulkStockClient = TuxBulkStockApi;\n',
+              'export type OperationsBulkStockClient = TuxBulkStockApi;\nexport type OperationsEndDayClient = TuxEndDayApi;\n',
+              1,
+          )
+          text = text.replace(
+              '  readonly bulkStock: OperationsBulkStockService;\n',
+              '  readonly bulkStock: OperationsBulkStockService;\n  readonly endDay: OperationsEndDayService;\n',
+              1,
+          )
+          marker = '''        bulkStock: new OperationsBulkStockService(
+          database,
+          readModel,
+          bulkStockStore,
+          runtime,
+          coordinator,
+        ),'''
+          if marker not in text:
+              raise SystemExit('browser Bulk Stock runtime marker missing')
+          text = text.replace(
+              marker,
+              marker + '''
+        endDay: new OperationsEndDayService(
+          database,
+          readModel,
+          draftStore,
+          expenseStore,
+          runtime,
+          coordinator,
+        ),''',
+              1,
+          )
+          if 'export function createOperationsEndDayClient' not in text:
+              text = text.rstrip() + '''
+
+export function createOperationsEndDayClient(): OperationsEndDayClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.endDay;
+  return {
+    beginEndDay: async (draftScopeId) => (await browserRuntime()).endDay.beginEndDay(draftScopeId),
+    discardDraft: async (draftScopeId) => (await browserRuntime()).endDay.discardDraft(draftScopeId),
+    previewReconciliation: async (input) =>
+      (await browserRuntime()).endDay.previewReconciliation(input),
+    closeDay: async (input) => (await browserRuntime()).endDay.closeDay(input),
+  };
+}
+'''
+          p.write_text(text)
+
+          # Electron main runtime.
+          p = Path('apps/operations-desktop/src/main/index.ts')
+          text = p.read_text()
+          text = text.replace(
+              "import { ExpensesIpcRuntime } from './expensesIpc';\n",
+              "import { EndDayIpcRuntime } from './endDayIpc';\nimport { ExpensesIpcRuntime } from './expensesIpc';\n",
+              1,
+          )
+          text = text.replace(
+              'let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;\n',
+              'let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;\nlet endDayIpcRuntime: EndDayIpcRuntime | null = null;\n',
+              1,
+          )
+          marker = '''  bulkStockIpcRuntime = await BulkStockIpcRuntime.create({
+    databasePath,
+    database: operationsDatabase,
+    readModel: operatorReadModel,
+    runtime,
+    coordinator,
+  });'''
+          if marker not in text:
+              raise SystemExit('Electron Bulk Stock init marker missing')
+          text = text.replace(
+              marker,
+              marker + '''
+  endDayIpcRuntime = await EndDayIpcRuntime.create({
+    databasePath,
+    database: operationsDatabase,
+    readModel: operatorReadModel,
+    draftStore: orderDraftStore,
+    runtime,
+    coordinator,
+  });''',
+              1,
+          )
+          marker = '''  expensesIpcRuntime.register(window);
+  bulkStockIpcRuntime.register(window);'''
+          if marker not in text:
+              raise SystemExit('Electron register marker missing')
+          text = text.replace(
+              marker,
+              '''  if (endDayIpcRuntime === null) {
+    throw new Error('Operations End Day IPC runtime has not been initialized.');
+  }
+  expensesIpcRuntime.register(window);
+  bulkStockIpcRuntime.register(window);
+  endDayIpcRuntime.register(window);''',
+              1,
+          )
+          text = text.replace(
+              "app.on('before-quit', () => {\n  void bulkStockIpcRuntime?.close();",
+              "app.on('before-quit', () => {\n  void endDayIpcRuntime?.close();\n  void bulkStockIpcRuntime?.close();",
+              1,
+          )
+          text = text.replace(
+              '  bulkStockIpcRuntime = null;\n',
+              '  endDayIpcRuntime = null;\n  bulkStockIpcRuntime = null;\n',
+              1,
+          )
+          p.write_text(text)
+
+          # Preload typed API.
+          p = Path('apps/operations-desktop/src/preload/index.ts')
+          text = p.read_text()
+          text = text.replace(
+              "import { assertExpenseMutationResult, assertExpensesLedgerResult } from './expensesResult';\n",
+              "import {\n  assertEndDayCloseResult,\n  assertEndDayDiscardResult,\n  assertEndDayGateResult,\n  assertEndDayPreviewResult,\n} from './endDayResult';\nimport { assertExpenseMutationResult, assertExpensesLedgerResult } from './expensesResult';\n",
+              1,
+          )
+          marker = "const IPC_BULK_UNDO = 'tux:bulk-stock:undo';\n"
+          if marker not in text:
+              raise SystemExit('preload Bulk constant marker missing')
+          text = text.replace(
+              marker,
+              marker + "const IPC_END_DAY_BEGIN = 'tux:end-day:begin';\nconst IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';\nconst IPC_END_DAY_PREVIEW = 'tux:end-day:preview';\nconst IPC_END_DAY_CLOSE = 'tux:end-day:close';\n",
+              1,
+          )
+          marker = '''  bulkStock: Object.freeze({
+    loadBoard: async () =>
+      assertBulkStockBoardResult((await ipcRenderer.invoke(IPC_BULK_LOAD)) as unknown),
+    finishOne: async (input: Parameters<TuxDesktopApi['bulkStock']['finishOne']>[0]) =>
+      assertBulkStockMutationResult(
+        (await ipcRenderer.invoke(IPC_BULK_FINISH_ONE, input)) as unknown,
+      ),
+    addStock: async (input: Parameters<TuxDesktopApi['bulkStock']['addStock']>[0]) =>
+      assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_ADD, input)) as unknown),
+    undoMovement: async (input: Parameters<TuxDesktopApi['bulkStock']['undoMovement']>[0]) =>
+      assertBulkStockMutationResult((await ipcRenderer.invoke(IPC_BULK_UNDO, input)) as unknown),
+  }),'''
+          if marker not in text:
+              raise SystemExit('preload Bulk API marker missing')
+          text = text.replace(
+              marker,
+              marker + '''
+  endDay: Object.freeze({
+    beginEndDay: async (draftScopeId: string) =>
+      assertEndDayGateResult((await ipcRenderer.invoke(IPC_END_DAY_BEGIN, draftScopeId)) as unknown),
+    discardDraft: async (draftScopeId: string) =>
+      assertEndDayDiscardResult(
+        (await ipcRenderer.invoke(IPC_END_DAY_DISCARD_DRAFT, draftScopeId)) as unknown,
+      ),
+    previewReconciliation: async (
+      input: Parameters<TuxDesktopApi['endDay']['previewReconciliation']>[0],
+    ) => assertEndDayPreviewResult((await ipcRenderer.invoke(IPC_END_DAY_PREVIEW, input)) as unknown),
+    closeDay: async (input: Parameters<TuxDesktopApi['endDay']['closeDay']>[0]) =>
+      assertEndDayCloseResult((await ipcRenderer.invoke(IPC_END_DAY_CLOSE, input)) as unknown),
+  }),''',
+              1,
+          )
+          p.write_text(text)
+
+          # App shell: Profile -> End Day only; successful close refreshes session into locked screen.
+          p = Path('apps/operations/src/app/App.tsx')
+          text = p.read_text()
+          text = text.replace(
+              "import { BulkStockWorkspace } from './BulkStockWorkspace';\n",
+              "import { BulkStockWorkspace } from './BulkStockWorkspace';\nimport { EndDayFlow } from './EndDayFlow';\n",
+              1,
+          )
+          text = text.replace(
+              '  createOperationsExpensesClient,\n',
+              '  createOperationsEndDayClient,\n  createOperationsExpensesClient,\n',
+              1,
+          )
+          text = text.replace(
+              '  type OperationsExpensesClient,\n',
+              '  type OperationsEndDayClient,\n  type OperationsExpensesClient,\n',
+              1,
+          )
+          text = text.replace(
+              '  readonly bulkStockClient: OperationsBulkStockClient;\n',
+              '  readonly bulkStockClient: OperationsBulkStockClient;\n  readonly endDayClient: OperationsEndDayClient;\n',
+              1,
+          )
+          text = text.replace(
+              '  readonly onSignOut: () => Promise<void>;\n',
+              '  readonly onSignOut: () => Promise<void>;\n  readonly onBusinessDayClosed: () => Promise<void>;\n',
+              1,
+          )
+          text = text.replace(
+              '  bulkStockClient,\n  busy,',
+              '  bulkStockClient,\n  endDayClient,\n  busy,',
+              1,
+          )
+          text = text.replace(
+              '  onSignOut,\n}: {',
+              '  onSignOut,\n  onBusinessDayClosed,\n}: {',
+              1,
+          )
+          text = text.replace(
+              "  const [area, setArea] = useState<OperationsArea>('ORDERS');\n",
+              "  const [area, setArea] = useState<OperationsArea>('ORDERS');\n  const [endDayOpen, setEndDayOpen] = useState(false);\n",
+              1,
+          )
+          old = '''                <button type="button" role="menuitem" disabled>
+                  End Day
+                </button>'''
+          new = '''                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEndDayOpen(true);
+                  }}
+                >
+                  End Day
+                </button>'''
+          if old not in text:
+              raise SystemExit('disabled End Day menu marker missing')
+          text = text.replace(old, new, 1)
+          marker = '''      {error === null ? null : (
+        <div className="global-error" role="alert">
+          {error}
+        </div>
+      )}'''
+          if marker not in text:
+              raise SystemExit('App global error marker missing')
+          text = text.replace(
+              marker,
+              marker + '''
+
+      {endDayOpen ? (
+        <EndDayFlow
+          client={endDayClient}
+          onCancel={() => setEndDayOpen(false)}
+          onReturnToOrders={() => {
+            setArea('ORDERS');
+            setEndDayOpen(false);
+          }}
+          onReturnToBoard={() => {
+            setArea('ORDERS_BOARD');
+            setEndDayOpen(false);
+          }}
+          onClosed={async () => {
+            setEndDayOpen(false);
+            await onBusinessDayClosed();
+          }}
+        />
+      ) : null}''',
+              1,
+          )
+          text = text.replace(
+              '  const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);\n',
+              '  const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);\n  const endDayClient = useMemo(() => createOperationsEndDayClient(), []);\n',
+              1,
+          )
+          marker = '''  async function signOut(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    const result = await client.signOut();
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
+  }'''
+          if marker not in text:
+              raise SystemExit('App signOut marker missing')
+          text = text.replace(
+              marker,
+              marker + '''
+
+  async function refreshAfterEndDay(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    const result = await client.getState();
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
+  }''',
+              1,
+          )
+          text = text.replace(
+              '      bulkStockClient={bulkStockClient}\n      busy={busy}',
+              '      bulkStockClient={bulkStockClient}\n      endDayClient={endDayClient}\n      busy={busy}',
+              1,
+          )
+          text = text.replace(
+              '      onSignOut={signOut}\n',
+              '      onSignOut={signOut}\n      onBusinessDayClosed={refreshAfterEndDay}\n',
+              1,
+          )
+          p.write_text(text)
+
+          # Load End Day CSS.
+          p = Path('apps/operations/src/main.tsx')
+          text = p.read_text()
+          if "import './styles/end-day.css';" not in text:
+              text = text.replace(
+                  "import './styles/expenses.css';\n",
+                  "import './styles/expenses.css';\nimport './styles/end-day.css';\n",
+                  1,
+              )
+          p.write_text(text)
+          PY
+      - name: Install and format
+        run: |
+          npm ci
+          npm run format
+      - name: Remove one-shot wiring helper
+        run: |
+          rm -f .phase8-wire.trigger .github/workflows/phase8-wire.yml
+      - name: Commit wired Phase 8 tree
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Wire Phase 8 End Day workflow'
+          git push origin HEAD:feat/ops-08-end-day
