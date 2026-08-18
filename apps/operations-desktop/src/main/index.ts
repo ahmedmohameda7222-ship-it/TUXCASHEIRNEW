@@ -5,13 +5,20 @@ import {
   CoordinatedOperationsSessionService,
   OperationsOrdersService,
 } from '@tux/application';
-import { instant, parseEntityId, type OrderDraft, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type OrderDraft,
+  type OrderId,
+  type ShopId,
+} from '@tux/domain';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
   assertTrustedIpcSender,
@@ -27,6 +34,7 @@ const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
+const IPC_ORDERS_REPRINT = 'tux:orders:reprint';
 
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
@@ -70,6 +78,7 @@ async function initializeOperationsServices(): Promise<void> {
     orderDraftStore,
     runtime,
     coordinator,
+    new ElectronOrderPrinter(),
   );
 }
 
@@ -97,6 +106,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_ORDERS_SAVE_DRAFT,
     IPC_ORDERS_FIND_CUSTOMER,
     IPC_ORDERS_PLACE,
+    IPC_ORDERS_REPRINT,
   ]) {
     ipcMain.removeHandler(channel);
   }
@@ -149,6 +159,13 @@ function registerIpcHandlers(window: BrowserWindow): void {
     assertTrustedIpcSender(event, window.webContents.id);
     assertObjectPayload(draft, 'Order draft');
     return currentOrdersService().placeOrder(draft as unknown as OrderDraft);
+  });
+  ipcMain.handle(IPC_ORDERS_REPRINT, async (event, orderId: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    if (typeof orderId !== 'string') {
+      throw new TypeError('Order reprint IPC payload must be an Order ID string.');
+    }
+    return currentOrdersService().reprintOrder(parseEntityId<OrderId>(orderId));
   });
 }
 
