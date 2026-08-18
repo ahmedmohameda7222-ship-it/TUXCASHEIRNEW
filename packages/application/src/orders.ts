@@ -86,7 +86,9 @@ function persistenceError(message: string, cause: unknown): ApplicationError {
   return { code: 'LOCAL_PERSISTENCE_ERROR', message, cause };
 }
 
-function firstActiveOrderTypeId(configuration: OperationsConfigurationSnapshot): OrderDraft['orderTypeId'] {
+function firstActiveOrderTypeId(
+  configuration: OperationsConfigurationSnapshot,
+): OrderDraft['orderTypeId'] {
   const ordered = configuration.orderTypes
     .filter((orderType) => orderType.active)
     .sort((left, right) => left.sortOrder - right.sortOrder);
@@ -540,7 +542,12 @@ export class OperationsOrdersService {
     if (worker === null || !worker.active || worker.shopId !== shop.id) {
       return err({ code: 'CONFLICT_ERROR', message: 'The Current Operator is unavailable.' });
     }
-    return ok({ shopId: shop.id, day: state.day, configuration: state.configuration, operator: worker });
+    return ok({
+      shopId: shop.id,
+      day: state.day,
+      configuration: state.configuration,
+      operator: worker,
+    });
   }
 
   #buildFulfillment(
@@ -577,9 +584,7 @@ export class OperationsOrdersService {
     };
   }
 
-  #buildPayments(
-    prepared: ReturnType<typeof preparePaymentParts>,
-  ): readonly PaymentPart[] {
+  #buildPayments(prepared: ReturnType<typeof preparePaymentParts>): readonly PaymentPart[] {
     return prepared.map((part) => {
       if (part.method.logicType === 'CASH') {
         if (part.receivedMinor === null || part.changeMinor === null) {

@@ -8,7 +8,11 @@ export interface TenderSuggestion {
 
 export function suggestCashTenders(
   totalMinor: MoneyMinor,
-  denominationsMinor: readonly MoneyMinor[] = [moneyMinor(5_000), moneyMinor(10_000), moneyMinor(20_000)],
+  denominationsMinor: readonly MoneyMinor[] = [
+    moneyMinor(5_000),
+    moneyMinor(10_000),
+    moneyMinor(20_000),
+  ],
 ): readonly TenderSuggestion[] {
   if (totalMinor <= 0) return [];
   const denominations = [...new Set(denominationsMinor)]
@@ -45,7 +49,8 @@ export function suggestCashTenders(
       if (!Number.isSafeInteger(sum + added)) {
         throw new DomainInvariantError('Tender suggestion exceeded safe integer range.');
       }
-      const nextNotes = count === 0 ? notes : [...notes, ...Array<MoneyMinor>(count).fill(denomination)];
+      const nextNotes =
+        count === 0 ? notes : [...notes, ...Array<MoneyMinor>(count).fill(denomination)];
       visit(index + 1, nextNotes, sum + added);
     }
   }

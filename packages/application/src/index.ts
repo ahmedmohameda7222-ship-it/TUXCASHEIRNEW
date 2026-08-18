@@ -1,10 +1,7 @@
 export { ApplicationCommandCoordinator } from './commandCoordinator';
 export { CoordinatedOperationsSessionService } from './coordinatedSession';
 export type { ApplicationError, ApplicationErrorCode } from './errors';
-export {
-  createEmptyOrderDraft,
-  OperationsOrdersService,
-} from './orders';
+export { createEmptyOrderDraft, OperationsOrdersService } from './orders';
 export type {
   OrderPlacement,
   OrderPlacementError,

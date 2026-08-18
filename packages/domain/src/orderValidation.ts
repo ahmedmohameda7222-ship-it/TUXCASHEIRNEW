@@ -41,7 +41,11 @@ export function validateOrderDraft(
   const issues: OrderValidationIssue[] = [];
 
   if (draft.shopId !== configuration.shopId) {
-    issues.push({ path: 'cart', code: 'SHOP_MISMATCH', message: 'Draft shop does not match configuration.' });
+    issues.push({
+      path: 'cart',
+      code: 'SHOP_MISMATCH',
+      message: 'Draft shop does not match configuration.',
+    });
   }
   if (draft.checkoutIntentKey.trim().length === 0) {
     issues.push({ path: 'cart', code: 'MISSING_INTENT', message: 'Checkout intent is missing.' });
@@ -54,7 +58,11 @@ export function validateOrderDraft(
     (candidate) => candidate.id === draft.orderTypeId && candidate.active,
   );
   if (orderType === undefined) {
-    issues.push({ path: 'orderType', code: 'ORDER_TYPE_REQUIRED', message: 'Select an available order type.' });
+    issues.push({
+      path: 'orderType',
+      code: 'ORDER_TYPE_REQUIRED',
+      message: 'Select an available order type.',
+    });
   }
 
   for (const line of draft.lines) {
@@ -92,7 +100,9 @@ export function validateOrderDraft(
 
   let normalizedDeliveryPhone: string | null = null;
   if (orderType?.behavior === 'DELIVERY') {
-    const phone = normalizeEgyptianPhone(draft.delivery.displayPhone || draft.delivery.normalizedPhone);
+    const phone = normalizeEgyptianPhone(
+      draft.delivery.displayPhone || draft.delivery.normalizedPhone,
+    );
     if (!phone.valid) {
       issues.push({
         path: 'delivery.phone',
@@ -103,17 +113,32 @@ export function validateOrderDraft(
       normalizedDeliveryPhone = phone.normalizedPhone;
     }
     if (draft.delivery.customerName.trim().length === 0) {
-      issues.push({ path: 'delivery.name', code: 'DELIVERY_NAME_REQUIRED', message: 'Customer Name is required.' });
+      issues.push({
+        path: 'delivery.name',
+        code: 'DELIVERY_NAME_REQUIRED',
+        message: 'Customer Name is required.',
+      });
     }
     if (draft.delivery.zoneId === null) {
-      issues.push({ path: 'delivery.zone', code: 'DELIVERY_ZONE_REQUIRED', message: 'Delivery Zone is required.' });
+      issues.push({
+        path: 'delivery.zone',
+        code: 'DELIVERY_ZONE_REQUIRED',
+        message: 'Delivery Zone is required.',
+      });
     }
     if (draft.delivery.address.trim().length === 0) {
-      issues.push({ path: 'delivery.address', code: 'DELIVERY_ADDRESS_REQUIRED', message: 'Full address is required.' });
+      issues.push({
+        path: 'delivery.address',
+        code: 'DELIVERY_ADDRESS_REQUIRED',
+        message: 'Full address is required.',
+      });
     }
   }
 
-  const deliveryFeeMinor = orderType?.behavior === 'DELIVERY' ? draft.delivery.finalFeeMinor : draft.delivery.finalFeeMinor - draft.delivery.finalFeeMinor;
+  const deliveryFeeMinor =
+    orderType?.behavior === 'DELIVERY'
+      ? draft.delivery.finalFeeMinor
+      : draft.delivery.finalFeeMinor - draft.delivery.finalFeeMinor;
   let pricing: OrderPricing | null = null;
   try {
     pricing = calculateOrderPricing({

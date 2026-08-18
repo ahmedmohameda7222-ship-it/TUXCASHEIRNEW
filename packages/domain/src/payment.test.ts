@@ -66,7 +66,10 @@ describe('preparePaymentParts', () => {
       methods,
       moneyMinor(18_000),
     );
-    expect(parts.map((part) => part.allocatedMinor)).toEqual([moneyMinor(10_000), moneyMinor(8_000)]);
+    expect(parts.map((part) => part.allocatedMinor)).toEqual([
+      moneyMinor(10_000),
+      moneyMinor(8_000),
+    ]);
     expect(parts[1]?.changeMinor).toBe(moneyMinor(2_000));
   });
 
