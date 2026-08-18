@@ -92,7 +92,12 @@ export function validateOrderDraft(
       const beverageProduct = configuration.products.find(
         (candidate) => candidate.id === beverage.productId,
       );
-      if (!allowed || beverageProduct === undefined || !beverageProduct.active || beverageProduct.soldOut) {
+      if (
+        !allowed ||
+        beverageProduct === undefined ||
+        !beverageProduct.active ||
+        beverageProduct.soldOut
+      ) {
         issues.push({
           path: `line:${line.id}`,
           code: 'COMBO_BEVERAGE_UNAVAILABLE',
