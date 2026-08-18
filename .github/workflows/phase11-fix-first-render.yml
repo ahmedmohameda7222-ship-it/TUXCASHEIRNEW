@@ -1,9 +1,9 @@
 name: Phase 11 Repair First Render
 
 on:
-  push:
+  pull_request:
     branches:
-      - test/ops-11-rendered-qa
+      - feat/ops-09-sync
 
 permissions:
   contents: write
