@@ -22,6 +22,7 @@ const ERROR_CODES = new Set<ApplicationErrorCode>([
 
 type SaveDraftResult = Awaited<ReturnType<OperationsOrdersService['saveDraft']>>;
 type CustomerLookupResult = Awaited<ReturnType<OperationsOrdersService['findCustomerByPhone']>>;
+type ReprintOrderResult = Awaited<ReturnType<OperationsOrdersService['reprintOrder']>>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -62,6 +63,23 @@ function isOrderDraft(value: unknown): boolean {
     isRecord(delivery) &&
     isRecord(payment) &&
     typeof payment['mode'] === 'string'
+  );
+}
+
+function isOrderSnapshot(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    isEntityId(value['id']) &&
+    isEntityId(value['shopId']) &&
+    isEntityId(value['businessDayId']) &&
+    isSafeInteger(value['displayOrderNo']) &&
+    value['displayOrderNo'] > 0 &&
+    typeof value['idempotencyKey'] === 'string' &&
+    typeof value['status'] === 'string' &&
+    typeof value['createdAt'] === 'string' &&
+    Array.isArray(value['items']) &&
+    Array.isArray(value['payments']) &&
+    isSafeInteger(value['totalMinor'])
   );
 }
 
@@ -131,14 +149,8 @@ export function assertOrderPlacementResult(value: unknown): OrderPlacementResult
     value,
     (payload) => {
       if (!isRecord(payload) || typeof payload['replayed'] !== 'boolean') return false;
-      const order = payload['order'];
       return (
-        isRecord(order) &&
-        isEntityId(order['id']) &&
-        isEntityId(order['businessDayId']) &&
-        isSafeInteger(order['displayOrderNo']) &&
-        order['displayOrderNo'] > 0 &&
-        isSafeInteger(order['totalMinor']) &&
+        isOrderSnapshot(payload['order']) &&
         isOrderDraft(payload['nextDraft']) &&
         Array.isArray(payload['postCommitWarnings']) &&
         payload['postCommitWarnings'].every((warning) => typeof warning === 'string')
@@ -146,4 +158,8 @@ export function assertOrderPlacementResult(value: unknown): OrderPlacementResult
     },
     'order placement',
   );
+}
+
+export function assertReprintOrderResult(value: unknown): ReprintOrderResult {
+  return assertResult<ReprintOrderResult>(value, isOrderSnapshot, 'order reprint');
 }
