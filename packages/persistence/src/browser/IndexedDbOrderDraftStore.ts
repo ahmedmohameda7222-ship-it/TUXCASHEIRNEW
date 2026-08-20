@@ -1,4 +1,4 @@
-import type { OrderDraft } from '@tux/domain';
+import { parseOrderDraft, type OrderDraft } from '@tux/domain';
 import type { OrderDraftKey, OrderDraftStore } from '../orderDraftStore';
 
 const DATABASE_VERSION = 1;
@@ -62,9 +62,7 @@ export class IndexedDbOrderDraftStore implements OrderDraftStore {
   }
 
   async initialize(): Promise<void> {
-    if (this.#database !== null) {
-      return;
-    }
+    if (this.#database !== null) return;
     this.#database = await openDatabase(this.#name);
     if (typeof navigator !== 'undefined' && navigator.storage?.persist !== undefined) {
       await navigator.storage.persist();
@@ -76,26 +74,20 @@ export class IndexedDbOrderDraftStore implements OrderDraftStore {
     const transaction = database.transaction(STORE_NAME, 'readonly');
     const result = await requestResult(transaction.objectStore(STORE_NAME).get(keyTuple(key)));
     await transactionDone(transaction);
-    return result === undefined ? null : (result as OrderDraft);
+    return result === undefined ? null : parseOrderDraft(result);
   }
 
   async put(draft: OrderDraft): Promise<void> {
-    if (!Number.isSafeInteger(draft.revision) || draft.revision < 0) {
-      throw new RangeError('Draft revision must be a non-negative safe integer.');
-    }
-    if (draft.draftScopeId.trim().length === 0 || draft.checkoutIntentKey.trim().length === 0) {
-      throw new Error('Draft scope and checkout intent keys are required.');
-    }
-
+    const validated = parseOrderDraft(draft);
     const database = this.#requireDatabase();
     const transaction = database.transaction(STORE_NAME, 'readwrite', { durability: 'strict' });
     const completion = transactionDone(transaction);
     const store = transaction.objectStore(STORE_NAME);
     try {
       const key: OrderDraftKey = {
-        shopId: draft.shopId,
-        businessDayId: draft.businessDayId,
-        draftScopeId: draft.draftScopeId,
+        shopId: validated.shopId,
+        businessDayId: validated.businessDayId,
+        draftScopeId: validated.draftScopeId,
       };
       const existing = await requestResult(store.get(keyTuple(key)));
       if (
@@ -103,11 +95,11 @@ export class IndexedDbOrderDraftStore implements OrderDraftStore {
         typeof existing === 'object' &&
         existing !== null &&
         'revision' in existing &&
-        Number((existing as { revision: unknown }).revision) > draft.revision
+        Number((existing as { revision: unknown }).revision) > validated.revision
       ) {
         throw new Error('Refusing to overwrite a newer durable order draft revision.');
       }
-      await requestResult(store.put(draft));
+      await requestResult(store.put(validated));
       await completion;
     } catch (error) {
       try {
