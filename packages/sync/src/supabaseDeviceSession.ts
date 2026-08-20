@@ -177,7 +177,9 @@ function parseOperationsBootstrap(
   const workers = workersSource.map((workerValue, index): Worker => {
     const source = objectValue(workerValue, `Operations bootstrap worker ${index}`);
     const worker: Worker = {
-      id: parseEntityId<WorkerId>(required(source['id'], `Operations bootstrap worker ${index} id`)),
+      id: parseEntityId<WorkerId>(
+        required(source['id'], `Operations bootstrap worker ${index} id`),
+      ),
       shopId: parseEntityId<ShopId>(
         required(source['shopId'], `Operations bootstrap worker ${index} shopId`),
       ),
@@ -393,7 +395,8 @@ export class SupabaseOperationsBootstrapProvider {
       this.#timeoutMs,
       'Remote Operations bootstrap request',
     );
-    if (!response.ok) throw new Error(`Remote bootstrap request failed with HTTP ${response.status}.`);
+    if (!response.ok)
+      throw new Error(`Remote bootstrap request failed with HTTP ${response.status}.`);
     return parseOperationsBootstrap(await response.json(), shopId, session.deviceId);
   }
 }
