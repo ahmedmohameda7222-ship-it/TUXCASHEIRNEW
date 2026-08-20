@@ -114,7 +114,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
         new BrowserOrderPrinter(),
       );
-      const ordersBoard = new OperationsOrdersBoardService(database, readModel, runtime, coordinator);
+      const ordersBoard = new OperationsOrdersBoardService(
+        database,
+        readModel,
+        runtime,
+        coordinator,
+      );
       const expenses = new OperationsExpensesService(
         database,
         readModel,
@@ -205,14 +210,17 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           sessionManager: manager,
         });
         if (configurationRefreshTimer !== null) window.clearInterval(configurationRefreshTimer);
-        configurationRefreshTimer = window.setInterval(() => {
-          void synchronizeRemote(settings, manager, false).catch((cause) => {
-            console.warn(
-              'TUX browser remote refresh is unavailable; continuing with last known-good local data.',
-              cause,
-            );
-          });
-        }, 5 * 60 * 1000);
+        configurationRefreshTimer = window.setInterval(
+          () => {
+            void synchronizeRemote(settings, manager, false).catch((cause) => {
+              console.warn(
+                'TUX browser remote refresh is unavailable; continuing with last known-good local data.',
+                cause,
+              );
+            });
+          },
+          5 * 60 * 1000,
+        );
       };
 
       const setupRemoteDevice = async (
