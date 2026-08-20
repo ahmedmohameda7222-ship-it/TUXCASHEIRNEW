@@ -40,7 +40,6 @@ begin
     raise exception 'TUX_CONFIGURATION_VERSION_NOT_MONOTONIC';
   end if;
 
-  -- Preserve historical identities but make a complete bundle authoritative for active state.
   update public.menu_categories set active = false, updated_at = v_updated_at where shop_id = p_shop_id;
   update public.products set active = false, updated_at = v_updated_at where shop_id = p_shop_id;
   update public.modifiers set active = false, updated_at = v_updated_at where shop_id = p_shop_id;
@@ -50,18 +49,17 @@ begin
   update public.delivery_zones set active = false, updated_at = v_updated_at where shop_id = p_shop_id;
 
   insert into public.menu_categories(id, shop_id, name, sort_order, active, updated_at)
-  select x.id, x.shop_id, x.name, x.sort_order, x.active, v_updated_at
+  select x.id, x."shopId", x.name, x."sortOrder", x.active, v_updated_at
   from jsonb_to_recordset(v_snapshot -> 'categories') as x(
     id uuid, "shopId" uuid, name text, "sortOrder" integer, active boolean
   )
-  cross join lateral (select x."shopId" as shop_id, x."sortOrder" as sort_order) normalized
+  where x."shopId" = p_shop_id
   on conflict (id) do update set
     name = excluded.name,
     sort_order = excluded.sort_order,
     active = excluded.active,
     updated_at = excluded.updated_at;
 
-  -- The recordset aliases below map camelCase bundle fields to SQL columns explicitly.
   insert into public.products(
     id, shop_id, category_id, name, description, price_minor, image_key,
     active, sold_out, is_combo, sort_order, updated_at
@@ -167,7 +165,6 @@ begin
     sort_order = excluded.sort_order,
     updated_at = excluded.updated_at;
 
-  -- Relationship tables are configuration-only and are safe to replace completely.
   delete from public.product_modifiers where shop_id = p_shop_id;
   insert into public.product_modifiers(shop_id, product_id, modifier_id, max_quantity, sort_order)
   select x."shopId", x."productId", x."modifierId", x."maxQuantity", x."sortOrder"
