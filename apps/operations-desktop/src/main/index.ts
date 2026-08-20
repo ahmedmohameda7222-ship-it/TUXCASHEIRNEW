@@ -13,10 +13,7 @@ import {
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
-import {
-  SupabaseInboundConfigurationProvider,
-  type AutomaticOutboxScheduler,
-} from '@tux/sync';
+import { SupabaseInboundConfigurationProvider, type AutomaticOutboxScheduler } from '@tux/sync';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import {
   createDesktopSupabaseDeviceSessionManager,
@@ -99,11 +96,17 @@ async function initializeOperationsServices(): Promise<void> {
       try {
         const remoteSession = await ensureDesktopSupabaseDeviceSession(remoteSessionManager);
         const result = await configurationService.sync(remoteSession.shopId);
-        if (result.status === 'INVALID_REMOTE_CONFIGURATION' || result.status === 'LOCAL_PERSISTENCE_ERROR') {
+        if (
+          result.status === 'INVALID_REMOTE_CONFIGURATION' ||
+          result.status === 'LOCAL_PERSISTENCE_ERROR'
+        ) {
           console.error(`TUX remote configuration ${result.status}: ${result.message}`);
         }
       } catch (cause) {
-        console.warn('TUX remote configuration is unavailable; using the last known-good local snapshot.', cause);
+        console.warn(
+          'TUX remote configuration is unavailable; using the last known-good local snapshot.',
+          cause,
+        );
       }
     };
     await synchronizeConfiguration();
