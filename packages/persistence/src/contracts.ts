@@ -6,6 +6,7 @@ import type {
   Device,
   DeviceId,
   Expense,
+  Instant,
   InventoryItem,
   InventoryMovement,
   OperationsConfigurationSnapshot,
@@ -20,43 +21,35 @@ import type {
   WorkerId,
   WorkerSession,
 } from '@tux/domain';
-import type { Instant } from '@tux/domain';
 
 export interface ShopRepository {
   getById(id: ShopId): Promise<Shop | null>;
   put(shop: Shop): Promise<void>;
 }
-
 export interface DeviceRepository {
   getById(id: DeviceId): Promise<Device | null>;
   put(device: Device): Promise<void>;
 }
-
 export interface WorkerRepository {
   getById(id: WorkerId): Promise<Worker | null>;
   put(worker: Worker): Promise<void>;
 }
-
 export interface WorkerSessionRepository {
   put(session: WorkerSession): Promise<void>;
 }
-
 export interface ConfigurationRepository {
   getForShop(shopId: ShopId): Promise<OperationsConfigurationSnapshot | null>;
   put(snapshot: OperationsConfigurationSnapshot): Promise<void>;
 }
-
 export interface CustomerContactRepository {
   getByNormalizedPhone(shopId: ShopId, normalizedPhone: string): Promise<CustomerContact | null>;
   put(contact: CustomerContact): Promise<void>;
 }
-
 export interface BusinessDayRepository {
   getById(id: BusinessDayId): Promise<BusinessDay | null>;
   getOpenForShop(shopId: ShopId): Promise<BusinessDay | null>;
   put(day: BusinessDay): Promise<void>;
 }
-
 export interface OrderRepository {
   getById(id: OrderId): Promise<OrderSnapshot | null>;
   getByIdempotencyKey(shopId: ShopId, idempotencyKey: string): Promise<OrderSnapshot | null>;
@@ -64,25 +57,20 @@ export interface OrderRepository {
   insert(order: OrderSnapshot): Promise<void>;
   updateOperationalState(order: OrderSnapshot): Promise<void>;
 }
-
 export interface ExpenseRepository {
   put(expense: Expense): Promise<void>;
 }
-
 export interface InventoryRepository {
   putItem(item: InventoryItem): Promise<void>;
   appendMovement(movement: InventoryMovement): Promise<void>;
   listMovementsForOrder(orderId: OrderId): Promise<readonly InventoryMovement[]>;
 }
-
 export interface ReconciliationRepository {
   put(reconciliation: Reconciliation): Promise<void>;
 }
-
 export interface AuditRepository {
   append(event: AuditEvent): Promise<void>;
 }
-
 export interface OutboxRepository {
   append(event: OutboxEvent): Promise<void>;
   listPending(now: Instant, limit: number): Promise<readonly OutboxEvent[]>;
@@ -93,6 +81,7 @@ export interface OutboxRepository {
     nextAttemptAt: Instant,
     lastError: string,
   ): Promise<void>;
+  quarantine(id: OutboxEventId, quarantinedAt: Instant, reason: string): Promise<void>;
 }
 
 export interface OperationsTransaction {
@@ -112,9 +101,5 @@ export interface OperationsTransaction {
 }
 
 export interface OperationsDatabase {
-  initialize(): Promise<void>;
-  transaction<Result>(
-    work: (transaction: OperationsTransaction) => Promise<Result>,
-  ): Promise<Result>;
-  close(): Promise<void>;
+  transaction<Result>(work: (transaction: OperationsTransaction) => Promise<Result>): Promise<Result>;
 }
