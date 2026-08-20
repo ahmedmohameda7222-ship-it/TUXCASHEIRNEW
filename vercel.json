@@ -3,5 +3,6 @@
   "framework": "vite",
   "installCommand": "npm ci",
   "buildCommand": "npm run build -w @tux/operations",
-  "outputDirectory": "apps/operations/dist"
+  "outputDirectory": "apps/operations/dist",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ]; then exit 1; else exit 0; fi"
 }
