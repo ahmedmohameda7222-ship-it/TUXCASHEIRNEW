@@ -5,8 +5,7 @@ export interface HttpOutboxTransportOptions {
   readonly endpoint: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly headerProvider?: () =>
-    | Readonly<Record<string, string>>
-    | Promise<Readonly<Record<string, string>>>;
+    Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
   readonly fetcher?: typeof fetch;
   readonly timeoutMs?: number;
 }
