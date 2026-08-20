@@ -31,6 +31,10 @@ function parseSession(value: Record<string, unknown>): BrowserRemoteSession {
   };
 }
 
+function isLoopbackHost(): boolean {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 function browserDeviceId(): string {
   try {
     const stored = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY)?.trim() ?? '';
@@ -50,6 +54,8 @@ function browserDeviceId(): string {
 
 export class VercelBrowserRemoteGateway implements InboundConfigurationProvider {
   async currentSession(): Promise<BrowserRemoteSession | null> {
+    if (isLoopbackHost()) return null;
+
     let response: Response;
     try {
       response = await fetch('/api/device-session', {
