@@ -147,8 +147,8 @@ function DeviceSetupScreen({
           />
 
           <p className="remote-setup-help">
-            Enrollment is one-time. The code is not stored after setup; the browser keeps the enrolled
-            device session locally for future launches.
+            Enrollment is one-time. The code is not stored after setup; the browser keeps the
+            enrolled device session locally for future launches.
           </p>
           {error === null ? null : (
             <p className="form-error" role="alert">
