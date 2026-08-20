@@ -235,8 +235,12 @@ function ActiveShell({
           </button>
         </nav>
         <div className="header-actions">
-          <span className="sync-status" aria-label="Local-first status">
-            Saved locally
+          <span
+            className="sync-status"
+            aria-label="Remote sync status: Local only"
+            title="Remote sync is not configured. Business operations remain durably saved locally."
+          >
+            Local only
           </span>
           <button type="button" className="theme-trigger" onClick={cycleTheme}>
             Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
