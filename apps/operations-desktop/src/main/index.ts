@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
+  OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
 } from '@tux/application';
@@ -12,9 +13,16 @@ import {
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
-import type { AutomaticOutboxScheduler } from '@tux/sync';
+import {
+  SupabaseInboundConfigurationProvider,
+  type AutomaticOutboxScheduler,
+} from '@tux/sync';
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { startDesktopAutomaticSync } from './automaticSync';
+import {
+  createDesktopSupabaseDeviceSessionManager,
+  ensureDesktopSupabaseDeviceSession,
+  startDesktopAutomaticSync,
+} from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
@@ -51,6 +59,7 @@ let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
+let configurationSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -75,6 +84,32 @@ async function initializeOperationsServices(): Promise<void> {
     createUuid: () => randomUUID(),
   };
   const coordinator = new ApplicationCommandCoordinator();
+  const remoteSessionManager = createDesktopSupabaseDeviceSessionManager();
+  const supabaseUrl = process.env['TUX_SUPABASE_URL']?.trim();
+  if (remoteSessionManager !== null && supabaseUrl) {
+    const configurationService = new OperationsConfigurationSyncService(
+      operationsDatabase,
+      coordinator,
+      new SupabaseInboundConfigurationProvider({
+        projectUrl: supabaseUrl,
+        session: remoteSessionManager,
+      }),
+    );
+    const synchronizeConfiguration = async () => {
+      try {
+        const remoteSession = await ensureDesktopSupabaseDeviceSession(remoteSessionManager);
+        const result = await configurationService.sync(remoteSession.shopId);
+        if (result.status === 'INVALID_REMOTE_CONFIGURATION' || result.status === 'LOCAL_PERSISTENCE_ERROR') {
+          console.error(`TUX remote configuration ${result.status}: ${result.message}`);
+        }
+      } catch (cause) {
+        console.warn('TUX remote configuration is unavailable; using the last known-good local snapshot.', cause);
+      }
+    };
+    await synchronizeConfiguration();
+    configurationSyncTimer = setInterval(() => void synchronizeConfiguration(), 5 * 60 * 1000);
+  }
+
   sessionService = new CoordinatedOperationsSessionService(
     operationsDatabase,
     operatorReadModel,
@@ -121,6 +156,7 @@ async function initializeOperationsServices(): Promise<void> {
   automaticSyncScheduler = startDesktopAutomaticSync({
     database: operationsDatabase,
     now: runtime.now,
+    ...(remoteSessionManager === null ? {} : { sessionManager: remoteSessionManager }),
   });
 }
 
@@ -307,6 +343,8 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
+  configurationSyncTimer = null;
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
