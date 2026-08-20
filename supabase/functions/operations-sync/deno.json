@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "@tux/domain": "https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/789351db4fdbbe6114e4bac7127098dfdf525fe6/packages/domain/src/index.ts",
+    "@tux/remote-materializer": "https://raw.githubusercontent.com/ahmedmohameda7222-ship-it/TUXCASHEIRNEW/789351db4fdbbe6114e4bac7127098dfdf525fe6/packages/sync/src/remoteMaterializer.ts"
+  }
+}
