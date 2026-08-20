@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { OrderDraft } from '@tux/domain';
+import { parseOrderDraft, type OrderDraft } from '@tux/domain';
 import type { OrderDraftKey, OrderDraftStore } from '../orderDraftStore';
 
 const DRAFT_SCHEMA_VERSION = 1;
@@ -19,7 +19,7 @@ function parseDraft(row: unknown): OrderDraft | null {
   if (typeof payload !== 'string') {
     throw new Error('SQLite draft payload_json must be text.');
   }
-  return JSON.parse(payload) as OrderDraft;
+  return parseOrderDraft(JSON.parse(payload) as unknown);
 }
 
 export class SqliteOrderDraftStore implements OrderDraftStore {
@@ -93,10 +93,14 @@ CREATE INDEX IF NOT EXISTS idx_order_drafts_checkout_intent
 
   async put(draft: OrderDraft): Promise<void> {
     this.#assertInitialized();
-    if (!Number.isSafeInteger(draft.revision) || draft.revision < 0) {
+    const validated = parseOrderDraft(draft);
+    if (!Number.isSafeInteger(validated.revision) || validated.revision < 0) {
       throw new RangeError('Draft revision must be a non-negative safe integer.');
     }
-    if (draft.draftScopeId.trim().length === 0 || draft.checkoutIntentKey.trim().length === 0) {
+    if (
+      validated.draftScopeId.trim().length === 0 ||
+      validated.checkoutIntentKey.trim().length === 0
+    ) {
       throw new Error('Draft scope and checkout intent keys are required.');
     }
 
@@ -107,9 +111,10 @@ CREATE INDEX IF NOT EXISTS idx_order_drafts_checkout_intent
           `SELECT revision FROM order_drafts
            WHERE shop_id = ? AND business_day_id = ? AND draft_scope_id = ?`,
         )
-        .get(draft.shopId, draft.businessDayId, draft.draftScopeId) as
-        { revision?: unknown } | undefined;
-      if (existing !== undefined && Number(existing.revision) > draft.revision) {
+        .get(validated.shopId, validated.businessDayId, validated.draftScopeId) as
+        | { revision?: unknown }
+        | undefined;
+      if (existing !== undefined && Number(existing.revision) > validated.revision) {
         throw new Error('Refusing to overwrite a newer durable order draft revision.');
       }
 
@@ -126,13 +131,13 @@ CREATE INDEX IF NOT EXISTS idx_order_drafts_checkout_intent
              payload_json = excluded.payload_json`,
         )
         .run(
-          draft.shopId,
-          draft.businessDayId,
-          draft.draftScopeId,
-          draft.revision,
-          draft.checkoutIntentKey,
-          draft.updatedAt,
-          serialize(draft),
+          validated.shopId,
+          validated.businessDayId,
+          validated.draftScopeId,
+          validated.revision,
+          validated.checkoutIntentKey,
+          validated.updatedAt,
+          serialize(validated),
         );
       this.#database.exec('COMMIT');
     } catch (error) {
