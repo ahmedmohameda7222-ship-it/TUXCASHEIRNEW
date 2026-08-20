@@ -15,10 +15,7 @@ interface ExpensesIpcRuntimeInput {
   readonly databasePath: string;
   readonly database: OperationsDatabase;
   readonly readModel: OperatorSessionReadModel;
-  readonly runtime: {
-    now(): Instant;
-    createUuid(): string;
-  };
+  readonly runtime: { now(): Instant; createUuid(): string };
   readonly coordinator: ApplicationCommandCoordinator;
 }
 
@@ -73,6 +70,7 @@ export class ExpensesIpcRuntime {
       assertTrustedIpcSender(event, window.webContents.id);
       assertObjectPayload(input, 'Create expense');
       if (
+        typeof input['commandId'] !== 'string' ||
         typeof input['description'] !== 'string' ||
         typeof input['amountMinor'] !== 'number' ||
         (input['paidFrom'] !== 'CASH' && input['paidFrom'] !== 'OTHER') ||
@@ -81,6 +79,7 @@ export class ExpensesIpcRuntime {
         throw new TypeError('Create expense IPC payload is invalid.');
       }
       return this.#service.createExpense({
+        commandId: input['commandId'],
         description: input['description'],
         amountMinor: moneyMinor(input['amountMinor']),
         paidFrom: input['paidFrom'],
