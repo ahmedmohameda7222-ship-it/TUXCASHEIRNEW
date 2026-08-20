@@ -2,8 +2,9 @@ export { HttpOutboxTransport, type HttpOutboxTransportOptions } from './httpTran
 export {
   nextOutboxRetryAt,
   outboxRetryDelayMs,
+  OutboxDeliveryError,
   OutboxSyncService,
-  type OutboxSyncCoordinator,
+  type OutboxFailureKind,
   type OutboxSyncRuntime,
   type OutboxSyncSummary,
   type OutboxTransport,
