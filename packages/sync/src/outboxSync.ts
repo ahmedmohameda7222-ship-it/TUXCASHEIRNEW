@@ -1,6 +1,20 @@
 import type { Instant, OutboxEvent } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 
+export type OutboxFailureKind = 'TRANSIENT' | 'PERMANENT';
+
+export class OutboxDeliveryError extends Error {
+  readonly kind: OutboxFailureKind;
+  readonly status: number | null;
+
+  constructor(message: string, kind: OutboxFailureKind, status: number | null = null, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'OutboxDeliveryError';
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
 export interface OutboxTransport {
   deliver(event: OutboxEvent): Promise<void>;
 }
@@ -9,14 +23,11 @@ export interface OutboxSyncRuntime {
   now(): Instant;
 }
 
-export interface OutboxSyncCoordinator {
-  runExclusive<Result>(work: () => Promise<Result>): Promise<Result>;
-}
-
 export interface OutboxSyncSummary {
   readonly attempted: number;
   readonly delivered: number;
   readonly failed: number;
+  readonly quarantined: number;
   readonly blockedUntil: Instant | null;
   readonly lastError: string | null;
 }
@@ -44,69 +55,99 @@ function normalizedError(error: unknown): string {
   return message.trim().slice(0, 1_000) || 'Remote outbox delivery failed.';
 }
 
+function failureKind(error: unknown): OutboxFailureKind {
+  return error instanceof OutboxDeliveryError ? error.kind : 'TRANSIENT';
+}
+
 export class OutboxSyncService {
   readonly #database: OperationsDatabase;
   readonly #transport: OutboxTransport;
   readonly #runtime: OutboxSyncRuntime;
-  readonly #coordinator: OutboxSyncCoordinator;
+  #tail: Promise<void> = Promise.resolve();
 
-  constructor(
-    database: OperationsDatabase,
-    transport: OutboxTransport,
-    runtime: OutboxSyncRuntime,
-    coordinator: OutboxSyncCoordinator,
-  ) {
+  constructor(database: OperationsDatabase, transport: OutboxTransport, runtime: OutboxSyncRuntime) {
     this.#database = database;
     this.#transport = transport;
     this.#runtime = runtime;
-    this.#coordinator = coordinator;
   }
 
   async syncOnce(limit = DEFAULT_BATCH_SIZE): Promise<OutboxSyncSummary> {
     if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 500) {
       throw new RangeError('Outbox sync batch size must be between 1 and 500.');
     }
+    return this.#exclusive(() => this.#syncUnlocked(limit));
+  }
 
-    return this.#coordinator.runExclusive(async () => {
-      const now = this.#runtime.now();
-      const pending = await this.#database.transaction((transaction) =>
-        transaction.outbox.listPending(now, limit),
-      );
-      let delivered = 0;
+  async #syncUnlocked(limit: number): Promise<OutboxSyncSummary> {
+    const now = this.#runtime.now();
+    const pending = await this.#database.transaction((transaction) =>
+      transaction.outbox.listPending(now, limit),
+    );
+    let delivered = 0;
+    let quarantined = 0;
+    let attempted = 0;
+    let lastPermanentError: string | null = null;
 
-      for (const event of pending) {
-        try {
-          await this.#transport.deliver(event);
-          const deliveredAt = this.#runtime.now();
+    for (const event of pending) {
+      attempted += 1;
+      try {
+        // Network I/O deliberately happens outside every local transaction and outside the
+        // application business-command coordinator. Local POS commands remain independent.
+        await this.#transport.deliver(event);
+        const deliveredAt = this.#runtime.now();
+        await this.#database.transaction((transaction) =>
+          transaction.outbox.markDelivered(event.id, deliveredAt),
+        );
+        delivered += 1;
+      } catch (error) {
+        const lastError = normalizedError(error);
+        const failedAt = this.#runtime.now();
+        if (failureKind(error) === 'PERMANENT') {
           await this.#database.transaction((transaction) =>
-            transaction.outbox.markDelivered(event.id, deliveredAt),
+            transaction.outbox.quarantine(event.id, failedAt, lastError),
           );
-          delivered += 1;
-        } catch (error) {
-          const attemptCount = event.attemptCount + 1;
-          const failedAt = this.#runtime.now();
-          const nextAttemptAt = nextOutboxRetryAt(failedAt, attemptCount);
-          const lastError = normalizedError(error);
-          await this.#database.transaction((transaction) =>
-            transaction.outbox.recordFailure(event.id, attemptCount, nextAttemptAt, lastError),
-          );
-          return {
-            attempted: delivered + 1,
-            delivered,
-            failed: 1,
-            blockedUntil: nextAttemptAt,
-            lastError,
-          };
+          quarantined += 1;
+          lastPermanentError = lastError;
+          continue;
         }
-      }
 
-      return {
-        attempted: pending.length,
-        delivered,
-        failed: 0,
-        blockedUntil: null,
-        lastError: null,
-      };
+        const attemptCount = event.attemptCount + 1;
+        const nextAttemptAt = nextOutboxRetryAt(failedAt, attemptCount);
+        await this.#database.transaction((transaction) =>
+          transaction.outbox.recordFailure(event.id, attemptCount, nextAttemptAt, lastError),
+        );
+        return {
+          attempted,
+          delivered,
+          failed: 1,
+          quarantined,
+          blockedUntil: nextAttemptAt,
+          lastError,
+        };
+      }
+    }
+
+    return {
+      attempted,
+      delivered,
+      failed: 0,
+      quarantined,
+      blockedUntil: null,
+      lastError: lastPermanentError,
+    };
+  }
+
+  async #exclusive<Result>(work: () => Promise<Result>): Promise<Result> {
+    const previous = this.#tail;
+    let release = (): void => undefined;
+    this.#tail = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+    }
   }
 }
