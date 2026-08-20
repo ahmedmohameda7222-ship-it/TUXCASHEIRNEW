@@ -123,6 +123,10 @@ function parseProduct(value: unknown, shopId: ShopId, seen: Set<string>): Produc
     description: nullableString(source['description'], 'product description'),
     priceMinor: nonNegativeMoney(source['priceMinor'], 'product priceMinor'),
     imageKey: nullableString(source['imageKey'], 'product imageKey'),
+    family:
+      source['family'] === undefined || source['family'] === null
+        ? null
+        : string(source['family'], 'product family'),
     active: boolean(source['active'], 'product active'),
     soldOut: boolean(source['soldOut'], 'product soldOut'),
     isCombo: boolean(source['isCombo'], 'product isCombo'),
