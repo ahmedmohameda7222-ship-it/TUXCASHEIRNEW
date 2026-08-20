@@ -20,7 +20,10 @@ Deno.serve(async (request) => {
   if (request.method !== 'GET') return jsonResponse(405, { error: 'method_not_allowed' });
 
   const token = bearerToken(request);
-  if (token === null) return jsonResponse(401, { error: 'authentication_required' });
+  const deviceId = request.headers.get('x-tux-device-id')?.trim() ?? '';
+  if (token === null || !UUID_PATTERN.test(deviceId)) {
+    return jsonResponse(401, { error: 'device_authentication_required' });
+  }
 
   const url = new URL(request.url);
   const shopId = url.searchParams.get('shopId')?.trim() ?? '';
@@ -48,6 +51,18 @@ Deno.serve(async (request) => {
   });
   const { data: userData, error: userError } = await client.auth.getUser(token);
   if (userError || !userData.user) return jsonResponse(401, { error: 'invalid_access_token' });
+
+  const { data: device, error: deviceError } = await client
+    .from('devices')
+    .select('id,shop_id')
+    .eq('id', deviceId)
+    .eq('shop_id', shopId)
+    .maybeSingle();
+  if (deviceError) {
+    console.error('configuration device authorization lookup failed', deviceError);
+    return jsonResponse(500, { error: 'device_authorization_lookup_failed' });
+  }
+  if (!device) return jsonResponse(403, { error: 'device_not_authorized' });
 
   if (version === null) {
     const { data, error } = await client

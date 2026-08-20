@@ -71,6 +71,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Migration-chain smoke
         run: npm run test:migrations
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Edge Function typecheck
+        run: |
+          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E
