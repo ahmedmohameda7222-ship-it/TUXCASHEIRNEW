@@ -1,11 +1,52 @@
+import * as path from 'node:path';
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
   HttpOutboxTransport,
   OutboxSyncService,
-  type SupabaseDeviceSessionManager,
+  SupabaseDeviceSessionManager,
 } from '@tux/sync';
+import { app } from 'electron';
+import { ElectronSafeStorageDeviceSessionStore } from './secureDeviceSessionStore';
+
+function createSessionManager(): SupabaseDeviceSessionManager | null {
+  const projectUrl = process.env['TUX_SUPABASE_URL']?.trim();
+  const publishableKey = process.env['TUX_SUPABASE_PUBLISHABLE_KEY']?.trim();
+  if (!projectUrl || !publishableKey) return null;
+  return new SupabaseDeviceSessionManager({
+    projectUrl,
+    publishableKey,
+    store: new ElectronSafeStorageDeviceSessionStore(
+      path.join(app.getPath('userData'), 'tux-device-session.bin'),
+    ),
+  });
+}
+
+async function ensureEnrolled(
+  manager: SupabaseDeviceSessionManager,
+): Promise<Readonly<Record<string, string>>> {
+  const existing = await manager.currentSession();
+  if (existing !== null) return manager.authorizationHeaders();
+
+  const enrollmentCode = process.env['TUX_DEVICE_ENROLLMENT_CODE']?.trim();
+  const deviceId = process.env['TUX_DEVICE_ID']?.trim();
+  if (!enrollmentCode || !deviceId) {
+    throw new Error(
+      'TUX Operations remote sync requires an enrolled device or first-run enrollment credentials.',
+    );
+  }
+  await manager.enroll({
+    enrollmentCode,
+    deviceId,
+    deviceLabel: process.env['TUX_DEVICE_LABEL']?.trim(),
+  });
+  return manager.authorizationHeaders();
+}
+
+export function createDesktopSupabaseDeviceSessionManager(): SupabaseDeviceSessionManager | null {
+  return createSessionManager();
+}
 
 export function startDesktopAutomaticSync(input: {
   readonly database: OperationsDatabase;
@@ -22,16 +63,18 @@ export function startDesktopAutomaticSync(input: {
         : null;
   if (endpoint === null) return null;
 
-  if (input.sessionManager === undefined) {
-    // Remote Operations sync must never fall back to a publishable key or embedded
-    // service credential. No enrolled device session means sync remains safely local.
-    return null;
-  }
+  const sessionManager = input.sessionManager ?? createSessionManager();
+  if (sessionManager === null) return null;
 
-  const transport = new HttpOutboxTransport({
-    endpoint,
-    headerProvider: () => input.sessionManager?.authorizationHeaders() ?? {},
-  });
+  let enrollmentInFlight: Promise<Readonly<Record<string, string>>> | null = null;
+  const headerProvider = async () => {
+    enrollmentInFlight ??= ensureEnrolled(sessionManager).finally(() => {
+      enrollmentInFlight = null;
+    });
+    return enrollmentInFlight;
+  };
+
+  const transport = new HttpOutboxTransport({ endpoint, headerProvider });
   const service = new OutboxSyncService(input.database, transport, { now: input.now });
   const scheduler = new AutomaticOutboxScheduler(service);
   scheduler.start();
