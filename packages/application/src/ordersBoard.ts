@@ -23,6 +23,7 @@ import {
   type OperationsSyncPayloadV1,
   type OrderId,
   type OrderSnapshot,
+  type OrderTransitionSyncSnapshotV1,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -137,15 +138,24 @@ export class OperationsOrdersBoardService {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, orderId);
       const updated = markOrderDone(order, now);
+      const transition = this.#transition(
+        'ORDER_MARKED_DONE',
+        order,
+        updated,
+        context.operator,
+        now,
+      );
       await transaction.orders.updateOperationalState(updated);
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'ORDER_MARKED_DONE', {
           fromStatus: 'ACTIVE',
           toStatus: 'DONE',
-          operationalRevision: orderLifecycle(updated).revision,
+          operationalRevision: transition.revision,
         }),
       );
-      await transaction.outbox.append(this.#outbox(updated, now, 'ORDER_MARKED_DONE', [], null));
+      await transaction.outbox.append(
+        this.#outbox(updated, now, 'ORDER_MARKED_DONE', transition, [], null),
+      );
       return updated;
     });
   }
@@ -157,15 +167,24 @@ export class OperationsOrdersBoardService {
         throw new DomainInvariantError('The Done undo window has expired.');
       }
       const updated = undoOrderDone(order);
+      const transition = this.#transition(
+        'ORDER_DONE_UNDONE',
+        order,
+        updated,
+        context.operator,
+        now,
+      );
       await transaction.orders.updateOperationalState(updated);
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'ORDER_DONE_UNDONE', {
           fromStatus: 'DONE',
           toStatus: 'ACTIVE',
-          operationalRevision: orderLifecycle(updated).revision,
+          operationalRevision: transition.revision,
         }),
       );
-      await transaction.outbox.append(this.#outbox(updated, now, 'ORDER_DONE_UNDONE', [], null));
+      await transaction.outbox.append(
+        this.#outbox(updated, now, 'ORDER_DONE_UNDONE', transition, [], null),
+      );
       return updated;
     });
   }
@@ -209,16 +228,28 @@ export class OperationsOrdersBoardService {
       await transaction.orders.updateOperationalState(updated);
       const cancellation = orderLifecycle(updated).cancellation;
       if (cancellation === null) throw new Error('Cancelled order is missing cancellation metadata.');
+      const transition = this.#transition(
+        'ORDER_CANCELLED',
+        order,
+        updated,
+        context.operator,
+        now,
+        {
+          reason: cancellation.reason,
+          foodPrepared: cancellation.foodPrepared,
+          stockRestored: cancellation.stockRestored,
+        },
+      );
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'ORDER_CANCELLED', {
           reason: cancellation.reason,
           foodPrepared: cancellation.foodPrepared,
           stockRestored: cancellation.stockRestored,
-          operationalRevision: orderLifecycle(updated).revision,
+          operationalRevision: transition.revision,
         }),
       );
       await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_CANCELLED', restockMovements, null),
+        this.#outbox(updated, now, 'ORDER_CANCELLED', transition, restockMovements, null),
       );
       return updated;
     });
@@ -252,6 +283,14 @@ export class OperationsOrdersBoardService {
 
       await transaction.orders.updateOperationalState(updated);
       await transaction.expenses.put(expense);
+      const transition = this.#transition(
+        'DELIVERY_RETURNED',
+        order,
+        updated,
+        context.operator,
+        now,
+        { reason: returned.reason },
+      );
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'DELIVERY_RETURNED', {
           reason: returned.reason,
@@ -261,10 +300,12 @@ export class OperationsOrdersBoardService {
           excludedFromExpectedReconciliation: true,
           inventoryRestored: false,
           expenseId: expense.id,
-          operationalRevision: orderLifecycle(updated).revision,
+          operationalRevision: transition.revision,
         }),
       );
-      await transaction.outbox.append(this.#outbox(updated, now, 'DELIVERY_RETURNED', [], expense));
+      await transaction.outbox.append(
+        this.#outbox(updated, now, 'DELIVERY_RETURNED', transition, [], expense),
+      );
       return updated;
     });
   }
@@ -336,6 +377,32 @@ export class OperationsOrdersBoardService {
     return order;
   }
 
+  #transition(
+    eventType: OrderTransitionSyncSnapshotV1['eventType'],
+    from: OrderSnapshot,
+    to: OrderSnapshot,
+    worker: Worker,
+    at: Instant,
+    detail: {
+      readonly reason?: string;
+      readonly foodPrepared?: boolean;
+      readonly stockRestored?: boolean;
+    } = {},
+  ): OrderTransitionSyncSnapshotV1 {
+    return {
+      eventType,
+      revision: orderLifecycle(to).revision,
+      fromStatus: from.status,
+      toStatus: to.status,
+      at,
+      workerId: worker.id,
+      workerName: worker.displayName,
+      reason: detail.reason ?? null,
+      foodPrepared: detail.foodPrepared ?? null,
+      stockRestored: detail.stockRestored ?? null,
+    };
+  }
+
   #audit(
     order: OrderSnapshot,
     worker: Worker,
@@ -363,6 +430,7 @@ export class OperationsOrdersBoardService {
     order: OrderSnapshot,
     createdAt: Instant,
     eventType: 'ORDER_MARKED_DONE' | 'ORDER_DONE_UNDONE' | 'ORDER_CANCELLED' | 'DELIVERY_RETURNED',
+    transition: OrderTransitionSyncSnapshotV1,
     inventoryMovements: readonly InventoryMovement[],
     deliveryFailedExpense: Extract<Expense, { kind: 'DELIVERY_FAILED' }> | null,
   ): OutboxEvent {
@@ -370,6 +438,7 @@ export class OperationsOrdersBoardService {
       eventType,
       version: 1,
       order,
+      transition,
       inventoryMovements,
       deliveryFailedExpense,
     } satisfies OperationsSyncPayloadV1;
