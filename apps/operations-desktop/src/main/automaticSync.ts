@@ -32,6 +32,7 @@ export async function ensureDesktopSupabaseDeviceSession(
 
   const enrollmentCode = process.env['TUX_DEVICE_ENROLLMENT_CODE']?.trim();
   const deviceId = process.env['TUX_DEVICE_ID']?.trim();
+  const deviceLabel = process.env['TUX_DEVICE_LABEL']?.trim();
   if (!enrollmentCode || !deviceId) {
     throw new Error(
       'TUX Operations remote integration requires an enrolled device or first-run enrollment credentials.',
@@ -40,7 +41,7 @@ export async function ensureDesktopSupabaseDeviceSession(
   return manager.enroll({
     enrollmentCode,
     deviceId,
-    deviceLabel: process.env['TUX_DEVICE_LABEL']?.trim(),
+    ...(deviceLabel ? { deviceLabel } : {}),
   });
 }
 
