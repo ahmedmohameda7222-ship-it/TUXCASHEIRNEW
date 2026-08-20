@@ -1,0 +1,36 @@
+name: Temporary Format Export
+
+on:
+  push:
+    branches:
+      - feat/browser-supabase-provisioning
+
+permissions:
+  contents: read
+
+jobs:
+  format-export:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format source
+        run: npm run format
+      - name: Upload formatted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-wiring-formatted-source
+          path: |
+            apps/operations/src/app/App.tsx
+            apps/operations/src/app/browserRemote.ts
+            apps/operations/src/app/sessionClient.ts
+            packages/sync/src/supabaseDeviceSession.ts
+          if-no-files-found: error
+          retention-days: 1
