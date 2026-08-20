@@ -68,7 +68,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         now: () => instant(new Date()),
         createUuid: () => crypto.randomUUID(),
       };
-      startBrowserAutomaticSync({ database, coordinator, now: runtime.now });
+      startBrowserAutomaticSync({ database, now: runtime.now });
       return {
         session: new CoordinatedOperationsSessionService(
           database,
