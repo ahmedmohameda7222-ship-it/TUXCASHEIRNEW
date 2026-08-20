@@ -1,11 +1,9 @@
-import type { ApplicationCommandCoordinator } from '@tux/application';
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 import { AutomaticOutboxScheduler, HttpOutboxTransport, OutboxSyncService } from '@tux/sync';
 
 export function startDesktopAutomaticSync(input: {
   readonly database: OperationsDatabase;
-  readonly coordinator: ApplicationCommandCoordinator;
   readonly now: () => Instant;
 }): AutomaticOutboxScheduler | null {
   const endpoint = process.env['TUX_SYNC_ENDPOINT']?.trim();
@@ -19,12 +17,7 @@ export function startDesktopAutomaticSync(input: {
           endpoint,
           headers: { authorization: `Bearer ${token}` },
         });
-  const service = new OutboxSyncService(
-    input.database,
-    transport,
-    { now: input.now },
-    input.coordinator,
-  );
+  const service = new OutboxSyncService(input.database, transport, { now: input.now });
   const scheduler = new AutomaticOutboxScheduler(service);
   scheduler.start();
   return scheduler;
