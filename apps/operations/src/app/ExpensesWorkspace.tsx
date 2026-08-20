@@ -284,6 +284,7 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
   const [expenses, setExpenses] = useState<readonly ExpenseLedgerRecord[]>([]);
   const [totalExpensesMinor, setTotalExpensesMinor] = useState<MoneyMinor>(ZERO_MONEY);
   const [form, setForm] = useState<ExpenseFormValues>(EMPTY_FORM);
+  const [createCommandId, setCreateCommandId] = useState(() => crypto.randomUUID());
   const [editTarget, setEditTarget] = useState<ManualExpenseRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ManualExpenseRecord | null>(null);
   const [busy, setBusy] = useState(false);
@@ -313,6 +314,7 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
     setError(null);
     setMessage(null);
     const result = await client.createExpense({
+      commandId: createCommandId,
       description: form.description,
       amountMinor: form.amountMinor,
       paidFrom: form.paidFrom,
@@ -324,6 +326,7 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
       return;
     }
     setForm(EMPTY_FORM);
+    setCreateCommandId(crypto.randomUUID());
     setMessage('Expense saved locally.');
     await refresh();
   }
