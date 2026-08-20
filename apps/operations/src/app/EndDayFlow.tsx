@@ -265,67 +265,91 @@ export function EndDayFlow({
               </p>
             </div>
 
-            <div className="end-day-summary-totals">
-              <div>
-                <span>Recognized Sales</span>
-                <strong>{formatMoneyMinor(stage.preview.recognizedSalesMinor)}</strong>
+            <section aria-labelledby="end-day-orders-summary">
+              <h4 id="end-day-orders-summary">Orders</h4>
+              <div className="end-day-summary-totals">
+                <div>
+                  <span>Completed</span>
+                  <strong>{stage.preview.completedCount}</strong>
+                </div>
+                <div>
+                  <span>Cancelled</span>
+                  <strong>{stage.preview.cancelledCount}</strong>
+                </div>
+                <div>
+                  <span>Returned</span>
+                  <strong>{stage.preview.returnedCount}</strong>
+                </div>
               </div>
-              <div>
-                <span>Total Expenses</span>
-                <strong>{formatMoneyMinor(stage.preview.totalExpensesMinor)}</strong>
-              </div>
-            </div>
+            </section>
 
-            <div className="end-day-reconciliation-lines">
-              {stage.preview.lines.map((line) => (
-                <article className="end-day-reconciliation-line" key={line.paymentMethod.id}>
-                  <header>
-                    <strong>{line.paymentMethod.label}</strong>
-                    <span
-                      className={
-                        line.differenceMinor === ZERO_MONEY ? 'end-day-match' : 'end-day-variance'
-                      }
-                    >
-                      {line.differenceMinor === ZERO_MONEY ? 'Matched' : 'Variance'}
-                    </span>
-                  </header>
-                  <dl>
-                    <div>
-                      <dt>Expected</dt>
-                      <dd>{formatMoneyMinor(line.expectedMinor)}</dd>
-                    </div>
-                    <div>
-                      <dt>Actual</dt>
-                      <dd>{formatMoneyMinor(line.actualMinor)}</dd>
-                    </div>
-                    <div>
-                      <dt>Difference</dt>
-                      <dd>{formatMoneyMinor(line.differenceMinor)}</dd>
-                    </div>
-                  </dl>
-                  {line.differenceMinor === ZERO_MONEY ? null : (
-                    <label htmlFor={`end-day-reason-${line.paymentMethod.id}`}>
-                      Variance reason
-                      <textarea
-                        id={`end-day-reason-${line.paymentMethod.id}`}
-                        rows={2}
-                        maxLength={500}
-                        value={reasons.get(line.paymentMethod.id) ?? ''}
-                        disabled={busy}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setReasons((current) => {
-                            const next = new Map(current);
-                            next.set(line.paymentMethod.id, value);
-                            return next;
-                          });
-                        }}
-                      />
-                    </label>
-                  )}
-                </article>
-              ))}
-            </div>
+            <section aria-labelledby="end-day-payments-summary">
+              <h4 id="end-day-payments-summary">Payments</h4>
+              <div className="end-day-reconciliation-lines">
+                {stage.preview.lines.map((line) => (
+                  <article className="end-day-reconciliation-line" key={line.paymentMethod.id}>
+                    <header>
+                      <strong>{line.paymentMethod.label}</strong>
+                      <span
+                        className={
+                          line.differenceMinor === ZERO_MONEY ? 'end-day-match' : 'end-day-variance'
+                        }
+                      >
+                        {line.differenceMinor === ZERO_MONEY ? 'Matched' : 'Variance'}
+                      </span>
+                    </header>
+                    <dl>
+                      <div>
+                        <dt>Expected</dt>
+                        <dd>{formatMoneyMinor(line.expectedMinor)}</dd>
+                      </div>
+                      <div>
+                        <dt>{line.paymentMethod.logicType === 'CASH' ? 'Counted' : 'Actual'}</dt>
+                        <dd>{formatMoneyMinor(line.actualMinor)}</dd>
+                      </div>
+                      <div>
+                        <dt>Difference</dt>
+                        <dd>{formatMoneyMinor(line.differenceMinor)}</dd>
+                      </div>
+                    </dl>
+                    {line.differenceMinor === ZERO_MONEY ? null : (
+                      <label htmlFor={`end-day-reason-${line.paymentMethod.id}`}>
+                        Variance reason
+                        <textarea
+                          id={`end-day-reason-${line.paymentMethod.id}`}
+                          rows={2}
+                          maxLength={500}
+                          value={reasons.get(line.paymentMethod.id) ?? ''}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setReasons((current) => {
+                              const next = new Map(current);
+                              next.set(line.paymentMethod.id, value);
+                              return next;
+                            });
+                          }}
+                        />
+                      </label>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section aria-labelledby="end-day-expenses-summary">
+              <h4 id="end-day-expenses-summary">Expenses</h4>
+              <div className="end-day-summary-totals">
+                <div>
+                  <span>Total Expenses</span>
+                  <strong>{formatMoneyMinor(stage.preview.totalExpensesMinor)}</strong>
+                </div>
+                <div>
+                  <span>Cash Expenses</span>
+                  <strong>{formatMoneyMinor(stage.preview.cashExpensesMinor)}</strong>
+                </div>
+              </div>
+            </section>
 
             <div className="end-day-navigation-actions">
               <button
@@ -342,7 +366,7 @@ export function EndDayFlow({
                   setStage({ kind: 'COUNT', gate });
                 }}
               >
-                Back to Counts
+                Back
               </button>
               <button
                 type="button"
