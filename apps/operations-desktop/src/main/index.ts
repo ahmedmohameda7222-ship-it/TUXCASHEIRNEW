@@ -6,7 +6,7 @@ import {
   OperationsOrdersBoardService,
   OperationsOrdersService,
 } from '@tux/application';
-import { instant, parseEntityId, type OrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
@@ -190,8 +190,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   });
   ipcMain.handle(IPC_ORDERS_SAVE_DRAFT, async (event, draft: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    assertObjectPayload(draft, 'Order draft');
-    return currentOrdersService().saveDraft(draft as unknown as OrderDraft);
+    return currentOrdersService().saveDraft(parseOrderDraft(draft));
   });
   ipcMain.handle(
     IPC_ORDERS_FIND_CUSTOMER,
@@ -208,8 +207,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   );
   ipcMain.handle(IPC_ORDERS_PLACE, async (event, draft: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    assertObjectPayload(draft, 'Order draft');
-    return currentOrdersService().placeOrder(draft as unknown as OrderDraft);
+    return currentOrdersService().placeOrder(parseOrderDraft(draft));
   });
   ipcMain.handle(IPC_ORDERS_REPRINT, async (event, orderId: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
