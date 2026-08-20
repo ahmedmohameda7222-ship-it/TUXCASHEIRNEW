@@ -1,0 +1,1 @@
+export { renderOrderReceiptHtml } from './receipt';

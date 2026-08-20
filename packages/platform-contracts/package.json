@@ -1,0 +1,14 @@
+{
+  "name": "@tux/platform-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@tux/application": "0.0.0"
+  }
+}
