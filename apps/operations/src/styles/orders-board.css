@@ -370,7 +370,7 @@
 
 .board-undo-toast {
   position: fixed;
-  z-index: var(--tux-z-dialog);
+  z-index: calc(var(--tux-z-dialog) + 1);
   left: 50%;
   bottom: var(--tux-space-6);
   transform: translateX(-50%);
