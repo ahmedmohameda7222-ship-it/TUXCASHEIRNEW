@@ -57,9 +57,11 @@ export class IndexedDbOperatorSessionReadModel implements OperatorSessionReadMod
 
   async listActiveWorkers(shopId: ShopId): Promise<readonly Worker[]> {
     const transaction = this.#db().transaction('workers', 'readonly');
-    const workers = (await requestResult(transaction.objectStore('workers').getAll())) as Worker[];
+    const workers = (await requestResult(
+      transaction.objectStore('workers').index('shopId').getAll(shopId),
+    )) as Worker[];
     return workers
-      .filter((worker) => worker.shopId === shopId && worker.active)
+      .filter((worker) => worker.active)
       .sort(
         (left, right) =>
           left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id),
@@ -69,11 +71,11 @@ export class IndexedDbOperatorSessionReadModel implements OperatorSessionReadMod
   async getOpenWorkerSession(businessDayId: BusinessDayId): Promise<WorkerSession | null> {
     const transaction = this.#db().transaction('workerSessions', 'readonly');
     const sessions = (await requestResult(
-      transaction.objectStore('workerSessions').getAll(),
+      transaction.objectStore('workerSessions').index('businessDayId').getAll(businessDayId),
     )) as WorkerSession[];
     return (
       sessions
-        .filter((session) => session.businessDayId === businessDayId && session.endedAt === null)
+        .filter((session) => session.endedAt === null)
         .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0] ?? null
     );
   }

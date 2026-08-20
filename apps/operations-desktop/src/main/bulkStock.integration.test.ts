@@ -309,6 +309,7 @@ describe('Operations Bulk Stock SQLite integration', () => {
         businessDayId: DAY_ID,
         aggregateType: 'TEST',
         aggregateId: 'seed',
+        aggregateRevision: null,
         eventType: 'SEED',
         idempotencyKey: 'seed:bulk-stock-failure',
         payloadVersion: 1,

@@ -35,7 +35,9 @@ function record(value: unknown, path: string): UnknownRecord {
 
 function stringValue(value: unknown, path: string, allowEmpty = true): string {
   if (typeof value !== 'string' || (!allowEmpty && value.trim().length === 0)) {
-    throw new InvalidOrderDraftError(`${path} must be ${allowEmpty ? 'a string' : 'a non-empty string'}.`);
+    throw new InvalidOrderDraftError(
+      `${path} must be ${allowEmpty ? 'a string' : 'a non-empty string'}.`,
+    );
   }
   return value;
 }
@@ -103,7 +105,11 @@ function parseLines(value: unknown): readonly DraftOrderLine[] {
     return {
       id: entityId<DraftLineId>(line['id'], `OrderDraft.lines[${index}].id`),
       productId: entityId<ProductId>(line['productId'], `OrderDraft.lines[${index}].productId`),
-      productName: stringValue(line['productName'], `OrderDraft.lines[${index}].productName`, false),
+      productName: stringValue(
+        line['productName'],
+        `OrderDraft.lines[${index}].productName`,
+        false,
+      ),
       unitPriceMinor: moneyMinor(
         safeInteger(line['unitPriceMinor'], `OrderDraft.lines[${index}].unitPriceMinor`),
       ),
@@ -114,7 +120,11 @@ function parseLines(value: unknown): readonly DraftOrderLine[] {
         `OrderDraft.lines[${index}].comboBeverages`,
       ),
       itemNote: nullableString(line['itemNote'], `OrderDraft.lines[${index}].itemNote`),
-      addedSequence: safeInteger(line['addedSequence'], `OrderDraft.lines[${index}].addedSequence`, 0),
+      addedSequence: safeInteger(
+        line['addedSequence'],
+        `OrderDraft.lines[${index}].addedSequence`,
+        0,
+      ),
     };
   });
 }
@@ -142,7 +152,9 @@ function parsePayment(value: unknown): PaymentDraft {
     return {
       mode: 'SPLIT',
       methodAId: entityId<PaymentMethodId>(payment['methodAId'], 'OrderDraft.payment.methodAId'),
-      amountAMinor: moneyMinor(safeInteger(payment['amountAMinor'], 'OrderDraft.payment.amountAMinor')),
+      amountAMinor: moneyMinor(
+        safeInteger(payment['amountAMinor'], 'OrderDraft.payment.amountAMinor'),
+      ),
       methodACashReceivedMinor: nullableMoney(
         payment['methodACashReceivedMinor'],
         'OrderDraft.payment.methodACashReceivedMinor',
@@ -171,9 +183,7 @@ export function parseOrderDraft(value: unknown): OrderDraft {
       updatedAt: instant(stringValue(draft['updatedAt'], 'OrderDraft.updatedAt', false)),
       checkoutIntentKey: uuid(draft['checkoutIntentKey'], 'OrderDraft.checkoutIntentKey'),
       orderTypeId:
-        orderTypeId === null
-          ? null
-          : entityId<OrderTypeId>(orderTypeId, 'OrderDraft.orderTypeId'),
+        orderTypeId === null ? null : entityId<OrderTypeId>(orderTypeId, 'OrderDraft.orderTypeId'),
       lines: parseLines(draft['lines']),
       orderNote: nullableString(draft['orderNote'], 'OrderDraft.orderNote'),
       discountMinor: moneyMinor(safeInteger(draft['discountMinor'], 'OrderDraft.discountMinor')),

@@ -61,6 +61,8 @@ export interface ExpenseRepository {
   put(expense: Expense): Promise<void>;
 }
 export interface InventoryRepository {
+  listItemsForShop(shopId: ShopId): Promise<readonly InventoryItem[]>;
+  replaceConfigurationItems(shopId: ShopId, items: readonly InventoryItem[]): Promise<void>;
   putItem(item: InventoryItem): Promise<void>;
   appendMovement(movement: InventoryMovement): Promise<void>;
   listMovementsForOrder(orderId: OrderId): Promise<readonly InventoryMovement[]>;
@@ -82,6 +84,11 @@ export interface OutboxRepository {
     lastError: string,
   ): Promise<void>;
   quarantine(id: OutboxEventId, quarantinedAt: Instant, reason: string): Promise<void>;
+  quarantineDependents(
+    origin: OutboxEvent,
+    quarantinedAt: Instant,
+    reason: string,
+  ): Promise<number>;
 }
 
 export interface OperationsTransaction {
@@ -101,5 +108,7 @@ export interface OperationsTransaction {
 }
 
 export interface OperationsDatabase {
-  transaction<Result>(work: (transaction: OperationsTransaction) => Promise<Result>): Promise<Result>;
+  transaction<Result>(
+    work: (transaction: OperationsTransaction) => Promise<Result>,
+  ): Promise<Result>;
 }

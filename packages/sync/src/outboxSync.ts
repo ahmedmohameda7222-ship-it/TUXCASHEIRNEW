@@ -7,7 +7,12 @@ export class OutboxDeliveryError extends Error {
   readonly kind: OutboxFailureKind;
   readonly status: number | null;
 
-  constructor(message: string, kind: OutboxFailureKind, status: number | null = null, options?: ErrorOptions) {
+  constructor(
+    message: string,
+    kind: OutboxFailureKind,
+    status: number | null = null,
+    options?: ErrorOptions,
+  ) {
     super(message, options);
     this.name = 'OutboxDeliveryError';
     this.kind = kind;
@@ -28,6 +33,7 @@ export interface OutboxSyncSummary {
   readonly delivered: number;
   readonly failed: number;
   readonly quarantined: number;
+  readonly dependencyBlocked: number;
   readonly blockedUntil: Instant | null;
   readonly lastError: string | null;
 }
@@ -65,7 +71,11 @@ export class OutboxSyncService {
   readonly #runtime: OutboxSyncRuntime;
   #tail: Promise<void> = Promise.resolve();
 
-  constructor(database: OperationsDatabase, transport: OutboxTransport, runtime: OutboxSyncRuntime) {
+  constructor(
+    database: OperationsDatabase,
+    transport: OutboxTransport,
+    runtime: OutboxSyncRuntime,
+  ) {
     this.#database = database;
     this.#transport = transport;
     this.#runtime = runtime;
@@ -85,10 +95,21 @@ export class OutboxSyncService {
     );
     let delivered = 0;
     let quarantined = 0;
+    let dependencyBlocked = 0;
     let attempted = 0;
     let lastPermanentError: string | null = null;
+    const blockedAggregateRevisions = new Map<string, number>();
 
     for (const event of pending) {
+      const aggregateKey = `${event.shopId}:${event.aggregateType}:${event.aggregateId}`;
+      const blockedAfterRevision = blockedAggregateRevisions.get(aggregateKey);
+      if (
+        blockedAfterRevision !== undefined &&
+        event.aggregateRevision !== null &&
+        event.aggregateRevision > blockedAfterRevision
+      ) {
+        continue;
+      }
       attempted += 1;
       try {
         // Network I/O deliberately happens outside every local transaction and outside the
@@ -103,9 +124,13 @@ export class OutboxSyncService {
         const lastError = normalizedError(error);
         const failedAt = this.#runtime.now();
         if (failureKind(error) === 'PERMANENT') {
-          await this.#database.transaction((transaction) =>
-            transaction.outbox.quarantine(event.id, failedAt, lastError),
-          );
+          dependencyBlocked += await this.#database.transaction(async (transaction) => {
+            await transaction.outbox.quarantine(event.id, failedAt, lastError);
+            return transaction.outbox.quarantineDependents(event, failedAt, lastError);
+          });
+          if (event.aggregateRevision !== null) {
+            blockedAggregateRevisions.set(aggregateKey, event.aggregateRevision);
+          }
           quarantined += 1;
           lastPermanentError = lastError;
           continue;
@@ -121,6 +146,7 @@ export class OutboxSyncService {
           delivered,
           failed: 1,
           quarantined,
+          dependencyBlocked,
           blockedUntil: nextAttemptAt,
           lastError,
         };
@@ -132,6 +158,7 @@ export class OutboxSyncService {
       delivered,
       failed: 0,
       quarantined,
+      dependencyBlocked,
       blockedUntil: null,
       lastError: lastPermanentError,
     };

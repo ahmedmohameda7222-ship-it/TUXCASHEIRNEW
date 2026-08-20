@@ -11,13 +11,11 @@ export {
 } from './outboxSync';
 export {
   buildRemoteMaterializationPlanV1,
+  shouldApplyRemoteMutation,
   type RemoteMaterializationPlanV1,
+  type RemoteMutationGuard,
   type RemoteMutationMode,
   type RemoteTableMutation,
 } from './remoteMaterializer';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
-export {
-  buildSyncHealth,
-  type SyncHealthSnapshot,
-  type SyncHealthState,
-} from './syncHealth';
+export { buildSyncHealth, type SyncHealthSnapshot, type SyncHealthState } from './syncHealth';

@@ -1,1 +1,1 @@
-export { renderOrderReceiptHtml } from './receipt';
+export { renderOrderReceiptHtml, type ReceiptRenderOptions } from './receipt';

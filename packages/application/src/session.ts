@@ -159,14 +159,11 @@ export class OperationsSessionService {
               }),
             );
             await transaction.outbox.append(
-              this.#outbox(
-                shop.id,
-                'BUSINESS_DAY_STARTED',
-                day.id,
-                day.id,
-                now,
-                { eventType: 'BUSINESS_DAY_STARTED', version: 1, businessDay: day },
-              ),
+              this.#outbox(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, now, {
+                eventType: 'BUSINESS_DAY_STARTED',
+                version: 1,
+                businessDay: day,
+              }),
             );
           }
 
@@ -367,6 +364,12 @@ export class OperationsSessionService {
       businessDayId,
       aggregateType: eventType.startsWith('BUSINESS_DAY') ? 'BUSINESS_DAY' : 'WORKER_SESSION',
       aggregateId,
+      aggregateRevision:
+        eventType === 'BUSINESS_DAY_STARTED' ||
+        eventType === 'WORKER_SIGNED_IN' ||
+        eventType === 'WORKER_SWITCHED'
+          ? 0
+          : 1,
       eventType,
       idempotencyKey: `${eventType.toLowerCase()}:${aggregateId}`,
       payloadVersion: 1,

@@ -1,93 +1,56 @@
-# TUX V2 Migration Discipline
+# TUX V2 Migration Strategy
 
-## Durable migration chains
+## Rule
 
-TUX Operations has different physical stores behind one shared domain/persistence contract.
+All durable schemas are versioned. Integrated migrations are append-only: new schema evolution adds a new migration rather than rewriting historical migration meaning.
 
-```text
-Desktop local SQLite
-  packages/persistence/src/sqlite/migrations.ts
+No repository command applies migrations to a production or remote Supabase project.
 
-Browser IndexedDB
-  versioned inside the browser persistence adapter
+## Desktop SQLite
 
-Remote Postgres/Supabase
-  supabase/migrations/*.sql
-```
-
-## SQLite
-
-SQLite migrations are append-only once integrated. Phase 3 does not rewrite the Phase 2 foundation migration.
+`packages/persistence/src/sqlite/migrations.ts` owns the local desktop migration registry. `local_schema_migrations` records each version and name.
 
 Current chain:
 
-```text
-1  operations_foundation
-2  one_open_worker_session_per_business_day
-```
+1. `operations_foundation` — local Operations tables, exact constraints, core indexes and durable outbox.
+2. `one_open_worker_session_per_business_day` — one Current Operator session per Business Day.
+3. `orders_board_lookup_indexes` — order-linked inventory lookup.
+4. `outbox_permanent_failure_quarantine` — durable quarantine metadata.
+5. `outbox_aggregate_dependency_ordering` — aggregate revisions, dependency blocking and supporting indexes.
 
-Migration v1 creates the local operational transaction store.
+Each migration is applied inside `BEGIN IMMEDIATE`; a failed migration rolls back and is not recorded as applied.
 
-Migration v2 adds:
+SQLite tests create earlier-version databases, reopen them with current code, and verify preserved records plus new constraints/indexes.
 
-```sql
-CREATE UNIQUE INDEX ux_worker_sessions_one_open_per_business_day
-ON worker_sessions(business_day_id)
-WHERE ended_at IS NULL;
-```
+## Browser IndexedDB
 
-This means the durable desktop store permits at most one currently open worker session for a Business Day. Switching workers closes the old session before inserting the new one in the same application transaction.
+`packages/persistence/src/browser/indexedDbMigrations.ts` is the explicit browser schema registry. Browser upgrades are not one-shot creation logic hidden inside the adapter.
 
-The migration runner:
+Current chain:
 
-1. creates `local_schema_migrations` if necessary;
-2. loads applied versions;
-3. executes each new migration inside `BEGIN IMMEDIATE`;
-4. records its version/name/applied timestamp only after the migration SQL succeeds;
-5. rolls back on failure.
+1. `initial_operations_schema` — all Operations object stores and original indexes.
+2. `operational_query_and_outbox_dependency_indexes` — indexed Business-Day/query paths plus aggregate-stream outbox indexing.
 
-Future integrated schema changes must add a new migration rather than silently rewriting historical migration meaning.
+`applyIndexedDbMigrations()` requires every intermediate version to exist and refuses a skipped/missing migration. Automated tests cover both fresh v2 creation and a populated v1 → v2 upgrade without business-data loss. The rendered Playwright harness also seeds a real v1 browser database before loading current Operations, exercising the production upgrade path.
 
-## IndexedDB
+The browser physical schema need not mirror normalized PostgreSQL table-for-table; it must preserve the same Operations facts and atomic boundaries.
 
-The browser adapter currently uses database version `1`.
+## Repository PostgreSQL/Supabase chain
 
-Any future schema change must increment the IndexedDB version and perform deterministic `upgradeneeded` transformations. Never delete/recreate production stores simply to avoid writing a migration.
+The repository carries, in filename order:
 
-The browser schema is not expected to mirror normalized Postgres table-for-table. It preserves the same domain facts required by Operations. Phase 3 serializes session commands within the browser service, but does not claim the SQLite v2 uniqueness constraint has an equivalent cross-tab IndexedDB database constraint.
+1. `20260817195000_operations_foundation.sql`
+2. `20260817195500_tenant_integrity.sql`
+3. `20260820023000_operations_sync_domain_parity.sql`
 
-## Postgres / Supabase
+The third migration adds parity needed by the local-first sync protocol: Current Operator uniqueness, Expense lifecycle fields, Order operational lifecycle/configuration-version fields, parent-position identities for nested snapshots, order-status revision data, and the durable `operations_sync_event_receipts` idempotency receipt table.
 
-The repository remote chain contains:
+## Migration-chain smoke gate
 
-```text
-supabase/migrations/20260817195000_operations_foundation.sql
-supabase/migrations/20260817195500_tenant_integrity.sql
-```
+`npm run test:migrations` requires `TUX_TEST_DATABASE_URL` and deliberately refuses non-loopback hosts. It resets only that local test database, creates the minimal `auth.users` compatibility table supplied by Supabase in production, applies every repository migration in filename order with `psql -v ON_ERROR_STOP=1`, then asserts critical tenant FKs, lifecycle constraints, Current Operator uniqueness, sync-receipt presence, and RLS enablement.
 
-The first migration establishes the normalized remote V2 foundation. The second hardens same-shop composite relationships and removes duplicated mutable revenue/collection facts that should be derived from authoritative status/payment history.
+GitHub Actions supplies a clean PostgreSQL service for this gate. This proves SQL compile/order/invariant integrity; it does **not** claim to emulate the complete Supabase Auth/runtime platform.
 
-The remote schema includes shop/tenant scope, future authenticated memberships/devices, workers with PIN hash fields only, Business Days/sessions, normalized configuration, exact numeric storage, Orders/history snapshots, customer contacts, Expenses, inventory movement ledger, reconciliation, audit, constraints/indexes, and RLS enabled on exposed `public` tables.
+## Production deployment boundary
 
-No permissive RLS policy is created yet. The real V2 remote authorization model must be reviewed before client row access is opened.
-
-## Remote application rule
-
-Do not run a remote migration command until the user supplies and explicitly authorizes the real V2 target.
-
-When that target exists:
-
-1. verify it is not the legacy Tuxcashier project;
-2. inspect the complete repository migration chain;
-3. run the chain against a local/ephemeral Postgres/Supabase environment first;
-4. verify constraints, indexes and RLS;
-5. only then apply to the authorized target;
-6. verify the resulting remote schema matches Git history.
-
-No secret or project reference belongs in a migration file.
-
-## Current validation status
-
-SQLite migrations are executed by automated tests against `node:sqlite`. Phase 3 specifically verifies that the v2 index rejects a second simultaneous open worker session for the same Business Day.
-
-The Postgres migration chain remains repository-reviewed but unapplied because no approved V2 Supabase target or local Supabase stack is connected. That distinction remains explicit in release reporting.
+Real V2 Supabase project creation, credentials, RLS policy design for authenticated clients/service roles, backup/restore rehearsal, and production migration application are external deployment work. They remain unconfigured until explicitly authorized.

@@ -11,6 +11,8 @@ release/
 coverage/
 .playwright/
 test-results/
+playwright-report/
+qa-artifacts/
 
 # environment / secrets
 .env

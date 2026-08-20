@@ -19,6 +19,7 @@ function outbox(id: string, createdAt: string): OutboxEvent {
     businessDayId: null,
     aggregateType: 'ORDER',
     aggregateId: id,
+    aggregateRevision: 0,
     eventType: 'ORDER_PLACED',
     idempotencyKey: `order-placed:${id}`,
     payloadVersion: 1,
@@ -57,6 +58,16 @@ class MemoryDatabase implements OperationsDatabase {
           if (current === undefined) throw new Error('Missing event');
           this.events.set(id, { ...current, deliveredAt, nextAttemptAt: null, lastError: null });
         },
+        quarantine: async (
+          id: OutboxEventId,
+          _quarantinedAt: ReturnType<typeof instant>,
+          reason: string,
+        ) => {
+          const current = this.events.get(id);
+          if (current === undefined) throw new Error('Missing event');
+          this.events.set(id, { ...current, lastError: reason, nextAttemptAt: null });
+        },
+        quarantineDependents: async () => 0,
         recordFailure: async (
           id: OutboxEventId,
           attemptCount: number,
@@ -72,8 +83,6 @@ class MemoryDatabase implements OperationsDatabase {
     return work(transaction);
   }
 }
-
-const coordinator = { runExclusive: async <Result>(work: () => Promise<Result>) => work() };
 
 describe('OutboxSyncService', () => {
   it('delivers oldest eligible events and marks delivered only after transport success', async () => {
@@ -92,12 +101,13 @@ describe('OutboxSyncService', () => {
         },
       },
       { now: () => instant('2026-08-18T11:00:00.000Z') },
-      coordinator,
     );
     expect(await service.syncOnce()).toEqual({
       attempted: 2,
       delivered: 2,
       failed: 0,
+      quarantined: 0,
+      dependencyBlocked: 0,
       blockedUntil: null,
       lastError: null,
     });
@@ -120,7 +130,6 @@ describe('OutboxSyncService', () => {
         },
       },
       { now: () => instant('2026-08-18T11:00:00.000Z') },
-      coordinator,
     );
     const result = await service.syncOnce();
     expect(attempted).toEqual([first.id]);

@@ -11,6 +11,11 @@ export type {
   UndoBulkStockInput,
 } from './bulkStock';
 export { ApplicationCommandCoordinator } from './commandCoordinator';
+export { OperationsConfigurationSyncService } from './configurationSync';
+export type {
+  ConfigurationApplicationResult,
+  InboundConfigurationProvider,
+} from './configurationSync';
 export { CoordinatedOperationsSessionService } from './coordinatedSession';
 export { OperationsEndDayService } from './endDay';
 export type {
@@ -36,6 +41,11 @@ export type {
   ManualExpenseInput,
 } from './expenses';
 export { unavailableOrderPrinter } from './orderPrinter';
+export {
+  DEFAULT_RECEIPT_PRINTER_CONFIGURATION,
+  parseReceiptPrinterConfiguration,
+} from './printerConfiguration';
+export type { ReceiptPaperWidthMm, ReceiptPrinterConfiguration } from './printerConfiguration';
 export type { OrderPrintAttempt, OrderPrinter } from './orderPrinter';
 export { createEmptyOrderDraft, OperationsOrdersService } from './orders';
 export { OperationsOrdersBoardService } from './ordersBoard';

@@ -1,0 +1,22 @@
+appId: com.tux.operations
+productName: TUX Operations
+directories:
+  output: release/windows
+files:
+  - package.json
+  - apps/operations/dist/**/*
+  - apps/operations-desktop/dist/main/**/*
+  - apps/operations-desktop/dist/preload/**/*
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: TUX-Operations-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

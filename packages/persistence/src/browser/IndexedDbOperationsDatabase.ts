@@ -22,29 +22,16 @@ import type {
 } from '@tux/domain';
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '../contracts';
-
-const DATABASE_VERSION = 1;
-const STORES = [
-  'shops',
-  'devices',
-  'workers',
-  'workerSessions',
-  'configurationSnapshots',
-  'customerContacts',
-  'businessDays',
-  'orders',
-  'expenses',
-  'inventoryItems',
-  'inventoryMovements',
-  'reconciliations',
-  'auditEvents',
-  'outboxEvents',
-] as const;
-
-type StoreName = (typeof STORES)[number];
+import {
+  applyIndexedDbMigrations,
+  INDEXED_DB_STORES,
+  INDEXED_DB_VERSION,
+  type IndexedDbStoreName,
+} from './indexedDbMigrations';
 type StoredOutboxEvent = OutboxEvent & {
-  readonly quarantinedAt?: Instant | null;
-  readonly permanentFailureReason?: string | null;
+  readonly quarantinedAt: Instant | null;
+  readonly permanentFailureReason: string | null;
+  readonly blockedByEventId: OutboxEventId | null;
 };
 
 function requestResult<Result>(request: IDBRequest<Result>): Promise<Result> {
@@ -81,52 +68,18 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 
 function openDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name, DATABASE_VERSION);
-    request.addEventListener('upgradeneeded', () => {
-      const database = request.result;
-      const shops = database.createObjectStore('shops', { keyPath: 'id' });
-      shops.createIndex('active', 'active');
-
-      const devices = database.createObjectStore('devices', { keyPath: 'id' });
-      devices.createIndex('shopId', 'shopId');
-
-      const workers = database.createObjectStore('workers', { keyPath: 'id' });
-      workers.createIndex('shopId', 'shopId');
-
-      database.createObjectStore('workerSessions', { keyPath: 'id' });
-      database.createObjectStore('configurationSnapshots', { keyPath: 'shopId' });
-
-      const customerContacts = database.createObjectStore('customerContacts', { keyPath: 'id' });
-      customerContacts.createIndex('shopPhone', ['shopId', 'normalizedPhone'], { unique: true });
-
-      const businessDays = database.createObjectStore('businessDays', { keyPath: 'id' });
-      businessDays.createIndex('shopStatus', ['shopId', 'status']);
-
-      const orders = database.createObjectStore('orders', { keyPath: 'id' });
-      orders.createIndex('shopIdempotency', ['shopId', 'idempotencyKey'], { unique: true });
-      orders.createIndex('businessDayStatus', ['businessDayId', 'status']);
-
-      const expenses = database.createObjectStore('expenses', { keyPath: 'id' });
-      expenses.createIndex('businessDayId', 'businessDayId');
-
-      const inventoryItems = database.createObjectStore('inventoryItems', { keyPath: 'id' });
-      inventoryItems.createIndex('shopTrackingMode', ['shopId', 'trackingMode']);
-
-      const inventoryMovements = database.createObjectStore('inventoryMovements', {
-        keyPath: 'id',
-      });
-      inventoryMovements.createIndex('shopIdempotency', ['shopId', 'idempotencyKey'], {
-        unique: true,
-      });
-
-      const reconciliations = database.createObjectStore('reconciliations', { keyPath: 'id' });
-      reconciliations.createIndex('shopBusinessDay', ['shopId', 'businessDayId'], { unique: true });
-
-      database.createObjectStore('auditEvents', { keyPath: 'id' });
-
-      const outbox = database.createObjectStore('outboxEvents', { keyPath: 'id' });
-      outbox.createIndex('shopIdempotency', ['shopId', 'idempotencyKey'], { unique: true });
-      outbox.createIndex('deliveredAt', 'deliveredAt');
+    const request = indexedDB.open(name, INDEXED_DB_VERSION);
+    request.addEventListener('upgradeneeded', (event) => {
+      const transaction = request.transaction;
+      if (transaction === null) {
+        throw new Error('IndexedDB upgrade transaction is unavailable.');
+      }
+      applyIndexedDbMigrations(
+        request.result,
+        transaction,
+        event.oldVersion,
+        event.newVersion ?? INDEXED_DB_VERSION,
+      );
     });
     request.addEventListener('success', () => resolve(request.result), { once: true });
     request.addEventListener(
@@ -138,7 +91,7 @@ function openDatabase(name: string): Promise<IDBDatabase> {
 }
 
 function createRepositories(transaction: IDBTransaction): OperationsTransaction {
-  const store = (name: StoreName) => transaction.objectStore(name);
+  const store = (name: IndexedDbStoreName) => transaction.objectStore(name);
   return {
     shops: {
       async getById(id: ShopId) {
@@ -233,14 +186,16 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         );
       },
       async listByBusinessDay(businessDayId: BusinessDayId) {
-        const all = (await requestResult(store('orders').getAll())) as OrderSnapshot[];
-        return all
-          .filter((order) => order.businessDayId === businessDayId)
-          .sort(
-            (left, right) =>
-              left.createdAt.localeCompare(right.createdAt) ||
-              left.displayOrderNo - right.displayOrderNo,
-          );
+        const all = (await requestResult(
+          store('orders')
+            .index('businessDayCreatedAt')
+            .getAll(IDBKeyRange.bound([businessDayId, ''], [businessDayId, '\uffff'])),
+        )) as OrderSnapshot[];
+        return all.sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.displayOrderNo - right.displayOrderNo,
+        );
       },
       async insert(order: OrderSnapshot) {
         await requestResult(store('orders').add(order));
@@ -262,6 +217,27 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       },
     },
     inventory: {
+      async listItemsForShop(shopId: ShopId) {
+        return (await requestResult(
+          store('inventoryItems').index('shopId').getAll(shopId),
+        )) as InventoryItem[];
+      },
+      async replaceConfigurationItems(shopId: ShopId, items: readonly InventoryItem[]) {
+        if (items.some((item) => item.shopId !== shopId)) {
+          throw new Error('Configuration inventory items must belong to the target shop.');
+        }
+        const inventoryItems = store('inventoryItems');
+        const existing = (await requestResult(
+          inventoryItems.index('shopId').getAll(shopId),
+        )) as InventoryItem[];
+        const incomingIds = new Set(items.map((item) => item.id));
+        for (const item of items) await requestResult(inventoryItems.put(item));
+        for (const item of existing) {
+          if (!incomingIds.has(item.id)) {
+            await requestResult(inventoryItems.put({ ...item, active: false }));
+          }
+        }
+      },
       async putItem(item: InventoryItem) {
         await requestResult(store('inventoryItems').put(item));
       },
@@ -269,10 +245,11 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         await requestResult(store('inventoryMovements').add(movement));
       },
       async listMovementsForOrder(orderId: OrderId) {
-        const all = (await requestResult(store('inventoryMovements').getAll())) as InventoryMovement[];
-        return all
-          .filter((movement) => movement.orderId === orderId)
-          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+        return (await requestResult(
+          store('inventoryMovements')
+            .index('orderCreatedAt')
+            .getAll(IDBKeyRange.bound([orderId, ''], [orderId, '\uffff'])),
+        )) as InventoryMovement[];
       },
     },
     reconciliations: {
@@ -287,10 +264,38 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
     },
     outbox: {
       async append(event: OutboxEvent) {
+        let blockedByEventId: OutboxEventId | null = null;
+        let blockedReason: string | null = null;
+        if (event.aggregateRevision !== null && event.aggregateRevision > 0) {
+          const predecessors = (await requestResult(
+            store('outboxEvents')
+              .index('aggregateStream')
+              .getAll(
+                IDBKeyRange.bound(
+                  [event.shopId, event.aggregateType, event.aggregateId, 0],
+                  [event.shopId, event.aggregateType, event.aggregateId, event.aggregateRevision],
+                  false,
+                  true,
+                ),
+              ),
+          )) as StoredOutboxEvent[];
+          const predecessor = predecessors
+            .filter((candidate) => candidate.quarantinedAt !== null)
+            .sort(
+              (left, right) => (right.aggregateRevision ?? -1) - (left.aggregateRevision ?? -1),
+            )[0];
+          if (predecessor !== undefined) {
+            blockedByEventId = predecessor.id;
+            blockedReason = `DEPENDENCY_BLOCKED_BY:${predecessor.id}`;
+          }
+        }
         const stored: StoredOutboxEvent = {
           ...event,
-          quarantinedAt: null,
-          permanentFailureReason: null,
+          nextAttemptAt: blockedReason === null ? event.nextAttemptAt : null,
+          lastError: blockedReason ?? event.lastError,
+          quarantinedAt: blockedReason === null ? null : event.createdAt,
+          permanentFailureReason: blockedReason,
+          blockedByEventId,
         };
         await requestResult(store('outboxEvents').add(stored));
       },
@@ -298,7 +303,9 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         if (!Number.isSafeInteger(limit) || limit <= 0) {
           throw new RangeError('Outbox pending limit must be a positive safe integer.');
         }
-        const all = (await requestResult(store('outboxEvents').getAll())) as StoredOutboxEvent[];
+        const all = (await requestResult(
+          store('outboxEvents').index('createdAt').getAll(),
+        )) as StoredOutboxEvent[];
         return all
           .filter(
             (event) =>
@@ -344,6 +351,39 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
           }),
         );
       },
+      async quarantineDependents(origin: OutboxEvent, quarantinedAt: Instant, reason: string) {
+        if (origin.aggregateRevision === null) return 0;
+        const objectStore = store('outboxEvents');
+        const candidates = (await requestResult(
+          objectStore
+            .index('aggregateStream')
+            .getAll(
+              IDBKeyRange.bound(
+                [origin.shopId, origin.aggregateType, origin.aggregateId, origin.aggregateRevision],
+                [origin.shopId, origin.aggregateType, origin.aggregateId, Number.MAX_SAFE_INTEGER],
+                true,
+                false,
+              ),
+            ),
+        )) as StoredOutboxEvent[];
+        let blocked = 0;
+        for (const candidate of candidates) {
+          if (candidate.deliveredAt !== null || candidate.quarantinedAt !== null) continue;
+          const blockedReason = `DEPENDENCY_BLOCKED_BY:${origin.id}:${reason}`;
+          await requestResult(
+            objectStore.put({
+              ...candidate,
+              quarantinedAt,
+              permanentFailureReason: blockedReason,
+              blockedByEventId: origin.id,
+              lastError: blockedReason,
+              nextAttemptAt: null,
+            } satisfies StoredOutboxEvent),
+          );
+          blocked += 1;
+        }
+        return blocked;
+      },
     },
   };
 }
@@ -370,7 +410,7 @@ export class IndexedDbOperationsDatabase implements OperationsDatabase {
     if (this.#database === null) {
       throw new Error('IndexedDB Operations database must be initialized before use.');
     }
-    const transaction = this.#database.transaction([...STORES], 'readwrite', {
+    const transaction = this.#database.transaction([...INDEXED_DB_STORES], 'readwrite', {
       durability: 'strict',
     });
     const completion = transactionDone(transaction);

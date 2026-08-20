@@ -25,7 +25,16 @@ function paymentDescription(payment: PaymentPart): string {
   return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)}`;
 }
 
-export function renderOrderReceiptHtml(order: OrderSnapshot): string {
+export interface ReceiptRenderOptions {
+  readonly paperWidthMm?: 58 | 80;
+}
+
+export function renderOrderReceiptHtml(
+  order: OrderSnapshot,
+  options: ReceiptRenderOptions = {},
+): string {
+  const paperWidthMm = options.paperWidthMm ?? 80;
+  const contentWidthMm = paperWidthMm - 8;
   const itemRows = order.items
     .map((item) => {
       const modifiers = item.modifiers
@@ -75,7 +84,7 @@ export function renderOrderReceiptHtml(order: OrderSnapshot): string {
   @page { margin: 4mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; color: #000; background: #fff; font-family: Arial, sans-serif; }
-  body { width: 72mm; padding: 2mm; font-size: 11px; line-height: 1.35; }
+  body { width: ${contentWidthMm}mm; padding: 2mm; font-size: 11px; line-height: 1.35; }
   h1 { margin: 0; font-size: 19px; letter-spacing: 0.14em; text-align: center; }
   .meta { margin-top: 2mm; text-align: center; font-size: 10px; }
   .block { padding: 2mm 0; border-top: 1px dashed #666; }

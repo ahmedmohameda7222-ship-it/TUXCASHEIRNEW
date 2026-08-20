@@ -1,3 +1,4 @@
+import { instant } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
 import { buildSyncHealth } from './syncHealth';
 
@@ -6,13 +7,16 @@ const cleanSummary = {
   delivered: 0,
   failed: 0,
   quarantined: 0,
+  dependencyBlocked: 0,
   blockedUntil: null,
   lastError: null,
 } as const;
 
 describe('buildSyncHealth', () => {
   it('never reports cloud success when no receiver is configured', () => {
-    expect(buildSyncHealth({ remoteConfigured: false, hasRun: true, lastResult: cleanSummary })).toEqual({
+    expect(
+      buildSyncHealth({ remoteConfigured: false, hasRun: true, lastResult: cleanSummary }),
+    ).toEqual({
       state: 'LOCAL_ONLY',
       label: 'Local only',
       remoteConfigured: false,
@@ -22,13 +26,22 @@ describe('buildSyncHealth', () => {
 
   it('distinguishes pending, active, successful, retrying, and permanent issue states', () => {
     expect(buildSyncHealth({ remoteConfigured: true })).toMatchObject({ state: 'SYNC_PENDING' });
-    expect(buildSyncHealth({ remoteConfigured: true, syncing: true })).toMatchObject({ state: 'SYNCING' });
-    expect(buildSyncHealth({ remoteConfigured: true, hasRun: true, lastResult: cleanSummary })).toMatchObject({ state: 'SYNCED' });
+    expect(buildSyncHealth({ remoteConfigured: true, syncing: true })).toMatchObject({
+      state: 'SYNCING',
+    });
+    expect(
+      buildSyncHealth({ remoteConfigured: true, hasRun: true, lastResult: cleanSummary }),
+    ).toMatchObject({ state: 'SYNCED' });
     expect(
       buildSyncHealth({
         remoteConfigured: true,
         hasRun: true,
-        lastResult: { ...cleanSummary, failed: 1, blockedUntil: '2026-08-20T00:01:00.000Z', lastError: 'timeout' },
+        lastResult: {
+          ...cleanSummary,
+          failed: 1,
+          blockedUntil: instant('2026-08-20T00:01:00.000Z'),
+          lastError: 'timeout',
+        },
       }),
     ).toMatchObject({ state: 'SYNC_RETRYING', attentionRequired: false });
     expect(

@@ -227,7 +227,8 @@ export class OperationsOrdersBoardService {
 
       await transaction.orders.updateOperationalState(updated);
       const cancellation = orderLifecycle(updated).cancellation;
-      if (cancellation === null) throw new Error('Cancelled order is missing cancellation metadata.');
+      if (cancellation === null)
+        throw new Error('Cancelled order is missing cancellation metadata.');
       const transition = this.#transition(
         'ORDER_CANCELLED',
         order,
@@ -449,6 +450,7 @@ export class OperationsOrdersBoardService {
       businessDayId: order.businessDayId,
       aggregateType: 'ORDER',
       aggregateId: order.id,
+      aggregateRevision: revision,
       eventType,
       idempotencyKey: `order-operational:${order.id}:${revision}:${eventType}`,
       payloadVersion: 1,

@@ -7,10 +7,7 @@ export interface RemoteReceiptIdentityV1 {
 
 export type RemoteReceiptDecisionV1 = 'APPLY' | 'REPLAY';
 
-function sameReceipt(
-  left: RemoteReceiptIdentityV1,
-  right: RemoteReceiptIdentityV1,
-): boolean {
+function sameReceipt(left: RemoteReceiptIdentityV1, right: RemoteReceiptIdentityV1): boolean {
   return (
     left.eventId === right.eventId &&
     left.shopId === right.shopId &&

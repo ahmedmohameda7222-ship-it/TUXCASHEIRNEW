@@ -1,20 +1,43 @@
-import {
-  parseOperationsSyncPayloadV1,
-  type ExpenseLedgerRecord,
-  type InventoryMovement,
-  type OperationsSyncEnvelopeV1,
-  type OrderSnapshot,
-  type Reconciliation,
-  type WorkerSession,
+import { parseOperationsSyncEnvelopeV1 } from '@tux/domain';
+import type {
+  ExpenseLedgerRecord,
+  InventoryMovement,
+  OperationsSyncEnvelopeV1,
+  OrderSnapshot,
+  OrderTransitionSyncSnapshotV1,
+  Instant,
+  Reconciliation,
+  WorkerSession,
 } from '@tux/domain';
+import type { parseOperationsSyncPayloadV1 } from '@tux/domain';
 
-export type RemoteMutationMode = 'UPSERT';
+export type RemoteMutationMode = 'UPSERT' | 'UPDATE';
+
+export type RemoteMutationGuard =
+  | {
+      readonly kind: 'MONOTONIC_REVISION';
+      readonly column: 'operational_revision' | 'lifecycle_revision';
+      readonly incomingRevision: number;
+    }
+  | {
+      readonly kind: 'MONOTONIC_TIMESTAMP';
+      readonly column: 'last_order_at' | 'ended_at';
+      readonly incomingTimestamp: Instant | null;
+    }
+  | {
+      readonly kind: 'STATE_RANK';
+      readonly column: 'status';
+      readonly incomingStatus: string;
+      readonly rank: Readonly<Record<string, number>>;
+    };
 
 export interface RemoteTableMutation {
   readonly table: string;
   readonly mode: RemoteMutationMode;
   readonly conflictColumns: readonly string[];
   readonly row: Readonly<Record<string, unknown>>;
+  /** Receiver-side predicate. Existing newer state must make this mutation a no-op. */
+  readonly guard: RemoteMutationGuard | null;
 }
 
 export interface RemoteMaterializationPlanV1 {
@@ -29,31 +52,115 @@ function mutation(
   table: string,
   conflictColumns: readonly string[],
   row: Readonly<Record<string, unknown>>,
+  options: {
+    readonly mode?: RemoteMutationMode;
+    readonly guard?: RemoteMutationGuard | null;
+  } = {},
 ): RemoteTableMutation {
-  return { table, mode: 'UPSERT', conflictColumns, row };
+  return {
+    table,
+    mode: options.mode ?? 'UPSERT',
+    conflictColumns,
+    row,
+    guard: options.guard ?? null,
+  };
 }
 
-function businessDayMutation(day: Extract<ReturnType<typeof parseOperationsSyncPayloadV1>, { eventType: 'BUSINESS_DAY_STARTED' }>['businessDay']): RemoteTableMutation {
-  return mutation('business_days', ['id'], {
-    id: day.id,
-    shop_id: day.shopId,
-    status: day.status,
-    started_at: day.startedAt,
-    ended_at: day.endedAt,
-    started_by_worker_id: day.startedByWorkerId,
-    ended_by_worker_id: day.endedByWorkerId,
-    last_allocated_display_order_no: day.lastAllocatedDisplayOrderNo,
-  });
+/** Deterministic receiver policy used by future SQL/HTTP materializers before applying a row. */
+export function shouldApplyRemoteMutation(
+  existing: Readonly<Record<string, unknown>> | null,
+  planned: RemoteTableMutation,
+): boolean {
+  if (existing === null) return planned.mode === 'UPSERT';
+  const guard = planned.guard;
+  if (guard === null) return true;
+
+  if (guard.kind === 'MONOTONIC_REVISION') {
+    const current = existing[guard.column];
+    if (current === null || current === undefined) return true;
+    return (
+      typeof current === 'number' &&
+      Number.isSafeInteger(current) &&
+      current >= 0 &&
+      guard.incomingRevision >= current
+    );
+  }
+
+  if (guard.kind === 'MONOTONIC_TIMESTAMP') {
+    const current = existing[guard.column];
+    if (guard.incomingTimestamp === null) return current === null || current === undefined;
+    if (current === null || current === undefined) return true;
+    if (typeof current !== 'string') return false;
+    const currentTime = Date.parse(current);
+    const incomingTime = Date.parse(guard.incomingTimestamp);
+    return (
+      Number.isFinite(currentTime) && Number.isFinite(incomingTime) && incomingTime >= currentTime
+    );
+  }
+
+  const currentStatus = existing[guard.column];
+  if (typeof currentStatus !== 'string') return false;
+  const currentRank = guard.rank[currentStatus];
+  const incomingRank = guard.rank[guard.incomingStatus];
+  return currentRank !== undefined && incomingRank !== undefined && incomingRank >= currentRank;
+}
+
+function businessDayMutation(
+  day: Extract<
+    ReturnType<typeof parseOperationsSyncPayloadV1>,
+    { eventType: 'BUSINESS_DAY_STARTED' | 'BUSINESS_DAY_CLOSED' }
+  >['businessDay'],
+): RemoteTableMutation {
+  return mutation(
+    'business_days',
+    ['id'],
+    {
+      id: day.id,
+      shop_id: day.shopId,
+      status: day.status,
+      started_at: day.startedAt,
+      ended_at: day.endedAt,
+      started_by_worker_id: day.startedByWorkerId,
+      ended_by_worker_id: day.endedByWorkerId,
+      last_allocated_display_order_no: day.lastAllocatedDisplayOrderNo,
+    },
+    {
+      mode: day.status === 'CLOSED' ? 'UPDATE' : 'UPSERT',
+      guard: {
+        kind: 'STATE_RANK',
+        column: 'status',
+        incomingStatus: day.status,
+        rank: { OPEN: 0, CLOSED: 1 },
+      },
+    },
+  );
 }
 
 function workerSessionMutation(session: WorkerSession): RemoteTableMutation {
-  return mutation('worker_sessions', ['id'], {
+  const row = {
     id: session.id,
     shop_id: session.shopId,
     business_day_id: session.businessDayId,
     worker_id: session.workerId,
     started_at: session.startedAt,
     ended_at: session.endedAt,
+  };
+  if (session.endedAt === null) {
+    return mutation('worker_sessions', ['id'], row, {
+      guard: {
+        kind: 'MONOTONIC_TIMESTAMP',
+        column: 'ended_at',
+        incomingTimestamp: null,
+      },
+    });
+  }
+  return mutation('worker_sessions', ['id'], row, {
+    mode: 'UPDATE',
+    guard: {
+      kind: 'MONOTONIC_TIMESTAMP',
+      column: 'ended_at',
+      incomingTimestamp: session.endedAt,
+    },
   });
 }
 
@@ -73,7 +180,10 @@ function movementMutation(movement: InventoryMovement): RemoteTableMutation {
   });
 }
 
-function expenseMutation(expense: ExpenseLedgerRecord): RemoteTableMutation {
+function expenseMutation(
+  expense: ExpenseLedgerRecord,
+  mode: RemoteMutationMode = 'UPSERT',
+): RemoteTableMutation {
   if (expense.kind === 'DELIVERY_FAILED') {
     return mutation('expenses', ['id'], {
       id: expense.id,
@@ -97,26 +207,38 @@ function expenseMutation(expense: ExpenseLedgerRecord): RemoteTableMutation {
     });
   }
   const lifecycle = expense.lifecycle;
-  return mutation('expenses', ['id'], {
-    id: expense.id,
-    shop_id: expense.shopId,
-    business_day_id: expense.businessDayId,
-    kind: expense.kind,
-    description: expense.description,
-    amount_minor: expense.amountMinor,
-    paid_from: expense.paidFrom,
-    note: expense.note,
-    order_id: null,
-    created_by_worker_id: expense.createdByWorkerId,
-    created_at: expense.createdAt,
-    updated_at: lifecycle.deletedAt ?? lifecycle.updatedAt ?? expense.createdAt,
-    lifecycle_revision: lifecycle.revision,
-    lifecycle_updated_at: lifecycle.updatedAt,
-    lifecycle_updated_by_worker_id: lifecycle.updatedByWorkerId,
-    deleted_at: lifecycle.deletedAt,
-    deleted_by_worker_id: lifecycle.deletedByWorkerId,
-    snapshot_json: expense,
-  });
+  return mutation(
+    'expenses',
+    ['id'],
+    {
+      id: expense.id,
+      shop_id: expense.shopId,
+      business_day_id: expense.businessDayId,
+      kind: expense.kind,
+      description: expense.description,
+      amount_minor: expense.amountMinor,
+      paid_from: expense.paidFrom,
+      note: expense.note,
+      order_id: null,
+      created_by_worker_id: expense.createdByWorkerId,
+      created_at: expense.createdAt,
+      updated_at: lifecycle.deletedAt ?? lifecycle.updatedAt ?? expense.createdAt,
+      lifecycle_revision: lifecycle.revision,
+      lifecycle_updated_at: lifecycle.updatedAt,
+      lifecycle_updated_by_worker_id: lifecycle.updatedByWorkerId,
+      deleted_at: lifecycle.deletedAt,
+      deleted_by_worker_id: lifecycle.deletedByWorkerId,
+      snapshot_json: expense,
+    },
+    {
+      mode,
+      guard: {
+        kind: 'MONOTONIC_REVISION',
+        column: 'lifecycle_revision',
+        incomingRevision: lifecycle.revision,
+      },
+    },
+  );
 }
 
 function orderLifecycle(order: OrderSnapshot) {
@@ -130,54 +252,66 @@ function orderLifecycle(order: OrderSnapshot) {
   );
 }
 
-function orderMutations(order: OrderSnapshot, configurationVersion: number | null): RemoteTableMutation[] {
+function orderPlacementMutations(
+  order: OrderSnapshot,
+  configurationVersion: number,
+): RemoteTableMutation[] {
   const lifecycle = orderLifecycle(order);
   const delivery = order.fulfillment.delivery;
-  const lastOperationalAt =
-    lifecycle.returned?.at ?? lifecycle.cancellation?.at ?? lifecycle.doneAt ?? order.createdAt;
   const result: RemoteTableMutation[] = [
-    mutation('orders', ['id'], {
-      id: order.id,
-      shop_id: order.shopId,
-      business_day_id: order.businessDayId,
-      display_order_no: order.displayOrderNo,
-      idempotency_key: order.idempotencyKey,
-      source: order.source,
-      status: order.status,
-      operator_worker_id: order.operatorWorkerId,
-      operator_name_snapshot: order.operatorName,
-      order_type_id: order.fulfillment.orderTypeId,
-      order_type_label_snapshot: order.fulfillment.orderTypeLabel,
-      order_type_behavior_snapshot: order.fulfillment.behavior,
-      customer_contact_id: delivery?.customerContactId ?? null,
-      customer_name_snapshot: delivery?.customerName ?? null,
-      normalized_phone_snapshot: delivery?.normalizedPhone ?? null,
-      address_snapshot: delivery?.address ?? null,
-      delivery_zone_id: delivery?.zoneId ?? null,
-      delivery_zone_label_snapshot: delivery?.zoneLabel ?? null,
-      configured_delivery_fee_minor: delivery?.configuredFeeMinor ?? 0,
-      final_delivery_fee_minor: delivery?.finalFeeMinor ?? 0,
-      items_subtotal_minor: order.itemsSubtotalMinor,
-      discount_minor: order.discountMinor,
-      total_minor: order.totalMinor,
-      order_note: order.orderNote,
-      created_at: order.createdAt,
-      updated_at: lastOperationalAt,
-      configuration_version: configurationVersion,
-      operational_revision: lifecycle.revision,
-      done_at: lifecycle.doneAt,
-      cancelled_at: lifecycle.cancellation?.at ?? null,
-      cancelled_by_worker_id: lifecycle.cancellation?.workerId ?? null,
-      cancelled_by_worker_name_snapshot: lifecycle.cancellation?.workerName ?? null,
-      cancellation_reason: lifecycle.cancellation?.reason ?? null,
-      cancellation_food_prepared: lifecycle.cancellation?.foodPrepared ?? null,
-      cancellation_stock_restored: lifecycle.cancellation?.stockRestored ?? null,
-      returned_at: lifecycle.returned?.at ?? null,
-      returned_by_worker_id: lifecycle.returned?.workerId ?? null,
-      returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
-      return_reason: lifecycle.returned?.reason ?? null,
-      snapshot_json: order,
-    }),
+    mutation(
+      'orders',
+      ['id'],
+      {
+        id: order.id,
+        shop_id: order.shopId,
+        business_day_id: order.businessDayId,
+        display_order_no: order.displayOrderNo,
+        idempotency_key: order.idempotencyKey,
+        source: order.source,
+        status: order.status,
+        operator_worker_id: order.operatorWorkerId,
+        operator_name_snapshot: order.operatorName,
+        order_type_id: order.fulfillment.orderTypeId,
+        order_type_label_snapshot: order.fulfillment.orderTypeLabel,
+        order_type_behavior_snapshot: order.fulfillment.behavior,
+        customer_contact_id: delivery?.customerContactId ?? null,
+        customer_name_snapshot: delivery?.customerName ?? null,
+        normalized_phone_snapshot: delivery?.normalizedPhone ?? null,
+        address_snapshot: delivery?.address ?? null,
+        delivery_zone_id: delivery?.zoneId ?? null,
+        delivery_zone_label_snapshot: delivery?.zoneLabel ?? null,
+        configured_delivery_fee_minor: delivery?.configuredFeeMinor ?? 0,
+        final_delivery_fee_minor: delivery?.finalFeeMinor ?? 0,
+        items_subtotal_minor: order.itemsSubtotalMinor,
+        discount_minor: order.discountMinor,
+        total_minor: order.totalMinor,
+        order_note: order.orderNote,
+        created_at: order.createdAt,
+        updated_at: order.createdAt,
+        configuration_version: configurationVersion,
+        operational_revision: lifecycle.revision,
+        done_at: lifecycle.doneAt,
+        cancelled_at: lifecycle.cancellation?.at ?? null,
+        cancelled_by_worker_id: lifecycle.cancellation?.workerId ?? null,
+        cancelled_by_worker_name_snapshot: lifecycle.cancellation?.workerName ?? null,
+        cancellation_reason: lifecycle.cancellation?.reason ?? null,
+        cancellation_food_prepared: lifecycle.cancellation?.foodPrepared ?? null,
+        cancellation_stock_restored: lifecycle.cancellation?.stockRestored ?? null,
+        returned_at: lifecycle.returned?.at ?? null,
+        returned_by_worker_id: lifecycle.returned?.workerId ?? null,
+        returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
+        return_reason: lifecycle.returned?.reason ?? null,
+        snapshot_json: order,
+      },
+      {
+        guard: {
+          kind: 'MONOTONIC_REVISION',
+          column: 'operational_revision',
+          incomingRevision: lifecycle.revision,
+        },
+      },
+    ),
   ];
 
   order.items.forEach((item, linePosition) => {
@@ -243,6 +377,42 @@ function orderMutations(order: OrderSnapshot, configurationVersion: number | nul
   return result;
 }
 
+function orderLifecycleMutation(order: OrderSnapshot): RemoteTableMutation {
+  const lifecycle = orderLifecycle(order);
+  const lastOperationalAt =
+    lifecycle.returned?.at ?? lifecycle.cancellation?.at ?? lifecycle.doneAt ?? order.createdAt;
+  return mutation(
+    'orders',
+    ['id'],
+    {
+      id: order.id,
+      shop_id: order.shopId,
+      status: order.status,
+      updated_at: lastOperationalAt,
+      operational_revision: lifecycle.revision,
+      done_at: lifecycle.doneAt,
+      cancelled_at: lifecycle.cancellation?.at ?? null,
+      cancelled_by_worker_id: lifecycle.cancellation?.workerId ?? null,
+      cancelled_by_worker_name_snapshot: lifecycle.cancellation?.workerName ?? null,
+      cancellation_reason: lifecycle.cancellation?.reason ?? null,
+      cancellation_food_prepared: lifecycle.cancellation?.foodPrepared ?? null,
+      cancellation_stock_restored: lifecycle.cancellation?.stockRestored ?? null,
+      returned_at: lifecycle.returned?.at ?? null,
+      returned_by_worker_id: lifecycle.returned?.workerId ?? null,
+      returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
+      return_reason: lifecycle.returned?.reason ?? null,
+    },
+    {
+      mode: 'UPDATE',
+      guard: {
+        kind: 'MONOTONIC_REVISION',
+        column: 'operational_revision',
+        incomingRevision: lifecycle.revision,
+      },
+    },
+  );
+}
+
 function reconciliationMutations(reconciliation: Reconciliation): RemoteTableMutation[] {
   const result: RemoteTableMutation[] = [
     mutation('reconciliations', ['id'], {
@@ -272,26 +442,45 @@ function reconciliationMutations(reconciliation: Reconciliation): RemoteTableMut
   return result;
 }
 
-function customerMutation(contact: NonNullable<Extract<ReturnType<typeof parseOperationsSyncPayloadV1>, { eventType: 'ORDER_PLACED' }>['customerContactUpsert']>): RemoteTableMutation {
-  return mutation('customer_contacts', ['id'], {
-    id: contact.id,
-    shop_id: contact.shopId,
-    normalized_phone: contact.normalizedPhone,
-    display_phone: contact.displayPhone,
-    name: contact.name,
-    latest_address: contact.latestAddress,
-    latest_zone_id: contact.latestZoneId,
-    last_order_at: contact.lastOrderAt,
-    updated_at: contact.lastOrderAt,
-  });
+function customerMutation(
+  contact: NonNullable<
+    Extract<
+      ReturnType<typeof parseOperationsSyncPayloadV1>,
+      { eventType: 'ORDER_PLACED' }
+    >['customerContactUpsert']
+  >,
+): RemoteTableMutation {
+  return mutation(
+    'customer_contacts',
+    ['id'],
+    {
+      id: contact.id,
+      shop_id: contact.shopId,
+      normalized_phone: contact.normalizedPhone,
+      display_phone: contact.displayPhone,
+      name: contact.name,
+      latest_address: contact.latestAddress,
+      latest_zone_id: contact.latestZoneId,
+      last_order_at: contact.lastOrderAt,
+      updated_at: contact.lastOrderAt,
+    },
+    {
+      guard:
+        contact.lastOrderAt === null
+          ? null
+          : {
+              kind: 'MONOTONIC_TIMESTAMP',
+              column: 'last_order_at',
+              incomingTimestamp: contact.lastOrderAt,
+            },
+    },
+  );
 }
 
 function statusEventMutation(
   envelope: OperationsSyncEnvelopeV1,
   order: OrderSnapshot,
-  transition:
-    | Extract<ReturnType<typeof parseOperationsSyncPayloadV1>, { eventType: 'ORDER_MARKED_DONE' }>['transition']
-    | null,
+  transition: OrderTransitionSyncSnapshotV1 | null,
 ): RemoteTableMutation {
   const eventType =
     envelope.eventType === 'ORDER_PLACED'
@@ -322,13 +511,9 @@ function statusEventMutation(
   });
 }
 
-export function buildRemoteMaterializationPlanV1(
-  envelope: OperationsSyncEnvelopeV1,
-): RemoteMaterializationPlanV1 {
-  const payload = parseOperationsSyncPayloadV1(envelope.payload);
-  if (payload.eventType !== envelope.eventType || envelope.payloadVersion !== 1) {
-    throw new TypeError('Remote materialization envelope does not match its V1 payload.');
-  }
+export function buildRemoteMaterializationPlanV1(envelope: unknown): RemoteMaterializationPlanV1 {
+  const normalizedEnvelope = parseOperationsSyncEnvelopeV1(envelope);
+  const payload = normalizedEnvelope.payload;
   const mutations: RemoteTableMutation[] = [];
 
   switch (payload.eventType) {
@@ -336,16 +521,16 @@ export function buildRemoteMaterializationPlanV1(
       if (payload.customerContactUpsert !== null) {
         mutations.push(customerMutation(payload.customerContactUpsert));
       }
-      mutations.push(...orderMutations(payload.order, payload.configurationVersion));
-      mutations.push(statusEventMutation(envelope, payload.order, null));
+      mutations.push(...orderPlacementMutations(payload.order, payload.configurationVersion));
+      mutations.push(statusEventMutation(normalizedEnvelope, payload.order, null));
       mutations.push(...payload.inventoryMovements.map(movementMutation));
       break;
     case 'ORDER_MARKED_DONE':
     case 'ORDER_DONE_UNDONE':
     case 'ORDER_CANCELLED':
     case 'DELIVERY_RETURNED':
-      mutations.push(...orderMutations(payload.order, null));
-      mutations.push(statusEventMutation(envelope, payload.order, payload.transition));
+      mutations.push(orderLifecycleMutation(payload.order));
+      mutations.push(statusEventMutation(normalizedEnvelope, payload.order, payload.transition));
       mutations.push(...payload.inventoryMovements.map(movementMutation));
       if (payload.deliveryFailedExpense !== null) {
         mutations.push(expenseMutation(payload.deliveryFailedExpense));
@@ -354,7 +539,12 @@ export function buildRemoteMaterializationPlanV1(
     case 'EXPENSE_CREATED':
     case 'EXPENSE_EDITED':
     case 'EXPENSE_DELETED':
-      mutations.push(expenseMutation(payload.expense));
+      mutations.push(
+        expenseMutation(
+          payload.expense,
+          payload.eventType === 'EXPENSE_CREATED' ? 'UPSERT' : 'UPDATE',
+        ),
+      );
       break;
     case 'INVENTORY_MOVEMENT_RECORDED':
       mutations.push(movementMutation(payload.movement));
@@ -366,7 +556,8 @@ export function buildRemoteMaterializationPlanV1(
     case 'WORKER_SIGNED_IN':
     case 'WORKER_SWITCHED':
     case 'WORKER_SIGNED_OUT':
-      if (payload.previousSession !== null) mutations.push(workerSessionMutation(payload.previousSession));
+      if (payload.previousSession !== null)
+        mutations.push(workerSessionMutation(payload.previousSession));
       mutations.push(workerSessionMutation(payload.session));
       break;
     case 'RECONCILIATION_RECORDED':
@@ -375,17 +566,17 @@ export function buildRemoteMaterializationPlanV1(
   }
 
   for (const planned of mutations) {
-    if (planned.row['shop_id'] !== envelope.shopId) {
+    if (planned.row['shop_id'] !== normalizedEnvelope.shopId) {
       throw new TypeError(
         `Remote materialization attempted a cross-shop mutation for ${planned.table}.`,
       );
     }
   }
   return {
-    eventId: envelope.eventId,
-    shopId: envelope.shopId,
-    idempotencyKey: envelope.idempotencyKey,
-    eventType: envelope.eventType,
+    eventId: normalizedEnvelope.eventId,
+    shopId: normalizedEnvelope.shopId,
+    idempotencyKey: normalizedEnvelope.idempotencyKey,
+    eventType: normalizedEnvelope.eventType,
     mutations,
   };
 }

@@ -13,7 +13,11 @@ import {
   type WorkerId,
   type WorkerSessionId,
 } from '@tux/domain';
-import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel, SqliteExpenseLedgerStore } from '@tux/persistence/sqlite';
+import {
+  SqliteOperationsDatabase,
+  SqliteOperatorSessionReadModel,
+  SqliteExpenseLedgerStore,
+} from '@tux/persistence/sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import { OperationsExpensesService } from './expenses';
@@ -25,7 +29,9 @@ const at = instant('2026-08-20T00:00:00.000Z');
 const directories: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
 });
 
 async function fixture() {
@@ -46,7 +52,13 @@ async function fixture() {
   };
   await database.transaction(async (transaction) => {
     await transaction.shops.put({ id: shopId, name: 'Dev Shop', active: true });
-    await transaction.workers.put({ id: workerId, shopId, displayName: 'Dev Worker', pinHash: 'test-only', active: true });
+    await transaction.workers.put({
+      id: workerId,
+      shopId,
+      displayName: 'Dev Worker',
+      pinHash: 'test-only',
+      active: true,
+    });
     await transaction.businessDays.put(day);
     await transaction.workerSessions.put({
       id: parseEntityId<WorkerSessionId>('44444444-4444-4444-8444-444444444444'),
@@ -73,7 +85,11 @@ async function fixture() {
 function count(path: string, table: string): number {
   const sqlite = new DatabaseSync(path);
   try {
-    return Number((sqlite.prepare(`select count(*) as value from ${table}`).get() as Record<string, unknown>)['value']);
+    return Number(
+      (sqlite.prepare(`select count(*) as value from ${table}`).get() as Record<string, unknown>)[
+        'value'
+      ],
+    );
   } finally {
     sqlite.close();
   }

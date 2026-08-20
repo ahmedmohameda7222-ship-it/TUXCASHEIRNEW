@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseOperationsSyncPayloadV1,
-  type OperationsSyncPayloadV1,
-} from './syncContract';
+import { parseOperationsSyncPayloadV1, type OperationsSyncPayloadV1 } from './syncContract';
 import { moneyMinor } from './money';
 import { stockQuantityMicros } from './quantity';
 import { instant } from './time';
@@ -10,6 +7,7 @@ import {
   parseEntityId,
   type BusinessDayId,
   type CustomerContactId,
+  type EntityId,
   type ExpenseId,
   type InventoryItemId,
   type InventoryMovementId,
@@ -24,16 +22,11 @@ import {
   type WorkerId,
   type WorkerSessionId,
 } from './ids';
-import type {
-  CustomerContact,
-  InventoryMovement,
-  OrderSnapshot,
-  Reconciliation,
-  WorkerSession,
-} from './models';
+import type { CustomerContact } from './catalog';
+import type { InventoryMovement, OrderSnapshot, Reconciliation, WorkerSession } from './models';
 import type { ManualExpenseRecord } from './expense';
 
-const id = <Id extends string>(value: string): Id => parseEntityId(value) as Id;
+const id = <Id extends EntityId>(value: string): Id => parseEntityId<Id>(value);
 const shopId = id<ShopId>('11111111-1111-4111-8111-111111111111');
 const businessDayId = id<BusinessDayId>('22222222-2222-4222-8222-222222222222');
 const workerId = id<WorkerId>('33333333-3333-4333-8333-333333333333');
@@ -99,7 +92,7 @@ const order: OrderSnapshot = {
 };
 
 const contact: CustomerContact = {
-  id: order.fulfillment.delivery!.customerContactId,
+  id: order.fulfillment.delivery!.customerContactId!,
   shopId,
   normalizedPhone: '01012345678',
   displayPhone: '+20 101 234 5678',
@@ -264,15 +257,57 @@ describe('OperationsSyncPayloadV1', () => {
     };
     const payloads: OperationsSyncPayloadV1[] = [
       { eventType: 'EXPENSE_CREATED', version: 1, expense: manualExpense },
-      { eventType: 'EXPENSE_EDITED', version: 1, expense: { ...manualExpense, lifecycle: { ...manualExpense.lifecycle, revision: 1, updatedAt: at, updatedByWorkerId: workerId } } },
-      { eventType: 'EXPENSE_DELETED', version: 1, expense: { ...manualExpense, lifecycle: { ...manualExpense.lifecycle, revision: 1, deletedAt: at, deletedByWorkerId: workerId } } },
+      {
+        eventType: 'EXPENSE_EDITED',
+        version: 1,
+        expense: {
+          ...manualExpense,
+          lifecycle: {
+            ...manualExpense.lifecycle,
+            revision: 1,
+            updatedAt: at,
+            updatedByWorkerId: workerId,
+          },
+        },
+      },
+      {
+        eventType: 'EXPENSE_DELETED',
+        version: 1,
+        expense: {
+          ...manualExpense,
+          lifecycle: {
+            ...manualExpense.lifecycle,
+            revision: 1,
+            deletedAt: at,
+            deletedByWorkerId: workerId,
+          },
+        },
+      },
       { eventType: 'INVENTORY_MOVEMENT_RECORDED', version: 1, movement },
       { eventType: 'BUSINESS_DAY_STARTED', version: 1, businessDay },
       { eventType: 'WORKER_SIGNED_IN', version: 1, session, previousSession: null },
-      { eventType: 'WORKER_SWITCHED', version: 1, session, previousSession: { ...session, id: id<WorkerSessionId>('15151515-1515-4515-8515-151515151515'), endedAt: at } },
-      { eventType: 'WORKER_SIGNED_OUT', version: 1, session: { ...session, endedAt: at }, previousSession: null },
+      {
+        eventType: 'WORKER_SWITCHED',
+        version: 1,
+        session,
+        previousSession: {
+          ...session,
+          id: id<WorkerSessionId>('15151515-1515-4515-8515-151515151515'),
+          endedAt: at,
+        },
+      },
+      {
+        eventType: 'WORKER_SIGNED_OUT',
+        version: 1,
+        session: { ...session, endedAt: at },
+        previousSession: null,
+      },
       { eventType: 'RECONCILIATION_RECORDED', version: 1, reconciliation },
-      { eventType: 'BUSINESS_DAY_CLOSED', version: 1, businessDay: { ...businessDay, status: 'CLOSED', endedAt: at, endedByWorkerId: workerId } },
+      {
+        eventType: 'BUSINESS_DAY_CLOSED',
+        version: 1,
+        businessDay: { ...businessDay, status: 'CLOSED', endedAt: at, endedByWorkerId: workerId },
+      },
     ];
     for (const payload of payloads) {
       expect(roundTrip(payload)).toEqual(payload);

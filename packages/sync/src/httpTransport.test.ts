@@ -1,25 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import {
   instant,
+  operationsSyncPayloadJson,
   parseEntityId,
+  type BusinessDayId,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
+  type WorkerId,
 } from '@tux/domain';
 import { HttpOutboxTransport } from './httpTransport';
 
 const SHOP_ID = parseEntityId<ShopId>('12000000-0000-4000-8000-000000000001');
 const EVENT_ID = parseEntityId<OutboxEventId>('22000000-0000-4000-8000-000000000001');
+const DAY_ID = parseEntityId<BusinessDayId>('32000000-0000-4000-8000-000000000001');
+const WORKER_ID = parseEntityId<WorkerId>('42000000-0000-4000-8000-000000000001');
 const event: OutboxEvent = {
   id: EVENT_ID,
   shopId: SHOP_ID,
-  businessDayId: null,
-  aggregateType: 'ORDER',
-  aggregateId: 'order-fixture',
-  eventType: 'ORDER_PLACED',
-  idempotencyKey: 'order-placed:fixture',
+  businessDayId: DAY_ID,
+  aggregateType: 'BUSINESS_DAY',
+  aggregateId: DAY_ID,
+  aggregateRevision: 0,
+  eventType: 'BUSINESS_DAY_STARTED',
+  idempotencyKey: 'business-day-started:fixture',
   payloadVersion: 1,
-  payload: { orderId: 'fixture' },
+  payload: operationsSyncPayloadJson({
+    eventType: 'BUSINESS_DAY_STARTED',
+    version: 1,
+    businessDay: {
+      id: DAY_ID,
+      shopId: SHOP_ID,
+      status: 'OPEN',
+      startedAt: instant('2026-08-18T10:00:00.000Z'),
+      endedAt: null,
+      startedByWorkerId: WORKER_ID,
+      endedByWorkerId: null,
+      lastAllocatedDisplayOrderNo: 0,
+    },
+  }),
   createdAt: instant('2026-08-18T10:00:00.000Z'),
   attemptCount: 0,
   nextAttemptAt: null,
@@ -50,7 +69,7 @@ describe('HttpOutboxTransport', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({
       eventId: EVENT_ID,
       idempotencyKey: event.idempotencyKey,
-      eventType: 'ORDER_PLACED',
+      eventType: 'BUSINESS_DAY_STARTED',
     });
   });
 

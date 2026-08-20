@@ -1,133 +1,334 @@
-import { resolve } from 'node:path';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { env } from 'node:process';
+import {
+  ApplicationCommandCoordinator,
+  OperationsConfigurationSyncService,
+  type InboundConfigurationProvider,
+} from '@tux/application';
 import {
   instant,
   moneyMinor,
   parseEntityId,
   stockQuantityMicros,
-  type CategoryId,
-  type DeliveryZoneId,
+  type InventoryItem,
   type InventoryItemId,
-  type OperationsConfigurationSnapshot,
+  type MenuCategoryId,
+  type ModifierId,
+  type OperationsConfigurationBundle,
   type OrderTypeId,
   type PaymentMethodId,
   type ProductId,
   type ShopId,
   type WorkerId,
 } from '@tux/domain';
-import {
-  SqliteOperationsDatabase,
-  SqliteOperatorSessionReadModel,
-} from '@tux/persistence/sqlite';
+import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
 
-const DEV_SHOP_ID = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000101');
-const DEV_WORKER_ID = parseEntityId<WorkerId>('00000000-0000-4000-8000-000000000102');
-const DEV_CATEGORY_ID = parseEntityId<CategoryId>('00000000-0000-4000-8000-000000000103');
-const DEV_PRODUCT_ID = parseEntityId<ProductId>('00000000-0000-4000-8000-000000000104');
-const DEV_ORDER_TYPE_ID = parseEntityId<OrderTypeId>('00000000-0000-4000-8000-000000000105');
-const DEV_PAYMENT_METHOD_ID = parseEntityId<PaymentMethodId>('00000000-0000-4000-8000-000000000106');
-const DEV_DELIVERY_ZONE_ID = parseEntityId<DeliveryZoneId>('00000000-0000-4000-8000-000000000107');
-const DEV_INVENTORY_ITEM_ID = parseEntityId<InventoryItemId>('00000000-0000-4000-8000-000000000108');
+const DEV_SHOP_ID = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
+const DEV_WORKER_ONE_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
+const DEV_WORKER_TWO_ID = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000002');
+const PBKDF2_ITERATIONS = 210_000;
+const DERIVED_KEY_BYTES = 32;
 
-function requiredArgument(name: string): string {
+function argument(name: string): string | null {
   const index = process.argv.indexOf(name);
   const value = index >= 0 ? process.argv[index + 1]?.trim() : undefined;
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required ${name} argument.`);
-  }
-  return value;
+  return value === undefined || value.length === 0 ? null : value;
 }
 
-function configuration(updatedAt: ReturnType<typeof instant>): OperationsConfigurationSnapshot {
-  return {
+function developmentDatabasePath(): string {
+  return resolve(argument('--database') ?? '.tux-dev/operations.sqlite3');
+}
+
+function hashDevelopmentPin(pin: string): string {
+  if (!/^\d{4,8}$/.test(pin)) throw new Error('Development PIN must contain 4 to 8 digits.');
+  const salt = randomBytes(16);
+  const digest = pbkdf2Sync(pin, salt, PBKDF2_ITERATIONS, DERIVED_KEY_BYTES, 'sha256');
+  return `pbkdf2-sha256$${PBKDF2_ITERATIONS}$${salt.toString('hex')}$${digest.toString('hex')}`;
+}
+
+function entityId<Id>(prefix: string, index: number, parse: (value: string) => Id): Id {
+  return parse(`${prefix}-0000-4000-8000-${String(index).padStart(12, '0')}`);
+}
+
+function configurationBundle(updatedAt: ReturnType<typeof instant>): OperationsConfigurationBundle {
+  const category = (index: number) =>
+    entityId<MenuCategoryId>('30000000', index, (value) => parseEntityId<MenuCategoryId>(value));
+  const product = (index: number) =>
+    entityId<ProductId>('40000000', index, (value) => parseEntityId<ProductId>(value));
+  const modifier = (index: number) =>
+    entityId<ModifierId>('50000000', index, (value) => parseEntityId<ModifierId>(value));
+  const inventory = (index: number) =>
+    entityId<InventoryItemId>('60000000', index, (value) => parseEntityId<InventoryItemId>(value));
+  const orderType = (index: number) =>
+    entityId<OrderTypeId>('70000000', index, (value) => parseEntityId<OrderTypeId>(value));
+  const payment = (index: number) =>
+    entityId<PaymentMethodId>('80000000', index, (value) => parseEntityId<PaymentMethodId>(value));
+
+  const categories = [
+    { id: category(1), shopId: DEV_SHOP_ID, name: 'Burgers', sortOrder: 0, active: true },
+    { id: category(2), shopId: DEV_SHOP_ID, name: 'Sides', sortOrder: 1, active: true },
+    { id: category(3), shopId: DEV_SHOP_ID, name: 'Drinks', sortOrder: 2, active: true },
+  ];
+  const products = [
+    ['Classic Smash', 12_000, 1, false, false],
+    ['Double Smash', 16_000, 1, false, false],
+    ['Triple Smash', 20_000, 1, false, false],
+    ['TUX Loaded Burger', 22_000, 1, false, false],
+    ['Crispy Chicken', 14_000, 1, false, false],
+    ['Spicy Chicken', 15_000, 1, false, false],
+    ['Combo Smash + Required Beverage', 19_000, 1, true, false],
+    ['Long Name Layout Stress Burger with Extra Description', 21_000, 1, false, false],
+    ['Sold Out Test Burger', 17_000, 1, false, true],
+    ['Fries', 5_000, 2, false, false],
+    ['Loaded Fries', 8_000, 2, false, false],
+    ['Onion Rings', 6_000, 2, false, false],
+    ['Cola', 3_000, 3, false, false],
+    ['Diet Cola', 3_000, 3, false, false],
+    ['Water', 2_000, 3, false, false],
+    ['Orange Soda', 3_000, 3, false, false],
+    ['Lemon Soda', 3_000, 3, false, false],
+    ['Iced Tea', 4_000, 3, false, false],
+  ].map(([name, price, categoryIndex, isCombo, soldOut], index) => ({
+    id: product(index + 1),
     shopId: DEV_SHOP_ID,
-    version: 1,
-    categories: [
-      {
-        id: DEV_CATEGORY_ID,
+    categoryId: category(categoryIndex as number),
+    name: name as string,
+    description:
+      index === 7 ? 'Development-only long text used to stress responsive menu layout.' : null,
+    priceMinor: moneyMinor(price as number),
+    imageKey: null,
+    active: true,
+    soldOut: soldOut as boolean,
+    isCombo: isCombo as boolean,
+    sortOrder: index,
+  }));
+  const modifiers = [
+    {
+      id: modifier(1),
+      shopId: DEV_SHOP_ID,
+      name: 'Extra Cheese',
+      priceMinor: moneyMinor(2_000),
+      standaloneProductId: null,
+      active: true,
+      sortOrder: 0,
+    },
+    {
+      id: modifier(2),
+      shopId: DEV_SHOP_ID,
+      name: 'Extra Patty',
+      priceMinor: moneyMinor(4_000),
+      standaloneProductId: null,
+      active: true,
+      sortOrder: 1,
+    },
+    {
+      id: modifier(3),
+      shopId: DEV_SHOP_ID,
+      name: 'No Onion',
+      priceMinor: moneyMinor(0),
+      standaloneProductId: null,
+      active: true,
+      sortOrder: 2,
+    },
+  ];
+  const inventoryItems: readonly InventoryItem[] = [
+    {
+      id: inventory(1),
+      shopId: DEV_SHOP_ID,
+      name: 'Beef Patty',
+      unitLabel: 'portion',
+      trackingMode: 'RECIPE_TRACKED',
+      active: true,
+    },
+    {
+      id: inventory(2),
+      shopId: DEV_SHOP_ID,
+      name: 'Chicken Fillet',
+      unitLabel: 'portion',
+      trackingMode: 'RECIPE_TRACKED',
+      active: true,
+    },
+    {
+      id: inventory(3),
+      shopId: DEV_SHOP_ID,
+      name: 'Burger Bun',
+      unitLabel: 'piece',
+      trackingMode: 'RECIPE_TRACKED',
+      active: true,
+    },
+    {
+      id: inventory(4),
+      shopId: DEV_SHOP_ID,
+      name: 'Fries Bulk Bag',
+      unitLabel: 'bag',
+      trackingMode: 'BULK_MANUAL',
+      active: true,
+    },
+    {
+      id: inventory(5),
+      shopId: DEV_SHOP_ID,
+      name: 'Packaging Box',
+      unitLabel: 'box',
+      trackingMode: 'BULK_MANUAL',
+      active: true,
+    },
+  ];
+
+  return {
+    snapshot: {
+      shopId: DEV_SHOP_ID,
+      version: 1,
+      updatedAt,
+      categories,
+      products,
+      modifiers,
+      productModifierLinks: [
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(1),
+          modifierId: modifier(1),
+          maxQuantity: 2,
+          sortOrder: 0,
+        },
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(1),
+          modifierId: modifier(2),
+          maxQuantity: 3,
+          sortOrder: 1,
+        },
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(1),
+          modifierId: modifier(3),
+          maxQuantity: 1,
+          sortOrder: 2,
+        },
+      ],
+      comboBeverageOptions: [13, 14, 15, 16, 17, 18].map((beverageIndex, sortOrder) => ({
         shopId: DEV_SHOP_ID,
-        name: 'Development',
-        sortOrder: 1,
-        active: true,
-      },
-    ],
-    products: [
-      {
-        id: DEV_PRODUCT_ID,
-        shopId: DEV_SHOP_ID,
-        categoryId: DEV_CATEGORY_ID,
-        name: 'Development Burger',
-        priceMinor: moneyMinor(10000),
-        active: true,
-        sortOrder: 1,
-        modifierGroupIds: [],
-        allowsItemNote: true,
-        combo: null,
-      },
-    ],
-    modifierGroups: [],
-    modifiers: [],
-    orderTypes: [
-      {
-        id: DEV_ORDER_TYPE_ID,
-        shopId: DEV_SHOP_ID,
-        name: 'Delivery',
-        behavior: 'DELIVERY',
-        sortOrder: 1,
-        active: true,
-      },
-    ],
-    paymentMethods: [
-      {
-        id: DEV_PAYMENT_METHOD_ID,
-        shopId: DEV_SHOP_ID,
-        displayName: 'Cash',
-        logicType: 'CASH',
-        sortOrder: 1,
-        active: true,
-      },
-    ],
-    deliveryZones: [
-      {
-        id: DEV_DELIVERY_ZONE_ID,
-        shopId: DEV_SHOP_ID,
-        label: 'Development Zone',
-        feeMinor: moneyMinor(2500),
-        active: true,
-        sortOrder: 1,
-      },
-    ],
-    inventoryItems: [
-      {
-        id: DEV_INVENTORY_ITEM_ID,
-        shopId: DEV_SHOP_ID,
-        name: 'Development Patty',
-        unitLabel: 'patty',
-        trackingMode: 'RECIPE_TRACKED',
-        active: true,
-      },
-    ],
-    recipeLines: [
-      {
-        productId: DEV_PRODUCT_ID,
-        inventoryItemId: DEV_INVENTORY_ITEM_ID,
-        quantityMicros: stockQuantityMicros(1_000_000),
-      },
-    ],
-    updatedAt,
+        comboProductId: product(7),
+        beverageProductId: product(beverageIndex),
+        sortOrder,
+      })),
+      recipeLines: [
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(1),
+          inventoryItemId: inventory(1),
+          quantityMicros: stockQuantityMicros(1_000_000),
+        },
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(1),
+          inventoryItemId: inventory(3),
+          quantityMicros: stockQuantityMicros(1_000_000),
+        },
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(5),
+          inventoryItemId: inventory(2),
+          quantityMicros: stockQuantityMicros(1_000_000),
+        },
+        {
+          shopId: DEV_SHOP_ID,
+          productId: product(5),
+          inventoryItemId: inventory(3),
+          quantityMicros: stockQuantityMicros(1_000_000),
+        },
+      ],
+      orderTypes: [
+        {
+          id: orderType(1),
+          shopId: DEV_SHOP_ID,
+          name: 'Take Away',
+          behavior: 'TAKE_AWAY',
+          sortOrder: 0,
+          active: true,
+        },
+        {
+          id: orderType(2),
+          shopId: DEV_SHOP_ID,
+          name: 'Dine In',
+          behavior: 'DINE_IN',
+          sortOrder: 1,
+          active: true,
+        },
+        {
+          id: orderType(3),
+          shopId: DEV_SHOP_ID,
+          name: 'Delivery',
+          behavior: 'DELIVERY',
+          sortOrder: 2,
+          active: true,
+        },
+      ],
+      paymentMethods: [
+        {
+          id: payment(1),
+          shopId: DEV_SHOP_ID,
+          displayName: 'Cash',
+          logicType: 'CASH',
+          requiresReconciliation: true,
+          sortOrder: 0,
+          active: true,
+        },
+        {
+          id: payment(2),
+          shopId: DEV_SHOP_ID,
+          displayName: 'Instapay',
+          logicType: 'DIGITAL',
+          requiresReconciliation: true,
+          sortOrder: 1,
+          active: true,
+        },
+      ],
+      deliveryZones: [
+        {
+          id: parseEntityId('90000000-0000-4000-8000-000000000001'),
+          shopId: DEV_SHOP_ID,
+          name: 'Downtown Demo',
+          feeMinor: moneyMinor(3_500),
+          sortOrder: 0,
+          active: true,
+        },
+        {
+          id: parseEntityId('90000000-0000-4000-8000-000000000002'),
+          shopId: DEV_SHOP_ID,
+          name: 'Outer Demo Zone',
+          feeMinor: moneyMinor(5_000),
+          sortOrder: 1,
+          active: true,
+        },
+      ],
+    },
+    inventoryItems,
   };
 }
 
+const unusedRemoteProvider: InboundConfigurationProvider = {
+  async discoverVersion() {
+    throw new Error('Development provisioning does not use a remote provider.');
+  },
+  async fetchCompleteConfiguration() {
+    throw new Error('Development provisioning does not use a remote provider.');
+  },
+};
+
 async function main(): Promise<void> {
-  if (process.env['NODE_ENV'] === 'production') {
+  if (env.NODE_ENV === 'production') {
     throw new Error('Development provisioning is disabled when NODE_ENV=production.');
   }
-
-  const databasePath = resolve(requiredArgument('--database'));
-  const pinHash = requiredArgument('--pin-hash');
-  if (pinHash.length < 20) {
-    throw new Error('--pin-hash must be a normal precomputed worker PIN hash, not a plaintext PIN.');
+  if (!process.argv.includes('--development')) {
+    throw new Error('Development provisioning requires the explicit --development safety flag.');
   }
 
+  const databasePath = developmentDatabasePath();
+  mkdirSync(dirname(databasePath), { recursive: true });
+  const primaryPin = argument('--pin') ?? '1234';
+  const secondaryPin = argument('--secondary-pin') ?? '5678';
   const database = new SqliteOperationsDatabase(databasePath);
   await database.initialize();
   const readModel = new SqliteOperatorSessionReadModel(databasePath);
@@ -140,38 +341,45 @@ async function main(): Promise<void> {
       );
     }
 
-    const now = instant(new Date());
     await database.transaction(async (transaction) => {
       const existingShop = await transaction.shops.getById(DEV_SHOP_ID);
       if (existingShop !== null && existingShop.name !== 'TUX Development Shop') {
-        throw new Error('Refusing to overwrite an existing record that uses the reserved dev Shop ID.');
+        throw new Error(
+          'Refusing to overwrite a non-development record using the reserved dev Shop ID.',
+        );
       }
-      const existingWorker = await transaction.workers.getById(DEV_WORKER_ID);
-      if (existingWorker !== null && existingWorker.displayName !== 'Development Worker') {
-        throw new Error('Refusing to overwrite an existing record that uses the reserved dev Worker ID.');
-      }
-
-      await transaction.shops.put({
-        id: DEV_SHOP_ID,
-        name: 'TUX Development Shop',
+      await transaction.shops.put({ id: DEV_SHOP_ID, name: 'TUX Development Shop', active: true });
+      await transaction.workers.put({
+        id: DEV_WORKER_ONE_ID,
+        shopId: DEV_SHOP_ID,
+        displayName: 'Demo Worker One',
+        pinHash: hashDevelopmentPin(primaryPin),
         active: true,
       });
       await transaction.workers.put({
-        id: DEV_WORKER_ID,
+        id: DEV_WORKER_TWO_ID,
         shopId: DEV_SHOP_ID,
-        displayName: 'Development Worker',
-        pinHash,
+        displayName: 'Demo Worker Two',
+        pinHash: hashDevelopmentPin(secondaryPin),
         active: true,
       });
-      const snapshot = configuration(now);
-      await transaction.configuration.put(snapshot);
-      for (const item of snapshot.inventoryItems) {
-        await transaction.inventory.putItem(item);
-      }
     });
 
+    const service = new OperationsConfigurationSyncService(
+      database,
+      new ApplicationCommandCoordinator(),
+      unusedRemoteProvider,
+    );
+    const result = await service.installProvisionedConfiguration(
+      DEV_SHOP_ID,
+      configurationBundle(instant(new Date())),
+    );
+    if (result.status !== 'APPLIED' && result.status !== 'UP_TO_DATE') {
+      throw new Error(`Configuration provisioning failed: ${result.status}`);
+    }
+
     process.stdout.write(
-      `Provisioned TUX Development Shop at ${databasePath}. Re-running this command is idempotent.\n`,
+      `Provisioned development-only TUX shop at ${databasePath}. Demo worker PINs were hashed before storage.\n`,
     );
   } finally {
     await readModel.close();

@@ -642,6 +642,7 @@ describe('Operations End Day SQLite integration', () => {
         businessDayId: DAY_ID,
         aggregateType: 'TEST',
         aggregateId: 'seed',
+        aggregateRevision: null,
         eventType: 'SEED',
         idempotencyKey: 'seed:end-day-conflict',
         payloadVersion: 1,

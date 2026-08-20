@@ -6,7 +6,9 @@
   "scripts": {
     "build": "vite build --config vite.main.config.ts && vite build --config vite.preload.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "start": "electron ."
+    "start": "electron .",
+    "build:provision": "vite build --config vite.provision.config.ts",
+    "dev:provision": "npm run build:provision && node dist/tools/devProvision.js --development"
   },
   "dependencies": {
     "@tux/application": "*",

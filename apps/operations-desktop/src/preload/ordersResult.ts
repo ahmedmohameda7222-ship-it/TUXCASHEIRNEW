@@ -119,6 +119,8 @@ export function assertOrdersWorkspaceResult(value: unknown): OrdersWorkspaceResu
         isRecord(operator) &&
         isEntityId(operator['id']) &&
         typeof operator['displayName'] === 'string' &&
+        (payload['recoveryState'] === 'NONE' ||
+          payload['recoveryState'] === 'PREVIOUS_ORDER_ALREADY_SAVED') &&
         isOrderDraft(payload['draft'])
       );
     },

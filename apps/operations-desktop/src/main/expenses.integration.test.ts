@@ -186,6 +186,7 @@ describe('Operations Expenses SQLite integration', () => {
     expect(
       (
         await fx.service.createExpense({
+          commandId: '71000000-0000-4000-8000-000000000001',
           description: 'Taxi',
           amountMinor: moneyMinor(15_000),
           paidFrom: 'CASH',
@@ -197,6 +198,7 @@ describe('Operations Expenses SQLite integration', () => {
     expect(
       (
         await fx.service.createExpense({
+          commandId: '72000000-0000-4000-8000-000000000002',
           description: 'Packaging',
           amountMinor: moneyMinor(20_000),
           paidFrom: 'OTHER',
@@ -222,6 +224,7 @@ describe('Operations Expenses SQLite integration', () => {
     expect(
       (
         await fx.service.createExpense({
+          commandId: '73000000-0000-4000-8000-000000000003',
           description: 'Taxi',
           amountMinor: moneyMinor(15_050),
           paidFrom: 'CASH',
@@ -233,6 +236,7 @@ describe('Operations Expenses SQLite integration', () => {
     expect(
       (
         await fx.service.createExpense({
+          commandId: '74000000-0000-4000-8000-000000000004',
           description: 'Ice',
           amountMinor: moneyMinor(9_975),
           paidFrom: 'OTHER',
@@ -257,6 +261,7 @@ describe('Operations Expenses SQLite integration', () => {
   it('edits in place while preserving identity/creation and updating exact totals', async () => {
     const fx = await fixture();
     const created = await fx.service.createExpense({
+      commandId: '75000000-0000-4000-8000-000000000005',
       description: 'Taxi',
       amountMinor: moneyMinor(15_000),
       paidFrom: 'CASH',
@@ -293,6 +298,7 @@ describe('Operations Expenses SQLite integration', () => {
   it('soft-deletes from the operational ledger while preserving the database fact', async () => {
     const fx = await fixture();
     const created = await fx.service.createExpense({
+      commandId: '76000000-0000-4000-8000-000000000006',
       description: 'Mistake',
       amountMinor: moneyMinor(50_000),
       paidFrom: 'CASH',
@@ -391,7 +397,7 @@ describe('Operations Expenses SQLite integration', () => {
     const EXPENSE_UUID = '72000000-0000-4000-8000-000000000001';
     const AUDIT_UUID = '72000000-0000-4000-8000-000000000002';
     const COLLIDING_OUTBOX_UUID = '72000000-0000-4000-8000-000000000003';
-    const fx = await fixture([EXPENSE_UUID, AUDIT_UUID, COLLIDING_OUTBOX_UUID]);
+    const fx = await fixture([AUDIT_UUID, COLLIDING_OUTBOX_UUID]);
     await fx.database.transaction((transaction) =>
       transaction.outbox.append({
         id: parseEntityId<OutboxEventId>(COLLIDING_OUTBOX_UUID),
@@ -399,6 +405,7 @@ describe('Operations Expenses SQLite integration', () => {
         businessDayId: DAY_ID,
         aggregateType: 'TEST',
         aggregateId: 'seed',
+        aggregateRevision: null,
         eventType: 'SEED',
         idempotencyKey: 'seed:outbox',
         payloadVersion: 1,
@@ -412,6 +419,7 @@ describe('Operations Expenses SQLite integration', () => {
     );
 
     const result = await fx.service.createExpense({
+      commandId: EXPENSE_UUID,
       description: 'Should roll back',
       amountMinor: moneyMinor(1000),
       paidFrom: 'CASH',

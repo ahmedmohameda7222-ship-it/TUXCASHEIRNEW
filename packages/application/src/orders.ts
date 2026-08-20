@@ -57,6 +57,7 @@ export interface OrdersWorkspace {
     readonly displayName: string;
   };
   readonly draft: OrderDraft;
+  readonly recoveryState: 'NONE' | 'PREVIOUS_ORDER_ALREADY_SAVED';
 }
 
 export interface OrderPlacement {
@@ -78,6 +79,12 @@ interface ResolvedContext {
   readonly day: OpenBusinessDay;
   readonly configuration: OperationsConfigurationSnapshot;
   readonly operator: Worker;
+}
+
+interface CommittedOrderPlacement {
+  readonly order: OrderSnapshot;
+  readonly replayed: boolean;
+  readonly configuration: OperationsConfigurationSnapshot;
 }
 
 interface DraftResetResult {
@@ -221,6 +228,7 @@ export class OperationsOrdersService {
         const { shopId, day, configuration, operator } = context.value;
         const key = { shopId, businessDayId: day.id, draftScopeId };
         let draft = await this.#draftStore.get(key);
+        let recoveryState: OrdersWorkspace['recoveryState'] = 'NONE';
         if (draft === null) {
           draft = createEmptyOrderDraft({
             shopId,
@@ -231,6 +239,15 @@ export class OperationsOrdersService {
             checkoutIntentKey: this.#runtime.createUuid(),
           });
           await this.#draftStore.put(draft);
+        } else {
+          const loadedDraft = draft;
+          const committedOrder = await this.#database.transaction((transaction) =>
+            transaction.orders.getByIdempotencyKey(shopId, loadedDraft.checkoutIntentKey),
+          );
+          if (committedOrder !== null) {
+            draft = await this.#recoverCommittedDraftOnLoad(loadedDraft, configuration);
+            recoveryState = 'PREVIOUS_ORDER_ALREADY_SAVED';
+          }
         }
         return ok({
           shopId,
@@ -238,6 +255,7 @@ export class OperationsOrdersService {
           configuration,
           operator: { id: operator.id, displayName: operator.displayName },
           draft,
+          recoveryState,
         });
       } catch (cause) {
         return err(persistenceError('Could not load the local Orders workspace.', cause));
@@ -293,236 +311,281 @@ export class OperationsOrdersService {
   }
 
   async placeOrder(draft: OrderDraft): Promise<OrderPlacementResult> {
-    return this.#coordinator.runExclusive(async () => {
-      try {
-        const existing = await this.#database.transaction((transaction) =>
-          transaction.orders.getByIdempotencyKey(draft.shopId, draft.checkoutIntentKey),
-        );
-        if (existing !== null) return ok(await this.#recoverCommittedDraft(draft, existing));
-
-        const contextResult = await this.#resolveContext();
-        if (!contextResult.ok) return contextResult;
-        const context = contextResult.value;
-        if (
-          draft.shopId !== context.shopId ||
-          draft.businessDayId !== context.day.id ||
-          draft.draftScopeId.trim().length === 0
-        ) {
-          return err({
-            code: 'CONFLICT_ERROR',
-            message: 'The order draft does not belong to the active Business Day.',
-          });
-        }
-
-        const validation = validateOrderDraft(draft, context.configuration);
-        if (!validation.valid) {
-          return err({
-            code: 'VALIDATION_ERROR',
-            message: validation.issues[0]?.message ?? 'Order validation failed.',
-            validationIssues: validation.issues,
-          });
-        }
-
-        const preparedPayments = preparePaymentParts(
-          draft.payment,
-          context.configuration.paymentMethods,
-          validation.value.pricing.totalMinor,
-        );
-        const inventoryUsage = calculateInventoryConsumption(draft, context.configuration);
-        const committedAt = this.#runtime.now();
-        const operator = context.operator;
-
-        const commitResult = await this.#database.transaction(async (transaction) => {
-          const replay = await transaction.orders.getByIdempotencyKey(
-            draft.shopId,
-            draft.checkoutIntentKey,
+    const committed = await this.#coordinator.runExclusive(
+      async (): Promise<Result<CommittedOrderPlacement, OrderPlacementError>> => {
+        try {
+          const existing = await this.#database.transaction((transaction) =>
+            transaction.orders.getByIdempotencyKey(draft.shopId, draft.checkoutIntentKey),
           );
-          if (replay !== null) return { order: replay, replayed: true } as const;
-
-          const currentDay = await transaction.businessDays.getOpenForShop(context.shopId);
-          if (
-            currentDay === null ||
-            currentDay.status !== 'OPEN' ||
-            currentDay.id !== draft.businessDayId
-          ) {
-            throw new Error('The Business Day changed before checkout could commit.');
-          }
-          const currentConfiguration = await transaction.configuration.getForShop(context.shopId);
-          if (
-            currentConfiguration === null ||
-            currentConfiguration.version !== context.configuration.version
-          ) {
-            throw new Error('The local configuration changed before checkout could commit.');
-          }
-          const currentWorker = await transaction.workers.getById(operator.id);
-          if (
-            currentWorker === null ||
-            !currentWorker.active ||
-            currentWorker.shopId !== context.shopId
-          ) {
-            throw new Error('The Current Operator is no longer valid for checkout.');
-          }
-
-          const allocated = allocateDisplayOrderNo(currentDay);
-          const orderId = this.#id<OrderId>();
-          let customerContact: CustomerContact | null = null;
-          if (
-            validation.value.orderType.behavior === 'DELIVERY' &&
-            validation.value.normalizedDeliveryPhone !== null
-          ) {
-            const existingContact = await transaction.customerContacts.getByNormalizedPhone(
-              context.shopId,
-              validation.value.normalizedDeliveryPhone,
+          if (existing !== null) {
+            const configuration = await this.#database.transaction((transaction) =>
+              transaction.configuration.getForShop(existing.shopId),
             );
-            customerContact = {
-              id: existingContact?.id ?? this.#id<CustomerContactId>(),
-              shopId: context.shopId,
-              normalizedPhone: validation.value.normalizedDeliveryPhone,
-              displayPhone:
-                draft.delivery.displayPhone.trim() || validation.value.normalizedDeliveryPhone,
-              name: draft.delivery.customerName.trim(),
-              latestAddress: draft.delivery.address.trim(),
-              latestZoneId: draft.delivery.zoneId,
-              lastOrderAt: committedAt,
-            };
-            await transaction.customerContacts.put(customerContact);
+            if (configuration === null) {
+              throw new Error(
+                'Local configuration is unavailable while recovering a committed order.',
+              );
+            }
+            return ok({ order: existing, replayed: true, configuration });
           }
 
-          const fulfillment = this.#buildFulfillment(
-            draft,
-            validation.value.orderType,
-            validation.value.normalizedDeliveryPhone,
-            customerContact,
+          const contextResult = await this.#resolveContext();
+          if (!contextResult.ok) return contextResult;
+          const context = contextResult.value;
+          if (
+            draft.shopId !== context.shopId ||
+            draft.businessDayId !== context.day.id ||
+            draft.draftScopeId.trim().length === 0
+          ) {
+            return err({
+              code: 'CONFLICT_ERROR',
+              message: 'The order draft does not belong to the active Business Day.',
+            });
+          }
+
+          const validation = validateOrderDraft(draft, context.configuration);
+          if (!validation.valid) {
+            return err({
+              code: 'VALIDATION_ERROR',
+              message: validation.issues[0]?.message ?? 'Order validation failed.',
+              validationIssues: validation.issues,
+            });
+          }
+
+          const preparedPayments = preparePaymentParts(
+            draft.payment,
+            context.configuration.paymentMethods,
+            validation.value.pricing.totalMinor,
           );
-          const payments = this.#buildPayments(preparedPayments);
-          const order: OrderSnapshot = {
-            id: orderId,
-            shopId: context.shopId,
-            businessDayId: currentDay.id,
-            displayOrderNo: allocated.displayOrderNo,
-            idempotencyKey: draft.checkoutIntentKey,
-            status: 'ACTIVE',
-            lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
-            source: 'POS',
-            operatorWorkerId: currentWorker.id,
-            operatorName: currentWorker.displayName,
-            createdAt: committedAt,
-            fulfillment,
-            items: draft.lines.map((line) => ({
-              id: this.#id<OrderItemId>(),
-              productId: line.productId,
-              productName: line.productName,
-              unitPriceMinor: line.unitPriceMinor,
-              quantity: line.quantity,
-              modifiers: line.modifiers,
-              comboBeverages: line.comboBeverages,
-              itemNote: line.itemNote,
-            })),
-            orderNote: draft.orderNote,
-            itemsSubtotalMinor: validation.value.pricing.itemsSubtotalMinor,
-            discountMinor: validation.value.pricing.discountMinor,
-            deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
-            totalMinor: validation.value.pricing.totalMinor,
-            payments,
-          };
-          assertOrderSnapshotIntegrity(order);
+          const inventoryUsage = calculateInventoryConsumption(draft, context.configuration);
+          const committedAt = this.#runtime.now();
+          const operator = context.operator;
 
-          await transaction.businessDays.put(allocated.businessDay);
-          await transaction.orders.insert(order);
+          const commitResult = await this.#database.transaction(async (transaction) => {
+            const replay = await transaction.orders.getByIdempotencyKey(
+              draft.shopId,
+              draft.checkoutIntentKey,
+            );
+            if (replay !== null) return { order: replay, replayed: true } as const;
 
-          const inventoryMovements: InventoryMovement[] = [];
-          for (const [itemId, consumedMicros] of inventoryUsage) {
-            if (consumedMicros === 0) continue;
-            const movement: InventoryMovement = {
-              id: this.#id<InventoryMovementId>(),
+            const currentDay = await transaction.businessDays.getOpenForShop(context.shopId);
+            if (
+              currentDay === null ||
+              currentDay.status !== 'OPEN' ||
+              currentDay.id !== draft.businessDayId
+            ) {
+              throw new Error('The Business Day changed before checkout could commit.');
+            }
+            const currentConfiguration = await transaction.configuration.getForShop(context.shopId);
+            if (
+              currentConfiguration === null ||
+              currentConfiguration.version !== context.configuration.version
+            ) {
+              throw new Error('The local configuration changed before checkout could commit.');
+            }
+            const currentWorker = await transaction.workers.getById(operator.id);
+            if (
+              currentWorker === null ||
+              !currentWorker.active ||
+              currentWorker.shopId !== context.shopId
+            ) {
+              throw new Error('The Current Operator is no longer valid for checkout.');
+            }
+
+            const allocated = allocateDisplayOrderNo(currentDay);
+            const orderId = this.#id<OrderId>();
+            let customerContact: CustomerContact | null = null;
+            if (
+              validation.value.orderType.behavior === 'DELIVERY' &&
+              validation.value.normalizedDeliveryPhone !== null
+            ) {
+              const existingContact = await transaction.customerContacts.getByNormalizedPhone(
+                context.shopId,
+                validation.value.normalizedDeliveryPhone,
+              );
+              customerContact = {
+                id: existingContact?.id ?? this.#id<CustomerContactId>(),
+                shopId: context.shopId,
+                normalizedPhone: validation.value.normalizedDeliveryPhone,
+                displayPhone:
+                  draft.delivery.displayPhone.trim() || validation.value.normalizedDeliveryPhone,
+                name: draft.delivery.customerName.trim(),
+                latestAddress: draft.delivery.address.trim(),
+                latestZoneId: draft.delivery.zoneId,
+                lastOrderAt: committedAt,
+              };
+              await transaction.customerContacts.put(customerContact);
+            }
+
+            const fulfillment = this.#buildFulfillment(
+              draft,
+              validation.value.orderType,
+              validation.value.normalizedDeliveryPhone,
+              customerContact,
+            );
+            const payments = this.#buildPayments(preparedPayments);
+            const order: OrderSnapshot = {
+              id: orderId,
               shopId: context.shopId,
               businessDayId: currentDay.id,
-              itemId,
-              movementType: 'ORDER_CONSUMPTION',
-              quantityDeltaMicros: stockQuantityMicros(-consumedMicros),
-              idempotencyKey: `order-consumption:${order.id}:${itemId}`,
-              workerId: currentWorker.id,
-              orderId: order.id,
+              displayOrderNo: allocated.displayOrderNo,
+              idempotencyKey: draft.checkoutIntentKey,
+              status: 'ACTIVE',
+              lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
+              source: 'POS',
+              operatorWorkerId: currentWorker.id,
+              operatorName: currentWorker.displayName,
               createdAt: committedAt,
-              compensatesMovementId: null,
+              fulfillment,
+              items: draft.lines.map((line) => ({
+                id: this.#id<OrderItemId>(),
+                productId: line.productId,
+                productName: line.productName,
+                unitPriceMinor: line.unitPriceMinor,
+                quantity: line.quantity,
+                modifiers: line.modifiers,
+                comboBeverages: line.comboBeverages,
+                itemNote: line.itemNote,
+              })),
+              orderNote: draft.orderNote,
+              itemsSubtotalMinor: validation.value.pricing.itemsSubtotalMinor,
+              discountMinor: validation.value.pricing.discountMinor,
+              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+              totalMinor: validation.value.pricing.totalMinor,
+              payments,
             };
-            inventoryMovements.push(movement);
-            await transaction.inventory.appendMovement(movement);
-          }
+            assertOrderSnapshotIntegrity(order);
 
-          await transaction.audit.append(this.#orderAudit(order, committedAt));
-          await transaction.outbox.append(
-            this.#orderOutbox(
-              order,
-              customerContact,
-              inventoryMovements,
-              context.configuration.version,
-              committedAt,
-            ),
-          );
-          return { order, replayed: false } as const;
-        });
+            await transaction.businessDays.put(allocated.businessDay);
+            await transaction.orders.insert(order);
 
-        const warnings: string[] = [];
-        if (!commitResult.replayed) {
-          try {
-            const printed = await this.#printer.print(commitResult.order);
-            if (!printed.ok) warnings.push('PRINT_FAILED');
-          } catch {
-            warnings.push('PRINT_FAILED');
-          }
-        } else {
-          warnings.push('PRINT_STATUS_UNKNOWN');
+            const inventoryMovements: InventoryMovement[] = [];
+            for (const [itemId, consumedMicros] of inventoryUsage) {
+              if (consumedMicros === 0) continue;
+              const movement: InventoryMovement = {
+                id: this.#id<InventoryMovementId>(),
+                shopId: context.shopId,
+                businessDayId: currentDay.id,
+                itemId,
+                movementType: 'ORDER_CONSUMPTION',
+                quantityDeltaMicros: stockQuantityMicros(-consumedMicros),
+                idempotencyKey: `order-consumption:${order.id}:${itemId}`,
+                workerId: currentWorker.id,
+                orderId: order.id,
+                createdAt: committedAt,
+                compensatesMovementId: null,
+              };
+              inventoryMovements.push(movement);
+              await transaction.inventory.appendMovement(movement);
+            }
+
+            await transaction.audit.append(this.#orderAudit(order, committedAt));
+            await transaction.outbox.append(
+              this.#orderOutbox(
+                order,
+                customerContact,
+                inventoryMovements,
+                context.configuration.version,
+                committedAt,
+              ),
+            );
+            return { order, replayed: false } as const;
+          });
+
+          return ok({
+            order: commitResult.order,
+            replayed: commitResult.replayed,
+            configuration: context.configuration,
+          });
+        } catch (cause) {
+          return err({
+            code: 'LOCAL_PERSISTENCE_ERROR',
+            message: 'The order was not placed because the local durable commit failed.',
+            cause,
+          });
         }
+      },
+    );
 
-        const reset = await this.#resetDraftAfterCommit(draft, context.configuration, warnings);
-        return ok({
-          order: commitResult.order,
-          replayed: commitResult.replayed,
-          nextDraft: reset.nextDraft,
-          postCommitWarnings: reset.warnings,
-        });
-      } catch (cause) {
-        return err({
-          code: 'LOCAL_PERSISTENCE_ERROR',
-          message: 'The order was not placed because the local durable commit failed.',
-          cause,
-        });
+    if (!committed.ok) return committed;
+
+    const warnings: string[] = [];
+    if (!committed.value.replayed) {
+      try {
+        const printed = await this.#printer.print(committed.value.order);
+        if (!printed.ok) warnings.push('PRINT_FAILED');
+      } catch {
+        warnings.push('PRINT_FAILED');
       }
+    } else {
+      warnings.push('PRINT_STATUS_UNKNOWN');
+    }
+
+    const reset = await this.#resetDraftAfterCommit(draft, committed.value.configuration, warnings);
+    return ok({
+      order: committed.value.order,
+      replayed: committed.value.replayed,
+      nextDraft: reset.nextDraft,
+      postCommitWarnings: reset.warnings,
     });
   }
 
   async reprintOrder(orderId: OrderId): Promise<Result<OrderSnapshot, ApplicationError>> {
-    return this.#coordinator.runExclusive(async () => {
-      try {
-        const order = await this.#database.transaction((transaction) =>
-          transaction.orders.getById(orderId),
-        );
-        if (order === null) {
-          return err({ code: 'NOT_FOUND', message: 'The saved order could not be found.' });
+    const lookup = await this.#coordinator.runExclusive(
+      async (): Promise<Result<OrderSnapshot, ApplicationError>> => {
+        try {
+          const order = await this.#database.transaction((transaction) =>
+            transaction.orders.getById(orderId),
+          );
+          if (order === null) {
+            return err({ code: 'NOT_FOUND', message: 'The saved order could not be found.' });
+          }
+          return ok(order);
+        } catch (cause) {
+          return err({
+            code: 'LOCAL_PERSISTENCE_ERROR',
+            message: 'The saved order could not be loaded for reprint.',
+            cause,
+          });
         }
-        const printed = await this.#printer.print(order);
-        if (!printed.ok) return err({ code: 'PRINT_ERROR', message: printed.message });
-        return ok(order);
-      } catch (cause) {
-        return err({
-          code: 'PRINT_ERROR',
-          message: 'The saved order is intact, but the receipt could not be printed.',
-          cause,
-        });
-      }
-    });
+      },
+    );
+    if (!lookup.ok) return lookup;
+
+    try {
+      const printed = await this.#printer.print(lookup.value);
+      if (!printed.ok) return err({ code: 'PRINT_ERROR', message: printed.message });
+      return lookup;
+    } catch (cause) {
+      return err({
+        code: 'PRINT_ERROR',
+        message: 'The saved order is intact, but the receipt could not be printed.',
+        cause,
+      });
+    }
   }
 
-  async #recoverCommittedDraft(draft: OrderDraft, order: OrderSnapshot): Promise<OrderPlacement> {
-    const configuration = await this.#database.transaction((transaction) =>
-      transaction.configuration.getForShop(order.shopId),
-    );
-    if (configuration === null) {
-      throw new Error('Local configuration is unavailable while recovering a committed order.');
+  async #recoverCommittedDraftOnLoad(
+    committedDraft: OrderDraft,
+    configuration: OperationsConfigurationSnapshot,
+  ): Promise<OrderDraft> {
+    const key = orderDraftKey(committedDraft);
+    const current = await this.#draftStore.get(key);
+    if (current !== null && current.checkoutIntentKey !== committedDraft.checkoutIntentKey) {
+      return current;
     }
-    const reset = await this.#resetDraftAfterCommit(draft, configuration, ['PRINT_STATUS_UNKNOWN']);
-    return { order, replayed: true, nextDraft: reset.nextDraft, postCommitWarnings: reset.warnings };
+
+    const candidate = createEmptyOrderDraft({
+      shopId: committedDraft.shopId,
+      businessDayId: committedDraft.businessDayId,
+      draftScopeId: committedDraft.draftScopeId,
+      configuration,
+      now: this.#runtime.now(),
+      checkoutIntentKey: this.#runtime.createUuid(),
+    });
+    if (current !== null) await this.#draftStore.delete(key);
+    await this.#draftStore.put(candidate);
+    return candidate;
   }
 
   async #resetDraftAfterCommit(
@@ -588,7 +651,12 @@ export class OperationsOrdersService {
     if (worker === null || !worker.active || worker.shopId !== shop.id) {
       return err({ code: 'CONFLICT_ERROR', message: 'The Current Operator is unavailable.' });
     }
-    return ok({ shopId: shop.id, day: state.day, configuration: state.configuration, operator: worker });
+    return ok({
+      shopId: shop.id,
+      day: state.day,
+      configuration: state.configuration,
+      operator: worker,
+    });
   }
 
   #buildFulfillment(
@@ -610,7 +678,9 @@ export class OperationsOrdersService {
       normalizedDeliveryPhone === null ||
       customerContact === null
     ) {
-      throw new Error('Validated Delivery order is missing its customer, zone, or normalized phone.');
+      throw new Error(
+        'Validated Delivery order is missing its customer, zone, or normalized phone.',
+      );
     }
     return {
       orderTypeId: orderType.id,
@@ -693,6 +763,7 @@ export class OperationsOrdersService {
       businessDayId: order.businessDayId,
       aggregateType: 'ORDER',
       aggregateId: order.id,
+      aggregateRevision: 0,
       eventType: 'ORDER_PLACED',
       idempotencyKey: `order-placed:${order.id}`,
       payloadVersion: 1,
