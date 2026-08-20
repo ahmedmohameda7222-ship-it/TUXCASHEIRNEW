@@ -1112,3 +1112,9 @@
     justify-content: flex-end;
   }
 }
+
+@media (min-width: 74.01rem) {
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
+  }
+}
