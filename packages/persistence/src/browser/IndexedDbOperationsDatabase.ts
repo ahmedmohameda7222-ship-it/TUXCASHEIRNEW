@@ -42,6 +42,10 @@ const STORES = [
 ] as const;
 
 type StoreName = (typeof STORES)[number];
+type StoredOutboxEvent = OutboxEvent & {
+  readonly quarantinedAt?: Instant | null;
+  readonly permanentFailureReason?: string | null;
+};
 
 function requestResult<Result>(request: IDBRequest<Result>): Promise<Result> {
   return new Promise((resolve, reject) => {
@@ -244,9 +248,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       async updateOperationalState(order: OrderSnapshot) {
         const orders = store('orders');
         const existing = await recordOrNull<OrderSnapshot>(orders.get(order.id));
-        if (existing === null) {
-          throw new Error(`Order ${order.id} was not found.`);
-        }
+        if (existing === null) throw new Error(`Order ${order.id} was not found.`);
         const updated =
           order.lifecycle === undefined
             ? { ...existing, status: order.status }
@@ -267,9 +269,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         await requestResult(store('inventoryMovements').add(movement));
       },
       async listMovementsForOrder(orderId: OrderId) {
-        const all = (await requestResult(
-          store('inventoryMovements').getAll(),
-        )) as InventoryMovement[];
+        const all = (await requestResult(store('inventoryMovements').getAll())) as InventoryMovement[];
         return all
           .filter((movement) => movement.orderId === orderId)
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -287,17 +287,23 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
     },
     outbox: {
       async append(event: OutboxEvent) {
-        await requestResult(store('outboxEvents').add(event));
+        const stored: StoredOutboxEvent = {
+          ...event,
+          quarantinedAt: null,
+          permanentFailureReason: null,
+        };
+        await requestResult(store('outboxEvents').add(stored));
       },
       async listPending(now: Instant, limit: number) {
         if (!Number.isSafeInteger(limit) || limit <= 0) {
           throw new RangeError('Outbox pending limit must be a positive safe integer.');
         }
-        const all = (await requestResult(store('outboxEvents').getAll())) as OutboxEvent[];
+        const all = (await requestResult(store('outboxEvents').getAll())) as StoredOutboxEvent[];
         return all
           .filter(
             (event) =>
               event.deliveredAt === null &&
+              (event.quarantinedAt ?? null) === null &&
               (event.nextAttemptAt === null || event.nextAttemptAt <= now),
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
@@ -305,10 +311,8 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       },
       async markDelivered(id: OutboxEventId, deliveredAt: Instant) {
         const objectStore = store('outboxEvents');
-        const existing = await recordOrNull<OutboxEvent>(objectStore.get(id));
-        if (existing === null) {
-          throw new Error(`Outbox event ${id} was not found.`);
-        }
+        const existing = await recordOrNull<StoredOutboxEvent>(objectStore.get(id));
+        if (existing === null) throw new Error(`Outbox event ${id} was not found.`);
         await requestResult(
           objectStore.put({ ...existing, deliveredAt, lastError: null, nextAttemptAt: null }),
         );
@@ -320,12 +324,24 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         lastError: string,
       ) {
         const objectStore = store('outboxEvents');
-        const existing = await recordOrNull<OutboxEvent>(objectStore.get(id));
-        if (existing === null) {
-          throw new Error(`Outbox event ${id} was not found.`);
-        }
+        const existing = await recordOrNull<StoredOutboxEvent>(objectStore.get(id));
+        if (existing === null) throw new Error(`Outbox event ${id} was not found.`);
         await requestResult(
           objectStore.put({ ...existing, attemptCount, nextAttemptAt, lastError }),
+        );
+      },
+      async quarantine(id: OutboxEventId, quarantinedAt: Instant, reason: string) {
+        const objectStore = store('outboxEvents');
+        const existing = await recordOrNull<StoredOutboxEvent>(objectStore.get(id));
+        if (existing === null) throw new Error(`Outbox event ${id} was not found.`);
+        await requestResult(
+          objectStore.put({
+            ...existing,
+            quarantinedAt,
+            permanentFailureReason: reason,
+            lastError: reason,
+            nextAttemptAt: null,
+          }),
         );
       },
     },
@@ -341,9 +357,7 @@ export class IndexedDbOperationsDatabase implements OperationsDatabase {
   }
 
   async initialize(): Promise<void> {
-    if (this.#database !== null) {
-      return;
-    }
+    if (this.#database !== null) return;
     this.#database = await openDatabase(this.#name);
     if (typeof navigator !== 'undefined' && navigator.storage?.persist !== undefined) {
       await navigator.storage.persist();
