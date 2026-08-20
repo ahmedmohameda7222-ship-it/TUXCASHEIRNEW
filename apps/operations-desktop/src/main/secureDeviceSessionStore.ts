@@ -46,14 +46,18 @@ export class ElectronSafeStorageDeviceSessionStore implements SupabaseDeviceSess
       throw cause;
     }
     if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('OS credential encryption is unavailable; refusing to load TUX device secrets.');
+      throw new Error(
+        'OS credential encryption is unavailable; refusing to load TUX device secrets.',
+      );
     }
     return parseRecord(JSON.parse(safeStorage.decryptString(encrypted)) as unknown);
   }
 
   async save(session: SupabaseDeviceSessionRecord): Promise<void> {
     if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('OS credential encryption is unavailable; refusing to store TUX device secrets.');
+      throw new Error(
+        'OS credential encryption is unavailable; refusing to store TUX device secrets.',
+      );
     }
     await mkdir(dirname(this.#filePath), { recursive: true });
     const temporaryPath = `${this.#filePath}.tmp`;
