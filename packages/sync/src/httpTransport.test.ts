@@ -73,6 +73,30 @@ describe('HttpOutboxTransport', () => {
     });
   });
 
+  it('resolves authorization headers per delivery so refreshed device JWTs are used', async () => {
+    const calls: Array<Parameters<typeof fetch>> = [];
+    let tokenRevision = 0;
+    const fetcher: typeof fetch = async (...args) => {
+      calls.push(args);
+      return new Response(null, { status: 204 });
+    };
+    const transport = new HttpOutboxTransport({
+      endpoint: 'https://sync.example.test/events',
+      headerProvider: async () => ({ authorization: `Bearer token-${++tokenRevision}` }),
+      fetcher,
+    });
+
+    await transport.deliver(event);
+    await transport.deliver(event);
+
+    expect((calls[0]?.[1]?.headers as Record<string, string>)['authorization']).toBe(
+      'Bearer token-1',
+    );
+    expect((calls[1]?.[1]?.headers as Record<string, string>)['authorization']).toBe(
+      'Bearer token-2',
+    );
+  });
+
   it('does not accept non-2xx responses as delivered', async () => {
     const transport = new HttpOutboxTransport({
       endpoint: 'https://sync.example.test/events',
