@@ -17,5 +17,12 @@ export {
   type RemoteMutationMode,
   type RemoteTableMutation,
 } from './remoteMaterializer';
+export {
+  SupabaseDeviceSessionManager,
+  SupabaseInboundConfigurationProvider,
+  type SupabaseDeviceSessionManagerOptions,
+  type SupabaseDeviceSessionRecord,
+  type SupabaseDeviceSessionStore,
+} from './supabaseDeviceSession';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
 export { buildSyncHealth, type SyncHealthSnapshot, type SyncHealthState } from './syncHealth';
