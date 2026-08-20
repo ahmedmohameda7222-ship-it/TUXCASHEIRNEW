@@ -320,10 +320,7 @@ export function OrdersWorkspace({
   }, [configuration, selectedCategoryId]);
 
   useEffect(() => {
-    if (
-      selectedProductFamily !== null &&
-      !productFamilies.includes(selectedProductFamily)
-    ) {
+    if (selectedProductFamily !== null && !productFamilies.includes(selectedProductFamily)) {
       setSelectedProductFamily(null);
     }
   }, [productFamilies, selectedProductFamily]);
