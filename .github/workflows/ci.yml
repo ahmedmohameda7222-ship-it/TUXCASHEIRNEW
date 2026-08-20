@@ -45,10 +45,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Temporary formatter diagnostic
-        run: |
-          npm run format
-          git diff -- apps packages .github
       - name: Format check
         run: npm run format:check
       - name: Lint
