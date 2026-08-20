@@ -1,5 +1,6 @@
 import {
   createOpenBusinessDay,
+  operationsSyncPayloadJson,
   parseEntityId,
   type AuditEvent,
   type AuditEventId,
@@ -7,6 +8,7 @@ import {
   type EntityId,
   type Instant,
   type OpenBusinessDay,
+  type OperationsSyncPayloadV1,
   type OutboxEvent,
   type OutboxEventId,
   type Shop,
@@ -35,14 +37,8 @@ export interface OperatorSummary {
 }
 
 export type OperationsSessionState =
-  | {
-      readonly status: 'CONFIGURATION_REQUIRED';
-      readonly message: string;
-    }
-  | {
-      readonly status: 'NO_ACTIVE_DAY';
-      readonly shopId: ShopId;
-    }
+  | { readonly status: 'CONFIGURATION_REQUIRED'; readonly message: string }
+  | { readonly status: 'NO_ACTIVE_DAY'; readonly shopId: ShopId }
   | {
       readonly status: 'SIGN_IN_REQUIRED';
       readonly shopId: ShopId;
@@ -114,9 +110,7 @@ export class OperationsSessionService {
         let authenticatedWorker: Worker | null = null;
         for (const worker of workers) {
           const matches = await this.#pinVerifier.verify(pin, worker.pinHash);
-          if (matches && authenticatedWorker === null) {
-            authenticatedWorker = worker;
-          }
+          if (matches && authenticatedWorker === null) authenticatedWorker = worker;
         }
         if (authenticatedWorker === null) {
           return err({ code: 'PIN_AUTH_ERROR', message: 'Invalid PIN.' });
@@ -165,10 +159,14 @@ export class OperationsSessionService {
               }),
             );
             await transaction.outbox.append(
-              this.#outbox(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, now, {
-                businessDayId: day.id,
-                startedByWorkerId: worker.id,
-              }),
+              this.#outbox(
+                shop.id,
+                'BUSINESS_DAY_STARTED',
+                day.id,
+                day.id,
+                now,
+                { eventType: 'BUSINESS_DAY_STARTED', version: 1, businessDay: day },
+              ),
             );
           }
 
@@ -183,8 +181,10 @@ export class OperationsSessionService {
             return this.#activeState(shop, day, worker);
           }
 
-          if (openExistingSession !== null) {
-            await transaction.workerSessions.put({ ...openExistingSession, endedAt: now });
+          const closedPreviousSession: WorkerSession | null =
+            openExistingSession === null ? null : { ...openExistingSession, endedAt: now };
+          if (closedPreviousSession !== null) {
+            await transaction.workerSessions.put(closedPreviousSession);
           }
 
           const newSession: WorkerSession = {
@@ -208,9 +208,10 @@ export class OperationsSessionService {
           );
           await transaction.outbox.append(
             this.#outbox(shop.id, eventType, day.id, newSession.id, now, {
-              businessDayId: day.id,
-              workerId: worker.id,
-              previousWorkerId: switched ? openExistingSession.workerId : null,
+              eventType,
+              version: 1,
+              session: newSession,
+              previousSession: closedPreviousSession,
             }),
           );
 
@@ -248,8 +249,9 @@ export class OperationsSessionService {
         }
 
         const now = this.#runtime.now();
+        const closedSession: WorkerSession = { ...session, endedAt: now };
         await this.#database.transaction(async (transaction) => {
-          await transaction.workerSessions.put({ ...session, endedAt: now });
+          await transaction.workerSessions.put(closedSession);
           await transaction.audit.append(
             this.#audit(shop.id, 'WORKER_SIGNED_OUT', day.id, session.id, session.workerId, now, {
               workerId: session.workerId,
@@ -257,8 +259,10 @@ export class OperationsSessionService {
           );
           await transaction.outbox.append(
             this.#outbox(shop.id, 'WORKER_SIGNED_OUT', day.id, session.id, now, {
-              businessDayId: day.id,
-              workerId: session.workerId,
+              eventType: 'WORKER_SIGNED_OUT',
+              version: 1,
+              session: closedSession,
+              previousSession: null,
             }),
           );
         });
@@ -351,11 +355,11 @@ export class OperationsSessionService {
 
   #outbox(
     shopId: ShopId,
-    eventType: string,
+    eventType: OperationsSyncPayloadV1['eventType'],
     businessDayId: BusinessDayId,
     aggregateId: EntityId,
     createdAt: Instant,
-    payload: OutboxEvent['payload'],
+    payload: OperationsSyncPayloadV1,
   ): OutboxEvent {
     return {
       id: this.#id<OutboxEventId>(),
@@ -366,7 +370,7 @@ export class OperationsSessionService {
       eventType,
       idempotencyKey: `${eventType.toLowerCase()}:${aggregateId}`,
       payloadVersion: 1,
-      payload,
+      payload: operationsSyncPayloadJson(payload),
       createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
