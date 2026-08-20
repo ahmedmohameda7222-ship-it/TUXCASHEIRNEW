@@ -1,6 +1,7 @@
 import {
   allocateDisplayOrderNo,
   assertOrderSnapshotIntegrity,
+  operationsSyncPayloadJson,
   parseEntityId,
   preparePaymentParts,
   stockQuantityMicros,
@@ -18,6 +19,7 @@ import {
   type InventoryMovementId,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
+  type OperationsSyncPayloadV1,
   type OrderDraft,
   type OrderFulfillmentSnapshot,
   type OrderId,
@@ -159,11 +161,8 @@ function calculateInventoryConsumption(
     if (!Number.isSafeInteger(multiplier) || multiplier <= 0) {
       throw new RangeError('Inventory recipe multiplier must be a positive safe integer.');
     }
-
     for (const recipe of configuration.recipeLines) {
-      if (recipe.productId !== productId) {
-        continue;
-      }
+      if (recipe.productId !== productId) continue;
       const quantity = recipe.quantityMicros * multiplier;
       if (!Number.isSafeInteger(quantity)) {
         throw new RangeError('Inventory recipe consumption exceeded the safe integer range.');
@@ -174,11 +173,7 @@ function calculateInventoryConsumption(
 
   for (const line of draft.lines) {
     addProductRecipe(line.productId, line.quantity);
-
-    for (const beverage of line.comboBeverages) {
-      addProductRecipe(beverage.productId, 1);
-    }
-
+    for (const beverage of line.comboBeverages) addProductRecipe(beverage.productId, 1);
     for (const modifierSnapshot of line.modifiers) {
       const modifier = configuration.modifiers.find(
         (candidate) => candidate.id === modifierSnapshot.modifierId,
@@ -188,7 +183,6 @@ function calculateInventoryConsumption(
       }
     }
   }
-
   return usage;
 }
 
@@ -222,12 +216,8 @@ export class OperationsOrdersService {
         if (draftScopeId.trim().length === 0) {
           return err({ code: 'VALIDATION_ERROR', message: 'Draft scope is required.' });
         }
-
         const context = await this.#resolveContext();
-        if (!context.ok) {
-          return context;
-        }
-
+        if (!context.ok) return context;
         const { shopId, day, configuration, operator } = context.value;
         const key = { shopId, businessDayId: day.id, draftScopeId };
         let draft = await this.#draftStore.get(key);
@@ -242,7 +232,6 @@ export class OperationsOrdersService {
           });
           await this.#draftStore.put(draft);
         }
-
         return ok({
           shopId,
           businessDayId: day.id,
@@ -260,9 +249,7 @@ export class OperationsOrdersService {
     return this.#coordinator.runExclusive(async () => {
       try {
         const context = await this.#resolveContext();
-        if (!context.ok) {
-          return context;
-        }
+        if (!context.ok) return context;
         if (
           draft.shopId !== context.value.shopId ||
           draft.businessDayId !== context.value.day.id ||
@@ -273,7 +260,6 @@ export class OperationsOrdersService {
             message: 'This draft no longer belongs to the active Business Day.',
           });
         }
-
         const updated: OrderDraft = {
           ...draft,
           revision: draft.revision + 1,
@@ -282,7 +268,6 @@ export class OperationsOrdersService {
         if (!Number.isSafeInteger(updated.revision)) {
           return err({ code: 'VALIDATION_ERROR', message: 'Draft revision overflowed.' });
         }
-
         await this.#draftStore.put(updated);
         return ok(updated);
       } catch (cause) {
@@ -313,14 +298,10 @@ export class OperationsOrdersService {
         const existing = await this.#database.transaction((transaction) =>
           transaction.orders.getByIdempotencyKey(draft.shopId, draft.checkoutIntentKey),
         );
-        if (existing !== null) {
-          return ok(await this.#recoverCommittedDraft(draft, existing));
-        }
+        if (existing !== null) return ok(await this.#recoverCommittedDraft(draft, existing));
 
         const contextResult = await this.#resolveContext();
-        if (!contextResult.ok) {
-          return contextResult;
-        }
+        if (!contextResult.ok) return contextResult;
         const context = contextResult.value;
         if (
           draft.shopId !== context.shopId ||
@@ -356,9 +337,7 @@ export class OperationsOrdersService {
             draft.shopId,
             draft.checkoutIntentKey,
           );
-          if (replay !== null) {
-            return { order: replay, replayed: true } as const;
-          }
+          if (replay !== null) return { order: replay, replayed: true } as const;
 
           const currentDay = await transaction.businessDays.getOpenForShop(context.shopId);
           if (
@@ -368,7 +347,6 @@ export class OperationsOrdersService {
           ) {
             throw new Error('The Business Day changed before checkout could commit.');
           }
-
           const currentConfiguration = await transaction.configuration.getForShop(context.shopId);
           if (
             currentConfiguration === null ||
@@ -376,7 +354,6 @@ export class OperationsOrdersService {
           ) {
             throw new Error('The local configuration changed before checkout could commit.');
           }
-
           const currentWorker = await transaction.workers.getById(operator.id);
           if (
             currentWorker === null ||
@@ -388,20 +365,34 @@ export class OperationsOrdersService {
 
           const allocated = allocateDisplayOrderNo(currentDay);
           const orderId = this.#id<OrderId>();
-          const existingContact =
+          let customerContact: CustomerContact | null = null;
+          if (
             validation.value.orderType.behavior === 'DELIVERY' &&
             validation.value.normalizedDeliveryPhone !== null
-              ? await transaction.customerContacts.getByNormalizedPhone(
-                  context.shopId,
-                  validation.value.normalizedDeliveryPhone,
-                )
-              : null;
+          ) {
+            const existingContact = await transaction.customerContacts.getByNormalizedPhone(
+              context.shopId,
+              validation.value.normalizedDeliveryPhone,
+            );
+            customerContact = {
+              id: existingContact?.id ?? this.#id<CustomerContactId>(),
+              shopId: context.shopId,
+              normalizedPhone: validation.value.normalizedDeliveryPhone,
+              displayPhone:
+                draft.delivery.displayPhone.trim() || validation.value.normalizedDeliveryPhone,
+              name: draft.delivery.customerName.trim(),
+              latestAddress: draft.delivery.address.trim(),
+              latestZoneId: draft.delivery.zoneId,
+              lastOrderAt: committedAt,
+            };
+            await transaction.customerContacts.put(customerContact);
+          }
 
           const fulfillment = this.#buildFulfillment(
             draft,
             validation.value.orderType,
             validation.value.normalizedDeliveryPhone,
-            existingContact,
+            customerContact,
           );
           const payments = this.#buildPayments(preparedPayments);
           const order: OrderSnapshot = {
@@ -411,12 +402,7 @@ export class OperationsOrdersService {
             displayOrderNo: allocated.displayOrderNo,
             idempotencyKey: draft.checkoutIntentKey,
             status: 'ACTIVE',
-            lifecycle: {
-              revision: 0,
-              doneAt: null,
-              cancellation: null,
-              returned: null,
-            },
+            lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
             source: 'POS',
             operatorWorkerId: currentWorker.id,
             operatorName: currentWorker.displayName,
@@ -444,10 +430,9 @@ export class OperationsOrdersService {
           await transaction.businessDays.put(allocated.businessDay);
           await transaction.orders.insert(order);
 
+          const inventoryMovements: InventoryMovement[] = [];
           for (const [itemId, consumedMicros] of inventoryUsage) {
-            if (consumedMicros === 0) {
-              continue;
-            }
+            if (consumedMicros === 0) continue;
             const movement: InventoryMovement = {
               id: this.#id<InventoryMovementId>(),
               shopId: context.shopId,
@@ -461,32 +446,28 @@ export class OperationsOrdersService {
               createdAt: committedAt,
               compensatesMovementId: null,
             };
+            inventoryMovements.push(movement);
             await transaction.inventory.appendMovement(movement);
           }
 
           await transaction.audit.append(this.#orderAudit(order, committedAt));
           await transaction.outbox.append(
-            this.#orderOutbox(order, context.configuration.version, committedAt),
+            this.#orderOutbox(
+              order,
+              customerContact,
+              inventoryMovements,
+              context.configuration.version,
+              committedAt,
+            ),
           );
-
           return { order, replayed: false } as const;
         });
 
         const warnings: string[] = [];
-        if (!commitResult.replayed && commitResult.order.fulfillment.behavior === 'DELIVERY') {
-          try {
-            await this.#updateDeliveryCustomer(commitResult.order);
-          } catch {
-            warnings.push('CUSTOMER_CONTACT_UPDATE_FAILED');
-          }
-        }
-
         if (!commitResult.replayed) {
           try {
             const printed = await this.#printer.print(commitResult.order);
-            if (!printed.ok) {
-              warnings.push('PRINT_FAILED');
-            }
+            if (!printed.ok) warnings.push('PRINT_FAILED');
           } catch {
             warnings.push('PRINT_FAILED');
           }
@@ -520,11 +501,8 @@ export class OperationsOrdersService {
         if (order === null) {
           return err({ code: 'NOT_FOUND', message: 'The saved order could not be found.' });
         }
-
         const printed = await this.#printer.print(order);
-        if (!printed.ok) {
-          return err({ code: 'PRINT_ERROR', message: printed.message });
-        }
+        if (!printed.ok) return err({ code: 'PRINT_ERROR', message: printed.message });
         return ok(order);
       } catch (cause) {
         return err({
@@ -543,14 +521,8 @@ export class OperationsOrdersService {
     if (configuration === null) {
       throw new Error('Local configuration is unavailable while recovering a committed order.');
     }
-
     const reset = await this.#resetDraftAfterCommit(draft, configuration, ['PRINT_STATUS_UNKNOWN']);
-    return {
-      order,
-      replayed: true,
-      nextDraft: reset.nextDraft,
-      postCommitWarnings: reset.warnings,
-    };
+    return { order, replayed: true, nextDraft: reset.nextDraft, postCommitWarnings: reset.warnings };
   }
 
   async #resetDraftAfterCommit(
@@ -568,17 +540,13 @@ export class OperationsOrdersService {
       now: this.#runtime.now(),
       checkoutIntentKey: this.#runtime.createUuid(),
     });
-
     try {
       const current = await this.#draftStore.get(key);
       if (current !== null && current.checkoutIntentKey !== committedDraft.checkoutIntentKey) {
         warnings.push('DRAFT_SCOPE_ADVANCED');
         return { nextDraft: current, warnings };
       }
-
-      if (current !== null) {
-        await this.#draftStore.delete(key);
-      }
+      if (current !== null) await this.#draftStore.delete(key);
       await this.#draftStore.put(candidate);
       return { nextDraft: candidate, warnings };
     } catch {
@@ -596,7 +564,6 @@ export class OperationsOrdersService {
         message: 'This device is not assigned to exactly one active shop.',
       });
     }
-
     const state = await this.#database.transaction(async (transaction) => {
       const day = await transaction.businessDays.getOpenForShop(shop.id);
       const configuration = await transaction.configuration.getForShop(shop.id);
@@ -611,32 +578,24 @@ export class OperationsOrdersService {
         message: 'A valid local menu configuration is required before taking orders.',
       });
     }
-
     const session = await this.#readModel.getOpenWorkerSession(state.day.id);
     if (session === null || session.endedAt !== null) {
       return err({ code: 'CONFLICT_ERROR', message: 'A Current Operator is required.' });
     }
-
     const worker = await this.#database.transaction((transaction) =>
       transaction.workers.getById(session.workerId),
     );
     if (worker === null || !worker.active || worker.shopId !== shop.id) {
       return err({ code: 'CONFLICT_ERROR', message: 'The Current Operator is unavailable.' });
     }
-
-    return ok({
-      shopId: shop.id,
-      day: state.day,
-      configuration: state.configuration,
-      operator: worker,
-    });
+    return ok({ shopId: shop.id, day: state.day, configuration: state.configuration, operator: worker });
   }
 
   #buildFulfillment(
     draft: OrderDraft,
     orderType: OperationsConfigurationSnapshot['orderTypes'][number],
     normalizedDeliveryPhone: string | null,
-    existingContact: CustomerContact | null,
+    customerContact: CustomerContact | null,
   ): OrderFulfillmentSnapshot {
     if (orderType.behavior !== 'DELIVERY') {
       return {
@@ -646,16 +605,19 @@ export class OperationsOrdersService {
         delivery: null,
       };
     }
-    if (draft.delivery.zoneId === null || normalizedDeliveryPhone === null) {
-      throw new Error('Validated Delivery order is missing its zone or normalized phone.');
+    if (
+      draft.delivery.zoneId === null ||
+      normalizedDeliveryPhone === null ||
+      customerContact === null
+    ) {
+      throw new Error('Validated Delivery order is missing its customer, zone, or normalized phone.');
     }
-
     return {
       orderTypeId: orderType.id,
       orderTypeLabel: orderType.name,
       behavior: 'DELIVERY',
       delivery: {
-        customerContactId: existingContact?.id ?? null,
+        customerContactId: customerContact.id,
         customerName: draft.delivery.customerName.trim(),
         normalizedPhone: normalizedDeliveryPhone,
         address: draft.delivery.address.trim(),
@@ -681,7 +643,6 @@ export class OperationsOrdersService {
           changeMinor: part.changeMinor,
         };
       }
-
       return {
         id: this.#id<PaymentId>(),
         method: { ...part.method, logicType: part.method.logicType },
@@ -689,31 +650,6 @@ export class OperationsOrdersService {
         receivedMinor: null,
         changeMinor: null,
       };
-    });
-  }
-
-  async #updateDeliveryCustomer(order: OrderSnapshot): Promise<void> {
-    if (order.fulfillment.behavior !== 'DELIVERY') {
-      return;
-    }
-
-    const delivery = order.fulfillment.delivery;
-    await this.#database.transaction(async (transaction) => {
-      const existing = await transaction.customerContacts.getByNormalizedPhone(
-        order.shopId,
-        delivery.normalizedPhone,
-      );
-      const contact: CustomerContact = {
-        id: existing?.id ?? this.#id<CustomerContactId>(),
-        shopId: order.shopId,
-        normalizedPhone: delivery.normalizedPhone,
-        displayPhone: delivery.normalizedPhone,
-        name: delivery.customerName,
-        latestAddress: delivery.address,
-        latestZoneId: delivery.zoneId,
-        lastOrderAt: order.createdAt,
-      };
-      await transaction.customerContacts.put(contact);
     });
   }
 
@@ -738,9 +674,19 @@ export class OperationsOrdersService {
 
   #orderOutbox(
     order: OrderSnapshot,
+    customerContact: CustomerContact | null,
+    inventoryMovements: readonly InventoryMovement[],
     configurationVersion: number,
     createdAt: Instant,
   ): OutboxEvent {
+    const payload = {
+      eventType: 'ORDER_PLACED',
+      version: 1,
+      order,
+      customerContactUpsert: customerContact,
+      inventoryMovements,
+      configurationVersion,
+    } satisfies OperationsSyncPayloadV1;
     return {
       id: this.#id<OutboxEventId>(),
       shopId: order.shopId,
@@ -750,13 +696,7 @@ export class OperationsOrdersService {
       eventType: 'ORDER_PLACED',
       idempotencyKey: `order-placed:${order.id}`,
       payloadVersion: 1,
-      payload: {
-        orderId: order.id,
-        orderIdempotencyKey: order.idempotencyKey,
-        businessDayId: order.businessDayId,
-        displayOrderNo: order.displayOrderNo,
-        configurationVersion,
-      },
+      payload: operationsSyncPayloadJson(payload),
       createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
