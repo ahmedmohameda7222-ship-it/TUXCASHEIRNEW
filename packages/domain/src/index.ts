@@ -78,6 +78,7 @@ export {
   undoOrderDone,
 } from './orderLifecycle';
 export type * from './orderDraft';
+export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
 export {
   parsePoundsToMinor,
   parseWholePoundsToMinor,
