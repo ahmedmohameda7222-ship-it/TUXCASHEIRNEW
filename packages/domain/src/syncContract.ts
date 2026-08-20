@@ -1,6 +1,8 @@
 import { assertOrderSnapshotIntegrity } from './order';
 import type { BusinessDay } from './businessDay';
 import type { ExpenseLedgerRecord, ManualExpenseRecord } from './expense';
+import type { Instant } from './time';
+import type { WorkerId } from './ids';
 import type {
   CustomerContact,
   Expense,
@@ -20,6 +22,19 @@ export type OrderTransitionSyncEventType =
   | 'ORDER_CANCELLED'
   | 'DELIVERY_RETURNED';
 
+export interface OrderTransitionSyncSnapshotV1 {
+  readonly eventType: OrderTransitionSyncEventType;
+  readonly revision: number;
+  readonly fromStatus: OrderSnapshot['status'];
+  readonly toStatus: OrderSnapshot['status'];
+  readonly at: Instant;
+  readonly workerId: WorkerId;
+  readonly workerName: string;
+  readonly reason: string | null;
+  readonly foodPrepared: boolean | null;
+  readonly stockRestored: boolean | null;
+}
+
 export type ExpenseSyncEventType = 'EXPENSE_CREATED' | 'EXPENSE_EDITED' | 'EXPENSE_DELETED';
 export type WorkerSessionSyncEventType = 'WORKER_SIGNED_IN' | 'WORKER_SWITCHED' | 'WORKER_SIGNED_OUT';
 
@@ -36,6 +51,7 @@ export type OperationsSyncPayloadV1 =
       readonly eventType: OrderTransitionSyncEventType;
       readonly version: 1;
       readonly order: OrderSnapshot;
+      readonly transition: OrderTransitionSyncSnapshotV1;
       readonly inventoryMovements: readonly InventoryMovement[];
       readonly deliveryFailedExpense: Extract<Expense, { kind: 'DELIVERY_FAILED' }> | null;
     }
@@ -194,6 +210,28 @@ function assertReconciliation(value: unknown): void {
   }
 }
 
+function assertTransition(value: unknown, eventType: OrderTransitionSyncEventType): void {
+  if (!isRecord(value)) throw new TypeError('Operations sync order transition must be an object.');
+  if (requiredString(value, 'eventType') !== eventType) {
+    throw new TypeError('Operations sync transition event type must match its payload.');
+  }
+  requiredSafeInteger(value, 'revision');
+  requiredString(value, 'fromStatus');
+  requiredString(value, 'toStatus');
+  requiredString(value, 'at');
+  requiredString(value, 'workerId');
+  requiredString(value, 'workerName');
+  for (const key of ['reason', 'foodPrepared', 'stockRestored']) {
+    const field = value[key];
+    if (
+      (key === 'reason' && field !== null && typeof field !== 'string') ||
+      (key !== 'reason' && field !== null && typeof field !== 'boolean')
+    ) {
+      throw new TypeError(`Operations sync transition ${key} is invalid.`);
+    }
+  }
+}
+
 const SUPPORTED_EVENT_TYPES = new Set<OperationsSyncPayloadV1['eventType']>([
   'ORDER_PLACED',
   'ORDER_MARKED_DONE',
@@ -235,6 +273,7 @@ export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayl
     eventType === 'DELIVERY_RETURNED'
   ) {
     assertOrder(value['order']);
+    assertTransition(value['transition'], eventType);
     if (!Array.isArray(value['inventoryMovements'])) throw new TypeError('Order transition inventory movements are required.');
     value['inventoryMovements'].forEach(assertMovement);
     if (value['deliveryFailedExpense'] !== null) assertExpense(value['deliveryFailedExpense']);
