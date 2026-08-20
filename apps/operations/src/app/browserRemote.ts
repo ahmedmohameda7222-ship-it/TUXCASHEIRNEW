@@ -1,7 +1,4 @@
-import type {
-  SupabaseDeviceSessionRecord,
-  SupabaseDeviceSessionStore,
-} from '@tux/sync';
+import type { SupabaseDeviceSessionRecord, SupabaseDeviceSessionStore } from '@tux/sync';
 
 const REMOTE_SETTINGS_STORAGE_KEY = 'tux.operations.remote-settings.v1';
 const SESSION_DATABASE_NAME = 'tux-operations-browser-auth';
@@ -133,7 +130,9 @@ export class BrowserIndexedDbDeviceSessionStore implements SupabaseDeviceSession
     const database = await openSessionDatabase();
     try {
       const transaction = database.transaction(SESSION_STORE_NAME, 'readonly');
-      const value = await requestValue(transaction.objectStore(SESSION_STORE_NAME).get(SESSION_KEY));
+      const value = await requestValue(
+        transaction.objectStore(SESSION_STORE_NAME).get(SESSION_KEY),
+      );
       return parseStoredSession(value);
     } finally {
       database.close();
