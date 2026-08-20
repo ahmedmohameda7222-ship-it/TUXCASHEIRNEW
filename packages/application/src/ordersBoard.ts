@@ -4,6 +4,7 @@ import {
   canUndoOrderDone,
   cancelActiveOrder,
   markOrderDone,
+  operationsSyncPayloadJson,
   orderLifecycle,
   parseEntityId,
   returnFailedDelivery,
@@ -17,8 +18,9 @@ import {
   type ExpenseId,
   type Instant,
   type InventoryMovement,
-  type JsonValue,
   type InventoryMovementId,
+  type JsonValue,
+  type OperationsSyncPayloadV1,
   type OrderId,
   type OrderSnapshot,
   type OutboxEvent,
@@ -143,12 +145,7 @@ export class OperationsOrdersBoardService {
           operationalRevision: orderLifecycle(updated).revision,
         }),
       );
-      await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_MARKED_DONE', {
-          status: 'DONE',
-          operationalRevision: orderLifecycle(updated).revision,
-        }),
-      );
+      await transaction.outbox.append(this.#outbox(updated, now, 'ORDER_MARKED_DONE', [], null));
       return updated;
     });
   }
@@ -168,12 +165,7 @@ export class OperationsOrdersBoardService {
           operationalRevision: orderLifecycle(updated).revision,
         }),
       );
-      await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_DONE_UNDONE', {
-          status: 'ACTIVE',
-          operationalRevision: orderLifecycle(updated).revision,
-        }),
-      );
+      await transaction.outbox.append(this.#outbox(updated, now, 'ORDER_DONE_UNDONE', [], null));
       return updated;
     });
   }
@@ -188,7 +180,7 @@ export class OperationsOrdersBoardService {
         foodPrepared: input.foodPrepared,
         reason: input.reason,
       });
-
+      const restockMovements: InventoryMovement[] = [];
       if (!input.foodPrepared) {
         const movements = await transaction.inventory.listMovementsForOrder(order.id);
         for (const movement of movements) {
@@ -209,14 +201,14 @@ export class OperationsOrdersBoardService {
             createdAt: now,
             compensatesMovementId: movement.id,
           };
+          restockMovements.push(restock);
           await transaction.inventory.appendMovement(restock);
         }
       }
 
       await transaction.orders.updateOperationalState(updated);
       const cancellation = orderLifecycle(updated).cancellation;
-      if (cancellation === null)
-        throw new Error('Cancelled order is missing cancellation metadata.');
+      if (cancellation === null) throw new Error('Cancelled order is missing cancellation metadata.');
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'ORDER_CANCELLED', {
           reason: cancellation.reason,
@@ -226,13 +218,7 @@ export class OperationsOrdersBoardService {
         }),
       );
       await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_CANCELLED', {
-          status: 'CANCELLED',
-          reason: cancellation.reason,
-          foodPrepared: cancellation.foodPrepared,
-          stockRestored: cancellation.stockRestored,
-          operationalRevision: orderLifecycle(updated).revision,
-        }),
+        this.#outbox(updated, now, 'ORDER_CANCELLED', restockMovements, null),
       );
       return updated;
     });
@@ -250,7 +236,7 @@ export class OperationsOrdersBoardService {
       const returned = orderLifecycle(updated).returned;
       if (returned === null) throw new Error('Returned Delivery is missing return metadata.');
 
-      const expense: Expense = {
+      const expense: Extract<Expense, { kind: 'DELIVERY_FAILED' }> = {
         id: this.#id<ExpenseId>(),
         shopId: order.shopId,
         businessDayId: order.businessDayId,
@@ -278,19 +264,7 @@ export class OperationsOrdersBoardService {
           operationalRevision: orderLifecycle(updated).revision,
         }),
       );
-      await transaction.outbox.append(
-        this.#outbox(updated, now, 'DELIVERY_RETURNED', {
-          status: 'RETURNED',
-          reason: returned.reason,
-          historicalOrderTotalMinor: order.totalMinor,
-          recognizedRevenueMinor: ZERO_MONEY,
-          collectedPaymentMinor: ZERO_MONEY,
-          excludedFromExpectedReconciliation: true,
-          inventoryRestored: false,
-          deliveryFailedExpenseId: expense.id,
-          operationalRevision: orderLifecycle(updated).revision,
-        }),
-      );
+      await transaction.outbox.append(this.#outbox(updated, now, 'DELIVERY_RETURNED', [], expense));
       return updated;
     });
   }
@@ -389,8 +363,16 @@ export class OperationsOrdersBoardService {
     order: OrderSnapshot,
     createdAt: Instant,
     eventType: 'ORDER_MARKED_DONE' | 'ORDER_DONE_UNDONE' | 'ORDER_CANCELLED' | 'DELIVERY_RETURNED',
-    payload: Readonly<Record<string, JsonValue>>,
+    inventoryMovements: readonly InventoryMovement[],
+    deliveryFailedExpense: Extract<Expense, { kind: 'DELIVERY_FAILED' }> | null,
   ): OutboxEvent {
+    const payload = {
+      eventType,
+      version: 1,
+      order,
+      inventoryMovements,
+      deliveryFailedExpense,
+    } satisfies OperationsSyncPayloadV1;
     const revision = orderLifecycle(order).revision;
     return {
       id: this.#id<OutboxEventId>(),
@@ -401,12 +383,7 @@ export class OperationsOrdersBoardService {
       eventType,
       idempotencyKey: `order-operational:${order.id}:${revision}:${eventType}`,
       payloadVersion: 1,
-      payload: {
-        orderId: order.id,
-        businessDayId: order.businessDayId,
-        displayOrderNo: order.displayOrderNo,
-        ...payload,
-      },
+      payload: operationsSyncPayloadJson(payload),
       createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
