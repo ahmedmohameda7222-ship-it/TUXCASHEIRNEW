@@ -201,6 +201,15 @@ WHERE ended_at IS NULL;
 CREATE INDEX idx_inventory_movements_order ON inventory_movements(order_id, created_at);
 `,
   },
+  {
+    version: 4,
+    name: 'outbox_permanent_failure_quarantine',
+    sql: `
+ALTER TABLE outbox_events ADD COLUMN quarantined_at TEXT;
+ALTER TABLE outbox_events ADD COLUMN permanent_failure_reason TEXT;
+CREATE INDEX idx_outbox_quarantined ON outbox_events(quarantined_at, created_at);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {
@@ -216,9 +225,7 @@ CREATE TABLE IF NOT EXISTS local_schema_migrations (
   const applied = new Set(appliedRows.map((row) => Number(row['version'])));
 
   for (const migration of SQLITE_MIGRATIONS) {
-    if (applied.has(migration.version)) {
-      continue;
-    }
+    if (applied.has(migration.version)) continue;
     database.exec('BEGIN IMMEDIATE');
     try {
       database.exec(migration.sql);
@@ -227,9 +234,7 @@ CREATE TABLE IF NOT EXISTS local_schema_migrations (
         .run(migration.version, migration.name, new Date().toISOString());
       database.exec('COMMIT');
     } catch (error) {
-      if (database.isTransaction) {
-        database.exec('ROLLBACK');
-      }
+      if (database.isTransaction) database.exec('ROLLBACK');
       throw error;
     }
   }
