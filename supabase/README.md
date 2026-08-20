@@ -29,4 +29,4 @@ Worker PIN identity is operational identity and is not the remote authorization 
 
 ## Validation status
 
-The complete repository migration chain is exercised against fresh PostgreSQL in CI. The current Supabase integration branch also validates the Edge Function import graph, rendered Operations browser workflow, and unsigned Windows x64 packaging before merge. Remote schema changes must be represented by a repository migration and rechecked with Supabase security/performance advisors after application.
+The complete repository migration chain is exercised against fresh PostgreSQL in CI. The Supabase integration validates the Edge Function import graph, rendered Operations browser workflow, and unsigned Windows x64 packaging before merge. Remote schema changes must be represented by a repository migration and rechecked with Supabase security/performance advisors after application.
