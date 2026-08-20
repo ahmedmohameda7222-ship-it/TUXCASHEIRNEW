@@ -19,7 +19,10 @@ export interface SupabaseDeviceSessionManagerOptions {
   readonly store: SupabaseDeviceSessionStore;
   readonly fetcher?: typeof fetch;
   readonly nowEpochSeconds?: () => number;
+  readonly timeoutMs?: number;
 }
+
+const DEFAULT_SUPABASE_TIMEOUT_MS = 10_000;
 
 function projectUrl(value: string): string {
   const url = new URL(value.trim());
@@ -39,6 +42,35 @@ function positiveEpoch(value: unknown, label: string): number {
     throw new TypeError(`${label} must be a positive epoch timestamp.`);
   }
   return value;
+}
+
+function timeoutMs(value: number | undefined): number {
+  const normalized = value ?? DEFAULT_SUPABASE_TIMEOUT_MS;
+  if (!Number.isSafeInteger(normalized) || normalized <= 0 || normalized > 120_000) {
+    throw new RangeError('Supabase HTTP timeout must be between 1 and 120000 ms.');
+  }
+  return normalized;
+}
+
+async function fetchWithTimeout(
+  fetcher: typeof fetch,
+  input: string | URL | Request,
+  init: RequestInit | undefined,
+  requestTimeoutMs: number,
+  label: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    return await fetcher(input, { ...init, signal: controller.signal });
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      throw new Error(`${label} timed out after ${requestTimeoutMs} ms.`, { cause });
+    }
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function parseSessionResponse(value: unknown): SupabaseDeviceSessionRecord {
@@ -87,6 +119,7 @@ export class SupabaseDeviceSessionManager {
   readonly #store: SupabaseDeviceSessionStore;
   readonly #fetcher: typeof fetch;
   readonly #nowEpochSeconds: () => number;
+  readonly #timeoutMs: number;
   #refreshInFlight: Promise<SupabaseDeviceSessionRecord> | null = null;
 
   constructor(options: SupabaseDeviceSessionManagerOptions) {
@@ -95,6 +128,7 @@ export class SupabaseDeviceSessionManager {
     this.#store = options.store;
     this.#fetcher = options.fetcher ?? fetch;
     this.#nowEpochSeconds = options.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1000));
+    this.#timeoutMs = timeoutMs(options.timeoutMs);
   }
 
   async enroll(input: {
@@ -102,18 +136,24 @@ export class SupabaseDeviceSessionManager {
     readonly deviceId: string;
     readonly deviceLabel?: string;
   }): Promise<SupabaseDeviceSessionRecord> {
-    const response = await this.#fetcher(`${this.#projectUrl}/functions/v1/device-enroll`, {
-      method: 'POST',
-      headers: {
-        apikey: this.#publishableKey,
-        'content-type': 'application/json',
+    const response = await fetchWithTimeout(
+      this.#fetcher,
+      `${this.#projectUrl}/functions/v1/device-enroll`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: this.#publishableKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          enrollmentCode: required(input.enrollmentCode, 'Device enrollment code'),
+          deviceId: required(input.deviceId, 'Device ID'),
+          deviceLabel: input.deviceLabel?.trim() ?? '',
+        }),
       },
-      body: JSON.stringify({
-        enrollmentCode: required(input.enrollmentCode, 'Device enrollment code'),
-        deviceId: required(input.deviceId, 'Device ID'),
-        deviceLabel: input.deviceLabel?.trim() ?? '',
-      }),
-    });
+      this.#timeoutMs,
+      'TUX device enrollment',
+    );
     if (!response.ok) {
       throw new Error(`TUX device enrollment failed with HTTP ${response.status}.`);
     }
@@ -147,7 +187,8 @@ export class SupabaseDeviceSessionManager {
   async #refresh(existing: SupabaseDeviceSessionRecord): Promise<SupabaseDeviceSessionRecord> {
     if (this.#refreshInFlight !== null) return this.#refreshInFlight;
     this.#refreshInFlight = (async () => {
-      const response = await this.#fetcher(
+      const response = await fetchWithTimeout(
+        this.#fetcher,
         `${this.#projectUrl}/auth/v1/token?grant_type=refresh_token`,
         {
           method: 'POST',
@@ -157,6 +198,8 @@ export class SupabaseDeviceSessionManager {
           },
           body: JSON.stringify({ refresh_token: existing.refreshToken }),
         },
+        this.#timeoutMs,
+        'Supabase device session refresh',
       );
       if (!response.ok) {
         throw new Error(`Supabase device session refresh failed with HTTP ${response.status}.`);
@@ -181,15 +224,18 @@ export class SupabaseInboundConfigurationProvider {
   readonly #projectUrl: string;
   readonly #session: SupabaseDeviceSessionManager;
   readonly #fetcher: typeof fetch;
+  readonly #timeoutMs: number;
 
   constructor(input: {
     readonly projectUrl: string;
     readonly session: SupabaseDeviceSessionManager;
     readonly fetcher?: typeof fetch;
+    readonly timeoutMs?: number;
   }) {
     this.#projectUrl = projectUrl(input.projectUrl);
     this.#session = input.session;
     this.#fetcher = input.fetcher ?? fetch;
+    this.#timeoutMs = timeoutMs(input.timeoutMs);
   }
 
   async discoverVersion(shopId: ShopId): Promise<number | null> {
@@ -215,9 +261,13 @@ export class SupabaseInboundConfigurationProvider {
     const url = new URL(`${this.#projectUrl}/functions/v1/operations-config`);
     url.searchParams.set('shopId', shopId);
     if (version !== null) url.searchParams.set('version', String(version));
-    const response = await this.#fetcher(url, {
-      headers: await this.#session.authorizationHeaders(),
-    });
+    const response = await fetchWithTimeout(
+      this.#fetcher,
+      url,
+      { headers: await this.#session.authorizationHeaders() },
+      this.#timeoutMs,
+      'Remote Operations configuration request',
+    );
     if (!response.ok)
       throw new Error(`Remote configuration request failed with HTTP ${response.status}.`);
     const body: unknown = await response.json();
