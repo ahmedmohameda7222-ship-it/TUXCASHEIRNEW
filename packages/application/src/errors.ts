@@ -1,5 +1,6 @@
 export type ApplicationErrorCode =
   | 'VALIDATION_ERROR'
+  | 'INVALID_DRAFT'
   | 'LOCAL_PERSISTENCE_ERROR'
   | 'PRINT_ERROR'
   | 'REMOTE_SYNC_ERROR'
