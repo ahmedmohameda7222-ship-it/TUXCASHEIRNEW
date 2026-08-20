@@ -18,8 +18,7 @@ interface SupabaseServerConfig {
   readonly publishableKey: string;
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COOKIE_ACCESS = 'tux_ops_access';
 const COOKIE_REFRESH = 'tux_ops_refresh';
 const COOKIE_SHOP = 'tux_ops_shop';
@@ -66,9 +65,7 @@ export function sendJson(
   response.end(JSON.stringify(body));
 }
 
-export function requireServerConfig(
-  response: GatewayResponse,
-): SupabaseServerConfig | null {
+export function requireServerConfig(response: GatewayResponse): SupabaseServerConfig | null {
   const config = serverConfig();
   if (config === null) {
     sendJson(response, 503, { error: 'remote_backend_not_configured' });
@@ -151,7 +148,9 @@ function jwtExpiry(accessToken: string): number | null {
   try {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
-    const parsed: unknown = JSON.parse(Buffer.from(normalized + padding, 'base64').toString('utf8'));
+    const parsed: unknown = JSON.parse(
+      Buffer.from(normalized + padding, 'base64').toString('utf8'),
+    );
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
     const exp = (parsed as Record<string, unknown>)['exp'];
     return typeof exp === 'number' && Number.isSafeInteger(exp) && exp > 0 ? exp : null;
