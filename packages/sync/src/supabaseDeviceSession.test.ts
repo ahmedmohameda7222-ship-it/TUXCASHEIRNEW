@@ -69,15 +69,13 @@ describe('SupabaseDeviceSessionManager', () => {
       refreshToken: 'old-refresh',
       expiresAt: 1_050,
     };
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        jsonResponse({
-          access_token: 'new-access',
-          refresh_token: 'new-refresh',
-          expires_in: 3_600,
-        }),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+        expires_in: 3_600,
+      }),
+    );
     const manager = new SupabaseDeviceSessionManager({
       projectUrl: 'https://example.supabase.co',
       publishableKey: 'sb_publishable_test',
