@@ -4,6 +4,9 @@ import { OutboxDeliveryError, type OutboxTransport } from './outboxSync';
 export interface HttpOutboxTransportOptions {
   readonly endpoint: string;
   readonly headers?: Readonly<Record<string, string>>;
+  readonly headerProvider?: () =>
+    | Readonly<Record<string, string>>
+    | Promise<Readonly<Record<string, string>>>;
   readonly fetcher?: typeof fetch;
   readonly timeoutMs?: number;
 }
@@ -41,12 +44,16 @@ function responseFailure(status: number): OutboxDeliveryError {
 export class HttpOutboxTransport implements OutboxTransport {
   readonly #endpoint: string;
   readonly #headers: Readonly<Record<string, string>>;
+  readonly #headerProvider:
+    | (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>> | null)
+    | null;
   readonly #fetcher: typeof fetch;
   readonly #timeoutMs: number;
 
   constructor(options: HttpOutboxTransportOptions) {
     this.#endpoint = normalizeEndpoint(options.endpoint);
     this.#headers = options.headers ?? {};
+    this.#headerProvider = options.headerProvider ?? null;
     this.#fetcher = options.fetcher ?? fetch;
     this.#timeoutMs = normalizeTimeout(options.timeoutMs);
   }
@@ -64,6 +71,18 @@ export class HttpOutboxTransport implements OutboxTransport {
       );
     }
 
+    let dynamicHeaders: Readonly<Record<string, string>> = {};
+    try {
+      dynamicHeaders = (await this.#headerProvider?.()) ?? {};
+    } catch (cause) {
+      throw new OutboxDeliveryError(
+        'Remote outbox authentication is temporarily unavailable.',
+        'TRANSIENT',
+        null,
+        { cause },
+      );
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
@@ -74,6 +93,7 @@ export class HttpOutboxTransport implements OutboxTransport {
           'x-tux-event-id': event.id,
           'x-tux-idempotency-key': event.idempotencyKey,
           ...this.#headers,
+          ...dynamicHeaders,
         },
         body: JSON.stringify(envelope),
         signal: controller.signal,
