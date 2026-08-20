@@ -30,6 +30,8 @@ export interface Product {
   readonly description: string | null;
   readonly priceMinor: MoneyMinor;
   readonly imageKey: string | null;
+  /** Optional merchandising family inside a top-level category, e.g. TUX / TUXIFY. */
+  readonly family?: string | null;
   readonly active: boolean;
   readonly soldOut: boolean;
   readonly isCombo: boolean;

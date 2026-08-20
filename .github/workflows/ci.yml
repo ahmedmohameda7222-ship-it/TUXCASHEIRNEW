@@ -71,6 +71,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Migration-chain smoke
         run: npm run test:migrations
+      - uses: denoland/setup-deno@v2
+        with:
+          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
+          # same resolver semantics so remote import-graph failures are caught before deploy.
+          deno-version: v1.46.3
+      - name: Edge Function typecheck
+        run: |
+          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E

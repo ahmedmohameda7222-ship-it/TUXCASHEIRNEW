@@ -153,6 +153,7 @@ export function OrdersWorkspace({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
+  const [selectedProductFamily, setSelectedProductFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
@@ -192,6 +193,7 @@ export function OrdersWorkspace({
           ? current
           : (categories[0]?.id ?? null),
       );
+      setSelectedProductFamily(null);
     });
     return () => {
       cancelled = true;
@@ -300,6 +302,29 @@ export function OrdersWorkspace({
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
+  const productFamilies = useMemo(() => {
+    if (configuration === null || selectedCategoryId === null) return [];
+    const seen = new Set<string>();
+    const families: string[] = [];
+    const categoryProducts = configuration.products
+      .filter((product) => product.active && product.categoryId === selectedCategoryId)
+      .slice()
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+    for (const product of categoryProducts) {
+      const family = product.family?.trim();
+      if (!family || seen.has(family)) continue;
+      seen.add(family);
+      families.push(family);
+    }
+    return families;
+  }, [configuration, selectedCategoryId]);
+
+  useEffect(() => {
+    if (selectedProductFamily !== null && !productFamilies.includes(selectedProductFamily)) {
+      setSelectedProductFamily(null);
+    }
+  }, [productFamilies, selectedProductFamily]);
+
   const products = useMemo(() => {
     if (configuration === null) return [];
     const active = configuration.products.filter((product) => product.active);
@@ -307,9 +332,13 @@ export function OrdersWorkspace({
     const filtered =
       query.length > 0
         ? active.filter((product) => product.name.toLocaleLowerCase().includes(query))
-        : active.filter((product) => product.categoryId === selectedCategoryId);
+        : active.filter(
+            (product) =>
+              product.categoryId === selectedCategoryId &&
+              (selectedProductFamily === null || product.family === selectedProductFamily),
+          );
     return [...filtered].sort((left, right) => left.sortOrder - right.sortOrder);
-  }, [configuration, search, selectedCategoryId]);
+  }, [configuration, search, selectedCategoryId, selectedProductFamily]);
 
   const validation = useMemo(() => {
     if (draft === null || configuration === null) return null;
@@ -559,22 +588,48 @@ export function OrdersWorkspace({
     <main className="orders-workspace">
       <section className="menu-pane" aria-label="Menu">
         <div className="menu-toolbar">
-          <div className="category-rail" aria-label="Menu categories">
-            {activeCategories.map((category) => (
-              <button
-                type="button"
-                key={category.id}
-                className={
-                  selectedCategoryId === category.id && search.length === 0 ? 'selected' : undefined
-                }
-                onClick={() => {
-                  setSelectedCategoryId(category.id);
-                  setSearch('');
-                }}
-              >
-                {category.name}
-              </button>
-            ))}
+          <div className="field-stack">
+            <div className="category-rail" aria-label="Menu categories">
+              {activeCategories.map((category) => (
+                <button
+                  type="button"
+                  key={category.id}
+                  className={
+                    selectedCategoryId === category.id && search.length === 0
+                      ? 'selected'
+                      : undefined
+                  }
+                  onClick={() => {
+                    setSelectedCategoryId(category.id);
+                    setSelectedProductFamily(null);
+                    setSearch('');
+                  }}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+            {search.length === 0 && productFamilies.length > 1 ? (
+              <div className="segmented-control" aria-label="Product families">
+                <button
+                  type="button"
+                  className={selectedProductFamily === null ? 'selected' : undefined}
+                  onClick={() => setSelectedProductFamily(null)}
+                >
+                  All
+                </button>
+                {productFamilies.map((family) => (
+                  <button
+                    type="button"
+                    key={family}
+                    className={selectedProductFamily === family ? 'selected' : undefined}
+                    onClick={() => setSelectedProductFamily(family)}
+                  >
+                    {family}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="product-search">
             <label htmlFor="product-search">Search menu</label>
@@ -586,7 +641,11 @@ export function OrdersWorkspace({
                 value={search}
                 placeholder="Search products"
                 autoComplete="off"
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  const nextSearch = event.target.value;
+                  setSearch(nextSearch);
+                  if (nextSearch.trim().length > 0) setSelectedProductFamily(null);
+                }}
               />
               <kbd>Ctrl K</kbd>
             </div>

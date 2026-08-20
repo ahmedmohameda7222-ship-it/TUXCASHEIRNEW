@@ -37,7 +37,14 @@ psql(
      create schema public;
      drop schema if exists auth cascade;
      create schema auth;
-     create table auth.users(id uuid primary key);`,
+     do $$
+     begin
+       if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon noinherit; end if;
+       if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated noinherit; end if;
+       if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role noinherit; end if;
+     end $$;
+     create table auth.users(id uuid primary key);
+     create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;`,
   ],
   'Fresh database reset and Supabase auth compatibility stub',
 );
@@ -54,6 +61,12 @@ psql(
      begin
        if to_regclass('public.operations_sync_event_receipts') is null then
          raise exception 'operations_sync_event_receipts missing';
+       end if;
+       if to_regclass('public.operations_configuration_snapshots') is null then
+         raise exception 'operations_configuration_snapshots missing';
+       end if;
+       if to_regclass('private.device_enrollment_codes') is null then
+         raise exception 'private.device_enrollment_codes missing';
        end if;
        if not exists (
          select 1 from pg_constraint where conname = 'orders_business_day_same_shop_fk' and contype = 'f'
@@ -72,6 +85,21 @@ psql(
          raise exception 'worker session unique-open index missing';
        end if;
        if not exists (
+         select 1 from information_schema.columns
+         where table_schema = 'public' and table_name = 'devices' and column_name = 'auth_user_id'
+       ) then
+         raise exception 'device auth identity column missing';
+       end if;
+       if to_regprocedure('public.ingest_tux_operations_materialization_v1(uuid,uuid,jsonb,text,jsonb)') is null then
+         raise exception 'Operations sync receiver RPC missing';
+       end if;
+       if to_regprocedure('public.create_tux_device_enrollment(uuid,text,integer)') is null then
+         raise exception 'device enrollment RPC missing';
+       end if;
+       if to_regprocedure('public.publish_tux_operations_configuration(uuid,integer,jsonb,uuid)') is null then
+         raise exception 'configuration publish RPC missing';
+       end if;
+       if not exists (
          select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
          where n.nspname = 'public' and c.relname = 'orders' and c.relrowsecurity
        ) then
@@ -82,6 +110,29 @@ psql(
          where n.nspname = 'public' and c.relname = 'operations_sync_event_receipts' and c.relrowsecurity
        ) then
          raise exception 'sync receipts RLS is not enabled';
+       end if;
+       if not exists (
+         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relname = 'operations_configuration_snapshots' and c.relrowsecurity
+       ) then
+         raise exception 'configuration snapshots RLS is not enabled';
+       end if;
+       if not exists (
+         select 1 from pg_policies
+         where schemaname = 'public'
+           and tablename = 'operations_configuration_snapshots'
+           and policyname = 'operations_configuration_device_select'
+       ) then
+         raise exception 'configuration device RLS policy missing';
+       end if;
+       if exists (
+         select 1 from pg_constraint
+         where conname in (
+           'order_item_combo_beverages_order_item_id_unit_index_key',
+           'reconciliation_lines_reconciliation_id_payment_method_id_key'
+         )
+       ) then
+         raise exception 'redundant unique constraints reintroduced';
        end if;
      end $$;`,
   ],
