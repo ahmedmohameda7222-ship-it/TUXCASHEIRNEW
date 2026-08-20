@@ -161,7 +161,11 @@ export class SupabaseDeviceSessionManager {
       if (!response.ok) {
         throw new Error(`Supabase device session refresh failed with HTTP ${response.status}.`);
       }
-      const refreshed = parseRefreshResponse(await response.json(), existing, this.#nowEpochSeconds);
+      const refreshed = parseRefreshResponse(
+        await response.json(),
+        existing,
+        this.#nowEpochSeconds,
+      );
       await this.#store.save(refreshed);
       return refreshed;
     })();
@@ -200,7 +204,8 @@ export class SupabaseInboundConfigurationProvider {
 
   async fetchCompleteConfiguration(shopId: ShopId, version: number): Promise<unknown> {
     const response = await this.#request(shopId, version);
-    if (response['version'] !== version) throw new TypeError('Remote configuration version mismatch.');
+    if (response['version'] !== version)
+      throw new TypeError('Remote configuration version mismatch.');
     return response['bundle'];
   }
 
@@ -213,7 +218,8 @@ export class SupabaseInboundConfigurationProvider {
     const response = await this.#fetcher(url, {
       headers: await this.#session.authorizationHeaders(),
     });
-    if (!response.ok) throw new Error(`Remote configuration request failed with HTTP ${response.status}.`);
+    if (!response.ok)
+      throw new Error(`Remote configuration request failed with HTTP ${response.status}.`);
     const body: unknown = await response.json();
     if (typeof body !== 'object' || body === null || Array.isArray(body)) {
       throw new TypeError('Remote configuration response must be an object.');
