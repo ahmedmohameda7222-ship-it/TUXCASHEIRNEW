@@ -16,3 +16,8 @@ export {
   type RemoteTableMutation,
 } from './remoteMaterializer';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
+export {
+  buildSyncHealth,
+  type SyncHealthSnapshot,
+  type SyncHealthState,
+} from './syncHealth';
