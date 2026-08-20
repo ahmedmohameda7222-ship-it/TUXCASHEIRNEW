@@ -1,26 +1,65 @@
-# TUX V2 Supabase migrations
+# TUX V2 Supabase
 
-This directory is the authoritative remote Postgres/Supabase schema history for TUX V2.
+This directory is the authoritative remote Postgres/Supabase schema and Edge Function source for TUX V2.
 
 ## Current state
 
-No real V2 Supabase project is linked or configured.
+An authorized, dedicated **TUX V2** Supabase project now exists and the repository migration chain is applied through:
 
-`migrations/20260817195000_operations_foundation.sql` is intentionally **unapplied remotely**. It defines the Operations/future-Admin data foundation so the schema can be reviewed and versioned before a production target exists.
+`20260820106000_remote_gateway_advisor_hardening.sql`
 
-Do not:
+The legacy Tuxcashier Supabase project remains out of scope and must never be linked, migrated in place, or mutated by this repository.
 
-- link this repository to the legacy Tuxcashier Supabase project;
-- add a project ref, URL, anon key, service-role key, access token, or database password to Git;
-- run a remote `supabase db push` without explicit target-project authorization;
-- bypass the migration chain by editing a future remote schema directly.
+The live V2 backend currently contains the schema/auth/sync/configuration infrastructure only. No production shop, worker, menu, price, inventory configuration, device enrollment, order, expense, reconciliation, or historical financial data is seeded by these migrations. Business configuration must be migrated or provisioned deliberately from an approved source of truth.
 
-## Security posture
+## Remote architecture
 
-The foundation migration enables Row Level Security on every table in the exposed `public` schema but deliberately creates no permissive client policies yet. Until the real V2 authentication/device authorization model is approved and implemented, browser/API roles should not receive row access through these tables.
+Operations remains local-first. A successful sale is committed to the local transactional database before remote delivery. Durable outbox events are delivered automatically to the authenticated remote receiver; cloud availability is not a prerequisite for local financial success.
 
-Worker PIN identity is operational identity and is not the remote authorization boundary. Worker records store a secure hash field only; plaintext production PINs do not belong in source control or durable normal records.
+The deployed backend boundary is:
 
-## Validation status
+- `device-enroll` — first-run one-time device enrollment. Gateway JWT verification is intentionally disabled because no device JWT exists yet; the endpoint validates a short-lived one-time enrollment code and creates the device Auth identity through trusted server-side credentials.
+- `operations-config` — JWT-required read endpoint for complete versioned Operations configuration. Access is bound to the authenticated Auth user, device ID, active device record, shop membership, and RLS.
+- `operations-sync` — JWT-required outbox receiver. It executes the canonical deep V1 sync parser/materializer before calling the service-role-only Postgres ingest RPC.
 
-The migration is versioned and reviewed in Git, but Phase 2 does not claim that it has been applied to a local Supabase/Postgres engine or any remote project. Local SQLite migrations are executable and covered by automated tests. A future authorized Supabase setup must run the complete repository migration chain against the real V2 target and verify constraints, indexes, and RLS before application connectivity is enabled.
+Operations clients never receive a service-role key and do not write operational fact tables directly. Financial/operational tables remain RLS deny-by-default for client roles; trusted receiver RPCs are the remote write boundary.
+
+## Device enrollment
+
+A trusted administrator/backend process creates a short-lived enrollment code with `create_tux_device_enrollment`. Only a SHA-256 digest of the code is stored. The device exchanges the one-time code for a dedicated Supabase Auth session, and the refresh token is stored by the Electron main process using Electron `safeStorage`.
+
+Enrollment claims are retry-safe: an incomplete, unexpired claim can be released if Auth/session creation fails. Completed codes cannot be reused.
+
+Worker PINs remain local operational identity and are not the remote authorization boundary. Plaintext production PINs must never be committed to source control or stored in normal durable records.
+
+## Configuration delivery
+
+`publish_tux_operations_configuration` is service-role-only until the separate Admin product exists. Publishing a new version validates the complete bundle, materializes configuration tables atomically, preserves historical referenced identities, replaces relationship tables from the complete snapshot, and records the immutable versioned configuration snapshot.
+
+Operations downloads only a complete validated configuration for its enrolled shop. Invalid, stale, cross-shop, or unavailable remote configuration must leave the last known-good local snapshot unchanged.
+
+## Sync integrity
+
+`operations-sync` uses the canonical TypeScript V1 envelope parser and remote materializer pinned to a reviewed repository commit. The Edge import map explicitly resolves canonical `.ts` modules so the same source graph works under Supabase Edge Runtime resolver semantics.
+
+The Postgres ingest boundary enforces:
+
+- authenticated active device + shop membership;
+- event receipt idempotency and conflicting-replay rejection;
+- aggregate serialization;
+- stable conflict-identity row serialization for monotonic lifecycle guards;
+- dependency failures as retryable ordering failures;
+- shop identity checks before remote mutation;
+- service-role-only execution of trusted materialization RPCs.
+
+## Validation
+
+Permanent CI validates formatting, lint, strict TypeScript, unit/integration tests, production builds, development provisioning safety, the complete migration chain on fresh PostgreSQL, Edge Function typechecking using Deno 1.46 resolver semantics, rendered browser E2E, and the unsigned Windows x64 package.
+
+After remote DDL changes, run Supabase security advisors. Operational tables intentionally showing `RLS Enabled No Policy` at INFO level are deny-by-default by design; do not add permissive policies merely to silence the advisory. Material WARN/ERROR findings must be resolved before release.
+
+## Secrets and repository safety
+
+Do not commit or document live project refs, project URLs, publishable keys, service-role keys, access tokens, refresh tokens, enrollment codes, database passwords, or production PINs in Git.
+
+Runtime values belong in the deployment/device environment or platform secret store. Desktop production integration uses `TUX_SUPABASE_URL` and `TUX_SUPABASE_PUBLISHABLE_KEY`; first enrollment additionally uses the one-time `TUX_DEVICE_ENROLLMENT_CODE`, stable `TUX_DEVICE_ID`, and optional `TUX_DEVICE_LABEL`.
