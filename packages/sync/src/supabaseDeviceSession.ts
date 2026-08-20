@@ -58,6 +58,7 @@ function parseSessionResponse(value: unknown): SupabaseDeviceSessionRecord {
 function parseRefreshResponse(
   value: unknown,
   existing: SupabaseDeviceSessionRecord,
+  nowEpochSeconds: () => number,
 ): SupabaseDeviceSessionRecord {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new TypeError('Supabase refresh response must be an object.');
@@ -69,7 +70,7 @@ function parseRefreshResponse(
     typeof expiresAt === 'number' && Number.isSafeInteger(expiresAt) && expiresAt > 0
       ? expiresAt
       : typeof expiresIn === 'number' && Number.isSafeInteger(expiresIn) && expiresIn > 0
-        ? Math.floor(Date.now() / 1000) + expiresIn
+        ? nowEpochSeconds() + expiresIn
         : null;
   if (normalizedExpiry === null) throw new TypeError('Supabase refresh response has no expiry.');
   return {
@@ -137,6 +138,7 @@ export class SupabaseDeviceSessionManager {
   async authorizationHeaders(): Promise<Readonly<Record<string, string>>> {
     const session = await this.requiredSession();
     return {
+      apikey: this.#publishableKey,
       authorization: `Bearer ${session.accessToken}`,
       'x-tux-device-id': session.deviceId,
     };
@@ -159,7 +161,7 @@ export class SupabaseDeviceSessionManager {
       if (!response.ok) {
         throw new Error(`Supabase device session refresh failed with HTTP ${response.status}.`);
       }
-      const refreshed = parseRefreshResponse(await response.json(), existing);
+      const refreshed = parseRefreshResponse(await response.json(), existing, this.#nowEpochSeconds);
       await this.#store.save(refreshed);
       return refreshed;
     })();
@@ -209,7 +211,7 @@ export class SupabaseInboundConfigurationProvider {
     url.searchParams.set('shopId', shopId);
     if (version !== null) url.searchParams.set('version', String(version));
     const response = await this.#fetcher(url, {
-      headers: { authorization: `Bearer ${session.accessToken}`, apikey: '' },
+      headers: await this.#session.authorizationHeaders(),
     });
     if (!response.ok) throw new Error(`Remote configuration request failed with HTTP ${response.status}.`);
     const body: unknown = await response.json();
