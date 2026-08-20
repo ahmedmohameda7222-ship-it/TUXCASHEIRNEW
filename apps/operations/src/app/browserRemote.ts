@@ -2,8 +2,7 @@ import type { InboundConfigurationProvider } from '@tux/application';
 import { parseEntityId, type ShopId } from '@tux/domain';
 
 const DEVICE_ID_STORAGE_KEY = 'tux.operations.device-id';
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface BrowserRemoteSession {
   readonly shopId: ShopId;
@@ -63,7 +62,8 @@ export class VercelBrowserRemoteGateway implements InboundConfigurationProvider 
       return null;
     }
     if (response.status === 404 || response.status === 401 || response.status === 503) return null;
-    if (!response.ok) throw new Error(`Device session request failed with HTTP ${response.status}.`);
+    if (!response.ok)
+      throw new Error(`Device session request failed with HTTP ${response.status}.`);
     return parseSession(await jsonObject(response, 'Device session'));
   }
 
