@@ -101,5 +101,16 @@ export {
   wholeStockUnits,
 } from './quantity';
 export type { StockQuantityMicros } from './quantity';
+export {
+  OPERATIONS_SYNC_PAYLOAD_VERSION,
+  operationsSyncPayloadJson,
+  parseOperationsSyncPayloadV1,
+  toOperationsSyncEnvelopeV1,
+  type ExpenseSyncEventType,
+  type OperationsSyncEnvelopeV1,
+  type OperationsSyncPayloadV1,
+  type OrderTransitionSyncEventType,
+  type WorkerSessionSyncEventType,
+} from './syncContract';
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
