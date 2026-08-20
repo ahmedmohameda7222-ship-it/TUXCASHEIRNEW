@@ -70,7 +70,7 @@ export class HttpOutboxTransport implements OutboxTransport {
       );
     }
 
-    let dynamicHeaders: Readonly<Record<string, string>> = {};
+    let dynamicHeaders: Readonly<Record<string, string>>;
     try {
       dynamicHeaders = (await this.#headerProvider?.()) ?? {};
     } catch (cause) {
