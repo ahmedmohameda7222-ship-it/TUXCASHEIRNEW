@@ -91,6 +91,34 @@ describe('SupabaseDeviceSessionManager', () => {
     });
     expect(store.session?.refreshToken).toBe('new-refresh');
   });
+
+  it('aborts a stalled enrollment request instead of blocking offline startup indefinitely', async () => {
+    const store = new MemoryStore();
+    const fetcher: typeof fetch = async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal === undefined || signal === null) {
+          reject(new Error('Expected an AbortSignal.'));
+          return;
+        }
+        signal.addEventListener(
+          'abort',
+          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+          { once: true },
+        );
+      });
+    const manager = new SupabaseDeviceSessionManager({
+      projectUrl: 'https://example.supabase.co',
+      publishableKey: 'sb_publishable_test',
+      store,
+      fetcher,
+      timeoutMs: 5,
+    });
+
+    await expect(
+      manager.enroll({ enrollmentCode: 'a'.repeat(64), deviceId: DEVICE_ID }),
+    ).rejects.toThrow(/timed out after 5 ms/);
+  });
 });
 
 describe('SupabaseInboundConfigurationProvider', () => {
