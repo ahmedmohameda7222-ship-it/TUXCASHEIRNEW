@@ -230,7 +230,11 @@ export class OperationsEndDayService {
           return err({ code: 'NOT_FOUND', message: 'The Business Day was not found.' });
         }
         if (existingDay.status === 'CLOSED') {
-          return ok({ businessDayId: existingDay.id, closedAt: existingDay.endedAt, replayed: true });
+          return ok({
+            businessDayId: existingDay.id,
+            closedAt: existingDay.endedAt,
+            replayed: true,
+          });
         }
 
         const context = await this.#resolveExpectedOpenContext(input.businessDayId);
@@ -360,7 +364,10 @@ export class OperationsEndDayService {
       expenses,
       configuration: context.configuration,
     });
-    const projected = buildEndDayReconciliationProjection(financial.expectedPayments, actualPayments);
+    const projected = buildEndDayReconciliationProjection(
+      financial.expectedPayments,
+      actualPayments,
+    );
     const reasonByMethod = new Map(
       varianceReasons.map((entry) => [entry.paymentMethodId, entry.reason] as const),
     );
@@ -454,7 +461,8 @@ export class OperationsEndDayService {
       const day = await this.#database.transaction((transaction) =>
         transaction.businessDays.getById(businessDayId),
       );
-      if (day === null) return err({ code: 'NOT_FOUND', message: 'The Business Day was not found.' });
+      if (day === null)
+        return err({ code: 'NOT_FOUND', message: 'The Business Day was not found.' });
       if (day.status !== 'OPEN') {
         return err({ code: 'ALREADY_CLOSED', message: 'The Business Day is already closed.' });
       }
@@ -476,7 +484,10 @@ export class OperationsEndDayService {
       this.#readModel.getOpenWorkerSession(day.id),
     ]);
     if (configuration === null) {
-      return err({ code: 'CONFLICT_ERROR', message: 'Local Operations configuration is unavailable.' });
+      return err({
+        code: 'CONFLICT_ERROR',
+        message: 'Local Operations configuration is unavailable.',
+      });
     }
     if (session === null || session.endedAt !== null) {
       return err({ code: 'CONFLICT_ERROR', message: 'A Current Operator is required.' });
@@ -603,6 +614,8 @@ export class OperationsEndDayService {
       businessDayId: context.day.id,
       aggregateType,
       aggregateId,
+      aggregateRevision:
+        eventType === 'BUSINESS_DAY_CLOSED' || eventType === 'WORKER_SIGNED_OUT' ? 1 : null,
       eventType,
       idempotencyKey,
       payloadVersion: 1,

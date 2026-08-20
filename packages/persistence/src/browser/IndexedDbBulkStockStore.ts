@@ -104,14 +104,15 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
     const database = this.#requiredDatabase();
     const transaction = database.transaction(['inventoryMovements'], 'readonly');
     const all = (await requestResult(
-      transaction.objectStore('inventoryMovements').getAll(),
+      transaction
+        .objectStore('inventoryMovements')
+        .index('itemCreatedAt')
+        .getAll(IDBKeyRange.bound([itemId, ''], [itemId, '\uffff'])),
     )) as InventoryMovement[];
-    return all
-      .filter((movement) => movement.itemId === itemId)
-      .sort(
-        (left, right) =>
-          left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
-      );
+    return all.sort(
+      (left, right) =>
+        left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+    );
   }
 
   async getMovementById(id: InventoryMovementId): Promise<InventoryMovement | null> {
@@ -123,10 +124,10 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
   async hasCompensationFor(id: InventoryMovementId): Promise<boolean> {
     const database = this.#requiredDatabase();
     const transaction = database.transaction(['inventoryMovements'], 'readonly');
-    const all = (await requestResult(
-      transaction.objectStore('inventoryMovements').getAll(),
-    )) as InventoryMovement[];
-    return all.some((movement) => movement.compensatesMovementId === id);
+    const compensation = await recordOrNull<InventoryMovement>(
+      transaction.objectStore('inventoryMovements').index('compensatesMovementId').get(id),
+    );
+    return compensation !== null;
   }
 
   async commitMovement(commit: BulkStockMovementCommit): Promise<void> {
@@ -158,7 +159,10 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
         throw new Error('The Business Day changed before the Bulk Stock movement committed.');
       }
       const sessions = (await requestResult(
-        transaction.objectStore('workerSessions').getAll(),
+        transaction
+          .objectStore('workerSessions')
+          .index('businessDayId')
+          .getAll(commit.expectedBusinessDayId),
       )) as WorkerSession[];
       if (
         !sessions.some(
@@ -195,7 +199,9 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
         const original = await recordOrNull<InventoryMovement>(
           movements.get(commit.expectedCompensatedMovementId),
         );
-        const all = (await requestResult(movements.getAll())) as InventoryMovement[];
+        const existingCompensation = await recordOrNull<InventoryMovement>(
+          movements.index('compensatesMovementId').get(commit.expectedCompensatedMovementId),
+        );
         if (
           original === null ||
           original.shopId !== commit.expectedShopId ||
@@ -203,9 +209,7 @@ export class IndexedDbBulkStockStore implements BulkStockStore {
           original.itemId !== commit.movement.itemId ||
           (original.movementType !== 'BULK_UNIT_FINISHED' &&
             original.movementType !== 'BULK_STOCK_RECEIVED') ||
-          all.some(
-            (movement) => movement.compensatesMovementId === commit.expectedCompensatedMovementId,
-          )
+          existingCompensation !== null
         ) {
           throw new Error('The original Bulk Stock movement can no longer be undone.');
         }

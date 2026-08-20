@@ -21,6 +21,10 @@ export {
 } from './businessDay';
 export type * from './catalog';
 export {
+  parseOperationsConfigurationBundle,
+  type OperationsConfigurationBundle,
+} from './configurationBundle';
+export {
   addProductUnit,
   applyDeliveryZone,
   decrementDraftLine,
@@ -104,6 +108,7 @@ export type { StockQuantityMicros } from './quantity';
 export {
   OPERATIONS_SYNC_PAYLOAD_VERSION,
   operationsSyncPayloadJson,
+  parseOperationsSyncEnvelopeV1,
   parseOperationsSyncPayloadV1,
   toOperationsSyncEnvelopeV1,
   type ExpenseSyncEventType,

@@ -3,7 +3,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { OperationsOrdersService, type OrderPrinter } from '@tux/application';
+import {
+  ApplicationCommandCoordinator,
+  OperationsOrdersService,
+  type OrderPrinter,
+} from '@tux/application';
 import {
   createOpenBusinessDay,
   instant,
@@ -151,6 +155,7 @@ function configuration(): OperationsConfigurationSnapshot {
 async function fixture(
   databaseOverride?: (base: SqliteOperationsDatabase) => OperationsDatabase,
   printer?: OrderPrinter,
+  coordinator = new ApplicationCommandCoordinator(),
 ) {
   const directory = await mkdtemp(path.join(tmpdir(), 'tux-orders-'));
   const databasePath = path.join(directory, 'operations.sqlite3');
@@ -206,7 +211,7 @@ async function fixture(
       now: () => now,
       createUuid: () => randomUUID(),
     },
-    undefined,
+    coordinator,
     printer,
   );
 
@@ -222,6 +227,7 @@ async function fixture(
     database,
     draftStore,
     service,
+    coordinator,
     setNow(value: string) {
       now = instant(value);
     },
@@ -278,8 +284,6 @@ function scalar(databasePath: string, sql: string): number {
 
 function failingInventoryDatabase(base: SqliteOperationsDatabase): OperationsDatabase {
   return {
-    initialize: () => base.initialize(),
-    close: async () => undefined,
     transaction: <Result>(
       work: (transaction: OperationsTransaction) => Promise<Result>,
     ): Promise<Result> =>
@@ -306,6 +310,32 @@ class RecordingOrderPrinter implements OrderPrinter {
     return this.fail
       ? ({ ok: false, message: 'Injected receipt print failure.' } as const)
       : ({ ok: true } as const);
+  }
+}
+
+class DelayedOrderPrinter implements OrderPrinter {
+  readonly orders: OrderSnapshot[] = [];
+  readonly started: Promise<void>;
+  #signalStarted = (): void => undefined;
+  #release = (): void => undefined;
+
+  constructor() {
+    this.started = new Promise<void>((resolve) => {
+      this.#signalStarted = resolve;
+    });
+  }
+
+  async print(order: OrderSnapshot) {
+    this.orders.push(order);
+    this.#signalStarted();
+    await new Promise<void>((resolve) => {
+      this.#release = resolve;
+    });
+    return { ok: true as const };
+  }
+
+  release(): void {
+    this.#release();
   }
 }
 
@@ -539,6 +569,98 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(contact?.latestAddress).toBe('12 Test Street');
     expect(contact?.latestZoneId).toBe(ZONE_ID);
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM customer_contacts')).toBe(1);
+  });
+
+  it('releases the global business-command lock after durable commit while printing is still pending', async () => {
+    const printer = new DelayedOrderPrinter();
+    const coordinator = new ApplicationCommandCoordinator();
+    const { databasePath, service } = await fixture(undefined, printer, coordinator);
+    const workspace = await service.loadWorkspace(DRAFT_SCOPE);
+    if (!workspace.ok) throw new Error(workspace.error.message);
+
+    const saved = await saveDraft(
+      service,
+      withCashPayment(withSingleBurger(workspace.value.draft)),
+    );
+    const placement = service.placeOrder(saved);
+    await printer.started;
+
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(
+      scalar(
+        databasePath,
+        "SELECT COUNT(*) AS value FROM outbox_events WHERE event_type = 'ORDER_PLACED'",
+      ),
+    ).toBe(1);
+
+    const unrelatedCommand = await Promise.race([
+      coordinator.runExclusive(async () => 'UNRELATED_COMMAND_COMPLETED'),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('BLOCKED_BY_PRINTER'), 100);
+      }),
+    ]);
+    expect(unrelatedCommand).toBe('UNRELATED_COMMAND_COMPLETED');
+    expect(printer.orders).toHaveLength(1);
+
+    printer.release();
+    const result = await placement;
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value.postCommitWarnings).not.toContain('PRINT_FAILED');
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
+  });
+
+  it('recovers a committed durable draft on workspace load before pending print housekeeping finishes', async () => {
+    const printer = new DelayedOrderPrinter();
+    const { databasePath, draftStore, service } = await fixture(undefined, printer);
+    const workspace = await service.loadWorkspace(DRAFT_SCOPE);
+    if (!workspace.ok) throw new Error(workspace.error.message);
+
+    const saved = await saveDraft(
+      service,
+      withCashPayment(withSingleBurger(workspace.value.draft)),
+    );
+    const placement = service.placeOrder(saved);
+    await printer.started;
+
+    const stalePersisted = await draftStore.get({
+      shopId: SHOP_ID,
+      businessDayId: BUSINESS_DAY_ID,
+      draftScopeId: DRAFT_SCOPE,
+    });
+    expect(stalePersisted?.checkoutIntentKey).toBe(saved.checkoutIntentKey);
+
+    const recovered = await service.loadWorkspace(DRAFT_SCOPE);
+    expect(recovered.ok).toBe(true);
+    if (!recovered.ok) throw new Error(recovered.error.message);
+    expect(recovered.value.recoveryState).toBe('PREVIOUS_ORDER_ALREADY_SAVED');
+    expect(recovered.value.draft.lines).toHaveLength(0);
+    expect(recovered.value.draft.payment).toEqual({ mode: 'NONE' });
+    expect(recovered.value.draft.orderTypeId).toBe(TAKE_AWAY_ID);
+    expect(recovered.value.draft.checkoutIntentKey).not.toBe(saved.checkoutIntentKey);
+    expect(printer.orders).toHaveLength(1);
+
+    printer.release();
+    const result = await placement;
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value.postCommitWarnings).toContain('DRAFT_SCOPE_ADVANCED');
+    expect(result.value.nextDraft.checkoutIntentKey).toBe(recovered.value.draft.checkoutIntentKey);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(
+      scalar(
+        databasePath,
+        "SELECT COUNT(*) AS value FROM audit_events WHERE event_type = 'ORDER_PLACED'",
+      ),
+    ).toBe(1);
+    expect(
+      scalar(
+        databasePath,
+        "SELECT COUNT(*) AS value FROM outbox_events WHERE event_type = 'ORDER_PLACED'",
+      ),
+    ).toBe(1);
   });
 
   it('prints a fresh durable order once and never auto-prints an idempotent replay', async () => {

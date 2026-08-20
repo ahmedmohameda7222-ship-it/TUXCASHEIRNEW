@@ -179,6 +179,9 @@ export function OrdersWorkspace({
         return;
       }
       setWorkspace(result.value);
+      if (result.value.recoveryState === 'PREVIOUS_ORDER_ALREADY_SAVED') {
+        setSuccessMessage('Previous order was already saved. A new cart is ready.');
+      }
       draftRef.current = result.value.draft;
       setDraft(result.value.draft);
       const categories = result.value.configuration.categories

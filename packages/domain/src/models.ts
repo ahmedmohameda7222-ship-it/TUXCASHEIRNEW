@@ -305,6 +305,11 @@ export interface OutboxEvent {
   readonly businessDayId: BusinessDayId | null;
   readonly aggregateType: string;
   readonly aggregateId: string;
+  /**
+   * Monotonic causal revision for aggregates whose events depend on predecessors.
+   * `null` means the event is an independent fact rather than an ordered lifecycle step.
+   */
+  readonly aggregateRevision: number | null;
   readonly eventType: string;
   readonly idempotencyKey: string;
   readonly payloadVersion: number;

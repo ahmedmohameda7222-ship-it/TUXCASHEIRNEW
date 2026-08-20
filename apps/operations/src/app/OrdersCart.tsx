@@ -17,7 +17,7 @@ import {
   type PaymentMethod,
   type PaymentMethodId,
 } from '@tux/domain';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { MoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
@@ -181,6 +181,8 @@ export function OrdersCart({
   readonly onDeliveryPhoneCommit: (displayPhone: string) => void;
   readonly onPlace: () => void;
 }) {
+  const instanceId = useId();
+  const controlId = (suffix: string): string => `${instanceId}-${suffix}`;
   const orderTypes = configuration.orderTypes
     .filter((orderType) => orderType.active)
     .sort((left, right) => left.sortOrder - right.sortOrder);
@@ -269,8 +271,11 @@ export function OrdersCart({
       </div>
 
       <div className="cart-scroll">
-        <section className="cart-section order-type-section" aria-labelledby="order-type-title">
-          <h2 id="order-type-title">Order type</h2>
+        <section
+          className="cart-section order-type-section"
+          aria-labelledby={controlId('order-type-title')}
+        >
+          <h2 id={controlId('order-type-title')}>Order type</h2>
           <div className="segmented-control">
             {orderTypes.map((orderType) => (
               <button
@@ -287,9 +292,12 @@ export function OrdersCart({
           <SectionIssues issues={issues} paths={['orderType']} />
         </section>
 
-        <section className="cart-section cart-lines-section" aria-labelledby="cart-items-title">
+        <section
+          className="cart-section cart-lines-section"
+          aria-labelledby={controlId('cart-items-title')}
+        >
           <div className="section-heading-row">
-            <h2 id="cart-items-title">Items</h2>
+            <h2 id={controlId('cart-items-title')}>Items</h2>
             <span>{formatMoneyMinor(itemsSubtotalMinor)}</span>
           </div>
           {draft.lines.length === 0 ? (
@@ -349,10 +357,13 @@ export function OrdersCart({
         </section>
 
         {delivery ? (
-          <section className="cart-section delivery-section" aria-labelledby="delivery-title">
-            <h2 id="delivery-title">Delivery</h2>
+          <section
+            className="cart-section delivery-section"
+            aria-labelledby={controlId('delivery-title')}
+          >
+            <h2 id={controlId('delivery-title')}>Delivery</h2>
             <DraftTextField
-              id="delivery-phone"
+              id={controlId('delivery-phone')}
               label="Phone"
               value={draft.delivery.displayPhone}
               placeholder="01xxxxxxxxx"
@@ -360,7 +371,7 @@ export function OrdersCart({
               onCommit={onDeliveryPhoneCommit}
             />
             <DraftTextField
-              id="delivery-name"
+              id={controlId('delivery-name')}
               label="Customer name"
               value={draft.delivery.customerName}
               disabled={busy}
@@ -371,10 +382,10 @@ export function OrdersCart({
                 }))
               }
             />
-            <label className="field-stack" htmlFor="delivery-zone">
+            <label className="field-stack" htmlFor={controlId('delivery-zone')}>
               <span>Zone</span>
               <select
-                id="delivery-zone"
+                id={controlId('delivery-zone')}
                 value={draft.delivery.zoneId ?? ''}
                 disabled={busy}
                 onChange={(event) => {
@@ -400,7 +411,7 @@ export function OrdersCart({
               </select>
             </label>
             <DraftTextField
-              id="delivery-address"
+              id={controlId('delivery-address')}
               label="Full address"
               value={draft.delivery.address}
               multiline
@@ -413,7 +424,7 @@ export function OrdersCart({
               }
             />
             <MoneyInput
-              id="delivery-fee"
+              id={controlId('delivery-fee')}
               label="Delivery fee"
               value={draft.delivery.finalFeeMinor}
               disabled={busy}
@@ -438,10 +449,13 @@ export function OrdersCart({
         ) : null}
 
         {draft.lines.length > 0 ? (
-          <section className="cart-section adjustments-section" aria-labelledby="adjustments-title">
-            <h2 id="adjustments-title">Notes & discount</h2>
+          <section
+            className="cart-section adjustments-section"
+            aria-labelledby={controlId('adjustments-title')}
+          >
+            <h2 id={controlId('adjustments-title')}>Notes & discount</h2>
             <DraftTextField
-              id="order-note"
+              id={controlId('order-note')}
               label="Order note"
               value={draft.orderNote ?? ''}
               multiline
@@ -455,7 +469,7 @@ export function OrdersCart({
               }
             />
             <MoneyInput
-              id="discount"
+              id={controlId('discount')}
               label="Discount"
               value={draft.discountMinor}
               disabled={busy}
@@ -466,9 +480,12 @@ export function OrdersCart({
         ) : null}
 
         {draft.lines.length > 0 ? (
-          <section className="cart-section payment-section" aria-labelledby="payment-title">
+          <section
+            className="cart-section payment-section"
+            aria-labelledby={controlId('payment-title')}
+          >
             <div className="section-heading-row">
-              <h2 id="payment-title">Payment</h2>
+              <h2 id={controlId('payment-title')}>Payment</h2>
               {draft.payment.mode === 'SPLIT' ? <span>Split 2 ways</span> : null}
             </div>
 
@@ -505,7 +522,7 @@ export function OrdersCart({
                 {draft.payment.mode === 'SINGLE' && pricing !== null ? (
                   methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
                     <CashEditor
-                      idPrefix="single"
+                      idPrefix={controlId('single')}
                       label="Cash received"
                       allocatedMinor={pricing.totalMinor}
                       receivedMinor={draft.payment.cashReceivedMinor}
@@ -527,10 +544,10 @@ export function OrdersCart({
             ) : pricing === null ? null : (
               <div className="split-editor">
                 <div className="split-method-block">
-                  <label className="field-stack" htmlFor="split-method-a">
+                  <label className="field-stack" htmlFor={controlId('split-method-a')}>
                     <span>Method A</span>
                     <select
-                      id="split-method-a"
+                      id={controlId('split-method-a')}
                       value={draft.payment.methodAId}
                       disabled={busy}
                       onChange={(event) => {
@@ -561,7 +578,7 @@ export function OrdersCart({
                     </select>
                   </label>
                   <MoneyInput
-                    id="split-amount-a"
+                    id={controlId('split-amount-a')}
                     label="Amount A"
                     value={draft.payment.amountAMinor}
                     disabled={busy}
@@ -575,7 +592,7 @@ export function OrdersCart({
                   />
                   {methodById(methods, draft.payment.methodAId)?.logicType === 'CASH' ? (
                     <CashEditor
-                      idPrefix="split-a"
+                      idPrefix={controlId('split-a')}
                       label="Cash received A"
                       allocatedMinor={draft.payment.amountAMinor}
                       receivedMinor={draft.payment.methodACashReceivedMinor}
@@ -595,10 +612,10 @@ export function OrdersCart({
                 </div>
 
                 <div className="split-method-block">
-                  <label className="field-stack" htmlFor="split-method-b">
+                  <label className="field-stack" htmlFor={controlId('split-method-b')}>
                     <span>Method B</span>
                     <select
-                      id="split-method-b"
+                      id={controlId('split-method-b')}
                       value={draft.payment.methodBId}
                       disabled={busy}
                       onChange={(event) => {
@@ -641,7 +658,7 @@ export function OrdersCart({
                   {methodById(methods, draft.payment.methodBId)?.logicType === 'CASH' &&
                   draft.payment.amountAMinor <= pricing.totalMinor ? (
                     <CashEditor
-                      idPrefix="split-b"
+                      idPrefix={controlId('split-b')}
                       label="Cash received B"
                       allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}
                       receivedMinor={draft.payment.methodBCashReceivedMinor}

@@ -61,10 +61,13 @@ describe('parseOrderDraft', () => {
     [{ ...validDraft, lines: [{ ...validDraft.lines[0], quantity: 0 }] }, 'quantity'],
     [{ ...validDraft, payment: { mode: 'UNKNOWN' } }, 'payment.mode'],
     [{ ...validDraft, delivery: { ...validDraft.delivery, finalFeeMinor: 1.5 } }, 'finalFeeMinor'],
-  ])('rejects malformed durable or IPC payloads before they become OrderDraft (%s)', (value, field) => {
-    expect(() => parseOrderDraft(value)).toThrow(InvalidOrderDraftError);
-    expect(() => parseOrderDraft(value)).toThrow(String(field));
-  });
+  ])(
+    'rejects malformed durable or IPC payloads before they become OrderDraft (%s)',
+    (value, field) => {
+      expect(() => parseOrderDraft(value)).toThrow(InvalidOrderDraftError);
+      expect(() => parseOrderDraft(value)).toThrow(String(field));
+    },
+  );
 
   it('does not accept a JSON object merely because TypeScript could cast it', () => {
     expect(() => parseOrderDraft({ shopId: validDraft.shopId })).toThrow(InvalidOrderDraftError);

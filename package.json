@@ -12,23 +12,34 @@
   "scripts": {
     "dev:operations": "npm run dev -w @tux/operations",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\" --max-warnings 0",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:e2e",
+    "lint": "eslint \"{apps,packages,e2e}/**/*.{ts,tsx}\" playwright.config.ts --max-warnings 0",
     "test": "vitest run",
-    "format": "prettier --write \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"*.{json,mjs}\" \".github/**/*.yml\"",
-    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"*.{json,mjs}\" \".github/**/*.yml\""
+    "format": "prettier --write \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
+    "dev:provision": "npm run dev:provision -w @tux/operations-desktop --",
+    "test:migrations": "node scripts/test-migrations.mjs",
+    "package:win": "npm run build && electron-builder --win nsis --x64",
+    "test:e2e": "playwright test",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "e2e:serve": "npm run build -w @tux/operations && npm exec --workspace @tux/operations -- vite preview --host 127.0.0.1 --port 4173"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.3.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "electron": "43.2.0",
+    "electron-builder": "26.15.3",
     "eslint": "10.8.0",
+    "fake-indexeddb": "6.2.5",
     "prettier": "3.9.6",
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vite": "8.2.0",
     "vitest": "4.1.10"
-  }
+  },
+  "main": "apps/operations-desktop/dist/main/index.js",
+  "description": "TUX Operations V2 local-first point-of-sale application."
 }

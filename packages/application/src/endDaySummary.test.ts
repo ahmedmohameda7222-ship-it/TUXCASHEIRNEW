@@ -49,16 +49,31 @@ const configuration: OperationsConfigurationSnapshot = {
   version: 1,
   categories: [],
   products: [],
-  modifierGroups: [],
   modifiers: [],
+  productModifierLinks: [],
+  comboBeverageOptions: [],
   orderTypes: [
-    { id: orderTypeId, shopId, name: 'Takeaway', behavior: 'TAKEAWAY', sortOrder: 1, active: true },
+    {
+      id: orderTypeId,
+      shopId,
+      name: 'Takeaway',
+      behavior: 'TAKE_AWAY',
+      sortOrder: 1,
+      active: true,
+    },
   ],
   paymentMethods: [
-    { id: paymentMethodId, shopId, displayName: 'Cash', logicType: 'CASH', sortOrder: 1, active: true },
+    {
+      id: paymentMethodId,
+      shopId,
+      displayName: 'Cash',
+      logicType: 'CASH',
+      requiresReconciliation: true,
+      sortOrder: 1,
+      active: true,
+    },
   ],
   deliveryZones: [],
-  inventoryItems: [],
   recipeLines: [],
   updatedAt: at,
 };
@@ -97,7 +112,7 @@ function order(id: string, displayOrderNo: number, status: OrderSnapshot['status
     fulfillment: {
       orderTypeId,
       orderTypeLabel: 'Takeaway',
-      behavior: 'TAKEAWAY',
+      behavior: 'TAKE_AWAY',
       delivery: null,
     },
     items: [],
@@ -108,7 +123,9 @@ function order(id: string, displayOrderNo: number, status: OrderSnapshot['status
     totalMinor: moneyMinor(10000),
     payments: [
       {
-        id: parseEntityId<PaymentId>(`66666666-6666-4666-8666-${String(displayOrderNo).padStart(12, '0')}`),
+        id: parseEntityId<PaymentId>(
+          `66666666-6666-4666-8666-${String(displayOrderNo).padStart(12, '0')}`,
+        ),
         method: { id: paymentMethodId, label: 'Cash', logicType: 'CASH' },
         allocatedMinor: moneyMinor(10000),
         receivedMinor: moneyMinor(10000),
@@ -131,7 +148,13 @@ const expenses: readonly ManualExpenseRecord[] = [
     orderId: null,
     createdByWorkerId: workerId,
     createdAt: at,
-    lifecycle: { revision: 0, updatedAt: null, updatedByWorkerId: null, deletedAt: null, deletedByWorkerId: null },
+    lifecycle: {
+      revision: 0,
+      updatedAt: null,
+      updatedByWorkerId: null,
+      deletedAt: null,
+      deletedByWorkerId: null,
+    },
   },
   {
     id: parseEntityId<ExpenseId>('77777777-7777-4777-8777-777777777772'),
@@ -145,7 +168,13 @@ const expenses: readonly ManualExpenseRecord[] = [
     orderId: null,
     createdByWorkerId: workerId,
     createdAt: at,
-    lifecycle: { revision: 0, updatedAt: null, updatedByWorkerId: null, deletedAt: null, deletedByWorkerId: null },
+    lifecycle: {
+      revision: 0,
+      updatedAt: null,
+      updatedByWorkerId: null,
+      deletedAt: null,
+      deletedByWorkerId: null,
+    },
   },
 ];
 
@@ -168,7 +197,13 @@ function fixture() {
           put: async () => undefined,
         },
         workers: {
-          getById: async () => ({ id: workerId, shopId, displayName: 'Dev Worker', pinHash: 'hash', active: true }),
+          getById: async () => ({
+            id: workerId,
+            shopId,
+            displayName: 'Dev Worker',
+            pinHash: 'hash',
+            active: true,
+          }),
           put: async () => undefined,
         },
         orders: {

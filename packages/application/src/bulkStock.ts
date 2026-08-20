@@ -358,6 +358,7 @@ export class OperationsBulkStockService {
       businessDayId: movement.businessDayId,
       aggregateType: 'INVENTORY_ITEM',
       aggregateId: movement.itemId,
+      aggregateRevision: null,
       eventType: 'INVENTORY_MOVEMENT_RECORDED',
       idempotencyKey: `inventory-movement:${movement.id}`,
       payloadVersion: 1,

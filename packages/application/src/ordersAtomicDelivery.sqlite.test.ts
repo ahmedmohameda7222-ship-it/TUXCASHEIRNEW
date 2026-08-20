@@ -8,14 +8,15 @@ import {
   parseEntityId,
   stockQuantityMicros,
   type BusinessDayId,
-  type CategoryId,
+  type InventoryItem,
+  type MenuCategoryId,
   type CustomerContactId,
   type DeliveryZoneId,
   type InventoryItemId,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
-  type OrderDraftLineId,
+  type DraftLineId,
   type OrderTypeId,
   type PaymentMethodId,
   type ProductId,
@@ -37,12 +38,21 @@ const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const orderTypeId = parseEntityId<OrderTypeId>('44444444-4444-4444-8444-444444444444');
-const categoryId = parseEntityId<CategoryId>('55555555-5555-4555-8555-555555555555');
+const categoryId = parseEntityId<MenuCategoryId>('55555555-5555-4555-8555-555555555555');
 const productId = parseEntityId<ProductId>('66666666-6666-4666-8666-666666666666');
 const inventoryItemId = parseEntityId<InventoryItemId>('77777777-7777-4777-8777-777777777777');
 const paymentMethodId = parseEntityId<PaymentMethodId>('88888888-8888-4888-8888-888888888888');
 const deliveryZoneId = parseEntityId<DeliveryZoneId>('99999999-9999-4999-8999-999999999999');
 const createdAt = instant('2026-08-20T00:00:00.000Z');
+
+const inventoryItem: InventoryItem = {
+  id: inventoryItemId,
+  shopId,
+  name: 'Beef',
+  unitLabel: 'portion',
+  trackingMode: 'RECIPE_TRACKED',
+  active: true,
+};
 
 const configuration: OperationsConfigurationSnapshot = {
   shopId,
@@ -54,27 +64,45 @@ const configuration: OperationsConfigurationSnapshot = {
       shopId,
       categoryId,
       name: 'Atomic Burger',
+      description: null,
       priceMinor: moneyMinor(10000),
+      imageKey: null,
       active: true,
+      soldOut: false,
+      isCombo: false,
       sortOrder: 1,
-      modifierGroupIds: [],
-      allowsItemNote: true,
-      combo: null,
     },
   ],
-  modifierGroups: [],
   modifiers: [],
-  orderTypes: [{ id: orderTypeId, shopId, name: 'Delivery', behavior: 'DELIVERY', sortOrder: 1, active: true }],
+  productModifierLinks: [],
+  comboBeverageOptions: [],
+  orderTypes: [
+    { id: orderTypeId, shopId, name: 'Delivery', behavior: 'DELIVERY', sortOrder: 1, active: true },
+  ],
   paymentMethods: [
-    { id: paymentMethodId, shopId, displayName: 'Cash', logicType: 'CASH', sortOrder: 1, active: true },
+    {
+      id: paymentMethodId,
+      shopId,
+      displayName: 'Cash',
+      logicType: 'CASH',
+      requiresReconciliation: true,
+      sortOrder: 1,
+      active: true,
+    },
   ],
   deliveryZones: [
-    { id: deliveryZoneId, shopId, label: 'Zone A', feeMinor: moneyMinor(2500), active: true, sortOrder: 1 },
+    {
+      id: deliveryZoneId,
+      shopId,
+      name: 'Zone A',
+      feeMinor: moneyMinor(2500),
+      active: true,
+      sortOrder: 1,
+    },
   ],
-  inventoryItems: [
-    { id: inventoryItemId, shopId, name: 'Beef', unitLabel: 'portion', trackingMode: 'RECIPE_TRACKED', active: true },
+  recipeLines: [
+    { shopId, productId, inventoryItemId, quantityMicros: stockQuantityMicros(1_000_000) },
   ],
-  recipeLines: [{ productId, inventoryItemId, quantityMicros: stockQuantityMicros(1_000_000) }],
   updatedAt: createdAt,
 };
 
@@ -89,7 +117,7 @@ function draft(intent = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'): OrderDraft {
     orderTypeId,
     lines: [
       {
-        id: parseEntityId<OrderDraftLineId>('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+        id: parseEntityId<DraftLineId>('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
         productId,
         productName: 'Atomic Burger',
         unitPriceMinor: moneyMinor(10000),
@@ -133,7 +161,13 @@ async function seed(database: SqliteOperationsDatabase): Promise<void> {
   };
   await database.transaction(async (transaction) => {
     await transaction.shops.put({ id: shopId, name: 'Dev Shop', active: true });
-    await transaction.workers.put({ id: workerId, shopId, displayName: 'Dev Worker', pinHash: 'test-only', active: true });
+    await transaction.workers.put({
+      id: workerId,
+      shopId,
+      displayName: 'Dev Worker',
+      pinHash: 'test-only',
+      active: true,
+    });
     await transaction.businessDays.put(day);
     await transaction.workerSessions.put({
       id: parseEntityId<WorkerSessionId>('cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
@@ -144,7 +178,7 @@ async function seed(database: SqliteOperationsDatabase): Promise<void> {
       endedAt: null,
     });
     await transaction.configuration.put(configuration);
-    await transaction.inventory.putItem(configuration.inventoryItems[0]!);
+    await transaction.inventory.putItem(inventoryItem);
   });
 }
 
@@ -155,7 +189,9 @@ class FailingCustomerContactDatabase implements OperationsDatabase {
     this.#inner = inner;
   }
 
-  transaction<Result>(work: (transaction: OperationsTransaction) => Promise<Result>): Promise<Result> {
+  transaction<Result>(
+    work: (transaction: OperationsTransaction) => Promise<Result>,
+  ): Promise<Result> {
     return this.#inner.transaction((transaction) =>
       work({
         ...transaction,
@@ -172,7 +208,11 @@ class FailingCustomerContactDatabase implements OperationsDatabase {
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
 });
 
 async function fixture(input?: { failContactWrite?: boolean }) {
@@ -183,7 +223,6 @@ async function fixture(input?: { failContactWrite?: boolean }) {
   await database.initialize();
   await seed(database);
   const readModel = new SqliteOperatorSessionReadModel(path);
-  await readModel.initialize();
   const draftStore = new SqliteOrderDraftStore(path);
   await draftStore.initialize();
   let sequence = 0;
@@ -260,7 +299,11 @@ describe('Delivery customer learning checkout atomicity', () => {
     const contact = await test.database.transaction((transaction) =>
       transaction.customerContacts.getByNormalizedPhone(shopId, '01012345678'),
     );
-    expect(contact).toMatchObject({ id: contactId, name: 'Customer One', latestAddress: '1 Atomic Street' });
+    expect(contact).toMatchObject({
+      id: contactId,
+      name: 'Customer One',
+      latestAddress: '1 Atomic Street',
+    });
   });
 
   it('rolls back the complete checkout and does not consume the display number when contact persistence fails', async () => {

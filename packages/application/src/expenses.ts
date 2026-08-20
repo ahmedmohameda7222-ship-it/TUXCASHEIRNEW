@@ -194,7 +194,9 @@ export class OperationsExpensesService {
         });
         return ok(expense);
       } catch (cause) {
-        return err(domainError(cause, 'The expense was not saved because the local commit failed.'));
+        return err(
+          domainError(cause, 'The expense was not saved because the local commit failed.'),
+        );
       }
     });
   }
@@ -207,7 +209,10 @@ export class OperationsExpensesService {
       try {
         const existing = await this.#currentExpense(context, input.expenseId);
         if (existing.kind !== 'MANUAL') {
-          return err({ code: 'CONFLICT_ERROR', message: 'Delivery Failed system records are locked.' });
+          return err({
+            code: 'CONFLICT_ERROR',
+            message: 'Delivery Failed system records are locked.',
+          });
         }
         const now = this.#runtime.now();
         const expense = editManualExpense(existing, input, now, context.operator.id);
@@ -235,7 +240,10 @@ export class OperationsExpensesService {
       try {
         const existing = await this.#currentExpense(context, expenseId);
         if (existing.kind !== 'MANUAL') {
-          return err({ code: 'CONFLICT_ERROR', message: 'Delivery Failed system records are locked.' });
+          return err({
+            code: 'CONFLICT_ERROR',
+            message: 'Delivery Failed system records are locked.',
+          });
         }
         const now = this.#runtime.now();
         const expense = deleteManualExpense(existing, now, context.operator.id);
@@ -253,7 +261,9 @@ export class OperationsExpensesService {
         if (cause instanceof DomainInvariantError) {
           return err({ code: 'CONFLICT_ERROR', message: cause.message, cause });
         }
-        return err(persistenceError('The expense could not be removed from the current ledger.', cause));
+        return err(
+          persistenceError('The expense could not be removed from the current ledger.', cause),
+        );
       }
     });
   }
@@ -344,6 +354,7 @@ export class OperationsExpensesService {
       businessDayId: expense.businessDayId,
       aggregateType: 'EXPENSE',
       aggregateId: expense.id,
+      aggregateRevision: expense.lifecycle.revision,
       eventType,
       idempotencyKey: `expense:${expense.id}:${expense.lifecycle.revision}:${eventType}`,
       payloadVersion: 1,

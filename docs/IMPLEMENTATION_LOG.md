@@ -148,3 +148,21 @@ The attached canonical source used for Phase 0 has SHA-256 `8cad80ed1faa57f03da9
 - `START-001` remains `BLOCKED` only for the missing approved graphic TUX logo asset; the approved copy and screen behavior are rendered and validated with the existing typographic fallback.
 - `OPS-001` remains outside the completed Operations implementation because the canonical plan explicitly defers detailed TUX Admin information architecture to a separate design phase after Operations is frozen.
 - No Supabase project was linked and no remote migration was applied.
+
+
+## 2026-08-20 — Final Operations stabilization / hardening
+
+- Started from `main` baseline `d46e5fb69714994fc9c372a43f3837de69fd9dbd` on `fix/operations-stabilization`; draft PR #17 targets `main`.
+- Reproduced the inherited red gate: locked install succeeded but Prettier rejected 32 files, which had prevented lint/typecheck/test/build from running in that merge-era CI attempt. Canonical Prettier output was applied; latent strict-TypeScript fixture/sync defects were then repaired without relaxing compiler/lint rules.
+- Moved receipt printing and post-commit draft housekeeping outside the shared business-command lock and added delayed-printer concurrency proof.
+- Added startup recovery for stale durable drafts whose checkout intent was already committed, without duplicate printing or business effects.
+- Hardened V1 sync parsing to validate nested untrusted envelopes and added causal aggregate revisions, durable dependency quarantine, restart-safe pending selection, monotonic receiver guards, and immutable placement/configuration-version preservation.
+- Added transport-independent inbound configuration discovery/fetch plus atomic validated snapshot installation and rollback coverage. Development provisioning uses the same install path.
+- Replaced one-shot main browser DB creation with explicit IndexedDB migration registry v1→v2 and populated upgrade tests.
+- Added repository PostgreSQL migration-chain smoke command, printer configuration/native test-print boundary, development-only PBKDF2 provisioning command, deterministic Windows x64 NSIS packaging target, permanent Playwright rendered/browser fallback workflow, and stable aggregate CI `Required quality gate`.
+- Local permanent source gates after stabilization changes: format GREEN, lint GREEN, strict TypeScript GREEN, 44 Vitest files / 170 tests GREEN, production builds GREEN. Local rendered Playwright execution is blocked by the execution container's administrator policy denying loopback Chromium navigation; GitHub-hosted rendered CI is therefore the authoritative rendered gate.
+- No V2 Supabase remote project was linked or mutated. No Admin application was added. No legacy repository was modified.
+- Remaining explicit non-code decisions: missing approved graphic TUX logo asset and contradictory Delivery-after-close product semantics (ADR 0011). Production code-signing credentials/printer fleet values/backend credentials are external deployment inputs.
+
+- Current stabilization evidence run `32336585959` is GREEN: format, lint, strict TypeScript, 44 Vitest files / 170 tests, production builds, provisioning safety, PostgreSQL migration-chain smoke, desktop/mobile rendered Playwright, unsigned Windows x64 packaging, and the aggregate Required quality gate all passed.
+- Current evidence artifacts: rendered Operations `9394882053` and unsigned Windows x64 `9394879294`. This evidence is from current stabilization code head `7217a918b98e72d308ed88c41de61ff2048fe20e`, not the historical Phase 11 run.

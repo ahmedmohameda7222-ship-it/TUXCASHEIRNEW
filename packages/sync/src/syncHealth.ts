@@ -1,16 +1,12 @@
 import type { OutboxSyncSummary } from './outboxSync';
 
 export type SyncHealthState =
-  | 'LOCAL_ONLY'
-  | 'SYNC_PENDING'
-  | 'SYNCING'
-  | 'SYNCED'
-  | 'SYNC_RETRYING'
-  | 'SYNC_ISSUE';
+  'LOCAL_ONLY' | 'SYNC_PENDING' | 'SYNCING' | 'SYNCED' | 'SYNC_RETRYING' | 'SYNC_ISSUE';
 
 export interface SyncHealthSnapshot {
   readonly state: SyncHealthState;
-  readonly label: 'Local only' | 'Sync pending' | 'Syncing' | 'Synced' | 'Sync retrying' | 'Sync issue';
+  readonly label:
+    'Local only' | 'Sync pending' | 'Syncing' | 'Synced' | 'Sync retrying' | 'Sync issue';
   readonly remoteConfigured: boolean;
   readonly attentionRequired: boolean;
 }

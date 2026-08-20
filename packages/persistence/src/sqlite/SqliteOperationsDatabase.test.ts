@@ -65,6 +65,7 @@ function outboxEvent(): OutboxEvent {
     businessDayId,
     aggregateType: 'BUSINESS_DAY',
     aggregateId: businessDayId,
+    aggregateRevision: 0,
     eventType: 'BUSINESS_DAY_STARTED',
     idempotencyKey: 'business-day-started-1',
     payloadVersion: 1,

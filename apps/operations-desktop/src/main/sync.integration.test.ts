@@ -2,7 +2,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { ApplicationCommandCoordinator } from '@tux/application';
 import {
   instant,
   parseEntityId,
@@ -29,6 +28,7 @@ function event(): OutboxEvent {
     businessDayId: null,
     aggregateType: 'ORDER',
     aggregateId: 'order-fixture',
+    aggregateRevision: 0,
     eventType: 'ORDER_PLACED',
     idempotencyKey: 'order-placed:order-fixture',
     payloadVersion: 1,
@@ -81,12 +81,7 @@ describe('automatic outbox sync SQLite integration', () => {
         if (shouldFail) throw new Error('offline fixture');
       },
     };
-    const service = new OutboxSyncService(
-      database,
-      transport,
-      { now: () => now },
-      new ApplicationCommandCoordinator(),
-    );
+    const service = new OutboxSyncService(database, transport, { now: () => now });
 
     const failed = await service.syncOnce();
     expect(failed).toMatchObject({

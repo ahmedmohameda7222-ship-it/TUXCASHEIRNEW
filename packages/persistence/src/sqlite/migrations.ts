@@ -210,6 +210,33 @@ ALTER TABLE outbox_events ADD COLUMN permanent_failure_reason TEXT;
 CREATE INDEX idx_outbox_quarantined ON outbox_events(quarantined_at, created_at);
 `,
   },
+  {
+    version: 5,
+    name: 'outbox_aggregate_dependency_ordering',
+    sql: `
+ALTER TABLE outbox_events ADD COLUMN aggregate_revision INTEGER
+  CHECK (aggregate_revision IS NULL OR aggregate_revision >= 0);
+ALTER TABLE outbox_events ADD COLUMN blocked_by_event_id TEXT REFERENCES outbox_events(id);
+
+UPDATE outbox_events SET aggregate_revision = 0
+WHERE aggregate_type = 'ORDER' AND event_type = 'ORDER_PLACED';
+UPDATE outbox_events SET aggregate_revision = json_extract(payload_json, '$.payload.transition.revision')
+WHERE aggregate_type = 'ORDER' AND event_type IN ('ORDER_MARKED_DONE', 'ORDER_DONE_UNDONE', 'ORDER_CANCELLED', 'DELIVERY_RETURNED');
+UPDATE outbox_events SET aggregate_revision = json_extract(payload_json, '$.payload.expense.lifecycle.revision')
+WHERE aggregate_type = 'EXPENSE';
+UPDATE outbox_events SET aggregate_revision = CASE event_type
+  WHEN 'BUSINESS_DAY_STARTED' THEN 0 WHEN 'BUSINESS_DAY_CLOSED' THEN 1 ELSE aggregate_revision END
+WHERE aggregate_type = 'BUSINESS_DAY';
+UPDATE outbox_events SET aggregate_revision = CASE event_type
+  WHEN 'WORKER_SIGNED_IN' THEN 0 WHEN 'WORKER_SWITCHED' THEN 0 WHEN 'WORKER_SIGNED_OUT' THEN 1 ELSE aggregate_revision END
+WHERE aggregate_type = 'WORKER_SESSION';
+
+CREATE INDEX idx_outbox_aggregate_stream
+ON outbox_events(shop_id, aggregate_type, aggregate_id, aggregate_revision, created_at);
+CREATE INDEX idx_outbox_dependency_block
+ON outbox_events(blocked_by_event_id, created_at);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

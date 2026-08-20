@@ -126,7 +126,10 @@ export class IndexedDbExpenseLedgerStore implements ExpenseLedgerStore {
         throw new Error('The Business Day changed before the expense mutation committed.');
       }
       const sessions = (await requestResult(
-        transaction.objectStore('workerSessions').getAll(),
+        transaction
+          .objectStore('workerSessions')
+          .index('businessDayId')
+          .getAll(mutation.expectedBusinessDayId),
       )) as WorkerSession[];
       if (
         !sessions.some(

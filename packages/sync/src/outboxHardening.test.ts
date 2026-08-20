@@ -37,6 +37,7 @@ function event(value: string): OutboxEvent {
     businessDayId,
     aggregateType: 'BUSINESS_DAY',
     aggregateId: businessDayId,
+    aggregateRevision: 0,
     eventType: 'BUSINESS_DAY_STARTED',
     idempotencyKey: `business-day-started:${eventId}`,
     payloadVersion: 1,
@@ -60,16 +61,25 @@ function fakeDatabase(initial: readonly OutboxEvent[]) {
   const failures: Array<{ id: string; attemptCount: number; error: string }> = [];
   const outbox = {
     append: async () => undefined,
-    listPending: async () => pending.filter((candidate) => !delivered.includes(candidate.id) && !quarantined.includes(candidate.id)),
+    listPending: async () =>
+      pending.filter(
+        (candidate) => !delivered.includes(candidate.id) && !quarantined.includes(candidate.id),
+      ),
     markDelivered: async (id: OutboxEventId) => {
       delivered.push(id);
     },
-    recordFailure: async (id: OutboxEventId, attemptCount: number, _nextAttemptAt: string, lastError: string) => {
+    recordFailure: async (
+      id: OutboxEventId,
+      attemptCount: number,
+      _nextAttemptAt: string,
+      lastError: string,
+    ) => {
       failures.push({ id, attemptCount, error: lastError });
     },
     quarantine: async (id: OutboxEventId) => {
       quarantined.push(id);
     },
+    quarantineDependents: async () => 0,
   };
   const database = {
     transaction: async <Result>(work: (transaction: OperationsTransaction) => Promise<Result>) =>

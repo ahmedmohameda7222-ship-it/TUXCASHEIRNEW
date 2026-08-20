@@ -112,8 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_order_drafts_checkout_intent
            WHERE shop_id = ? AND business_day_id = ? AND draft_scope_id = ?`,
         )
         .get(validated.shopId, validated.businessDayId, validated.draftScopeId) as
-        | { revision?: unknown }
-        | undefined;
+        { revision?: unknown } | undefined;
       if (existing !== undefined && Number(existing.revision) > validated.revision) {
         throw new Error('Refusing to overwrite a newer durable order draft revision.');
       }
