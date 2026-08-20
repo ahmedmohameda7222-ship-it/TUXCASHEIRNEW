@@ -5,6 +5,7 @@ import {
   deleteManualExpense,
   editManualExpense,
   isExpenseDeleted,
+  operationsSyncPayloadJson,
   parseEntityId,
   type AuditEvent,
   type AuditEventId,
@@ -17,6 +18,7 @@ import {
   type JsonValue,
   type ManualExpenseRecord,
   type MoneyMinor,
+  type OperationsSyncPayloadV1,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -37,13 +39,14 @@ export interface ExpensesRuntime {
 }
 
 export interface ManualExpenseInput {
+  readonly commandId: string;
   readonly description: string;
   readonly amountMinor: MoneyMinor;
   readonly paidFrom: ExpensePaidFrom;
   readonly note: string | null;
 }
 
-export interface EditManualExpenseInput extends ManualExpenseInput {
+export interface EditManualExpenseInput extends Omit<ManualExpenseInput, 'commandId'> {
   readonly expenseId: ExpenseId;
 }
 
@@ -74,6 +77,25 @@ function domainError(cause: unknown, fallback: string): ApplicationError {
     return { code: 'VALIDATION_ERROR', message: cause.message, cause };
   }
   return persistenceError(fallback, cause);
+}
+
+function commandExpenseId(commandId: string): ExpenseId {
+  try {
+    return parseEntityId<ExpenseId>(commandId.trim());
+  } catch (cause) {
+    throw new DomainInvariantError('Expense command ID must be a UUID.', { cause });
+  }
+}
+
+function sameCreatePayload(existing: ManualExpenseRecord, input: ManualExpenseInput): boolean {
+  return (
+    existing.description === input.description.trim() &&
+    existing.amountMinor === input.amountMinor &&
+    existing.paidFrom === input.paidFrom &&
+    existing.note === (input.note?.trim() || null) &&
+    existing.lifecycle.revision === 0 &&
+    existing.lifecycle.deletedAt === null
+  );
 }
 
 export class OperationsExpensesService {
@@ -135,12 +157,25 @@ export class OperationsExpensesService {
       const contextResult = await this.#resolveMutationContext();
       if (!contextResult.ok) return contextResult;
       const context = contextResult.value;
-      const now = this.#runtime.now();
-      let expense: ManualExpenseRecord;
       try {
-        expense = createManualExpense(
+        const expenseId = commandExpenseId(input.commandId);
+        const existing = await this.#store.getById(expenseId);
+        if (existing !== null) {
+          if (
+            existing.kind === 'MANUAL' &&
+            existing.shopId === context.shopId &&
+            existing.businessDayId === context.businessDayId &&
+            sameCreatePayload(existing, input)
+          ) {
+            return ok(existing);
+          }
+          return err({ code: 'CONFLICT_ERROR', message: 'Expense command identity conflict.' });
+        }
+
+        const now = this.#runtime.now();
+        const expense = createManualExpense(
           {
-            id: this.#id<ExpenseId>(),
+            id: expenseId,
             shopId: context.shopId,
             businessDayId: context.businessDayId,
             createdByWorkerId: context.operator.id,
@@ -148,10 +183,6 @@ export class OperationsExpensesService {
           },
           input,
         );
-      } catch (cause) {
-        return err(domainError(cause, 'Expense validation failed.'));
-      }
-      try {
         await this.#store.commitMutation({
           action: 'CREATE',
           expectedBusinessDayId: context.businessDayId,
@@ -163,9 +194,7 @@ export class OperationsExpensesService {
         });
         return ok(expense);
       } catch (cause) {
-        return err(
-          persistenceError('The expense was not saved because the local commit failed.', cause),
-        );
+        return err(domainError(cause, 'The expense was not saved because the local commit failed.'));
       }
     });
   }
@@ -178,10 +207,7 @@ export class OperationsExpensesService {
       try {
         const existing = await this.#currentExpense(context, input.expenseId);
         if (existing.kind !== 'MANUAL') {
-          return err({
-            code: 'CONFLICT_ERROR',
-            message: 'Delivery Failed system records are locked.',
-          });
+          return err({ code: 'CONFLICT_ERROR', message: 'Delivery Failed system records are locked.' });
         }
         const now = this.#runtime.now();
         const expense = editManualExpense(existing, input, now, context.operator.id);
@@ -209,10 +235,7 @@ export class OperationsExpensesService {
       try {
         const existing = await this.#currentExpense(context, expenseId);
         if (existing.kind !== 'MANUAL') {
-          return err({
-            code: 'CONFLICT_ERROR',
-            message: 'Delivery Failed system records are locked.',
-          });
+          return err({ code: 'CONFLICT_ERROR', message: 'Delivery Failed system records are locked.' });
         }
         const now = this.#runtime.now();
         const expense = deleteManualExpense(existing, now, context.operator.id);
@@ -230,9 +253,7 @@ export class OperationsExpensesService {
         if (cause instanceof DomainInvariantError) {
           return err({ code: 'CONFLICT_ERROR', message: cause.message, cause });
         }
-        return err(
-          persistenceError('The expense could not be removed from the current ledger.', cause),
-        );
+        return err(persistenceError('The expense could not be removed from the current ledger.', cause));
       }
     });
   }
@@ -316,6 +337,7 @@ export class OperationsExpensesService {
     createdAt: Instant,
     eventType: 'EXPENSE_CREATED' | 'EXPENSE_EDITED' | 'EXPENSE_DELETED',
   ): OutboxEvent {
+    const payload = { eventType, version: 1, expense } satisfies OperationsSyncPayloadV1;
     return {
       id: this.#id<OutboxEventId>(),
       shopId: expense.shopId,
@@ -325,15 +347,7 @@ export class OperationsExpensesService {
       eventType,
       idempotencyKey: `expense:${expense.id}:${expense.lifecycle.revision}:${eventType}`,
       payloadVersion: 1,
-      payload: {
-        expenseId: expense.id,
-        businessDayId: expense.businessDayId,
-        description: expense.description,
-        amountMinor: expense.amountMinor,
-        paidFrom: expense.paidFrom,
-        revision: expense.lifecycle.revision,
-        softDeleted: expense.lifecycle.deletedAt !== null,
-      },
+      payload: operationsSyncPayloadJson(payload),
       createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
