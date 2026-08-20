@@ -5,6 +5,7 @@ import {
   bulkStockWholeUnitCount,
   canUndoBulkMovement,
   finishedBulkUnitDelta,
+  operationsSyncPayloadJson,
   parseEntityId,
   receivedBulkStockDelta,
   undoBulkMovementDelta,
@@ -19,6 +20,7 @@ import {
   type InventoryMovement,
   type InventoryMovementId,
   type JsonValue,
+  type OperationsSyncPayloadV1,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
@@ -169,10 +171,7 @@ export class OperationsBulkStockService {
           compensatesMovementId: null,
         };
         await this.#commit(context, movement, null);
-        return ok({
-          movement,
-          undoUntil: addMilliseconds(now, BULK_STOCK_UNDO_WINDOW_MS),
-        });
+        return ok({ movement, undoUntil: addMilliseconds(now, BULK_STOCK_UNDO_WINDOW_MS) });
       } catch (cause) {
         return this.#mutationError(
           cause,
@@ -209,10 +208,7 @@ export class OperationsBulkStockService {
           compensatesMovementId: null,
         };
         await this.#commit(context, movement, null);
-        return ok({
-          movement,
-          undoUntil: addMilliseconds(now, BULK_STOCK_UNDO_WINDOW_MS),
-        });
+        return ok({ movement, undoUntil: addMilliseconds(now, BULK_STOCK_UNDO_WINDOW_MS) });
       } catch (cause) {
         return this.#mutationError(cause, 'The stock receipt could not be committed locally.');
       }
@@ -351,6 +347,11 @@ export class OperationsBulkStockService {
   }
 
   #outbox(movement: InventoryMovement): OutboxEvent {
+    const payload = {
+      eventType: 'INVENTORY_MOVEMENT_RECORDED',
+      version: 1,
+      movement,
+    } satisfies OperationsSyncPayloadV1;
     return {
       id: this.#id<OutboxEventId>(),
       shopId: movement.shopId,
@@ -360,7 +361,7 @@ export class OperationsBulkStockService {
       eventType: 'INVENTORY_MOVEMENT_RECORDED',
       idempotencyKey: `inventory-movement:${movement.id}`,
       payloadVersion: 1,
-      payload: this.#movementPayload(movement),
+      payload: operationsSyncPayloadJson(payload),
       createdAt: movement.createdAt,
       attemptCount: 0,
       nextAttemptAt: null,
@@ -372,12 +373,16 @@ export class OperationsBulkStockService {
   #movementPayload(movement: InventoryMovement): Record<string, JsonValue> {
     return {
       movementId: movement.id,
+      shopId: movement.shopId,
       businessDayId: movement.businessDayId,
       itemId: movement.itemId,
       movementType: movement.movementType,
       quantityDeltaMicros: movement.quantityDeltaMicros,
       workerId: movement.workerId,
+      orderId: movement.orderId,
+      createdAt: movement.createdAt,
       compensatesMovementId: movement.compensatesMovementId,
+      idempotencyKey: movement.idempotencyKey,
     };
   }
 
