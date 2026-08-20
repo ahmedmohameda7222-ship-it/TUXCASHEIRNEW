@@ -5,10 +5,8 @@ import { AutomaticOutboxScheduler, HttpOutboxTransport, OutboxSyncService } from
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
-}): AutomaticOutboxScheduler | null {
-  const endpoint = import.meta.env['VITE_TUX_SYNC_ENDPOINT']?.trim();
-  if (endpoint === undefined || endpoint.length === 0) return null;
-
+}): AutomaticOutboxScheduler {
+  const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
   const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
     now: input.now,
   });
