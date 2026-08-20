@@ -110,6 +110,7 @@ export {
   type OperationsSyncEnvelopeV1,
   type OperationsSyncPayloadV1,
   type OrderTransitionSyncEventType,
+  type OrderTransitionSyncSnapshotV1,
   type WorkerSessionSyncEventType,
 } from './syncContract';
 export { suggestCashTenders, type TenderSuggestion } from './tender';
