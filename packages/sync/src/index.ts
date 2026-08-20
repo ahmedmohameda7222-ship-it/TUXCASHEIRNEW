@@ -20,9 +20,11 @@ export {
 export {
   SupabaseDeviceSessionManager,
   SupabaseInboundConfigurationProvider,
+  SupabaseOperationsBootstrapProvider,
   type SupabaseDeviceSessionManagerOptions,
   type SupabaseDeviceSessionRecord,
   type SupabaseDeviceSessionStore,
+  type SupabaseOperationsBootstrap,
 } from './supabaseDeviceSession';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
 export { buildSyncHealth, type SyncHealthSnapshot, type SyncHealthState } from './syncHealth';

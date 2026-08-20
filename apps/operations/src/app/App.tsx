@@ -1,6 +1,7 @@
 import { greetingForHour, type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
+import type { BrowserRemoteSetupDefaults, BrowserRemoteSetupInput } from './browserRemote';
 import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
@@ -45,6 +46,121 @@ function Brand() {
     <div className="tux-brand" aria-label="TUX">
       TUX
     </div>
+  );
+}
+
+function DeviceSetupScreen({
+  message,
+  defaults,
+  busy,
+  error,
+  onSubmit,
+}: {
+  readonly message: string;
+  readonly defaults: BrowserRemoteSetupDefaults;
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly onSubmit: (input: BrowserRemoteSetupInput) => Promise<void>;
+}) {
+  const [projectUrl, setProjectUrl] = useState(defaults.projectUrl);
+  const [publishableKey, setPublishableKey] = useState(defaults.publishableKey);
+  const [enrollmentCode, setEnrollmentCode] = useState('');
+  const [deviceLabel, setDeviceLabel] = useState(defaults.deviceLabel);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    await onSubmit({ projectUrl, publishableKey, enrollmentCode, deviceLabel });
+    setEnrollmentCode('');
+  }
+
+  const ready =
+    projectUrl.trim().length > 0 &&
+    publishableKey.trim().length > 0 &&
+    enrollmentCode.trim().length > 0;
+
+  return (
+    <main className="entry-shell">
+      <section className="entry-card device-setup-card" aria-labelledby="configuration-title">
+        <Brand />
+        <h1 id="configuration-title">TUX Operations</h1>
+        <p className="entry-state">Device setup required</p>
+        <p className="configuration-note">{message}</p>
+        <form className="remote-setup-form" onSubmit={submit}>
+          <label htmlFor="supabase-project-url">Supabase project URL</label>
+          <input
+            id="supabase-project-url"
+            name="supabase-project-url"
+            type="url"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={projectUrl}
+            onChange={(event) => setProjectUrl(event.target.value)}
+            placeholder="https://project.supabase.co"
+            disabled={busy}
+            required
+          />
+
+          <label htmlFor="supabase-publishable-key">Publishable key</label>
+          <input
+            id="supabase-publishable-key"
+            name="supabase-publishable-key"
+            type="text"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={publishableKey}
+            onChange={(event) => setPublishableKey(event.target.value)}
+            placeholder="sb_publishable_…"
+            disabled={busy}
+            required
+          />
+
+          <label htmlFor="device-enrollment-code">One-time enrollment code</label>
+          <input
+            id="device-enrollment-code"
+            name="device-enrollment-code"
+            type="password"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={enrollmentCode}
+            onChange={(event) => setEnrollmentCode(event.target.value)}
+            disabled={busy}
+            required
+          />
+
+          <label htmlFor="device-label">Device label</label>
+          <input
+            id="device-label"
+            name="device-label"
+            type="text"
+            autoComplete="off"
+            value={deviceLabel}
+            onChange={(event) => setDeviceLabel(event.target.value)}
+            placeholder="Front Counter Browser"
+            disabled={busy}
+            maxLength={120}
+          />
+
+          <p className="remote-setup-help">
+            Enrollment is one-time. The code is not stored after setup; the browser keeps the enrolled
+            device session locally for future launches.
+          </p>
+          {error === null ? null : (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="primary-action" type="submit" disabled={busy || !ready}>
+            {busy ? 'Connecting…' : 'Connect Device'}
+          </button>
+        </form>
+      </section>
+    </main>
   );
 }
 
@@ -387,6 +503,20 @@ export function App() {
     };
   }, [client]);
 
+  async function setupRemoteDevice(input: BrowserRemoteSetupInput): Promise<void> {
+    const setup = client.setupRemoteDevice;
+    if (setup === undefined) return;
+    setBusy(true);
+    setError(null);
+    const result = await setup(input);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
+  }
+
   async function applyPin(pin: string): Promise<boolean> {
     setBusy(true);
     setError(null);
@@ -434,6 +564,23 @@ export function App() {
     return <main className="loading-shell" aria-label="Loading TUX Operations" />;
   if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
+    if (client.setupRemoteDevice !== undefined) {
+      return (
+        <DeviceSetupScreen
+          message={screen.session.message}
+          defaults={
+            client.remoteSetupDefaults ?? {
+              projectUrl: '',
+              publishableKey: '',
+              deviceLabel: 'Browser POS',
+            }
+          }
+          busy={busy}
+          error={error}
+          onSubmit={setupRemoteDevice}
+        />
+      );
+    }
     return (
       <main className="entry-shell">
         <section className="entry-card" aria-labelledby="configuration-title">

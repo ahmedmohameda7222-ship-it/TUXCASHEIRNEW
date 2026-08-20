@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   SupabaseDeviceSessionManager,
   SupabaseInboundConfigurationProvider,
+  SupabaseOperationsBootstrapProvider,
   type SupabaseDeviceSessionRecord,
   type SupabaseDeviceSessionStore,
 } from './supabaseDeviceSession';
@@ -158,5 +159,68 @@ describe('SupabaseInboundConfigurationProvider', () => {
       authorization: 'Bearer access-1',
       'x-tux-device-id': DEVICE_ID,
     });
+  });
+});
+
+describe('SupabaseOperationsBootstrapProvider', () => {
+  it('returns the authorized shop, device, and active worker profiles', async () => {
+    const store = new MemoryStore();
+    store.session = {
+      shopId: SHOP_ID,
+      deviceId: DEVICE_ID,
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      expiresAt: 10_000,
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        bootstrap: {
+          shop: { id: SHOP_ID, name: 'TUX', active: true },
+          device: {
+            id: DEVICE_ID,
+            shopId: SHOP_ID,
+            label: 'Browser POS',
+            active: true,
+          },
+          workers: [
+            {
+              id: '20000000-0000-4000-8000-000000000001',
+              shopId: SHOP_ID,
+              displayName: 'Preview Worker',
+              pinHash: 'pbkdf2-sha256$100000$aa$bb',
+              active: true,
+            },
+          ],
+        },
+      }),
+    );
+    const manager = new SupabaseDeviceSessionManager({
+      projectUrl: 'https://example.supabase.co',
+      publishableKey: 'sb_publishable_test',
+      store,
+      fetcher,
+      nowEpochSeconds: () => 1_000,
+    });
+    const provider = new SupabaseOperationsBootstrapProvider({
+      projectUrl: 'https://example.supabase.co',
+      session: manager,
+      fetcher,
+    });
+
+    const bootstrap = await provider.fetch(SHOP_ID);
+
+    expect(bootstrap.shop).toEqual({ id: SHOP_ID, name: 'TUX', active: true });
+    expect(bootstrap.device.label).toBe('Browser POS');
+    expect(bootstrap.workers).toHaveLength(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.objectContaining({ search: expect.stringContaining('bootstrap=1') }),
+      expect.objectContaining({
+        headers: {
+          apikey: 'sb_publishable_test',
+          authorization: 'Bearer access-1',
+          'x-tux-device-id': DEVICE_ID,
+        },
+      }),
+    );
   });
 });

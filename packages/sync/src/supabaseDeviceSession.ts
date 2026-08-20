@@ -1,4 +1,12 @@
-import { parseEntityId, type ShopId } from '@tux/domain';
+import {
+  parseEntityId,
+  type Device,
+  type DeviceId,
+  type Shop,
+  type ShopId,
+  type Worker,
+  type WorkerId,
+} from '@tux/domain';
 
 export interface SupabaseDeviceSessionRecord {
   readonly shopId: ShopId;
@@ -22,6 +30,12 @@ export interface SupabaseDeviceSessionManagerOptions {
   readonly timeoutMs?: number;
 }
 
+export interface SupabaseOperationsBootstrap {
+  readonly shop: Shop;
+  readonly device: Device;
+  readonly workers: readonly Worker[];
+}
+
 const DEFAULT_SUPABASE_TIMEOUT_MS = 10_000;
 
 function projectUrl(value: string): string {
@@ -35,6 +49,11 @@ function required(value: unknown, label: string): string {
     throw new TypeError(`${label} is required.`);
   }
   return value.trim();
+}
+
+function booleanValue(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean.`);
+  return value;
 }
 
 function positiveEpoch(value: unknown, label: string): number {
@@ -111,6 +130,71 @@ function parseRefreshResponse(
     refreshToken: required(source['refresh_token'], 'Supabase refresh refresh_token'),
     expiresAt: normalizedExpiry,
   };
+}
+
+function objectValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function parseOperationsBootstrap(
+  value: unknown,
+  expectedShopId: ShopId,
+  expectedDeviceId: string,
+): SupabaseOperationsBootstrap {
+  const body = objectValue(value, 'Operations bootstrap response');
+  const bootstrap = objectValue(body['bootstrap'], 'Operations bootstrap payload');
+  const shopSource = objectValue(bootstrap['shop'], 'Operations bootstrap shop');
+  const deviceSource = objectValue(bootstrap['device'], 'Operations bootstrap device');
+  const workersSource = bootstrap['workers'];
+  if (!Array.isArray(workersSource)) {
+    throw new TypeError('Operations bootstrap workers must be an array.');
+  }
+
+  const shop: Shop = {
+    id: parseEntityId<ShopId>(required(shopSource['id'], 'Operations bootstrap shop id')),
+    name: required(shopSource['name'], 'Operations bootstrap shop name'),
+    active: booleanValue(shopSource['active'], 'Operations bootstrap shop active'),
+  };
+  if (shop.id !== expectedShopId || !shop.active) {
+    throw new Error('Operations bootstrap shop does not match the enrolled active shop.');
+  }
+
+  const device: Device = {
+    id: parseEntityId<DeviceId>(required(deviceSource['id'], 'Operations bootstrap device id')),
+    shopId: parseEntityId<ShopId>(
+      required(deviceSource['shopId'], 'Operations bootstrap device shopId'),
+    ),
+    label: required(deviceSource['label'], 'Operations bootstrap device label'),
+    active: booleanValue(deviceSource['active'], 'Operations bootstrap device active'),
+  };
+  if (device.id !== expectedDeviceId || device.shopId !== expectedShopId || !device.active) {
+    throw new Error('Operations bootstrap device does not match the enrolled active device.');
+  }
+
+  const workers = workersSource.map((workerValue, index): Worker => {
+    const source = objectValue(workerValue, `Operations bootstrap worker ${index}`);
+    const worker: Worker = {
+      id: parseEntityId<WorkerId>(required(source['id'], `Operations bootstrap worker ${index} id`)),
+      shopId: parseEntityId<ShopId>(
+        required(source['shopId'], `Operations bootstrap worker ${index} shopId`),
+      ),
+      displayName: required(
+        source['displayName'],
+        `Operations bootstrap worker ${index} displayName`,
+      ),
+      pinHash: required(source['pinHash'], `Operations bootstrap worker ${index} pinHash`),
+      active: booleanValue(source['active'], `Operations bootstrap worker ${index} active`),
+    };
+    if (worker.shopId !== expectedShopId || !worker.active) {
+      throw new Error('Operations bootstrap returned a worker outside the enrolled active shop.');
+    }
+    return worker;
+  });
+
+  return { shop, device, workers };
 }
 
 export class SupabaseDeviceSessionManager {
@@ -275,5 +359,41 @@ export class SupabaseInboundConfigurationProvider {
       throw new TypeError('Remote configuration response must be an object.');
     }
     return body as Record<string, unknown>;
+  }
+}
+
+export class SupabaseOperationsBootstrapProvider {
+  readonly #projectUrl: string;
+  readonly #session: SupabaseDeviceSessionManager;
+  readonly #fetcher: typeof fetch;
+  readonly #timeoutMs: number;
+
+  constructor(input: {
+    readonly projectUrl: string;
+    readonly session: SupabaseDeviceSessionManager;
+    readonly fetcher?: typeof fetch;
+    readonly timeoutMs?: number;
+  }) {
+    this.#projectUrl = projectUrl(input.projectUrl);
+    this.#session = input.session;
+    this.#fetcher = input.fetcher ?? fetch;
+    this.#timeoutMs = timeoutMs(input.timeoutMs);
+  }
+
+  async fetch(shopId: ShopId): Promise<SupabaseOperationsBootstrap> {
+    const session = await this.#session.requiredSession();
+    if (session.shopId !== shopId) throw new Error('Device session belongs to a different shop.');
+    const url = new URL(`${this.#projectUrl}/functions/v1/operations-config`);
+    url.searchParams.set('shopId', shopId);
+    url.searchParams.set('bootstrap', '1');
+    const response = await fetchWithTimeout(
+      this.#fetcher,
+      url,
+      { headers: await this.#session.authorizationHeaders() },
+      this.#timeoutMs,
+      'Remote Operations bootstrap request',
+    );
+    if (!response.ok) throw new Error(`Remote bootstrap request failed with HTTP ${response.status}.`);
+    return parseOperationsBootstrap(await response.json(), shopId, session.deviceId);
   }
 }

@@ -1,0 +1,43 @@
+.device-setup-card {
+  width: min(100%, 34rem);
+}
+
+.remote-setup-form {
+  display: grid;
+  gap: var(--tux-space-3);
+  margin-top: var(--tux-space-6);
+  text-align: left;
+}
+
+.remote-setup-form label {
+  margin-top: var(--tux-space-1);
+  font-size: var(--tux-font-size-sm);
+  font-weight: 700;
+}
+
+.remote-setup-form input {
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: 0 var(--tux-space-4);
+}
+
+.remote-setup-form input::placeholder {
+  color: var(--tux-text-secondary);
+}
+
+.remote-setup-help {
+  margin: var(--tux-space-2) 0 0;
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+  line-height: 1.55;
+}
+
+@media (max-width: 560px) {
+  .device-setup-card {
+    padding-inline: var(--tux-space-5);
+  }
+}

@@ -1,17 +1,29 @@
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
-import { AutomaticOutboxScheduler, HttpOutboxTransport, OutboxSyncService } from '@tux/sync';
+import {
+  AutomaticOutboxScheduler,
+  HttpOutboxTransport,
+  OutboxSyncService,
+  type SupabaseDeviceSessionManager,
+} from '@tux/sync';
 
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
-}): AutomaticOutboxScheduler | null {
-  const endpoint = import.meta.env['VITE_TUX_SYNC_ENDPOINT']?.trim();
-  if (endpoint === undefined || endpoint.length === 0) return null;
+  readonly projectUrl: string;
+  readonly sessionManager: SupabaseDeviceSessionManager;
+}): AutomaticOutboxScheduler {
+  const explicitEndpoint = import.meta.env['VITE_TUX_SYNC_ENDPOINT']?.trim();
+  const endpoint =
+    explicitEndpoint && explicitEndpoint.length > 0
+      ? explicitEndpoint
+      : `${input.projectUrl.replace(/\/$/, '')}/functions/v1/operations-sync`;
 
-  const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
-    now: input.now,
+  const transport = new HttpOutboxTransport({
+    endpoint,
+    headerProvider: () => input.sessionManager.authorizationHeaders(),
   });
+  const service = new OutboxSyncService(input.database, transport, { now: input.now });
   const scheduler = new AutomaticOutboxScheduler(service);
   scheduler.start();
   return scheduler;

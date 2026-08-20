@@ -2,12 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import { buildRemoteMaterializationPlanV1 } from '@tux/remote-materializer';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-headers': 'apikey, authorization, content-type, x-tux-device-id',
+  'access-control-allow-methods': 'POST, OPTIONS',
+} as const;
 
 function jsonResponse(status: number, body: Readonly<Record<string, unknown>>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { ...CORS_HEADERS, 'content-type': 'application/json; charset=utf-8' },
   });
+}
+
+function preflightResponse(): Response {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 function stableJson(value: unknown): string {
@@ -33,6 +42,7 @@ function bearerToken(request: Request): string | null {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return preflightResponse();
   if (request.method !== 'POST') return jsonResponse(405, { error: 'method_not_allowed' });
 
   const token = bearerToken(request);
