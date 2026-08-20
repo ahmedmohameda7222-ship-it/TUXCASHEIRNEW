@@ -6,6 +6,7 @@ import {
   HttpOutboxTransport,
   OutboxSyncService,
   SupabaseDeviceSessionManager,
+  type SupabaseDeviceSessionRecord,
 } from '@tux/sync';
 import { app } from 'electron';
 import { ElectronSafeStorageDeviceSessionStore } from './secureDeviceSessionStore';
@@ -23,25 +24,24 @@ function createSessionManager(): SupabaseDeviceSessionManager | null {
   });
 }
 
-async function ensureEnrolled(
+export async function ensureDesktopSupabaseDeviceSession(
   manager: SupabaseDeviceSessionManager,
-): Promise<Readonly<Record<string, string>>> {
+): Promise<SupabaseDeviceSessionRecord> {
   const existing = await manager.currentSession();
-  if (existing !== null) return manager.authorizationHeaders();
+  if (existing !== null) return existing;
 
   const enrollmentCode = process.env['TUX_DEVICE_ENROLLMENT_CODE']?.trim();
   const deviceId = process.env['TUX_DEVICE_ID']?.trim();
   if (!enrollmentCode || !deviceId) {
     throw new Error(
-      'TUX Operations remote sync requires an enrolled device or first-run enrollment credentials.',
+      'TUX Operations remote integration requires an enrolled device or first-run enrollment credentials.',
     );
   }
-  await manager.enroll({
+  return manager.enroll({
     enrollmentCode,
     deviceId,
     deviceLabel: process.env['TUX_DEVICE_LABEL']?.trim(),
   });
-  return manager.authorizationHeaders();
 }
 
 export function createDesktopSupabaseDeviceSessionManager(): SupabaseDeviceSessionManager | null {
@@ -68,9 +68,11 @@ export function startDesktopAutomaticSync(input: {
 
   let enrollmentInFlight: Promise<Readonly<Record<string, string>>> | null = null;
   const headerProvider = async () => {
-    enrollmentInFlight ??= ensureEnrolled(sessionManager).finally(() => {
-      enrollmentInFlight = null;
-    });
+    enrollmentInFlight ??= ensureDesktopSupabaseDeviceSession(sessionManager)
+      .then(() => sessionManager.authorizationHeaders())
+      .finally(() => {
+        enrollmentInFlight = null;
+      });
     return enrollmentInFlight;
   };
 
