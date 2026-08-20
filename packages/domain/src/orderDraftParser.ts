@@ -4,6 +4,7 @@ import {
   type BusinessDayId,
   type DeliveryZoneId,
   type DraftLineId,
+  type EntityId,
   type ModifierId,
   type OrderTypeId,
   type PaymentMethodId,
@@ -60,13 +61,10 @@ function uuid(value: unknown, path: string): string {
   return text;
 }
 
-function entityId<Id extends Parameters<typeof parseEntityId>[0] extends never ? never : string>(
-  value: unknown,
-  path: string,
-): Id {
+function entityId<Id extends EntityId>(value: unknown, path: string): Id {
   const text = uuid(value, path);
   try {
-    return parseEntityId(text) as Id;
+    return parseEntityId<Id>(text);
   } catch (cause) {
     throw new InvalidOrderDraftError(`${path} must be a valid entity ID.`, { cause });
   }
