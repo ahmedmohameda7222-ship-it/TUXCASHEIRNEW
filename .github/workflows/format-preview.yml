@@ -1,0 +1,24 @@
+name: TUX V2 Format Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Print exact Prettier diff
+        run: |
+          npx prettier --write "apps/**/*.{ts,tsx,css,html,json}" "packages/**/*.{ts,tsx,css,json}" "e2e/**/*.{ts,tsx}" "*.{json,mjs,ts}" ".github/**/*.yml"
+          git diff -- apps packages .github
