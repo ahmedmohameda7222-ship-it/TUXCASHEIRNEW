@@ -120,7 +120,6 @@ async function initializeOperationsServices(): Promise<void> {
   });
   automaticSyncScheduler = startDesktopAutomaticSync({
     database: operationsDatabase,
-    coordinator,
     now: runtime.now,
   });
 }
