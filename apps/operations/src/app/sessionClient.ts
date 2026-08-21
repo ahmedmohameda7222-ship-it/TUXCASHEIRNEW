@@ -2,13 +2,15 @@ import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
   OperationsBulkStockService,
+  OperationsConfigurationSyncService,
   OperationsEndDayService,
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  err,
   type OperationsSessionResult,
 } from '@tux/application';
-import { instant } from '@tux/domain';
+import { instant, type ShopId } from '@tux/domain';
 import {
   IndexedDbBulkStockStore,
   IndexedDbExpenseLedgerStore,
@@ -24,6 +26,7 @@ import type {
   TuxOrdersBoardApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
+import { VercelBrowserRemoteGateway } from './browserRemote';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
@@ -31,6 +34,7 @@ export interface OperationsSessionClient {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
+  enrollDevice?(enrollmentCode: string): Promise<OperationsSessionResult>;
 }
 
 export type OperationsOrdersClient = TuxOrdersApi;
@@ -46,6 +50,7 @@ interface BrowserRuntime {
   readonly expenses: OperationsExpensesService;
   readonly bulkStock: OperationsBulkStockService;
   readonly endDay: OperationsEndDayService;
+  enrollDevice(enrollmentCode: string): Promise<OperationsSessionResult>;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -68,15 +73,47 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         now: () => instant(new Date()),
         createUuid: () => crypto.randomUUID(),
       };
-      startBrowserAutomaticSync({ database, now: runtime.now });
+
+      const remoteGateway = new VercelBrowserRemoteGateway();
+      const configurationService = new OperationsConfigurationSyncService(
+        database,
+        coordinator,
+        remoteGateway,
+      );
+      let automaticSyncStarted = false;
+      let configurationTimerStarted = false;
+
+      const startRemoteRuntime = (shopId: ShopId): void => {
+        if (!automaticSyncStarted) {
+          startBrowserAutomaticSync({ database, now: runtime.now });
+          automaticSyncStarted = true;
+        }
+        if (!configurationTimerStarted) {
+          window.setInterval(() => void configurationService.sync(shopId), 5 * 60 * 1000);
+          configurationTimerStarted = true;
+        }
+      };
+
+      try {
+        const remoteSession = await remoteGateway.currentSession();
+        if (remoteSession !== null) {
+          await configurationService.sync(remoteSession.shopId);
+          startRemoteRuntime(remoteSession.shopId);
+        }
+      } catch {
+        // Browser Operations stays usable from the last known-good local snapshot.
+      }
+
+      const session = new CoordinatedOperationsSessionService(
+        database,
+        readModel,
+        new BrowserPbkdf2PinVerifier(),
+        runtime,
+        coordinator,
+      );
+
       return {
-        session: new CoordinatedOperationsSessionService(
-          database,
-          readModel,
-          new BrowserPbkdf2PinVerifier(),
-          runtime,
-          coordinator,
-        ),
+        session,
         orders: new OperationsOrdersService(
           database,
           readModel,
@@ -108,6 +145,41 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
+        enrollDevice: async (enrollmentCode) => {
+          try {
+            const remoteSession = await remoteGateway.enroll(enrollmentCode);
+            const configuration = await configurationService.sync(remoteSession.shopId);
+            if (configuration.status === 'REMOTE_UNAVAILABLE') {
+              return err({
+                code: 'REMOTE_SYNC_ERROR',
+                message: 'Device enrolled, but the Operations configuration is unavailable.',
+              });
+            }
+            if (
+              configuration.status === 'INVALID_REMOTE_CONFIGURATION' ||
+              configuration.status === 'LOCAL_PERSISTENCE_ERROR'
+            ) {
+              return err({
+                code:
+                  configuration.status === 'LOCAL_PERSISTENCE_ERROR'
+                    ? 'LOCAL_PERSISTENCE_ERROR'
+                    : 'REMOTE_SYNC_ERROR',
+                message: 'Could not install the Operations configuration on this device.',
+              });
+            }
+            startRemoteRuntime(remoteSession.shopId);
+            return session.getState();
+          } catch (cause) {
+            return err({
+              code: 'REMOTE_SYNC_ERROR',
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : 'Could not complete TUX Operations device setup.',
+              cause,
+            });
+          }
+        },
       };
     })();
   }
@@ -121,6 +193,8 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     getState: async () => (await browserRuntime()).session.getState(),
     submitPin: async (pin: string) => (await browserRuntime()).session.submitPin(pin),
     signOut: async () => (await browserRuntime()).session.signOut(),
+    enrollDevice: async (enrollmentCode: string) =>
+      (await browserRuntime()).enrollDevice(enrollmentCode),
   };
 }
 

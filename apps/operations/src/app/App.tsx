@@ -96,6 +96,71 @@ function PinForm({
   );
 }
 
+function DeviceSetupScreen({
+  message,
+  busy,
+  error,
+  canEnroll,
+  onEnroll,
+}: {
+  readonly message: string;
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly canEnroll: boolean;
+  readonly onEnroll: (enrollmentCode: string) => Promise<void>;
+}) {
+  const [enrollmentCode, setEnrollmentCode] = useState('');
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !canEnroll) return;
+    await onEnroll(enrollmentCode);
+  }
+
+  return (
+    <main className="entry-shell">
+      <section className="entry-card" aria-labelledby="configuration-title">
+        <Brand />
+        <h1 id="configuration-title">TUX Operations</h1>
+        <p className="entry-state">Device setup required</p>
+        <p className="configuration-note">{message}</p>
+        {canEnroll ? (
+          <form className="pin-form" onSubmit={submit}>
+            <label htmlFor="device-enrollment-code">Device enrollment code</label>
+            <input
+              id="device-enrollment-code"
+              name="device-enrollment-code"
+              type="password"
+              autoComplete="off"
+              value={enrollmentCode}
+              onChange={(event) => setEnrollmentCode(event.target.value.trim())}
+              disabled={busy}
+              autoFocus
+              aria-describedby={error === null ? undefined : 'device-enrollment-error'}
+            />
+            {error === null ? null : (
+              <p className="form-error" id="device-enrollment-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button
+              className="primary-action"
+              type="submit"
+              disabled={busy || enrollmentCode.length === 0}
+            >
+              {busy ? 'Connecting…' : 'Enroll Device'}
+            </button>
+          </form>
+        ) : error === null ? null : (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    </main>
+  );
+}
+
 function EntryScreen({
   session,
   busy,
@@ -237,10 +302,10 @@ function ActiveShell({
         <div className="header-actions">
           <span
             className="sync-status"
-            aria-label="Remote sync status: Local only"
-            title="Remote sync is not configured. Business operations remain durably saved locally."
+            aria-label="Operations persistence: Local-first"
+            title="Business operations save locally first. Remote sync runs automatically when this device is enrolled."
           >
-            Local only
+            Local-first
           </span>
           <button type="button" className="theme-trigger" onClick={cycleTheme}>
             Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
@@ -406,6 +471,19 @@ export function App() {
     return true;
   }
 
+  async function enrollDevice(enrollmentCode: string): Promise<void> {
+    if (client.enrollDevice === undefined) return;
+    setBusy(true);
+    setError(null);
+    const result = await client.enrollDevice(enrollmentCode);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setScreen({ kind: 'SESSION', session: result.value });
+  }
+
   async function signOut(): Promise<void> {
     setBusy(true);
     setError(null);
@@ -435,14 +513,13 @@ export function App() {
   if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
     return (
-      <main className="entry-shell">
-        <section className="entry-card" aria-labelledby="configuration-title">
-          <Brand />
-          <h1 id="configuration-title">TUX Operations</h1>
-          <p className="entry-state">Device setup required</p>
-          <p className="configuration-note">{screen.session.message}</p>
-        </section>
-      </main>
+      <DeviceSetupScreen
+        message={screen.session.message}
+        busy={busy}
+        error={error}
+        canEnroll={client.enrollDevice !== undefined}
+        onEnroll={enrollDevice}
+      />
     );
   }
   if (screen.session.status === 'NO_ACTIVE_DAY' || screen.session.status === 'SIGN_IN_REQUIRED') {
