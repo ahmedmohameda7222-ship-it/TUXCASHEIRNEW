@@ -79,6 +79,7 @@ jobs:
       - name: Edge Function typecheck
         run: |
           deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
           deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
           deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
       - name: Install Playwright Chromium

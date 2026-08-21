@@ -7,7 +7,7 @@ import './styles/orders-board.css';
 import './styles/expenses.css';
 import './styles/bulk-stock.css';
 import './styles/end-day.css';
-import { App } from './app/App';
+import { BrowserBootstrapGate } from './app/BrowserBootstrapGate';
 
 const rootElement = document.getElementById('root');
 
@@ -17,6 +17,6 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <BrowserBootstrapGate />
   </StrictMode>,
 );

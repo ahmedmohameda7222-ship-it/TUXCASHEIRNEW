@@ -34,7 +34,7 @@ export interface OperationsSessionClient {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
-  enrollDevice?(enrollmentCode: string): Promise<OperationsSessionResult>;
+  enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
 export type OperationsOrdersClient = TuxOrdersApi;
@@ -50,7 +50,7 @@ interface BrowserRuntime {
   readonly expenses: OperationsExpensesService;
   readonly bulkStock: OperationsBulkStockService;
   readonly endDay: OperationsEndDayService;
-  enrollDevice(enrollmentCode: string): Promise<OperationsSessionResult>;
+  submitPin(pin: string): Promise<OperationsSessionResult>;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -112,6 +112,63 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
       );
 
+      const bootstrapWithPin = async (pin: string): Promise<OperationsSessionResult> => {
+        try {
+          const bootstrap = await remoteGateway.bootstrap(pin);
+          await database.transaction(async (transaction) => {
+            await transaction.shops.put(bootstrap.shop);
+            await transaction.workers.put(bootstrap.worker);
+          });
+
+          const configuration = await configurationService.sync(bootstrap.shopId);
+          if (configuration.status === 'REMOTE_UNAVAILABLE') {
+            return err({
+              code: 'REMOTE_SYNC_ERROR',
+              message: 'PIN accepted, but the Operations configuration is unavailable.',
+            });
+          }
+          if (
+            configuration.status === 'INVALID_REMOTE_CONFIGURATION' ||
+            configuration.status === 'LOCAL_PERSISTENCE_ERROR'
+          ) {
+            return err({
+              code:
+                configuration.status === 'LOCAL_PERSISTENCE_ERROR'
+                  ? 'LOCAL_PERSISTENCE_ERROR'
+                  : 'REMOTE_SYNC_ERROR',
+              message: 'Could not install the Operations configuration on this browser.',
+            });
+          }
+          startRemoteRuntime(bootstrap.shopId);
+          return session.submitPin(pin);
+        } catch (cause) {
+          return err({
+            code: 'REMOTE_SYNC_ERROR',
+            message:
+              cause instanceof Error ? cause.message : 'Could not sign in to TUX Operations.',
+            cause,
+          });
+        }
+      };
+
+      const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
+        const local = await session.submitPin(pin);
+        if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') return local;
+
+        const needsRemoteBootstrap =
+          (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
+          (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
+        if (!needsRemoteBootstrap) return local;
+
+        const remote = await bootstrapWithPin(pin);
+        if (!remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok) {
+          return local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
+            ? local
+            : remote;
+        }
+        return remote;
+      };
+
       return {
         session,
         orders: new OperationsOrdersService(
@@ -145,41 +202,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
-        enrollDevice: async (enrollmentCode) => {
-          try {
-            const remoteSession = await remoteGateway.enroll(enrollmentCode);
-            const configuration = await configurationService.sync(remoteSession.shopId);
-            if (configuration.status === 'REMOTE_UNAVAILABLE') {
-              return err({
-                code: 'REMOTE_SYNC_ERROR',
-                message: 'Device enrolled, but the Operations configuration is unavailable.',
-              });
-            }
-            if (
-              configuration.status === 'INVALID_REMOTE_CONFIGURATION' ||
-              configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-            ) {
-              return err({
-                code:
-                  configuration.status === 'LOCAL_PERSISTENCE_ERROR'
-                    ? 'LOCAL_PERSISTENCE_ERROR'
-                    : 'REMOTE_SYNC_ERROR',
-                message: 'Could not install the Operations configuration on this device.',
-              });
-            }
-            startRemoteRuntime(remoteSession.shopId);
-            return session.getState();
-          } catch (cause) {
-            return err({
-              code: 'REMOTE_SYNC_ERROR',
-              message:
-                cause instanceof Error
-                  ? cause.message
-                  : 'Could not complete TUX Operations device setup.',
-              cause,
-            });
-          }
-        },
+        submitPin,
       };
     })();
   }
@@ -191,10 +214,9 @@ export function createOperationsSessionClient(): OperationsSessionClient {
   if (desktop !== undefined) return desktop.session;
   return {
     getState: async () => (await browserRuntime()).session.getState(),
-    submitPin: async (pin: string) => (await browserRuntime()).session.submitPin(pin),
+    submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
     signOut: async () => (await browserRuntime()).session.signOut(),
-    enrollDevice: async (enrollmentCode: string) =>
-      (await browserRuntime()).enrollDevice(enrollmentCode),
+    enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
   };
 }
 
