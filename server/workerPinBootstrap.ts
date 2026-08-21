@@ -1,11 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
-import {
-  readJsonBody,
-  requireSameOrigin,
-  requireServerConfig,
-  sendJson,
-} from './supabaseGateway';
+import { readJsonBody, requireSameOrigin, requireServerConfig, sendJson } from './supabaseGateway';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COOKIE_ACCESS = 'tux_ops_access';
@@ -22,11 +17,7 @@ function requiredString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function cookie(
-  name: string,
-  value: string,
-  maxAge = COOKIE_MAX_AGE_SECONDS,
-): string {
+function cookie(name: string, value: string, maxAge = COOKIE_MAX_AGE_SECONDS): string {
   return `${name}=${encodeURIComponent(value)}; Path=/api; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 
@@ -54,16 +45,13 @@ function persistSession(
 }
 
 function rateLimitKey(request: GatewayRequest, deviceId: string): string {
-  const forwarded =
-    firstHeader(request.headers['x-forwarded-for']).split(',')[0]?.trim() ?? '';
+  const forwarded = firstHeader(request.headers['x-forwarded-for']).split(',')[0]?.trim() ?? '';
   const realIp = firstHeader(request.headers['x-real-ip']).trim();
   const vercelForwarded =
     firstHeader(request.headers['x-vercel-forwarded-for']).split(',')[0]?.trim() ?? '';
   const clientAddress = vercelForwarded || forwarded || realIp || 'unknown';
   const userAgent = firstHeader(request.headers['user-agent']).slice(0, 256);
-  return createHash('sha256')
-    .update(`${clientAddress}\n${deviceId}\n${userAgent}`)
-    .digest('hex');
+  return createHash('sha256').update(`${clientAddress}\n${deviceId}\n${userAgent}`).digest('hex');
 }
 
 function safeObject(value: unknown): Record<string, unknown> | null {
