@@ -7,6 +7,7 @@ import './styles/orders-board.css';
 import './styles/expenses.css';
 import './styles/bulk-stock.css';
 import './styles/end-day.css';
+import './styles/premium.css';
 import { BrowserBootstrapGate } from './app/BrowserBootstrapGate';
 
 const rootElement = document.getElementById('root');
