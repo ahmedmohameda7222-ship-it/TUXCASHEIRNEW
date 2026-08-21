@@ -22,7 +22,11 @@ function requiredString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function cookie(name: string, value: string, maxAge = COOKIE_MAX_AGE_SECONDS): string {
+function cookie(
+  name: string,
+  value: string,
+  maxAge = COOKIE_MAX_AGE_SECONDS,
+): string {
   return `${name}=${encodeURIComponent(value)}; Path=/api; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 
@@ -50,11 +54,11 @@ function persistSession(
 }
 
 function rateLimitKey(request: GatewayRequest, deviceId: string): string {
-  const forwarded = firstHeader(request.headers['x-forwarded-for']).split(',')[0]?.trim() ?? '';
+  const forwarded =
+    firstHeader(request.headers['x-forwarded-for']).split(',')[0]?.trim() ?? '';
   const realIp = firstHeader(request.headers['x-real-ip']).trim();
-  const vercelForwarded = firstHeader(request.headers['x-vercel-forwarded-for'])
-    .split(',')[0]
-    ?.trim() ?? '';
+  const vercelForwarded =
+    firstHeader(request.headers['x-vercel-forwarded-for']).split(',')[0]?.trim() ?? '';
   const clientAddress = vercelForwarded || forwarded || realIp || 'unknown';
   const userAgent = firstHeader(request.headers['user-agent']).slice(0, 256);
   return createHash('sha256')
@@ -87,7 +91,12 @@ export async function bootstrapDeviceWithWorkerPin(
   const deviceId = requiredString(body['deviceId']);
   const deviceLabel =
     typeof body['deviceLabel'] === 'string' ? body['deviceLabel'].trim().slice(0, 120) : '';
-  if (pin === null || !/^\d{4,12}$/.test(pin) || deviceId === null || !UUID_PATTERN.test(deviceId)) {
+  if (
+    pin === null ||
+    !/^\d{4,12}$/.test(pin) ||
+    deviceId === null ||
+    !UUID_PATTERN.test(deviceId)
+  ) {
     sendJson(response, 400, { error: 'invalid_bootstrap_request' });
     return;
   }
@@ -124,7 +133,9 @@ export async function bootstrapDeviceWithWorkerPin(
       sendJson(response, 429, { error: 'too_many_pin_attempts' });
       return;
     }
-    sendJson(response, upstream.status >= 500 ? 503 : 502, { error: 'device_bootstrap_failed' });
+    sendJson(response, upstream.status >= 500 ? 503 : 502, {
+      error: 'device_bootstrap_failed',
+    });
     return;
   }
 
