@@ -34,6 +34,7 @@ export interface OperationsSessionClient {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
   signOut(): Promise<OperationsSessionResult>;
+  enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
 export type OperationsOrdersClient = TuxOrdersApi;
@@ -150,6 +151,24 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         }
       };
 
+      const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
+        const local = await session.submitPin(pin);
+        if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') return local;
+
+        const needsRemoteBootstrap =
+          (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
+          (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
+        if (!needsRemoteBootstrap) return local;
+
+        const remote = await bootstrapWithPin(pin);
+        if (!remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok) {
+          return local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
+            ? local
+            : remote;
+        }
+        return remote;
+      };
+
       return {
         session,
         orders: new OperationsOrdersService(
@@ -183,23 +202,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
-        submitPin: async (pin) => {
-          const local = await session.submitPin(pin);
-          if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') return local;
-
-          const needsRemoteBootstrap =
-            (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
-            (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
-          if (!needsRemoteBootstrap) return local;
-
-          const remote = await bootstrapWithPin(pin);
-          if (!remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok) {
-            return local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
-              ? local
-              : remote;
-          }
-          return remote;
-        },
+        submitPin,
       };
     })();
   }
@@ -213,6 +216,7 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     getState: async () => (await browserRuntime()).session.getState(),
     submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
     signOut: async () => (await browserRuntime()).session.signOut(),
+    enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
   };
 }
 
