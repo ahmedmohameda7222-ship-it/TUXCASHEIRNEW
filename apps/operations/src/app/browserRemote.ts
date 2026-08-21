@@ -1,5 +1,11 @@
 import type { InboundConfigurationProvider } from '@tux/application';
-import { parseEntityId, type ShopId } from '@tux/domain';
+import {
+  parseEntityId,
+  type Shop,
+  type ShopId,
+  type Worker,
+  type WorkerId,
+} from '@tux/domain';
 
 const DEVICE_ID_STORAGE_KEY = 'tux.operations.device-id';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -9,6 +15,11 @@ export interface BrowserRemoteSession {
   readonly deviceId: string;
 }
 
+export interface BrowserBootstrapResult extends BrowserRemoteSession {
+  readonly shop: Shop;
+  readonly worker: Worker;
+}
+
 function requiredString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new TypeError(`${label} is required.`);
@@ -16,18 +27,53 @@ function requiredString(value: unknown, label: string): string {
   return value.trim();
 }
 
-async function jsonObject(response: Response, label: string): Promise<Record<string, unknown>> {
-  const value: unknown = await response.json();
+function object(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new TypeError(`${label} response must be an object.`);
+    throw new TypeError(`${label} must be an object.`);
   }
   return value as Record<string, unknown>;
+}
+
+async function jsonObject(response: Response, label: string): Promise<Record<string, unknown>> {
+  return object(await response.json(), `${label} response`);
 }
 
 function parseSession(value: Record<string, unknown>): BrowserRemoteSession {
   return {
     shopId: parseEntityId<ShopId>(requiredString(value['shopId'], 'Remote session shopId')),
     deviceId: requiredString(value['deviceId'], 'Remote session deviceId'),
+  };
+}
+
+function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult {
+  const session = parseSession(value);
+  const shopSource = object(value['shop'], 'Bootstrap shop');
+  const workerSource = object(value['worker'], 'Bootstrap worker');
+  const shopId = parseEntityId<ShopId>(requiredString(shopSource['id'], 'Bootstrap shop id'));
+  if (shopId !== session.shopId || shopSource['active'] !== true) {
+    throw new TypeError('Bootstrap shop identity is invalid.');
+  }
+  const workerShopId = parseEntityId<ShopId>(
+    requiredString(workerSource['shopId'], 'Bootstrap worker shopId'),
+  );
+  if (workerShopId !== session.shopId || workerSource['active'] !== true) {
+    throw new TypeError('Bootstrap worker identity is invalid.');
+  }
+
+  return {
+    ...session,
+    shop: {
+      id: shopId,
+      name: requiredString(shopSource['name'], 'Bootstrap shop name'),
+      active: true,
+    },
+    worker: {
+      id: parseEntityId<WorkerId>(requiredString(workerSource['id'], 'Bootstrap worker id')),
+      shopId: workerShopId,
+      displayName: requiredString(workerSource['displayName'], 'Bootstrap worker name'),
+      pinHash: requiredString(workerSource['pinHash'], 'Bootstrap worker PIN hash'),
+      active: true,
+    },
   };
 }
 
@@ -73,8 +119,9 @@ export class VercelBrowserRemoteGateway implements InboundConfigurationProvider 
     return parseSession(await jsonObject(response, 'Device session'));
   }
 
-  async enroll(enrollmentCode: string): Promise<BrowserRemoteSession> {
-    const response = await fetch('/api/device-enroll', {
+  async bootstrap(pin: string): Promise<BrowserBootstrapResult> {
+    if (isLoopbackHost()) throw new Error('Remote worker sign-in is unavailable on localhost.');
+    const response = await fetch('/api/device-bootstrap', {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
@@ -83,19 +130,19 @@ export class VercelBrowserRemoteGateway implements InboundConfigurationProvider 
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        enrollmentCode: requiredString(enrollmentCode, 'Device enrollment code'),
+        pin: requiredString(pin, 'Worker PIN'),
         deviceId: browserDeviceId(),
         deviceLabel: 'TUX Operations Web',
       }),
     });
     if (!response.ok) {
-      throw new Error(
-        response.status === 401
-          ? 'The device enrollment code is invalid or no longer available.'
-          : 'Could not enroll this TUX Operations device.',
-      );
+      if (response.status === 401) throw new Error('Invalid PIN.');
+      if (response.status === 429) {
+        throw new Error('Too many PIN attempts. Wait a few minutes and try again.');
+      }
+      throw new Error('Could not connect this TUX Operations browser.');
     }
-    return parseSession(await jsonObject(response, 'Device enrollment'));
+    return parseBootstrap(await jsonObject(response, 'Worker sign-in'));
   }
 
   async discoverVersion(shopId: ShopId): Promise<number | null> {
