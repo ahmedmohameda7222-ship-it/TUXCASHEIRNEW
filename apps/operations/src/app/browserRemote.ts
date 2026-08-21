@@ -1,11 +1,5 @@
 import type { InboundConfigurationProvider } from '@tux/application';
-import {
-  parseEntityId,
-  type Shop,
-  type ShopId,
-  type Worker,
-  type WorkerId,
-} from '@tux/domain';
+import { parseEntityId, type Shop, type ShopId, type Worker, type WorkerId } from '@tux/domain';
 
 const DEVICE_ID_STORAGE_KEY = 'tux.operations.device-id';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,10 +28,7 @@ function object(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-async function jsonObject(
-  response: Response,
-  label: string,
-): Promise<Record<string, unknown>> {
+async function jsonObject(response: Response, label: string): Promise<Record<string, unknown>> {
   return object(await response.json(), `${label} response`);
 }
 
@@ -52,9 +43,7 @@ function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult 
   const session = parseSession(value);
   const shopSource = object(value['shop'], 'Bootstrap shop');
   const workerSource = object(value['worker'], 'Bootstrap worker');
-  const shopId = parseEntityId<ShopId>(
-    requiredString(shopSource['id'], 'Bootstrap shop id'),
-  );
+  const shopId = parseEntityId<ShopId>(requiredString(shopSource['id'], 'Bootstrap shop id'));
   if (shopId !== session.shopId || shopSource['active'] !== true) {
     throw new TypeError('Bootstrap shop identity is invalid.');
   }
@@ -125,8 +114,7 @@ export class VercelBrowserRemoteGateway implements InboundConfigurationProvider 
   }
 
   async bootstrap(pin: string): Promise<BrowserBootstrapResult> {
-    if (isLoopbackHost())
-      throw new Error('Remote worker sign-in is unavailable on localhost.');
+    if (isLoopbackHost()) throw new Error('Remote worker sign-in is unavailable on localhost.');
     const response = await fetch('/api/device-bootstrap', {
       method: 'POST',
       credentials: 'same-origin',
