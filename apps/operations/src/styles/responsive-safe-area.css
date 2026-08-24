@@ -16,6 +16,7 @@
     right: auto;
     bottom: auto;
     left: auto;
+    z-index: auto;
     margin: var(--tux-space-2) var(--tux-space-4) var(--tux-space-4);
   }
 }
