@@ -10,7 +10,7 @@ describe('AutomaticOutboxScheduler', () => {
   it('reports the start of a real sync cycle before its result', async () => {
     vi.useFakeTimers();
     const events: string[] = [];
-    let resolveSync: ((value: OutboxSyncSummary) => void) | null = null;
+    let resolveSync!: (value: OutboxSyncSummary) => void;
     const service = {
       syncOnce: vi.fn(
         () =>
@@ -30,17 +30,15 @@ describe('AutomaticOutboxScheduler', () => {
     scheduler.start();
     await vi.waitFor(() => expect(events).toEqual(['start']));
 
-    if (resolveSync !== null) {
-      resolveSync({
-        attempted: 0,
-        delivered: 0,
-        failed: 0,
-        quarantined: 0,
-        dependencyBlocked: 0,
-        blockedUntil: null,
-        lastError: null,
-      });
-    }
+    resolveSync({
+      attempted: 0,
+      delivered: 0,
+      failed: 0,
+      quarantined: 0,
+      dependencyBlocked: 0,
+      blockedUntil: null,
+      lastError: null,
+    });
     await vi.waitFor(() => expect(events).toEqual(['start', 'result']));
 
     scheduler.stop();
