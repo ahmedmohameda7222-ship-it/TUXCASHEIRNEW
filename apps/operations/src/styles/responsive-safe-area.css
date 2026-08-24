@@ -1,25 +1,33 @@
 @media (max-width: 54rem) {
   .orders-workspace {
-    display: block;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     padding-bottom: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .menu-pane {
-    min-height: 100%;
-    overflow: visible;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .menu-toolbar {
+    position: relative;
+    top: auto;
   }
 
   .product-grid {
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: var(--tux-space-8);
   }
 
   .mobile-cart-trigger {
-    position: fixed;
-    right: var(--tux-space-4);
-    bottom: calc(var(--tux-space-4) + env(safe-area-inset-bottom));
-    left: var(--tux-space-4);
-    z-index: 4;
-    margin: 0;
+    position: static;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    z-index: auto;
+    margin: var(--tux-space-2) var(--tux-space-4) var(--tux-space-4);
   }
 }
