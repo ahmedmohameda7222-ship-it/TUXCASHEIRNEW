@@ -1,0 +1,21 @@
+@media (max-width: 54rem) {
+  .orders-workspace {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  .menu-pane {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .mobile-cart-trigger {
+    position: static;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    margin: var(--tux-space-2) var(--tux-space-4) var(--tux-space-4);
+  }
+}
