@@ -27,6 +27,16 @@
   padding: 0;
 }
 
+:root[data-theme='dark'] .tux-brand {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .tux-brand {
+    filter: invert(1);
+  }
+}
+
 @media (max-width: 34rem) {
   .operations-header .tux-brand {
     width: 2.4rem;
