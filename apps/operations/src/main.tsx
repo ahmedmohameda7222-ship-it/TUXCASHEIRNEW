@@ -9,6 +9,7 @@ import './styles/bulk-stock.css';
 import './styles/end-day.css';
 import './styles/premium.css';
 import './styles/brand.css';
+import './styles/responsive-safe-area.css';
 import { BrowserBootstrapGate } from './app/BrowserBootstrapGate';
 
 const rootElement = document.getElementById('root');
