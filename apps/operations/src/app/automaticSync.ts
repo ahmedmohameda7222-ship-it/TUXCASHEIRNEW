@@ -1,6 +1,7 @@
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
 import { AutomaticOutboxScheduler, HttpOutboxTransport, OutboxSyncService } from '@tux/sync';
+import { browserSyncStatusStore } from './syncStatus';
 
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
@@ -10,7 +11,11 @@ export function startBrowserAutomaticSync(input: {
   const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
     now: input.now,
   });
-  const scheduler = new AutomaticOutboxScheduler(service);
+  const scheduler = new AutomaticOutboxScheduler(service, {
+    onStart: () => browserSyncStatusStore.markSyncStarted(),
+    onResult: (result) => browserSyncStatusStore.markSyncFinished(result),
+  });
+  browserSyncStatusStore.markRemoteConfigured();
   scheduler.start();
   return scheduler;
 }
