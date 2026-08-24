@@ -5,11 +5,7 @@ import { createOperationsSessionClient } from './sessionClient';
 type GateState = 'LOADING' | 'PIN_REQUIRED' | 'READY';
 
 function Brand() {
-  return (
-    <div className="tux-brand" aria-label="TUX">
-      TUX
-    </div>
-  );
+  return <img className="tux-brand" src="/favicon.svg" alt="TUX" />;
 }
 
 export function BrowserBootstrapGate() {
