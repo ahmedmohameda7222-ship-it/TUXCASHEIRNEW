@@ -43,11 +43,7 @@ function initialTheme(): ThemePreference {
 }
 
 function Brand() {
-  return (
-    <div className="tux-brand" aria-label="TUX">
-      TUX
-    </div>
-  );
+  return <img className="tux-brand" src="/favicon.svg" alt="TUX" />;
 }
 
 function PinForm({
