@@ -357,6 +357,34 @@ async function waitForActiveShell(page: Page): Promise<void> {
   });
 }
 
+async function setAppearance(page: Page, theme: 'Light' | 'Dark'): Promise<void> {
+  const operator = page.getByRole('button', { name: /Demo Worker One/ });
+  await operator.click();
+  await page.getByRole('button', { name: theme, exact: true }).click();
+  await operator.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme.toLowerCase());
+}
+
+async function captureVisualEvidence(page: Page, testInfo: TestInfo): Promise<void> {
+  await setAppearance(page, 'Light');
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath('operations-light.png'),
+    animations: 'disabled',
+    caret: 'hide',
+  });
+
+  await setAppearance(page, 'Dark');
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath('operations-dark.png'),
+    animations: 'disabled',
+    caret: 'hide',
+  });
+
+  await setAppearance(page, 'Light');
+}
+
 async function openCartIfMobile(page: Page, testInfo: TestInfo): Promise<void> {
   if (testInfo.project.name.startsWith('mobile')) {
     await page.getByRole('button', { name: /Review & pay/ }).click();
@@ -549,8 +577,10 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
   await page.getByLabel('Enter PIN to Start Day').fill('1234');
   await page.getByRole('button', { name: 'Start Day' }).click();
   await waitForActiveShell(page);
+  await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add one Sold Out Test Burger' })).toBeDisabled();
   await expectNoHorizontalOverflow(page);
+  await captureVisualEvidence(page, testInfo);
 
   await placeCashOrder(page, testInfo);
   await placeDeliveryInstapayOrder(page, testInfo);
