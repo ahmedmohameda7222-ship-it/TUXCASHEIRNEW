@@ -8,9 +8,14 @@ export interface SyncStatusStore {
   readonly markSyncFinished: (result: OutboxSyncSummary | Error) => void;
 }
 
-export function createSyncStatusStore(_options?: {
+export function createSyncStatusStore(options?: {
   readonly visibilityDelayMs?: number;
 }): SyncStatusStore {
+  const visibilityDelayMs = options?.visibilityDelayMs ?? 400;
+  if (!Number.isFinite(visibilityDelayMs) || visibilityDelayMs < 0) {
+    throw new RangeError('Sync status visibility delay must be a non-negative number.');
+  }
+
   let snapshot = buildSyncHealth({ remoteConfigured: false });
   const listeners = new Set<() => void>();
 
