@@ -43,6 +43,13 @@ export function MenuProductCard({
   readonly onAdd: () => void;
 }) {
   const description = product.description?.trim() ?? '';
+  const className = [
+    'product-card',
+    quantity > 0 ? 'product-card-selected' : null,
+    product.soldOut ? 'product-card-sold-out' : null,
+  ]
+    .filter((value) => value !== null)
+    .join(' ');
 
   function runIndependentAction(
     event: MouseEvent<HTMLButtonElement>,
@@ -53,9 +60,7 @@ export function MenuProductCard({
   }
 
   return (
-    <article
-      className={`product-card${quantity > 0 ? ' product-card-selected' : ''}${product.soldOut ? ' product-card-sold-out' : ''}`}
-    >
+    <article className={className}>
       <button
         type="button"
         className="product-main"

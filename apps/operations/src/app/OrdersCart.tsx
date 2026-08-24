@@ -220,7 +220,9 @@ export function OrdersCart({
     (issue) => issue.path === 'orderNote' || issue.path === 'order.note',
   );
   const discountHasIssue = issues.some((issue) => issue.path === 'discount');
-  const [noteExpanded, setNoteExpanded] = useState(draft.orderNote !== null || noteHasIssue);
+  const [noteExpanded, setNoteExpanded] = useState(
+    draft.orderNote !== null || noteHasIssue,
+  );
   const [discountExpanded, setDiscountExpanded] = useState(
     draft.discountMinor > ZERO_MONEY || discountHasIssue,
   );
@@ -230,7 +232,9 @@ export function OrdersCart({
   }, [draft.orderNote, noteHasIssue]);
 
   useEffect(() => {
-    if (draft.discountMinor > ZERO_MONEY || discountHasIssue) setDiscountExpanded(true);
+    if (draft.discountMinor > ZERO_MONEY || discountHasIssue) {
+      setDiscountExpanded(true);
+    }
   }, [draft.discountMinor, discountHasIssue]);
 
   function selectOrderType(orderTypeId: OrderTypeId): void {
@@ -517,7 +521,9 @@ export function OrdersCart({
                   disabled={busy}
                   onCommit={(discountMinor) => {
                     onMutate((current) => ({ ...current, discountMinor }));
-                    if (discountMinor === ZERO_MONEY && !discountHasIssue) setDiscountExpanded(false);
+                    if (discountMinor === ZERO_MONEY && !discountHasIssue) {
+                      setDiscountExpanded(false);
+                    }
                   }}
                 />
               </div>
