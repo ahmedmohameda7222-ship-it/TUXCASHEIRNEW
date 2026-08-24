@@ -8,11 +8,7 @@
   --tux-text-secondary: #707773;
   --tux-text-muted: var(--tux-text-secondary);
   --tux-border-subtle: #e3e9e6;
-  --tux-border-strong: color-mix(
-    in srgb,
-    var(--tux-border-subtle) 72%,
-    var(--tux-text-secondary)
-  );
+  --tux-border-strong: color-mix(in srgb, var(--tux-border-subtle) 72%, var(--tux-text-secondary));
   --tux-accent: #1f6b52;
   --tux-accent-hover: #195f48;
   --tux-accent-pressed: #14533f;
@@ -20,11 +16,7 @@
   --tux-accent-soft: #eaf4ef;
   --tux-accent-hover-soft: #f3f8f5;
   --tux-positive: #2b7a55;
-  --tux-positive-soft: color-mix(
-    in srgb,
-    var(--tux-positive) 12%,
-    var(--tux-surface-panel)
-  );
+  --tux-positive-soft: color-mix(in srgb, var(--tux-positive) 12%, var(--tux-surface-panel));
   --tux-warning: #a86400;
   --tux-destructive: #b42318;
   --tux-focus-ring: var(--tux-accent);
@@ -95,11 +87,7 @@
       var(--tux-accent-hover)
     );
     --tux-positive: #63b78e;
-    --tux-positive-soft: color-mix(
-      in srgb,
-      var(--tux-positive) 14%,
-      var(--tux-surface-panel)
-    );
+    --tux-positive-soft: color-mix(in srgb, var(--tux-positive) 14%, var(--tux-surface-panel));
     --tux-warning: #e3a23a;
     --tux-destructive: #f06b61;
     --tux-focus-ring: var(--tux-accent);
@@ -120,11 +108,7 @@
   --tux-text-secondary: #707773;
   --tux-text-muted: var(--tux-text-secondary);
   --tux-border-subtle: #e3e9e6;
-  --tux-border-strong: color-mix(
-    in srgb,
-    var(--tux-border-subtle) 72%,
-    var(--tux-text-secondary)
-  );
+  --tux-border-strong: color-mix(in srgb, var(--tux-border-subtle) 72%, var(--tux-text-secondary));
   --tux-accent: #1f6b52;
   --tux-accent-hover: #195f48;
   --tux-accent-pressed: #14533f;
@@ -132,11 +116,7 @@
   --tux-accent-soft: #eaf4ef;
   --tux-accent-hover-soft: #f3f8f5;
   --tux-positive: #2b7a55;
-  --tux-positive-soft: color-mix(
-    in srgb,
-    var(--tux-positive) 12%,
-    var(--tux-surface-panel)
-  );
+  --tux-positive-soft: color-mix(in srgb, var(--tux-positive) 12%, var(--tux-surface-panel));
   --tux-warning: #a86400;
   --tux-destructive: #b42318;
   --tux-focus-ring: var(--tux-accent);
@@ -156,27 +136,15 @@
   --tux-text-secondary: #aab4af;
   --tux-text-muted: var(--tux-text-secondary);
   --tux-border-subtle: #29322e;
-  --tux-border-strong: color-mix(
-    in srgb,
-    var(--tux-border-subtle) 72%,
-    var(--tux-text-secondary)
-  );
+  --tux-border-strong: color-mix(in srgb, var(--tux-border-subtle) 72%, var(--tux-text-secondary));
   --tux-accent: #5fae8a;
   --tux-accent-hover: #6dba98;
   --tux-accent-pressed: #4f9b7a;
   --tux-accent-strong: var(--tux-accent-pressed);
   --tux-accent-soft: #173429;
-  --tux-accent-hover-soft: color-mix(
-    in srgb,
-    var(--tux-accent-soft) 78%,
-    var(--tux-accent-hover)
-  );
+  --tux-accent-hover-soft: color-mix(in srgb, var(--tux-accent-soft) 78%, var(--tux-accent-hover));
   --tux-positive: #63b78e;
-  --tux-positive-soft: color-mix(
-    in srgb,
-    var(--tux-positive) 14%,
-    var(--tux-surface-panel)
-  );
+  --tux-positive-soft: color-mix(in srgb, var(--tux-positive) 14%, var(--tux-surface-panel));
   --tux-warning: #e3a23a;
   --tux-destructive: #f06b61;
   --tux-focus-ring: var(--tux-accent);
