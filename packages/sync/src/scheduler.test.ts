@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OutboxSyncService, OutboxSyncSummary } from './outboxSync';
-import {
-  AutomaticOutboxScheduler,
-  type AutomaticOutboxSchedulerOptions,
-} from './scheduler';
+import { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
 
 afterEach(() => {
   vi.useRealTimers();
