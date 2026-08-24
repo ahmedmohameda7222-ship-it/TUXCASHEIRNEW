@@ -1,23 +1,28 @@
 @media (max-width: 54rem) {
   .orders-workspace {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    display: flex;
+    height: calc(100vh - 7.3rem);
+    min-height: 0;
+    flex-direction: column;
     padding-bottom: 0;
     overflow: hidden;
   }
 
   .menu-pane {
     min-height: 0;
+    flex: 1 1 auto;
     overflow: hidden;
   }
 
   .menu-toolbar {
     position: relative;
     top: auto;
+    flex: 0 0 auto;
   }
 
   .product-grid {
     min-height: 0;
+    flex: 1 1 auto;
     overflow-y: auto;
     padding-bottom: var(--tux-space-8);
   }
@@ -28,6 +33,8 @@
     bottom: auto;
     left: auto;
     z-index: auto;
+    flex: 0 0 auto;
+    align-self: stretch;
     margin: var(--tux-space-2) var(--tux-space-4) var(--tux-space-4);
   }
 }
