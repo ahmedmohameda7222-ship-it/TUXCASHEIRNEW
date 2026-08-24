@@ -261,16 +261,12 @@ function ActiveShell({
     }
   }, [theme]);
 
-  function cycleTheme(): void {
-    setTheme((current) =>
-      current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
-    );
-  }
-
   return (
     <div className="operations-shell">
       <header className="operations-header">
-        <Brand />
+        <div className="operations-brand-slot">
+          <Brand />
+        </div>
         <nav className="operations-nav" aria-label="Operations">
           <button
             type="button"
@@ -303,14 +299,12 @@ function ActiveShell({
         </nav>
         <div className="header-actions">
           <SyncStatusIndicator />
-          <button type="button" className="theme-trigger" onClick={cycleTheme}>
-            Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
-          </button>
           <div className="operator-menu-wrap">
             <button
               className="operator-trigger"
               type="button"
               aria-expanded={menuOpen}
+              aria-haspopup="menu"
               onClick={() => setMenuOpen((open) => !open)}
             >
               {session.operator.displayName} <span aria-hidden="true">▾</span>
@@ -321,6 +315,27 @@ function ActiveShell({
                   <strong>{session.operator.displayName}</strong>
                   <span>Shift started: {formatShiftTime(session.businessDayStartedAt)}</span>
                 </div>
+                <div className="appearance-section">
+                  <span className="appearance-label">Appearance</span>
+                  <div className="appearance-options" role="group" aria-label="Appearance">
+                    {(['system', 'light', 'dark'] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          theme === option
+                            ? 'appearance-option appearance-option-active'
+                            : 'appearance-option'
+                        }
+                        aria-pressed={theme === option}
+                        onClick={() => setTheme(option)}
+                      >
+                        {option === 'system' ? 'System' : option === 'light' ? 'Light' : 'Dark'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="menu-divider" />
                 <button
                   type="button"
                   role="menuitem"
