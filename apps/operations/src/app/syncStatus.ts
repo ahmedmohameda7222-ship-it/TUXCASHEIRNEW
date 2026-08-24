@@ -30,19 +30,25 @@ export function createSyncStatusStore(options?: {
     visibilityTimer = null;
   };
 
+  const scheduleVisibleState = (next: SyncHealthSnapshot): void => {
+    cancelVisibilityTimer();
+    visibilityTimer = setTimeout(() => {
+      visibilityTimer = null;
+      publish(next);
+    }, visibilityDelayMs);
+  };
+
   return {
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    markRemoteConfigured: () => undefined,
+    markRemoteConfigured: () => {
+      scheduleVisibleState(buildSyncHealth({ remoteConfigured: true }));
+    },
     markSyncStarted: () => {
-      cancelVisibilityTimer();
-      visibilityTimer = setTimeout(() => {
-        visibilityTimer = null;
-        publish(buildSyncHealth({ remoteConfigured: true, syncing: true }));
-      }, visibilityDelayMs);
+      scheduleVisibleState(buildSyncHealth({ remoteConfigured: true, syncing: true }));
     },
     markSyncFinished: (result) => {
       cancelVisibilityTimer();
