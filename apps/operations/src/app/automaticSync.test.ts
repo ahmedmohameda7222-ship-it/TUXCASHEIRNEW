@@ -13,7 +13,8 @@ const harness = vi.hoisted(() => ({
 
 vi.mock('@tux/sync', () => ({
   AutomaticOutboxScheduler: class AutomaticOutboxScheduler {
-    constructor(_service: unknown, options?: AutomaticOutboxSchedulerOptions) {
+    constructor(service: unknown, options?: AutomaticOutboxSchedulerOptions) {
+      void service;
       harness.schedulerOptions = options;
     }
 
@@ -22,10 +23,16 @@ vi.mock('@tux/sync', () => ({
     }
   },
   HttpOutboxTransport: class HttpOutboxTransport {
-    constructor(_options: unknown) {}
+    constructor(options: unknown) {
+      void options;
+    }
   },
   OutboxSyncService: class OutboxSyncService {
-    constructor(_database: unknown, _transport: unknown, _runtime: unknown) {}
+    constructor(database: unknown, transport: unknown, runtime: unknown) {
+      void database;
+      void transport;
+      void runtime;
+    }
   },
 }));
 
