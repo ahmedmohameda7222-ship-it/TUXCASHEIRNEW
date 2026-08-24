@@ -45,4 +45,17 @@ describe('renderer sync status store', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(store.getSnapshot().state).toBe('SYNCING');
   });
+
+  it('shows SYNC_PENDING only after a configured remote waits 400 ms for its first cycle', async () => {
+    vi.useFakeTimers();
+    const store = createSyncStatusStore({ visibilityDelayMs: 400 });
+
+    store.markRemoteConfigured();
+
+    await vi.advanceTimersByTimeAsync(399);
+    expect(store.getSnapshot().state).toBe('LOCAL_ONLY');
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(store.getSnapshot().state).toBe('SYNC_PENDING');
+  });
 });
