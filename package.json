@@ -25,7 +25,7 @@
     "e2e:serve": "npm run build -w @tux/operations && npm exec --workspace @tux/operations -- vite preview --host 127.0.0.1 --port 4173"
   },
   "devDependencies": {
-    "@eslint/js": "10.8.0",
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",
     "@types/node": "24.3.0",
     "@types/react": "19.2.18",
