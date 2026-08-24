@@ -421,6 +421,7 @@ async function addClassicWithModifier(page: Page): Promise<void> {
 
 async function placeCashOrder(page: Page, testInfo: TestInfo): Promise<void> {
   await addClassicWithModifier(page);
+  await captureVisualEvidence(page, testInfo);
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
   await cart.getByRole('button', { name: 'Cash', exact: true }).click();
@@ -580,7 +581,6 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
   await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add one Sold Out Test Burger' })).toBeDisabled();
   await expectNoHorizontalOverflow(page);
-  await captureVisualEvidence(page, testInfo);
 
   await placeCashOrder(page, testInfo);
   await placeDeliveryInstapayOrder(page, testInfo);
