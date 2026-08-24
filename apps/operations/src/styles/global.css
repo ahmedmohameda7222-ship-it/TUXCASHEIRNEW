@@ -230,11 +230,40 @@ button:not(:disabled) {
 }
 
 .sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tux-space-1);
+  color: var(--tux-text-secondary);
   font-size: var(--tux-font-size-xs);
-  font-weight: 800;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-status svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.sync-status[data-state='SYNCED'] {
   color: var(--tux-positive);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+}
+
+.sync-status[data-state='SYNC_PENDING'],
+.sync-status[data-state='SYNCING'] {
+  color: var(--tux-accent-strong);
+}
+
+.sync-status[data-state='SYNC_RETRYING'] {
+  color: var(--tux-warning);
+}
+
+.sync-status[data-state='SYNC_ISSUE'] {
+  color: var(--tux-destructive);
 }
 
 .operator-menu-wrap {

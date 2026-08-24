@@ -18,6 +18,8 @@ import {
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
 } from './sessionClient';
+import { connectDesktopSyncStatus } from './syncStatus';
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ScreenState =
   | { readonly kind: 'LOADING' }
@@ -300,13 +302,7 @@ function ActiveShell({
           </button>
         </nav>
         <div className="header-actions">
-          <span
-            className="sync-status"
-            aria-label="Operations persistence: Local-first"
-            title="Business operations save locally first. Remote sync runs automatically when this device is enrolled."
-          >
-            Local-first
-          </span>
+          <SyncStatusIndicator />
           <button type="button" className="theme-trigger" onClick={cycleTheme}>
             Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
           </button>
@@ -439,6 +435,12 @@ export function App() {
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const desktopSync = window.tuxDesktop?.sync;
+    if (desktopSync === undefined) return;
+    return connectDesktopSyncStatus(desktopSync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

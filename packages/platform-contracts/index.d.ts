@@ -45,6 +45,11 @@ export type TuxSyncHealthSnapshot =
       readonly attentionRequired: true;
     };
 
+export interface TuxSyncApi {
+  readonly getStatus: () => Promise<TuxSyncHealthSnapshot>;
+  readonly subscribe: (listener: (snapshot: TuxSyncHealthSnapshot) => void) => () => void;
+}
+
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
   'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
@@ -79,6 +84,7 @@ export interface TuxDesktopApi {
     readonly submitPin: (pin: string) => Promise<OperationsSessionResult>;
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
+  readonly sync: TuxSyncApi;
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
   readonly expenses: TuxExpensesApi;

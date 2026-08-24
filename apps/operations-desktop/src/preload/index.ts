@@ -1,6 +1,6 @@
 import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { assertBulkStockBoardResult, assertBulkStockMutationResult } from './bulkStockResult';
 import {
   assertEndDayCloseResult,
@@ -18,11 +18,14 @@ import {
 } from './ordersResult';
 import { assertOrderTransitionResult, assertOrdersBoardResult } from './ordersBoardResult';
 import { assertSessionResult } from './sessionResult';
+import { assertSyncHealthSnapshot } from './syncStatusResult';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
 const IPC_SESSION_SUBMIT_PIN = 'tux:session:submit-pin';
 const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
+const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
+const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
@@ -63,6 +66,17 @@ const api: TuxDesktopApi = Object.freeze({
       assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_SUBMIT_PIN, pin)) as unknown),
     signOut: async () =>
       assertSessionResult((await ipcRenderer.invoke(IPC_SESSION_SIGN_OUT)) as unknown),
+  }),
+  sync: Object.freeze({
+    getStatus: async () =>
+      assertSyncHealthSnapshot((await ipcRenderer.invoke(IPC_SYNC_GET_STATUS)) as unknown),
+    subscribe: (listener) => {
+      const wrapper = (_event: IpcRendererEvent, value: unknown): void => {
+        listener(assertSyncHealthSnapshot(value));
+      };
+      ipcRenderer.on(IPC_SYNC_STATUS_CHANGED, wrapper);
+      return () => ipcRenderer.removeListener(IPC_SYNC_STATUS_CHANGED, wrapper);
+    },
   }),
   orders: Object.freeze({
     loadWorkspace: async (draftScopeId: string) =>

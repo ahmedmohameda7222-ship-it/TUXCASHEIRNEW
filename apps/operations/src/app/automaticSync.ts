@@ -16,6 +16,11 @@ export function startBrowserAutomaticSync(input: {
     onResult: (result) => browserSyncStatusStore.markSyncFinished(result),
   });
   browserSyncStatusStore.markRemoteConfigured();
+  if (typeof window.addEventListener === 'function' && typeof navigator !== 'undefined') {
+    browserSyncStatusStore.setOnline(navigator.onLine);
+    window.addEventListener('online', () => browserSyncStatusStore.setOnline(true));
+    window.addEventListener('offline', () => browserSyncStatusStore.setOnline(false));
+  }
   scheduler.start();
   return scheduler;
 }
