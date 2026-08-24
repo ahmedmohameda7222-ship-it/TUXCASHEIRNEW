@@ -220,9 +220,7 @@ export function OrdersCart({
     (issue) => issue.path === 'orderNote' || issue.path === 'order.note',
   );
   const discountHasIssue = issues.some((issue) => issue.path === 'discount');
-  const [noteExpanded, setNoteExpanded] = useState(
-    draft.orderNote !== null || noteHasIssue,
-  );
+  const [noteExpanded, setNoteExpanded] = useState(draft.orderNote !== null || noteHasIssue);
   const [discountExpanded, setDiscountExpanded] = useState(
     draft.discountMinor > ZERO_MONEY || discountHasIssue,
   );

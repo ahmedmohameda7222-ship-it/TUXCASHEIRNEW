@@ -51,10 +51,7 @@ export function MenuProductCard({
     .filter((value) => value !== null)
     .join(' ');
 
-  function runIndependentAction(
-    event: MouseEvent<HTMLButtonElement>,
-    action: () => void,
-  ): void {
+  function runIndependentAction(event: MouseEvent<HTMLButtonElement>, action: () => void): void {
     event.stopPropagation();
     action();
   }
