@@ -216,18 +216,15 @@ export function OrdersCart({
   }, [draft.payment, methods, pricing]);
 
   const totalQuantity = draft.lines.reduce((total, line) => total + line.quantity, 0);
-  const noteHasIssue = issues.some(
-    (issue) => issue.path === 'orderNote' || issue.path === 'order.note',
-  );
   const discountHasIssue = issues.some((issue) => issue.path === 'discount');
-  const [noteExpanded, setNoteExpanded] = useState(draft.orderNote !== null || noteHasIssue);
+  const [noteExpanded, setNoteExpanded] = useState(draft.orderNote !== null);
   const [discountExpanded, setDiscountExpanded] = useState(
     draft.discountMinor > ZERO_MONEY || discountHasIssue,
   );
 
   useEffect(() => {
-    if (draft.orderNote !== null || noteHasIssue) setNoteExpanded(true);
-  }, [draft.orderNote, noteHasIssue]);
+    if (draft.orderNote !== null) setNoteExpanded(true);
+  }, [draft.orderNote]);
 
   useEffect(() => {
     if (draft.discountMinor > ZERO_MONEY || discountHasIssue) {
@@ -495,7 +492,7 @@ export function OrdersCart({
                   onCommit={(value) => {
                     const nextNote = value.trim().length === 0 ? null : value;
                     onMutate((current) => ({ ...current, orderNote: nextNote }));
-                    if (nextNote === null && !noteHasIssue) setNoteExpanded(false);
+                    if (nextNote === null) setNoteExpanded(false);
                   }}
                 />
               </div>
