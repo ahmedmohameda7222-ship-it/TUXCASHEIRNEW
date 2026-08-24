@@ -70,7 +70,7 @@ const api: TuxDesktopApi = Object.freeze({
   sync: Object.freeze({
     getStatus: async () =>
       assertSyncHealthSnapshot((await ipcRenderer.invoke(IPC_SYNC_GET_STATUS)) as unknown),
-    subscribe: (listener) => {
+    subscribe: (listener: Parameters<TuxDesktopApi['sync']['subscribe']>[0]) => {
       const wrapper = (_event: IpcRendererEvent, value: unknown): void => {
         listener(assertSyncHealthSnapshot(value));
       };
