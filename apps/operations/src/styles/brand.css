@@ -1,0 +1,38 @@
+.tux-brand {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  object-fit: contain;
+}
+
+.entry-card .tux-brand,
+.greeting-content .tux-brand {
+  width: 4rem;
+  height: 4rem;
+  margin-inline: auto;
+}
+
+.greeting-content .tux-brand {
+  margin-bottom: var(--tux-space-8);
+}
+
+.operations-header .tux-brand {
+  width: 2.6rem;
+  height: 2.6rem;
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  padding: 0;
+}
+
+@media (max-width: 34rem) {
+  .operations-header .tux-brand {
+    width: 2.4rem;
+    height: 2.4rem;
+    min-width: 2.4rem;
+    min-height: 2.4rem;
+    padding: 0;
+  }
+}
