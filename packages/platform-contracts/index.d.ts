@@ -7,6 +7,49 @@ import type {
   OperationsSessionResult,
 } from '@tux/application';
 
+export type TuxSyncHealthSnapshot =
+  | {
+      readonly state: 'LOCAL_ONLY';
+      readonly label: 'Local only';
+      readonly remoteConfigured: false;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'SYNC_PENDING';
+      readonly label: 'Sync pending';
+      readonly remoteConfigured: true;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'SYNCING';
+      readonly label: 'Syncing';
+      readonly remoteConfigured: true;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'SYNCED';
+      readonly label: 'Synced';
+      readonly remoteConfigured: true;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'SYNC_RETRYING';
+      readonly label: 'Sync retrying';
+      readonly remoteConfigured: true;
+      readonly attentionRequired: false;
+    }
+  | {
+      readonly state: 'SYNC_ISSUE';
+      readonly label: 'Sync issue';
+      readonly remoteConfigured: true;
+      readonly attentionRequired: true;
+    };
+
+export interface TuxSyncApi {
+  readonly getStatus: () => Promise<TuxSyncHealthSnapshot>;
+  readonly subscribe: (listener: (snapshot: TuxSyncHealthSnapshot) => void) => () => void;
+}
+
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
   'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
@@ -41,6 +84,7 @@ export interface TuxDesktopApi {
     readonly submitPin: (pin: string) => Promise<OperationsSessionResult>;
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
+  readonly sync: TuxSyncApi;
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
   readonly expenses: TuxExpensesApi;

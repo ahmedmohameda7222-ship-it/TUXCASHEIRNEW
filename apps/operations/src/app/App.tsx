@@ -18,6 +18,8 @@ import {
   type OperationsOrdersBoardClient,
   type OperationsOrdersClient,
 } from './sessionClient';
+import { connectDesktopSyncStatus } from './syncStatus';
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 
 type ScreenState =
   | { readonly kind: 'LOADING' }
@@ -41,11 +43,7 @@ function initialTheme(): ThemePreference {
 }
 
 function Brand() {
-  return (
-    <div className="tux-brand" aria-label="TUX">
-      TUX
-    </div>
-  );
+  return <img className="tux-brand" src="/favicon.svg" alt="TUX" />;
 }
 
 function PinForm({
@@ -259,16 +257,12 @@ function ActiveShell({
     }
   }, [theme]);
 
-  function cycleTheme(): void {
-    setTheme((current) =>
-      current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
-    );
-  }
-
   return (
     <div className="operations-shell">
       <header className="operations-header">
-        <Brand />
+        <div className="operations-brand-slot">
+          <Brand />
+        </div>
         <nav className="operations-nav" aria-label="Operations">
           <button
             type="button"
@@ -300,21 +294,13 @@ function ActiveShell({
           </button>
         </nav>
         <div className="header-actions">
-          <span
-            className="sync-status"
-            aria-label="Operations persistence: Local-first"
-            title="Business operations save locally first. Remote sync runs automatically when this device is enrolled."
-          >
-            Local-first
-          </span>
-          <button type="button" className="theme-trigger" onClick={cycleTheme}>
-            Theme: {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
-          </button>
+          <SyncStatusIndicator />
           <div className="operator-menu-wrap">
             <button
               className="operator-trigger"
               type="button"
               aria-expanded={menuOpen}
+              aria-haspopup="menu"
               onClick={() => setMenuOpen((open) => !open)}
             >
               {session.operator.displayName} <span aria-hidden="true">▾</span>
@@ -325,6 +311,27 @@ function ActiveShell({
                   <strong>{session.operator.displayName}</strong>
                   <span>Shift started: {formatShiftTime(session.businessDayStartedAt)}</span>
                 </div>
+                <div className="appearance-section">
+                  <span className="appearance-label">Appearance</span>
+                  <div className="appearance-options" role="group" aria-label="Appearance">
+                    {(['system', 'light', 'dark'] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          theme === option
+                            ? 'appearance-option appearance-option-active'
+                            : 'appearance-option'
+                        }
+                        aria-pressed={theme === option}
+                        onClick={() => setTheme(option)}
+                      >
+                        {option === 'system' ? 'System' : option === 'light' ? 'Light' : 'Dark'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="menu-divider" />
                 <button
                   type="button"
                   role="menuitem"
@@ -439,6 +446,12 @@ export function App() {
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const desktopSync = window.tuxDesktop?.sync;
+    if (desktopSync === undefined) return;
+    return connectDesktopSyncStatus(desktopSync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

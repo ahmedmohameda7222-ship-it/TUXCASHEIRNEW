@@ -216,6 +216,21 @@ export function OrdersCart({
   }, [draft.payment, methods, pricing]);
 
   const totalQuantity = draft.lines.reduce((total, line) => total + line.quantity, 0);
+  const discountHasIssue = issues.some((issue) => issue.path === 'discount');
+  const [noteExpanded, setNoteExpanded] = useState(draft.orderNote !== null);
+  const [discountExpanded, setDiscountExpanded] = useState(
+    draft.discountMinor > ZERO_MONEY || discountHasIssue,
+  );
+
+  useEffect(() => {
+    if (draft.orderNote !== null) setNoteExpanded(true);
+  }, [draft.orderNote]);
+
+  useEffect(() => {
+    if (draft.discountMinor > ZERO_MONEY || discountHasIssue) {
+      setDiscountExpanded(true);
+    }
+  }, [draft.discountMinor, discountHasIssue]);
 
   function selectOrderType(orderTypeId: OrderTypeId): void {
     onMutate((current) => ({ ...current, orderTypeId }));
@@ -454,27 +469,60 @@ export function OrdersCart({
             aria-labelledby={controlId('adjustments-title')}
           >
             <h2 id={controlId('adjustments-title')}>Notes & discount</h2>
-            <DraftTextField
-              id={controlId('order-note')}
-              label="Order note"
-              value={draft.orderNote ?? ''}
-              multiline
-              placeholder="For the whole order"
+            <button
+              type="button"
+              className="adjustment-disclosure"
+              aria-expanded={noteExpanded}
+              aria-controls={controlId('order-note-editor')}
               disabled={busy}
-              onCommit={(value) =>
-                onMutate((current) => ({
-                  ...current,
-                  orderNote: value.trim().length === 0 ? null : value,
-                }))
-              }
-            />
-            <MoneyInput
-              id={controlId('discount')}
-              label="Discount"
-              value={draft.discountMinor}
+              onClick={() => setNoteExpanded((expanded) => !expanded)}
+            >
+              <span>{draft.orderNote === null ? 'Add order note' : 'Order note'}</span>
+              {draft.orderNote === null ? null : <strong>Added</strong>}
+            </button>
+            {noteExpanded ? (
+              <div className="adjustment-editor" id={controlId('order-note-editor')}>
+                <DraftTextField
+                  id={controlId('order-note')}
+                  label="Order note"
+                  value={draft.orderNote ?? ''}
+                  multiline
+                  placeholder="For the whole order"
+                  disabled={busy}
+                  onCommit={(value) => {
+                    const nextNote = value.trim().length === 0 ? null : value;
+                    onMutate((current) => ({ ...current, orderNote: nextNote }));
+                    if (nextNote === null) setNoteExpanded(false);
+                  }}
+                />
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="adjustment-disclosure"
+              aria-expanded={discountExpanded}
+              aria-controls={controlId('discount-editor')}
               disabled={busy}
-              onCommit={(discountMinor) => onMutate((current) => ({ ...current, discountMinor }))}
-            />
+              onClick={() => setDiscountExpanded((expanded) => !expanded)}
+            >
+              <span>Discount · {formatMoneyMinor(draft.discountMinor)}</span>
+            </button>
+            {discountExpanded ? (
+              <div className="adjustment-editor" id={controlId('discount-editor')}>
+                <MoneyInput
+                  id={controlId('discount')}
+                  label="Discount"
+                  value={draft.discountMinor}
+                  disabled={busy}
+                  onCommit={(discountMinor) => {
+                    onMutate((current) => ({ ...current, discountMinor }));
+                    if (discountMinor === ZERO_MONEY && !discountHasIssue) {
+                      setDiscountExpanded(false);
+                    }
+                  }}
+                />
+              </div>
+            ) : null}
             <SectionIssues issues={issues} paths={['discount']} />
           </section>
         ) : null}
@@ -699,13 +747,15 @@ export function OrdersCart({
             <dt>Items</dt>
             <dd>{formatMoneyMinor(itemsSubtotalMinor)}</dd>
           </div>
-          {draft.discountMinor === ZERO_MONEY ? null : (
-            <div>
-              <dt>Discount</dt>
-              <dd>− {formatMoneyMinor(draft.discountMinor)}</dd>
-            </div>
-          )}
-          {!delivery || draft.delivery.finalFeeMinor === ZERO_MONEY ? null : (
+          <div>
+            <dt>Discount</dt>
+            <dd>
+              {draft.discountMinor === ZERO_MONEY
+                ? formatMoneyMinor(ZERO_MONEY)
+                : `− ${formatMoneyMinor(draft.discountMinor)}`}
+            </dd>
+          </div>
+          {!delivery ? null : (
             <div>
               <dt>Delivery</dt>
               <dd>{formatMoneyMinor(draft.delivery.finalFeeMinor)}</dd>
@@ -729,10 +779,12 @@ export function OrdersCart({
         <button
           type="button"
           className="place-order-action"
+          aria-label="Place Order"
           disabled={busy || placing || draft.lines.length === 0}
           onClick={onPlace}
         >
-          {placing ? 'Saving order…' : 'Place Order'}
+          <span>{placing ? 'Saving order…' : 'Place Order'}</span>
+          <strong>{pricing === null ? '—' : formatMoneyMinor(pricing.totalMinor)}</strong>
         </button>
       </div>
     </aside>

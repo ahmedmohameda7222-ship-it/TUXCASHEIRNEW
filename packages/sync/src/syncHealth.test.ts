@@ -52,4 +52,19 @@ describe('buildSyncHealth', () => {
       }),
     ).toMatchObject({ state: 'SYNC_ISSUE', attentionRequired: true });
   });
+
+  it('treats a thrown sync error as a permanent visible sync issue', () => {
+    expect(
+      buildSyncHealth({
+        remoteConfigured: true,
+        hasRun: true,
+        lastResult: new Error('transport unavailable'),
+      }),
+    ).toEqual({
+      state: 'SYNC_ISSUE',
+      label: 'Sync issue',
+      remoteConfigured: true,
+      attentionRequired: true,
+    });
+  });
 });

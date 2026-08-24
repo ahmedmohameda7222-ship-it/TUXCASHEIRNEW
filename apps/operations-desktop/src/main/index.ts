@@ -13,7 +13,13 @@ import {
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
 } from '@tux/persistence/sqlite';
-import { SupabaseInboundConfigurationProvider, type AutomaticOutboxScheduler } from '@tux/sync';
+import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
+import {
+  buildSyncHealth,
+  SupabaseInboundConfigurationProvider,
+  type AutomaticOutboxScheduler,
+  type OutboxSyncSummary,
+} from '@tux/sync';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import {
   createDesktopSupabaseDeviceSessionManager,
@@ -35,6 +41,8 @@ const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
 const IPC_SESSION_SUBMIT_PIN = 'tux:session:submit-pin';
 const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
+const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
+const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
@@ -57,6 +65,9 @@ let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
 let configurationSyncTimer: ReturnType<typeof setInterval> | null = null;
+let syncHealthSnapshot = buildSyncHealth({ remoteConfigured: false }) as TuxSyncHealthSnapshot;
+let syncHasRun = false;
+let syncLastResult: OutboxSyncSummary | Error | null = null;
 
 function assertObjectPayload(
   value: unknown,
@@ -64,6 +75,13 @@ function assertObjectPayload(
 ): asserts value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new TypeError(`${label} IPC payload must be an object.`);
+  }
+}
+
+function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
+  syncHealthSnapshot = buildSyncHealth(input) as TuxSyncHealthSnapshot;
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(IPC_SYNC_STATUS_CHANGED, syncHealthSnapshot);
   }
 }
 
@@ -156,10 +174,31 @@ async function initializeOperationsServices(): Promise<void> {
     runtime,
     coordinator,
   });
+
+  syncHasRun = false;
+  syncLastResult = null;
+  updateSyncHealth({ remoteConfigured: false });
   automaticSyncScheduler = startDesktopAutomaticSync({
     database: operationsDatabase,
     now: runtime.now,
     ...(remoteSessionManager === null ? {} : { sessionManager: remoteSessionManager }),
+    onConfigured: () => updateSyncHealth({ remoteConfigured: true }),
+    onStart: () =>
+      updateSyncHealth({
+        remoteConfigured: true,
+        syncing: true,
+        hasRun: syncHasRun,
+        lastResult: syncLastResult,
+      }),
+    onResult: (result) => {
+      syncHasRun = true;
+      syncLastResult = result;
+      updateSyncHealth({
+        remoteConfigured: true,
+        hasRun: true,
+        lastResult: result,
+      });
+    },
   });
 }
 
@@ -188,6 +227,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_SESSION_GET_STATE,
     IPC_SESSION_SUBMIT_PIN,
     IPC_SESSION_SIGN_OUT,
+    IPC_SYNC_GET_STATUS,
     IPC_ORDERS_LOAD_WORKSPACE,
     IPC_ORDERS_SAVE_DRAFT,
     IPC_ORDERS_FIND_CUSTOMER,
@@ -205,6 +245,10 @@ function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_GET_APP_VERSION, (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
     return app.getVersion();
+  });
+  ipcMain.handle(IPC_SYNC_GET_STATUS, (event) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    return syncHealthSnapshot;
   });
   ipcMain.handle(IPC_SESSION_GET_STATE, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
@@ -365,6 +409,9 @@ app.on('before-quit', () => {
   sessionService = null;
   ordersService = null;
   ordersBoardService = null;
+  syncHasRun = false;
+  syncLastResult = null;
+  syncHealthSnapshot = buildSyncHealth({ remoteConfigured: false }) as TuxSyncHealthSnapshot;
 });
 
 app.on('window-all-closed', () => {

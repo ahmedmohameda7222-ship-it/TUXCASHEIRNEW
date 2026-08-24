@@ -2,12 +2,14 @@ import type { OutboxSyncService, OutboxSyncSummary } from './outboxSync';
 
 export interface AutomaticOutboxSchedulerOptions {
   readonly intervalMs?: number;
+  readonly onStart?: () => void;
   readonly onResult?: (result: OutboxSyncSummary | Error) => void;
 }
 
 export class AutomaticOutboxScheduler {
   readonly #service: OutboxSyncService;
   readonly #intervalMs: number;
+  readonly #onStart: (() => void) | undefined;
   readonly #onResult: ((result: OutboxSyncSummary | Error) => void) | undefined;
   #timer: ReturnType<typeof setInterval> | null = null;
   #running = false;
@@ -19,6 +21,7 @@ export class AutomaticOutboxScheduler {
     }
     this.#service = service;
     this.#intervalMs = intervalMs;
+    this.#onStart = options.onStart;
     this.#onResult = options.onResult;
   }
 
@@ -37,6 +40,7 @@ export class AutomaticOutboxScheduler {
     if (this.#running) return;
     this.#running = true;
     try {
+      this.#onStart?.();
       this.#onResult?.(await this.#service.syncOnce());
     } catch (error) {
       this.#onResult?.(error instanceof Error ? error : new Error(String(error)));

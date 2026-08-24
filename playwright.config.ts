@@ -26,8 +26,12 @@ export default defineConfig({
       use: { browserName: 'chromium', viewport: { width: 1440, height: 960 } },
     },
     {
+      name: 'mobile-tablet-browser-fallback',
+      use: { browserName: 'chromium', viewport: { width: 768, height: 1024 } },
+    },
+    {
       name: 'mobile-browser-fallback',
-      use: { browserName: 'chromium', viewport: { width: 390, height: 844 } },
+      use: { browserName: 'chromium', viewport: { width: 375, height: 812 } },
     },
   ],
   webServer: {

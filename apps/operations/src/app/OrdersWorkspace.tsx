@@ -22,6 +22,7 @@ import {
   type ProductId,
 } from '@tux/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { MenuProductCard } from './MenuProductCard';
 import type { OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
@@ -663,50 +664,17 @@ export function OrdersWorkspace({
               </span>
             </div>
           ) : (
-            products.map((product) => {
-              const quantity = productQuantityInDraft(draft, product.id);
-              return (
-                <article
-                  className={`product-card${quantity > 0 ? ' product-card-selected' : ''}${product.soldOut ? ' product-card-sold-out' : ''}`}
-                  key={product.id}
-                >
-                  <button
-                    type="button"
-                    className="product-main"
-                    onClick={() => setQuickInfoProductId(product.id)}
-                    aria-label={`Quick Info for ${product.name}`}
-                  >
-                    <div className="product-media">
-                      <ProductImage product={product} />
-                    </div>
-                    <div className="product-copy">
-                      <strong>{product.name}</strong>
-                      <span>{formatMoneyMinor(product.priceMinor)}</span>
-                      {product.soldOut ? <em>Sold Out</em> : null}
-                    </div>
-                  </button>
-                  <div className="product-quantity" aria-label={`${product.name} quantity`}>
-                    <button
-                      type="button"
-                      aria-label={`Remove one ${product.name}`}
-                      disabled={busy || quantity === 0}
-                      onClick={() => decrementProduct(product)}
-                    >
-                      −
-                    </button>
-                    <output>{quantity}</output>
-                    <button
-                      type="button"
-                      aria-label={`Add one ${product.name}`}
-                      disabled={busy || product.soldOut}
-                      onClick={() => addProduct(product)}
-                    >
-                      +
-                    </button>
-                  </div>
-                </article>
-              );
-            })
+            products.map((product) => (
+              <MenuProductCard
+                key={product.id}
+                product={product}
+                quantity={productQuantityInDraft(draft, product.id)}
+                busy={busy}
+                onQuickInfo={() => setQuickInfoProductId(product.id)}
+                onDecrement={() => decrementProduct(product)}
+                onAdd={() => addProduct(product)}
+              />
+            ))
           )}
         </div>
       </section>

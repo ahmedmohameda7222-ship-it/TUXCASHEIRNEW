@@ -6,6 +6,7 @@ import {
   HttpOutboxTransport,
   OutboxSyncService,
   SupabaseDeviceSessionManager,
+  type OutboxSyncSummary,
   type SupabaseDeviceSessionRecord,
 } from '@tux/sync';
 import { app } from 'electron';
@@ -53,6 +54,9 @@ export function startDesktopAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
   readonly sessionManager?: SupabaseDeviceSessionManager;
+  readonly onConfigured?: () => void;
+  readonly onStart?: () => void;
+  readonly onResult?: (result: OutboxSyncSummary | Error) => void;
 }): AutomaticOutboxScheduler | null {
   const explicitEndpoint = process.env['TUX_SYNC_ENDPOINT']?.trim();
   const supabaseUrl = process.env['TUX_SUPABASE_URL']?.trim();
@@ -79,7 +83,11 @@ export function startDesktopAutomaticSync(input: {
 
   const transport = new HttpOutboxTransport({ endpoint, headerProvider });
   const service = new OutboxSyncService(input.database, transport, { now: input.now });
-  const scheduler = new AutomaticOutboxScheduler(service);
+  const scheduler = new AutomaticOutboxScheduler(service, {
+    ...(input.onStart === undefined ? {} : { onStart: input.onStart }),
+    ...(input.onResult === undefined ? {} : { onResult: input.onResult }),
+  });
+  input.onConfigured?.();
   scheduler.start();
   return scheduler;
 }
