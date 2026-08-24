@@ -11,6 +11,9 @@ test('serves and renders the canonical TUX logo asset', async ({ page, request }
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(EXPECTED_TUX_LOGO_SHA256);
 
   await page.goto('/');
-  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
+  const favicon = page.locator('link[rel="icon"]');
+  const faviconHref = await favicon.getAttribute('href');
+  expect(faviconHref).not.toBeNull();
+  expect(new URL(faviconHref ?? '', page.url()).pathname).toBe('/favicon.svg');
   await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
 });
