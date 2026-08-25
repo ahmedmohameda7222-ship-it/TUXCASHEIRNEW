@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -27,78 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 9 reconciliation implementation
-        if: github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
-          text = path.read_text()
-          text = text.replace(
-              '  type DraftLineId,\n  type MenuCategoryId,\n',
-              '  type DraftLineId,\n  type MenuCategory,\n  type MenuCategoryId,\n',
-              1,
-          )
-          text = text.replace(
-              '  type ProductId,\n} from \'@tux/domain\';',
-              '  type ProductId,\n  type WorkerUiPreferences,\n} from \'@tux/domain\';',
-              1,
-          )
-          anchor = "type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;\n"
-          helper = """
-
-          export function reconcileCategoryOrder(
-            activeCategories: readonly MenuCategory[],
-            preference: WorkerUiPreferences | null,
-          ): readonly MenuCategory[] {
-            if (preference === null || preference.categoryOrder.length === 0) return activeCategories;
-
-            const byId = new Map(activeCategories.map((category) => [category.id, category]));
-            const reconciled: MenuCategory[] = [];
-            const seen = new Set<MenuCategoryId>();
-
-            for (const categoryId of preference.categoryOrder) {
-              const category = byId.get(categoryId);
-              if (category === undefined || seen.has(categoryId)) continue;
-              reconciled.push(category);
-              seen.add(categoryId);
-            }
-
-            for (const category of activeCategories) {
-              if (seen.has(category.id)) continue;
-              reconciled.push(category);
-              seen.add(category.id);
-            }
-
-            return reconciled;
-          }
-          """
-          if 'export function reconcileCategoryOrder(' not in text:
-              text = text.replace(anchor, anchor + helper, 1)
-          path.write_text(text)
-          PY
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx
       - name: Format check
         run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
-      - name: Focused category reconciliation tests
-        if: github.actor != 'github-actions[bot]'
-        run: npm test -- apps/operations/src/app/OrdersWorkspace.test.ts
-      - name: Typecheck reconciliation change
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck
-      - name: Commit verified reconciliation implementation
-        if: github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: reconcile worker category order"
-          git push origin HEAD:ui/tux-pos-refinement
