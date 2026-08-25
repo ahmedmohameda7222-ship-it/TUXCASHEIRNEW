@@ -460,8 +460,6 @@ async function placeSplitComboOrder(page: Page, testInfo: TestInfo): Promise<voi
   await cart.getByRole('button', { name: 'Split payment' }).click();
   await cart.getByLabel('Amount A').fill('50');
   await cart.getByLabel('Amount A').blur();
-  await cart.getByLabel('Cash received A').fill('50');
-  await cart.getByLabel('Cash received A').blur();
   await cart.getByRole('button', { name: 'Place Order' }).click();
   await expectOrderPlaced(page);
   await closeMobileCartIfOpen(page, testInfo);
@@ -819,7 +817,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
   expect(scrollBox!.y + scrollBox!.height).toBeLessThanOrEqual(totalsBox!.y + 1);
 });
 
-test('Cash entry stays optional and split stays allocation-only', async ({ page }, testInfo) => {
+test('cash entry stays optional and split stays allocation-only', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
   await page.getByRole('button', { name: 'Add one Double Smash' }).click();

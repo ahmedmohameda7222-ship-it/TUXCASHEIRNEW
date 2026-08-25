@@ -19,7 +19,7 @@ import {
 } from '@tux/domain';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { EditPencilIcon, PlusCircleIcon } from './icons';
-import { MoneyInput } from './MoneyInput';
+import { MoneyInput, OptionalMoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
 export type DraftMutation = (draft: OrderDraft) => OrderDraft;
@@ -111,12 +111,9 @@ function CashEditor({
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor | null;
   readonly busy: boolean;
-  readonly onCommit: (value: MoneyMinor) => void;
+  readonly onCommit: (value: MoneyMinor | null) => void;
 }) {
-  const suggestions = useMemo(
-    () => suggestCashTenders(allocatedMinor).slice(0, 4),
-    [allocatedMinor],
-  );
+  const suggestions = useMemo(() => suggestCashTenders(allocatedMinor), [allocatedMinor]);
   const changeMinor =
     receivedMinor !== null && receivedMinor >= allocatedMinor
       ? subtractMoney(receivedMinor, allocatedMinor)
@@ -124,10 +121,10 @@ function CashEditor({
 
   return (
     <div className="cash-editor">
-      <MoneyInput
+      <OptionalMoneyInput
         id={`${idPrefix}-cash-received`}
         label={label}
-        value={receivedMinor ?? ZERO_MONEY}
+        value={receivedMinor}
         disabled={busy}
         compact
         onCommit={onCommit}
@@ -272,9 +269,7 @@ export function OrdersCart({
         mode: 'SPLIT',
         methodAId: methodA.id,
         amountAMinor: ZERO_MONEY,
-        methodACashReceivedMinor: null,
         methodBId: methodB.id,
-        methodBCashReceivedMinor: null,
       },
     }));
   }

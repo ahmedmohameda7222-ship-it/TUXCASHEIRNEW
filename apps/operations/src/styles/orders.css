@@ -628,23 +628,54 @@
 }
 
 .tender-suggestions button {
-  min-height: 2.2rem;
+  min-height: var(--tux-touch-target);
   border-color: var(--tux-border-subtle);
   background: var(--tux-surface-raised);
   padding: 0 var(--tux-space-2);
   font-size: var(--tux-font-size-xs);
 }
 
-.change-row,
-.split-remainder {
+.change-row {
   padding: var(--tux-space-2) var(--tux-space-3);
   border-radius: var(--tux-radius-sm);
   background: color-mix(in srgb, var(--tux-positive) 8%, var(--tux-surface-raised));
 }
 
-.change-row strong,
-.split-remainder strong {
+.change-row strong {
   font-size: var(--tux-font-size-sm);
+}
+
+.split-remainder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.payment-section .field-stack > span,
+.payment-section .money-field > label,
+.payment-section .split-remainder > span {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.payment-section select,
+.payment-section .money-input-wrap input,
+.payment-section .split-remainder > strong {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.split-method-block {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .split-payment-action {
