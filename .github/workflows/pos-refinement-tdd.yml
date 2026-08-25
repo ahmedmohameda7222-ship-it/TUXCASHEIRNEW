@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tdd:
-    name: committed-pos-contracts
+    name: task-five-mobile-payment-red
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -27,11 +27,80 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add Task 5 rendered RED contract
+        run: |
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          test('final correction keeps mobile Review & pay unobstructed with integrated split', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+
+            await page.locator('.mobile-cart-trigger').click();
+            const overlay = page.locator('.mobile-cart-overlay');
+            await expect(overlay).toBeVisible();
+            await expect(overlay.locator('.mobile-cart-bar strong')).toHaveText('Review & pay');
+            await expect(
+              overlay.locator('strong').filter({ hasText: /^Current order$/i }),
+            ).toHaveCount(1);
+            await expect(overlay.locator('.cart-title')).toHaveText('Current Order');
+            await expect(page.getByRole('separator', { name: 'Resize Current Order' })).toHaveCount(0);
+
+            const payment = overlay.locator('.payment-section');
+            const split = payment.getByRole('button', { name: 'Split payment' });
+            await expect(split).toBeVisible();
+            const [paymentBox, splitBox] = await Promise.all([payment.boundingBox(), split.boundingBox()]);
+            expect(paymentBox).not.toBeNull();
+            expect(splitBox).not.toBeNull();
+            const paymentPadding = await payment.evaluate((node) => {
+              const style = getComputedStyle(node);
+              return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+            });
+            expect(Math.round(splitBox!.height)).toBe(44);
+            expect(Math.abs(splitBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+
+            await split.click();
+            await overlay.getByLabel('Amount A').fill('320');
+            await overlay.getByLabel('Amount A').blur();
+            await expect(overlay.getByText('Method A', { exact: true })).toBeVisible();
+            await expect(overlay.getByText('Amount A', { exact: true })).toBeVisible();
+            await expect(overlay.getByText('Method B', { exact: true })).toBeVisible();
+            await expect(overlay.getByText('Amount B', { exact: true })).toBeVisible();
+            await expect(overlay.locator('.split-remainder')).toContainText('80.00');
+            await expect(overlay.getByText('Cash received', { exact: true })).toHaveCount(0);
+            await expect(overlay.getByText('Change', { exact: true })).toHaveCount(0);
+
+            const cancel = payment.getByRole('button', { name: 'Cancel split' });
+            const cancelBox = await cancel.boundingBox();
+            expect(cancelBox).not.toBeNull();
+            expect(Math.round(cancelBox!.height)).toBe(44);
+            expect(Math.abs(cancelBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+
+            const scroll = overlay.locator('.cart-scroll');
+            await scroll.evaluate((node) => {
+              node.scrollTop = node.scrollHeight;
+            });
+            await expect(cancel).toBeVisible();
+            const [finalControlBox, totalsBox, placeBox] = await Promise.all([
+              cancel.boundingBox(),
+              overlay.locator('.cart-totals').boundingBox(),
+              overlay.getByRole('button', { name: 'Place Order' }).boundingBox(),
+            ]);
+            expect(finalControlBox).not.toBeNull();
+            expect(totalsBox).not.toBeNull();
+            expect(placeBox).not.toBeNull();
+            expect(totalsBox!.y - (finalControlBox!.y + finalControlBox!.height)).toBeGreaterThanOrEqual(16);
+            expect(placeBox!.y).toBeGreaterThanOrEqual(0);
+            expect(placeBox!.y + placeBox!.height).toBeLessThanOrEqual(812);
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run committed POS contracts
+      - name: Verify Task 5 contract is RED before implementation
         run: >-
-          npm run test:e2e -- --project=desktop-browser-fallback --grep
-          "approved category hierarchy|search keeps both category levels|category edit contains primary categories only|final correction keeps header and categories visible during compact search|premium POS visual hierarchy matches approved sizing|final correction keeps Extra and product controls fully contained"
+          npx playwright test e2e/operations.e2e.ts --project=mobile-browser-fallback --grep
+          "final correction keeps mobile Review & pay unobstructed with integrated split"
