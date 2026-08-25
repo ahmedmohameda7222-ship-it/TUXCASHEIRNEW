@@ -27,13 +27,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show Task 8 formatter diff
-        shell: bash
-        run: |
-          npx prettier apps/operations-desktop/src/main/workerUiPreferencesIpc.ts > /tmp/workerUiPreferencesIpc.ts.formatted
-          diff -u apps/operations-desktop/src/main/workerUiPreferencesIpc.ts /tmp/workerUiPreferencesIpc.ts.formatted || true
-          npx prettier packages/platform-contracts/index.d.ts > /tmp/index.d.ts.formatted
-          diff -u packages/platform-contracts/index.d.ts /tmp/index.d.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
