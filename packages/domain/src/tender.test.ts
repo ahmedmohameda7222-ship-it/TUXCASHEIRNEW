@@ -33,12 +33,9 @@ describe('suggestCashTenders', () => {
     expect(() => suggestCashTenders(moneyMinor(70_500), [])).toThrow(DomainInvariantError);
   });
 
-  it.each([moneyMinor(0), moneyMinor(-1)])(
-    'rejects invalid custom rounding step %s',
-    (step) => {
-      expect(() => suggestCashTenders(moneyMinor(70_500), [step])).toThrow(DomainInvariantError);
-    },
-  );
+  it.each([moneyMinor(0), moneyMinor(-1)])('rejects invalid custom rounding step %s', (step) => {
+    expect(() => suggestCashTenders(moneyMinor(70_500), [step])).toThrow(DomainInvariantError);
+  });
 
   it('rejects rounded values that exceed the safe-integer range', () => {
     expect(() =>
