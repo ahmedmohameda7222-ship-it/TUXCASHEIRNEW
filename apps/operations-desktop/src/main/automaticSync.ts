@@ -1,8 +1,5 @@
 import * as path from 'node:path';
-import type {
-  RemoteWorkerUiPreferences,
-  WorkerUiPreferencesRemoteGateway,
-} from '@tux/application';
+import type { RemoteWorkerUiPreferences, WorkerUiPreferencesRemoteGateway } from '@tux/application';
 import {
   parseWorkerUiPreferences,
   type CategoryAlignment,
@@ -66,9 +63,7 @@ function oneRemoteRow(value: unknown): RemoteWorkerUiPreferences {
   return parseRemoteWorkerUiPreferences(value);
 }
 
-export class SupabaseDesktopWorkerUiPreferencesGateway
-  implements WorkerUiPreferencesRemoteGateway
-{
+export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPreferencesRemoteGateway {
   readonly #projectUrl: string;
   readonly #sessionManager: DesktopWorkerUiPreferencesSessionManager;
   readonly #fetcher: typeof fetch;
