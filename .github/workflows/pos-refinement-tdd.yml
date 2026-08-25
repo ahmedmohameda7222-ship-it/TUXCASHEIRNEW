@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,24 +14,37 @@ concurrency:
 
 jobs:
   tdd:
-    name: committed-pos-contracts
+    name: task-three-fixture
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply approved menu fixture
+        run: |
+          python scripts/apply_task3_fixture.py
+          python scripts/fix_task3_generated_names.py
+      - name: Format E2E source
+        run: npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run committed category contracts
-        run: >-
-          npm run test:e2e -- --project=desktop-browser-fallback --grep
-          "approved category hierarchy|search keeps both category levels|category edit contains primary categories only"
+      - name: Run complete Operations E2E file
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit approved fixture
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: use approved two-level menu fixture"
+          git push origin HEAD:ui/tux-pos-refinement
