@@ -27,6 +27,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Show desktop preference gateway formatter diff
+        shell: bash
+        run: |
+          npx prettier apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts > /tmp/workerUiPreferencesRemote.test.ts.formatted
+          diff -u apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts /tmp/workerUiPreferencesRemote.test.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
