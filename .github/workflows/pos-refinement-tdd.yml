@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,36 +27,46 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add Task 13 rendered resize contract
+      - name: Apply Task 13 resizable rail implementation
         if: github.actor != 'github-actions[bot]'
-        run: python scripts/task13_red_e2e.py
-      - name: Format Task 13 rendered contract
+        run: python scripts/task13_green.py
+      - name: Format Task 13 implementation
         if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write e2e/operations.e2e.ts
+        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/orders.css
+      - name: Full typecheck
+        if: github.actor != 'github-actions[bot]'
+        run: npm run typecheck
       - name: E2E typecheck
         if: github.actor != 'github-actions[bot]'
         run: npm run typecheck:e2e
+      - name: Lint staged implementation
+        if: github.actor != 'github-actions[bot]'
+        run: npm run lint
+      - name: Unit and integration tests for staged implementation
+        if: github.actor != 'github-actions[bot]'
+        run: npm run test
       - name: Install Playwright Chromium
         if: github.actor != 'github-actions[bot]'
         run: npx playwright install --with-deps chromium
-      - name: Confirm Task 13 rendered RED and commit test
+      - name: Rendered Current Order resize contract
+        if: github.actor != 'github-actions[bot]'
+        run: npm run test:e2e -- --retries=0 --grep "resize Current Order rail"
+      - name: Commit Task 13 product implementation
         if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
-          set +e
-          npm run test:e2e -- --project=desktop-browser-fallback --retries=0 --timeout=30000 --grep "resize Current Order rail" 2>&1 | tee /tmp/task13-red.log
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -ne 0
-          grep -Eq "Resize Current Order|separator|element\(s\) not found" /tmp/task13-red.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add e2e/operations.e2e.ts
-          git commit -m "test: define current order rail resizing"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/orders.css
+          git diff --cached --quiet && { echo "Task 13 implementation produced no product diff"; exit 1; }
+          git commit -m "feat: add resizable current order rail"
           git push origin HEAD:ui/tux-pos-refinement
       - name: Format check
+        if: github.actor == 'github-actions[bot]'
         run: npm run format:check
       - name: Lint
+        if: github.actor == 'github-actions[bot]'
         run: npm run lint
       - name: Unit and integration tests
+        if: github.actor == 'github-actions[bot]'
         run: npm run test
