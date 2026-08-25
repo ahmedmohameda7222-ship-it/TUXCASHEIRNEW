@@ -121,3 +121,9 @@ export {
 } from './syncContract';
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
+export {
+  parseWorkerUiPreferences,
+  type CategoryAlignment,
+  type WorkerUiPreferences,
+  type WorkerUiPreferencesSyncState,
+} from './workerUiPreferences';
