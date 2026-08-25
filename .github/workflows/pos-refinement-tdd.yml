@@ -34,6 +34,7 @@ jobs:
           python scripts/apply_task3_fixture.py
           python scripts/fix_task3_generated_names.py
           python scripts/fix_task3_combo_navigation.py
+          python scripts/fix_task3_search_query.py
       - name: Format E2E source
         run: npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
