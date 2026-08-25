@@ -84,9 +84,7 @@ function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult 
   };
 }
 
-function parseRemoteWorkerUiPreferences(
-  value: Record<string, unknown>,
-): RemoteWorkerUiPreferences {
+function parseRemoteWorkerUiPreferences(value: Record<string, unknown>): RemoteWorkerUiPreferences {
   const parsed = parseWorkerUiPreferences({ ...value, syncState: 'CLEAN' });
   return {
     shopId: parsed.shopId,
