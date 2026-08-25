@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm run test:e2e -- --grep "category|search" 2>&1 | tee /tmp/task9-red.log
+          npm run test:e2e -- --project=desktop-browser-fallback --grep "category|search" 2>&1 | tee /tmp/task9-red.log
           status=${PIPESTATUS[0]}
           set -e
           test "$status" -ne 0
