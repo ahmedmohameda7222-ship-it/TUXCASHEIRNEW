@@ -43,7 +43,7 @@ import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } f
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
 const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
-const CART_RESIZE_KEYBOARD_STEP = 16;
+const CART_RESIZE_KEYBOARD_STEP = 24;
 
 function desktopCartResizeMatches(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
@@ -206,7 +206,7 @@ export function OrdersWorkspace({
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
-  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('center');
+  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
   const [categoryEditSaving, setCategoryEditSaving] = useState(false);
   const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
   const [categoryResetRequested, setCategoryResetRequested] = useState(false);
@@ -436,7 +436,7 @@ export function OrdersWorkspace({
     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
     [categoryPreference, configuredActiveCategories],
   );
-  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'center';
+  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'left';
   const categoryEditorCategories = useMemo(() => {
     const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));
     return categoryEditOrder.flatMap((categoryId) => {
@@ -536,7 +536,7 @@ export function OrdersWorkspace({
 
   function resetCategoryEdit(): void {
     setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
-    setCategoryEditAlignment('center');
+    setCategoryEditAlignment('left');
     setCategoryEditError(null);
     setCategoryResetRequested(true);
   }
@@ -917,36 +917,6 @@ export function OrdersWorkspace({
                 </div>
               </div>
             </section>
-          ) : categoryMode === 'SEARCH' ? (
-            <div className="product-search category-search-inline">
-              <SearchIcon className="category-search-glyph" />
-              <input
-                ref={searchRef}
-                id="product-search"
-                type="search"
-                aria-label="Search menu"
-                value={search}
-                placeholder="Search products"
-                autoComplete="off"
-                onChange={(event) => {
-                  const nextSearch = event.target.value;
-                  setSearch(nextSearch);
-                  if (nextSearch.trim().length > 0) setSelectedProductFamily(null);
-                }}
-              />
-              <kbd>Ctrl K</kbd>
-              <button
-                type="button"
-                className="category-search-clear"
-                aria-label="Clear search"
-                onClick={() => {
-                  setSearch('');
-                  setCategoryMode('IDLE');
-                }}
-              >
-                Clear
-              </button>
-            </div>
           ) : (
             <div className="field-stack category-navigation-stack">
               <div className="category-navigation">
@@ -978,20 +948,53 @@ export function OrdersWorkspace({
                   <button
                     type="button"
                     className="category-icon-action"
-                    aria-label="Search menu"
-                    title="Search menu"
-                    onClick={() => setCategoryMode('SEARCH')}
-                  >
-                    <SearchIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="category-edit-action"
+                    aria-label="Edit categories"
+                    title="Edit categories"
                     onClick={beginCategoryEdit}
                   >
                     <EditPencilIcon />
-                    <span>Edit categories</span>
                   </button>
+                  {categoryMode === 'SEARCH' ? (
+                    <div className="product-search category-search-inline">
+                      <SearchIcon className="category-search-glyph" />
+                      <input
+                        ref={searchRef}
+                        id="product-search"
+                        type="search"
+                        aria-label="Search menu"
+                        value={search}
+                        placeholder="Search products"
+                        autoComplete="off"
+                        onChange={(event) => {
+                          const nextSearch = event.target.value;
+                          setSearch(nextSearch);
+                          if (nextSearch.trim().length > 0) setSelectedProductFamily(null);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="category-search-clear"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        onClick={() => {
+                          setSearch('');
+                          setCategoryMode('IDLE');
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="category-icon-action"
+                      aria-label="Search menu"
+                      title="Search menu"
+                      onClick={() => setCategoryMode('SEARCH')}
+                    >
+                      <SearchIcon />
+                    </button>
+                  )}
                 </div>
               </div>
               {productFamilies.length > 1 ? (

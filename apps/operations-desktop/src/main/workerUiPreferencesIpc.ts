@@ -83,7 +83,7 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
   }
 
   async reset(): Promise<void> {
-    await this.update({ categoryOrder: [], categoryAlignment: 'center' });
+    await this.update({ categoryOrder: [], categoryAlignment: 'left' });
   }
 
   register(window: BrowserWindow): void {

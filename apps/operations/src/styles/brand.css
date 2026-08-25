@@ -20,11 +20,13 @@
 }
 
 .operations-header .tux-brand {
-  width: 3.1rem;
-  height: 3.1rem;
-  min-width: 3.1rem;
-  min-height: 3.1rem;
+  width: auto;
+  height: 44px;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 44px;
   padding: 0;
+  object-fit: contain;
 }
 
 :root[data-theme='dark'] .tux-brand {
@@ -39,10 +41,11 @@
 
 @media (max-width: 34rem) {
   .operations-header .tux-brand {
-    width: 2.9rem;
-    height: 2.9rem;
-    min-width: 2.9rem;
-    min-height: 2.9rem;
+    width: auto;
+    height: 44px;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 44px;
     padding: 0;
   }
 }

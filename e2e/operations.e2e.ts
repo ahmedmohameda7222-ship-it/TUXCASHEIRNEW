@@ -49,7 +49,19 @@ function configuration() {
     categoryId: category(Number(categoryIndex)),
     name: String(name),
     description:
-      index === 7 ? 'Development-only long text used to stress responsive menu layout.' : null,
+      index === 0
+        ? '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce'
+        : index === 1
+          ? '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'
+          : index === 2
+            ? '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'
+            : index === 3
+              ? '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom'
+              : index === 7
+                ? 'Development-only long text used to stress responsive menu layout.'
+                : index === 10
+                  ? 'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce'
+                  : null,
     priceMinor: Number(priceMinor),
     imageKey: null,
     active: true,
@@ -684,7 +696,7 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
   await expect(resetCategories.nth(0)).toHaveText('Burgers');
-  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'center');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'left');
 });
 
 test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
@@ -1191,4 +1203,163 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
   } else {
     await screenshot('09-tablet-review-pay.png');
   }
+});
+
+test('final correction keeps header and categories visible during compact search', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const header = page.locator('.operations-header');
+  const headerBox = await header.boundingBox();
+  const headerStyle = await header.evaluate((node) => getComputedStyle(node));
+  expect(headerBox).not.toBeNull();
+  expect(Math.round(headerBox!.height)).toBe(64);
+  expect(headerStyle.paddingLeft).toBe('16px');
+  expect(headerStyle.paddingRight).toBe('16px');
+  const logoBox = await header.getByRole('img', { name: 'TUX' }).boundingBox();
+  expect(logoBox).not.toBeNull();
+  expect(Math.round(logoBox!.height)).toBe(44);
+  const categories = page.getByLabel('Menu categories');
+  await expect(categories).toHaveAttribute('data-alignment', 'left');
+  expect((await categories.evaluate((node) => getComputedStyle(node))).gap).toBe('6px');
+  const toolbarBox = await page.locator('.menu-toolbar').boundingBox();
+  expect(toolbarBox).not.toBeNull();
+  expect(Math.round(toolbarBox!.height)).toBe(56);
+  const actionButtons = page.locator('.category-nav-actions > button');
+  await expect(actionButtons).toHaveCount(2);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit categories');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');
+  await page.getByRole('button', { name: 'Search menu' }).click();
+  await expect(header).toBeVisible();
+  await expect(categories).toBeVisible();
+  const search = page.locator('.category-search-inline');
+  const searchBox = await search.boundingBox();
+  expect(searchBox).not.toBeNull();
+  expect(Math.round(searchBox!.width)).toBe(300);
+  await expect(search.locator('kbd')).toHaveCount(0);
+  const input = page.getByPlaceholder('Search products');
+  await expect(input).toBeFocused();
+  const inputStyle = await input.evaluate((node) => getComputedStyle(node));
+  expect(inputStyle.fontSize).toBe('14px');
+  expect(inputStyle.lineHeight).toBe('18px');
+  expect(Number(inputStyle.fontWeight)).toBe(400);
+  const clear = search.getByRole('button', { name: 'Clear search' });
+  await expect(clear).toHaveText('×');
+  const clearBox = await clear.boundingBox();
+  expect(clearBox).not.toBeNull();
+  expect(Math.round(clearBox!.width)).toBe(44);
+  expect(Math.round(clearBox!.height)).toBe(44);
+});
+
+test('final correction keeps product controls cashier-sized', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const gridStyle = await page.locator('.product-grid').evaluate((node) => getComputedStyle(node));
+  expect(gridStyle.rowGap).toBe('8px');
+  expect(gridStyle.columnGap).toBe('8px');
+  const card = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+  expect((await card.evaluate((node) => getComputedStyle(node))).borderRadius).toBe('12px');
+  const media = await card.locator('.product-media').boundingBox();
+  expect(media).not.toBeNull();
+  expect(Math.round(media!.width)).toBe(68);
+  expect(Math.round(media!.height)).toBe(68);
+  const price = await card.locator('.product-price').evaluate((node) => getComputedStyle(node));
+  expect(price.fontSize).toBe('14px');
+  expect(price.lineHeight).toBe('18px');
+  expect(Number(price.fontWeight)).toBe(500);
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  expect(Math.round((await extra.boundingBox())!.height)).toBe(44);
+  expect(Math.round((await extra.locator('svg').boundingBox())!.width)).toBe(20);
+  const stepper = card.getByLabel('Classic Smash quantity');
+  for (const button of [
+    stepper.getByRole('button', { name: 'Remove one Classic Smash' }),
+    stepper.getByRole('button', { name: 'Add one Classic Smash' }),
+  ]) {
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(44);
+    expect(Math.round(box!.height)).toBe(44);
+  }
+  await stepper.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  const badge = card.locator('.product-quantity-badge');
+  const badgeBox = await badge.boundingBox();
+  expect(badgeBox).not.toBeNull();
+  expect(badgeBox!.width).toBeGreaterThanOrEqual(24);
+  expect(badgeBox!.height).toBeGreaterThanOrEqual(24);
+  const badgeStyle = await badge.evaluate((node) => getComputedStyle(node));
+  expect(badgeStyle.fontSize).toBe('13px');
+  expect(badgeStyle.lineHeight).toBe('16px');
+  expect(Number(badgeStyle.fontWeight)).toBe(600);
+});
+
+test('final correction keeps cart and payment controls at visible target sizes', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+  await card.getByRole('button', { name: 'Extra', exact: true }).click();
+  const customizer = page.getByRole('dialog', { name: 'Classic Smash' });
+  await customizer.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+  await customizer.getByRole('button', { name: /Add to order/i }).click();
+  const cart = page
+    .locator('.desktop-cart-wrap')
+    .getByRole('complementary', { name: 'Current order' });
+  const clear = cart.getByRole('button', { name: 'Clear', exact: true });
+  const clearStyle = await clear.evaluate((node) => getComputedStyle(node));
+  expect(clearStyle.fontSize).toBe('14px');
+  expect(clearStyle.lineHeight).toBe('18px');
+  expect(Number(clearStyle.fontWeight)).toBe(500);
+  const line = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' }).first();
+  for (const name of ['−1', '+1']) {
+    const box = await line.getByRole('button', { name, exact: true }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(44);
+    expect(Math.round(box!.height)).toBe(44);
+  }
+  for (const name of ['Edit', 'Extra']) {
+    const button = line.getByRole('button', { name, exact: true });
+    expect(Math.round((await button.boundingBox())!.height)).toBe(44);
+    const style = await button.evaluate((node) => getComputedStyle(node));
+    expect(style.fontSize).toBe('14px');
+    expect(style.lineHeight).toBe('18px');
+    expect(Number(style.fontWeight)).toBe(500);
+  }
+  expect(
+    Math.round((await cart.getByRole('button', { name: 'Take Away' }).boundingBox())!.height),
+  ).toBe(44);
+  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+  const cash = cart.getByLabel('Cash received');
+  await expect(cash).toHaveValue('');
+  await expect(cash).toHaveAttribute('placeholder', '0');
+  expect(Math.round((await cash.boundingBox())!.height)).toBe(44);
+  const tenders = cart.getByLabel('Smart Cash tenders');
+  expect((await tenders.evaluate((node) => getComputedStyle(node))).gap).toBe('6px');
+  expect(Math.round((await tenders.getByRole('button').first().boundingBox())!.height)).toBe(44);
+  const split = cart.getByRole('button', { name: 'Split payment' });
+  expect(Math.round((await split.boundingBox())!.height)).toBe(44);
+  await split.click();
+  await expect(cart.getByLabel('Method A')).toBeVisible();
+  await expect(cart.getByLabel('Amount A')).toBeVisible();
+  await expect(cart.getByLabel('Method B')).toBeVisible();
+  await expect(cart.getByText('Amount B', { exact: true })).toBeVisible();
+  await expect(cart.getByLabel('Cash received A')).toHaveCount(0);
+  await expect(cart.getByLabel('Cash received B')).toHaveCount(0);
+});
+
+test('final correction resizes Current Order by 24px per keyboard step', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  const cart = page.locator('.desktop-cart-wrap');
+  const before = await cart.boundingBox();
+  expect(before).not.toBeNull();
+  await separator.focus();
+  await page.keyboard.press('ArrowRight');
+  const after = await cart.boundingBox();
+  expect(after).not.toBeNull();
+  expect(Math.round(Math.abs(after!.width - before!.width))).toBe(24);
 });
