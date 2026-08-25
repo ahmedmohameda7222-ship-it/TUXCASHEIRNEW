@@ -27,11 +27,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show gateway-test formatter diff
-        shell: bash
-        run: |
-          npx prettier server/workerUiPreferencesGateway.test.ts > /tmp/workerUiPreferencesGateway.test.ts.formatted
-          diff -u server/workerUiPreferencesGateway.test.ts /tmp/workerUiPreferencesGateway.test.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
