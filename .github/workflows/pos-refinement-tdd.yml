@@ -89,10 +89,6 @@ jobs:
           }
 
           '''
-          if described_minimum not in css:
-              raise SystemExit('Expected described-card minimum block was not found')
-          css = css.replace(described_minimum, '', 1)
-
           mobile_minimums = '''/* Mobile card containment fix. */
           .product-card {
             min-height: 146px;
@@ -110,6 +106,14 @@ jobs:
           if mobile_minimums not in css:
               raise SystemExit('Expected forced mobile card minimums were not found')
           css = css.replace(mobile_minimums, replacement, 1)
+
+          remaining_described = css.count(described_minimum)
+          if remaining_described < 1:
+              raise SystemExit('Expected remaining described-card minimums were not found')
+          css = css.replace(described_minimum, '')
+          if described_minimum in css:
+              raise SystemExit('A forced described-card minimum remains')
+
           css_path.write_text(css)
           PY
           npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
