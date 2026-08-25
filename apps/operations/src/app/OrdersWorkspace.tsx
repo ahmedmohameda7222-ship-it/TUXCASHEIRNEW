@@ -981,15 +981,17 @@ export function OrdersWorkspace({
                   ))}
                 </div>
                 <div className="category-nav-actions">
-                  <button
-                    type="button"
-                    className="category-icon-action"
-                    aria-label="Edit categories"
-                    title="Edit categories"
-                    onClick={beginCategoryEdit}
-                  >
-                    <EditPencilIcon />
-                  </button>
+                  {categoryMode === 'IDLE' ? (
+                    <button
+                      type="button"
+                      className="category-icon-action"
+                      aria-label="Edit categories"
+                      title="Edit categories"
+                      onClick={beginCategoryEdit}
+                    >
+                      <EditPencilIcon />
+                    </button>
+                  ) : null}
                   {categoryMode === 'SEARCH' ? (
                     <div className="product-search category-search-inline">
                       <SearchIcon className="category-search-glyph" />

@@ -1344,3 +1344,101 @@ button:not(:disabled):active {
 .product-card:has(.product-copy p) {
   min-height: 152px;
 }
+
+/* Task 2 approved two-level menu composition. */
+.menu-toolbar:not(.category-mode-edit) {
+  height: auto;
+  min-height: 56px;
+  padding: 0 8px 8px;
+}
+
+.menu-toolbar .category-navigation-stack {
+  gap: 6px;
+}
+
+.menu-toolbar .category-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 56px;
+}
+
+.menu-toolbar .category-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-toolbar .product-family-filter {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.menu-toolbar .product-family-filter button {
+  min-height: 44px;
+  padding-inline: 14px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.menu-toolbar .product-family-filter button.selected {
+  font-weight: 600;
+}
+
+.menu-toolbar .category-search-inline {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 44px;
+  width: clamp(240px, 21vw, 300px);
+  max-width: 320px;
+  height: 44px;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-subtle);
+  overflow: hidden;
+}
+
+.menu-toolbar .category-search-inline .category-search-glyph {
+  margin-left: 10px;
+}
+
+.menu-toolbar .category-search-inline input {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding: 0 8px 0 10px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  outline: none;
+}
+
+.menu-toolbar .category-search-inline .category-search-clear {
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--tux-border-subtle) 60%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (max-width: 54rem) {
+  .menu-toolbar .category-navigation {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .menu-toolbar .category-search-inline {
+    width: clamp(240px, 42vw, 300px);
+  }
+}

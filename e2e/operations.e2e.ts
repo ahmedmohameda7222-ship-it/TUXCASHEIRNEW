@@ -31,18 +31,18 @@ function configuration() {
     ['TUX Loaded Burger', 22_000, 1, false, false],
     ['Crispy Chicken', 14_000, 1, false, false],
     ['Spicy Chicken', 15_000, 1, false, false],
-    ['Combo Smash + Required Beverage', 19_000, 1, true, false],
+    ['Combo Smash + Required Beverage', 19_000, 2, true, false],
     ['Long Name Layout Stress Burger with Extra Description', 21_000, 1, false, false],
     ['Sold Out Test Burger', 17_000, 1, false, true],
-    ['Fries', 5_000, 2, false, false],
-    ['Loaded Fries', 8_000, 2, false, false],
-    ['Onion Rings', 6_000, 2, false, false],
-    ['Cola', 3_000, 3, false, false],
-    ['Diet Cola', 3_000, 3, false, false],
-    ['Water', 2_000, 3, false, false],
-    ['Orange Soda', 3_000, 3, false, false],
-    ['Lemon Soda', 3_000, 3, false, false],
-    ['Iced Tea', 4_000, 3, false, false],
+    ['Fries', 5_000, 3, false, false],
+    ['Loaded Fries', 8_000, 3, false, false],
+    ['Onion Rings', 6_000, 3, false, false],
+    ['Cola', 3_000, 7, false, false],
+    ['Diet Cola', 3_000, 7, false, false],
+    ['Water', 2_000, 7, false, false],
+    ['Orange Soda', 3_000, 7, false, false],
+    ['Lemon Soda', 3_000, 7, false, false],
+    ['Iced Tea', 4_000, 7, false, false],
   ].map(([name, priceMinor, categoryIndex, isCombo, soldOut], index) => ({
     id: product(index + 1),
     shopId: SHOP,
@@ -66,6 +66,7 @@ function configuration() {
     imageKey: null,
     active: true,
     soldOut: Boolean(soldOut),
+    family: index <= 3 ? 'TUX' : index <= 5 ? 'TUXIFY' : null,
     isCombo: Boolean(isCombo),
     sortOrder: index,
   }));
@@ -88,8 +89,12 @@ function configuration() {
       updatedAt: '2026-08-20T03:00:00.000Z',
       categories: [
         { id: category(1), shopId: SHOP, name: 'Burgers', sortOrder: 0, active: true },
-        { id: category(2), shopId: SHOP, name: 'Sides', sortOrder: 1, active: true },
-        { id: category(3), shopId: SHOP, name: 'Drinks', sortOrder: 2, active: true },
+        { id: category(2), shopId: SHOP, name: 'Combo', sortOrder: 1, active: true },
+        { id: category(3), shopId: SHOP, name: 'Fries', sortOrder: 2, active: true },
+        { id: category(4), shopId: SHOP, name: 'Hawawshi', sortOrder: 3, active: true },
+        { id: category(5), shopId: SHOP, name: 'Zalabia', sortOrder: 4, active: true },
+        { id: category(6), shopId: SHOP, name: 'Extras', sortOrder: 5, active: true },
+        { id: category(7), shopId: SHOP, name: 'Drinks', sortOrder: 6, active: true },
       ],
       products,
       modifiers: [
@@ -1398,7 +1403,9 @@ test('search keeps both category levels visible and hides edit chrome', async ({
   await expect(page.getByPlaceholder('Search products')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit categories' })).toBeHidden();
   await expect(page.getByText('Ctrl K', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Clear', exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('.category-search-inline').getByRole('button', { name: 'Clear', exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Clear search' })).toBeVisible();
 });
 
