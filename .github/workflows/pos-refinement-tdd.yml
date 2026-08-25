@@ -32,6 +32,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           cart = Path('apps/operations/src/app/OrdersCart.tsx')
           text = cart.read_text()
@@ -49,19 +50,26 @@ jobs:
 
           test = Path('packages/application/src/workerUiPreferences.test.ts')
           text = test.read_text()
-          old = """    let release: (() => void) | null = null;
-          const first = new Promise<void>((resolve) => {
-            release = resolve;
-          });
-          """
-          new = """    let resolveFirst!: () => void;
-          const first = new Promise<void>((resolve) => {
-            resolveFirst = resolve;
-          });
-          """
-          if old not in text:
+          pattern = re.compile(
+              r"(?m)^(\s*)let release: \(\(\) => void\) \| null = null;\n"
+              r"\1const first = new Promise<void>\(\(resolve\) => \{\n"
+              r"\1  release = resolve;\n"
+              r"\1\}\);"
+          )
+          match = pattern.search(text)
+          if match is None:
               raise SystemExit('Expected retry resolver source block not found.')
-          text = text.replace(old, new, 1).replace('    release?.();\n', '    resolveFirst();\n', 1)
+          indent = match.group(1)
+          replacement = (
+              f"{indent}let resolveFirst!: () => void;\n"
+              f"{indent}const first = new Promise<void>((resolve) => {{\n"
+              f"{indent}  resolveFirst = resolve;\n"
+              f"{indent}}});"
+          )
+          text = pattern.sub(replacement, text, count=1)
+          if '    release?.();\n' not in text:
+              raise SystemExit('Expected retry resolver call not found.')
+          text = text.replace('    release?.();\n', '    resolveFirst();\n', 1)
           test.write_text(text)
           PY
       - name: Format check
