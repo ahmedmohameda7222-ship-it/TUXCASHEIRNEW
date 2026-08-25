@@ -33,3 +33,10 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: Task 7 migration verification
+        run: npm run test:migrations
+      - name: Task 7 focused preference tests
+        run: npm test -- packages/application/src/workerUiPreferences.test.ts apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts
+      - name: Task 7 full typecheck
+        continue-on-error: true
+        run: npm run typecheck
