@@ -594,3 +594,90 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
+
+async function enterActiveOrdersForCategoryTests(page: Page): Promise<void> {
+  await seedBrowserFallback(page);
+  await page.goto('/');
+  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+  await page.getByRole('button', { name: 'Start Day' }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
+  const welcomeAction = page.locator('.welcome-action');
+  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+  await waitForActiveShell(page);
+}
+
+test('category search is progressive and keyboard accessible', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const searchInput = page.getByPlaceholder('Search products');
+  const searchButton = page.getByRole('button', { name: 'Search menu' });
+  await expect(searchInput).toBeHidden();
+  await expect(searchButton).toBeVisible();
+
+  await page.keyboard.press('Control+K');
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toBeFocused();
+  await searchInput.fill('cola');
+  await expect(page.getByRole('button', { name: 'Add one Cola' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(searchInput).toHaveValue('');
+  await expect(searchInput).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(searchInput).toBeHidden();
+
+  await page.keyboard.press('/');
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toBeFocused();
+  await searchInput.fill('water');
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(searchInput).toBeHidden();
+});
+
+test('category editor persists alignment and keyboard reorder', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const searchButton = page.getByRole('button', { name: 'Search menu' });
+  const editButton = page.getByRole('button', { name: 'Edit categories' });
+  await expect(editButton).toBeVisible();
+  await editButton.click();
+  await expect(searchButton).toBeHidden();
+  await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Right', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Right', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  const editorItems = page.locator('.category-editor-item');
+  await expect(editorItems).toHaveCount(3);
+  await expect(editorItems.nth(0)).toContainText('Burgers');
+  await page.getByRole('button', { name: 'Move Burgers right' }).click();
+  await expect(editorItems.nth(0)).toContainText('Sides');
+  await expect(editorItems.nth(1)).toContainText('Burgers');
+
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const categories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(categories.nth(0)).toHaveText('Sides');
+  await expect(categories.nth(1)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+  await page.reload();
+  await waitForActiveShell(page);
+  const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(reloadedCategories.nth(0)).toHaveText('Sides');
+  await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+  await page.getByRole('button', { name: 'Edit categories' }).click();
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(resetCategories.nth(0)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'center');
+});
