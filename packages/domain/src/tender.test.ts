@@ -5,10 +5,7 @@ import { suggestCashTenders } from './tender';
 
 describe('suggestCashTenders', () => {
   it.each([
-    [
-      70_500,
-      [70_500, 71_000, 72_000, 75_000, 80_000],
-    ],
+    [70_500, [70_500, 71_000, 72_000, 75_000, 80_000]],
     [71_500, [71_500, 72_000, 75_000, 80_000]],
     [76_300, [76_300, 77_000, 78_000, 80_000]],
   ])('returns exact plus practical rounded tenders for %s minor units', (total, expected) => {
@@ -32,9 +29,16 @@ describe('suggestCashTenders', () => {
     expect(suggestCashTenders(moneyMinor(-100))).toEqual([]);
   });
 
-  it.each([moneyMinor(0), moneyMinor(-1)])('rejects invalid custom rounding step %s', (step) => {
-    expect(() => suggestCashTenders(moneyMinor(70_500), [step])).toThrow(DomainInvariantError);
+  it('rejects an empty custom rounding-step set', () => {
+    expect(() => suggestCashTenders(moneyMinor(70_500), [])).toThrow(DomainInvariantError);
   });
+
+  it.each([moneyMinor(0), moneyMinor(-1)])(
+    'rejects invalid custom rounding step %s',
+    (step) => {
+      expect(() => suggestCashTenders(moneyMinor(70_500), [step])).toThrow(DomainInvariantError);
+    },
+  );
 
   it('rejects rounded values that exceed the safe-integer range', () => {
     expect(() =>
