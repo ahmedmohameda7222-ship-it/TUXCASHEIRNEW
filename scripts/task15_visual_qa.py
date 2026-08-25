@@ -2,6 +2,99 @@ from pathlib import Path
 
 path = Path('e2e/operations.e2e.ts')
 text = path.read_text()
+
+
+def replace_once(before: str, after: str) -> None:
+    global text
+    if after in text:
+        return
+    if before not in text:
+        raise SystemExit(f'Expected E2E source block not found: {before[:120]!r}')
+    text = text.replace(before, after, 1)
+
+
+replace_once(
+    """  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+  await page.getByRole('button', { name: 'Start Day' }).click();
+  await waitForActiveShell(page);
+  await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
+""",
+    """  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+  await page.getByRole('button', { name: 'Start Day' }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label=\"Operations\"]') !== null,
+  );
+  const welcomeAction = page.locator('.welcome-action');
+  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+  await waitForActiveShell(page);
+  await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
+""",
+)
+
+replace_once(
+    """test('category persistence failure keeps editor and draft intact', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
+    name: 'Current order',
+  });
+  await expect(cart).toContainText('Classic Smash');
+""",
+    """test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+  await expect(cart).toContainText('Classic Smash');
+""",
+)
+
+replace_once(
+    """  expect(cartTitleStyle.fontSize).toBe('17px');
+  expect(cartTitleStyle.lineHeight).toBe('22px');
+  expect(Number(cartTitleStyle.fontWeight)).toBe(600);
+
+  const lineNameStyle = await cart
+""",
+    """  expect(cartTitleStyle.fontSize).toBe('17px');
+  expect(cartTitleStyle.lineHeight).toBe('22px');
+  expect(Number(cartTitleStyle.fontWeight)).toBe(600);
+
+  const subsectionHeadingStyle = await cart
+    .locator('.payment-section h2')
+    .evaluate((node) => getComputedStyle(node));
+  expect(subsectionHeadingStyle.fontSize).toBe('14px');
+  expect(subsectionHeadingStyle.lineHeight).toBe('18px');
+  expect(Number(subsectionHeadingStyle.fontWeight)).toBe(600);
+
+  const lineNameStyle = await cart
+""",
+)
+
+replace_once(
+    """  const totalStyle = await cart
+    .locator('.grand-total dd')
+    .evaluate((node) => getComputedStyle(node));
+  expect(totalStyle.fontSize).toBe('22px');
+""",
+    """  const totalLabelStyle = await cart
+    .locator('.grand-total dt')
+    .evaluate((node) => getComputedStyle(node));
+  expect(totalLabelStyle.fontSize).toBe('18px');
+  expect(totalLabelStyle.lineHeight).toBe('22px');
+  expect(Number(totalLabelStyle.fontWeight)).toBe(600);
+
+  const totalStyle = await cart
+    .locator('.grand-total dd')
+    .evaluate((node) => getComputedStyle(node));
+  expect(totalStyle.fontSize).toBe('22px');
+""",
+)
+
 marker = "test('visual approval evidence covers approved POS states'"
 if marker not in text:
     text += r'''
@@ -97,7 +190,7 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('05-single-cash-705.png');
     await cashReceived.fill('800');
     await cashReceived.blur();
-    await expect(cart.locator('.payment-summary')).toContainText('Change: 95.00');
+    await expect(cart.locator('.payment-summary')).toContainText('Change: EGP 95.00');
 
     await startFresh();
     await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
@@ -125,7 +218,11 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     const transitionDurations = await page
       .locator('.product-card')
       .first()
-      .evaluate((node) => getComputedStyle(node).transitionDuration.split(',').map((value) => parseFloat(value)));
+      .evaluate((node) =>
+        getComputedStyle(node)
+          .transitionDuration.split(',')
+          .map((value) => parseFloat(value)),
+      );
     expect(transitionDurations.every((duration) => duration <= 0.001)).toBe(true);
     return;
   }
