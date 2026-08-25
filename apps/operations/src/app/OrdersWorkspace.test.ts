@@ -40,7 +40,9 @@ function product(
   },
 ): Product {
   return {
-    id: parseEntityId<ProductId>(`44444444-4444-4444-8444-${String(index).padStart(12, '0')}`),
+    id: parseEntityId<ProductId>(
+      `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
+    ),
     shopId,
     categoryId: options.categoryId,
     name: options.name,
@@ -73,7 +75,9 @@ function preference(categoryOrder: readonly MenuCategoryId[]): WorkerUiPreferenc
 
 describe('reconcileCategoryOrder', () => {
   it('keeps saved active categories first and appends newly active configuration categories', () => {
-    const staleId = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-999999999999');
+    const staleId = parseEntityId<MenuCategoryId>(
+      '33333333-3333-4333-8333-999999999999',
+    );
 
     expect(
       reconcileCategoryOrder(
@@ -95,12 +99,38 @@ describe('reconcileCategoryOrder', () => {
 describe('productFamiliesForCategory', () => {
   it('derives ordered contextual families only from active products in the selected category', () => {
     const products = [
-      product(1, { name: 'Single Smashed Patty', categoryId: burgers.id, family: 'TUX', sortOrder: 0 }),
-      product(2, { name: 'Double Smashed Patty', categoryId: burgers.id, family: 'TUX', sortOrder: 1 }),
-      product(3, { name: 'Single TUXIFY', categoryId: burgers.id, family: 'TUXIFY', sortOrder: 2 }),
+      product(1, {
+        name: 'Single Smashed Patty',
+        categoryId: burgers.id,
+        family: 'TUX',
+        sortOrder: 0,
+      }),
+      product(2, {
+        name: 'Double Smashed Patty',
+        categoryId: burgers.id,
+        family: 'TUX',
+        sortOrder: 1,
+      }),
+      product(3, {
+        name: 'Single TUXIFY',
+        categoryId: burgers.id,
+        family: 'TUXIFY',
+        sortOrder: 2,
+      }),
       product(4, { name: "Johnny's", categoryId: burgers.id, family: null, sortOrder: 3 }),
-      product(5, { name: 'Blank family', categoryId: burgers.id, family: '   ', sortOrder: 4 }),
-      product(6, { name: 'Inactive family', categoryId: burgers.id, family: 'HIDDEN', sortOrder: 5, active: false }),
+      product(5, {
+        name: 'Blank family',
+        categoryId: burgers.id,
+        family: '   ',
+        sortOrder: 4,
+      }),
+      product(6, {
+        name: 'Inactive family',
+        categoryId: burgers.id,
+        family: 'HIDDEN',
+        sortOrder: 5,
+        active: false,
+      }),
       product(7, { name: 'Soda', categoryId: drinks.id, family: 'DRINKS', sortOrder: 6 }),
     ];
 
@@ -111,8 +141,18 @@ describe('productFamiliesForCategory', () => {
 
 describe('filterProductsForMenu', () => {
   const products = [
-    product(1, { name: 'Single Smashed Patty', categoryId: burgers.id, family: 'TUX', sortOrder: 0 }),
-    product(2, { name: 'Single TUXIFY', categoryId: burgers.id, family: 'TUXIFY', sortOrder: 1 }),
+    product(1, {
+      name: 'Single Smashed Patty',
+      categoryId: burgers.id,
+      family: 'TUX',
+      sortOrder: 0,
+    }),
+    product(2, {
+      name: 'Single TUXIFY',
+      categoryId: burgers.id,
+      family: 'TUXIFY',
+      sortOrder: 1,
+    }),
     product(3, { name: "Johnny's", categoryId: burgers.id, family: null, sortOrder: 2 }),
     product(4, { name: 'Soda', categoryId: drinks.id, family: null, sortOrder: 3 }),
   ];
