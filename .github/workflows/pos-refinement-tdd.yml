@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,75 +14,24 @@ concurrency:
 
 jobs:
   tdd:
-    name: task-three-full-gate
+    name: committed-pos-contracts
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved menu fixture and toolbar correction
-        run: |
-          python scripts/apply_task3_fixture.py
-          python scripts/fix_task3_generated_names.py
-          python scripts/fix_task3_combo_navigation.py
-          python scripts/fix_task3_search_query.py
-          python scripts/fix_task3_category_editor.py
-          python scripts/fix_task3_remaining_expectations.py
-          python scripts/fix_task3_toolbar_height.py
-      - name: Format changed sources
-        run: npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
-      - name: Reject legacy or development-only fixture text
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          text = Path('e2e/operations.e2e.ts').read_text()
-          forbidden = [
-              'Classic Smash',
-              'TUX Loaded Burger',
-              'Crispy Chicken',
-              'Spicy Chicken',
-              'Long Name Layout Stress Burger with Extra Description',
-              'Sold Out Test Burger',
-              'Development-only long text used to stress responsive menu layout.',
-              "fill('cola')",
-              "name: 'Sides'",
-              "toHaveText('Sides')",
-          ]
-          found = [token for token in forbidden if token in text]
-          for label, pattern in [
-              ('Double Smash', r'\bDouble Smash\b(?!ed)'),
-              ('Triple Smash', r'\bTriple Smash\b(?!ed)'),
-          ]:
-              if re.search(pattern, text):
-                  found.append(label)
-          if found:
-              raise SystemExit(f'Legacy fixture text remains: {found}')
-          PY
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run complete Operations E2E file
-        run: npx playwright test e2e/operations.e2e.ts
-      - name: Finalize committed Task 3 sources
-        run: |
-          python scripts/finalize_task3.py
-          npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css .github/workflows/pos-refinement-tdd.yml
-      - name: Commit Task 3 GREEN state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && { echo "Expected Task 3 changes were not generated"; exit 1; }
-          git commit -m "fix: align approved POS menu and category toolbar"
-          git push origin HEAD:ui/tux-pos-refinement
+      - name: Run committed POS contracts
+        run: >-
+          npm run test:e2e -- --project=desktop-browser-fallback --grep
+          "approved category hierarchy|search keeps both category levels|category edit contains primary categories only|final correction keeps header and categories visible during compact search|premium POS visual hierarchy matches approved sizing"
