@@ -1,5 +1,5 @@
-import { greetingForHour, type OperationsSessionState } from '@tux/application';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type OperationsSessionState } from '@tux/application';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
 import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
@@ -20,6 +20,11 @@ import {
 } from './sessionClient';
 import { connectDesktopSyncStatus } from './syncStatus';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
+import {
+  chooseWelcomeCopy,
+  greetingForLocalHour,
+  type WelcomeCopy,
+} from './welcomeCopy';
 
 type ScreenState =
   | { readonly kind: 'LOADING' }
@@ -27,6 +32,7 @@ type ScreenState =
   | {
       readonly kind: 'GREETING';
       readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+      readonly copy: WelcomeCopy;
     };
 
 type ThemePreference = 'system' | 'light' | 'dark';
@@ -195,16 +201,23 @@ function EntryScreen({
 
 function GreetingScreen({
   session,
+  copy,
+  onContinue,
 }: {
   readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+  readonly copy: WelcomeCopy;
+  readonly onContinue: () => void;
 }) {
   return (
     <main className="greeting-shell" aria-live="polite">
       <div className="greeting-content">
         <Brand />
-        <h1>{greetingForHour(new Date().getHours(), session.operator.displayName)}</h1>
+        <h1>{greetingForLocalHour(new Date().getHours(), session.operator.displayName)}</h1>
         <p>Glad you made it in safely.</p>
-        <p>Have a great shift.</p>
+        <p className="welcome-motivation">{copy.line}</p>
+        <button className="primary-action welcome-action" type="button" onClick={onContinue}>
+          {copy.button}
+        </button>
       </div>
     </main>
   );
@@ -443,6 +456,7 @@ export function App() {
   const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
   const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);
   const endDayClient = useMemo(() => createOperationsEndDayClient(), []);
+  const previousWelcomeCopy = useRef<WelcomeCopy | null>(null);
   const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -476,8 +490,12 @@ export function App() {
     }
     if (result.value.status === 'ACTIVE') {
       const active = result.value;
-      setScreen({ kind: 'GREETING', session: active });
-      window.setTimeout(() => setScreen({ kind: 'SESSION', session: active }), 1_250);
+      const copy = chooseWelcomeCopy({
+        previousLine: previousWelcomeCopy.current?.line ?? null,
+        previousButton: previousWelcomeCopy.current?.button ?? null,
+      });
+      previousWelcomeCopy.current = copy;
+      setScreen({ kind: 'GREETING', session: active, copy });
       return true;
     }
     setScreen({ kind: 'SESSION', session: result.value });
@@ -523,7 +541,16 @@ export function App() {
 
   if (screen.kind === 'LOADING')
     return <main className="loading-shell" aria-label="Loading TUX Operations" />;
-  if (screen.kind === 'GREETING') return <GreetingScreen session={screen.session} />;
+  if (screen.kind === 'GREETING') {
+    const active = screen.session;
+    return (
+      <GreetingScreen
+        session={active}
+        copy={screen.copy}
+        onContinue={() => setScreen({ kind: 'SESSION', session: active })}
+      />
+    );
+  }
   if (screen.session.status === 'CONFIGURATION_REQUIRED') {
     return (
       <DeviceSetupScreen
