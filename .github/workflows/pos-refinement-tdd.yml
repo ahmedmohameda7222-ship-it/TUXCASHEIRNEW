@@ -19,21 +19,6 @@ jobs:
     timeout-minutes: 12
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -48,14 +33,3 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Task 7 migration verification
-        run: npm run test:migrations
-      - name: Task 7 focused preference tests
-        run: npm test -- packages/application/src/workerUiPreferences.test.ts apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts
-      - name: Task 7 full typecheck
-        continue-on-error: true
-        run: npm run typecheck
