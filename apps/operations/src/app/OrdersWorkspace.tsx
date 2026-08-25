@@ -7,6 +7,7 @@ import {
   addProductUnit,
   decrementDraftLine,
   decrementProductUnit,
+  duplicateDraftLineUnit,
   normalizeEgyptianPhone,
   parseEntityId,
   productQuantityInDraft,
@@ -545,6 +546,19 @@ export function OrdersWorkspace({
     enqueueMutation((candidate) => decrementDraftLine(candidate, lineId));
   }
 
+  function incrementLine(lineId: DraftLineId): void {
+    if (draftRef.current === null || configuration === null) return;
+    enqueueMutation((current) =>
+      duplicateDraftLineUnit({
+        draft: current,
+        configuration,
+        lineId,
+        newLineId: parseEntityId<DraftLineId>(crypto.randomUUID()),
+        addedSequence: nextDraftAddedSequence(current),
+      }),
+    );
+  }
+
   function submitCustomization(customization: DraftLineCustomization): void {
     if (customizer === null || configuration === null) return;
     if (customizer.kind === 'ADD') {
@@ -991,6 +1005,7 @@ export function OrdersWorkspace({
             setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
           }
           onDecrementLine={decrementLine}
+          onIncrementLine={incrementLine}
           onClear={() => setClearConfirmOpen(true)}
           onDeliveryPhoneCommit={commitDeliveryPhone}
           onPlace={() => void placeOrder()}
@@ -1027,6 +1042,7 @@ export function OrdersWorkspace({
               setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
             }
             onDecrementLine={decrementLine}
+            onIncrementLine={incrementLine}
             onClear={() => setClearConfirmOpen(true)}
             onDeliveryPhoneCommit={commitDeliveryPhone}
             onPlace={() => void placeOrder()}

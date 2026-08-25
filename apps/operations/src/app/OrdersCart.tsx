@@ -167,6 +167,7 @@ export function OrdersCart({
   onEditLine,
   onEditLineExtras,
   onDecrementLine,
+  onIncrementLine,
   onClear,
   onDeliveryPhoneCommit,
   onPlace,
@@ -180,6 +181,7 @@ export function OrdersCart({
   readonly onEditLine: (lineId: DraftLineId) => void;
   readonly onEditLineExtras: (lineId: DraftLineId) => void;
   readonly onDecrementLine: (lineId: DraftLineId) => void;
+  readonly onIncrementLine: (lineId: DraftLineId) => void;
   readonly onClear: () => void;
   readonly onDeliveryPhoneCommit: (displayPhone: string) => void;
   readonly onPlace: () => void;
@@ -281,12 +283,12 @@ export function OrdersCart({
     <aside className="orders-cart" aria-label="Current order">
       <div className="cart-heading">
         <div>
-          <span>Current order</span>
-          <strong>
+          <strong className="cart-title">Current Order</strong>
+          <span className="cart-count">
             {totalQuantity === 0
               ? 'Empty'
               : `${totalQuantity} item${totalQuantity === 1 ? '' : 's'}`}
-          </strong>
+          </span>
         </div>
         <button
           type="button"
@@ -299,27 +301,6 @@ export function OrdersCart({
       </div>
 
       <div className="cart-scroll">
-        <section
-          className="cart-section order-type-section"
-          aria-labelledby={controlId('order-type-title')}
-        >
-          <h2 id={controlId('order-type-title')}>Order type</h2>
-          <div className="segmented-control">
-            {orderTypes.map((orderType) => (
-              <button
-                type="button"
-                key={orderType.id}
-                className={draft.orderTypeId === orderType.id ? 'selected' : undefined}
-                disabled={busy}
-                onClick={() => selectOrderType(orderType.id)}
-              >
-                {orderType.name}
-              </button>
-            ))}
-          </div>
-          <SectionIssues issues={issues} paths={['orderType']} />
-        </section>
-
         <section
           className="cart-section cart-lines-section"
           aria-labelledby={controlId('cart-items-title')}
@@ -365,7 +346,24 @@ export function OrdersCart({
                         {issue.message}
                       </p>
                     ))}
-                    <div className="line-actions">
+                    <div className="line-actions" aria-label={`${line.productName} actions`}>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onDecrementLine(line.id)}
+                      >
+                        −1
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onIncrementLine(line.id)}
+                      >
+                        +1
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
+                        Edit
+                      </button>
                       {supportsExtras ? (
                         <button
                           type="button"
@@ -377,16 +375,6 @@ export function OrdersCart({
                           <span>Extra</span>
                         </button>
                       ) : null}
-                      <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onDecrementLine(line.id)}
-                      >
-                        − One
-                      </button>
                     </div>
                   </article>
                 );
@@ -394,6 +382,27 @@ export function OrdersCart({
             </div>
           )}
           <SectionIssues issues={issues} paths={['cart']} />
+        </section>
+
+        <section
+          className="cart-section order-type-section"
+          aria-labelledby={controlId('order-type-title')}
+        >
+          <h2 id={controlId('order-type-title')}>Order type</h2>
+          <div className="segmented-control">
+            {orderTypes.map((orderType) => (
+              <button
+                type="button"
+                key={orderType.id}
+                className={draft.orderTypeId === orderType.id ? 'selected' : undefined}
+                disabled={busy}
+                onClick={() => selectOrderType(orderType.id)}
+              >
+                {orderType.name}
+              </button>
+            ))}
+          </div>
+          <SectionIssues issues={issues} paths={['orderType']} />
         </section>
 
         {delivery ? (
