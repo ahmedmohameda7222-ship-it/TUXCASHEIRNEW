@@ -47,7 +47,10 @@ function chooseFromPool<const Value extends string>(
   random: () => number,
 ): Value {
   const candidates = pool.length > 1 ? pool.filter((value) => value !== previous) : pool;
-  const index = Math.min(candidates.length - 1, Math.floor(Math.max(0, random()) * candidates.length));
+  const index = Math.min(
+    candidates.length - 1,
+    Math.floor(Math.max(0, random()) * candidates.length),
+  );
   const selected = candidates[index];
   if (selected === undefined) throw new RangeError('Welcome copy pool must not be empty.');
   return selected;
