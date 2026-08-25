@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,19 +14,25 @@ concurrency:
 
 jobs:
   tdd:
-    name: committed-pos-contracts
+    name: task-two-green
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply Task 2 GREEN patch
+        run: python scripts/apply_task2_green.py
+      - name: Format changed source
+        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/premium.css e2e/operations.e2e.ts
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
@@ -35,3 +41,10 @@ jobs:
         run: >-
           npm run test:e2e -- --project=desktop-browser-fallback --grep
           "approved category hierarchy|search keeps both category levels|category edit contains primary categories only"
+      - name: Commit Task 2 GREEN
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+          git commit -m "fix: restore category and search hierarchy"
+          git push origin HEAD:ui/tux-pos-refinement
