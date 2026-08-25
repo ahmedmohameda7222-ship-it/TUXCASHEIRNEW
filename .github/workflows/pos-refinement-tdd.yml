@@ -88,6 +88,10 @@ jobs:
               raise SystemExit('Expected worker preference response serialization not found.')
           gateway.write_text(text.replace(old, new, 1))
           PY
+          npx prettier --write \
+            apps/operations/src/app/OrdersCart.tsx \
+            packages/application/src/workerUiPreferences.test.ts \
+            server/workerUiPreferencesGateway.ts
       - name: Format check
         run: npm run format:check
       - name: Lint
