@@ -4,10 +4,7 @@ import { parseWorkerUiPreferences } from './workerUiPreferences';
 const validPreferences = {
   shopId: '11111111-1111-4111-8111-111111111111',
   workerId: '22222222-2222-4222-8222-222222222222',
-  categoryOrder: [
-    '33333333-3333-4333-8333-333333333331',
-    '33333333-3333-4333-8333-333333333332',
-  ],
+  categoryOrder: ['33333333-3333-4333-8333-333333333331', '33333333-3333-4333-8333-333333333332'],
   categoryAlignment: 'center',
   updatedAt: '2026-08-25T02:00:00.000Z',
   serverVersion: 4,
@@ -34,11 +31,14 @@ describe('parseWorkerUiPreferences', () => {
     ).toThrow('categoryOrder');
   });
 
-  it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rejects invalid serverVersion %s', (serverVersion) => {
-    expect(() => parseWorkerUiPreferences({ ...validPreferences, serverVersion })).toThrow(
-      'serverVersion',
-    );
-  });
+  it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid serverVersion %s',
+    (serverVersion) => {
+      expect(() => parseWorkerUiPreferences({ ...validPreferences, serverVersion })).toThrow(
+        'serverVersion',
+      );
+    },
+  );
 
   it.each(['PENDING', '', 'dirty'])('rejects invalid sync state %s', (syncState) => {
     expect(() => parseWorkerUiPreferences({ ...validPreferences, syncState })).toThrow('syncState');
