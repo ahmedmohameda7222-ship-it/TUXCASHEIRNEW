@@ -1,5 +1,11 @@
 import 'fake-indexeddb/auto';
-import { instant, parseEntityId, type MenuCategoryId, type ShopId, type WorkerId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type MenuCategoryId,
+  type ShopId,
+  type WorkerId,
+} from '@tux/domain';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IndexedDbOperationsDatabase } from './IndexedDbOperationsDatabase';
 import {
@@ -14,12 +20,8 @@ const createdDatabases = new Set<string>();
 const preferenceShopId = parseEntityId<ShopId>('81111111-1111-4111-8111-111111111111');
 const preferenceWorkerAId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222222222221');
 const preferenceWorkerBId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222222222222');
-const preferenceCategoryAId = parseEntityId<MenuCategoryId>(
-  '83333333-3333-4333-8333-333333333331',
-);
-const preferenceCategoryBId = parseEntityId<MenuCategoryId>(
-  '83333333-3333-4333-8333-333333333332',
-);
+const preferenceCategoryAId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333331');
+const preferenceCategoryBId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333332');
 
 function preference(workerId: WorkerId, serverVersion = 0) {
   return {
@@ -126,13 +128,7 @@ describe('IndexedDB migration registry', () => {
       );
       expect([...database.objectStoreNames]).toContain('workerUiPreferences');
       const transaction = database.transaction(
-        [
-          'orders',
-          'inventoryItems',
-          'inventoryMovements',
-          'outboxEvents',
-          'workerSessions',
-        ],
+        ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
         'readonly',
       );
       expect([...transaction.objectStore('orders').indexNames]).toContain('businessDayCreatedAt');
