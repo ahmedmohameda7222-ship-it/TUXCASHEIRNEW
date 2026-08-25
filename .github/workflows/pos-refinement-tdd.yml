@@ -29,7 +29,9 @@ jobs:
         run: npm ci
       - name: Apply Task 11 current order implementation
         if: github.actor != 'github-actions[bot]'
-        run: python scripts/task11_apply.py
+        run: |
+          python scripts/task11_apply.py
+          python scripts/task11_css_fix.py
       - name: Format Task 11 touched files
         if: github.actor != 'github-actions[bot]'
         run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
