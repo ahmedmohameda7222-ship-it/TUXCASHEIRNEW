@@ -40,9 +40,7 @@ function product(
   },
 ): Product {
   return {
-    id: parseEntityId<ProductId>(
-      `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
-    ),
+    id: parseEntityId<ProductId>(`44444444-4444-4444-8444-${String(index).padStart(12, '0')}`),
     shopId,
     categoryId: options.categoryId,
     name: options.name,
@@ -75,9 +73,7 @@ function preference(categoryOrder: readonly MenuCategoryId[]): WorkerUiPreferenc
 
 describe('reconcileCategoryOrder', () => {
   it('keeps saved active categories first and appends newly active configuration categories', () => {
-    const staleId = parseEntityId<MenuCategoryId>(
-      '33333333-3333-4333-8333-999999999999',
-    );
+    const staleId = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-999999999999');
 
     expect(
       reconcileCategoryOrder(
