@@ -8,8 +8,9 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type RemoteWorkerUiPreferences,
   type WorkerUiPreferencesRemoteGateway,
@@ -91,6 +92,10 @@ class RecordingGateway implements WorkerUiPreferencesRemoteGateway {
     return this.putResult;
   }
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('WorkerUiPreferencesService', () => {
   it('updates local state first, marks it DIRTY, and preserves the current server version', async () => {
@@ -194,5 +199,55 @@ describe('WorkerUiPreferencesService', () => {
     await expect(service.syncOnce(shopId, workerId)).rejects.toThrow('offline');
     expect(repository.value).toEqual(local);
     expect(gateway.calls).toEqual([`put:center:${categoryB}`]);
+  });
+});
+
+describe('WorkerUiPreferencesRetryController', () => {
+  it('runs only for an active identity and retries on the configured interval', async () => {
+    vi.useFakeTimers();
+    const syncOnce = vi.fn().mockResolvedValue(undefined);
+    let identity: { shopId: ShopId; workerId: WorkerId } | null = null;
+    const controller = new WorkerUiPreferencesRetryController(
+      { syncOnce },
+      () => identity,
+      { intervalMs: 60_000 },
+    );
+
+    controller.start();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(syncOnce).not.toHaveBeenCalled();
+
+    identity = { shopId, workerId };
+    await controller.syncActive();
+    expect(syncOnce).toHaveBeenCalledTimes(1);
+    expect(syncOnce).toHaveBeenLastCalledWith(shopId, workerId);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(syncOnce).toHaveBeenCalledTimes(2);
+    controller.stop();
+  });
+
+  it('swallows retry failures and prevents overlapping sync calls', async () => {
+    let release: (() => void) | null = null;
+    const first = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const syncOnce = vi
+      .fn()
+      .mockImplementationOnce(() => first)
+      .mockRejectedValueOnce(new Error('offline'));
+    const controller = new WorkerUiPreferencesRetryController(
+      { syncOnce },
+      () => ({ shopId, workerId }),
+    );
+
+    const pending = controller.syncActive();
+    const duplicate = controller.syncActive();
+    expect(syncOnce).toHaveBeenCalledTimes(1);
+    release?.();
+    await Promise.all([pending, duplicate]);
+
+    await expect(controller.syncActive()).resolves.toBeUndefined();
+    expect(syncOnce).toHaveBeenCalledTimes(2);
   });
 });
