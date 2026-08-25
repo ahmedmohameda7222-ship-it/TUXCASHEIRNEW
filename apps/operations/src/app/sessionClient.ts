@@ -165,16 +165,17 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
       );
 
-      const activePreferenceIdentityFromSession = async (): Promise<WorkerUiPreferencesSyncIdentity> => {
-        const result = await session.getState();
-        if (!result.ok || result.value.status !== 'ACTIVE') {
-          throw new Error('Active worker session required.');
-        }
-        return {
-          shopId: result.value.shopId,
-          workerId: result.value.operator.id,
+      const activePreferenceIdentityFromSession =
+        async (): Promise<WorkerUiPreferencesSyncIdentity> => {
+          const result = await session.getState();
+          if (!result.ok || result.value.status !== 'ACTIVE') {
+            throw new Error('Active worker session required.');
+          }
+          return {
+            shopId: result.value.shopId,
+            workerId: result.value.operator.id,
+          };
         };
-      };
 
       const workerUiPreferences: TuxWorkerUiPreferencesApi = {
         load: async () => {
@@ -183,7 +184,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         },
         update: async (input) => {
           const identity = await activePreferenceIdentityFromSession();
-          const updated = await preferencesService.update(identity.shopId, identity.workerId, input);
+          const updated = await preferencesService.update(
+            identity.shopId,
+            identity.workerId,
+            input,
+          );
           if (preferenceRetryStarted) retryPreferences();
           return updated;
         },
