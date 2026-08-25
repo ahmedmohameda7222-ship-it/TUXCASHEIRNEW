@@ -37,7 +37,70 @@ export interface WorkerUiPreferencesUpdate {
   readonly categoryAlignment: CategoryAlignment;
 }
 
-export class WorkerUiPreferencesService {
+export interface WorkerUiPreferencesSyncIdentity {
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+}
+
+export interface WorkerUiPreferencesSyncTarget {
+  syncOnce(shopId: ShopId, workerId: WorkerId): Promise<void>;
+}
+
+export interface WorkerUiPreferencesRetryOptions {
+  readonly intervalMs?: number;
+}
+
+const DEFAULT_WORKER_UI_PREFERENCES_RETRY_MS = 60_000;
+
+export class WorkerUiPreferencesRetryController {
+  readonly #target: WorkerUiPreferencesSyncTarget;
+  readonly #identity: () => WorkerUiPreferencesSyncIdentity | null;
+  readonly #intervalMs: number;
+  #interval: ReturnType<typeof setInterval> | null = null;
+  #syncInFlight: Promise<void> | null = null;
+
+  constructor(
+    target: WorkerUiPreferencesSyncTarget,
+    identity: () => WorkerUiPreferencesSyncIdentity | null,
+    options: WorkerUiPreferencesRetryOptions = {},
+  ) {
+    const intervalMs = options.intervalMs ?? DEFAULT_WORKER_UI_PREFERENCES_RETRY_MS;
+    if (!Number.isSafeInteger(intervalMs) || intervalMs <= 0) {
+      throw new RangeError('Worker UI preference retry interval must be a positive safe integer.');
+    }
+    this.#target = target;
+    this.#identity = identity;
+    this.#intervalMs = intervalMs;
+  }
+
+  start(): void {
+    if (this.#interval !== null) return;
+    this.#interval = setInterval(() => void this.syncActive(), this.#intervalMs);
+  }
+
+  stop(): void {
+    if (this.#interval === null) return;
+    clearInterval(this.#interval);
+    this.#interval = null;
+  }
+
+  async syncActive(): Promise<void> {
+    if (this.#syncInFlight !== null) return this.#syncInFlight;
+    const identity = this.#identity();
+    if (identity === null) return;
+
+    const sync = this.#target
+      .syncOnce(identity.shopId, identity.workerId)
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.#syncInFlight === sync) this.#syncInFlight = null;
+      });
+    this.#syncInFlight = sync;
+    return sync;
+  }
+}
+
+export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget {
   readonly #repository: WorkerUiPreferencesRepository;
   readonly #gateway: WorkerUiPreferencesRemoteGateway;
   readonly #now: () => Instant;
