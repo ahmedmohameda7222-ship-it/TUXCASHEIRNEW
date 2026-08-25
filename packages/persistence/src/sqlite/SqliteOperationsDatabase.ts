@@ -24,6 +24,7 @@ import type {
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '../contracts';
 import { applySqliteMigrations } from './migrations';
+import { createSqliteWorkerUiPreferencesRepository } from './SqliteWorkerUiPreferencesStore';
 
 function serialize(value: unknown): string {
   return JSON.stringify(value);
@@ -130,6 +131,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           );
       },
     },
+    workerUiPreferences: createSqliteWorkerUiPreferencesRepository(database),
     configuration: {
       async getForShop(shopId: ShopId) {
         return parsePayload<OperationsConfigurationSnapshot>(
