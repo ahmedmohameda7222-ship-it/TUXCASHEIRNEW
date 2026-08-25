@@ -48,9 +48,7 @@ export type PaymentDraft =
       readonly mode: 'SPLIT';
       readonly methodAId: PaymentMethodId;
       readonly amountAMinor: MoneyMinor;
-      readonly methodACashReceivedMinor: MoneyMinor | null;
       readonly methodBId: PaymentMethodId;
-      readonly methodBCashReceivedMinor: MoneyMinor | null;
     };
 
 export interface OrderDraft {

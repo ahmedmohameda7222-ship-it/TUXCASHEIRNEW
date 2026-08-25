@@ -35,17 +35,15 @@ function preparePart(
   if (method.logicType !== 'CASH') {
     return { method: snapshot, allocatedMinor, receivedMinor: null, changeMinor: null };
   }
-  if (cashReceivedMinor === null) {
-    throw new DomainInvariantError('Cash Received is required for a Cash payment.');
-  }
-  if (cashReceivedMinor < allocatedMinor) {
+  const effectiveReceived = cashReceivedMinor ?? allocatedMinor;
+  if (effectiveReceived < allocatedMinor) {
     throw new DomainInvariantError('Cash Received cannot be less than the Cash allocation.');
   }
   return {
     method: snapshot,
     allocatedMinor,
-    receivedMinor: cashReceivedMinor,
-    changeMinor: subtractMoney(cashReceivedMinor, allocatedMinor),
+    receivedMinor: effectiveReceived,
+    changeMinor: subtractMoney(effectiveReceived, allocatedMinor),
   };
 }
 
@@ -77,10 +75,7 @@ export function preparePaymentParts(
   const remainder = subtractMoney(totalMinor, draft.amountAMinor);
   const methodA = activeMethod(methods, draft.methodAId);
   const methodB = activeMethod(methods, draft.methodBId);
-  return [
-    preparePart(methodA, draft.amountAMinor, draft.methodACashReceivedMinor),
-    preparePart(methodB, remainder, draft.methodBCashReceivedMinor),
-  ];
+  return [preparePart(methodA, draft.amountAMinor, null), preparePart(methodB, remainder, null)];
 }
 
 export function parsePoundsToMinor(raw: string): MoneyMinor | null {
