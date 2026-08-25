@@ -33,10 +33,11 @@ jobs:
           python scripts/final_correction_test_expectations.py
           python scripts/final_correction_geometry_fix.py
           python scripts/final_correction_brand_fix.py
+          python scripts/final_correction_regression_fix.py
           python scripts/final_correction_mobile_diagnostic.py
       - name: Format diagnostic source
         run: npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Diagnose mobile combo hit target
+      - name: Verify mobile combo hit target
         run: npm run test:e2e -- --project=mobile-browser-fallback --grep "diagnostic combo mobile hit target"
