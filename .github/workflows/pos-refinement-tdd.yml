@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tdd:
-    name: committed-pos-contracts
+    name: task-four-card-containment-red
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -27,11 +27,50 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add Task 4 rendered RED contract
+        run: |
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          test('final correction lets product card height follow content without overflow', async ({ page }) => {
+            await enterActiveOrdersForCategoryTests(page);
+            await page.getByRole('button', { name: 'Fries', exact: true }).click();
+
+            const grid = page.locator('.product-grid');
+            const gridStyle = await grid.evaluate((node) => getComputedStyle(node));
+            expect(gridStyle.rowGap).toBe('8px');
+            expect(gridStyle.columnGap).toBe('8px');
+            expect(gridStyle.alignItems).toBe('start');
+
+            const plain = grid.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
+            const described = grid.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
+            await expect(plain.locator('.product-copy p')).toHaveCount(0);
+            await expect(described.locator('.product-copy p')).toHaveCount(1);
+
+            const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
+            const describedStyle = await described.evaluate((node) => getComputedStyle(node));
+            expect(plainStyle.minHeight).toBe('0px');
+            expect(describedStyle.minHeight).toBe('0px');
+
+            for (const card of [plain, described]) {
+              const media = await card.locator('.product-media').boundingBox();
+              expect(media).not.toBeNull();
+              expect(Math.round(media!.width)).toBe(68);
+              expect(Math.round(media!.height)).toBe(68);
+            }
+
+            const overflow = await page.evaluate(() => ({
+              viewport: window.innerWidth,
+              scroll: document.documentElement.scrollWidth,
+            }));
+            expect(overflow.scroll).toBeLessThanOrEqual(overflow.viewport);
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run committed POS contracts
+      - name: Verify Task 4 contract is RED before implementation
         run: >-
-          npm run test:e2e -- --project=desktop-browser-fallback --grep
-          "approved category hierarchy|search keeps both category levels|category edit contains primary categories only|final correction keeps header and categories visible during compact search|premium POS visual hierarchy matches approved sizing"
+          npx playwright test e2e/operations.e2e.ts --grep
+          "final correction lets product card height follow content without overflow"
