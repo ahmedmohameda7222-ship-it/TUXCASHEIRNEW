@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,39 +27,37 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add focused Task 11 rendered contract
+      - name: Apply Task 11 current order implementation
         if: github.actor != 'github-actions[bot]'
-        run: python scripts/task11_red_test.py
-      - name: Format focused Task 11 contract
+        run: python scripts/task11_apply.py
+      - name: Format Task 11 touched files
         if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write e2e/operations.e2e.ts
-      - name: Typecheck focused rendered contract
+        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
+      - name: Format check
+        run: npm run format:check
+      - name: Typecheck
+        if: github.actor != 'github-actions[bot]'
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm run test
+      - name: E2E typecheck
         if: github.actor != 'github-actions[bot]'
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         if: github.actor != 'github-actions[bot]'
         run: npx playwright install --with-deps chromium
-      - name: Confirm focused Task 11 RED and commit tests
+      - name: Verify current order cashier workflow
+        if: github.actor != 'github-actions[bot]'
+        run: npm run test:e2e -- --grep "Current Order keeps cashier|Extra shortcuts"
+      - name: Commit verified Task 11 implementation
         if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
-          set +e
-          npm run test:e2e -- --project=desktop-browser-fallback --retries=0 --timeout=30000 --grep "Current Order keeps cashier" 2>&1 | tee /tmp/task11-red.log
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -ne 0
-          grep -Eq "Items|Current Order|\+1|toEqual|toHaveText" /tmp/task11-red.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add e2e/operations.e2e.ts
-          git commit -m "test: define current order cashier workflow"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: align current order with cashier workflow"
           git push origin HEAD:ui/tux-pos-refinement
-      - name: Format check
-        if: github.actor == 'github-actions[bot]'
-        run: npm run format:check
-      - name: Lint
-        if: github.actor == 'github-actions[bot]'
-        run: npm run lint
-      - name: Unit and integration tests
-        if: github.actor == 'github-actions[bot]'
-        run: npm run test
