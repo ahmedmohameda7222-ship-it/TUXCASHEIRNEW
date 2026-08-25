@@ -20,11 +20,7 @@ import {
 } from './sessionClient';
 import { connectDesktopSyncStatus } from './syncStatus';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
-import {
-  chooseWelcomeCopy,
-  greetingForLocalHour,
-  type WelcomeCopy,
-} from './welcomeCopy';
+import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
 type ScreenState =
   | { readonly kind: 'LOADING' }
