@@ -50,12 +50,14 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
     transaction.addEventListener('complete', () => resolve(), { once: true });
     transaction.addEventListener(
       'abort',
-      () => reject(transaction.error ?? new Error('IndexedDB worker preference transaction aborted.')),
+      () =>
+        reject(transaction.error ?? new Error('IndexedDB worker preference transaction aborted.')),
       { once: true },
     );
     transaction.addEventListener(
       'error',
-      () => reject(transaction.error ?? new Error('IndexedDB worker preference transaction failed.')),
+      () =>
+        reject(transaction.error ?? new Error('IndexedDB worker preference transaction failed.')),
       { once: true },
     );
   });
