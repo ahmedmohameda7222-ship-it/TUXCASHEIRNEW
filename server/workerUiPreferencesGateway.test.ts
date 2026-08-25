@@ -91,7 +91,10 @@ describe('handleWorkerUiPreferences', () => {
   it('rejects requests without an enrolled device session', async () => {
     const capture = responseCapture();
     await handleWorkerUiPreferences(
-      request({ method: 'GET', url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerA}` }),
+      request({
+        method: 'GET',
+        url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerA}`,
+      }),
       capture.response,
     );
 
@@ -137,7 +140,9 @@ describe('handleWorkerUiPreferences', () => {
     const upstream = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 1)]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 2)]), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRow(workerA, 2)]), { status: 200 }),
+      );
     vi.stubGlobal('fetch', upstream);
 
     const performPut = async () => {
@@ -171,7 +176,9 @@ describe('handleWorkerUiPreferences', () => {
     const upstream = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 3)]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerB, 7)]), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRow(workerB, 7)]), { status: 200 }),
+      );
     vi.stubGlobal('fetch', upstream);
 
     for (const workerId of [workerA, workerB]) {
