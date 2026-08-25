@@ -24,50 +24,198 @@ function configuration() {
   const inventory = (index: number) => uuid('60000000', index);
   const orderType = (index: number) => uuid('70000000', index);
   const payment = (index: number) => uuid('80000000', index);
-  const products = [
-    ['Classic Smash', 12_000, 1, false, false],
-    ['Double Smash', 16_000, 1, false, false],
-    ['Triple Smash', 20_000, 1, false, false],
-    ['TUX Loaded Burger', 22_000, 1, false, false],
-    ['Crispy Chicken', 14_000, 1, false, false],
-    ['Spicy Chicken', 15_000, 1, false, false],
-    ['Combo Smash + Required Beverage', 19_000, 2, true, false],
-    ['Long Name Layout Stress Burger with Extra Description', 21_000, 1, false, false],
-    ['Sold Out Test Burger', 17_000, 1, false, true],
-    ['Fries', 5_000, 3, false, false],
-    ['Loaded Fries', 8_000, 3, false, false],
-    ['Onion Rings', 6_000, 3, false, false],
-    ['Cola', 3_000, 7, false, false],
-    ['Diet Cola', 3_000, 7, false, false],
-    ['Water', 2_000, 7, false, false],
-    ['Orange Soda', 3_000, 7, false, false],
-    ['Lemon Soda', 3_000, 7, false, false],
-    ['Iced Tea', 4_000, 7, false, false],
-  ].map(([name, priceMinor, categoryIndex, isCombo, soldOut], index) => ({
+  const productRows = [
+    {
+      name: 'Single Smashed Patty',
+      priceMinor: 12_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'Double Smashed Patty',
+      priceMinor: 16_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'Triple Smashed Patty',
+      priceMinor: 20_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'TUX Quatro Smashed Patty',
+      priceMinor: 25_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: true,
+      description:
+        '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom',
+    },
+    {
+      name: 'Single TUXIFY',
+      priceMinor: 14_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Double TUXIFY',
+      priceMinor: 18_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 2 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Triple TUXIFY',
+      priceMinor: 22_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 3 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Quatro TUXIFY',
+      priceMinor: 26_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 4 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Johnny’s',
+      priceMinor: 33_000,
+      categoryIndex: 1,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description:
+        '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
+    },
+    {
+      name: 'Classic Fries',
+      priceMinor: 3_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Potato Wedges',
+      priceMinor: 4_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Chili Fries',
+      priceMinor: 7_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Fries, cheese, chili sauce, jalapeno',
+    },
+    {
+      name: 'TUX Fries',
+      priceMinor: 9_500,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce',
+    },
+    {
+      name: 'Doppy Fries',
+      priceMinor: 12_500,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Fries, smashed patty, bacon, cheese, caramelized onions, ranch sauce, nachos, chopped green onion',
+    },
+    {
+      name: 'Classic Hawawshi',
+      priceMinor: 10_500,
+      categoryIndex: 4,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce',
+    },
+    {
+      name: 'TUX Hawawshi',
+      priceMinor: 12_500,
+      categoryIndex: 4,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce, mozzarella',
+    },
+    {
+      name: 'Soda',
+      priceMinor: 2_000,
+      categoryIndex: 7,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Water',
+      priceMinor: 1_000,
+      categoryIndex: 7,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Combo Smash + Required Beverage',
+      priceMinor: 19_000,
+      categoryIndex: 2,
+      family: null,
+      isCombo: true,
+      soldOut: false,
+      description: null,
+    },
+  ] as const;
+  const products = productRows.map((item, index) => ({
     id: product(index + 1),
     shopId: SHOP,
-    categoryId: category(Number(categoryIndex)),
-    name: String(name),
-    description:
-      index === 0
-        ? '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce'
-        : index === 1
-          ? '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'
-          : index === 2
-            ? '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'
-            : index === 3
-              ? '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom'
-              : index === 7
-                ? 'Development-only long text used to stress responsive menu layout.'
-                : index === 10
-                  ? 'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce'
-                  : null,
-    priceMinor: Number(priceMinor),
+    categoryId: category(item.categoryIndex),
+    name: item.name,
+    description: item.description,
+    priceMinor: item.priceMinor,
     imageKey: null,
     active: true,
-    soldOut: Boolean(soldOut),
-    family: index <= 3 ? 'TUX' : index <= 5 ? 'TUXIFY' : null,
-    isCombo: Boolean(isCombo),
+    soldOut: item.soldOut,
+    family: item.family,
+    isCombo: item.isCombo,
     sortOrder: index,
   }));
   const inventoryItems = [
@@ -149,9 +297,9 @@ function configuration() {
           sortOrder: 2,
         },
       ],
-      comboBeverageOptions: [13, 14, 15, 16, 17, 18].map((beverageIndex, sortOrder) => ({
+      comboBeverageOptions: [17, 18].map((beverageIndex, sortOrder) => ({
         shopId: SHOP,
-        comboProductId: product(7),
+        comboProductId: product(19),
         beverageProductId: product(beverageIndex),
         sortOrder,
       })),
@@ -171,7 +319,7 @@ function configuration() {
         {
           shopId: SHOP,
           productId: product(5),
-          inventoryItemId: inventory(2),
+          inventoryItemId: inventory(1),
           quantityMicros: 1_000_000,
         },
         {
@@ -430,7 +578,7 @@ async function expectOrderPlaced(page: Page): Promise<void> {
 }
 
 async function addClassicWithModifier(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Quick Info for Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
   await page.getByRole('button', { name: 'Customize & add' }).click();
   await page.getByRole('button', { name: 'Add one Extra Cheese' }).click();
   await page.getByRole('button', { name: 'Add to order' }).click();
@@ -450,7 +598,7 @@ async function placeCashOrder(page: Page, testInfo: TestInfo): Promise<void> {
 }
 
 async function placeDeliveryInstapayOrder(page: Page, testInfo: TestInfo): Promise<void> {
-  await page.getByRole('button', { name: 'Add one Double Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
   await cart.getByRole('button', { name: 'Delivery', exact: true }).click();
@@ -468,9 +616,13 @@ async function placeDeliveryInstapayOrder(page: Page, testInfo: TestInfo): Promi
 }
 
 async function placeSplitComboOrder(page: Page, testInfo: TestInfo): Promise<void> {
+  await page
+    .getByLabel('Menu categories')
+    .getByRole('button', { name: 'Combo', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Add one Combo Smash + Required Beverage' }).click();
   const customizer = page.getByRole('dialog', { name: 'Combo Smash + Required Beverage' });
-  await customizer.getByRole('combobox').selectOption({ label: 'Cola' });
+  await customizer.getByRole('combobox').selectOption({ label: 'Soda' });
   await customizer.getByRole('button', { name: 'Add to order' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
@@ -601,7 +753,9 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
   if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
   await waitForActiveShell(page);
   await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add one Sold Out Test Burger' })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Add one TUX Quatro Smashed Patty' }),
+  ).toBeDisabled();
   await expectNoHorizontalOverflow(page);
 
   await placeCashOrder(page, testInfo);
@@ -643,8 +797,8 @@ test('category search is progressive and keyboard accessible', async ({ page }) 
   await page.keyboard.press('Control+K');
   await expect(searchInput).toBeVisible();
   await expect(searchInput).toBeFocused();
-  await searchInput.fill('cola');
-  await expect(page.getByRole('button', { name: 'Add one Cola' })).toBeVisible();
+  await searchInput.fill('soda');
+  await expect(page.getByRole('button', { name: 'Add one Soda' })).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(searchInput).toHaveValue('');
@@ -677,22 +831,24 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
   );
 
   const editorItems = page.locator('.category-editor-item');
-  await expect(editorItems).toHaveCount(3);
+  await expect(editorItems).toHaveCount(7);
   await expect(editorItems.nth(0)).toContainText('Burgers');
   await page.getByRole('button', { name: 'Move Burgers right' }).click();
-  await expect(editorItems.nth(0)).toContainText('Sides');
+  await expect(editorItems.nth(0)).toContainText('Combo');
   await expect(editorItems.nth(1)).toContainText('Burgers');
 
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   const categories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(categories.nth(0)).toHaveText('Sides');
+  await expect(categories).toHaveCount(7);
+  await expect(categories.nth(0)).toHaveText('Combo');
   await expect(categories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
 
   await page.reload();
   await waitForActiveShell(page);
   const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(reloadedCategories.nth(0)).toHaveText('Sides');
+  await expect(reloadedCategories).toHaveCount(7);
+  await expect(reloadedCategories.nth(0)).toHaveText('Combo');
   await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
 
@@ -707,10 +863,10 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
 test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
-  await expect(cart).toContainText('Classic Smash');
+  await expect(cart).toContainText('Single Smashed Patty');
   await closeMobileCartIfOpen(page, testInfo);
 
   await page.getByRole('button', { name: 'Edit categories' }).click();
@@ -734,19 +890,25 @@ test('category persistence failure keeps editor and draft intact', async ({ page
   await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
   await expect(page.getByLabel('Edit categories')).toBeVisible();
   await openCartIfMobile(page, testInfo);
-  await expect(currentOrderCart(page, testInfo)).toContainText('Classic Smash');
+  await expect(currentOrderCart(page, testInfo)).toContainText('Single Smashed Patty');
 });
 
 test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
-  const doubleCard = page.locator('.product-card').filter({ hasText: 'Double Smash' }).first();
+  const classicCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const doubleCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Double Smashed Patty' })
+    .first();
   await expect(classicCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
   await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toHaveCount(0);
 
   await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
-  const addDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const addDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   const addExtrasSection = addDialog.locator('[aria-labelledby="extras-title"]');
   await expect(addExtrasSection).toBeFocused();
   await addDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
@@ -757,14 +919,14 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('1');
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
-  const classicLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const classicLines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(classicLines).toHaveCount(1);
   await expect(classicLines.nth(0)).toContainText('2× Extra Cheese');
   await expect(classicLines.nth(0)).toContainText('1× Extra Patty');
   await expect(classicLines.nth(0)).toContainText(/200\.00/);
 
   await closeMobileCartIfOpen(page, testInfo);
-  await classicCard.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await classicCard.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('2');
   await openCartIfMobile(page, testInfo);
   await expect(classicLines).toHaveCount(2);
@@ -773,12 +935,12 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
   await expect(classicLines.nth(1)).toContainText(/120\.00/);
 
   await classicLines.nth(0).getByRole('button', { name: 'Extra', exact: true }).click();
-  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const editDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await expect(editDialog.locator('[aria-labelledby="extras-title"]')).toBeFocused();
   await editDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
   await editDialog.getByRole('button', { name: 'Save item' }).click();
 
-  const updatedLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const updatedLines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(updatedLines).toHaveCount(2);
   await expect(updatedLines.nth(0)).toContainText('2× Extra Patty');
   await expect(updatedLines.nth(0)).toContainText(/240\.00/);
@@ -805,7 +967,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
   expect(await count.evaluate((node) => getComputedStyle(node).fontSize)).toBe('13px');
   expect(await count.evaluate((node) => getComputedStyle(node).lineHeight)).toBe('16px');
 
-  const lines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const lines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(lines).toHaveCount(1);
   const line = lines.first();
   await expect(line).toContainText('1× Extra Cheese');
@@ -821,10 +983,10 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
 
   await lines.first().getByRole('button', { name: '−1', exact: true }).click();
   await expect(lines.first()).toContainText('× 1');
-  await expect(page.locator('.undo-toast')).toContainText('Removed one Classic Smash');
+  await expect(page.locator('.undo-toast')).toContainText('Removed one Single Smashed Patty');
 
   await lines.first().getByRole('button', { name: 'Edit', exact: true }).click();
-  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const editDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await expect(editDialog).toBeVisible();
   await expect(editDialog.getByText('Extra Cheese')).toBeVisible();
   await editDialog.getByRole('button', { name: 'Cancel' }).click();
@@ -845,7 +1007,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
 test('cash entry stays optional and split stays allocation-only', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  await page.getByRole('button', { name: 'Add one Double Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   let cart = currentOrderCart(page, testInfo);
 
@@ -871,8 +1033,8 @@ test('cash entry stays optional and split stays allocation-only', async ({ page 
   await expectOrderPlaced(page);
   await closeMobileCartIfOpen(page, testInfo);
 
-  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   cart = currentOrderCart(page, testInfo);
 
@@ -979,7 +1141,7 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
 
   const categories = page.getByLabel('Menu categories');
   const activeCategory = categories.getByRole('button', { name: 'Burgers', exact: true });
-  const inactiveCategory = categories.getByRole('button', { name: 'Sides', exact: true });
+  const inactiveCategory = categories.getByRole('button', { name: 'Combo', exact: true });
   const activeCategoryStyle = await activeCategory.evaluate((node) => getComputedStyle(node));
   const inactiveCategoryStyle = await inactiveCategory.evaluate((node) => getComputedStyle(node));
   expect(activeCategoryStyle.fontSize).toBe('15px');
@@ -988,10 +1150,7 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
   expect(Number(inactiveCategoryStyle.fontWeight)).toBe(500);
   expect((await activeCategory.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  const stressCard = page
-    .locator('.product-card')
-    .filter({ hasText: 'Long Name Layout Stress Burger with Extra Description' })
-    .first();
+  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
   const productName = stressCard.locator('.product-copy strong');
   const productDescription = stressCard.locator('.product-copy p');
   const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
@@ -1006,14 +1165,14 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
   expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
   expect(productDescriptionStyle.webkitLineClamp).toBe('2');
   await expect(productDescription).toHaveText(
-    'Development-only long text used to stress responsive menu layout.',
+    '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
   );
   expect(
     (await stressCard.locator('.product-price').evaluate((node) => getComputedStyle(node)))
       .fontVariantNumeric,
   ).toContain('tabular-nums');
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
     name: 'Current order',
   });
@@ -1136,12 +1295,12 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('04-category-edit.png');
     await page.getByRole('button', { name: 'Done', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one TUX Loaded Burger' }).click();
-    await page.getByRole('button', { name: 'Add one Spicy Chicken' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple TUXIFY' }).click();
+    await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
     await page.getByLabel('Menu categories').getByRole('button', { name: 'Drinks' }).click();
-    await page.getByRole('button', { name: 'Add one Cola' }).click();
+    await page.getByRole('button', { name: 'Add one Soda' }).click();
 
     let cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
       name: 'Current order',
@@ -1166,8 +1325,8 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await expect(cart.locator('.payment-summary')).toContainText('Change: EGP 95.00');
 
     await startFresh();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
     cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
       name: 'Current order',
     });
@@ -1180,9 +1339,12 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('06-split-payment-400.png');
 
     await startFresh();
-    const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+    const classicCard = page
+      .locator('.product-card')
+      .filter({ hasText: 'Single Smashed Patty' })
+      .first();
     await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
-    const extrasDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+    const extrasDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
     await extrasDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
     await extrasDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
     await screenshot('07-extras-customizer.png');
@@ -1200,7 +1362,7 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     return;
   }
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   await expect(page.locator('.mobile-cart-overlay')).toBeVisible();
   if (testInfo.project.name === 'mobile-browser-fallback') {
@@ -1263,7 +1425,7 @@ test('final correction keeps product controls cashier-sized', async ({ page }, t
   const gridStyle = await page.locator('.product-grid').evaluate((node) => getComputedStyle(node));
   expect(gridStyle.rowGap).toBe('8px');
   expect(gridStyle.columnGap).toBe('8px');
-  const card = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
   expect((await card.evaluate((node) => getComputedStyle(node))).borderRadius).toBe('12px');
   const media = await card.locator('.product-media').boundingBox();
   expect(media).not.toBeNull();
@@ -1276,17 +1438,17 @@ test('final correction keeps product controls cashier-sized', async ({ page }, t
   const extra = card.getByRole('button', { name: 'Extra', exact: true });
   expect(Math.round((await extra.boundingBox())!.height)).toBe(44);
   expect(Math.round((await extra.locator('svg').boundingBox())!.width)).toBe(20);
-  const stepper = card.getByLabel('Classic Smash quantity');
+  const stepper = card.getByLabel('Single Smashed Patty quantity');
   for (const button of [
-    stepper.getByRole('button', { name: 'Remove one Classic Smash' }),
-    stepper.getByRole('button', { name: 'Add one Classic Smash' }),
+    stepper.getByRole('button', { name: 'Remove one Single Smashed Patty' }),
+    stepper.getByRole('button', { name: 'Add one Single Smashed Patty' }),
   ]) {
     const box = await button.boundingBox();
     expect(box).not.toBeNull();
     expect(Math.round(box!.width)).toBe(44);
     expect(Math.round(box!.height)).toBe(44);
   }
-  await stepper.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await stepper.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   const badge = card.locator('.product-quantity-badge');
   const badgeBox = await badge.boundingBox();
   expect(badgeBox).not.toBeNull();
@@ -1303,9 +1465,9 @@ test('final correction keeps cart and payment controls at visible target sizes',
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await enterActiveOrdersForCategoryTests(page);
-  const card = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
   await card.getByRole('button', { name: 'Extra', exact: true }).click();
-  const customizer = page.getByRole('dialog', { name: 'Classic Smash' });
+  const customizer = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await customizer.getByRole('button', { name: 'Add one Extra Cheese' }).click();
   await customizer.getByRole('button', { name: /Add to order/i }).click();
   const cart = page
@@ -1316,7 +1478,7 @@ test('final correction keeps cart and payment controls at visible target sizes',
   expect(clearStyle.fontSize).toBe('14px');
   expect(clearStyle.lineHeight).toBe('18px');
   expect(Number(clearStyle.fontWeight)).toBe(500);
-  const line = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' }).first();
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
   for (const name of ['−1', '+1']) {
     const box = await line.getByRole('button', { name, exact: true }).boundingBox();
     expect(box).not.toBeNull();
