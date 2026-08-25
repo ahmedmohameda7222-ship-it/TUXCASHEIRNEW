@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tdd:
-    if: "${{ github.event.head_commit.message != 'fix: let product cards follow content' }}"
+    if: "${{ github.event.head_commit.message != 'fix: keep product controls fully visible' }}"
     name: task-four-card-containment-green
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -30,46 +30,84 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 4 rendered contract and minimal CSS correction
+      - name: Apply exact Task 4 geometry contract and CSS correction
         run: |
           python - <<'PY'
           from pathlib import Path
 
           e2e_path = Path('e2e/operations.e2e.ts')
           e2e = e2e_path.read_text()
-          marker = "test('final correction lets product card height follow content without overflow'"
+          marker = "test('final correction keeps Extra and product controls fully contained'"
           test_block = r'''
 
-          test('final correction lets product card height follow content without overflow', async ({ page }) => {
+          test('final correction keeps Extra and product controls fully contained', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name === 'mobile-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
-            await page.getByRole('button', { name: 'Fries', exact: true }).click();
 
             const grid = page.locator('.product-grid');
             const gridStyle = await grid.evaluate((node) => getComputedStyle(node));
             expect(gridStyle.rowGap).toBe('8px');
             expect(gridStyle.columnGap).toBe('8px');
             expect(gridStyle.alignItems).toBe('start');
+            const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
+            expect(columnCount).toBe(testInfo.project.name === 'desktop-browser-fallback' ? 3 : 2);
 
+            const card = grid
+              .locator('.product-card')
+              .filter({ hasText: 'Single Smashed Patty' })
+              .first();
+            const cardBox = await card.boundingBox();
+            expect(cardBox).not.toBeNull();
+
+            const extra = card.getByRole('button', { name: 'Extra', exact: true });
+            const minus = card.getByRole('button', { name: 'Remove one Single Smashed Patty' });
+            const plus = card.getByRole('button', { name: 'Add one Single Smashed Patty' });
+            const quantity = card.locator('.product-quantity output');
+            await expect(extra).toBeVisible();
+            await expect(minus).toBeVisible();
+            await expect(quantity).toBeVisible();
+            await expect(plus).toBeVisible();
+
+            const controls = [extra, minus, quantity, plus];
+            for (const control of controls) {
+              const box = await control.boundingBox();
+              expect(box).not.toBeNull();
+              expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+              expect(box!.y).toBeGreaterThanOrEqual(cardBox!.y - 1);
+              expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+              expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+            }
+
+            for (const button of [minus, plus]) {
+              const box = await button.boundingBox();
+              expect(box).not.toBeNull();
+              expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+              expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+            }
+            const extraBox = await extra.boundingBox();
+            expect(extraBox).not.toBeNull();
+            expect(Math.round(extraBox!.height)).toBeGreaterThanOrEqual(44);
+
+            const footerStyle = await card.locator('.product-card-footer').evaluate((node) =>
+              getComputedStyle(node),
+            );
+            expect(footerStyle.minHeight).toBe('52px');
+            expect(footerStyle.flexWrap).toBe('wrap');
+            expect(footerStyle.rowGap).toBe('8px');
+            const controlsStyle = await card.locator('.product-card-controls').evaluate((node) =>
+              getComputedStyle(node),
+            );
+            expect(controlsStyle.flexWrap).toBe('nowrap');
+
+            await page.getByRole('button', { name: 'Fries', exact: true }).click();
             const plain = grid.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
             const described = grid.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
             await expect(plain.locator('.product-copy p')).toHaveCount(0);
             await expect(described.locator('.product-copy p')).toHaveCount(1);
-
             const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
             const describedStyle = await described.evaluate((node) => getComputedStyle(node));
             expect(plainStyle.minHeight).toBe('0px');
-            expect(describedStyle.minHeight).toBe('0px');
-
-            for (const card of [plain, described]) {
-              const media = await card.locator('.product-media').boundingBox();
-              expect(media).not.toBeNull();
-              expect(Math.round(media!.width)).toBe(68);
-              expect(Math.round(media!.height)).toBe(68);
-            }
-
-            const plainBox = await plain.boundingBox();
-            expect(plainBox).not.toBeNull();
-            expect(Math.round(plainBox!.height)).toBeLessThanOrEqual(154);
+            expect(describedStyle.minHeight).toBe('152px');
 
             const overflow = await page.evaluate(() => ({
               viewport: window.innerWidth,
@@ -84,11 +122,84 @@ jobs:
           css_path = Path('apps/operations/src/styles/premium.css')
           css = css_path.read_text()
 
-          described_minimum = '''.product-card:has(.product-copy p) {
-            min-height: 152px;
+          css = css.replace(
+              '''.product-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 0.625rem;
+            padding: var(--tux-space-2) var(--tux-space-4) var(--tux-space-6);
+          }''',
+              '''.product-grid {
+            grid-template-columns: minmax(0, 1fr);
+            align-items: start;
+            gap: 8px;
+            padding: var(--tux-space-2) var(--tux-space-4) var(--tux-space-6);
+          }''',
+              1,
+          )
+
+          old_queries = '''@container tux-menu (min-width: 26rem) {
+            .product-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
           }
 
-          '''
+          @container tux-menu (min-width: 42rem) {
+            .product-grid {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+          }
+
+          @container tux-menu (min-width: 58rem) {
+            .product-grid {
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+          }'''
+          new_queries = '''@container tux-menu (min-width: 568px) {
+            .product-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          @container tux-menu (min-width: 856px) {
+            .product-grid {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+          }
+
+          @container tux-menu (min-width: 1144px) {
+            .product-grid {
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+          }'''
+          if old_queries not in css:
+              raise SystemExit('Expected old product-grid container queries were not found')
+          css = css.replace(old_queries, new_queries, 1)
+
+          old_footer = '''.product-card-footer {
+            display: flex;
+            min-height: 3.4rem;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--tux-space-2);
+            padding: var(--tux-space-1) var(--tux-space-2) var(--tux-space-1) var(--tux-space-3);
+            border-top: 1px solid var(--tux-border-subtle);
+          }'''
+          new_footer = '''.product-card-footer {
+            display: flex;
+            height: auto;
+            min-height: 52px;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--tux-space-2);
+            row-gap: 8px;
+            flex-wrap: wrap;
+            padding: var(--tux-space-1) var(--tux-space-2) var(--tux-space-1) var(--tux-space-3);
+            border-top: 1px solid var(--tux-border-subtle);
+          }'''
+          if old_footer not in css:
+              raise SystemExit('Expected product-card footer block was not found')
+          css = css.replace(old_footer, new_footer, 1)
+
           mobile_minimums = '''/* Mobile card containment fix. */
           .product-card {
             min-height: 146px;
@@ -98,22 +209,17 @@ jobs:
             min-height: 152px;
           }
           '''
-          replacement = '''/* Final card containment: content determines height without row stretching. */
-          .product-grid {
-            align-items: start;
+          if mobile_minimums not in css:
+              raise SystemExit('Expected stale mobile card minimum block was not found')
+          css = css.replace(mobile_minimums, '', 1)
+
+          css += '''
+
+          /* Task 4: keep the complete cashier control group intact when the footer wraps. */
+          .product-card-controls {
+            flex-wrap: nowrap;
           }
           '''
-          if mobile_minimums not in css:
-              raise SystemExit('Expected forced mobile card minimums were not found')
-          css = css.replace(mobile_minimums, replacement, 1)
-
-          remaining_described = css.count(described_minimum)
-          if remaining_described < 1:
-              raise SystemExit('Expected remaining described-card minimums were not found')
-          css = css.replace(described_minimum, '')
-          if described_minimum in css:
-              raise SystemExit('A forced described-card minimum remains')
-
           css_path.write_text(css)
           PY
           npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
@@ -125,10 +231,12 @@ jobs:
           npx prettier --check e2e/operations.e2e.ts apps/operations/src/styles/premium.css
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify Task 4 targeted contract GREEN
+      - name: Verify exact Task 4 geometry GREEN
         run: >-
           npx playwright test e2e/operations.e2e.ts --grep
-          "final correction lets product card height follow content without overflow"
+          "final correction keeps Extra and product controls fully contained"
+      - name: Run plan-focused Extra and product-card coverage
+        run: npx playwright test e2e/operations.e2e.ts --grep "Extra|product card"
       - name: Run complete Operations E2E file
         run: npx playwright test e2e/operations.e2e.ts
       - name: Commit Task 4 GREEN state
@@ -137,5 +245,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add e2e/operations.e2e.ts apps/operations/src/styles/premium.css
           git diff --cached --quiet && { echo "Expected Task 4 changes were not generated"; exit 1; }
-          git commit -m "fix: let product cards follow content"
+          git commit -m "fix: keep product controls fully visible"
           git push origin HEAD:ui/tux-pos-refinement
