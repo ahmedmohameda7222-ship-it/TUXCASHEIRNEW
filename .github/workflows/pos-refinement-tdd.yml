@@ -27,11 +27,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show Task 9 icon formatter diff
-        shell: bash
-        run: |
-          npx prettier apps/operations/src/app/icons.tsx > /tmp/icons.tsx.formatted
-          diff -u apps/operations/src/app/icons.tsx /tmp/icons.tsx.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
