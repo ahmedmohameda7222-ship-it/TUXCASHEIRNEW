@@ -1,7 +1,4 @@
-import type {
-  OperationsSessionResult,
-  WorkerUiPreferencesService,
-} from '@tux/application';
+import type { OperationsSessionResult, WorkerUiPreferencesService } from '@tux/application';
 import { parseEntityId, type MenuCategoryId } from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import type { TuxWorkerUiPreferencesApi } from '@tux/platform-contracts';
