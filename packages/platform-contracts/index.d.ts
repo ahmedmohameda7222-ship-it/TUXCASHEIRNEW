@@ -6,6 +6,11 @@ import type {
   OperationsOrdersService,
   OperationsSessionResult,
 } from '@tux/application';
+import type {
+  CategoryAlignment,
+  MenuCategoryId,
+  WorkerUiPreferences,
+} from '@tux/domain';
 
 export type TuxSyncHealthSnapshot =
   | {
@@ -50,6 +55,15 @@ export interface TuxSyncApi {
   readonly subscribe: (listener: (snapshot: TuxSyncHealthSnapshot) => void) => () => void;
 }
 
+export interface TuxWorkerUiPreferencesApi {
+  load(): Promise<WorkerUiPreferences | null>;
+  update(input: {
+    readonly categoryOrder: readonly MenuCategoryId[];
+    readonly categoryAlignment: CategoryAlignment;
+  }): Promise<WorkerUiPreferences>;
+  reset(): Promise<void>;
+}
+
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
   'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
@@ -85,6 +99,7 @@ export interface TuxDesktopApi {
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
   readonly sync: TuxSyncApi;
+  readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
   readonly expenses: TuxExpensesApi;
