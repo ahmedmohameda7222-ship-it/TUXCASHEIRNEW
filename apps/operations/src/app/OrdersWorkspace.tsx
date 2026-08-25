@@ -26,6 +26,13 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CART_WIDTH_MAX_PX,
+  CART_WIDTH_MIN,
+  clampCartWidth,
+  readCartWidth,
+  writeCartWidth,
+} from './cartWidthPreference';
 import { EditPencilIcon, SearchIcon } from './icons';
 import { MenuProductCard } from './MenuProductCard';
 import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
@@ -34,6 +41,13 @@ import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustom
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+
+const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
+const CART_RESIZE_KEYBOARD_STEP = 16;
+
+function desktopCartResizeMatches(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
+}
 
 export function reconcileCategoryOrder(
   activeCategories: readonly MenuCategory[],
@@ -175,6 +189,7 @@ export function OrdersWorkspace({
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
   const undoTimerRef = useRef<number | null>(null);
+  const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -202,6 +217,18 @@ export function OrdersWorkspace({
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [desktopCartResizable, setDesktopCartResizable] = useState(desktopCartResizeMatches);
+  const [cartWidth, setCartWidth] = useState(() =>
+    typeof window === 'undefined'
+      ? CART_WIDTH_MIN
+      : readCartWidth(window.localStorage, window.innerWidth),
+  );
+
+  function commitCartWidth(nextWidth: number): void {
+    const next = clampCartWidth(nextWidth, window.innerWidth);
+    setCartWidth(next);
+    writeCartWidth(window.localStorage, next);
+  }
 
   function setCurrentDraft(next: OrderDraft): void {
     draftRef.current = next;
@@ -302,6 +329,29 @@ export function OrdersWorkspace({
     },
     [],
   );
+
+  useEffect(() => {
+    const media = window.matchMedia(DESKTOP_CART_RESIZE_QUERY);
+    const sync = () => setDesktopCartResizable(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    function clampToViewport(): void {
+      if (!desktopCartResizeMatches()) return;
+      setCartWidth((current) => {
+        const next = clampCartWidth(current, window.innerWidth);
+        if (next !== current) writeCartWidth(window.localStorage, next);
+        return next;
+      });
+    }
+
+    clampToViewport();
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, []);
 
   function beginPendingSave(): void {
     pendingSaveCountRef.current += 1;
@@ -759,7 +809,14 @@ export function OrdersWorkspace({
   const busy = saving || placing;
 
   return (
-    <main className="orders-workspace">
+    <main
+      className="orders-workspace"
+      style={
+        desktopCartResizable
+          ? { gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px` }
+          : undefined
+      }
+    >
       <section className="menu-pane" aria-label="Menu">
         <div className={`menu-toolbar category-mode-${categoryMode.toLowerCase()}`}>
           {categoryMode === 'EDIT' ? (
@@ -991,6 +1048,55 @@ export function OrdersWorkspace({
           )}
         </div>
       </section>
+
+      {desktopCartResizable ? (
+        <div
+          className="cart-resize-separator"
+          role="separator"
+          aria-label="Resize Current Order"
+          aria-orientation="vertical"
+          aria-valuemin={CART_WIDTH_MIN}
+          aria-valuemax={Math.floor(Math.min(CART_WIDTH_MAX_PX, window.innerWidth * 0.45))}
+          aria-valuenow={Math.round(cartWidth)}
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              commitCartWidth(cartWidth + CART_RESIZE_KEYBOARD_STEP);
+            } else if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              commitCartWidth(cartWidth - CART_RESIZE_KEYBOARD_STEP);
+            } else if (event.key === 'Home') {
+              event.preventDefault();
+              commitCartWidth(CART_WIDTH_MIN);
+            } else if (event.key === 'End') {
+              event.preventDefault();
+              commitCartWidth(CART_WIDTH_MAX_PX);
+            }
+          }}
+          onPointerDown={(event) => {
+            cartResizeRef.current = { startX: event.clientX, startWidth: cartWidth };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            const drag = cartResizeRef.current;
+            if (drag === null || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            commitCartWidth(drag.startWidth + drag.startX - event.clientX);
+          }}
+          onPointerUp={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            cartResizeRef.current = null;
+          }}
+          onPointerCancel={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            cartResizeRef.current = null;
+          }}
+        />
+      ) : null}
 
       <div className="desktop-cart-wrap">
         <OrdersCart

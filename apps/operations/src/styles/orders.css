@@ -17,6 +17,33 @@
   background: var(--tux-surface-canvas);
 }
 
+.cart-resize-separator {
+  position: relative;
+  min-width: 0.5rem;
+  min-height: 0;
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.cart-resize-separator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--tux-border-subtle);
+}
+
+.cart-resize-separator:hover::before,
+.cart-resize-separator:focus-visible::before {
+  width: 2px;
+  background: var(--tux-accent-strong);
+}
+
 .orders-loading,
 .orders-unavailable {
   min-height: calc(100vh - 4rem);
