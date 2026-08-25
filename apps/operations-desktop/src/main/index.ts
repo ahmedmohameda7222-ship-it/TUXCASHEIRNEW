@@ -9,6 +9,7 @@ import {
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type OperationsSessionResult,
+  type WorkerUiPreferencesRemoteGateway,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
 import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
@@ -42,6 +43,7 @@ import {
   createSecureWebPreferences,
   parseLoopbackDevelopmentUrl,
 } from './security';
+import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
@@ -69,6 +71,7 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
 let workerUiPreferencesRetry: WorkerUiPreferencesRetryController | null = null;
 let activeWorkerUiPreferencesIdentity: WorkerUiPreferencesSyncIdentity | null = null;
@@ -103,6 +106,16 @@ function trackWorkerUiPreferencesIdentity(result: OperationsSessionResult): void
     workerId: result.value.operator.id,
   };
   void workerUiPreferencesRetry?.syncActive();
+}
+
+function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new Error('Remote worker UI preference sync is not configured.');
+  };
+  return {
+    getWorkerUiPreferences: unavailable,
+    putWorkerUiPreferences: unavailable,
+  };
 }
 
 async function initializeOperationsServices(): Promise<void> {
@@ -159,29 +172,40 @@ async function initializeOperationsServices(): Promise<void> {
     coordinator,
   );
 
+  const preferencesRepository: WorkerUiPreferencesRepository = {
+    get: (shopId, workerId) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.get(shopId, workerId),
+      ),
+    put: (preferences) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.put(preferences),
+      ),
+    delete: (shopId, workerId) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.delete(shopId, workerId),
+      ),
+  };
+  const preferencesGateway =
+    remoteSessionManager !== null && supabaseUrl
+      ? new SupabaseDesktopWorkerUiPreferencesGateway({
+          projectUrl: supabaseUrl,
+          sessionManager: remoteSessionManager,
+        })
+      : unavailableWorkerUiPreferencesGateway();
+  const preferencesService = new WorkerUiPreferencesService(
+    preferencesRepository,
+    preferencesGateway,
+    runtime.now,
+  );
+  workerUiPreferencesIpcRuntime = new WorkerUiPreferencesIpcRuntime({
+    getSessionState: () => sessionService!.getState(),
+    repository: preferencesRepository,
+    service: preferencesService,
+    onChanged: () => void workerUiPreferencesRetry?.syncActive(),
+  });
+
   if (remoteSessionManager !== null && supabaseUrl) {
-    const preferencesRepository: WorkerUiPreferencesRepository = {
-      get: (shopId, workerId) =>
-        operationsDatabase!.transaction((transaction) =>
-          transaction.workerUiPreferences.get(shopId, workerId),
-        ),
-      put: (preferences) =>
-        operationsDatabase!.transaction((transaction) =>
-          transaction.workerUiPreferences.put(preferences),
-        ),
-      delete: (shopId, workerId) =>
-        operationsDatabase!.transaction((transaction) =>
-          transaction.workerUiPreferences.delete(shopId, workerId),
-        ),
-    };
-    const preferencesService = new WorkerUiPreferencesService(
-      preferencesRepository,
-      new SupabaseDesktopWorkerUiPreferencesGateway({
-        projectUrl: supabaseUrl,
-        sessionManager: remoteSessionManager,
-      }),
-      runtime.now,
-    );
     workerUiPreferencesRetry = new WorkerUiPreferencesRetryController(
       preferencesService,
       () => activeWorkerUiPreferencesIdentity,
@@ -398,6 +422,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     });
   });
 
+  if (workerUiPreferencesIpcRuntime === null) {
+    throw new Error('Worker UI Preferences IPC runtime has not been initialized.');
+  }
   if (expensesIpcRuntime === null) {
     throw new Error('Operations Expenses IPC runtime has not been initialized.');
   }
@@ -407,6 +434,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  workerUiPreferencesIpcRuntime.register(window);
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
   endDayIpcRuntime.register(window);
@@ -453,6 +481,8 @@ app.on('before-quit', () => {
   workerUiPreferencesRetry?.stop();
   workerUiPreferencesRetry = null;
   activeWorkerUiPreferencesIdentity = null;
+  workerUiPreferencesIpcRuntime?.close();
+  workerUiPreferencesIpcRuntime = null;
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
