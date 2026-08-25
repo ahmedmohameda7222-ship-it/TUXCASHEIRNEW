@@ -80,7 +80,9 @@ jobs:
             await enterActiveOrdersForCategoryTests(page);
 
             const searchButton = page.getByRole('button', { name: 'Search menu' });
-            await page.getByRole('button', { name: 'Edit categories' }).click();
+            const editButton = page.getByRole('button', { name: 'Edit categories' });
+            await expect(editButton).toBeVisible();
+            await editButton.click();
             await expect(searchButton).toBeHidden();
             await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
 
@@ -130,7 +132,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm run test:e2e -- --project=desktop-browser-fallback --grep "category|search" 2>&1 | tee /tmp/task9-red.log
+          npm run test:e2e -- --project=desktop-browser-fallback --retries=0 --timeout=30000 --grep "category|search" 2>&1 | tee /tmp/task9-red.log
           status=${PIPESTATUS[0]}
           set -e
           test "$status" -ne 0
