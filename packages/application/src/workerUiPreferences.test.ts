@@ -226,9 +226,9 @@ describe('WorkerUiPreferencesRetryController', () => {
   });
 
   it('swallows retry failures and prevents overlapping sync calls', async () => {
-    let release: (() => void) | null = null;
+    let resolveFirst!: () => void;
     const first = new Promise<void>((resolve) => {
-      release = resolve;
+      resolveFirst = resolve;
     });
     const syncOnce = vi
       .fn()
@@ -242,7 +242,7 @@ describe('WorkerUiPreferencesRetryController', () => {
     const pending = controller.syncActive();
     const duplicate = controller.syncActive();
     expect(syncOnce).toHaveBeenCalledTimes(1);
-    release?.();
+    resolveFirst();
     await Promise.all([pending, duplicate]);
 
     await expect(controller.syncActive()).resolves.toBeUndefined();

@@ -608,7 +608,6 @@ export function OrdersCart({
                             payment: {
                               ...current.payment,
                               methodAId,
-                              methodACashReceivedMinor: null,
                               methodBId:
                                 current.payment.methodBId === methodAId && fallbackB !== undefined
                                   ? fallbackB.id
@@ -638,25 +637,6 @@ export function OrdersCart({
                       )
                     }
                   />
-                  {methodById(methods, draft.payment.methodAId)?.logicType === 'CASH' ? (
-                    <CashEditor
-                      idPrefix={controlId('split-a')}
-                      label="Cash received A"
-                      allocatedMinor={draft.payment.amountAMinor}
-                      receivedMinor={draft.payment.methodACashReceivedMinor}
-                      busy={busy}
-                      onCommit={(methodACashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SPLIT'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, methodACashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null}
                 </div>
 
                 <div className="split-method-block">
@@ -676,7 +656,6 @@ export function OrdersCart({
                             payment: {
                               ...current.payment,
                               methodBId,
-                              methodBCashReceivedMinor: null,
                               methodAId:
                                 current.payment.methodAId === methodBId && fallbackA !== undefined
                                   ? fallbackA.id
@@ -703,26 +682,6 @@ export function OrdersCart({
                         : '—'}
                     </strong>
                   </div>
-                  {methodById(methods, draft.payment.methodBId)?.logicType === 'CASH' &&
-                  draft.payment.amountAMinor <= pricing.totalMinor ? (
-                    <CashEditor
-                      idPrefix={controlId('split-b')}
-                      label="Cash received B"
-                      allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}
-                      receivedMinor={draft.payment.methodBCashReceivedMinor}
-                      busy={busy}
-                      onCommit={(methodBCashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SPLIT'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, methodBCashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null}
                 </div>
 
                 <button

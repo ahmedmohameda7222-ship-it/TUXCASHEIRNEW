@@ -232,5 +232,12 @@ export async function handleWorkerUiPreferences(
     return;
   }
 
-  sendJson(response, 200, preference);
+  sendJson(response, 200, {
+    shopId: preference.shopId,
+    workerId: preference.workerId,
+    categoryOrder: preference.categoryOrder,
+    categoryAlignment: preference.categoryAlignment,
+    serverVersion: preference.serverVersion,
+    updatedAt: preference.updatedAt,
+  });
 }
