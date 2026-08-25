@@ -1,0 +1,54 @@
+from pathlib import Path
+
+workflow = """name: POS Refinement TDD
+
+on:
+  push:
+    branches:
+      - 'ui/tux-pos-refinement'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pos-refinement-tdd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tdd:
+    name: committed-pos-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run committed POS contracts
+        run: >-
+          npm run test:e2e -- --project=desktop-browser-fallback --grep
+          "approved category hierarchy|search keeps both category levels|category edit contains primary categories only|final correction keeps header and categories visible during compact search|premium POS visual hierarchy matches approved sizing"
+"""
+
+Path('.github/workflows/pos-refinement-tdd.yml').write_text(workflow)
+
+for raw in [
+    'scripts/apply_task3_fixture.py',
+    'scripts/fix_task3_generated_names.py',
+    'scripts/fix_task3_combo_navigation.py',
+    'scripts/fix_task3_search_query.py',
+    'scripts/fix_task3_category_editor.py',
+    'scripts/fix_task3_remaining_expectations.py',
+    'scripts/fix_task3_toolbar_height.py',
+    'scripts/finalize_task3.py',
+]:
+    Path(raw).unlink(missing_ok=True)
