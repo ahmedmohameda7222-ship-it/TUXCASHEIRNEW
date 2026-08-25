@@ -384,13 +384,13 @@ Every cart line provides compact direct controls:
 
 `+1` means **add one identical unit of this cart line**, preserving that line’s optional modifiers/extras, note, and required configuration. Implementation may increase quantity when safe or add a new equivalent line where the domain requires per-unit configuration; the semantic result must be one additional identical unit.
 
-The menu-card `+` remains a fresh/default add. For products with mandatory configuration such as combo drinks, it may still open the required customizer; “default” means no optional extras unless selected.
+The menu-card `+` remains a fresh/default add. If the product has mandatory per-unit configuration, such as a required combo drink, the `+` action must open the required customizer before the item can be added; “default” means no optional extras unless selected.
 
 ### General Edit versus Extra shortcut
 
 `Edit` remains the general full-item customization action for notes, required combo choices, and extras.
 
-A separate contextual Extra shortcut may open the same existing ProductCustomizer focused on the Extras section. Do not duplicate the modifier editor.
+The contextual Extra shortcut opens the same existing ProductCustomizer focused on the Extras section. Do not duplicate the modifier editor.
 
 ---
 
@@ -610,7 +610,7 @@ Test:
 - modifier price affects line/order total through existing pricing logic;
 - customized add is followed by clean/default optional-extra state for the next new add;
 - product aggregate badge/count includes plain and customized instances;
-- product-card + adds a fresh/default unit;
+- product-card + adds a fresh/default unit and invokes mandatory configuration when required;
 - cart `plus-circle Extra` becomes `edit-pencil Extra` when modifiers exist;
 - Extra shortcut and general Edit both reuse ProductCustomizer rather than separate modifier state;
 - maxQuantity and inactive/unavailable modifier rules remain enforced.
