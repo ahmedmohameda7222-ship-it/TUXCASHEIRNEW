@@ -7,6 +7,7 @@ import {
   instant,
   parseEntityId,
   type BusinessDayId,
+  type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OutboxEvent,
   type OutboxEventId,
@@ -17,6 +18,9 @@ import { SqliteOperationsDatabase } from './SqliteOperationsDatabase';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
+const secondWorkerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222223');
+const categoryAId = parseEntityId<MenuCategoryId>('23222222-2222-4222-8222-222222222221');
+const categoryBId = parseEntityId<MenuCategoryId>('23222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const outboxId = parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444444');
 
@@ -55,6 +59,18 @@ function configurationSnapshot(): OperationsConfigurationSnapshot {
     orderTypes: [],
     paymentMethods: [],
     deliveryZones: [],
+  };
+}
+
+function preference(worker: WorkerId, serverVersion = 0) {
+  return {
+    shopId,
+    workerId: worker,
+    categoryOrder: [categoryBId, categoryAId],
+    categoryAlignment: 'center' as const,
+    updatedAt: instant('2026-08-25T02:00:00.000Z'),
+    serverVersion,
+    syncState: 'DIRTY' as const,
   };
 }
 
@@ -122,6 +138,55 @@ describe('SqliteOperationsDatabase', () => {
     expect(result.pending[0]?.id).toBe(outboxId);
     await second.close();
     rmSync(directory, { recursive: true, force: true });
+  });
+
+  it('round-trips, upserts, isolates, and deletes worker UI preferences', async () => {
+    const database = new SqliteOperationsDatabase(':memory:');
+    await database.initialize();
+
+    await expect(
+      database.transaction((transaction) => transaction.workerUiPreferences.get(shopId, workerId)),
+    ).resolves.toBeNull();
+
+    await database.transaction((transaction) =>
+      transaction.workerUiPreferences.put(preference(workerId)),
+    );
+    await expect(
+      database.transaction((transaction) => transaction.workerUiPreferences.get(shopId, workerId)),
+    ).resolves.toEqual(preference(workerId));
+
+    const updated = {
+      ...preference(workerId, 3),
+      categoryOrder: [categoryAId],
+      categoryAlignment: 'right' as const,
+      syncState: 'CLEAN' as const,
+    };
+    await database.transaction(async (transaction) => {
+      await transaction.workerUiPreferences.put(updated);
+      await transaction.workerUiPreferences.put(preference(secondWorkerId, 1));
+    });
+
+    await expect(
+      database.transaction((transaction) => transaction.workerUiPreferences.get(shopId, workerId)),
+    ).resolves.toEqual(updated);
+    await expect(
+      database.transaction((transaction) =>
+        transaction.workerUiPreferences.get(shopId, secondWorkerId),
+      ),
+    ).resolves.toEqual(preference(secondWorkerId, 1));
+
+    await database.transaction((transaction) =>
+      transaction.workerUiPreferences.delete(shopId, workerId),
+    );
+    await expect(
+      database.transaction((transaction) => transaction.workerUiPreferences.get(shopId, workerId)),
+    ).resolves.toBeNull();
+    await expect(
+      database.transaction((transaction) =>
+        transaction.workerUiPreferences.get(shopId, secondWorkerId),
+      ),
+    ).resolves.toEqual(preference(secondWorkerId, 1));
+    await database.close();
   });
 
   it('enforces one open Business Day per shop at the database boundary', async () => {
