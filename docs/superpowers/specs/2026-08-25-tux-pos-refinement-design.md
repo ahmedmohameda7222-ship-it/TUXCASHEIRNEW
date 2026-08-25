@@ -191,21 +191,24 @@ Preference changes commit locally first, remain usable offline, and sync later t
 
 ---
 
-## 5. Money-input behavior
+## 5. Money-input presentation and empty-value semantics
 
-Zero-valued optional money fields must not display `0.00` as editable content.
+Zero/default optional money fields must not force the worker to delete visible `0.00` before typing.
 
-When the logical value is zero and the field has no explicit user-entered amount:
+Presentation rule when a money field has no explicit user-entered amount:
 
-- render the input text empty;
+- render the editable text empty;
 - show placeholder `0` only;
-- clicking/focusing lets the worker type immediately without first deleting `0.00`;
-- leaving the optional field empty resolves to logical zero;
-- non-zero values render normally.
+- focusing lets the worker type immediately;
+- do not use placeholder `0.00`.
 
-Apply this behavior where zero is a valid empty/default state, including Cash received, Discount, Split Amount A, and comparable optional money-entry surfaces. Required money fields may keep explicit validation rules.
+The empty value is resolved according to the field’s domain semantics rather than one generic rule:
 
-Do not use placeholder `0.00`.
+- **zero-default fields** such as Discount and Split Amount A: blank commits/resolves to `ZERO_MONEY`;
+- **nullable tender helper fields** such as single-payment Cash received: blank remains `null`, which means “no explicit tender entered”; the payment layer then applies the exact-cash assumption defined below;
+- required money fields keep their own explicit validation and must not silently become zero if zero is invalid.
+
+The reusable input component/API must therefore support both zero-default and nullable optional modes rather than encoding all blank fields as zero.
 
 ---
 
@@ -280,7 +283,7 @@ Rules:
 
 For a single Cash payment, `Cash received` is a cashier calculator helper, not a required business input.
 
-If the worker selects Cash and leaves Cash received empty:
+If the worker selects Cash and leaves Cash received empty (`null`):
 
 - treat received amount as exactly the allocated/order total;
 - persisted/prepared cash part resolves to `received = allocated` and `change = 0`;
@@ -529,7 +532,8 @@ If local preference persistence fails, do not pretend it saved; keep/revert edit
 
 ### Money/tender input
 
-- empty optional Cash received is valid exact payment;
+- blank nullable Cash received is valid exact payment;
+- blank zero-default money fields resolve to zero;
 - explicit invalid numeric text remains a field error;
 - explicit received < allocation is a payment validation error;
 - split Amount A remains validated independently.
@@ -558,9 +562,10 @@ Test:
 
 Test:
 
-- zero optional field renders empty with placeholder `0`;
+- zero-default field renders empty with placeholder `0`;
+- nullable Cash received renders empty with placeholder `0` while domain value remains null;
 - first keystroke enters directly without clearing `0.00`;
-- blank optional Cash received places an exact Cash payment;
+- blank Cash received places an exact Cash payment;
 - explicit 500 on total 400 produces change 100;
 - explicit received below total is rejected;
 - prepared/persisted exact Cash normalizes received=allocated and change=0.
@@ -675,7 +680,7 @@ The refinement is successful when:
 - header navigation is truly centered and branding has appropriate presence;
 - Apple-reviewed typography is more readable and less uniformly bold;
 - category controls are searchable on demand and personalized per worker across devices;
-- zero money fields no longer force deletion of `0.00`;
+- zero/default money fields no longer force deletion of `0.00`;
 - the welcome state remains until worker intent and uses fresh approved motivational copy;
 - single Cash can be completed without Cash received while still offering fast tender/change assistance;
 - split payment reflects allocation rather than per-leg tender entry;
