@@ -29,6 +29,7 @@ export {
   applyDeliveryZone,
   decrementDraftLine,
   decrementProductUnit,
+  duplicateDraftLineUnit,
   productQuantityInDraft,
   replaceDraftLineCustomization,
 } from './draftOperations';
