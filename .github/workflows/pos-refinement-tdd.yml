@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,9 +27,34 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add Task 9 persistence failure coverage
+        if: github.actor != 'github-actions[bot]'
+        run: python scripts/task9_failure_test.py
+      - name: Format E2E coverage
+        if: github.actor != 'github-actions[bot]'
+        run: npx prettier --write e2e/operations.e2e.ts
       - name: Format check
         run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: E2E typecheck
+        if: github.actor != 'github-actions[bot]'
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        if: github.actor != 'github-actions[bot]'
+        run: npx playwright install --with-deps chromium
+      - name: Verify category persistence failure path
+        if: github.actor != 'github-actions[bot]'
+        run: npm run test:e2e -- --project=desktop-browser-fallback --grep "category persistence failure"
+      - name: Commit verified failure-path coverage
+        if: github.actor != 'github-actions[bot]'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "test: protect category preference failure path"
+          git push origin HEAD:ui/tux-pos-refinement
