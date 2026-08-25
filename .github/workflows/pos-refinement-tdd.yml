@@ -31,6 +31,7 @@ jobs:
         run: |
           python scripts/final_evidence_apply.py
           python scripts/final_evidence_patch.py
+          python scripts/final_prompt_contract_apply.py
       - name: Format evidence tests
         run: npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
