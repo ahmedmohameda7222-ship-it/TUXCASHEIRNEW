@@ -1,0 +1,170 @@
+name: Task 15 browser contract commit
+
+on:
+  push:
+    branches:
+      - 'ui/tux-pos-refinement'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: task15-browser-contracts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  commit-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply approved browser contract updates
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('e2e/operations.e2e.ts')
+          text = path.read_text()
+
+          def replace_once(before: str, after: str) -> None:
+              global text
+              if after in text:
+                  return
+              if before not in text:
+                  raise SystemExit(f'Expected E2E source block not found: {before[:120]!r}')
+              text = text.replace(before, after, 1)
+
+          replace_once(
+              """  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+          await page.getByRole('button', { name: 'Start Day' }).click();
+          await waitForActiveShell(page);
+          await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
+          """,
+              """  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+          await page.getByRole('button', { name: 'Start Day' }).click();
+          await page.waitForFunction(
+            () =>
+              document.querySelector('.welcome-action') !== null ||
+              document.querySelector('[aria-label=\"Operations\"]') !== null,
+          );
+          const welcomeAction = page.locator('.welcome-action');
+          if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+          await waitForActiveShell(page);
+          await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
+          """,
+          )
+
+          replace_once(
+              """test('category persistence failure keeps editor and draft intact', async ({ page }) => {
+            await enterActiveOrdersForCategoryTests(page);
+
+            await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
+              name: 'Current order',
+            });
+            await expect(cart).toContainText('Classic Smash');
+          """,
+              """test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
+            await enterActiveOrdersForCategoryTests(page);
+
+            await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+            await openCartIfMobile(page, testInfo);
+            const cart = currentOrderCart(page, testInfo);
+            await expect(cart).toContainText('Classic Smash');
+            await closeMobileCartIfOpen(page, testInfo);
+          """,
+          )
+
+          replace_once(
+              """  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
+            await expect(page.getByLabel('Edit categories')).toBeVisible();
+            await expect(cart).toContainText('Classic Smash');
+          });
+          """,
+              """  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
+            await expect(page.getByLabel('Edit categories')).toBeVisible();
+            await openCartIfMobile(page, testInfo);
+            await expect(currentOrderCart(page, testInfo)).toContainText('Classic Smash');
+          });
+          """,
+          )
+
+          replace_once(
+              """  expect(cartTitleStyle.fontSize).toBe('17px');
+            expect(cartTitleStyle.lineHeight).toBe('22px');
+            expect(Number(cartTitleStyle.fontWeight)).toBe(600);
+
+            const lineNameStyle = await cart
+          """,
+              """  expect(cartTitleStyle.fontSize).toBe('17px');
+            expect(cartTitleStyle.lineHeight).toBe('22px');
+            expect(Number(cartTitleStyle.fontWeight)).toBe(600);
+
+            const subsectionHeadingStyle = await cart
+              .locator('.payment-section h2')
+              .evaluate((node) => getComputedStyle(node));
+            expect(subsectionHeadingStyle.fontSize).toBe('14px');
+            expect(subsectionHeadingStyle.lineHeight).toBe('18px');
+            expect(Number(subsectionHeadingStyle.fontWeight)).toBe(600);
+
+            const lineNameStyle = await cart
+          """,
+          )
+
+          replace_once(
+              """  const totalStyle = await cart
+              .locator('.grand-total dd')
+              .evaluate((node) => getComputedStyle(node));
+            expect(totalStyle.fontSize).toBe('22px');
+          """,
+              """  const totalLabelStyle = await cart
+              .locator('.grand-total dt')
+              .evaluate((node) => getComputedStyle(node));
+            expect(totalLabelStyle.fontSize).toBe('18px');
+            expect(totalLabelStyle.lineHeight).toBe('22px');
+            expect(Number(totalLabelStyle.fontWeight)).toBe(600);
+
+            const totalStyle = await cart
+              .locator('.grand-total dd')
+              .evaluate((node) => getComputedStyle(node));
+            expect(totalStyle.fontSize).toBe('22px');
+          """,
+          )
+
+          path.write_text(text)
+          PY
+          npx prettier --write e2e/operations.e2e.ts
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify corrected flow contracts
+        run: >-
+          npx playwright test e2e/operations.e2e.ts
+          --retries=0
+          --grep "Operations V2 full browser-fallback workflow stays durable and responsive|category persistence failure keeps editor and draft intact"
+      - name: Commit permanent browser contracts
+        shell: bash
+        run: |
+          changed="$(git status --short --untracked-files=no | awk '{print $2}')"
+          if [ -z "$changed" ]; then
+            echo 'Browser contracts already applied.'
+            exit 0
+          fi
+          test "$changed" = "e2e/operations.e2e.ts" || { echo "Unexpected tracked diff: $changed"; exit 1; }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add e2e/operations.e2e.ts
+          git commit -m 'test: align POS browser contracts with approved refinement'
+          git push origin HEAD:ui/tux-pos-refinement
