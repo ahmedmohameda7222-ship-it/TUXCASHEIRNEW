@@ -14,9 +14,9 @@ concurrency:
 
 jobs:
   tdd:
-    name: task-three-fixture
+    name: task-three-fixture-debug
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -39,12 +39,5 @@ jobs:
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run complete Operations E2E file
-        run: npx playwright test e2e/operations.e2e.ts
-      - name: Commit approved fixture
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add e2e/operations.e2e.ts
-          git commit -m "test: use approved two-level menu fixture"
-          git push origin HEAD:ui/tux-pos-refinement
+      - name: Find first Operations E2E incompatibility
+        run: npx playwright test e2e/operations.e2e.ts --max-failures=1
