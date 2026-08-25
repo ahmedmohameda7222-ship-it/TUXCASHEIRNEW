@@ -27,6 +27,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Show worker preference retry formatter diffs
+        shell: bash
+        run: |
+          npx prettier apps/operations/src/app/browserRemote.ts > /tmp/browserRemote.ts.formatted
+          diff -u apps/operations/src/app/browserRemote.ts /tmp/browserRemote.ts.formatted || true
+          npx prettier packages/application/src/workerUiPreferences.test.ts > /tmp/workerUiPreferences.test.ts.formatted
+          diff -u packages/application/src/workerUiPreferences.test.ts /tmp/workerUiPreferences.test.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
