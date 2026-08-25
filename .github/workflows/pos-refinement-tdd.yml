@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 12
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,40 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 12 cashier payment implementation
-        if: github.actor != 'github-actions[bot]'
-        run: python scripts/task12_apply.py
-      - name: Format Task 12 touched files
-        if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css e2e/operations.e2e.ts
       - name: Format check
         run: npm run format:check
-      - name: Typecheck
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck
       - name: Lint
         run: npm run lint
-      - name: Focused payment domain tests
-        if: github.actor != 'github-actions[bot]'
-        run: npm test -- packages/domain/src/payment.test.ts packages/domain/src/tender.test.ts
       - name: Unit and integration tests
         run: npm run test
-      - name: E2E typecheck
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck:e2e
-      - name: Install Playwright Chromium
-        if: github.actor != 'github-actions[bot]'
-        run: npx playwright install --with-deps chromium
-      - name: Verify cash and split flows
-        if: github.actor != 'github-actions[bot]'
-        run: npm run test:e2e -- --grep "cash|split"
-      - name: Commit verified Task 12 implementation
-        if: github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css e2e/operations.e2e.ts
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: simplify cashier payment entry"
-          git push origin HEAD:ui/tux-pos-refinement
