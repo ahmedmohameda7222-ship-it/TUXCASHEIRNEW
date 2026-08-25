@@ -1,30 +1,58 @@
-import { parsePoundsToMinor, type MoneyMinor } from '@tux/domain';
+import { parsePoundsToMinor, ZERO_MONEY, type MoneyMinor } from '@tux/domain';
 import { useEffect, useState } from 'react';
 import { moneyMinorInputValue } from './ordersView';
 
-export function MoneyInput({
+interface SharedMoneyInputProps {
+  readonly id: string;
+  readonly label: string;
+  readonly placeholder?: string;
+  readonly disabled?: boolean;
+  readonly compact?: boolean;
+}
+
+export interface MoneyInputProps extends SharedMoneyInputProps {
+  readonly value: MoneyMinor;
+  readonly onCommit: (value: MoneyMinor) => void;
+}
+
+export interface OptionalMoneyInputProps extends SharedMoneyInputProps {
+  readonly value: MoneyMinor | null;
+  readonly onCommit: (value: MoneyMinor | null) => void;
+}
+
+function rawValue(value: MoneyMinor | null): string {
+  return value === null || value === ZERO_MONEY ? '' : moneyMinorInputValue(value);
+}
+
+function MoneyTextEditor({
   id,
   label,
   value,
+  placeholder = '0',
   disabled = false,
   compact = false,
+  blankValue,
   onCommit,
-}: {
-  readonly id: string;
-  readonly label: string;
-  readonly value: MoneyMinor;
-  readonly disabled?: boolean;
-  readonly compact?: boolean;
-  readonly onCommit: (value: MoneyMinor) => void;
+}: SharedMoneyInputProps & {
+  readonly value: MoneyMinor | null;
+  readonly blankValue: MoneyMinor | null;
+  readonly onCommit: (value: MoneyMinor | null) => void;
 }) {
-  const [raw, setRaw] = useState(() => moneyMinorInputValue(value));
+  const [raw, setRaw] = useState(() => rawValue(value));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setRaw(moneyMinorInputValue(value));
+    setRaw(rawValue(value));
   }, [value]);
 
   function commit(): void {
+    if (raw.trim() === '') {
+      setError(null);
+      setRaw('');
+      onCommit(blankValue);
+      return;
+    }
+
     const parsed = parsePoundsToMinor(raw);
     if (parsed === null) {
       setError('Enter a valid amount with up to 2 decimal places.');
@@ -46,6 +74,7 @@ export function MoneyInput({
           inputMode="decimal"
           autoComplete="off"
           value={raw}
+          placeholder={placeholder}
           disabled={disabled}
           aria-invalid={error === null ? undefined : true}
           aria-describedby={error === null ? undefined : `${id}-error`}
@@ -69,4 +98,19 @@ export function MoneyInput({
       )}
     </div>
   );
+}
+
+export function MoneyInput({ value, onCommit, ...props }: MoneyInputProps) {
+  return (
+    <MoneyTextEditor
+      {...props}
+      value={value}
+      blankValue={ZERO_MONEY}
+      onCommit={(nextValue) => onCommit(nextValue ?? ZERO_MONEY)}
+    />
+  );
+}
+
+export function OptionalMoneyInput({ value, onCommit, ...props }: OptionalMoneyInputProps) {
+  return <MoneyTextEditor {...props} value={value} blankValue={null} onCommit={onCommit} />;
 }
