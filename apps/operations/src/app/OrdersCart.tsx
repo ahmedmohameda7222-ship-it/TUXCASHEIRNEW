@@ -18,6 +18,7 @@ import {
   type PaymentMethodId,
 } from '@tux/domain';
 import { useEffect, useId, useMemo, useState } from 'react';
+import { EditPencilIcon, PlusCircleIcon } from './icons';
 import { MoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
@@ -164,6 +165,7 @@ export function OrdersCart({
   placing,
   onMutate,
   onEditLine,
+  onEditLineExtras,
   onDecrementLine,
   onClear,
   onDeliveryPhoneCommit,
@@ -176,6 +178,7 @@ export function OrdersCart({
   readonly placing: boolean;
   readonly onMutate: (mutation: DraftMutation) => void;
   readonly onEditLine: (lineId: DraftLineId) => void;
+  readonly onEditLineExtras: (lineId: DraftLineId) => void;
   readonly onDecrementLine: (lineId: DraftLineId) => void;
   readonly onClear: () => void;
   readonly onDeliveryPhoneCommit: (displayPhone: string) => void;
@@ -190,6 +193,16 @@ export function OrdersCart({
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
   const methods = activePaymentMethods(configuration);
+  const productsWithExtras = useMemo(() => {
+    const activeModifierIds = new Set(
+      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
+    );
+    return new Set(
+      configuration.productModifierLinks
+        .filter((link) => activeModifierIds.has(link.modifierId))
+        .map((link) => link.productId),
+    );
+  }, [configuration.modifiers, configuration.productModifierLinks]);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
@@ -324,6 +337,7 @@ export function OrdersCart({
             <div className="cart-lines">
               {draft.lines.map((line) => {
                 const lineIssues = issues.filter((issue) => issue.path === `line:${line.id}`);
+                const supportsExtras = productsWithExtras.has(line.productId);
                 return (
                   <article className="cart-line" key={line.id}>
                     <div className="cart-line-top">
@@ -352,6 +366,17 @@ export function OrdersCart({
                       </p>
                     ))}
                     <div className="line-actions">
+                      {supportsExtras ? (
+                        <button
+                          type="button"
+                          className="line-extra-action"
+                          disabled={busy}
+                          onClick={() => onEditLineExtras(line.id)}
+                        >
+                          {line.modifiers.length > 0 ? <EditPencilIcon /> : <PlusCircleIcon />}
+                          <span>Extra</span>
+                        </button>
+                      ) : null}
                       <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
                         Edit
                       </button>

@@ -370,6 +370,17 @@ export function OrdersWorkspace({
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
+  const productsWithExtras = useMemo(() => {
+    if (configuration === null) return new Set<ProductId>();
+    const activeModifierIds = new Set(
+      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
+    );
+    return new Set(
+      configuration.productModifierLinks
+        .filter((link) => activeModifierIds.has(link.modifierId))
+        .map((link) => link.productId),
+    );
+  }, [configuration]);
   const activeCategories = useMemo(
     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
     [categoryPreference, configuredActiveCategories],
@@ -953,10 +964,14 @@ export function OrdersWorkspace({
                 key={product.id}
                 product={product}
                 quantity={productQuantityInDraft(draft, product.id)}
+                supportsExtras={productsWithExtras.has(product.id)}
                 busy={busy}
                 onQuickInfo={() => setQuickInfoProductId(product.id)}
                 onDecrement={() => decrementProduct(product)}
                 onAdd={() => addProduct(product)}
+                onExtras={() =>
+                  setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })
+                }
               />
             ))
           )}
@@ -972,6 +987,9 @@ export function OrdersWorkspace({
           placing={placing}
           onMutate={enqueueMutation}
           onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}
+          onEditLineExtras={(lineId) =>
+            setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
+          }
           onDecrementLine={decrementLine}
           onClear={() => setClearConfirmOpen(true)}
           onDeliveryPhoneCommit={commitDeliveryPhone}
@@ -1005,6 +1023,9 @@ export function OrdersWorkspace({
             placing={placing}
             onMutate={enqueueMutation}
             onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}
+            onEditLineExtras={(lineId) =>
+              setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
+            }
             onDecrementLine={decrementLine}
             onClear={() => setClearConfirmOpen(true)}
             onDeliveryPhoneCommit={commitDeliveryPhone}
@@ -1016,7 +1037,9 @@ export function OrdersWorkspace({
       {customizer === null ? null : (
         <ProductCustomizer
           key={
-            customizer.kind === 'ADD' ? `add:${customizer.productId}` : `edit:${customizer.lineId}`
+            customizer.kind === 'ADD'
+              ? `add:${customizer.productId}:${customizer.focusSection ?? 'FULL'}`
+              : `edit:${customizer.lineId}:${customizer.focusSection ?? 'FULL'}`
           }
           target={customizer}
           draft={draft}
@@ -1031,12 +1054,7 @@ export function OrdersWorkspace({
         <QuickInfo
           product={quickInfoProduct}
           busy={busy}
-          canCustomize={
-            quickInfoProduct.isCombo ||
-            configuration.productModifierLinks.some(
-              (link) => link.productId === quickInfoProduct.id,
-            )
-          }
+          canCustomize={quickInfoProduct.isCombo || productsWithExtras.has(quickInfoProduct.id)}
           onClose={() => setQuickInfoProductId(null)}
           onCustomize={() => {
             setQuickInfoProductId(null);
