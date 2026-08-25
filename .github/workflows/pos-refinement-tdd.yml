@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,36 +27,40 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add focused Task 12 rendered contract
+      - name: Apply Task 12 cashier payment implementation
         if: github.actor != 'github-actions[bot]'
-        run: python scripts/task12_red_test.py
-      - name: Format focused Task 12 contract
+        run: python scripts/task12_apply.py
+      - name: Format Task 12 touched files
         if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write e2e/operations.e2e.ts
-      - name: Typecheck focused rendered contract
+        run: npx prettier --write apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css e2e/operations.e2e.ts
+      - name: Format check
+        run: npm run format:check
+      - name: Typecheck
+        if: github.actor != 'github-actions[bot]'
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Focused payment domain tests
+        if: github.actor != 'github-actions[bot]'
+        run: npm test -- packages/domain/src/payment.test.ts packages/domain/src/tender.test.ts
+      - name: Unit and integration tests
+        run: npm run test
+      - name: E2E typecheck
         if: github.actor != 'github-actions[bot]'
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         if: github.actor != 'github-actions[bot]'
         run: npx playwright install --with-deps chromium
-      - name: Confirm focused Task 12 RED and commit tests
+      - name: Verify cash and split flows
+        if: github.actor != 'github-actions[bot]'
+        run: npm run test:e2e -- --grep "cash|split"
+      - name: Commit verified Task 12 implementation
         if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
-          set +e
-          npm run test:e2e -- --project=desktop-browser-fallback --retries=0 --timeout=30000 --grep "Cash entry stays optional" 2>&1 | tee /tmp/task12-red.log
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -ne 0
-          grep -Eq "toHaveCount|Expected: 5|Cash entry stays optional" /tmp/task12-red.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add e2e/operations.e2e.ts
-          git commit -m "test: define simplified cashier payment entry"
+          git add apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css e2e/operations.e2e.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: simplify cashier payment entry"
           git push origin HEAD:ui/tux-pos-refinement
-      - name: Format check
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm run test
