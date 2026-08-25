@@ -87,11 +87,11 @@ export function MenuProductCard({
       <footer className="product-card-footer">
         <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
         <div className="product-card-controls">
-          {supportsExtras && !product.soldOut ? (
+          {supportsExtras ? (
             <button
               type="button"
               className="product-extra-action"
-              disabled={busy}
+              disabled={busy || product.soldOut}
               onClick={(event) => runIndependentAction(event, onExtras)}
             >
               <PlusCircleIcon />
