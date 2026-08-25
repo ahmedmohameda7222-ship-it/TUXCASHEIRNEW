@@ -1,8 +1,11 @@
-import type { SVGProps } from 'react';
+import type { ReactNode, SVGProps } from 'react';
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, 'children'>;
 
-function IconFrame({ children, ...props }: IconProps & { readonly children: React.ReactNode }) {
+function IconFrame({
+  children,
+  ...props
+}: IconProps & { readonly children: ReactNode }) {
   return (
     <svg
       width="24"
