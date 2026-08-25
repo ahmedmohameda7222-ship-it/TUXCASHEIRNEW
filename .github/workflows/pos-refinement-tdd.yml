@@ -28,8 +28,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply approved payment and test typing cleanup
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           cart = Path('apps/operations/src/app/OrdersCart.tsx')
@@ -49,19 +50,20 @@ jobs:
           test = Path('packages/application/src/workerUiPreferences.test.ts')
           text = test.read_text()
           old = """    let release: (() => void) | null = null;
-    const first = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-"""
+          const first = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          """
           new = """    let resolveFirst!: () => void;
-    const first = new Promise<void>((resolve) => {
-      resolveFirst = resolve;
-    });
-"""
+          const first = new Promise<void>((resolve) => {
+            resolveFirst = resolve;
+          });
+          """
           if old not in text:
               raise SystemExit('Expected retry resolver source block not found.')
           text = text.replace(old, new, 1).replace('    release?.();\n', '    resolveFirst();\n', 1)
           test.write_text(text)
+          PY
       - name: Format check
         run: npm run format:check
       - name: Lint
