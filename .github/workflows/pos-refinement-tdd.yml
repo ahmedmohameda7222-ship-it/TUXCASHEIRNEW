@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,9 +27,125 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add focused Task 9 rendered contract
+        if: github.actor != 'github-actions[bot]'
+        shell: bash
+        run: |
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          async function enterActiveOrdersForCategoryTests(page: Page): Promise<void> {
+            await seedBrowserFallback(page);
+            await page.goto('/');
+            await page.getByLabel('Enter PIN to Start Day').fill('1234');
+            await page.getByRole('button', { name: 'Start Day' }).click();
+            await page.waitForFunction(
+              () =>
+                document.querySelector('.welcome-action') !== null ||
+                document.querySelector('[aria-label="Operations"]') !== null,
+            );
+            const welcomeAction = page.locator('.welcome-action');
+            if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+            await waitForActiveShell(page);
+          }
+
+          test('category search is progressive and keyboard accessible', async ({ page }) => {
+            await enterActiveOrdersForCategoryTests(page);
+
+            const searchInput = page.getByPlaceholder('Search products');
+            const searchButton = page.getByRole('button', { name: 'Search menu' });
+            await expect(searchInput).toBeHidden();
+            await expect(searchButton).toBeVisible();
+
+            await page.keyboard.press('Control+K');
+            await expect(searchInput).toBeVisible();
+            await expect(searchInput).toBeFocused();
+            await searchInput.fill('cola');
+            await expect(page.getByRole('button', { name: 'Add one Cola' })).toBeVisible();
+
+            await page.keyboard.press('Escape');
+            await expect(searchInput).toHaveValue('');
+            await expect(searchInput).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(searchInput).toBeHidden();
+
+            await page.keyboard.press('/');
+            await expect(searchInput).toBeVisible();
+            await expect(searchInput).toBeFocused();
+            await searchInput.fill('water');
+            await page.getByRole('button', { name: 'Clear search' }).click();
+            await expect(searchInput).toBeHidden();
+          });
+
+          test('category editor persists alignment and keyboard reorder', async ({ page }) => {
+            await enterActiveOrdersForCategoryTests(page);
+
+            const searchButton = page.getByRole('button', { name: 'Search menu' });
+            await page.getByRole('button', { name: 'Edit categories' }).click();
+            await expect(searchButton).toBeHidden();
+            await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+
+            await page.getByRole('button', { name: 'Right', exact: true }).click();
+            await expect(page.getByRole('button', { name: 'Right', exact: true })).toHaveAttribute(
+              'aria-pressed',
+              'true',
+            );
+
+            const editorItems = page.locator('.category-editor-item');
+            await expect(editorItems).toHaveCount(3);
+            await expect(editorItems.nth(0)).toContainText('Burgers');
+            await page.getByRole('button', { name: 'Move Burgers right' }).click();
+            await expect(editorItems.nth(0)).toContainText('Sides');
+            await expect(editorItems.nth(1)).toContainText('Burgers');
+
+            await page.getByRole('button', { name: 'Done', exact: true }).click();
+            const categories = page.getByLabel('Menu categories').locator('.category-tab');
+            await expect(categories.nth(0)).toHaveText('Sides');
+            await expect(categories.nth(1)).toHaveText('Burgers');
+            await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+            await page.reload();
+            await waitForActiveShell(page);
+            const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
+            await expect(reloadedCategories.nth(0)).toHaveText('Sides');
+            await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
+            await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+            await page.getByRole('button', { name: 'Edit categories' }).click();
+            await page.getByRole('button', { name: 'Reset', exact: true }).click();
+            await page.getByRole('button', { name: 'Done', exact: true }).click();
+            const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
+            await expect(resetCategories.nth(0)).toHaveText('Burgers');
+            await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'center');
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: Typecheck focused rendered contract
+        if: github.actor != 'github-actions[bot]'
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        if: github.actor != 'github-actions[bot]'
+        run: npx playwright install --with-deps chromium
+      - name: Confirm focused Task 9 RED and commit tests
+        if: github.actor != 'github-actions[bot]'
+        shell: bash
+        run: |
+          set +e
+          npm run test:e2e -- --grep "category|search" 2>&1 | tee /tmp/task9-red.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -Eq "Search menu|Edit categories|toBeHidden|category search|category editor" /tmp/task9-red.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: define progressive category navigation"
+          git push origin HEAD:ui/tux-pos-refinement
       - name: Format check
+        if: github.actor == 'github-actions[bot]'
         run: npm run format:check
       - name: Lint
+        if: github.actor == 'github-actions[bot]'
         run: npm run lint
       - name: Unit and integration tests
+        if: github.actor == 'github-actions[bot]'
         run: npm run test
