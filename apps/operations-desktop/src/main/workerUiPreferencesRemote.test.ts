@@ -1,4 +1,10 @@
-import { instant, parseEntityId, type MenuCategoryId, type ShopId, type WorkerId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type MenuCategoryId,
+  type ShopId,
+  type WorkerId,
+} from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { SupabaseDesktopWorkerUiPreferencesGateway } from './automaticSync';
 
@@ -116,7 +122,9 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
     expect(result.serverVersion).toBe(7);
     expect(result.workerId).toBe(workerA);
     const [target, init] = fetcher.mock.calls[0] ?? [];
-    expect(String(target)).toBe('https://project.supabase.co/rest/v1/rpc/put_worker_ui_preferences');
+    expect(String(target)).toBe(
+      'https://project.supabase.co/rest/v1/rpc/put_worker_ui_preferences',
+    );
     expect(init).toEqual(
       expect.objectContaining({
         method: 'POST',
