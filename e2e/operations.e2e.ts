@@ -827,8 +827,8 @@ test('Cash entry stays optional and split stays allocation-only', async ({ page 
   let cart = currentOrderCart(page, testInfo);
 
   await cart.locator('.adjustment-disclosure').filter({ hasText: 'Discount' }).click();
-  await cart.getByLabel('Discount').fill('39');
-  await cart.getByLabel('Discount').blur();
+  await cart.getByRole('textbox', { name: 'Discount' }).fill('39');
+  await cart.getByRole('textbox', { name: 'Discount' }).blur();
   await expect(cart.locator('.grand-total')).toContainText('121.00');
 
   await cart.getByRole('button', { name: 'Cash', exact: true }).click();
