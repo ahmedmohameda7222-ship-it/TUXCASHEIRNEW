@@ -8,10 +8,7 @@ export function clampCartWidth(width: number, viewportWidth: number): number {
   return Math.min(maximum, Math.max(CART_WIDTH_MIN, width));
 }
 
-export function readCartWidth(
-  storage: Pick<Storage, 'getItem'>,
-  viewportWidth: number,
-): number {
+export function readCartWidth(storage: Pick<Storage, 'getItem'>, viewportWidth: number): number {
   const stored = storage.getItem(CART_WIDTH_STORAGE_KEY);
   if (stored === null) return clampCartWidth(CART_WIDTH_DEFAULT, viewportWidth);
   const width = Number(stored);
