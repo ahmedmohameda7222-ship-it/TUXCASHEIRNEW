@@ -43,7 +43,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply final correction
-        run: python scripts/final_correction_apply.py
+        run: |
+          python scripts/final_correction_apply.py
+          python scripts/final_correction_test_expectations.py
       - name: Format touched files
         run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations-desktop/src/main/workerUiPreferencesIpc.ts apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css e2e/operations.e2e.ts
       - name: Format check
