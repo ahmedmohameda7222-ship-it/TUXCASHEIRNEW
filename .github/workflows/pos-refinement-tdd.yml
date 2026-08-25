@@ -30,7 +30,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply Task 2 GREEN patch
-        run: python scripts/apply_task2_green.py
+        run: |
+          python scripts/apply_task2_green.py
+          python scripts/fix_task2_search_clear_scope.py
       - name: Format changed source
         run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/premium.css e2e/operations.e2e.ts
       - name: E2E typecheck
