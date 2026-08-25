@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tdd:
-    name: task-three-fixture-debug
+    name: task-three-full-gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -40,13 +40,44 @@ jobs:
           python scripts/fix_task3_toolbar_height.py
       - name: Format changed sources
         run: npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
+      - name: Reject legacy or development-only fixture text
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('e2e/operations.e2e.ts').read_text()
+          forbidden = [
+              'Classic Smash',
+              'Double Smash',
+              'Triple Smash',
+              'TUX Loaded Burger',
+              'Crispy Chicken',
+              'Spicy Chicken',
+              'Long Name Layout Stress Burger with Extra Description',
+              'Sold Out Test Burger',
+              'Development-only long text used to stress responsive menu layout.',
+              "fill('cola')",
+              "name: 'Sides'",
+              "toHaveText('Sides')",
+          ]
+          found = [token for token in forbidden if token in text]
+          if found:
+              raise SystemExit(f'Legacy fixture text remains: {found}')
+          PY
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify locked toolbar height GREEN
-        run: >-
-          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
-          "final correction keeps header and categories visible during compact search"
-      - name: Find next Operations E2E incompatibility
-        run: npx playwright test e2e/operations.e2e.ts --max-failures=1
+      - name: Run complete Operations E2E file
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Finalize committed Task 3 sources
+        run: |
+          python scripts/finalize_task3.py
+          npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css .github/workflows/pos-refinement-tdd.yml
+      - name: Commit Task 3 GREEN state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "Expected Task 3 changes were not generated"; exit 1; }
+          git commit -m "fix: align approved POS menu and category toolbar"
+          git push origin HEAD:ui/tux-pos-refinement
