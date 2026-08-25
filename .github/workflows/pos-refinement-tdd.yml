@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved payment and test typing cleanup
+      - name: Apply approved Task 8 closing fixes
         shell: bash
         run: |
           python - <<'PY'
@@ -71,6 +71,22 @@ jobs:
               raise SystemExit('Expected retry resolver call not found.')
           text = text.replace('    release?.();\n', '    resolveFirst();\n', 1)
           test.write_text(text)
+
+          gateway = Path('server/workerUiPreferencesGateway.ts')
+          text = gateway.read_text()
+          old = '  sendJson(response, 200, preference);\n'
+          new = """  sendJson(response, 200, {
+            shopId: preference.shopId,
+            workerId: preference.workerId,
+            categoryOrder: preference.categoryOrder,
+            categoryAlignment: preference.categoryAlignment,
+            serverVersion: preference.serverVersion,
+            updatedAt: preference.updatedAt,
+          });
+          """
+          if old not in text:
+              raise SystemExit('Expected worker preference response serialization not found.')
+          gateway.write_text(text.replace(old, new, 1))
           PY
       - name: Format check
         run: npm run format:check
@@ -87,9 +103,9 @@ jobs:
         run: |
           git config user.name "TUX Refinement CI"
           git config user.email "actions@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersCart.tsx packages/application/src/workerUiPreferences.test.ts
+          git add apps/operations/src/app/OrdersCart.tsx packages/application/src/workerUiPreferences.test.ts server/workerUiPreferencesGateway.ts
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "fix: align renderer with payment semantics"
+          git commit -m "fix: align preference and payment boundaries"
           git push origin HEAD:ui/tux-pos-refinement
