@@ -714,7 +714,7 @@ test('category persistence failure keeps editor and draft intact', async ({ page
   await expect(cart).toContainText('Classic Smash');
 });
 
-test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }) => {
+test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
   const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
@@ -732,17 +732,18 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
   await addDialog.getByRole('button', { name: 'Add to order' }).click();
 
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('1');
-  const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
-    name: 'Current order',
-  });
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
   const classicLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
   await expect(classicLines).toHaveCount(1);
   await expect(classicLines.nth(0)).toContainText('2× Extra Cheese');
   await expect(classicLines.nth(0)).toContainText('1× Extra Patty');
   await expect(classicLines.nth(0)).toContainText(/200\.00/);
 
+  await closeMobileCartIfOpen(page, testInfo);
   await classicCard.getByRole('button', { name: 'Add one Classic Smash' }).click();
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('2');
+  await openCartIfMobile(page, testInfo);
   await expect(classicLines).toHaveCount(2);
   await expect(classicLines.nth(1)).not.toContainText('Extra Cheese');
   await expect(classicLines.nth(1)).not.toContainText('Extra Patty');
