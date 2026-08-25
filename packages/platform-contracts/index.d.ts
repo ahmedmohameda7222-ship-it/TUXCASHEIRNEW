@@ -6,11 +6,7 @@ import type {
   OperationsOrdersService,
   OperationsSessionResult,
 } from '@tux/application';
-import type {
-  CategoryAlignment,
-  MenuCategoryId,
-  WorkerUiPreferences,
-} from '@tux/domain';
+import type { CategoryAlignment, MenuCategoryId, WorkerUiPreferences } from '@tux/domain';
 
 export type TuxSyncHealthSnapshot =
   | {
