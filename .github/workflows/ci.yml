@@ -113,7 +113,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Build unsigned Windows x64 package
-        run: npm run package:win
+        run: npm run package:win -- --publish never
       - name: Upload unsigned Windows package
         uses: actions/upload-artifact@v4
         with:
