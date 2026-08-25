@@ -188,6 +188,37 @@ export function addProductUnit(input: {
   return { ...input.draft, lines: [...input.draft.lines, line] };
 }
 
+export function duplicateDraftLineUnit(input: {
+  readonly draft: OrderDraft;
+  readonly configuration: OperationsConfigurationSnapshot;
+  readonly lineId: DraftLineId;
+  readonly newLineId: DraftLineId;
+  readonly addedSequence: number;
+}): OrderDraft {
+  const line = input.draft.lines.find((candidate) => candidate.id === input.lineId);
+  if (line === undefined) {
+    throw new DomainInvariantError('Draft line was not found.');
+  }
+
+  const customization: DraftLineCustomization = {
+    modifiers: line.modifiers.map((modifier) => ({
+      modifierId: modifier.modifierId,
+      quantity: modifier.quantity,
+    })),
+    comboBeverageProductIds: line.comboBeverages.map((beverage) => beverage.productId),
+    itemNote: line.itemNote,
+  };
+
+  return addProductUnit({
+    draft: input.draft,
+    configuration: input.configuration,
+    productId: line.productId,
+    lineId: input.newLineId,
+    addedSequence: input.addedSequence,
+    customization,
+  });
+}
+
 export function decrementProductUnit(draft: OrderDraft, productId: ProductId): OrderDraft {
   const candidates = draft.lines
     .map((line, index) => ({ line, index }))
