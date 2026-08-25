@@ -896,7 +896,13 @@ button:not(:disabled):active {
   font-weight: 600;
 }
 
-.cart-section h2,
+.cart-section h2 {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .product-search > label,
 .field-stack > span,
 .money-field > label {
@@ -907,8 +913,8 @@ button:not(:disabled):active {
 }
 
 .cart-totals .grand-total dt {
-  font-size: 15px;
-  line-height: 20px;
+  font-size: 18px;
+  line-height: 22px;
   font-weight: 600;
 }
 
