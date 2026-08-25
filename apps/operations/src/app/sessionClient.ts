@@ -28,6 +28,7 @@ import type {
   TuxExpensesApi,
   TuxOrdersApi,
   TuxOrdersBoardApi,
+  TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
@@ -41,6 +42,7 @@ export interface OperationsSessionClient {
   enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
+export type OperationsWorkerUiPreferencesClient = TuxWorkerUiPreferencesApi;
 export type OperationsOrdersClient = TuxOrdersApi;
 export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 export type OperationsExpensesClient = TuxExpensesApi;
@@ -49,6 +51,7 @@ export type OperationsEndDayClient = TuxEndDayApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
+  readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
   readonly orders: OperationsOrdersService;
   readonly ordersBoard: OperationsOrdersBoardService;
   readonly expenses: OperationsExpensesService;
@@ -162,6 +165,33 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
       );
 
+      const activePreferenceIdentityFromSession = async (): Promise<WorkerUiPreferencesSyncIdentity> => {
+        const result = await session.getState();
+        if (!result.ok || result.value.status !== 'ACTIVE') {
+          throw new Error('Active worker session required.');
+        }
+        return {
+          shopId: result.value.shopId,
+          workerId: result.value.operator.id,
+        };
+      };
+
+      const workerUiPreferences: TuxWorkerUiPreferencesApi = {
+        load: async () => {
+          const identity = await activePreferenceIdentityFromSession();
+          return preferencesRepository.get(identity.shopId, identity.workerId);
+        },
+        update: async (input) => {
+          const identity = await activePreferenceIdentityFromSession();
+          const updated = await preferencesService.update(identity.shopId, identity.workerId, input);
+          if (preferenceRetryStarted) retryPreferences();
+          return updated;
+        },
+        reset: async () => {
+          await workerUiPreferences.update({ categoryOrder: [], categoryAlignment: 'center' });
+        },
+      };
+
       const bootstrapWithPin = async (pin: string): Promise<OperationsSessionResult> => {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin);
@@ -243,6 +273,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
 
       return {
         session,
+        workerUiPreferences,
         orders: new OperationsOrdersService(
           database,
           readModel,
@@ -291,6 +322,16 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
     signOut: async () => (await browserRuntime()).signOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
+  };
+}
+
+export function createWorkerUiPreferencesClient(): OperationsWorkerUiPreferencesClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.workerUiPreferences;
+  return {
+    load: async () => (await browserRuntime()).workerUiPreferences.load(),
+    update: async (input) => (await browserRuntime()).workerUiPreferences.update(input),
+    reset: async () => (await browserRuntime()).workerUiPreferences.reset(),
   };
 }
 
