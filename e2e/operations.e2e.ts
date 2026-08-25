@@ -798,7 +798,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
 
   await lines.first().getByRole('button', { name: '−1', exact: true }).click();
   await expect(lines.first()).toContainText('× 1');
-  await expect(page.getByRole('status')).toContainText('Removed one Classic Smash');
+  await expect(page.locator('.undo-toast')).toContainText('Removed one Classic Smash');
 
   await lines.first().getByRole('button', { name: 'Edit', exact: true }).click();
   const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
