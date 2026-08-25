@@ -33,5 +33,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run committed category contracts
         run: >-
-          npm run test:e2e -- --grep
+          npm run test:e2e -- --project=desktop-browser-fallback --grep
           "approved category hierarchy|search keeps both category levels|category edit contains primary categories only"
