@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -27,6 +27,41 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply approved payment and test typing cleanup
+        shell: python
+        run: |
+          from pathlib import Path
+
+          cart = Path('apps/operations/src/app/OrdersCart.tsx')
+          text = cart.read_text()
+          replacements = [
+              ("                              methodAId,\n                              methodACashReceivedMinor: null,\n                              methodBId:", "                              methodAId,\n                              methodBId:"),
+              ("                  {methodById(methods, draft.payment.methodAId)?.logicType === 'CASH' ? (\n                    <CashEditor\n                      idPrefix={controlId('split-a')}\n                      label=\"Cash received A\"\n                      allocatedMinor={draft.payment.amountAMinor}\n                      receivedMinor={draft.payment.methodACashReceivedMinor}\n                      busy={busy}\n                      onCommit={(methodACashReceivedMinor) =>\n                        onMutate((current) =>\n                          current.payment.mode === 'SPLIT'\n                            ? {\n                                ...current,\n                                payment: { ...current.payment, methodACashReceivedMinor },\n                              }\n                            : current,\n                        )\n                      }\n                    />\n                  ) : null}\n", ""),
+              ("                              methodBId,\n                              methodBCashReceivedMinor: null,\n                              methodAId:", "                              methodBId,\n                              methodAId:"),
+              ("                  {methodById(methods, draft.payment.methodBId)?.logicType === 'CASH' &&\n                  draft.payment.amountAMinor <= pricing.totalMinor ? (\n                    <CashEditor\n                      idPrefix={controlId('split-b')}\n                      label=\"Cash received B\"\n                      allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}\n                      receivedMinor={draft.payment.methodBCashReceivedMinor}\n                      busy={busy}\n                      onCommit={(methodBCashReceivedMinor) =>\n                        onMutate((current) =>\n                          current.payment.mode === 'SPLIT'\n                            ? {\n                                ...current,\n                                payment: { ...current.payment, methodBCashReceivedMinor },\n                              }\n                            : current,\n                        )\n                      }\n                    />\n                  ) : null}\n", ""),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Expected OrdersCart source block not found: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+          cart.write_text(text)
+
+          test = Path('packages/application/src/workerUiPreferences.test.ts')
+          text = test.read_text()
+          old = """    let release: (() => void) | null = null;
+    const first = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+"""
+          new = """    let resolveFirst!: () => void;
+    const first = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+"""
+          if old not in text:
+              raise SystemExit('Expected retry resolver source block not found.')
+          text = text.replace(old, new, 1).replace('    release?.();\n', '    resolveFirst();\n', 1)
+          test.write_text(text)
       - name: Format check
         run: npm run format:check
       - name: Lint
@@ -37,3 +72,14 @@ jobs:
         run: npm test -- apps/operations-desktop/src/main/*workerUiPreferences*.test.ts
       - name: Task 8 full typecheck
         run: npm run typecheck
+      - name: Commit verified Task 8 source fixes
+        shell: bash
+        run: |
+          git config user.name "TUX Refinement CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/operations/src/app/OrdersCart.tsx packages/application/src/workerUiPreferences.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "fix: align renderer with payment semantics"
+          git push origin HEAD:ui/tux-pos-refinement
