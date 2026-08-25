@@ -27,13 +27,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show Task 6 formatter diff
-        shell: bash
-        run: |
-          for file in packages/domain/src/workerUiPreferences.ts packages/persistence/src/browser/IndexedDbWorkerUiPreferencesStore.ts; do
-            npx prettier "$file" > "/tmp/$(basename "$file").formatted"
-            diff -u "$file" "/tmp/$(basename "$file").formatted" || true
-          done
       - name: Format check
         run: npm run format:check
       - name: Lint
