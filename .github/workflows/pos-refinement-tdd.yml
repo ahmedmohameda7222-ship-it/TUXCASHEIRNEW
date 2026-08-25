@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tdd:
-    if: github.event.head_commit.message != 'fix: let product cards follow content'
+    if: "${{ github.event.head_commit.message != 'fix: let product cards follow content' }}"
     name: task-four-card-containment-green
     runs-on: ubuntu-latest
     timeout-minutes: 20
