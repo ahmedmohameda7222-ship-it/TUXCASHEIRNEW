@@ -1,0 +1,35 @@
+name: Superpowers Task 2 RED
+
+on:
+  push:
+    branches: [ui/tux-pos-refinement]
+    paths:
+      - .github/workflows/superpowers-task2-red.yml
+      - scripts/apply_task2_red_e2e.py
+
+permissions:
+  contents: write
+
+jobs:
+  commit-red-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: python scripts/apply_task2_red_e2e.py
+      - run: npx prettier --write e2e/operations.e2e.ts
+      - name: Commit RED contract
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: define approved category composition"
+          git push origin HEAD:ui/tux-pos-refinement
