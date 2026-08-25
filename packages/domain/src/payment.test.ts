@@ -30,27 +30,71 @@ const methods: PaymentMethod[] = [
 ];
 
 describe('preparePaymentParts', () => {
-  it('calculates Cash Change from the stable CASH logic type rather than display name', () => {
-    const [part] = preparePaymentParts(
-      { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: moneyMinor(20_000) },
+  it('treats blank single-cash tender as exact payment', () => {
+    const parts = preparePaymentParts(
+      { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: null },
       methods,
-      moneyMinor(18_000),
+      moneyMinor(40_000),
+    );
+
+    expect(parts).toEqual([
+      expect.objectContaining({
+        allocatedMinor: moneyMinor(40_000),
+        receivedMinor: moneyMinor(40_000),
+        changeMinor: moneyMinor(0),
+      }),
+    ]);
+  });
+
+  it('calculates Cash Change from an explicit tender using the stable CASH logic type', () => {
+    const [part] = preparePaymentParts(
+      { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: moneyMinor(50_000) },
+      methods,
+      moneyMinor(40_000),
     );
     expect(part).toMatchObject({
-      allocatedMinor: moneyMinor(18_000),
-      receivedMinor: moneyMinor(20_000),
-      changeMinor: moneyMinor(2_000),
+      allocatedMinor: moneyMinor(40_000),
+      receivedMinor: moneyMinor(50_000),
+      changeMinor: moneyMinor(10_000),
     });
   });
 
-  it('blocks insufficient Cash Received', () => {
+  it('blocks insufficient explicit Cash Received', () => {
     expect(() =>
       preparePaymentParts(
-        { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: moneyMinor(17_999) },
+        { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: moneyMinor(39_999) },
         methods,
-        moneyMinor(18_000),
+        moneyMinor(40_000),
       ),
     ).toThrow('Cash Received cannot be less than the Cash allocation.');
+  });
+
+  it('prepares a cash split leg as exact allocation without tender fields', () => {
+    const parts = preparePaymentParts(
+      {
+        mode: 'SPLIT',
+        methodAId: CASH_ID,
+        amountAMinor: moneyMinor(32_000),
+        methodBId: CARD_ID,
+      },
+      methods,
+      moneyMinor(40_000),
+    );
+
+    expect(parts[0]).toEqual(
+      expect.objectContaining({
+        allocatedMinor: moneyMinor(32_000),
+        receivedMinor: moneyMinor(32_000),
+        changeMinor: moneyMinor(0),
+      }),
+    );
+    expect(parts[1]).toEqual(
+      expect.objectContaining({
+        allocatedMinor: moneyMinor(8_000),
+        receivedMinor: null,
+        changeMinor: null,
+      }),
+    );
   });
 
   it('auto-calculates Method B as the exact split remainder', () => {
@@ -59,9 +103,7 @@ describe('preparePaymentParts', () => {
         mode: 'SPLIT',
         methodAId: CARD_ID,
         amountAMinor: moneyMinor(10_000),
-        methodACashReceivedMinor: null,
         methodBId: CASH_ID,
-        methodBCashReceivedMinor: moneyMinor(10_000),
       },
       methods,
       moneyMinor(18_000),
@@ -70,7 +112,10 @@ describe('preparePaymentParts', () => {
       moneyMinor(10_000),
       moneyMinor(8_000),
     ]);
-    expect(parts[1]?.changeMinor).toBe(moneyMinor(2_000));
+    expect(parts[1]).toMatchObject({
+      receivedMinor: moneyMinor(8_000),
+      changeMinor: moneyMinor(0),
+    });
   });
 
   it('rejects duplicate split methods', () => {
@@ -80,9 +125,7 @@ describe('preparePaymentParts', () => {
           mode: 'SPLIT',
           methodAId: CARD_ID,
           amountAMinor: moneyMinor(10_000),
-          methodACashReceivedMinor: null,
           methodBId: CARD_ID,
-          methodBCashReceivedMinor: null,
         },
         methods,
         moneyMinor(18_000),
