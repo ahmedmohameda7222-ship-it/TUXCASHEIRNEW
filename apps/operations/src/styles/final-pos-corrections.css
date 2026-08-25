@@ -9,6 +9,21 @@
   min-height: 152px;
 }
 
+/* Category edit mode owns its intrinsic height so the scrollable grid cannot cover controls. */
+.menu-toolbar.category-mode-edit {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+}
+
+/* Quantity controls are exactly 44px including their visible borders. */
+.product-quantity,
+.quantity-control {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+}
+
 /* Quantity text is part of the 15/20 high-frequency control typography lock. */
 .product-quantity output,
 .quantity-control output {
