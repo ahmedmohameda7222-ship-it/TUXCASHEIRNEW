@@ -4,6 +4,7 @@ import {
   addProductUnit,
   applyDeliveryZone,
   decrementProductUnit,
+  duplicateDraftLineUnit,
   productQuantityInDraft,
 } from './draftOperations';
 import {
@@ -156,6 +157,83 @@ describe('draft operations', () => {
     expect(second.lines[0]?.quantity).toBe(2);
     expect(second.lines[0]?.addedSequence).toBe(2);
     expect(productQuantityInDraft(second, BURGER_ID)).toBe(2);
+  });
+
+  it('duplicates an identical customized non-combo line unit', () => {
+    const config = configuration();
+    const customized = addProductUnit({
+      draft: emptyDraft(),
+      configuration: config,
+      productId: BURGER_ID,
+      lineId: lineId(1),
+      addedSequence: 1,
+      customization: {
+        modifiers: [{ modifierId: MODIFIER_ID, quantity: 2 }],
+        comboBeverageProductIds: [],
+        itemNote: 'No onions',
+      },
+    });
+
+    const duplicated = duplicateDraftLineUnit({
+      draft: customized,
+      configuration: config,
+      lineId: lineId(1),
+      newLineId: lineId(2),
+      addedSequence: 2,
+    });
+
+    expect(duplicated.lines).toHaveLength(1);
+    expect(duplicated.lines[0]).toMatchObject({
+      id: lineId(1),
+      quantity: 2,
+      itemNote: 'No onions',
+      modifiers: [expect.objectContaining({ modifierId: MODIFIER_ID, quantity: 2 })],
+    });
+  });
+
+  it('duplicates a combo as a second equivalent line instead of increasing combo quantity', () => {
+    const config = configuration();
+    const combo = addProductUnit({
+      draft: emptyDraft(),
+      configuration: config,
+      productId: COMBO_ID,
+      lineId: lineId(1),
+      addedSequence: 1,
+      customization: {
+        modifiers: [],
+        comboBeverageProductIds: [DRINK_ID],
+        itemNote: 'No ice',
+      },
+    });
+
+    const duplicated = duplicateDraftLineUnit({
+      draft: combo,
+      configuration: config,
+      lineId: lineId(1),
+      newLineId: lineId(2),
+      addedSequence: 2,
+    });
+
+    expect(duplicated.lines).toHaveLength(2);
+    expect(duplicated.lines.map((line) => line.quantity)).toEqual([1, 1]);
+    expect(duplicated.lines[1]).toMatchObject({
+      id: lineId(2),
+      productId: COMBO_ID,
+      itemNote: 'No ice',
+      comboBeverages: [{ productId: DRINK_ID, label: 'Cola' }],
+    });
+  });
+
+  it('rejects duplication of a missing draft line', () => {
+    expect(() =>
+      duplicateDraftLineUnit({
+        draft: emptyDraft(),
+        configuration: configuration(),
+        lineId: lineId(1),
+        newLineId: lineId(2),
+        addedSequence: 2,
+      }),
+    ).toThrow('Draft line was not found.');
   });
 
   it('decrements the most recently added configuration deterministically', () => {
