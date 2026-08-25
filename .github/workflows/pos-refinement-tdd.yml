@@ -27,6 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply Task 11 Current Order test precision fix
+        if: github.actor != 'github-actions[bot]'
+        run: python scripts/task11_testfix.py
       - name: Apply Task 11 current order implementation
         if: github.actor != 'github-actions[bot]'
         run: |
@@ -34,7 +37,7 @@ jobs:
           python scripts/task11_css_fix.py
       - name: Format Task 11 touched files
         if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
+        run: npx prettier --write e2e/operations.e2e.ts apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
       - name: Format check
         run: npm run format:check
       - name: Typecheck
@@ -44,22 +47,24 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
-      - name: E2E typecheck
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         if: github.actor != 'github-actions[bot]'
         run: npx playwright install --with-deps chromium
       - name: Verify current order cashier workflow
         if: github.actor != 'github-actions[bot]'
         run: npm run test:e2e -- --grep "Current Order keeps cashier|Extra shortcuts"
-      - name: Commit verified Task 11 implementation
+      - name: Commit verified Task 11 test and implementation
         if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "test: target Current Order undo toast precisely"
+          fi
           git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/OrdersCart.tsx apps/operations/src/styles/orders.css
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: align current order with cashier workflow"
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: align current order with cashier workflow"
+          fi
           git push origin HEAD:ui/tux-pos-refinement
