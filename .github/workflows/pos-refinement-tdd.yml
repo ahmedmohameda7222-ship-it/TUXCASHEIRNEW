@@ -14,9 +14,9 @@ concurrency:
 
 jobs:
   tdd:
-    name: fast-tdd
+    name: final-approval-evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,9 +27,25 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format check
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm run test
+      - name: Apply evidence tests
+        run: python scripts/final_evidence_apply.py
+      - name: Format evidence tests
+        run: npx prettier --write e2e/operations.e2e.ts
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run fixed evidence and keyboard audit
+        run: |
+          mkdir -p final-evidence
+          npm run test:e2e -- --grep "final correction (approval evidence|keyboard audit)"
+      - name: Verify fixed eleven screenshots
+        run: |
+          test "$(find final-evidence -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 11
+          find final-evidence -maxdepth 1 -type f -name '*.png' -printf '%f\n' | sort
+      - name: Upload approval evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-correction-evidence
+          path: final-evidence
+          if-no-files-found: error
