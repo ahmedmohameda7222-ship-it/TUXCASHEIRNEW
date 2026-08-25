@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,45 +14,29 @@ concurrency:
 
 jobs:
   tdd:
-    name: final-approval-evidence
+    name: commit-task-two-red-contract
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply evidence tests
-        run: |
-          python scripts/final_evidence_apply.py
-          python scripts/final_evidence_patch.py
-          python scripts/final_prompt_contract_apply.py
-          python scripts/final_prompt_fixture_apply.py
-          python scripts/final_prompt_evidence_normalize.py
-          python scripts/final_menu_contract_apply.py
-          python scripts/final_numeric_contract_apply.py
-      - name: Format evidence tests
+      - name: Apply committed Task 2 RED contract
+        run: python scripts/apply_task2_red_e2e.py
+      - name: Format test source
         run: npx prettier --write e2e/operations.e2e.ts
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Run fixed evidence and keyboard audit
+      - name: Commit test contract
         run: |
-          mkdir -p final-evidence
-          npm run test:e2e -- --grep "final correction (approval evidence|keyboard audit)"
-      - name: Verify fixed eleven screenshots
-        run: |
-          test "$(find final-evidence -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 11
-          find final-evidence -maxdepth 1 -type f -name '*.png' -printf '%f\n' | sort
-      - name: Upload approval evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: final-correction-evidence
-          path: final-evidence
-          if-no-files-found: error
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: define approved category composition"
+          git push origin HEAD:ui/tux-pos-refinement
