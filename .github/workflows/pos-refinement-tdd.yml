@@ -33,3 +33,7 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: Task 8 focused worker preference tests
+        run: npm test -- apps/operations-desktop/src/main/*workerUiPreferences*.test.ts
+      - name: Task 8 full typecheck
+        run: npm run typecheck
