@@ -1,0 +1,68 @@
+name: POS Refinement Visual QA
+
+on:
+  push:
+    branches:
+      - 'ui/tux-pos-refinement'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pos-refinement-visual-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-qa:
+    name: visual-qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Stage visual approval scenarios
+        run: python scripts/task15_visual_qa.py
+      - name: Format staged QA test
+        run: npx prettier --write e2e/operations.e2e.ts
+      - name: Format check
+        run: npm run format:check
+      - name: Full typecheck
+        run: npm run typecheck
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm test
+      - name: Migration tests
+        run: npm run test:migrations
+      - name: Production build
+        run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Full E2E with visual approval scenarios
+        run: npm run test:e2e -- --retries=0
+      - name: Show staged QA diff only
+        if: always()
+        shell: bash
+        run: |
+          git status --short
+          changed="$(git status --short --untracked-files=no | awk '{print $2}')"
+          test "$changed" = "e2e/operations.e2e.ts" || { echo "Unexpected tracked QA diff: $changed"; exit 1; }
+      - name: Upload visual approval evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tux-pos-visual-approval
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+          retention-days: 7
