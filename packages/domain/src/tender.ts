@@ -6,55 +6,46 @@ export interface TenderSuggestion {
   readonly notesMinor: readonly MoneyMinor[];
 }
 
+const DEFAULT_ROUNDING_STEPS_MINOR = [
+  moneyMinor(1_000),
+  moneyMinor(2_000),
+  moneyMinor(5_000),
+  moneyMinor(10_000),
+  moneyMinor(20_000),
+] as const;
+
+function roundUpToStep(value: MoneyMinor, step: MoneyMinor): MoneyMinor {
+  const remainder = value % step;
+  if (remainder === 0) return value;
+  const rounded = value + step - remainder;
+  if (!Number.isSafeInteger(rounded)) {
+    throw new DomainInvariantError('Tender suggestion exceeded safe integer range.');
+  }
+  return moneyMinor(rounded);
+}
+
 export function suggestCashTenders(
   totalMinor: MoneyMinor,
-  denominationsMinor: readonly MoneyMinor[] = [
-    moneyMinor(5_000),
-    moneyMinor(10_000),
-    moneyMinor(20_000),
-  ],
+  roundingStepsMinor: readonly MoneyMinor[] = DEFAULT_ROUNDING_STEPS_MINOR,
 ): readonly TenderSuggestion[] {
   if (totalMinor <= 0) return [];
-  const denominations = [...new Set(denominationsMinor)]
-    .filter((value) => value > 0)
-    .sort((left, right) => right - left);
-  if (denominations.length === 0) {
-    throw new DomainInvariantError('At least one positive cash denomination is required.');
+  if (roundingStepsMinor.length === 0) {
+    throw new DomainInvariantError('At least one positive cash rounding step is required.');
   }
 
-  const minDenomination = denominations.at(-1);
-  if (minDenomination === undefined) return [];
-  const maxNotes = Math.ceil(totalMinor / minDenomination) + 1;
-  const byTotal = new Map<number, TenderSuggestion>();
-
-  function visit(index: number, notes: MoneyMinor[], sum: number): void {
-    if (notes.length > maxNotes) return;
-    if (index === denominations.length) {
-      if (sum < totalMinor || notes.length === 0) return;
-      const minimal = notes.every((note) => sum - note < totalMinor);
-      if (!minimal) return;
-      if (!byTotal.has(sum)) {
-        byTotal.set(sum, {
-          totalMinor: moneyMinor(sum),
-          notesMinor: [...notes].sort((left, right) => right - left),
-        });
-      }
-      return;
-    }
-
-    const denomination = denominations[index];
-    if (denomination === undefined) return;
-    for (let count = 0; count <= maxNotes - notes.length; count += 1) {
-      const added = denomination * count;
-      if (!Number.isSafeInteger(sum + added)) {
-        throw new DomainInvariantError('Tender suggestion exceeded safe integer range.');
-      }
-      const nextNotes =
-        count === 0 ? notes : [...notes, ...Array<MoneyMinor>(count).fill(denomination)];
-      visit(index + 1, nextNotes, sum + added);
+  const uniqueSteps = [...new Set(roundingStepsMinor)];
+  for (const step of uniqueSteps) {
+    if (!Number.isSafeInteger(step) || step <= 0) {
+      throw new DomainInvariantError('Cash rounding steps must be positive safe integers.');
     }
   }
 
-  visit(0, [], 0);
-  return [...byTotal.values()].sort((left, right) => left.totalMinor - right.totalMinor);
+  const totals = new Set<number>([totalMinor]);
+  for (const step of uniqueSteps) {
+    totals.add(roundUpToStep(totalMinor, step));
+  }
+
+  return [...totals]
+    .sort((left, right) => left - right)
+    .map((total) => ({ totalMinor: moneyMinor(total), notesMinor: [] }));
 }
