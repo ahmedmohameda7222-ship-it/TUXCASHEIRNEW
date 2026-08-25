@@ -28,7 +28,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply Task 9 reconciliation implementation
-        if: github.sha == '97a78f2bce4a2e375a247a4648353a80317aa5d0'
+        if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           python - <<'PY'
@@ -87,13 +87,13 @@ jobs:
       - name: Unit and integration tests
         run: npm run test
       - name: Focused category reconciliation tests
-        if: github.sha == '97a78f2bce4a2e375a247a4648353a80317aa5d0'
+        if: github.actor != 'github-actions[bot]'
         run: npm test -- apps/operations/src/app/OrdersWorkspace.test.ts
       - name: Typecheck reconciliation change
-        if: github.sha == '97a78f2bce4a2e375a247a4648353a80317aa5d0'
+        if: github.actor != 'github-actions[bot]'
         run: npm run typecheck
       - name: Commit verified reconciliation implementation
-        if: github.sha == '97a78f2bce4a2e375a247a4648353a80317aa5d0'
+        if: github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
