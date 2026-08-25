@@ -1,4 +1,5 @@
 import {
+  instant,
   parseEntityId,
   type MenuCategory,
   type MenuCategoryId,
@@ -33,7 +34,7 @@ function preference(categoryOrder: readonly MenuCategoryId[]): WorkerUiPreferenc
     categoryOrder,
     categoryAlignment: 'right',
     serverVersion: 4,
-    updatedAt: '2026-08-25T04:00:00.000Z',
+    updatedAt: instant(new Date('2026-08-25T04:00:00.000Z')),
     syncState: 'CLEAN',
   };
 }
