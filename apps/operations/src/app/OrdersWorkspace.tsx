@@ -75,6 +75,58 @@ export function reconcileCategoryOrder(
   return reconciled;
 }
 
+export function productFamiliesForCategory(
+  products: readonly Product[],
+  categoryId: MenuCategoryId | null,
+): readonly string[] {
+  if (categoryId === null) return [];
+
+  const seen = new Set<string>();
+  const families: string[] = [];
+  const categoryProducts = products
+    .filter((product) => product.active && product.categoryId === categoryId)
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  for (const product of categoryProducts) {
+    const family = product.family?.trim();
+    if (!family || seen.has(family)) continue;
+    seen.add(family);
+    families.push(family);
+  }
+
+  return families;
+}
+
+export function filterProductsForMenu(
+  products: readonly Product[],
+  options: {
+    readonly selectedCategoryId: MenuCategoryId | null;
+    readonly selectedFamily: string | null;
+    readonly search: string;
+  },
+): readonly Product[] {
+  const active = products.filter((product) => product.active);
+  const query = options.search.trim().toLocaleLowerCase();
+
+  if (query.length > 0) {
+    return active
+      .filter((product) => product.name.toLocaleLowerCase().includes(query))
+      .slice()
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+  }
+
+  if (options.selectedCategoryId === null) return [];
+
+  return active
+    .filter((product) => product.categoryId === options.selectedCategoryId)
+    .filter(
+      (product) => options.selectedFamily === null || product.family === options.selectedFamily,
+    )
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
 interface UndoState {
   readonly snapshot: OrderDraft;
   readonly message: string;
@@ -201,6 +253,7 @@ export function OrdersWorkspace({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
@@ -255,9 +308,13 @@ export function OrdersWorkspace({
       const categories = result.value.configuration.categories
         .filter((category) => category.active)
         .sort((left, right) => left.sortOrder - right.sortOrder);
+      const defaultCategoryId = categories[0]?.id ?? null;
       setSelectedCategoryId((current) =>
-        current !== null && categories.some((category) => category.id === current) ? current : null,
+        current !== null && categories.some((category) => category.id === current)
+          ? current
+          : defaultCategoryId,
       );
+      setSelectedFamily(null);
     });
     return () => {
       cancelled = true;
@@ -440,18 +497,26 @@ export function OrdersWorkspace({
       return category === undefined ? [] : [category];
     });
   }, [categoryEditOrder, configuredActiveCategories]);
-  const products = useMemo(() => {
-    if (configuration === null) return [];
-    const active = configuration.products.filter((product) => product.active);
-    const query = search.trim().toLocaleLowerCase();
-    const filtered =
-      query.length > 0
-        ? active.filter((product) => product.name.toLocaleLowerCase().includes(query))
-        : selectedCategoryId === null
-          ? active
-          : active.filter((product) => product.categoryId === selectedCategoryId);
-    return [...filtered].sort((left, right) => left.sortOrder - right.sortOrder);
-  }, [configuration, search, selectedCategoryId]);
+  const activeFamilies = useMemo(
+    () => productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId),
+    [configuration, selectedCategoryId],
+  );
+
+  useEffect(() => {
+    if (selectedFamily !== null && !activeFamilies.includes(selectedFamily)) {
+      setSelectedFamily(null);
+    }
+  }, [activeFamilies, selectedFamily]);
+
+  const products = useMemo(
+    () =>
+      filterProductsForMenu(configuration?.products ?? [], {
+        selectedCategoryId,
+        selectedFamily,
+        search,
+      }),
+    [configuration, search, selectedCategoryId, selectedFamily],
+  );
 
   const validation = useMemo(() => {
     if (draft === null || configuration === null) return null;
@@ -896,18 +961,6 @@ export function OrdersWorkspace({
                   aria-label="Menu categories"
                   data-alignment={categoryAlignment}
                 >
-                  <button
-                    type="button"
-                    className={
-                      selectedCategoryId === null ? 'category-tab selected' : 'category-tab'
-                    }
-                    onClick={() => {
-                      setSelectedCategoryId(null);
-                      setSearch('');
-                    }}
-                  >
-                    All
-                  </button>
                   {activeCategories.map((category) => (
                     <button
                       type="button"
@@ -919,6 +972,7 @@ export function OrdersWorkspace({
                       }
                       onClick={() => {
                         setSelectedCategoryId(category.id);
+                        setSelectedFamily(null);
                         setSearch('');
                       }}
                     >
@@ -975,6 +1029,30 @@ export function OrdersWorkspace({
                   )}
                 </div>
               </div>
+              {activeFamilies.length > 0 ? (
+                <div
+                  className="segmented-control product-family-filter"
+                  aria-label="Product families"
+                >
+                  <button
+                    type="button"
+                    className={selectedFamily === null ? 'selected' : undefined}
+                    onClick={() => setSelectedFamily(null)}
+                  >
+                    All
+                  </button>
+                  {activeFamilies.map((family) => (
+                    <button
+                      type="button"
+                      key={family}
+                      className={selectedFamily === family ? 'selected' : undefined}
+                      onClick={() => setSelectedFamily(family)}
+                    >
+                      {family}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </div>
