@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path('e2e/operations.e2e.ts')
 text = path.read_text()
@@ -26,6 +27,8 @@ replace_once(
     "        { id: category(1), shopId: SHOP, name: 'TUX', sortOrder: 0, active: true },\n        { id: category(2), shopId: SHOP, name: 'TUXIFY', sortOrder: 1, active: true },",
 )
 
+# Update legacy test references without matching prefixes inside already-approved names
+# such as "Double Smashed Patty" and "Triple Smashed Patty".
 for old, new in [
     ('TUX Loaded Burger', 'TUX Quatro Smashed Patty'),
     ('Classic Smash', 'Single Smashed Patty'),
@@ -36,6 +39,6 @@ for old, new in [
     ('Burgers', 'TUX'),
     ('Sides', 'TUXIFY'),
 ]:
-    text = text.replace(old, new)
+    text = re.sub(rf'\b{re.escape(old)}\b', new, text)
 
 path.write_text(text)
