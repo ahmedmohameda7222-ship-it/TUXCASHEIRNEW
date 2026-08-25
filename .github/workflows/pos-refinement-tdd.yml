@@ -27,6 +27,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Show worker preference client formatter diff
+        shell: bash
+        run: |
+          npx prettier apps/operations/src/app/sessionClient.ts > /tmp/sessionClient.ts.formatted
+          diff -u apps/operations/src/app/sessionClient.ts /tmp/sessionClient.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
