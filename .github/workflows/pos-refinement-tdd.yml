@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -21,17 +21,6 @@ jobs:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
-      - name: Apply final POS implementation
-        run: |
-          python scripts/apply_final_pos_code.py
-          git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx
-          if ! git diff --cached --quiet; then
-            git commit -m "fix: complete final POS category navigation"
-            git push origin HEAD:ui/tux-pos-refinement
-          fi
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -43,6 +32,8 @@ jobs:
           python scripts/final_evidence_apply.py
           python scripts/final_evidence_patch.py
           python scripts/final_prompt_contract_apply.py
+          python scripts/final_prompt_fixture_apply.py
+          python scripts/final_prompt_evidence_normalize.py
       - name: Format evidence tests
         run: npx prettier --write e2e/operations.e2e.ts
       - name: E2E typecheck
