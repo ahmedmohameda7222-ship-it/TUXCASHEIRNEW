@@ -75,9 +75,15 @@ export type {
   PinVerifier,
   SessionRuntime,
 } from './session';
-export { WorkerUiPreferencesService } from './workerUiPreferences';
+export {
+  WorkerUiPreferencesRetryController,
+  WorkerUiPreferencesService,
+} from './workerUiPreferences';
 export type {
   RemoteWorkerUiPreferences,
   WorkerUiPreferencesRemoteGateway,
+  WorkerUiPreferencesRetryOptions,
+  WorkerUiPreferencesSyncIdentity,
+  WorkerUiPreferencesSyncTarget,
   WorkerUiPreferencesUpdate,
 } from './workerUiPreferences';
