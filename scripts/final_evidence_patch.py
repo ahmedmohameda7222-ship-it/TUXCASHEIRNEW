@@ -25,6 +25,10 @@ replacements = [
         "    await extras.getByRole('button', { name: 'Add to order', exact: true }).click();",
     ),
     (
+        "    await expect(mixedCart.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();\n    await expect(mixedCart.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();",
+        "    const classicActions = mixedCart.getByLabel('Classic Smash actions');\n    await expect(classicActions.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();\n    await expect(classicActions.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();",
+    ),
+    (
         "  await page.getByRole('button', { name: 'Done', exact: true }).focus();\n  await page.keyboard.press('Enter');\n  await expect(editor).toHaveCount(0);",
         "  const reset = editor.getByRole('button', { name: 'Reset', exact: true });\n  await reset.focus();\n  await page.keyboard.press('Space');\n  await expect(editor.getByRole('button', { name: 'Left', exact: true })).toHaveAttribute(\n    'aria-pressed',\n    'true',\n  );",
     ),
