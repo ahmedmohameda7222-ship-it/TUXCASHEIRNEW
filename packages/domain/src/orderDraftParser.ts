@@ -155,15 +155,7 @@ function parsePayment(value: unknown): PaymentDraft {
       amountAMinor: moneyMinor(
         safeInteger(payment['amountAMinor'], 'OrderDraft.payment.amountAMinor'),
       ),
-      methodACashReceivedMinor: nullableMoney(
-        payment['methodACashReceivedMinor'],
-        'OrderDraft.payment.methodACashReceivedMinor',
-      ),
       methodBId: entityId<PaymentMethodId>(payment['methodBId'], 'OrderDraft.payment.methodBId'),
-      methodBCashReceivedMinor: nullableMoney(
-        payment['methodBCashReceivedMinor'],
-        'OrderDraft.payment.methodBCashReceivedMinor',
-      ),
     };
   }
   throw new InvalidOrderDraftError('OrderDraft.payment.mode is unsupported.');

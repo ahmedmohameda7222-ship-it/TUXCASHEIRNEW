@@ -1,5 +1,6 @@
 import type { Product } from '@tux/domain';
 import { useState, type MouseEvent } from 'react';
+import { PlusCircleIcon } from './icons';
 import { formatMoneyMinor } from './ordersView';
 
 function ProductMedia({ product }: { readonly product: Product }) {
@@ -30,17 +31,21 @@ function ProductMedia({ product }: { readonly product: Product }) {
 export function MenuProductCard({
   product,
   quantity,
+  supportsExtras,
   busy,
   onQuickInfo,
   onDecrement,
   onAdd,
+  onExtras,
 }: {
   readonly product: Product;
   readonly quantity: number;
+  readonly supportsExtras: boolean;
   readonly busy: boolean;
   readonly onQuickInfo: () => void;
   readonly onDecrement: () => void;
   readonly onAdd: () => void;
+  readonly onExtras: () => void;
 }) {
   const description = product.description?.trim() ?? '';
   const className = [
@@ -66,6 +71,11 @@ export function MenuProductCard({
       >
         <div className="product-media">
           <ProductMedia product={product} />
+          {quantity > 0 ? (
+            <span className="product-quantity-badge" aria-label={`${quantity} in current order`}>
+              {quantity}
+            </span>
+          ) : null}
         </div>
         <div className="product-copy">
           <strong>{product.name}</strong>
@@ -76,24 +86,37 @@ export function MenuProductCard({
 
       <footer className="product-card-footer">
         <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
-        <div className="product-quantity" aria-label={`${product.name} quantity`}>
-          <button
-            type="button"
-            aria-label={`Remove one ${product.name}`}
-            disabled={busy || quantity === 0}
-            onClick={(event) => runIndependentAction(event, onDecrement)}
-          >
-            −
-          </button>
-          <output>{quantity}</output>
-          <button
-            type="button"
-            aria-label={`Add one ${product.name}`}
-            disabled={busy || product.soldOut}
-            onClick={(event) => runIndependentAction(event, onAdd)}
-          >
-            +
-          </button>
+        <div className="product-card-controls">
+          {supportsExtras && !product.soldOut ? (
+            <button
+              type="button"
+              className="product-extra-action"
+              disabled={busy}
+              onClick={(event) => runIndependentAction(event, onExtras)}
+            >
+              <PlusCircleIcon />
+              <span>Extra</span>
+            </button>
+          ) : null}
+          <div className="product-quantity" aria-label={`${product.name} quantity`}>
+            <button
+              type="button"
+              aria-label={`Remove one ${product.name}`}
+              disabled={busy || quantity === 0}
+              onClick={(event) => runIndependentAction(event, onDecrement)}
+            >
+              −
+            </button>
+            <output>{quantity}</output>
+            <button
+              type="button"
+              aria-label={`Add one ${product.name}`}
+              disabled={busy || product.soldOut}
+              onClick={(event) => runIndependentAction(event, onAdd)}
+            >
+              +
+            </button>
+          </div>
         </div>
       </footer>
     </article>

@@ -90,18 +90,24 @@ Font stack:
 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 ```
 
-Type hierarchy:
-- Screen/section title: 22px / 26px, Semibold
-- Product name: 15–16px / 20px, Semibold
-- Navigation: 14px / 18px, Medium
-- Primary body: 14px / 19px, Regular
-- Product description: 13–14px / 18px, Regular
-- Price: 14–15px / 18px, Semibold
-- Buttons / segmented controls: 14px / 18px, Medium or Semibold
-- Secondary metadata: 12px / 16px, Regular
-- Total: 20–22px / 26px, Semibold or Bold
+Approved hierarchy after Apple Docs review:
 
-Use Regular for content, Medium for controls and prices, Semibold for product names/headings, and Bold only for exceptional emphasis such as the final total.
+- Major screen title: 22px / 26px, Semibold
+- Final monetary amount: 22px / 26px, Bold
+- Current Order title: 17px / 22px, Semibold
+- Primary action text: 16px / 20px, Semibold
+- Product/cart item name: 15px / 20px, Semibold
+- Top navigation/category label: 15px / 20px, Medium; active/selected Semibold
+- Standard control and price: 14px / 18px, Medium
+- Body/product description/input/payment value: 14px / 18px, Regular
+- Subsection heading: 14px / 18px, Semibold
+- Operational metadata/form label: 13px / 16px, Regular or Medium
+- Tertiary hint only: 12px / 15–16px, Regular
+- Final Total label: 18px / 22px, Semibold
+
+Use Regular for content, descriptions, input/payment values, and supporting metadata. Use Medium for controls, prices, and field labels. Use Semibold for product/cart names, selected navigation, section anchors, and primary actions. Reserve Bold for exceptional emphasis, primarily the final monetary total.
+
+Supporting metadata such as item counts is Regular by default; use Medium only when the value is operationally important.
 
 All monetary and quantity values use tabular numerals:
 
@@ -109,7 +115,7 @@ All monetary and quantity values use tabular numerals:
 font-variant-numeric: tabular-nums;
 ```
 
-Avoid Thin/Light weights and tiny low-contrast copy.
+Do not switch entire monetary labels to a monospace font. Avoid Thin/Light weights and tiny low-contrast copy.
 
 ## Geometry and materials
 
@@ -123,7 +129,8 @@ Avoid Thin/Light weights and tiny low-contrast copy.
 
 ## Interaction targets and controls
 
-- Primary touch/click targets are at least 44×44px.
+- High-frequency touch/click targets are at least 44×44px, including categories, search/edit icon buttons, product steppers, and repeated payment controls.
+- Place Order uses at least a 48px visible height.
 - Segmented controls are appropriate for 2–4 related mutually exclusive options such as order type.
 - Product steppers use direct `− quantity +` manipulation.
 - Secondary controls such as notes and discount use progressive disclosure when they are not needed continuously.
@@ -146,7 +153,7 @@ Motion confirms state; it does not perform.
 - Keep keyboard access and visible focus states.
 - Preserve semantic roles and accessible labels where existing E2E/tests depend on them.
 - Do not use color as the sole status indicator.
-- Keep text legible at dense POS sizes; descriptions must not collapse into tiny gray microcopy.
+- Keep text legible at dense POS sizes; operational information should normally be at least 13px, and 12px is reserved for genuinely tertiary hints.
 - Verify no horizontal overflow at 375px, 768px, and 1440px viewport widths.
 
 ## Responsive behavior
@@ -177,6 +184,7 @@ Do not ship:
 - literal Apple visual cloning
 - heavy shadows on every card
 - motion that competes with cashier speed
+- operational text compensated with excessive Semibold/Bold weight
 
 ## Design verification gate
 

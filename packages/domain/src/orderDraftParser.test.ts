@@ -49,9 +49,44 @@ const validDraft = {
   payment: { mode: 'NONE' },
 } as const;
 
+const METHOD_A_ID = '99999999-9999-4999-8999-999999999991';
+const METHOD_B_ID = '99999999-9999-4999-8999-999999999992';
+
 describe('parseOrderDraft', () => {
   it('rehydrates a fully validated nested draft', () => {
     expect(parseOrderDraft(validDraft)).toEqual(validDraft);
+  });
+
+  it('parses the simplified split-payment shape', () => {
+    const payment = {
+      mode: 'SPLIT',
+      methodAId: METHOD_A_ID,
+      amountAMinor: 32_000,
+      methodBId: METHOD_B_ID,
+    } as const;
+
+    expect(parseOrderDraft({ ...validDraft, payment }).payment).toEqual(payment);
+  });
+
+  it('tolerates legacy split tender keys without rehydrating them', () => {
+    const parsed = parseOrderDraft({
+      ...validDraft,
+      payment: {
+        mode: 'SPLIT',
+        methodAId: METHOD_A_ID,
+        amountAMinor: 32_000,
+        methodACashReceivedMinor: 40_000,
+        methodBId: METHOD_B_ID,
+        methodBCashReceivedMinor: null,
+      },
+    });
+
+    expect(parsed.payment).toEqual({
+      mode: 'SPLIT',
+      methodAId: METHOD_A_ID,
+      amountAMinor: 32_000,
+      methodBId: METHOD_B_ID,
+    });
   });
 
   it.each([

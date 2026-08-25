@@ -22,6 +22,7 @@ import type {
 } from '@tux/domain';
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '../contracts';
+import { createIndexedDbWorkerUiPreferencesRepository } from './IndexedDbWorkerUiPreferencesStore';
 import {
   applyIndexedDbMigrations,
   INDEXED_DB_STORES,
@@ -122,6 +123,7 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
         await requestResult(store('workerSessions').put(session));
       },
     },
+    workerUiPreferences: createIndexedDbWorkerUiPreferencesRepository(transaction),
     configuration: {
       async getForShop(shopId: ShopId) {
         return recordOrNull<OperationsConfigurationSnapshot>(

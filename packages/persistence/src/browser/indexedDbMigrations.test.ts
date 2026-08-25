@@ -1,5 +1,13 @@
 import 'fake-indexeddb/auto';
+import {
+  instant,
+  parseEntityId,
+  type MenuCategoryId,
+  type ShopId,
+  type WorkerId,
+} from '@tux/domain';
 import { afterEach, describe, expect, it } from 'vitest';
+import { IndexedDbOperationsDatabase } from './IndexedDbOperationsDatabase';
 import {
   applyIndexedDbMigrations,
   INDEXED_DB_STORES,
@@ -8,6 +16,24 @@ import {
 } from './indexedDbMigrations';
 
 const createdDatabases = new Set<string>();
+
+const preferenceShopId = parseEntityId<ShopId>('81111111-1111-4111-8111-111111111111');
+const preferenceWorkerAId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222222222221');
+const preferenceWorkerBId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222222222222');
+const preferenceCategoryAId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333331');
+const preferenceCategoryBId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333332');
+
+function preference(workerId: WorkerId, serverVersion = 0) {
+  return {
+    shopId: preferenceShopId,
+    workerId,
+    categoryOrder: [preferenceCategoryBId, preferenceCategoryAId],
+    categoryAlignment: 'right' as const,
+    updatedAt: instant('2026-08-25T02:00:00.000Z'),
+    serverVersion,
+    syncState: 'DIRTY' as const,
+  };
+}
 
 function openAtVersion(name: string, version: number): Promise<IDBDatabase> {
   createdDatabases.add(name);
@@ -89,17 +115,18 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2]);
-    expect(INDEXED_DB_VERSION).toBe(2);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3]);
+    expect(INDEXED_DB_VERSION).toBe(3);
   });
 
-  it('creates every production store and v2 operational index on a fresh install', async () => {
+  it('creates every production store and operational index on a fresh install', async () => {
     const name = `tux-indexeddb-fresh-${crypto.randomUUID()}`;
     const database = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
       expect([...database.objectStoreNames]).toEqual(
         expect.arrayContaining([...INDEXED_DB_STORES]),
       );
+      expect([...database.objectStoreNames]).toContain('workerUiPreferences');
       const transaction = database.transaction(
         ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
         'readonly',
@@ -118,7 +145,7 @@ describe('IndexedDB migration registry', () => {
     }
   });
 
-  it('upgrades a populated v1 database to v2 without destroying business data', async () => {
+  it('upgrades a populated v1 database to the latest version without destroying business data', async () => {
     const name = `tux-indexeddb-upgrade-${crypto.randomUUID()}`;
     const v1 = await openAtVersion(name, 1);
     const shopId = '10000000-0000-4000-8000-000000000001';
@@ -183,10 +210,11 @@ describe('IndexedDB migration registry', () => {
     await transactionDone(write);
     v1.close();
 
-    const v2 = await openAtVersion(name, INDEXED_DB_VERSION);
+    const latest = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
-      expect(v2.version).toBe(2);
-      const read = v2.transaction(
+      expect(latest.version).toBe(INDEXED_DB_VERSION);
+      expect([...latest.objectStoreNames]).toContain('workerUiPreferences');
+      const read = latest.transaction(
         ['shops', 'orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents'],
         'readonly',
       );
@@ -211,7 +239,68 @@ describe('IndexedDB migration registry', () => {
         requestResult(read.objectStore('outboxEvents').index('aggregateStream').getAll()),
       ).resolves.toHaveLength(1);
     } finally {
-      v2.close();
+      latest.close();
+    }
+  });
+
+  it('round-trips, upserts, isolates, and deletes worker UI preferences', async () => {
+    const name = `tux-indexeddb-preferences-${crypto.randomUUID()}`;
+    createdDatabases.add(name);
+    const database = new IndexedDbOperationsDatabase(name);
+    await database.initialize();
+    try {
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerAId),
+        ),
+      ).resolves.toBeNull();
+
+      await database.transaction((transaction) =>
+        transaction.workerUiPreferences.put(preference(preferenceWorkerAId)),
+      );
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerAId),
+        ),
+      ).resolves.toEqual(preference(preferenceWorkerAId));
+
+      const updated = {
+        ...preference(preferenceWorkerAId, 2),
+        categoryOrder: [preferenceCategoryAId],
+        categoryAlignment: 'left' as const,
+        syncState: 'CLEAN' as const,
+      };
+      await database.transaction((transaction) => transaction.workerUiPreferences.put(updated));
+      await database.transaction((transaction) =>
+        transaction.workerUiPreferences.put(preference(preferenceWorkerBId, 1)),
+      );
+
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerAId),
+        ),
+      ).resolves.toEqual(updated);
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerBId),
+        ),
+      ).resolves.toEqual(preference(preferenceWorkerBId, 1));
+
+      await database.transaction((transaction) =>
+        transaction.workerUiPreferences.delete(preferenceShopId, preferenceWorkerAId),
+      );
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerAId),
+        ),
+      ).resolves.toBeNull();
+      await expect(
+        database.transaction((transaction) =>
+          transaction.workerUiPreferences.get(preferenceShopId, preferenceWorkerBId),
+        ),
+      ).resolves.toEqual(preference(preferenceWorkerBId, 1));
+    } finally {
+      await database.close();
     }
   });
 
@@ -223,6 +312,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v3 is missing');
+    ).toThrow('IndexedDB migration v4 is missing');
   });
 });

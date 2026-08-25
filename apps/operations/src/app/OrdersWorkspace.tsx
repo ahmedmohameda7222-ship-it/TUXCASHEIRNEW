@@ -7,28 +7,73 @@ import {
   addProductUnit,
   decrementDraftLine,
   decrementProductUnit,
+  duplicateDraftLineUnit,
   normalizeEgyptianPhone,
   parseEntityId,
   productQuantityInDraft,
   replaceDraftLineCustomization,
   validateOrderDraft,
+  type CategoryAlignment,
   type DraftLineCustomization,
   type DraftLineId,
+  type MenuCategory,
   type MenuCategoryId,
   type OrderDraft,
   type OrderId,
   type OrderValidationIssue,
   type Product,
   type ProductId,
+  type WorkerUiPreferences,
 } from '@tux/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CART_WIDTH_MAX_PX,
+  CART_WIDTH_MIN,
+  clampCartWidth,
+  readCartWidth,
+  writeCartWidth,
+} from './cartWidthPreference';
+import { EditPencilIcon, SearchIcon } from './icons';
 import { MenuProductCard } from './MenuProductCard';
-import type { OperationsOrdersClient } from './sessionClient';
+import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+
+const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
+const CART_RESIZE_KEYBOARD_STEP = 16;
+
+function desktopCartResizeMatches(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
+}
+
+export function reconcileCategoryOrder(
+  activeCategories: readonly MenuCategory[],
+  preference: WorkerUiPreferences | null,
+): readonly MenuCategory[] {
+  if (preference === null || preference.categoryOrder.length === 0) return activeCategories;
+
+  const byId = new Map(activeCategories.map((category) => [category.id, category]));
+  const reconciled: MenuCategory[] = [];
+  const seen = new Set<MenuCategoryId>();
+
+  for (const categoryId of preference.categoryOrder) {
+    const category = byId.get(categoryId);
+    if (category === undefined || seen.has(categoryId)) continue;
+    reconciled.push(category);
+    seen.add(categoryId);
+  }
+
+  for (const category of activeCategories) {
+    if (seen.has(category.id)) continue;
+    reconciled.push(category);
+    seen.add(category.id);
+  }
+
+  return reconciled;
+}
 
 interface UndoState {
   readonly snapshot: OrderDraft;
@@ -138,11 +183,13 @@ export function OrdersWorkspace({
   readonly client: OperationsOrdersClient;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
+  const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
   const searchRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
   const undoTimerRef = useRef<number | null>(null);
+  const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -156,12 +203,32 @@ export function OrdersWorkspace({
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
   const [selectedProductFamily, setSelectedProductFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
+  const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
+  const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
+  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('center');
+  const [categoryEditSaving, setCategoryEditSaving] = useState(false);
+  const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
+  const [categoryResetRequested, setCategoryResetRequested] = useState(false);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [desktopCartResizable, setDesktopCartResizable] = useState(desktopCartResizeMatches);
+  const [cartWidth, setCartWidth] = useState(() =>
+    typeof window === 'undefined'
+      ? CART_WIDTH_MIN
+      : readCartWidth(window.localStorage, window.innerWidth),
+  );
+
+  function commitCartWidth(nextWidth: number): void {
+    const next = clampCartWidth(nextWidth, window.innerWidth);
+    setCartWidth(next);
+    writeCartWidth(window.localStorage, next);
+  }
 
   function setCurrentDraft(next: OrderDraft): void {
     draftRef.current = next;
@@ -202,6 +269,29 @@ export function OrdersWorkspace({
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
 
   useEffect(() => {
+    let cancelled = false;
+    setCategoryPreference(null);
+    setCategoryMode('IDLE');
+    setSearch('');
+    setCategoryEditError(null);
+    void preferencesClient
+      .load()
+      .then((preference) => {
+        if (!cancelled) setCategoryPreference(preference);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryPreference(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preferencesClient, session.operator.id]);
+
+  useEffect(() => {
+    if (categoryMode === 'SEARCH') searchRef.current?.focus();
+  }, [categoryMode]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       const target = event.target;
       const targetIsEditor =
@@ -209,24 +299,29 @@ export function OrdersWorkspace({
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        if (categoryMode === 'EDIT') return;
         event.preventDefault();
-        searchRef.current?.focus();
+        setCategoryMode('SEARCH');
         return;
       }
-      if (event.key === '/' && !targetIsEditor) {
+      if (event.key === '/' && !targetIsEditor && categoryMode !== 'EDIT') {
         event.preventDefault();
-        searchRef.current?.focus();
+        setCategoryMode('SEARCH');
         return;
       }
-      if (event.key === 'Escape' && search.length > 0) {
+      if (event.key === 'Escape' && categoryMode === 'SEARCH') {
         event.preventDefault();
-        setSearch('');
-        searchRef.current?.focus();
+        if (search.length > 0) {
+          setSearch('');
+          searchRef.current?.focus();
+        } else {
+          setCategoryMode('IDLE');
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [search]);
+  }, [categoryMode, search]);
 
   useEffect(
     () => () => {
@@ -234,6 +329,29 @@ export function OrdersWorkspace({
     },
     [],
   );
+
+  useEffect(() => {
+    const media = window.matchMedia(DESKTOP_CART_RESIZE_QUERY);
+    const sync = () => setDesktopCartResizable(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    function clampToViewport(): void {
+      if (!desktopCartResizeMatches()) return;
+      setCartWidth((current) => {
+        const next = clampCartWidth(current, window.innerWidth);
+        if (next !== current) writeCartWidth(window.localStorage, next);
+        return next;
+      });
+    }
+
+    clampToViewport();
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, []);
 
   function beginPendingSave(): void {
     pendingSaveCountRef.current += 1;
@@ -296,13 +414,36 @@ export function OrdersWorkspace({
   }
 
   const configuration = workspace?.configuration ?? null;
-  const activeCategories = useMemo(
+  const configuredActiveCategories = useMemo(
     () =>
       configuration?.categories
         .filter((category) => category.active)
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
+  const productsWithExtras = useMemo(() => {
+    if (configuration === null) return new Set<ProductId>();
+    const activeModifierIds = new Set(
+      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
+    );
+    return new Set(
+      configuration.productModifierLinks
+        .filter((link) => activeModifierIds.has(link.modifierId))
+        .map((link) => link.productId),
+    );
+  }, [configuration]);
+  const activeCategories = useMemo(
+    () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
+    [categoryPreference, configuredActiveCategories],
+  );
+  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'center';
+  const categoryEditorCategories = useMemo(() => {
+    const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));
+    return categoryEditOrder.flatMap((categoryId) => {
+      const category = byId.get(categoryId);
+      return category === undefined ? [] : [category];
+    });
+  }, [categoryEditOrder, configuredActiveCategories]);
   const productFamilies = useMemo(() => {
     if (configuration === null || selectedCategoryId === null) return [];
     const seen = new Set<string>();
@@ -354,6 +495,75 @@ export function OrdersWorkspace({
       ? null
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
+  function beginCategoryEdit(): void {
+    setSearch('');
+    setCategoryEditOrder(activeCategories.map((category) => category.id));
+    setCategoryEditAlignment(categoryAlignment);
+    setCategoryEditError(null);
+    setCategoryResetRequested(false);
+    setDraggedCategoryId(null);
+    setCategoryMode('EDIT');
+  }
+
+  function moveCategory(categoryId: MenuCategoryId, direction: -1 | 1): void {
+    setCategoryEditOrder((current) => {
+      const index = current.indexOf(categoryId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
+      return next;
+    });
+    setCategoryResetRequested(false);
+  }
+
+  function dropCategory(targetId: MenuCategoryId): void {
+    const sourceId = draggedCategoryId;
+    setDraggedCategoryId(null);
+    if (sourceId === null || sourceId === targetId) return;
+    setCategoryEditOrder((current) => {
+      const sourceIndex = current.indexOf(sourceId);
+      const targetIndex = current.indexOf(targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (moved === undefined) return current;
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+    setCategoryResetRequested(false);
+  }
+
+  function resetCategoryEdit(): void {
+    setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
+    setCategoryEditAlignment('center');
+    setCategoryEditError(null);
+    setCategoryResetRequested(true);
+  }
+
+  async function saveCategoryEdit(): Promise<void> {
+    if (categoryEditSaving) return;
+    setCategoryEditSaving(true);
+    setCategoryEditError(null);
+    try {
+      if (categoryResetRequested) {
+        await preferencesClient.reset();
+        setCategoryPreference(null);
+      } else {
+        const saved = await preferencesClient.update({
+          categoryOrder: categoryEditOrder,
+          categoryAlignment: categoryEditAlignment,
+        });
+        setCategoryPreference(saved);
+      }
+      setCategoryMode('IDLE');
+    } catch {
+      setCategoryEditError('Could not save category layout. Try again.');
+    } finally {
+      setCategoryEditSaving(false);
+    }
+  }
+
   function addProduct(product: Product): void {
     if (draftRef.current === null || configuration === null || product.soldOut) return;
     if (product.isCombo) {
@@ -384,6 +594,19 @@ export function OrdersWorkspace({
     if (current === null || line === undefined) return;
     showUndo(current, `Removed one ${line.productName}`);
     enqueueMutation((candidate) => decrementDraftLine(candidate, lineId));
+  }
+
+  function incrementLine(lineId: DraftLineId): void {
+    if (draftRef.current === null || configuration === null) return;
+    enqueueMutation((current) =>
+      duplicateDraftLineUnit({
+        draft: current,
+        configuration,
+        lineId,
+        newLineId: parseEntityId<DraftLineId>(crypto.randomUUID()),
+        addedSequence: nextDraftAddedSequence(current),
+      }),
+    );
   }
 
   function submitCustomization(customization: DraftLineCustomization): void {
@@ -586,59 +809,122 @@ export function OrdersWorkspace({
   const busy = saving || placing;
 
   return (
-    <main className="orders-workspace">
+    <main
+      className="orders-workspace"
+      style={
+        desktopCartResizable
+          ? { gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px` }
+          : undefined
+      }
+    >
       <section className="menu-pane" aria-label="Menu">
-        <div className="menu-toolbar">
-          <div className="field-stack">
-            <div className="category-rail" aria-label="Menu categories">
-              {activeCategories.map((category) => (
-                <button
-                  type="button"
-                  key={category.id}
-                  className={
-                    selectedCategoryId === category.id && search.length === 0
-                      ? 'selected'
-                      : undefined
-                  }
-                  onClick={() => {
-                    setSelectedCategoryId(category.id);
-                    setSelectedProductFamily(null);
-                    setSearch('');
-                  }}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-            {search.length === 0 && productFamilies.length > 1 ? (
-              <div className="segmented-control" aria-label="Product families">
-                <button
-                  type="button"
-                  className={selectedProductFamily === null ? 'selected' : undefined}
-                  onClick={() => setSelectedProductFamily(null)}
-                >
-                  All
-                </button>
-                {productFamilies.map((family) => (
-                  <button
-                    type="button"
-                    key={family}
-                    className={selectedProductFamily === family ? 'selected' : undefined}
-                    onClick={() => setSelectedProductFamily(family)}
+        <div className={`menu-toolbar category-mode-${categoryMode.toLowerCase()}`}>
+          {categoryMode === 'EDIT' ? (
+            <section className="category-editor" aria-label="Edit categories">
+              <div className="category-editor-toolbar">
+                <div>
+                  <strong>Category layout</strong>
+                  <span>Drag categories or use the move controls.</span>
+                </div>
+                <div className="category-alignment" role="group" aria-label="Category alignment">
+                  {(['left', 'center', 'right'] as const).map((alignment) => (
+                    <button
+                      type="button"
+                      key={alignment}
+                      aria-pressed={categoryEditAlignment === alignment}
+                      disabled={categoryEditSaving}
+                      onClick={() => {
+                        setCategoryEditAlignment(alignment);
+                        setCategoryResetRequested(false);
+                      }}
+                    >
+                      {alignment === 'left' ? 'Left' : alignment === 'center' ? 'Center' : 'Right'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="category-editor-list" role="list" aria-label="Category order">
+                {categoryEditorCategories.map((category, index) => (
+                  <div
+                    key={category.id}
+                    className="category-editor-item"
+                    role="listitem"
+                    draggable={!categoryEditSaving}
+                    onDragStart={(event) => {
+                      setDraggedCategoryId(category.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', category.id);
+                    }}
+                    onDragEnd={() => setDraggedCategoryId(null)}
+                    onDragOver={(event) => {
+                      if (draggedCategoryId !== null) event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      dropCategory(category.id);
+                    }}
                   >
-                    {family}
-                  </button>
+                    <span className="category-editor-grip" aria-hidden="true">
+                      ⋮⋮
+                    </span>
+                    <span className="category-editor-name">{category.name}</span>
+                    <div className="category-editor-move-actions">
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} left`}
+                        disabled={categoryEditSaving || index === 0}
+                        onClick={() => moveCategory(category.id, -1)}
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} right`}
+                        disabled={
+                          categoryEditSaving || index === categoryEditorCategories.length - 1
+                        }
+                        onClick={() => moveCategory(category.id, 1)}
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : null}
-          </div>
-          <div className="product-search">
-            <label htmlFor="product-search">Search menu</label>
-            <div>
+              <div className="category-editor-footer">
+                {categoryEditError === null ? null : (
+                  <span className="category-editor-error" role="alert">
+                    {categoryEditError}
+                  </span>
+                )}
+                <div className="category-editor-actions">
+                  <button
+                    type="button"
+                    className="secondary-action"
+                    disabled={categoryEditSaving}
+                    onClick={resetCategoryEdit}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-action"
+                    disabled={categoryEditSaving}
+                    onClick={() => void saveCategoryEdit()}
+                  >
+                    {categoryEditSaving ? 'Saving…' : 'Done'}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : categoryMode === 'SEARCH' ? (
+            <div className="product-search category-search-inline">
+              <SearchIcon className="category-search-glyph" />
               <input
                 ref={searchRef}
                 id="product-search"
                 type="search"
+                aria-label="Search menu"
                 value={search}
                 placeholder="Search products"
                 autoComplete="off"
@@ -649,8 +935,88 @@ export function OrdersWorkspace({
                 }}
               />
               <kbd>Ctrl K</kbd>
+              <button
+                type="button"
+                className="category-search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearch('');
+                  setCategoryMode('IDLE');
+                }}
+              >
+                Clear
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="field-stack category-navigation-stack">
+              <div className="category-navigation">
+                <div
+                  className="category-rail"
+                  aria-label="Menu categories"
+                  data-alignment={categoryAlignment}
+                >
+                  {activeCategories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.id}
+                      className={
+                        selectedCategoryId === category.id
+                          ? 'category-tab selected'
+                          : 'category-tab'
+                      }
+                      onClick={() => {
+                        setSelectedCategoryId(category.id);
+                        setSelectedProductFamily(null);
+                        setSearch('');
+                      }}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="category-nav-actions">
+                  <button
+                    type="button"
+                    className="category-icon-action"
+                    aria-label="Search menu"
+                    title="Search menu"
+                    onClick={() => setCategoryMode('SEARCH')}
+                  >
+                    <SearchIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="category-edit-action"
+                    onClick={beginCategoryEdit}
+                  >
+                    <EditPencilIcon />
+                    <span>Edit categories</span>
+                  </button>
+                </div>
+              </div>
+              {productFamilies.length > 1 ? (
+                <div className="segmented-control" aria-label="Product families">
+                  <button
+                    type="button"
+                    className={selectedProductFamily === null ? 'selected' : undefined}
+                    onClick={() => setSelectedProductFamily(null)}
+                  >
+                    All
+                  </button>
+                  {productFamilies.map((family) => (
+                    <button
+                      type="button"
+                      key={family}
+                      className={selectedProductFamily === family ? 'selected' : undefined}
+                      onClick={() => setSelectedProductFamily(family)}
+                    >
+                      {family}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div className="product-grid" aria-live="polite">
@@ -669,15 +1035,68 @@ export function OrdersWorkspace({
                 key={product.id}
                 product={product}
                 quantity={productQuantityInDraft(draft, product.id)}
+                supportsExtras={productsWithExtras.has(product.id)}
                 busy={busy}
                 onQuickInfo={() => setQuickInfoProductId(product.id)}
                 onDecrement={() => decrementProduct(product)}
                 onAdd={() => addProduct(product)}
+                onExtras={() =>
+                  setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })
+                }
               />
             ))
           )}
         </div>
       </section>
+
+      {desktopCartResizable ? (
+        <div
+          className="cart-resize-separator"
+          role="separator"
+          aria-label="Resize Current Order"
+          aria-orientation="vertical"
+          aria-valuemin={CART_WIDTH_MIN}
+          aria-valuemax={Math.floor(Math.min(CART_WIDTH_MAX_PX, window.innerWidth * 0.45))}
+          aria-valuenow={Math.round(cartWidth)}
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              commitCartWidth(cartWidth + CART_RESIZE_KEYBOARD_STEP);
+            } else if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              commitCartWidth(cartWidth - CART_RESIZE_KEYBOARD_STEP);
+            } else if (event.key === 'Home') {
+              event.preventDefault();
+              commitCartWidth(CART_WIDTH_MIN);
+            } else if (event.key === 'End') {
+              event.preventDefault();
+              commitCartWidth(CART_WIDTH_MAX_PX);
+            }
+          }}
+          onPointerDown={(event) => {
+            cartResizeRef.current = { startX: event.clientX, startWidth: cartWidth };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            const drag = cartResizeRef.current;
+            if (drag === null || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            commitCartWidth(drag.startWidth + drag.startX - event.clientX);
+          }}
+          onPointerUp={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            cartResizeRef.current = null;
+          }}
+          onPointerCancel={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+            cartResizeRef.current = null;
+          }}
+        />
+      ) : null}
 
       <div className="desktop-cart-wrap">
         <OrdersCart
@@ -688,7 +1107,11 @@ export function OrdersWorkspace({
           placing={placing}
           onMutate={enqueueMutation}
           onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}
+          onEditLineExtras={(lineId) =>
+            setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
+          }
           onDecrementLine={decrementLine}
+          onIncrementLine={incrementLine}
           onClear={() => setClearConfirmOpen(true)}
           onDeliveryPhoneCommit={commitDeliveryPhone}
           onPlace={() => void placeOrder()}
@@ -721,7 +1144,11 @@ export function OrdersWorkspace({
             placing={placing}
             onMutate={enqueueMutation}
             onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}
+            onEditLineExtras={(lineId) =>
+              setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })
+            }
             onDecrementLine={decrementLine}
+            onIncrementLine={incrementLine}
             onClear={() => setClearConfirmOpen(true)}
             onDeliveryPhoneCommit={commitDeliveryPhone}
             onPlace={() => void placeOrder()}
@@ -732,7 +1159,9 @@ export function OrdersWorkspace({
       {customizer === null ? null : (
         <ProductCustomizer
           key={
-            customizer.kind === 'ADD' ? `add:${customizer.productId}` : `edit:${customizer.lineId}`
+            customizer.kind === 'ADD'
+              ? `add:${customizer.productId}:${customizer.focusSection ?? 'FULL'}`
+              : `edit:${customizer.lineId}:${customizer.focusSection ?? 'FULL'}`
           }
           target={customizer}
           draft={draft}
@@ -747,12 +1176,7 @@ export function OrdersWorkspace({
         <QuickInfo
           product={quickInfoProduct}
           busy={busy}
-          canCustomize={
-            quickInfoProduct.isCombo ||
-            configuration.productModifierLinks.some(
-              (link) => link.productId === quickInfoProduct.id,
-            )
-          }
+          canCustomize={quickInfoProduct.isCombo || productsWithExtras.has(quickInfoProduct.id)}
           onClose={() => setQuickInfoProductId(null)}
           onCustomize={() => {
             setQuickInfoProductId(null);

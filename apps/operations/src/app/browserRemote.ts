@@ -1,5 +1,18 @@
-import type { InboundConfigurationProvider } from '@tux/application';
-import { parseEntityId, type Shop, type ShopId, type Worker, type WorkerId } from '@tux/domain';
+import type {
+  InboundConfigurationProvider,
+  RemoteWorkerUiPreferences,
+  WorkerUiPreferencesRemoteGateway,
+} from '@tux/application';
+import {
+  parseEntityId,
+  parseWorkerUiPreferences,
+  type CategoryAlignment,
+  type MenuCategoryId,
+  type Shop,
+  type ShopId,
+  type Worker,
+  type WorkerId,
+} from '@tux/domain';
 
 const DEVICE_ID_STORAGE_KEY = 'tux.operations.device-id';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -71,6 +84,18 @@ function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult 
   };
 }
 
+function parseRemoteWorkerUiPreferences(value: Record<string, unknown>): RemoteWorkerUiPreferences {
+  const parsed = parseWorkerUiPreferences({ ...value, syncState: 'CLEAN' });
+  return {
+    shopId: parsed.shopId,
+    workerId: parsed.workerId,
+    categoryOrder: parsed.categoryOrder,
+    categoryAlignment: parsed.categoryAlignment,
+    serverVersion: parsed.serverVersion,
+    updatedAt: parsed.updatedAt,
+  };
+}
+
 function isLoopbackHost(): boolean {
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
@@ -92,7 +117,9 @@ function browserDeviceId(): string {
   return created;
 }
 
-export class VercelBrowserRemoteGateway implements InboundConfigurationProvider {
+export class VercelBrowserRemoteGateway
+  implements InboundConfigurationProvider, WorkerUiPreferencesRemoteGateway
+{
   async currentSession(): Promise<BrowserRemoteSession | null> {
     if (isLoopbackHost()) return null;
 
@@ -178,5 +205,47 @@ export class VercelBrowserRemoteGateway implements InboundConfigurationProvider 
       throw new TypeError('Remote configuration version mismatch.');
     }
     return body['bundle'];
+  }
+
+  async getWorkerUiPreferences(
+    shopId: ShopId,
+    workerId: WorkerId,
+  ): Promise<RemoteWorkerUiPreferences | null> {
+    const url = new URL('/api/worker-ui-preferences', window.location.origin);
+    url.searchParams.set('shopId', shopId);
+    url.searchParams.set('workerId', workerId);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Worker preference request failed with HTTP ${response.status}.`);
+    }
+    return parseRemoteWorkerUiPreferences(await jsonObject(response, 'Worker preference'));
+  }
+
+  async putWorkerUiPreferences(input: {
+    readonly shopId: ShopId;
+    readonly workerId: WorkerId;
+    readonly categoryOrder: readonly MenuCategoryId[];
+    readonly categoryAlignment: CategoryAlignment;
+  }): Promise<RemoteWorkerUiPreferences> {
+    const response = await fetch('/api/worker-ui-preferences', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new Error(`Worker preference update failed with HTTP ${response.status}.`);
+    }
+    return parseRemoteWorkerUiPreferences(await jsonObject(response, 'Worker preference update'));
   }
 }

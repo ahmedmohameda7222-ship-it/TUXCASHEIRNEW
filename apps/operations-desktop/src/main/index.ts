@@ -6,8 +6,14 @@ import {
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  WorkerUiPreferencesRetryController,
+  WorkerUiPreferencesService,
+  type OperationsSessionResult,
+  type WorkerUiPreferencesRemoteGateway,
+  type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
 import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
@@ -25,6 +31,7 @@ import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
   startDesktopAutomaticSync,
+  SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { EndDayIpcRuntime } from './endDayIpc';
@@ -36,6 +43,7 @@ import {
   createSecureWebPreferences,
   parseLoopbackDevelopmentUrl,
 } from './security';
+import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
@@ -63,7 +71,10 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
+let workerUiPreferencesRetry: WorkerUiPreferencesRetryController | null = null;
+let activeWorkerUiPreferencesIdentity: WorkerUiPreferencesSyncIdentity | null = null;
 let configurationSyncTimer: ReturnType<typeof setInterval> | null = null;
 let syncHealthSnapshot = buildSyncHealth({ remoteConfigured: false }) as TuxSyncHealthSnapshot;
 let syncHasRun = false;
@@ -83,6 +94,28 @@ function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(IPC_SYNC_STATUS_CHANGED, syncHealthSnapshot);
   }
+}
+
+function trackWorkerUiPreferencesIdentity(result: OperationsSessionResult): void {
+  if (!result.ok || result.value.status !== 'ACTIVE') {
+    activeWorkerUiPreferencesIdentity = null;
+    return;
+  }
+  activeWorkerUiPreferencesIdentity = {
+    shopId: result.value.shopId,
+    workerId: result.value.operator.id,
+  };
+  void workerUiPreferencesRetry?.syncActive();
+}
+
+function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new Error('Remote worker UI preference sync is not configured.');
+  };
+  return {
+    getWorkerUiPreferences: unavailable,
+    putWorkerUiPreferences: unavailable,
+  };
 }
 
 async function initializeOperationsServices(): Promise<void> {
@@ -138,6 +171,49 @@ async function initializeOperationsServices(): Promise<void> {
     runtime,
     coordinator,
   );
+
+  const preferencesRepository: WorkerUiPreferencesRepository = {
+    get: (shopId, workerId) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.get(shopId, workerId),
+      ),
+    put: (preferences) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.put(preferences),
+      ),
+    delete: (shopId, workerId) =>
+      operationsDatabase!.transaction((transaction) =>
+        transaction.workerUiPreferences.delete(shopId, workerId),
+      ),
+  };
+  const preferencesGateway =
+    remoteSessionManager !== null && supabaseUrl
+      ? new SupabaseDesktopWorkerUiPreferencesGateway({
+          projectUrl: supabaseUrl,
+          sessionManager: remoteSessionManager,
+        })
+      : unavailableWorkerUiPreferencesGateway();
+  const preferencesService = new WorkerUiPreferencesService(
+    preferencesRepository,
+    preferencesGateway,
+    runtime.now,
+  );
+  workerUiPreferencesIpcRuntime = new WorkerUiPreferencesIpcRuntime({
+    getSessionState: () => sessionService!.getState(),
+    repository: preferencesRepository,
+    service: preferencesService,
+    onChanged: () => void workerUiPreferencesRetry?.syncActive(),
+  });
+
+  if (remoteSessionManager !== null && supabaseUrl) {
+    workerUiPreferencesRetry = new WorkerUiPreferencesRetryController(
+      preferencesService,
+      () => activeWorkerUiPreferencesIdentity,
+    );
+    workerUiPreferencesRetry.start();
+    trackWorkerUiPreferencesIdentity(await sessionService.getState());
+  }
+
   ordersService = new OperationsOrdersService(
     operationsDatabase,
     operatorReadModel,
@@ -252,16 +328,22 @@ function registerIpcHandlers(window: BrowserWindow): void {
   });
   ipcMain.handle(IPC_SESSION_GET_STATE, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    return currentSessionService().getState();
+    const result = await currentSessionService().getState();
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_SESSION_SUBMIT_PIN, async (event, pin: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     if (typeof pin !== 'string') throw new TypeError('PIN IPC payload must be a string.');
-    return currentSessionService().submitPin(pin);
+    const result = await currentSessionService().submitPin(pin);
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_SESSION_SIGN_OUT, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    return currentSessionService().signOut();
+    const result = await currentSessionService().signOut();
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
@@ -340,6 +422,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     });
   });
 
+  if (workerUiPreferencesIpcRuntime === null) {
+    throw new Error('Worker UI Preferences IPC runtime has not been initialized.');
+  }
   if (expensesIpcRuntime === null) {
     throw new Error('Operations Expenses IPC runtime has not been initialized.');
   }
@@ -349,6 +434,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  workerUiPreferencesIpcRuntime.register(window);
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
   endDayIpcRuntime.register(window);
@@ -392,6 +478,11 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
   configurationSyncTimer = null;
+  workerUiPreferencesRetry?.stop();
+  workerUiPreferencesRetry = null;
+  activeWorkerUiPreferencesIdentity = null;
+  workerUiPreferencesIpcRuntime?.close();
+  workerUiPreferencesIpcRuntime = null;
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();

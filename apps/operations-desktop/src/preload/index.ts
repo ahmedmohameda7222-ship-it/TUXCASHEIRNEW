@@ -1,4 +1,4 @@
-import type { OrderDraft, OrderId, ShopId } from '@tux/domain';
+import { parseWorkerUiPreferences, type OrderDraft, type OrderId, type ShopId } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { assertBulkStockBoardResult, assertBulkStockMutationResult } from './bulkStockResult';
@@ -26,6 +26,9 @@ const IPC_SESSION_SUBMIT_PIN = 'tux:session:submit-pin';
 const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
+const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
+const IPC_WORKER_UI_PREFERENCES_UPDATE = 'tux:worker-ui-preferences:update';
+const IPC_WORKER_UI_PREFERENCES_RESET = 'tux:worker-ui-preferences:reset';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
@@ -76,6 +79,19 @@ const api: TuxDesktopApi = Object.freeze({
       };
       ipcRenderer.on(IPC_SYNC_STATUS_CHANGED, wrapper);
       return () => ipcRenderer.removeListener(IPC_SYNC_STATUS_CHANGED, wrapper);
+    },
+  }),
+  workerUiPreferences: Object.freeze({
+    load: async () => {
+      const value: unknown = await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_LOAD);
+      return value === null ? null : parseWorkerUiPreferences(value);
+    },
+    update: async (input: Parameters<TuxDesktopApi['workerUiPreferences']['update']>[0]) =>
+      parseWorkerUiPreferences(
+        (await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_UPDATE, input)) as unknown,
+      ),
+    reset: async () => {
+      await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_RESET);
     },
   }),
   orders: Object.freeze({

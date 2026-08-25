@@ -7,10 +7,14 @@ import {
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  WorkerUiPreferencesRetryController,
+  WorkerUiPreferencesService,
   err,
   type OperationsSessionResult,
+  type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
 import { instant, type ShopId } from '@tux/domain';
+import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   IndexedDbBulkStockStore,
   IndexedDbExpenseLedgerStore,
@@ -24,6 +28,7 @@ import type {
   TuxExpensesApi,
   TuxOrdersApi,
   TuxOrdersBoardApi,
+  TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
@@ -37,6 +42,7 @@ export interface OperationsSessionClient {
   enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
+export type OperationsWorkerUiPreferencesClient = TuxWorkerUiPreferencesApi;
 export type OperationsOrdersClient = TuxOrdersApi;
 export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 export type OperationsExpensesClient = TuxExpensesApi;
@@ -45,12 +51,15 @@ export type OperationsEndDayClient = TuxEndDayApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
+  readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
   readonly orders: OperationsOrdersService;
   readonly ordersBoard: OperationsOrdersBoardService;
   readonly expenses: OperationsExpensesService;
   readonly bulkStock: OperationsBulkStockService;
   readonly endDay: OperationsEndDayService;
+  getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
+  signOut(): Promise<OperationsSessionResult>;
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
@@ -80,8 +89,35 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
         remoteGateway,
       );
+      const preferencesRepository: WorkerUiPreferencesRepository = {
+        get: (shopId, workerId) =>
+          database.transaction((transaction) =>
+            transaction.workerUiPreferences.get(shopId, workerId),
+          ),
+        put: (preferences) =>
+          database.transaction((transaction) => transaction.workerUiPreferences.put(preferences)),
+        delete: (shopId, workerId) =>
+          database.transaction((transaction) =>
+            transaction.workerUiPreferences.delete(shopId, workerId),
+          ),
+      };
+      const preferencesService = new WorkerUiPreferencesService(
+        preferencesRepository,
+        remoteGateway,
+        runtime.now,
+      );
+      let activePreferenceIdentity: WorkerUiPreferencesSyncIdentity | null = null;
+      const preferencesRetry = new WorkerUiPreferencesRetryController(
+        preferencesService,
+        () => activePreferenceIdentity,
+      );
       let automaticSyncStarted = false;
       let configurationTimerStarted = false;
+      let preferenceRetryStarted = false;
+
+      const retryPreferences = (): void => {
+        void preferencesRetry.syncActive();
+      };
 
       const startRemoteRuntime = (shopId: ShopId): void => {
         if (!automaticSyncStarted) {
@@ -92,6 +128,23 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           window.setInterval(() => void configurationService.sync(shopId), 5 * 60 * 1000);
           configurationTimerStarted = true;
         }
+        if (!preferenceRetryStarted) {
+          preferencesRetry.start();
+          window.addEventListener('online', retryPreferences);
+          preferenceRetryStarted = true;
+        }
+      };
+
+      const trackPreferenceIdentity = (result: OperationsSessionResult): void => {
+        if (!result.ok || result.value.status !== 'ACTIVE' || !preferenceRetryStarted) {
+          activePreferenceIdentity = null;
+          return;
+        }
+        activePreferenceIdentity = {
+          shopId: result.value.shopId,
+          workerId: result.value.operator.id,
+        };
+        retryPreferences();
       };
 
       try {
@@ -111,6 +164,38 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         runtime,
         coordinator,
       );
+
+      const activePreferenceIdentityFromSession =
+        async (): Promise<WorkerUiPreferencesSyncIdentity> => {
+          const result = await session.getState();
+          if (!result.ok || result.value.status !== 'ACTIVE') {
+            throw new Error('Active worker session required.');
+          }
+          return {
+            shopId: result.value.shopId,
+            workerId: result.value.operator.id,
+          };
+        };
+
+      const workerUiPreferences: TuxWorkerUiPreferencesApi = {
+        load: async () => {
+          const identity = await activePreferenceIdentityFromSession();
+          return preferencesRepository.get(identity.shopId, identity.workerId);
+        },
+        update: async (input) => {
+          const identity = await activePreferenceIdentityFromSession();
+          const updated = await preferencesService.update(
+            identity.shopId,
+            identity.workerId,
+            input,
+          );
+          if (preferenceRetryStarted) retryPreferences();
+          return updated;
+        },
+        reset: async () => {
+          await workerUiPreferences.update({ categoryOrder: [], categoryAlignment: 'center' });
+        },
+      };
 
       const bootstrapWithPin = async (pin: string): Promise<OperationsSessionResult> => {
         try {
@@ -153,24 +238,47 @@ async function browserRuntime(): Promise<BrowserRuntime> {
 
       const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
         const local = await session.submitPin(pin);
-        if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') return local;
+        if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') {
+          trackPreferenceIdentity(local);
+          return local;
+        }
 
         const needsRemoteBootstrap =
           (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
           (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
-        if (!needsRemoteBootstrap) return local;
+        if (!needsRemoteBootstrap) {
+          trackPreferenceIdentity(local);
+          return local;
+        }
 
         const remote = await bootstrapWithPin(pin);
-        if (!remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok) {
-          return local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
-            ? local
+        const result =
+          !remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok
+            ? local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
+              ? local
+              : remote
             : remote;
-        }
-        return remote;
+        trackPreferenceIdentity(result);
+        return result;
       };
+
+      const getState = async (): Promise<OperationsSessionResult> => {
+        const result = await session.getState();
+        trackPreferenceIdentity(result);
+        return result;
+      };
+
+      const signOut = async (): Promise<OperationsSessionResult> => {
+        const result = await session.signOut();
+        trackPreferenceIdentity(result);
+        return result;
+      };
+
+      if (preferenceRetryStarted) trackPreferenceIdentity(await session.getState());
 
       return {
         session,
+        workerUiPreferences,
         orders: new OperationsOrdersService(
           database,
           readModel,
@@ -202,7 +310,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
         ),
+        getState,
         submitPin,
+        signOut,
       };
     })();
   }
@@ -213,10 +323,20 @@ export function createOperationsSessionClient(): OperationsSessionClient {
   const desktop = window.tuxDesktop;
   if (desktop !== undefined) return desktop.session;
   return {
-    getState: async () => (await browserRuntime()).session.getState(),
+    getState: async () => (await browserRuntime()).getState(),
     submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
-    signOut: async () => (await browserRuntime()).session.signOut(),
+    signOut: async () => (await browserRuntime()).signOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
+  };
+}
+
+export function createWorkerUiPreferencesClient(): OperationsWorkerUiPreferencesClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.workerUiPreferences;
+  return {
+    load: async () => (await browserRuntime()).workerUiPreferences.load(),
+    update: async (input) => (await browserRuntime()).workerUiPreferences.update(input),
+    reset: async () => (await browserRuntime()).workerUiPreferences.reset(),
   };
 }
 

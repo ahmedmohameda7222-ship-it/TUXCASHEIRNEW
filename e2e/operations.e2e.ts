@@ -460,8 +460,6 @@ async function placeSplitComboOrder(page: Page, testInfo: TestInfo): Promise<voi
   await cart.getByRole('button', { name: 'Split payment' }).click();
   await cart.getByLabel('Amount A').fill('50');
   await cart.getByLabel('Amount A').blur();
-  await cart.getByLabel('Cash received A').fill('50');
-  await cart.getByLabel('Cash received A').blur();
   await cart.getByRole('button', { name: 'Place Order' }).click();
   await expectOrderPlaced(page);
   await closeMobileCartIfOpen(page, testInfo);
@@ -577,6 +575,13 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
 
   await page.getByLabel('Enter PIN to Start Day').fill('1234');
   await page.getByRole('button', { name: 'Start Day' }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
+  const welcomeAction = page.locator('.welcome-action');
+  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
   await waitForActiveShell(page);
   await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add one Sold Out Test Burger' })).toBeDisabled();
@@ -593,4 +598,597 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
+});
+
+async function enterActiveOrdersForCategoryTests(page: Page): Promise<void> {
+  await seedBrowserFallback(page);
+  await page.goto('/');
+  await page.getByLabel('Enter PIN to Start Day').fill('1234');
+  await page.getByRole('button', { name: 'Start Day' }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
+  const welcomeAction = page.locator('.welcome-action');
+  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+  await waitForActiveShell(page);
+}
+
+test('category search is progressive and keyboard accessible', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const searchInput = page.getByPlaceholder('Search products');
+  const searchButton = page.getByRole('button', { name: 'Search menu' });
+  await expect(searchInput).toBeHidden();
+  await expect(searchButton).toBeVisible();
+
+  await page.keyboard.press('Control+K');
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toBeFocused();
+  await searchInput.fill('cola');
+  await expect(page.getByRole('button', { name: 'Add one Cola' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(searchInput).toHaveValue('');
+  await expect(searchInput).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(searchInput).toBeHidden();
+
+  await page.keyboard.press('/');
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toBeFocused();
+  await searchInput.fill('water');
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(searchInput).toBeHidden();
+});
+
+test('category editor persists alignment and keyboard reorder', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const searchButton = page.getByRole('button', { name: 'Search menu' });
+  const editButton = page.getByRole('button', { name: 'Edit categories' });
+  await expect(editButton).toBeVisible();
+  await editButton.click();
+  await expect(searchButton).toBeHidden();
+  await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Right', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Right', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  const editorItems = page.locator('.category-editor-item');
+  await expect(editorItems).toHaveCount(3);
+  await expect(editorItems.nth(0)).toContainText('Burgers');
+  await page.getByRole('button', { name: 'Move Burgers right' }).click();
+  await expect(editorItems.nth(0)).toContainText('Sides');
+  await expect(editorItems.nth(1)).toContainText('Burgers');
+
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const categories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(categories.nth(0)).toHaveText('Sides');
+  await expect(categories.nth(1)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+  await page.reload();
+  await waitForActiveShell(page);
+  const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(reloadedCategories.nth(0)).toHaveText('Sides');
+  await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+
+  await page.getByRole('button', { name: 'Edit categories' }).click();
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(resetCategories.nth(0)).toHaveText('Burgers');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'center');
+});
+
+test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+  await expect(cart).toContainText('Classic Smash');
+  await closeMobileCartIfOpen(page, testInfo);
+
+  await page.getByRole('button', { name: 'Edit categories' }).click();
+  await page.getByRole('button', { name: 'Right', exact: true }).click();
+
+  await page.evaluate(() => {
+    const originalPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function forcedPreferenceWriteFailure(
+      value: unknown,
+      key?: IDBValidKey,
+    ) {
+      if (this.name === 'workerUiPreferences') {
+        throw new DOMException('Forced preference write failure', 'AbortError');
+      }
+      return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
+    };
+  });
+
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+
+  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
+  await expect(page.getByLabel('Edit categories')).toBeVisible();
+  await openCartIfMobile(page, testInfo);
+  await expect(currentOrderCart(page, testInfo)).toContainText('Classic Smash');
+});
+
+test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+  const doubleCard = page.locator('.product-card').filter({ hasText: 'Double Smash' }).first();
+  await expect(classicCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
+  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toHaveCount(0);
+
+  await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
+  const addDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const addExtrasSection = addDialog.locator('[aria-labelledby="extras-title"]');
+  await expect(addExtrasSection).toBeFocused();
+  await addDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+  await addDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+  await addDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
+  await addDialog.getByRole('button', { name: 'Add to order' }).click();
+
+  await expect(classicCard.locator('.product-quantity-badge')).toHaveText('1');
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+  const classicLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  await expect(classicLines).toHaveCount(1);
+  await expect(classicLines.nth(0)).toContainText('2× Extra Cheese');
+  await expect(classicLines.nth(0)).toContainText('1× Extra Patty');
+  await expect(classicLines.nth(0)).toContainText(/200\.00/);
+
+  await closeMobileCartIfOpen(page, testInfo);
+  await classicCard.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await expect(classicCard.locator('.product-quantity-badge')).toHaveText('2');
+  await openCartIfMobile(page, testInfo);
+  await expect(classicLines).toHaveCount(2);
+  await expect(classicLines.nth(1)).not.toContainText('Extra Cheese');
+  await expect(classicLines.nth(1)).not.toContainText('Extra Patty');
+  await expect(classicLines.nth(1)).toContainText(/120\.00/);
+
+  await classicLines.nth(0).getByRole('button', { name: 'Extra', exact: true }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  await expect(editDialog.locator('[aria-labelledby="extras-title"]')).toBeFocused();
+  await editDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
+  await editDialog.getByRole('button', { name: 'Save item' }).click();
+
+  const updatedLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  await expect(updatedLines).toHaveCount(2);
+  await expect(updatedLines.nth(0)).toContainText('2× Extra Patty');
+  await expect(updatedLines.nth(0)).toContainText(/240\.00/);
+  await expect(updatedLines.nth(1)).not.toContainText('Extra Patty');
+});
+
+test('Current Order keeps cashier controls attached to each line', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+  await addClassicWithModifier(page);
+  await openCartIfMobile(page, testInfo);
+
+  const cart = currentOrderCart(page, testInfo);
+  const sectionTitles = await cart
+    .locator('.cart-section > h2, .cart-section .section-heading-row > h2')
+    .allTextContents();
+  expect(sectionTitles.slice(0, 4)).toEqual(['Items', 'Order type', 'Notes & discount', 'Payment']);
+
+  const title = cart.locator('.cart-title');
+  const count = cart.locator('.cart-count');
+  await expect(title).toHaveText('Current Order');
+  await expect(count).toHaveText('1 item');
+  expect(await title.evaluate((node) => getComputedStyle(node).fontSize)).toBe('17px');
+  expect(await title.evaluate((node) => getComputedStyle(node).lineHeight)).toBe('22px');
+  expect(await count.evaluate((node) => getComputedStyle(node).fontSize)).toBe('13px');
+  expect(await count.evaluate((node) => getComputedStyle(node).lineHeight)).toBe('16px');
+
+  const lines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  await expect(lines).toHaveCount(1);
+  const line = lines.first();
+  await expect(line).toContainText('1× Extra Cheese');
+  await expect(line.getByRole('button', { name: '−1', exact: true })).toBeVisible();
+  await expect(line.getByRole('button', { name: '+1', exact: true })).toBeVisible();
+  await expect(line.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+  await expect(line.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
+
+  await line.getByRole('button', { name: '+1', exact: true }).click();
+  await expect(lines).toHaveCount(1);
+  await expect(lines.first()).toContainText('× 2');
+  await expect(lines.first()).toContainText('1× Extra Cheese');
+
+  await lines.first().getByRole('button', { name: '−1', exact: true }).click();
+  await expect(lines.first()).toContainText('× 1');
+  await expect(page.locator('.undo-toast')).toContainText('Removed one Classic Smash');
+
+  await lines.first().getByRole('button', { name: 'Edit', exact: true }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  await expect(editDialog).toBeVisible();
+  await expect(editDialog.getByText('Extra Cheese')).toBeVisible();
+  await editDialog.getByRole('button', { name: 'Cancel' }).click();
+
+  const cartDisplay = await cart.evaluate((node) => getComputedStyle(node).display);
+  expect(cartDisplay).toBe('grid');
+  const cartScroll = cart.locator('.cart-scroll');
+  const totals = cart.locator('.cart-totals');
+  const [scrollBox, totalsBox] = await Promise.all([
+    cartScroll.boundingBox(),
+    totals.boundingBox(),
+  ]);
+  expect(scrollBox).not.toBeNull();
+  expect(totalsBox).not.toBeNull();
+  expect(scrollBox!.y + scrollBox!.height).toBeLessThanOrEqual(totalsBox!.y + 1);
+});
+
+test('cash entry stays optional and split stays allocation-only', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Add one Double Smash' }).click();
+  await openCartIfMobile(page, testInfo);
+  let cart = currentOrderCart(page, testInfo);
+
+  await cart.locator('.adjustment-disclosure').filter({ hasText: 'Discount' }).click();
+  await cart.getByRole('textbox', { name: 'Discount' }).fill('39');
+  await cart.getByRole('textbox', { name: 'Discount' }).blur();
+  await expect(cart.locator('.grand-total')).toContainText('121.00');
+
+  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+  const cashReceived = cart.getByLabel('Cash received');
+  await expect(cashReceived).toHaveValue('');
+  await expect(cashReceived).toHaveAttribute('placeholder', '0');
+
+  const tenders = cart.getByLabel('Smart Cash tenders').getByRole('button');
+  await expect(tenders).toHaveCount(5);
+  await expect(tenders.nth(0)).toContainText('121.00');
+  await expect(tenders.nth(4)).toContainText('200.00');
+
+  await cashReceived.fill('');
+  await cashReceived.blur();
+  await expect(cashReceived).toHaveValue('');
+  await cart.getByRole('button', { name: 'Place Order' }).click();
+  await expectOrderPlaced(page);
+  await closeMobileCartIfOpen(page, testInfo);
+
+  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+  await openCartIfMobile(page, testInfo);
+  cart = currentOrderCart(page, testInfo);
+
+  await cart.getByRole('button', { name: 'Split payment' }).click();
+  await cart.getByLabel('Amount A').fill('320');
+  await cart.getByLabel('Amount A').blur();
+  await expect(cart.locator('.split-remainder')).toContainText('80.00');
+  await expect(cart.getByLabel('Cash received A')).toHaveCount(0);
+  await expect(cart.getByLabel('Cash received B')).toHaveCount(0);
+
+  await cart.getByRole('button', { name: 'Place Order' }).click();
+  await expectOrderPlaced(page);
+});
+
+test('resize Current Order rail persists device-local width', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  if (!testInfo.project.name.startsWith('desktop')) {
+    await expect(separator).toHaveCount(0);
+    return;
+  }
+
+  await expect(separator).toBeVisible();
+  await expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+
+  const cart = page.locator('.desktop-cart-wrap');
+  const menu = page.locator('.menu-pane');
+  const initialCart = await cart.boundingBox();
+  const initialMenu = await menu.boundingBox();
+  expect(initialCart).not.toBeNull();
+  expect(initialMenu).not.toBeNull();
+  expect(Math.abs(initialCart!.width - 432)).toBeLessThanOrEqual(2);
+
+  await separator.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect
+    .poll(async () => (await cart.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(initialCart!.width);
+  const keyboardCart = await cart.boundingBox();
+  const keyboardMenu = await menu.boundingBox();
+  expect(keyboardCart).not.toBeNull();
+  expect(keyboardMenu).not.toBeNull();
+  expect(keyboardMenu!.width).toBeLessThan(initialMenu!.width);
+
+  const handleBox = await separator.boundingBox();
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x - 48, handleBox!.y + handleBox!.height / 2, { steps: 4 });
+  await page.mouse.up();
+
+  const resizedCart = await cart.boundingBox();
+  expect(resizedCart).not.toBeNull();
+  expect(resizedCart!.width).toBeGreaterThan(keyboardCart!.width);
+  expect(resizedCart!.width).toBeLessThanOrEqual(600);
+  await expectNoHorizontalOverflow(page);
+
+  const persisted = await page.evaluate(() =>
+    localStorage.getItem('tux.operations.currentOrderWidth'),
+  );
+  expect(persisted).not.toBeNull();
+  expect(Number(persisted)).toBeCloseTo(resizedCart!.width, 0);
+
+  await page.reload();
+  await waitForActiveShell(page);
+  const reloadedCart = page.locator('.desktop-cart-wrap');
+  await expect
+    .poll(async () => (await reloadedCart.boundingBox())?.width ?? 0)
+    .toBeCloseTo(Number(persisted), 0);
+
+  await page.setViewportSize({ width: 1000, height: 960 });
+  await expect.poll(async () => (await reloadedCart.boundingBox())?.width ?? 0).toBeCloseTo(450, 0);
+  await expectNoHorizontalOverflow(page);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('tux.operations.currentOrderWidth')))
+    .toBe('450');
+});
+
+test('premium POS visual hierarchy matches approved sizing', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+  await expectNoHorizontalOverflow(page);
+
+  if (!testInfo.project.name.startsWith('desktop')) return;
+
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  const nav = page.getByRole('navigation', { name: 'Operations' });
+  const navBox = await nav.boundingBox();
+  expect(navBox).not.toBeNull();
+  expect(Math.abs(navBox!.x + navBox!.width / 2 - viewport!.width / 2)).toBeLessThanOrEqual(2);
+
+  const activeNav = page.getByRole('button', { name: 'Orders', exact: true });
+  const inactiveNav = page.getByRole('button', { name: 'Orders Board', exact: true });
+  const activeNavStyle = await activeNav.evaluate((node) => getComputedStyle(node));
+  const inactiveNavStyle = await inactiveNav.evaluate((node) => getComputedStyle(node));
+  expect(activeNavStyle.fontSize).toBe('15px');
+  expect(activeNavStyle.lineHeight).toBe('20px');
+  expect(Number(activeNavStyle.fontWeight)).toBe(600);
+  expect(inactiveNavStyle.fontSize).toBe('15px');
+  expect(inactiveNavStyle.lineHeight).toBe('20px');
+  expect(Number(inactiveNavStyle.fontWeight)).toBe(500);
+  expect((await activeNav.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+  const categories = page.getByLabel('Menu categories');
+  const activeCategory = categories.getByRole('button', { name: 'Burgers', exact: true });
+  const inactiveCategory = categories.getByRole('button', { name: 'Sides', exact: true });
+  const activeCategoryStyle = await activeCategory.evaluate((node) => getComputedStyle(node));
+  const inactiveCategoryStyle = await inactiveCategory.evaluate((node) => getComputedStyle(node));
+  expect(activeCategoryStyle.fontSize).toBe('15px');
+  expect(activeCategoryStyle.lineHeight).toBe('20px');
+  expect(Number(activeCategoryStyle.fontWeight)).toBe(600);
+  expect(Number(inactiveCategoryStyle.fontWeight)).toBe(500);
+  expect((await activeCategory.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+  const stressCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Long Name Layout Stress Burger with Extra Description' })
+    .first();
+  const productName = stressCard.locator('.product-copy strong');
+  const productDescription = stressCard.locator('.product-copy p');
+  const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
+  const productDescriptionStyle = await productDescription.evaluate((node) =>
+    getComputedStyle(node),
+  );
+  expect(productNameStyle.fontSize).toBe('15px');
+  expect(productNameStyle.lineHeight).toBe('20px');
+  expect(Number(productNameStyle.fontWeight)).toBe(600);
+  expect(productDescriptionStyle.fontSize).toBe('14px');
+  expect(productDescriptionStyle.lineHeight).toBe('18px');
+  expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
+  expect(productDescriptionStyle.webkitLineClamp).toBe('2');
+  await expect(productDescription).toHaveText(
+    'Development-only long text used to stress responsive menu layout.',
+  );
+  expect(
+    (await stressCard.locator('.product-price').evaluate((node) => getComputedStyle(node)))
+      .fontVariantNumeric,
+  ).toContain('tabular-nums');
+
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
+    name: 'Current order',
+  });
+  const cartTitleStyle = await cart
+    .locator('.cart-title')
+    .evaluate((node) => getComputedStyle(node));
+  expect(cartTitleStyle.fontSize).toBe('17px');
+  expect(cartTitleStyle.lineHeight).toBe('22px');
+  expect(Number(cartTitleStyle.fontWeight)).toBe(600);
+
+  const subsectionHeadingStyle = await cart
+    .locator('.payment-section h2')
+    .evaluate((node) => getComputedStyle(node));
+  expect(subsectionHeadingStyle.fontSize).toBe('14px');
+  expect(subsectionHeadingStyle.lineHeight).toBe('18px');
+  expect(Number(subsectionHeadingStyle.fontWeight)).toBe(600);
+
+  const lineNameStyle = await cart
+    .locator('.cart-line-top strong')
+    .first()
+    .evaluate((node) => getComputedStyle(node));
+  expect(lineNameStyle.fontSize).toBe('15px');
+  expect(lineNameStyle.lineHeight).toBe('20px');
+  expect(Number(lineNameStyle.fontWeight)).toBe(600);
+
+  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+  const cashInputStyle = await cart
+    .getByLabel('Cash received')
+    .evaluate((node) => getComputedStyle(node));
+  expect(cashInputStyle.fontSize).toBe('14px');
+  expect(cashInputStyle.lineHeight).toBe('18px');
+  expect(Number(cashInputStyle.fontWeight)).toBe(400);
+  expect(cashInputStyle.fontVariantNumeric).toContain('tabular-nums');
+
+  const totalLabelStyle = await cart
+    .locator('.grand-total dt')
+    .evaluate((node) => getComputedStyle(node));
+  expect(totalLabelStyle.fontSize).toBe('18px');
+  expect(totalLabelStyle.lineHeight).toBe('22px');
+  expect(Number(totalLabelStyle.fontWeight)).toBe(600);
+
+  const totalStyle = await cart
+    .locator('.grand-total dd')
+    .evaluate((node) => getComputedStyle(node));
+  expect(totalStyle.fontSize).toBe('22px');
+  expect(totalStyle.lineHeight).toBe('26px');
+  expect(Number(totalStyle.fontWeight)).toBe(700);
+  expect(totalStyle.fontVariantNumeric).toContain('tabular-nums');
+
+  const placeOrder = cart.getByRole('button', { name: 'Place Order' });
+  const placeOrderBox = await placeOrder.boundingBox();
+  const placeOrderStyle = await placeOrder.evaluate((node) => getComputedStyle(node));
+  expect(placeOrderBox).not.toBeNull();
+  expect(placeOrderBox!.height).toBeGreaterThanOrEqual(48);
+  expect(placeOrderStyle.fontSize).toBe('16px');
+  expect(placeOrderStyle.lineHeight).toBe('20px');
+  expect(Number(placeOrderStyle.fontWeight)).toBe(600);
+});
+
+test('visual approval evidence covers approved POS states', async ({ page }, testInfo) => {
+  async function screenshot(name: string): Promise<void> {
+    await expectNoHorizontalOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath(name),
+      animations: 'disabled',
+      caret: 'hide',
+      fullPage: false,
+    });
+  }
+
+  async function startFresh(keepWelcome = false): Promise<void> {
+    await seedBrowserFallback(page);
+    await page.goto('/');
+    await page.getByLabel('Enter PIN to Start Day').fill('1234');
+    await page.getByRole('button', { name: 'Start Day' }).click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector('.welcome-action') !== null ||
+        document.querySelector('[aria-label="Operations"]') !== null,
+    );
+    const welcomeAction = page.locator('.welcome-action');
+    if (keepWelcome) {
+      await expect(welcomeAction).toBeVisible();
+      return;
+    }
+    if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+    await waitForActiveShell(page);
+  }
+
+  await startFresh(true);
+  if (testInfo.project.name === 'desktop-browser-fallback') {
+    await screenshot('01-welcome.png');
+  }
+  await page.locator('.welcome-action').click();
+  await waitForActiveShell(page);
+  await expectNoHorizontalOverflow(page);
+
+  if (testInfo.project.name === 'desktop-browser-fallback') {
+    await screenshot('02-default-orders.png');
+    await captureVisualEvidence(page, testInfo);
+
+    const navigation = page.getByRole('navigation', { name: 'Operations' });
+    const navigationBox = await navigation.boundingBox();
+    const viewport = page.viewportSize();
+    expect(navigationBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(
+      Math.abs(navigationBox!.x + navigationBox!.width / 2 - viewport!.width / 2),
+    ).toBeLessThanOrEqual(2);
+
+    await page.keyboard.press('Control+K');
+    const searchInput = page.getByPlaceholder('Search products');
+    await expect(searchInput).toBeVisible();
+    await expect(searchInput).toBeFocused();
+    await screenshot('03-expanded-search.png');
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Edit categories' }).click();
+    await expect(page.getByLabel('Edit categories')).toBeVisible();
+    await screenshot('04-category-edit.png');
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    await page.getByRole('button', { name: 'Add one TUX Loaded Burger' }).click();
+    await page.getByRole('button', { name: 'Add one Spicy Chicken' }).click();
+    await page.getByLabel('Menu categories').getByRole('button', { name: 'Drinks' }).click();
+    await page.getByRole('button', { name: 'Add one Cola' }).click();
+
+    let cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
+      name: 'Current order',
+    });
+    await cart.locator('.adjustment-disclosure').filter({ hasText: 'Discount' }).click();
+    await cart.getByRole('textbox', { name: 'Discount' }).fill('95');
+    await cart.getByRole('textbox', { name: 'Discount' }).blur();
+    await expect(cart.locator('.grand-total')).toContainText('705.00');
+    await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+    const tenders = cart.getByLabel('Smart Cash tenders').getByRole('button');
+    await expect(tenders).toHaveCount(5);
+    await expect(tenders.nth(0)).toContainText('705.00');
+    await expect(tenders.nth(1)).toContainText('710.00');
+    await expect(tenders.nth(2)).toContainText('720.00');
+    await expect(tenders.nth(3)).toContainText('750.00');
+    await expect(tenders.nth(4)).toContainText('800.00');
+    const cashReceived = cart.getByLabel('Cash received');
+    await expect(cashReceived).toHaveValue('');
+    await screenshot('05-single-cash-705.png');
+    await cashReceived.fill('800');
+    await cashReceived.blur();
+    await expect(cart.locator('.payment-summary')).toContainText('Change: EGP 95.00');
+
+    await startFresh();
+    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
+      name: 'Current order',
+    });
+    await cart.getByRole('button', { name: 'Split payment' }).click();
+    await cart.getByLabel('Amount A').fill('320');
+    await cart.getByLabel('Amount A').blur();
+    await expect(cart.locator('.split-remainder')).toContainText('80.00');
+    await expect(cart.getByLabel('Cash received A')).toHaveCount(0);
+    await expect(cart.getByLabel('Cash received B')).toHaveCount(0);
+    await screenshot('06-split-payment-400.png');
+
+    await startFresh();
+    const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+    await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
+    const extrasDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+    await extrasDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+    await extrasDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
+    await screenshot('07-extras-customizer.png');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const transitionDurations = await page
+      .locator('.product-card')
+      .first()
+      .evaluate((node) =>
+        getComputedStyle(node)
+          .transitionDuration.split(',')
+          .map((value) => parseFloat(value)),
+      );
+    expect(transitionDurations.every((duration) => duration <= 0.001)).toBe(true);
+    return;
+  }
+
+  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await openCartIfMobile(page, testInfo);
+  await expect(page.locator('.mobile-cart-overlay')).toBeVisible();
+  if (testInfo.project.name === 'mobile-browser-fallback') {
+    await screenshot('08-mobile-review-pay.png');
+  } else {
+    await screenshot('09-tablet-review-pay.png');
+  }
 });

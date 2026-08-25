@@ -237,6 +237,22 @@ CREATE INDEX idx_outbox_dependency_block
 ON outbox_events(blocked_by_event_id, created_at);
 `,
   },
+  {
+    version: 6,
+    name: 'worker_ui_preferences',
+    sql: `
+CREATE TABLE IF NOT EXISTS worker_ui_preferences (
+  shop_id TEXT NOT NULL,
+  worker_id TEXT NOT NULL,
+  category_order_json TEXT NOT NULL,
+  category_alignment TEXT NOT NULL CHECK (category_alignment IN ('left','center','right')),
+  updated_at TEXT NOT NULL,
+  server_version INTEGER NOT NULL CHECK (server_version >= 0),
+  sync_state TEXT NOT NULL CHECK (sync_state IN ('CLEAN','DIRTY')),
+  PRIMARY KEY (shop_id, worker_id)
+);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

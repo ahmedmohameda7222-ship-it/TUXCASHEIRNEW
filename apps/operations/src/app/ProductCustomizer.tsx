@@ -8,12 +8,20 @@ import {
   type OrderDraft,
   type ProductId,
 } from '@tux/domain';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatMoneyMinor } from './ordersView';
 
 export type ProductCustomizerTarget =
-  | { readonly kind: 'ADD'; readonly productId: ProductId }
-  | { readonly kind: 'EDIT'; readonly lineId: DraftLineId };
+  | {
+      readonly kind: 'ADD';
+      readonly productId: ProductId;
+      readonly focusSection?: 'FULL' | 'EXTRAS';
+    }
+  | {
+      readonly kind: 'EDIT';
+      readonly lineId: DraftLineId;
+      readonly focusSection?: 'FULL' | 'EXTRAS';
+    };
 
 export function ProductCustomizer({
   target,
@@ -85,6 +93,16 @@ export function ProductCustomizer({
   });
   const [note, setNote] = useState(line?.itemNote ?? '');
   const [error, setError] = useState<string | null>(null);
+  const extrasSectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (target.focusSection !== 'EXTRAS' || modifierOptions.length === 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      extrasSectionRef.current?.scrollIntoView({ block: 'center' });
+      extrasSectionRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [modifierOptions.length, target.focusSection]);
 
   if (product === null) {
     return null;
@@ -184,7 +202,12 @@ export function ProductCustomizer({
           ) : null}
 
           {modifierOptions.length > 0 ? (
-            <section className="customizer-section" aria-labelledby="extras-title">
+            <section
+              ref={extrasSectionRef}
+              className="customizer-section"
+              aria-labelledby="extras-title"
+              tabIndex={-1}
+            >
               <div className="section-heading-row">
                 <h3 id="extras-title">Extras</h3>
                 <span>Optional</span>

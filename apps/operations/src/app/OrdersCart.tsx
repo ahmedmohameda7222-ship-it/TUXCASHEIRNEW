@@ -18,7 +18,8 @@ import {
   type PaymentMethodId,
 } from '@tux/domain';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { MoneyInput } from './MoneyInput';
+import { EditPencilIcon, PlusCircleIcon } from './icons';
+import { MoneyInput, OptionalMoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
 export type DraftMutation = (draft: OrderDraft) => OrderDraft;
@@ -110,12 +111,9 @@ function CashEditor({
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor | null;
   readonly busy: boolean;
-  readonly onCommit: (value: MoneyMinor) => void;
+  readonly onCommit: (value: MoneyMinor | null) => void;
 }) {
-  const suggestions = useMemo(
-    () => suggestCashTenders(allocatedMinor).slice(0, 4),
-    [allocatedMinor],
-  );
+  const suggestions = useMemo(() => suggestCashTenders(allocatedMinor), [allocatedMinor]);
   const changeMinor =
     receivedMinor !== null && receivedMinor >= allocatedMinor
       ? subtractMoney(receivedMinor, allocatedMinor)
@@ -123,10 +121,10 @@ function CashEditor({
 
   return (
     <div className="cash-editor">
-      <MoneyInput
+      <OptionalMoneyInput
         id={`${idPrefix}-cash-received`}
         label={label}
-        value={receivedMinor ?? ZERO_MONEY}
+        value={receivedMinor}
         disabled={busy}
         compact
         onCommit={onCommit}
@@ -164,7 +162,9 @@ export function OrdersCart({
   placing,
   onMutate,
   onEditLine,
+  onEditLineExtras,
   onDecrementLine,
+  onIncrementLine,
   onClear,
   onDeliveryPhoneCommit,
   onPlace,
@@ -176,7 +176,9 @@ export function OrdersCart({
   readonly placing: boolean;
   readonly onMutate: (mutation: DraftMutation) => void;
   readonly onEditLine: (lineId: DraftLineId) => void;
+  readonly onEditLineExtras: (lineId: DraftLineId) => void;
   readonly onDecrementLine: (lineId: DraftLineId) => void;
+  readonly onIncrementLine: (lineId: DraftLineId) => void;
   readonly onClear: () => void;
   readonly onDeliveryPhoneCommit: (displayPhone: string) => void;
   readonly onPlace: () => void;
@@ -190,6 +192,16 @@ export function OrdersCart({
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
   const methods = activePaymentMethods(configuration);
+  const productsWithExtras = useMemo(() => {
+    const activeModifierIds = new Set(
+      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
+    );
+    return new Set(
+      configuration.productModifierLinks
+        .filter((link) => activeModifierIds.has(link.modifierId))
+        .map((link) => link.productId),
+    );
+  }, [configuration.modifiers, configuration.productModifierLinks]);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
@@ -257,9 +269,7 @@ export function OrdersCart({
         mode: 'SPLIT',
         methodAId: methodA.id,
         amountAMinor: ZERO_MONEY,
-        methodACashReceivedMinor: null,
         methodBId: methodB.id,
-        methodBCashReceivedMinor: null,
       },
     }));
   }
@@ -268,12 +278,12 @@ export function OrdersCart({
     <aside className="orders-cart" aria-label="Current order">
       <div className="cart-heading">
         <div>
-          <span>Current order</span>
-          <strong>
+          <strong className="cart-title">Current Order</strong>
+          <span className="cart-count">
             {totalQuantity === 0
               ? 'Empty'
               : `${totalQuantity} item${totalQuantity === 1 ? '' : 's'}`}
-          </strong>
+          </span>
         </div>
         <button
           type="button"
@@ -286,27 +296,6 @@ export function OrdersCart({
       </div>
 
       <div className="cart-scroll">
-        <section
-          className="cart-section order-type-section"
-          aria-labelledby={controlId('order-type-title')}
-        >
-          <h2 id={controlId('order-type-title')}>Order type</h2>
-          <div className="segmented-control">
-            {orderTypes.map((orderType) => (
-              <button
-                type="button"
-                key={orderType.id}
-                className={draft.orderTypeId === orderType.id ? 'selected' : undefined}
-                disabled={busy}
-                onClick={() => selectOrderType(orderType.id)}
-              >
-                {orderType.name}
-              </button>
-            ))}
-          </div>
-          <SectionIssues issues={issues} paths={['orderType']} />
-        </section>
-
         <section
           className="cart-section cart-lines-section"
           aria-labelledby={controlId('cart-items-title')}
@@ -324,6 +313,7 @@ export function OrdersCart({
             <div className="cart-lines">
               {draft.lines.map((line) => {
                 const lineIssues = issues.filter((issue) => issue.path === `line:${line.id}`);
+                const supportsExtras = productsWithExtras.has(line.productId);
                 return (
                   <article className="cart-line" key={line.id}>
                     <div className="cart-line-top">
@@ -351,17 +341,35 @@ export function OrdersCart({
                         {issue.message}
                       </p>
                     ))}
-                    <div className="line-actions">
-                      <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
-                        Edit
-                      </button>
+                    <div className="line-actions" aria-label={`${line.productName} actions`}>
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => onDecrementLine(line.id)}
                       >
-                        − One
+                        −1
                       </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onIncrementLine(line.id)}
+                      >
+                        +1
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
+                        Edit
+                      </button>
+                      {supportsExtras ? (
+                        <button
+                          type="button"
+                          className="line-extra-action"
+                          disabled={busy}
+                          onClick={() => onEditLineExtras(line.id)}
+                        >
+                          {line.modifiers.length > 0 ? <EditPencilIcon /> : <PlusCircleIcon />}
+                          <span>Extra</span>
+                        </button>
+                      ) : null}
                     </div>
                   </article>
                 );
@@ -369,6 +377,27 @@ export function OrdersCart({
             </div>
           )}
           <SectionIssues issues={issues} paths={['cart']} />
+        </section>
+
+        <section
+          className="cart-section order-type-section"
+          aria-labelledby={controlId('order-type-title')}
+        >
+          <h2 id={controlId('order-type-title')}>Order type</h2>
+          <div className="segmented-control">
+            {orderTypes.map((orderType) => (
+              <button
+                type="button"
+                key={orderType.id}
+                className={draft.orderTypeId === orderType.id ? 'selected' : undefined}
+                disabled={busy}
+                onClick={() => selectOrderType(orderType.id)}
+              >
+                {orderType.name}
+              </button>
+            ))}
+          </div>
+          <SectionIssues issues={issues} paths={['orderType']} />
         </section>
 
         {delivery ? (
@@ -608,7 +637,6 @@ export function OrdersCart({
                             payment: {
                               ...current.payment,
                               methodAId,
-                              methodACashReceivedMinor: null,
                               methodBId:
                                 current.payment.methodBId === methodAId && fallbackB !== undefined
                                   ? fallbackB.id
@@ -638,25 +666,6 @@ export function OrdersCart({
                       )
                     }
                   />
-                  {methodById(methods, draft.payment.methodAId)?.logicType === 'CASH' ? (
-                    <CashEditor
-                      idPrefix={controlId('split-a')}
-                      label="Cash received A"
-                      allocatedMinor={draft.payment.amountAMinor}
-                      receivedMinor={draft.payment.methodACashReceivedMinor}
-                      busy={busy}
-                      onCommit={(methodACashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SPLIT'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, methodACashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null}
                 </div>
 
                 <div className="split-method-block">
@@ -676,7 +685,6 @@ export function OrdersCart({
                             payment: {
                               ...current.payment,
                               methodBId,
-                              methodBCashReceivedMinor: null,
                               methodAId:
                                 current.payment.methodAId === methodBId && fallbackA !== undefined
                                   ? fallbackA.id
@@ -703,26 +711,6 @@ export function OrdersCart({
                         : '—'}
                     </strong>
                   </div>
-                  {methodById(methods, draft.payment.methodBId)?.logicType === 'CASH' &&
-                  draft.payment.amountAMinor <= pricing.totalMinor ? (
-                    <CashEditor
-                      idPrefix={controlId('split-b')}
-                      label="Cash received B"
-                      allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}
-                      receivedMinor={draft.payment.methodBCashReceivedMinor}
-                      busy={busy}
-                      onCommit={(methodBCashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SPLIT'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, methodBCashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null}
                 </div>
 
                 <button
