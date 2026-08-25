@@ -88,7 +88,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       );
       const preferencesRepository: WorkerUiPreferencesRepository = {
         get: (shopId, workerId) =>
-          database.transaction((transaction) => transaction.workerUiPreferences.get(shopId, workerId)),
+          database.transaction((transaction) =>
+            transaction.workerUiPreferences.get(shopId, workerId),
+          ),
         put: (preferences) =>
           database.transaction((transaction) => transaction.workerUiPreferences.put(preferences)),
         delete: (shopId, workerId) =>
