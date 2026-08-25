@@ -1,0 +1,32 @@
+/* Final approved POS correction authority. Keep this last in the Operations style cascade. */
+
+/* Product cards only reserve the ~152px density target when descriptive copy exists. */
+.product-card {
+  min-height: 0;
+}
+
+.product-card:has(.product-copy p) {
+  min-height: 152px;
+}
+
+/* Quantity text is part of the 15/20 high-frequency control typography lock. */
+.product-quantity output,
+.quantity-control output {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+/* The visible/responsive resize handle is 12px while the divider remains a 1px hairline. */
+.cart-resize-separator {
+  width: 12px;
+  min-width: 12px;
+  justify-self: center;
+}
+
+/* Preserve true centered navigation throughout the desktop rail breakpoint. */
+@media (max-width: 74rem) and (min-width: 54.0625rem) {
+  .operations-header {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+}
