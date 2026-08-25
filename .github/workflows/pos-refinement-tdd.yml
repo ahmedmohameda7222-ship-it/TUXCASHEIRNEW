@@ -27,6 +27,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Show App formatter diff
+        shell: bash
+        run: |
+          npx prettier apps/operations/src/app/App.tsx > /tmp/App.tsx.formatted
+          diff -u apps/operations/src/app/App.tsx /tmp/App.tsx.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
