@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -16,7 +16,7 @@ jobs:
   tdd:
     name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 24
+    timeout-minutes: 12
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,49 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 14 premium hierarchy implementation
-        if: github.actor != 'github-actions[bot]'
-        run: python scripts/task14_green.py
-      - name: Format Task 14 implementation
-        if: github.actor != 'github-actions[bot]'
-        run: npx prettier --write apps/operations/src/styles/global.css apps/operations/src/styles/premium.css
-      - name: Full typecheck
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck
-      - name: E2E typecheck
-        if: github.actor != 'github-actions[bot]'
-        run: npm run typecheck:e2e
-      - name: Lint staged implementation
-        if: github.actor != 'github-actions[bot]'
-        run: npm run lint
-      - name: Unit and integration tests for staged implementation
-        if: github.actor != 'github-actions[bot]'
-        run: npm run test
-      - name: Install Playwright Chromium
-        if: github.actor != 'github-actions[bot]'
-        run: npx playwright install --with-deps chromium
-      - name: Rendered Task 14 hierarchy contract
-        if: github.actor != 'github-actions[bot]'
-        run: npm run test:e2e -- --retries=0 --grep "premium POS visual hierarchy"
-      - name: Rendered branding regression
-        if: github.actor != 'github-actions[bot]'
-        run: npm run test:e2e -- --retries=0 e2e/branding.e2e.ts
-      - name: Commit Task 14 product implementation
-        if: github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/styles/global.css apps/operations/src/styles/premium.css
-          git diff --cached --quiet && { echo "Task 14 implementation produced no product diff"; exit 1; }
-          git commit -m "refactor: finish premium POS visual hierarchy"
-          git push origin HEAD:ui/tux-pos-refinement
       - name: Format check
-        if: github.actor == 'github-actions[bot]'
         run: npm run format:check
       - name: Lint
-        if: github.actor == 'github-actions[bot]'
         run: npm run lint
       - name: Unit and integration tests
-        if: github.actor == 'github-actions[bot]'
         run: npm run test
