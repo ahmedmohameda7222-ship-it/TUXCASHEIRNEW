@@ -14,12 +14,14 @@ import {
   validateOrderDraft,
   type DraftLineCustomization,
   type DraftLineId,
+  type MenuCategory,
   type MenuCategoryId,
   type OrderDraft,
   type OrderId,
   type OrderValidationIssue,
   type Product,
   type ProductId,
+  type WorkerUiPreferences,
 } from '@tux/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MenuProductCard } from './MenuProductCard';
@@ -29,6 +31,32 @@ import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustom
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+
+export function reconcileCategoryOrder(
+  activeCategories: readonly MenuCategory[],
+  preference: WorkerUiPreferences | null,
+): readonly MenuCategory[] {
+  if (preference === null || preference.categoryOrder.length === 0) return activeCategories;
+
+  const byId = new Map(activeCategories.map((category) => [category.id, category]));
+  const reconciled: MenuCategory[] = [];
+  const seen = new Set<MenuCategoryId>();
+
+  for (const categoryId of preference.categoryOrder) {
+    const category = byId.get(categoryId);
+    if (category === undefined || seen.has(categoryId)) continue;
+    reconciled.push(category);
+    seen.add(categoryId);
+  }
+
+  for (const category of activeCategories) {
+    if (seen.has(category.id)) continue;
+    reconciled.push(category);
+    seen.add(category.id);
+  }
+
+  return reconciled;
+}
 
 interface UndoState {
   readonly snapshot: OrderDraft;
