@@ -54,7 +54,9 @@ function categoryOrder(value: unknown): readonly MenuCategoryId[] {
     }
   });
   if (new Set(parsed).size !== parsed.length) {
-    throw new TypeError('WorkerUiPreferences.categoryOrder must not contain duplicate category IDs.');
+    throw new TypeError(
+      'WorkerUiPreferences.categoryOrder must not contain duplicate category IDs.',
+    );
   }
   return parsed;
 }
@@ -62,7 +64,11 @@ function categoryOrder(value: unknown): readonly MenuCategoryId[] {
 export function parseWorkerUiPreferences(value: unknown): WorkerUiPreferences {
   const preferences = record(value);
   const serverVersion = preferences['serverVersion'];
-  if (typeof serverVersion !== 'number' || !Number.isSafeInteger(serverVersion) || serverVersion < 0) {
+  if (
+    typeof serverVersion !== 'number' ||
+    !Number.isSafeInteger(serverVersion) ||
+    serverVersion < 0
+  ) {
     throw new TypeError('WorkerUiPreferences.serverVersion must be a non-negative safe integer.');
   }
 
