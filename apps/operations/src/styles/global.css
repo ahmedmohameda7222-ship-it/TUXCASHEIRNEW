@@ -177,6 +177,15 @@ button:not(:disabled) {
   font-size: var(--tux-font-size-lg);
 }
 
+.greeting-content .welcome-motivation {
+  margin-top: var(--tux-space-4);
+}
+
+.welcome-action {
+  min-height: 3rem;
+  margin-top: var(--tux-space-6);
+}
+
 .operations-shell {
   min-height: 100vh;
 }
