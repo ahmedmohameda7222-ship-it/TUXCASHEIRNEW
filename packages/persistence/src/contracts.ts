@@ -21,6 +21,7 @@ import type {
   WorkerId,
   WorkerSession,
 } from '@tux/domain';
+import type { WorkerUiPreferencesRepository } from './workerUiPreferencesStore';
 
 export interface ShopRepository {
   getById(id: ShopId): Promise<Shop | null>;
@@ -96,6 +97,7 @@ export interface OperationsTransaction {
   readonly devices: DeviceRepository;
   readonly workers: WorkerRepository;
   readonly workerSessions: WorkerSessionRepository;
+  readonly workerUiPreferences: WorkerUiPreferencesRepository;
   readonly configuration: ConfigurationRepository;
   readonly customerContacts: CustomerContactRepository;
   readonly businessDays: BusinessDayRepository;
