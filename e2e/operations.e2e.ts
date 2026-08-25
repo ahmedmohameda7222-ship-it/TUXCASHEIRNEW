@@ -1592,3 +1592,78 @@ test('category edit contains primary categories only', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
 });
+
+test('final correction keeps Extra and product controls fully contained', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+
+  const grid = page.locator('.product-grid');
+  const gridStyle = await grid.evaluate((node) => getComputedStyle(node));
+  expect(gridStyle.rowGap).toBe('8px');
+  expect(gridStyle.columnGap).toBe('8px');
+  expect(gridStyle.alignItems).toBe('start');
+  const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
+  expect(columnCount).toBe(testInfo.project.name === 'desktop-browser-fallback' ? 3 : 2);
+
+  const card = grid.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const minus = card.getByRole('button', { name: 'Remove one Single Smashed Patty' });
+  const plus = card.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  const quantity = card.locator('.product-quantity output');
+  await expect(extra).toBeVisible();
+  await expect(minus).toBeVisible();
+  await expect(quantity).toBeVisible();
+  await expect(plus).toBeVisible();
+
+  const controls = [extra, minus, quantity, plus];
+  for (const control of controls) {
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+    expect(box!.y).toBeGreaterThanOrEqual(cardBox!.y - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+  }
+
+  for (const button of [minus, plus]) {
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+  }
+  const extraBox = await extra.boundingBox();
+  expect(extraBox).not.toBeNull();
+  expect(Math.round(extraBox!.height)).toBeGreaterThanOrEqual(44);
+
+  const footerStyle = await card
+    .locator('.product-card-footer')
+    .evaluate((node) => getComputedStyle(node));
+  expect(footerStyle.minHeight).toBe('52px');
+  expect(footerStyle.flexWrap).toBe('wrap');
+  expect(footerStyle.rowGap).toBe('8px');
+  const controlsStyle = await card
+    .locator('.product-card-controls')
+    .evaluate((node) => getComputedStyle(node));
+  expect(controlsStyle.flexWrap).toBe('nowrap');
+
+  await page.getByRole('button', { name: 'Fries', exact: true }).click();
+  const plain = grid.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
+  const described = grid.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
+  await expect(plain.locator('.product-copy p')).toHaveCount(0);
+  await expect(described.locator('.product-copy p')).toHaveCount(1);
+  const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
+  const describedStyle = await described.evaluate((node) => getComputedStyle(node));
+  expect(plainStyle.minHeight).toBe('0px');
+  expect(describedStyle.minHeight).toBe('152px');
+
+  const overflow = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.viewport);
+});
