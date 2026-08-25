@@ -46,11 +46,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show formatter diff during refinement TDD
-        shell: bash
-        run: |
-          npx prettier packages/domain/src/tender.test.ts > /tmp/tender.test.ts.formatted
-          diff -u packages/domain/src/tender.test.ts /tmp/tender.test.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
