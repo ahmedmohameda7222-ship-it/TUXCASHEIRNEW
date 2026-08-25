@@ -6,8 +6,13 @@ import {
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  WorkerUiPreferencesRetryController,
+  WorkerUiPreferencesService,
+  type OperationsSessionResult,
+  type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
 import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
@@ -25,6 +30,7 @@ import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
   startDesktopAutomaticSync,
+  SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { EndDayIpcRuntime } from './endDayIpc';
@@ -64,6 +70,8 @@ let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
+let workerUiPreferencesRetry: WorkerUiPreferencesRetryController | null = null;
+let activeWorkerUiPreferencesIdentity: WorkerUiPreferencesSyncIdentity | null = null;
 let configurationSyncTimer: ReturnType<typeof setInterval> | null = null;
 let syncHealthSnapshot = buildSyncHealth({ remoteConfigured: false }) as TuxSyncHealthSnapshot;
 let syncHasRun = false;
@@ -83,6 +91,18 @@ function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(IPC_SYNC_STATUS_CHANGED, syncHealthSnapshot);
   }
+}
+
+function trackWorkerUiPreferencesIdentity(result: OperationsSessionResult): void {
+  if (!result.ok || result.value.status !== 'ACTIVE') {
+    activeWorkerUiPreferencesIdentity = null;
+    return;
+  }
+  activeWorkerUiPreferencesIdentity = {
+    shopId: result.value.shopId,
+    workerId: result.value.operator.id,
+  };
+  void workerUiPreferencesRetry?.syncActive();
 }
 
 async function initializeOperationsServices(): Promise<void> {
@@ -138,6 +158,38 @@ async function initializeOperationsServices(): Promise<void> {
     runtime,
     coordinator,
   );
+
+  if (remoteSessionManager !== null && supabaseUrl) {
+    const preferencesRepository: WorkerUiPreferencesRepository = {
+      get: (shopId, workerId) =>
+        operationsDatabase!.transaction((transaction) =>
+          transaction.workerUiPreferences.get(shopId, workerId),
+        ),
+      put: (preferences) =>
+        operationsDatabase!.transaction((transaction) =>
+          transaction.workerUiPreferences.put(preferences),
+        ),
+      delete: (shopId, workerId) =>
+        operationsDatabase!.transaction((transaction) =>
+          transaction.workerUiPreferences.delete(shopId, workerId),
+        ),
+    };
+    const preferencesService = new WorkerUiPreferencesService(
+      preferencesRepository,
+      new SupabaseDesktopWorkerUiPreferencesGateway({
+        projectUrl: supabaseUrl,
+        sessionManager: remoteSessionManager,
+      }),
+      runtime.now,
+    );
+    workerUiPreferencesRetry = new WorkerUiPreferencesRetryController(
+      preferencesService,
+      () => activeWorkerUiPreferencesIdentity,
+    );
+    workerUiPreferencesRetry.start();
+    trackWorkerUiPreferencesIdentity(await sessionService.getState());
+  }
+
   ordersService = new OperationsOrdersService(
     operationsDatabase,
     operatorReadModel,
@@ -252,16 +304,22 @@ function registerIpcHandlers(window: BrowserWindow): void {
   });
   ipcMain.handle(IPC_SESSION_GET_STATE, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    return currentSessionService().getState();
+    const result = await currentSessionService().getState();
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_SESSION_SUBMIT_PIN, async (event, pin: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     if (typeof pin !== 'string') throw new TypeError('PIN IPC payload must be a string.');
-    return currentSessionService().submitPin(pin);
+    const result = await currentSessionService().submitPin(pin);
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_SESSION_SIGN_OUT, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
-    return currentSessionService().signOut();
+    const result = await currentSessionService().signOut();
+    trackWorkerUiPreferencesIdentity(result);
+    return result;
   });
   ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
@@ -392,6 +450,9 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
   configurationSyncTimer = null;
+  workerUiPreferencesRetry?.stop();
+  workerUiPreferencesRetry = null;
+  activeWorkerUiPreferencesIdentity = null;
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
