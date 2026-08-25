@@ -39,7 +39,9 @@ describe('suggestCashTenders', () => {
 
   it('rejects rounded values that exceed the safe-integer range', () => {
     expect(() =>
-      suggestCashTenders(moneyMinor(Number.MAX_SAFE_INTEGER - 1), [moneyMinor(1_000)]),
+      suggestCashTenders(moneyMinor(Number.MAX_SAFE_INTEGER), [
+        moneyMinor(Number.MAX_SAFE_INTEGER - 1),
+      ]),
     ).toThrow('Tender suggestion exceeded safe integer range.');
   });
 });
