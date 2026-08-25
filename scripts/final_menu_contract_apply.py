@@ -50,7 +50,10 @@ test('final correction approval evidence enforces exact approved menu content', 
 
   await expect(page.locator('.product-card')).toHaveCount(19);
   for (const name of allNames) {
-    const card = page.locator('.product-card').filter({ hasText: name }).first();
+    const card = page
+      .locator('.product-card')
+      .filter({ has: page.getByText(name, { exact: true }) })
+      .first();
     await expect(card).toBeVisible();
     const description = expectedDescriptions.get(name);
     if (description === undefined) {
