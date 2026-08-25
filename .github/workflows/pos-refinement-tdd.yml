@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -27,89 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved Task 8 closing fixes
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          cart = Path('apps/operations/src/app/OrdersCart.tsx')
-          text = cart.read_text()
-          replacements = [
-              ("                              methodAId,\n                              methodACashReceivedMinor: null,\n                              methodBId:", "                              methodAId,\n                              methodBId:"),
-              ("                  {methodById(methods, draft.payment.methodAId)?.logicType === 'CASH' ? (\n                    <CashEditor\n                      idPrefix={controlId('split-a')}\n                      label=\"Cash received A\"\n                      allocatedMinor={draft.payment.amountAMinor}\n                      receivedMinor={draft.payment.methodACashReceivedMinor}\n                      busy={busy}\n                      onCommit={(methodACashReceivedMinor) =>\n                        onMutate((current) =>\n                          current.payment.mode === 'SPLIT'\n                            ? {\n                                ...current,\n                                payment: { ...current.payment, methodACashReceivedMinor },\n                              }\n                            : current,\n                        )\n                      }\n                    />\n                  ) : null}\n", ""),
-              ("                              methodBId,\n                              methodBCashReceivedMinor: null,\n                              methodAId:", "                              methodBId,\n                              methodAId:"),
-              ("                  {methodById(methods, draft.payment.methodBId)?.logicType === 'CASH' &&\n                  draft.payment.amountAMinor <= pricing.totalMinor ? (\n                    <CashEditor\n                      idPrefix={controlId('split-b')}\n                      label=\"Cash received B\"\n                      allocatedMinor={subtractMoney(pricing.totalMinor, draft.payment.amountAMinor)}\n                      receivedMinor={draft.payment.methodBCashReceivedMinor}\n                      busy={busy}\n                      onCommit={(methodBCashReceivedMinor) =>\n                        onMutate((current) =>\n                          current.payment.mode === 'SPLIT'\n                            ? {\n                                ...current,\n                                payment: { ...current.payment, methodBCashReceivedMinor },\n                              }\n                            : current,\n                        )\n                      }\n                    />\n                  ) : null}\n", ""),
-          ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'Expected OrdersCart source block not found: {old[:80]!r}')
-              text = text.replace(old, new, 1)
-          cart.write_text(text)
-
-          test = Path('packages/application/src/workerUiPreferences.test.ts')
-          text = test.read_text()
-          pattern = re.compile(
-              r"(?m)^(\s*)let release: \(\(\) => void\) \| null = null;\n"
-              r"\1const first = new Promise<void>\(\(resolve\) => \{\n"
-              r"\1  release = resolve;\n"
-              r"\1\}\);"
-          )
-          match = pattern.search(text)
-          if match is None:
-              raise SystemExit('Expected retry resolver source block not found.')
-          indent = match.group(1)
-          replacement = (
-              f"{indent}let resolveFirst!: () => void;\n"
-              f"{indent}const first = new Promise<void>((resolve) => {{\n"
-              f"{indent}  resolveFirst = resolve;\n"
-              f"{indent}}});"
-          )
-          text = pattern.sub(replacement, text, count=1)
-          if '    release?.();\n' not in text:
-              raise SystemExit('Expected retry resolver call not found.')
-          text = text.replace('    release?.();\n', '    resolveFirst();\n', 1)
-          test.write_text(text)
-
-          gateway = Path('server/workerUiPreferencesGateway.ts')
-          text = gateway.read_text()
-          old = '  sendJson(response, 200, preference);\n'
-          new = """  sendJson(response, 200, {
-            shopId: preference.shopId,
-            workerId: preference.workerId,
-            categoryOrder: preference.categoryOrder,
-            categoryAlignment: preference.categoryAlignment,
-            serverVersion: preference.serverVersion,
-            updatedAt: preference.updatedAt,
-          });
-          """
-          if old not in text:
-              raise SystemExit('Expected worker preference response serialization not found.')
-          gateway.write_text(text.replace(old, new, 1))
-          PY
-          npx prettier --write \
-            apps/operations/src/app/OrdersCart.tsx \
-            packages/application/src/workerUiPreferences.test.ts \
-            server/workerUiPreferencesGateway.ts
       - name: Format check
         run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
-      - name: Task 8 focused worker preference tests
-        run: npm test -- apps/operations-desktop/src/main/*workerUiPreferences*.test.ts
-      - name: Task 8 full typecheck
-        run: npm run typecheck
-      - name: Commit verified Task 8 source fixes
-        shell: bash
-        run: |
-          git config user.name "TUX Refinement CI"
-          git config user.email "actions@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersCart.tsx packages/application/src/workerUiPreferences.test.ts server/workerUiPreferencesGateway.ts
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "fix: align preference and payment boundaries"
-          git push origin HEAD:ui/tux-pos-refinement
