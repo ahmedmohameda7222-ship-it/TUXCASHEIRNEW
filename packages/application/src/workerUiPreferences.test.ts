@@ -207,11 +207,9 @@ describe('WorkerUiPreferencesRetryController', () => {
     vi.useFakeTimers();
     const syncOnce = vi.fn().mockResolvedValue(undefined);
     let identity: { shopId: ShopId; workerId: WorkerId } | null = null;
-    const controller = new WorkerUiPreferencesRetryController(
-      { syncOnce },
-      () => identity,
-      { intervalMs: 60_000 },
-    );
+    const controller = new WorkerUiPreferencesRetryController({ syncOnce }, () => identity, {
+      intervalMs: 60_000,
+    });
 
     controller.start();
     await vi.advanceTimersByTimeAsync(60_000);
@@ -236,10 +234,10 @@ describe('WorkerUiPreferencesRetryController', () => {
       .fn()
       .mockImplementationOnce(() => first)
       .mockRejectedValueOnce(new Error('offline'));
-    const controller = new WorkerUiPreferencesRetryController(
-      { syncOnce },
-      () => ({ shopId, workerId }),
-    );
+    const controller = new WorkerUiPreferencesRetryController({ syncOnce }, () => ({
+      shopId,
+      workerId,
+    }));
 
     const pending = controller.syncActive();
     const duplicate = controller.syncActive();
