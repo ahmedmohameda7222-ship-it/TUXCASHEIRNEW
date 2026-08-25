@@ -97,17 +97,6 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
   };
 }
 
-async function parseSingleRemoteRow(upstream: Response): Promise<RemoteWorkerUiPreference | null> {
-  let parsed: unknown;
-  try {
-    parsed = await upstream.json();
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(parsed) || parsed.length !== 1) return null;
-  return parseRemoteRow(parsed[0]);
-}
-
 function upstreamHeaders(input: {
   readonly publishableKey: string;
   readonly accessToken: string;
@@ -235,7 +224,9 @@ export async function handleWorkerUiPreferences(
     return;
   }
   const preference =
-    Array.isArray(parsed) && parsed.length === 1 ? parseRemoteRow(parsed[0]) : parseRemoteRow(parsed);
+    Array.isArray(parsed) && parsed.length === 1
+      ? parseRemoteRow(parsed[0])
+      : parseRemoteRow(parsed);
   if (preference === null) {
     sendJson(response, 502, { error: 'invalid_remote_response' });
     return;
