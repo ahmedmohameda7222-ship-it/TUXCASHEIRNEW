@@ -47,8 +47,9 @@ jobs:
           python scripts/final_correction_apply.py
           python scripts/final_correction_test_expectations.py
           python scripts/final_correction_geometry_fix.py
+          python scripts/final_correction_brand_fix.py
       - name: Format touched files
-        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations-desktop/src/main/workerUiPreferencesIpc.ts apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations-desktop/src/main/workerUiPreferencesIpc.ts apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css apps/operations/src/styles/brand.css e2e/operations.e2e.ts
       - name: Format check
         run: npm run format:check
       - name: Typecheck
@@ -80,6 +81,7 @@ jobs:
             apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts \
             apps/operations/src/styles/orders.css \
             apps/operations/src/styles/premium.css \
+            apps/operations/src/styles/brand.css \
             e2e/operations.e2e.ts
           git diff --cached --quiet && exit 1
           git commit -m "fix: apply final POS visual correction"
