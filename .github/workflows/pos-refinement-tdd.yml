@@ -27,11 +27,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Show desktop preference gateway formatter diff
-        shell: bash
-        run: |
-          npx prettier apps/operations-desktop/src/main/automaticSync.ts > /tmp/automaticSync.ts.formatted
-          diff -u apps/operations-desktop/src/main/automaticSync.ts /tmp/automaticSync.ts.formatted || true
       - name: Format check
         run: npm run format:check
       - name: Lint
