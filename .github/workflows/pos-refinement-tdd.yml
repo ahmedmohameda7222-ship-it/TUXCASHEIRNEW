@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved menu fixture
+      - name: Apply approved menu fixture and toolbar correction
         run: |
           python scripts/apply_task3_fixture.py
           python scripts/fix_task3_generated_names.py
@@ -37,11 +37,16 @@ jobs:
           python scripts/fix_task3_search_query.py
           python scripts/fix_task3_category_editor.py
           python scripts/fix_task3_remaining_expectations.py
-      - name: Format E2E source
-        run: npx prettier --write e2e/operations.e2e.ts
+          python scripts/fix_task3_toolbar_height.py
+      - name: Format changed sources
+        run: npx prettier --write e2e/operations.e2e.ts apps/operations/src/styles/premium.css
       - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Find first Operations E2E incompatibility
+      - name: Verify locked toolbar height GREEN
+        run: >-
+          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
+          "final correction keeps header and categories visible during compact search"
+      - name: Find next Operations E2E incompatibility
         run: npx playwright test e2e/operations.e2e.ts --max-failures=1
