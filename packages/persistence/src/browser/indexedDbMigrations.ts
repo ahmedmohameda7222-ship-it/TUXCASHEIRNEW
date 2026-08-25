@@ -1,10 +1,11 @@
-export const INDEXED_DB_VERSION = 2;
+export const INDEXED_DB_VERSION = 3;
 
 export const INDEXED_DB_STORES = [
   'shops',
   'devices',
   'workers',
   'workerSessions',
+  'workerUiPreferences',
   'configurationSnapshots',
   'customerContacts',
   'businessDays',
@@ -99,6 +100,13 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
         'aggregateId',
         'aggregateRevision',
       ]);
+    },
+  },
+  {
+    version: 3,
+    name: 'worker_ui_preferences',
+    apply(database) {
+      database.createObjectStore('workerUiPreferences', { keyPath: 'id' });
     },
   },
 ];
