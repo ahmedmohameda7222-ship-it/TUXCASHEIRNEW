@@ -20,9 +20,7 @@ const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222')
 const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333331');
 const categoryB = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333332');
 
-function preference(
-  overrides: Partial<WorkerUiPreferences> = {},
-): WorkerUiPreferences {
+function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPreferences {
   return {
     shopId,
     workerId,
@@ -35,9 +33,7 @@ function preference(
   };
 }
 
-function remote(
-  overrides: Partial<RemoteWorkerUiPreferences> = {},
-): RemoteWorkerUiPreferences {
+function remote(overrides: Partial<RemoteWorkerUiPreferences> = {}): RemoteWorkerUiPreferences {
   return {
     shopId,
     workerId,
