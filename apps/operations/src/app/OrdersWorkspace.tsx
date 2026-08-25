@@ -12,6 +12,7 @@ import {
   productQuantityInDraft,
   replaceDraftLineCustomization,
   validateOrderDraft,
+  type CategoryAlignment,
   type DraftLineCustomization,
   type DraftLineId,
   type MenuCategory,
@@ -24,8 +25,9 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { EditPencilIcon, SearchIcon } from './icons';
 import { MenuProductCard } from './MenuProductCard';
-import type { OperationsOrdersClient } from './sessionClient';
+import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
@@ -166,6 +168,7 @@ export function OrdersWorkspace({
   readonly client: OperationsOrdersClient;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
+  const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
   const searchRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -184,6 +187,14 @@ export function OrdersWorkspace({
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
   const [selectedProductFamily, setSelectedProductFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
+  const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
+  const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
+  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('center');
+  const [categoryEditSaving, setCategoryEditSaving] = useState(false);
+  const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
+  const [categoryResetRequested, setCategoryResetRequested] = useState(false);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -230,6 +241,29 @@ export function OrdersWorkspace({
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
 
   useEffect(() => {
+    let cancelled = false;
+    setCategoryPreference(null);
+    setCategoryMode('IDLE');
+    setSearch('');
+    setCategoryEditError(null);
+    void preferencesClient
+      .load()
+      .then((preference) => {
+        if (!cancelled) setCategoryPreference(preference);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryPreference(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preferencesClient, session.operator.id]);
+
+  useEffect(() => {
+    if (categoryMode === 'SEARCH') searchRef.current?.focus();
+  }, [categoryMode]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       const target = event.target;
       const targetIsEditor =
@@ -237,24 +271,29 @@ export function OrdersWorkspace({
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        if (categoryMode === 'EDIT') return;
         event.preventDefault();
-        searchRef.current?.focus();
+        setCategoryMode('SEARCH');
         return;
       }
-      if (event.key === '/' && !targetIsEditor) {
+      if (event.key === '/' && !targetIsEditor && categoryMode !== 'EDIT') {
         event.preventDefault();
-        searchRef.current?.focus();
+        setCategoryMode('SEARCH');
         return;
       }
-      if (event.key === 'Escape' && search.length > 0) {
+      if (event.key === 'Escape' && categoryMode === 'SEARCH') {
         event.preventDefault();
-        setSearch('');
-        searchRef.current?.focus();
+        if (search.length > 0) {
+          setSearch('');
+          searchRef.current?.focus();
+        } else {
+          setCategoryMode('IDLE');
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [search]);
+  }, [categoryMode, search]);
 
   useEffect(
     () => () => {
@@ -324,13 +363,25 @@ export function OrdersWorkspace({
   }
 
   const configuration = workspace?.configuration ?? null;
-  const activeCategories = useMemo(
+  const configuredActiveCategories = useMemo(
     () =>
       configuration?.categories
         .filter((category) => category.active)
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
+  const activeCategories = useMemo(
+    () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
+    [categoryPreference, configuredActiveCategories],
+  );
+  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'center';
+  const categoryEditorCategories = useMemo(() => {
+    const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));
+    return categoryEditOrder.flatMap((categoryId) => {
+      const category = byId.get(categoryId);
+      return category === undefined ? [] : [category];
+    });
+  }, [categoryEditOrder, configuredActiveCategories]);
   const productFamilies = useMemo(() => {
     if (configuration === null || selectedCategoryId === null) return [];
     const seen = new Set<string>();
@@ -381,6 +432,75 @@ export function OrdersWorkspace({
     quickInfoProductId === null
       ? null
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
+
+  function beginCategoryEdit(): void {
+    setSearch('');
+    setCategoryEditOrder(activeCategories.map((category) => category.id));
+    setCategoryEditAlignment(categoryAlignment);
+    setCategoryEditError(null);
+    setCategoryResetRequested(false);
+    setDraggedCategoryId(null);
+    setCategoryMode('EDIT');
+  }
+
+  function moveCategory(categoryId: MenuCategoryId, direction: -1 | 1): void {
+    setCategoryEditOrder((current) => {
+      const index = current.indexOf(categoryId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
+      return next;
+    });
+    setCategoryResetRequested(false);
+  }
+
+  function dropCategory(targetId: MenuCategoryId): void {
+    const sourceId = draggedCategoryId;
+    setDraggedCategoryId(null);
+    if (sourceId === null || sourceId === targetId) return;
+    setCategoryEditOrder((current) => {
+      const sourceIndex = current.indexOf(sourceId);
+      const targetIndex = current.indexOf(targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (moved === undefined) return current;
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+    setCategoryResetRequested(false);
+  }
+
+  function resetCategoryEdit(): void {
+    setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
+    setCategoryEditAlignment('center');
+    setCategoryEditError(null);
+    setCategoryResetRequested(true);
+  }
+
+  async function saveCategoryEdit(): Promise<void> {
+    if (categoryEditSaving) return;
+    setCategoryEditSaving(true);
+    setCategoryEditError(null);
+    try {
+      if (categoryResetRequested) {
+        await preferencesClient.reset();
+        setCategoryPreference(null);
+      } else {
+        const saved = await preferencesClient.update({
+          categoryOrder: categoryEditOrder,
+          categoryAlignment: categoryEditAlignment,
+        });
+        setCategoryPreference(saved);
+      }
+      setCategoryMode('IDLE');
+    } catch {
+      setCategoryEditError('Could not save category layout. Try again.');
+    } finally {
+      setCategoryEditSaving(false);
+    }
+  }
 
   function addProduct(product: Product): void {
     if (draftRef.current === null || configuration === null || product.soldOut) return;
@@ -616,57 +736,113 @@ export function OrdersWorkspace({
   return (
     <main className="orders-workspace">
       <section className="menu-pane" aria-label="Menu">
-        <div className="menu-toolbar">
-          <div className="field-stack">
-            <div className="category-rail" aria-label="Menu categories">
-              {activeCategories.map((category) => (
-                <button
-                  type="button"
-                  key={category.id}
-                  className={
-                    selectedCategoryId === category.id && search.length === 0
-                      ? 'selected'
-                      : undefined
-                  }
-                  onClick={() => {
-                    setSelectedCategoryId(category.id);
-                    setSelectedProductFamily(null);
-                    setSearch('');
-                  }}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-            {search.length === 0 && productFamilies.length > 1 ? (
-              <div className="segmented-control" aria-label="Product families">
-                <button
-                  type="button"
-                  className={selectedProductFamily === null ? 'selected' : undefined}
-                  onClick={() => setSelectedProductFamily(null)}
-                >
-                  All
-                </button>
-                {productFamilies.map((family) => (
-                  <button
-                    type="button"
-                    key={family}
-                    className={selectedProductFamily === family ? 'selected' : undefined}
-                    onClick={() => setSelectedProductFamily(family)}
+        <div className={`menu-toolbar category-mode-${categoryMode.toLowerCase()}`}>
+          {categoryMode === 'EDIT' ? (
+            <section className="category-editor" aria-label="Edit categories">
+              <div className="category-editor-toolbar">
+                <div>
+                  <strong>Category layout</strong>
+                  <span>Drag categories or use the move controls.</span>
+                </div>
+                <div className="category-alignment" role="group" aria-label="Category alignment">
+                  {(['left', 'center', 'right'] as const).map((alignment) => (
+                    <button
+                      type="button"
+                      key={alignment}
+                      aria-pressed={categoryEditAlignment === alignment}
+                      disabled={categoryEditSaving}
+                      onClick={() => {
+                        setCategoryEditAlignment(alignment);
+                        setCategoryResetRequested(false);
+                      }}
+                    >
+                      {alignment === 'left' ? 'Left' : alignment === 'center' ? 'Center' : 'Right'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="category-editor-list" role="list" aria-label="Category order">
+                {categoryEditorCategories.map((category, index) => (
+                  <div
+                    key={category.id}
+                    className="category-editor-item"
+                    role="listitem"
+                    draggable={!categoryEditSaving}
+                    onDragStart={(event) => {
+                      setDraggedCategoryId(category.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', category.id);
+                    }}
+                    onDragEnd={() => setDraggedCategoryId(null)}
+                    onDragOver={(event) => {
+                      if (draggedCategoryId !== null) event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      dropCategory(category.id);
+                    }}
                   >
-                    {family}
-                  </button>
+                    <span className="category-editor-grip" aria-hidden="true">
+                      ⋮⋮
+                    </span>
+                    <span className="category-editor-name">{category.name}</span>
+                    <div className="category-editor-move-actions">
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} left`}
+                        disabled={categoryEditSaving || index === 0}
+                        onClick={() => moveCategory(category.id, -1)}
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} right`}
+                        disabled={
+                          categoryEditSaving || index === categoryEditorCategories.length - 1
+                        }
+                        onClick={() => moveCategory(category.id, 1)}
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : null}
-          </div>
-          <div className="product-search">
-            <label htmlFor="product-search">Search menu</label>
-            <div>
+              <div className="category-editor-footer">
+                {categoryEditError === null ? null : (
+                  <span className="category-editor-error" role="alert">
+                    {categoryEditError}
+                  </span>
+                )}
+                <div className="category-editor-actions">
+                  <button
+                    type="button"
+                    className="secondary-action"
+                    disabled={categoryEditSaving}
+                    onClick={resetCategoryEdit}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-action"
+                    disabled={categoryEditSaving}
+                    onClick={() => void saveCategoryEdit()}
+                  >
+                    {categoryEditSaving ? 'Saving…' : 'Done'}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : categoryMode === 'SEARCH' ? (
+            <div className="product-search category-search-inline">
+              <SearchIcon className="category-search-glyph" />
               <input
                 ref={searchRef}
                 id="product-search"
                 type="search"
+                aria-label="Search menu"
                 value={search}
                 placeholder="Search products"
                 autoComplete="off"
@@ -677,8 +853,88 @@ export function OrdersWorkspace({
                 }}
               />
               <kbd>Ctrl K</kbd>
+              <button
+                type="button"
+                className="category-search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearch('');
+                  setCategoryMode('IDLE');
+                }}
+              >
+                Clear
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="field-stack category-navigation-stack">
+              <div className="category-navigation">
+                <div
+                  className="category-rail"
+                  aria-label="Menu categories"
+                  data-alignment={categoryAlignment}
+                >
+                  {activeCategories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.id}
+                      className={
+                        selectedCategoryId === category.id
+                          ? 'category-tab selected'
+                          : 'category-tab'
+                      }
+                      onClick={() => {
+                        setSelectedCategoryId(category.id);
+                        setSelectedProductFamily(null);
+                        setSearch('');
+                      }}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="category-nav-actions">
+                  <button
+                    type="button"
+                    className="category-icon-action"
+                    aria-label="Search menu"
+                    title="Search menu"
+                    onClick={() => setCategoryMode('SEARCH')}
+                  >
+                    <SearchIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="category-edit-action"
+                    onClick={beginCategoryEdit}
+                  >
+                    <EditPencilIcon />
+                    <span>Edit categories</span>
+                  </button>
+                </div>
+              </div>
+              {productFamilies.length > 1 ? (
+                <div className="segmented-control" aria-label="Product families">
+                  <button
+                    type="button"
+                    className={selectedProductFamily === null ? 'selected' : undefined}
+                    onClick={() => setSelectedProductFamily(null)}
+                  >
+                    All
+                  </button>
+                  {productFamilies.map((family) => (
+                    <button
+                      type="button"
+                      key={family}
+                      className={selectedProductFamily === family ? 'selected' : undefined}
+                      onClick={() => setSelectedProductFamily(family)}
+                    >
+                      {family}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div className="product-grid" aria-live="polite">

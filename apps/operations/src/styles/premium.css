@@ -718,3 +718,76 @@ button:not(:disabled):active {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Task 9 premium category surface. */
+.menu-toolbar {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+}
+
+.menu-toolbar > .category-navigation-stack {
+  display: grid;
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.menu-toolbar .category-navigation .category-rail {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.menu-toolbar .category-rail .category-tab {
+  border-color: transparent;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+.menu-toolbar .category-rail .category-tab.selected {
+  font-weight: 600;
+}
+
+.menu-toolbar .category-search-inline,
+.menu-toolbar .category-editor {
+  grid-column: 1;
+  grid-row: auto;
+  min-width: 0;
+}
+
+.menu-toolbar .category-search-inline input {
+  background: var(--tux-surface-subtle);
+}
+
+.menu-toolbar .category-icon-action,
+.menu-toolbar .category-edit-action,
+.menu-toolbar .category-search-clear,
+.menu-toolbar .category-editor-move-actions button,
+.menu-toolbar .category-alignment button {
+  border-color: transparent;
+  background: var(--tux-surface-subtle);
+}
+
+.menu-toolbar .category-icon-action:hover,
+.menu-toolbar .category-edit-action:hover,
+.menu-toolbar .category-search-clear:hover,
+.menu-toolbar .category-editor-move-actions button:hover:not(:disabled),
+.menu-toolbar .category-alignment button:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+}
+
+.menu-toolbar .category-alignment button[aria-pressed='true'] {
+  background: var(--tux-accent-soft);
+  color: var(--tux-accent-strong);
+}
+
+.menu-toolbar > .category-navigation-stack > .segmented-control {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: var(--tux-space-1);
+  padding: var(--tux-space-1);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-subtle);
+  overflow-x: auto;
+}
