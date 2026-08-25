@@ -69,8 +69,6 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Focused desktop correction
         run: npm run test:e2e -- --project=desktop-browser-fallback --grep "final correction"
-      - name: Focused mobile workflow
-        run: npm run test:e2e -- --project=mobile-browser-fallback --grep "mobile workflow is durable and responsive"
       - name: Full rendered E2E
         run: npm run test:e2e
       - name: Diff check
