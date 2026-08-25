@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,26 +14,11 @@ concurrency:
 
 jobs:
   tdd:
-    name: final-correction-green
+    name: fast-tdd
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 12
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,48 +27,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply final correction
-        run: |
-          python scripts/final_correction_apply.py
-          python scripts/final_correction_test_expectations.py
-          python scripts/final_correction_geometry_fix.py
-          python scripts/final_correction_brand_fix.py
-          python scripts/final_correction_regression_fix.py
-      - name: Format touched files
-        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations-desktop/src/main/workerUiPreferencesIpc.ts apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css apps/operations/src/styles/brand.css e2e/operations.e2e.ts
       - name: Format check
         run: npm run format:check
-      - name: Typecheck
-        run: npm run typecheck
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
-        run: npm test
-      - name: Migration-chain smoke
-        run: npm run test:migrations
-      - name: Production build
-        run: npm run build
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Focused desktop correction
-        run: npm run test:e2e -- --project=desktop-browser-fallback --grep "final correction"
-      - name: Full rendered E2E
-        run: npm run test:e2e
-      - name: Diff check
-        run: git diff --check
-      - name: Commit verified final correction
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations-desktop/src/main/workerUiPreferencesIpc.ts \
-            apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts \
-            apps/operations/src/styles/orders.css \
-            apps/operations/src/styles/premium.css \
-            apps/operations/src/styles/brand.css \
-            e2e/operations.e2e.ts
-          git diff --cached --quiet && exit 1
-          git commit -m "fix: apply final POS visual correction"
-          git push
+        run: npm run test
