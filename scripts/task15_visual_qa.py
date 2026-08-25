@@ -50,6 +50,21 @@ replace_once(
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
   await expect(cart).toContainText('Classic Smash');
+  await closeMobileCartIfOpen(page, testInfo);
+""",
+)
+
+replace_once(
+    """  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
+  await expect(page.getByLabel('Edit categories')).toBeVisible();
+  await expect(cart).toContainText('Classic Smash');
+});
+""",
+    """  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
+  await expect(page.getByLabel('Edit categories')).toBeVisible();
+  await openCartIfMobile(page, testInfo);
+  await expect(currentOrderCart(page, testInfo)).toContainText('Classic Smash');
+});
 """,
 )
 
