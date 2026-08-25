@@ -1,4 +1,4 @@
-name: Task 15 browser contract commit
+name: Task 15 typography green commit
 
 on:
   push:
@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: task15-browser-contracts-${{ github.ref }}
+  group: task15-typography-green-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  commit-contracts:
+  commit-typography:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -28,30 +28,36 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved browser contract updates
+      - name: Apply approved typography correction
         run: |
-          python scripts/task15_visual_qa.py
-          npx prettier --write e2e/operations.e2e.ts
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
+          python scripts/task15_typography_green.py
+          npx prettier --write apps/operations/src/styles/premium.css
+      - name: Format check
+        run: npm run format:check
+      - name: Full typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm test
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify corrected flow contracts
+      - name: Verify approved hierarchy and branding
         run: >-
-          npx playwright test e2e/operations.e2e.ts
+          npx playwright test e2e/operations.e2e.ts e2e/branding.e2e.ts
           --retries=0
-          --grep "Operations V2 full browser-fallback workflow stays durable and responsive|category persistence failure keeps editor and draft intact"
-      - name: Commit permanent browser contracts
+          --grep "premium POS visual hierarchy matches approved sizing|serves and renders the canonical TUX logo asset"
+      - name: Commit verified typography correction
         shell: bash
         run: |
           changed="$(git status --short --untracked-files=no | awk '{print $2}')"
           if [ -z "$changed" ]; then
-            echo 'Browser contracts already applied.'
+            echo 'Typography correction already applied.'
             exit 0
           fi
-          test "$changed" = "e2e/operations.e2e.ts" || { echo "Unexpected tracked diff: $changed"; exit 1; }
+          test "$changed" = "apps/operations/src/styles/premium.css" || { echo "Unexpected tracked diff: $changed"; exit 1; }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add e2e/operations.e2e.ts
-          git commit -m 'test: align POS browser contracts with approved refinement'
+          git add apps/operations/src/styles/premium.css
+          git commit -m 'style: align final POS hierarchy with approved type scale'
           git push origin HEAD:ui/tux-pos-refinement
