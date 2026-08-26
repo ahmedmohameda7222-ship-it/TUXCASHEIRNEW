@@ -1,0 +1,45 @@
+name: Verify TUX UI alignment targeted v3
+
+on:
+  push:
+    branches:
+      - ui/tux-input-alignment-fixes
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    env:
+      VERIFIED_SHA: 249b14b6c6f2a30cf3915d1383d5e867149f6710
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.VERIFIED_SHA }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format check
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Alignment source contracts
+        run: npx vitest run apps/operations/src/styles/ui-alignment.test.ts
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered alignment regression
+        run: npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep "long-term UI alignment contracts render correctly"
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-ui-alignment-targeted-${{ env.VERIFIED_SHA }}
+          path: test-results/**
+          if-no-files-found: warn
