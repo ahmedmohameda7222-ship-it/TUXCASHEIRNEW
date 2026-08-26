@@ -34,13 +34,14 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
           workspace = workspace_path.read_text()
-          old_families = '''  const activeFamilies = useMemo(
-            () => productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId),
-            [configuration, selectedCategoryId],
-          );'''
+          start = workspace.find('  const activeFamilies = useMemo(')
+          end = workspace.find('\n\n  useEffect(() => {', start)
+          if start < 0 or end < 0:
+              raise SystemExit('activeFamilies anchors not found')
           new_families = '''  const activeFamilies = useMemo(() => {
             const selectedCategory = activeCategories.find(
               (category) => category.id === selectedCategoryId,
@@ -48,21 +49,27 @@ jobs:
             if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
             return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
           }, [activeCategories, configuration, selectedCategoryId]);'''
-          if old_families not in workspace:
-              raise SystemExit('activeFamilies source block not found')
-          workspace = workspace.replace(old_families, new_families, 1)
+          workspace = workspace[:start] + new_families + workspace[end:]
           workspace_path.write_text(workspace)
 
           card_path = Path('apps/operations/src/app/MenuProductCard.tsx')
           card = card_path.read_text()
-          old_description_decl = "  const description = product.description?.trim() ?? '';\n  const className = ["
-          if old_description_decl not in card:
+          card, count = re.subn(
+              r"\n\s*const description = product\.description\?\.trim\(\) \?\? '';",
+              '',
+              card,
+              count=1,
+          )
+          if count != 1:
               raise SystemExit('product-card description declaration not found')
-          card = card.replace(old_description_decl, "  const className = [", 1)
-          old_description_render = "          {description.length > 0 ? <p>{description}</p> : null}\n"
-          if old_description_render not in card:
+          card, count = re.subn(
+              r"\n\s*\{description\.length > 0 \? <p>\{description\}</p> : null\}",
+              '',
+              card,
+              count=1,
+          )
+          if count != 1:
               raise SystemExit('product-card description render not found')
-          card = card.replace(old_description_render, '', 1)
           card_path.write_text(card)
 
           css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
@@ -105,58 +112,40 @@ jobs:
           e2e_path = Path('e2e/operations.e2e.ts')
           e2e = e2e_path.read_text()
 
-          old_typography = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
-            const productName = stressCard.locator('.product-copy strong');
-            const productDescription = stressCard.locator('.product-copy p');
-            const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
-            const productDescriptionStyle = await productDescription.evaluate((node) =>
-              getComputedStyle(node),
-            );
-            expect(productNameStyle.fontSize).toBe('15px');
-            expect(productNameStyle.lineHeight).toBe('20px');
-            expect(Number(productNameStyle.fontWeight)).toBe(600);
-            expect(productDescriptionStyle.fontSize).toBe('14px');
-            expect(productDescriptionStyle.lineHeight).toBe('18px');
-            expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
-            expect(productDescriptionStyle.webkitLineClamp).toBe('2');
-            await expect(productDescription).toHaveText(
-              '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
-            );'''
-          new_typography = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
+          start = e2e.find("  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();")
+          end = e2e.find("\n  expect(\n    (await stressCard.locator('.product-price')", start)
+          if start < 0 or end < 0:
+              raise SystemExit('product-description typography anchors not found')
+          replacement = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
             const productName = stressCard.locator('.product-copy strong');
             const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
             expect(productNameStyle.fontSize).toBe('15px');
             expect(productNameStyle.lineHeight).toBe('20px');
             expect(Number(productNameStyle.fontWeight)).toBe(600);
             await expect(stressCard.locator('.product-copy p')).toHaveCount(0);'''
-          if old_typography not in e2e:
-              raise SystemExit('existing product-description typography contract not found')
-          e2e = e2e.replace(old_typography, new_typography, 1)
+          e2e = e2e[:start] + replacement + e2e[end:]
 
           old_toolbar = "  expect(Math.round(toolbarBox!.height)).toBe(56);"
           if old_toolbar not in e2e:
-              raise SystemExit('existing toolbar height assertion not found')
-          e2e = e2e.replace(
-              old_toolbar,
-              "  expect(toolbarBox!.height).toBeGreaterThan(56);",
-              1,
-          )
+              raise SystemExit('toolbar height assertion not found')
+          e2e = e2e.replace(old_toolbar, "  expect(toolbarBox!.height).toBeGreaterThan(56);", 1)
 
-          old_card_contract = '''  await expect(plain.locator('.product-copy p')).toHaveCount(0);
-            await expect(described.locator('.product-copy p')).toHaveCount(1);
-            const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
-            const describedStyle = await described.evaluate((node) => getComputedStyle(node));
-            expect(plainStyle.minHeight).toBe('0px');
-            expect(describedStyle.minHeight).toBe('152px');'''
-          new_card_contract = '''  await expect(plain.locator('.product-copy p')).toHaveCount(0);
-            await expect(described.locator('.product-copy p')).toHaveCount(0);
-            const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
-            const describedStyle = await described.evaluate((node) => getComputedStyle(node));
-            expect(plainStyle.minHeight).toBe('0px');
-            expect(describedStyle.minHeight).toBe('0px');'''
-          if old_card_contract not in e2e:
-              raise SystemExit('existing card description containment contract not found')
-          e2e = e2e.replace(old_card_contract, new_card_contract, 1)
+          e2e, count = re.subn(
+              r"  await expect\(described\.locator\('\.product-copy p'\)\)\.toHaveCount\(1\);",
+              "  await expect(described.locator('.product-copy p')).toHaveCount(0);",
+              e2e,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('described-card paragraph assertion not found')
+          e2e, count = re.subn(
+              r"  expect\(describedStyle\.minHeight\)\.toBe\('152px'\);",
+              "  expect(describedStyle.minHeight).toBe('0px');",
+              e2e,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('described-card min-height assertion not found')
 
           requested_marker = "test('Burger family filter appears below main categories only for Burgers'"
           if requested_marker not in e2e:
