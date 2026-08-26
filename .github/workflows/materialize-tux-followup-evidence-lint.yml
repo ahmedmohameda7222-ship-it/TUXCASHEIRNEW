@@ -1,0 +1,51 @@
+name: Materialize TUX Follow-up Evidence Lint Fix
+
+on:
+  push:
+    branches:
+      - recover/tux-followup-main-deploy-worker4
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: recover/tux-followup-main-deploy-worker4
+          path: recovery
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+          fetch-depth: 0
+          path: repo
+      - name: Require expected durable head
+        working-directory: repo
+        run: test "$(git rev-parse HEAD)" = "321612f3d42045a1ea09e3c55ff211edd3597be5"
+      - name: Apply lint fix
+        working-directory: repo
+        run: python ../recovery/scripts/fix-tux-followup-evidence-lint.py
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+      - name: Verify E2E lint and formatting
+        working-directory: repo
+        run: |
+          npm ci --ignore-scripts
+          npx prettier --write e2e/operations.e2e.ts
+          npx eslint e2e/operations.e2e.ts --max-warnings 0
+          npm run typecheck:e2e
+          git diff --check
+      - name: Commit lint fix to durable branch
+        working-directory: repo
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: polish follow-up rendered evidence"
+          git push origin HEAD:ui/tux-ops-followup-recovered
