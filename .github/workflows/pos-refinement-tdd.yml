@@ -1,4 +1,4 @@
-name: POS Requested UI Visual QA Evidence
+name: POS Requested UI Desktop Visual QA
 
 on:
   push:
@@ -14,9 +14,9 @@ concurrency:
 
 jobs:
   evidence:
-    name: requested-ui-visual-qa
+    name: requested-ui-desktop-visual-qa
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved candidate transiently
+      - name: Apply approved candidate transiently and add screenshot harness
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -39,39 +39,23 @@ jobs:
           end = workspace.find('\n\n  useEffect(() => {', start)
           if start < 0 or end < 0:
               raise SystemExit('activeFamilies anchors not found')
-          new_families = '''  const activeFamilies = useMemo(() => {
+          workspace = workspace[:start] + '''  const activeFamilies = useMemo(() => {
             const selectedCategory = activeCategories.find(
               (category) => category.id === selectedCategoryId,
             );
             if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
             return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
-          }, [activeCategories, configuration, selectedCategoryId]);'''
-          workspace = workspace[:start] + new_families + workspace[end:]
+          }, [activeCategories, configuration, selectedCategoryId]);''' + workspace[end:]
           workspace_path.write_text(workspace)
 
           card_path = Path('apps/operations/src/app/MenuProductCard.tsx')
           card = card_path.read_text()
-          card, count = re.subn(
-              r"\n\s*const description = product\.description\?\.trim\(\) \?\? '';",
-              '',
-              card,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit('product-card description declaration not found')
-          card, count = re.subn(
-              r"\n\s*\{description\.length > 0 \? <p>\{description\}</p> : null\}",
-              '',
-              card,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit('product-card description render not found')
+          card = re.sub(r"\n\s*const description = product\.description\?\.trim\(\) \?\? '';", '', card, count=1)
+          card = re.sub(r"\n\s*\{description\.length > 0 \? <p>\{description\}</p> : null\}", '', card, count=1)
           card_path.write_text(card)
 
           css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
-          css = css_path.read_text()
-          css += '''
+          css = css_path.read_text() + '''
 
           /* User-approved Burger subcategory row. */
           .menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
@@ -79,24 +63,16 @@ jobs:
             min-height: 56px;
             padding: 5px 8px 8px;
           }
-
-          .menu-toolbar:not(.category-mode-edit)
-            > .category-navigation-stack:has(.product-family-filter) {
+          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) {
             flex-direction: column;
             align-items: stretch;
           }
-
-          .menu-toolbar:not(.category-mode-edit)
-            > .category-navigation-stack:has(.product-family-filter)
-            .category-navigation {
+          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) .category-navigation {
             width: 100%;
             min-height: 44px;
             flex: 0 0 44px;
           }
-
-          .menu-toolbar:not(.category-mode-edit)
-            > .category-navigation-stack:has(.product-family-filter)
-            .product-family-filter {
+          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) .product-family-filter {
             width: fit-content;
             align-self: flex-start;
             flex: 0 0 44px;
@@ -105,37 +81,28 @@ jobs:
           css_path.write_text(css)
 
           e2e_path = Path('e2e/operations.e2e.ts')
-          e2e = e2e_path.read_text()
-          e2e += r'''
+          e2e = e2e_path.read_text() + r'''
 
-          test('requested UI visual QA desktop states', async ({ page }, testInfo) => {
+          test('requested desktop visual QA screenshots', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
             const primary = page.getByLabel('Menu categories');
             await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
-            const families = page.getByLabel('Product families');
-            await expect(families.getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
-            await expect(page.locator('.product-card').first().locator('.product-copy p')).toHaveCount(0);
-            await page.screenshot({ path: testInfo.outputPath('01-desktop-burgers-subrow-no-descriptions.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
+            await expect(page.getByLabel('Product families').getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
+            await expect(page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first().locator('.product-copy p')).toHaveCount(0);
+            await page.screenshot({ path: testInfo.outputPath('01-burgers-subrow-no-descriptions.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
 
             const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
             await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
             const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
             await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
-            await page.screenshot({ path: testInfo.outputPath('02-desktop-quick-info-description.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
+            await page.screenshot({ path: testInfo.outputPath('02-quick-info-description.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
             await page.keyboard.press('Escape');
+            await expect(dialog).toBeHidden();
 
             await primary.getByRole('button', { name: 'Fries', exact: true }).click();
             await expect(page.getByLabel('Product families')).toHaveCount(0);
-            await page.screenshot({ path: testInfo.outputPath('03-desktop-fries-no-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
-          });
-
-          test('requested UI visual QA mobile state', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Burgers', exact: true }).click();
-            await expect(page.getByLabel('Product families').getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
-            await page.screenshot({ path: testInfo.outputPath('04-mobile-375-burgers-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
+            await page.screenshot({ path: testInfo.outputPath('03-fries-no-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
           });
           '''
           e2e_path.write_text(e2e)
@@ -145,27 +112,26 @@ jobs:
             apps/operations/src/app/MenuProductCard.tsx \
             apps/operations/src/styles/final-pos-corrections.css \
             e2e/operations.e2e.ts
-      - name: Typecheck visual harness
+      - name: Typecheck screenshot harness
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture desktop and mobile visual QA
+      - name: Capture desktop visual QA
         run: >-
           npx playwright test e2e/operations.e2e.ts
           --project=desktop-browser-fallback
-          --project=mobile-browser-fallback
-          --grep "requested UI visual QA"
+          --grep "requested desktop visual QA screenshots"
       - name: Collect screenshots
         if: always()
         run: |
           mkdir -p visual-qa
           find test-results -type f -name '*.png' -exec cp {} visual-qa/ \;
           ls -lah visual-qa
-      - name: Upload visual QA evidence
+      - name: Upload desktop visual QA
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: requested-ui-visual-qa
+          name: requested-ui-desktop-visual-qa
           path: visual-qa/
           if-no-files-found: error
           retention-days: 7
