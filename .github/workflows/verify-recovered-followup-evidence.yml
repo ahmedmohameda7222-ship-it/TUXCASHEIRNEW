@@ -1,0 +1,42 @@
+name: Verify Recovered TUX Follow-up Evidence
+
+on:
+  push:
+    branches:
+      - verify/tux-ops-followup-evidence
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture recovered follow-up evidence
+        run: >-
+          npx playwright test e2e/operations.e2e.ts
+          --grep "follow-up desktop approval evidence is captured from the committed tree|follow-up mobile approval evidence is captured from the committed tree"
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-followup-rendered-evidence
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
