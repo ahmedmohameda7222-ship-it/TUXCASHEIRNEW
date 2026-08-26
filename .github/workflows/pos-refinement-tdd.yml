@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,155 +14,55 @@ concurrency:
 
 jobs:
   tdd:
-    if: "${{ github.event.head_commit.message != 'fix: integrate mobile review and split payment' }}"
-    name: task-five-mobile-payment-green
+    name: task-six-single-separator-red
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 5 mobile payment correction and rendered contract
+      - name: Add Task 6 rendered RED contract
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          cat >> e2e/operations.e2e.ts <<'EOF'
 
-          workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
-          workspace = workspace_path.read_text()
-          old_title = '''          <div className="mobile-cart-bar">\n            <strong>Current order</strong>'''
-          new_title = '''          <div className="mobile-cart-bar">\n            <strong>Review & pay</strong>'''
-          if old_title not in workspace:
-              raise SystemExit('Expected mobile Current order bar was not found')
-          workspace = workspace.replace(old_title, new_title, 1)
-          workspace_path.write_text(workspace)
-
-          css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
-          css = css_path.read_text()
-          task_five_css = '''
-
-          /* Task 5: keep mobile Review & pay controls clear of fixed totals. */
-          @media (max-width: 54rem) {
-            .mobile-cart-overlay .cart-scroll {
-              padding-bottom: 16px;
-              scroll-padding-bottom: 16px;
-            }
-
-            .mobile-cart-overlay .payment-section .split-payment-action {
-              box-sizing: border-box;
-              width: 100%;
-              height: 44px;
-              min-height: 44px;
-              justify-self: stretch;
-            }
-          }
-          '''
-          if 'Task 5: keep mobile Review & pay controls clear of fixed totals.' not in css:
-              css_path.write_text(css + task_five_css)
-
-          e2e_path = Path('e2e/operations.e2e.ts')
-          e2e = e2e_path.read_text()
-          marker = "test('final correction keeps mobile Review & pay unobstructed with integrated split'"
-          test_block = r'''
-
-          test('final correction keeps mobile Review & pay unobstructed with integrated split', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+          test('final correction uses one Current Order separator', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
 
-            await page.locator('.mobile-cart-trigger').click();
-            const overlay = page.locator('.mobile-cart-overlay');
-            await expect(overlay).toBeVisible();
-            await expect(overlay.locator('.mobile-cart-bar strong')).toHaveText('Review & pay');
-            await expect(
-              overlay.locator('strong').filter({ hasText: /^Current order$/i }),
-            ).toHaveCount(1);
-            await expect(overlay.locator('.cart-title')).toHaveText('Current Order');
-            await expect(page.getByRole('separator', { name: 'Resize Current Order' })).toHaveCount(0);
+            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+            await expect(separator).toBeVisible();
+            await expect(separator).toHaveAttribute('aria-orientation', 'vertical');
 
-            const payment = overlay.locator('.payment-section');
-            const split = payment.getByRole('button', { name: 'Split payment' });
-            await expect(split).toBeVisible();
-            const [paymentBox, splitBox] = await Promise.all([payment.boundingBox(), split.boundingBox()]);
-            expect(paymentBox).not.toBeNull();
-            expect(splitBox).not.toBeNull();
-            const paymentPadding = await payment.evaluate((node) => {
-              const style = getComputedStyle(node);
-              return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-            });
-            expect(Math.round(splitBox!.height)).toBe(44);
-            expect(Math.abs(splitBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+            const separatorLineWidth = await separator.evaluate((node) =>
+              getComputedStyle(node, '::before').width,
+            );
+            expect(separatorLineWidth).toBe('1px');
 
-            await split.click();
-            await overlay.getByLabel('Amount A').fill('320');
-            await overlay.getByLabel('Amount A').blur();
-            await expect(overlay.getByText('Method A', { exact: true })).toBeVisible();
-            await expect(overlay.getByText('Amount A', { exact: true })).toBeVisible();
-            await expect(overlay.getByText('Method B', { exact: true })).toBeVisible();
-            await expect(overlay.getByText('Amount B', { exact: true })).toBeVisible();
-            await expect(overlay.locator('.split-remainder')).toContainText('80.00');
-            await expect(overlay.getByText('Cash received', { exact: true })).toHaveCount(0);
-            await expect(overlay.getByText('Change', { exact: true })).toHaveCount(0);
+            const cart = page.locator('.desktop-cart-wrap');
+            const borderLeftWidth = await cart.evaluate((node) => getComputedStyle(node).borderLeftWidth);
+            expect(borderLeftWidth).toBe('0px');
 
-            const cancel = payment.getByRole('button', { name: 'Cancel split' });
-            const cancelBox = await cancel.boundingBox();
-            expect(cancelBox).not.toBeNull();
-            expect(Math.round(cancelBox!.height)).toBe(44);
-            expect(Math.abs(cancelBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
-
-            const scroll = overlay.locator('.cart-scroll');
-            await scroll.evaluate((node) => {
-              node.scrollTop = node.scrollHeight;
-            });
-            await expect(cancel).toBeVisible();
-            const [finalControlBox, totalsBox, placeBox] = await Promise.all([
-              cancel.boundingBox(),
-              overlay.locator('.cart-totals').boundingBox(),
-              overlay.getByRole('button', { name: 'Place Order' }).boundingBox(),
-            ]);
-            expect(finalControlBox).not.toBeNull();
-            expect(totalsBox).not.toBeNull();
-            expect(placeBox).not.toBeNull();
-            expect(totalsBox!.y - (finalControlBox!.y + finalControlBox!.height)).toBeGreaterThanOrEqual(16);
-            expect(placeBox!.y).toBeGreaterThanOrEqual(0);
-            expect(placeBox!.y + placeBox!.height).toBeLessThanOrEqual(812);
+            const initial = await cart.boundingBox();
+            expect(initial).not.toBeNull();
+            await separator.focus();
+            await page.keyboard.press('ArrowLeft');
+            const resized = await cart.boundingBox();
+            expect(resized).not.toBeNull();
+            expect(Math.round(resized!.width - initial!.width)).toBe(24);
           });
-          '''
-          if marker not in e2e:
-              e2e_path.write_text(e2e + test_block)
-          PY
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
-      - name: Static checks
-        run: |
-          npm run typecheck:e2e
-          npm run lint
-          npm run typecheck
-          npx prettier --check apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify Task 5 targeted mobile contract GREEN
+      - name: Verify Task 6 contract is RED before implementation
         run: >-
-          npx playwright test e2e/operations.e2e.ts --project=mobile-browser-fallback --grep
-          "final correction keeps mobile Review & pay unobstructed with integrated split"
-      - name: Verify payment regression coverage
-        run: >-
-          npx playwright test e2e/operations.e2e.ts --grep
-          "cash entry stays optional and split stays allocation-only|Current Order keeps cashier controls attached to each line"
-      - name: Run complete Operations E2E file
-        run: npx playwright test e2e/operations.e2e.ts
-      - name: Commit Task 5 GREEN state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
-          git diff --cached --quiet && { echo "Expected Task 5 changes were not generated"; exit 1; }
-          git commit -m "fix: integrate mobile review and split payment"
-          git push origin HEAD:ui/tux-pos-refinement
+          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
+          "final correction uses one Current Order separator"
