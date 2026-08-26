@@ -2014,7 +2014,7 @@ test('follow-up desktop approval evidence is captured from the committed tree', 
   await cart.getByLabel('Customer name').fill('Evidence Customer');
   await cart.getByLabel('Zone').selectOption({ index: 1 });
   await cart.getByLabel('Full address').fill('Evidence address');
-  const deliveryTotal = cart.getByLabel('Delivery', { exact: true });
+  const deliveryTotal = cart.getByRole('textbox', { name: 'Delivery', exact: true });
   await expect(deliveryTotal).toBeVisible();
   await deliveryTotal.fill('45');
   await deliveryTotal.blur();
@@ -2114,10 +2114,15 @@ test('follow-up mobile approval evidence is captured from the committed tree', a
   const mobileCart = currentOrderCart(page, testInfo);
   await mobileCart.getByRole('button', { name: 'Cash', exact: true }).click();
   await expect(mobileCart.getByLabel('Cash received')).toBeVisible();
-  const lastPaymentControl = mobileCart.locator('.payment-section').last();
+  const finalPaymentControl = mobileCart
+    .locator(
+      '.payment-section button:not([disabled]), .payment-section input:not([disabled]), .payment-section select:not([disabled])',
+    )
+    .last();
+  await finalPaymentControl.scrollIntoViewIfNeeded();
   const footer = mobileCart.locator('.cart-totals');
   const [paymentBox, footerBox] = await Promise.all([
-    lastPaymentControl.boundingBox(),
+    finalPaymentControl.boundingBox(),
     footer.boundingBox(),
   ]);
   expect(paymentBox).not.toBeNull();
