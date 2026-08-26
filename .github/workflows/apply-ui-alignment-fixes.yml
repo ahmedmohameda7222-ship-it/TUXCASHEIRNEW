@@ -39,10 +39,10 @@ jobs:
 
           expenses = Path('apps/operations/src/styles/expenses.css')
           expense_text = expenses.read_text()
-          old_control_rule = '.expense-fields input,\n.expense-fields textarea {'
-          new_control_rule = '.expense-fields > label > input,\n.expense-fields > label > textarea {'
+          old_control_rule = '.expense-fields input,\n.expense-fields textarea'
+          new_control_rule = '.expense-fields > label > input,\n.expense-fields > label > textarea'
           if expense_text.count(old_control_rule) != 2:
-              raise SystemExit(f'Expected two broad expense input rules, found {expense_text.count(old_control_rule)}.')
+              raise SystemExit(f'Expected two broad expense input selector prefixes, found {expense_text.count(old_control_rule)}.')
           expense_text = expense_text.replace(old_control_rule, new_control_rule)
 
           anchor = '.expense-fields label,\n.expense-paid-from {\n  display: grid;\n  gap: var(--tux-space-2);\n  margin: 0;\n  color: var(--tux-text-primary);\n  font-size: var(--tux-font-size-sm);\n  font-weight: 700;\n}\n'
