@@ -399,7 +399,7 @@ button:not(:disabled):active {
 
 /* Structural Current Order rail: hierarchy through dividers, not card-on-card chrome. */
 .desktop-cart-wrap {
-  border-left: 1px solid var(--tux-border-subtle);
+  border-left: 0;
   background: var(--tux-surface-panel);
 }
 

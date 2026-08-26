@@ -1731,3 +1731,29 @@ test('final correction keeps mobile Review & pay unobstructed with integrated sp
   expect(placeBox!.y).toBeGreaterThanOrEqual(0);
   expect(placeBox!.y + placeBox!.height).toBeLessThanOrEqual(812);
 });
+
+test('final correction uses one Current Order separator', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  await expect(separator).toBeVisible();
+  await expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+
+  const separatorLineWidth = await separator.evaluate(
+    (node) => getComputedStyle(node, '::before').width,
+  );
+  expect(separatorLineWidth).toBe('1px');
+
+  const cart = page.locator('.desktop-cart-wrap');
+  const borderLeftWidth = await cart.evaluate((node) => getComputedStyle(node).borderLeftWidth);
+  expect(borderLeftWidth).toBe('0px');
+
+  const initial = await cart.boundingBox();
+  expect(initial).not.toBeNull();
+  await separator.focus();
+  await page.keyboard.press('ArrowLeft');
+  const resized = await cart.boundingBox();
+  expect(resized).not.toBeNull();
+  expect(Math.round(resized!.width - initial!.width)).toBe(24);
+});

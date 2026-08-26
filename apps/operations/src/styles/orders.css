@@ -413,7 +413,7 @@
 .desktop-cart-wrap {
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--tux-border-subtle);
+  border-left: 0;
   background: var(--tux-surface-panel);
 }
 
