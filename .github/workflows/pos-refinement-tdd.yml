@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,22 +14,63 @@ concurrency:
 
 jobs:
   tdd:
-    name: task-five-mobile-payment-red
+    if: "${{ github.event.head_commit.message != 'fix: integrate mobile review and split payment' }}"
+    name: task-five-mobile-payment-green
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add Task 5 rendered RED contract
+      - name: Apply Task 5 mobile payment correction and rendered contract
         run: |
-          cat >> e2e/operations.e2e.ts <<'EOF'
+          python - <<'PY'
+          from pathlib import Path
+
+          workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          workspace = workspace_path.read_text()
+          old_title = '''          <div className="mobile-cart-bar">\n            <strong>Current order</strong>'''
+          new_title = '''          <div className="mobile-cart-bar">\n            <strong>Review & pay</strong>'''
+          if old_title not in workspace:
+              raise SystemExit('Expected mobile Current order bar was not found')
+          workspace = workspace.replace(old_title, new_title, 1)
+          workspace_path.write_text(workspace)
+
+          css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
+          css = css_path.read_text()
+          task_five_css = '''
+
+          /* Task 5: keep mobile Review & pay controls clear of fixed totals. */
+          @media (max-width: 54rem) {
+            .mobile-cart-overlay .cart-scroll {
+              padding-bottom: 16px;
+              scroll-padding-bottom: 16px;
+            }
+
+            .mobile-cart-overlay .payment-section .split-payment-action {
+              box-sizing: border-box;
+              width: 100%;
+              height: 44px;
+              min-height: 44px;
+              justify-self: stretch;
+            }
+          }
+          '''
+          if 'Task 5: keep mobile Review & pay controls clear of fixed totals.' not in css:
+              css_path.write_text(css + task_five_css)
+
+          e2e_path = Path('e2e/operations.e2e.ts')
+          e2e = e2e_path.read_text()
+          marker = "test('final correction keeps mobile Review & pay unobstructed with integrated split'"
+          test_block = r'''
 
           test('final correction keeps mobile Review & pay unobstructed with integrated split', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'mobile-browser-fallback');
@@ -94,13 +135,34 @@ jobs:
             expect(placeBox!.y).toBeGreaterThanOrEqual(0);
             expect(placeBox!.y + placeBox!.height).toBeLessThanOrEqual(812);
           });
-          EOF
-          npx prettier --write e2e/operations.e2e.ts
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
+          '''
+          if marker not in e2e:
+              e2e_path.write_text(e2e + test_block)
+          PY
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
+      - name: Static checks
+        run: |
+          npm run typecheck:e2e
+          npm run lint
+          npm run typecheck
+          npx prettier --check apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify Task 5 contract is RED before implementation
+      - name: Verify Task 5 targeted mobile contract GREEN
         run: >-
           npx playwright test e2e/operations.e2e.ts --project=mobile-browser-fallback --grep
           "final correction keeps mobile Review & pay unobstructed with integrated split"
+      - name: Verify payment regression coverage
+        run: >-
+          npx playwright test e2e/operations.e2e.ts --grep
+          "cash entry stays optional and split stays allocation-only|Current Order keeps cashier controls attached to each line"
+      - name: Run complete Operations E2E file
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit Task 5 GREEN state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css e2e/operations.e2e.ts
+          git diff --cached --quiet && { echo "Expected Task 5 changes were not generated"; exit 1; }
+          git commit -m "fix: integrate mobile review and split payment"
+          git push origin HEAD:ui/tux-pos-refinement
