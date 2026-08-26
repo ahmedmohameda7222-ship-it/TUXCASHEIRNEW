@@ -1,4 +1,4 @@
-name: POS Final Requested UI GREEN
+name: POS Final Evidence
 
 on:
   push:
@@ -6,71 +6,75 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: pos-final-requested-ui-green-${{ github.ref }}
+  group: pos-final-evidence-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  green:
-    if: "${{ github.event.head_commit.message != 'fix: refine Burger filters and product card actions' }}"
-    name: final-requested-ui-green
+  evidence:
+    name: committed-source-evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ui/tux-pos-refinement
+          ref: 8f5a8b01778f1b2894f5e431f518010ec9252723
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply only approved UI changes
+      - name: Add evidence-only screenshot checkpoints
         run: |
-          python scripts/apply_final_requested_ui.py
-          python scripts/fix_legacy_customize_helper.py
-          npx prettier --write \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
-      - name: Static verification
-        run: |
-          npm run typecheck:e2e
-          npm run typecheck
-          npm run lint
-          npx prettier --check \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('e2e/operations.e2e.ts')
+          text = path.read_text()
+          desktop_anchor = """    await screenshot('02-default-orders.png');\n    await captureVisualEvidence(page, testInfo);"""
+          desktop_replacement = """    await screenshot('02-default-orders.png');
+    const evidenceCard = page
+      .locator('.product-card')
+      .filter({ hasText: 'Single Smashed Patty' })
+      .first();
+    await evidenceCard
+      .getByRole('button', { name: 'Quick Info for Single Smashed Patty' })
+      .click();
+    await screenshot('02b-quick-info.png');
+    await page
+      .getByRole('dialog', { name: 'Single Smashed Patty' })
+      .getByRole('button', { name: 'Close', exact: true })
+      .click();
+    await captureVisualEvidence(page, testInfo);"""
+          if desktop_anchor not in text:
+              raise SystemExit('desktop evidence anchor not found')
+          text = text.replace(desktop_anchor, desktop_replacement, 1)
+
+          mobile_anchor = """  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();\n  await openCartIfMobile(page, testInfo);"""
+          mobile_replacement = """  if (testInfo.project.name === 'mobile-browser-fallback') {
+    await screenshot('08-mobile-menu.png');
+  }
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
+  await openCartIfMobile(page, testInfo);"""
+          if mobile_anchor not in text:
+              raise SystemExit('mobile evidence anchor not found')
+          path.write_text(text.replace(mobile_anchor, mobile_replacement, 1))
+          PY
+          npx prettier --write e2e/operations.e2e.ts
+      - name: Verify evidence test typechecks
+        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify all user-requested behaviors GREEN
-        run: >-
-          npx playwright test e2e/operations.e2e.ts --grep
-          "Burger family filter appears below main categories only for Burgers|product description appears only after opening the product card|Quick Info is informational only|Extra is centered between price and quantity controls|requested compact product card controls do not overlap"
-      - name: Verify affected existing UI contracts
-        run: >-
-          npx playwright test e2e/operations.e2e.ts --grep
-          "approved category hierarchy stays two-level|search keeps both category levels visible|premium POS visual hierarchy matches approved sizing|final correction keeps header and categories visible during compact search|final correction keeps Extra and product controls fully contained|final correction keeps product controls cashier-sized"
-      - name: Full Operations E2E regression
-        run: npx playwright test e2e/operations.e2e.ts
-      - name: Commit only approved source and regression-test changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
-          git rm scripts/apply_final_requested_ui.py scripts/fix_legacy_customize_helper.py
-          git diff --cached --quiet && { echo "Expected approved changes were not generated"; exit 1; }
-          git commit -m "fix: refine Burger filters and product card actions"
-          git push origin HEAD:ui/tux-pos-refinement
+      - name: Capture committed visual evidence
+        run: npx playwright test e2e/operations.e2e.ts --grep "visual approval evidence covers approved POS states"
+      - name: Upload committed visual evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-final-evidence-8f5a8b0
+          path: test-results/**/*.png
+          if-no-files-found: error
+          retention-days: 14
