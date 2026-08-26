@@ -249,7 +249,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Capture required evidence from exact source SHA
-        run: npx playwright test e2e/evidence.e2e.ts --grep "^evidence "
+        run: npx playwright test e2e/evidence.e2e.ts --grep "evidence "
       - name: Remove temporary harness and prove committed sources untouched
         if: always()
         run: |
