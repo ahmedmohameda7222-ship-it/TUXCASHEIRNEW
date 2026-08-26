@@ -1,4 +1,4 @@
-name: POS Requested UI Change RED
+name: POS Requested UI Change GREEN
 
 on:
   push:
@@ -6,30 +6,161 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: pos-requested-ui-red-${{ github.ref }}
+  group: pos-requested-ui-green-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  red:
-    name: requested-ui-red
+  green:
+    if: "${{ github.event.head_commit.message != 'fix: contextualize Burger families and card details' }}"
+    name: requested-ui-green
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add user-requested RED contracts
+      - name: Apply only the approved Burger-family and card-description changes
         run: |
-          cat >> e2e/operations.e2e.ts <<'EOF'
+          python - <<'PY'
+          from pathlib import Path
+
+          workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          workspace = workspace_path.read_text()
+          old_families = '''  const activeFamilies = useMemo(
+            () => productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId),
+            [configuration, selectedCategoryId],
+          );'''
+          new_families = '''  const activeFamilies = useMemo(() => {
+            const selectedCategory = activeCategories.find(
+              (category) => category.id === selectedCategoryId,
+            );
+            if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
+            return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
+          }, [activeCategories, configuration, selectedCategoryId]);'''
+          if old_families not in workspace:
+              raise SystemExit('activeFamilies source block not found')
+          workspace = workspace.replace(old_families, new_families, 1)
+          workspace_path.write_text(workspace)
+
+          card_path = Path('apps/operations/src/app/MenuProductCard.tsx')
+          card = card_path.read_text()
+          old_description_decl = "  const description = product.description?.trim() ?? '';\n  const className = ["
+          if old_description_decl not in card:
+              raise SystemExit('product-card description declaration not found')
+          card = card.replace(old_description_decl, "  const className = [", 1)
+          old_description_render = "          {description.length > 0 ? <p>{description}</p> : null}\n"
+          if old_description_render not in card:
+              raise SystemExit('product-card description render not found')
+          card = card.replace(old_description_render, '', 1)
+          card_path.write_text(card)
+
+          css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
+          css = css_path.read_text()
+          marker = '/* User-approved Burger subcategory row. */'
+          if marker not in css:
+              css += '''
+
+          /* User-approved Burger subcategory row. */
+          .menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
+            height: auto;
+            min-height: 56px;
+            padding: 5px 8px 8px;
+          }
+
+          .menu-toolbar:not(.category-mode-edit)
+            > .category-navigation-stack:has(.product-family-filter) {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .menu-toolbar:not(.category-mode-edit)
+            > .category-navigation-stack:has(.product-family-filter)
+            .category-navigation {
+            width: 100%;
+            min-height: 44px;
+            flex: 0 0 44px;
+          }
+
+          .menu-toolbar:not(.category-mode-edit)
+            > .category-navigation-stack:has(.product-family-filter)
+            .product-family-filter {
+            width: fit-content;
+            align-self: flex-start;
+            flex: 0 0 44px;
+          }
+          '''
+          css_path.write_text(css)
+
+          e2e_path = Path('e2e/operations.e2e.ts')
+          e2e = e2e_path.read_text()
+
+          old_typography = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
+            const productName = stressCard.locator('.product-copy strong');
+            const productDescription = stressCard.locator('.product-copy p');
+            const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
+            const productDescriptionStyle = await productDescription.evaluate((node) =>
+              getComputedStyle(node),
+            );
+            expect(productNameStyle.fontSize).toBe('15px');
+            expect(productNameStyle.lineHeight).toBe('20px');
+            expect(Number(productNameStyle.fontWeight)).toBe(600);
+            expect(productDescriptionStyle.fontSize).toBe('14px');
+            expect(productDescriptionStyle.lineHeight).toBe('18px');
+            expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
+            expect(productDescriptionStyle.webkitLineClamp).toBe('2');
+            await expect(productDescription).toHaveText(
+              '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
+            );'''
+          new_typography = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
+            const productName = stressCard.locator('.product-copy strong');
+            const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
+            expect(productNameStyle.fontSize).toBe('15px');
+            expect(productNameStyle.lineHeight).toBe('20px');
+            expect(Number(productNameStyle.fontWeight)).toBe(600);
+            await expect(stressCard.locator('.product-copy p')).toHaveCount(0);'''
+          if old_typography not in e2e:
+              raise SystemExit('existing product-description typography contract not found')
+          e2e = e2e.replace(old_typography, new_typography, 1)
+
+          old_toolbar = "  expect(Math.round(toolbarBox!.height)).toBe(56);"
+          if old_toolbar not in e2e:
+              raise SystemExit('existing toolbar height assertion not found')
+          e2e = e2e.replace(
+              old_toolbar,
+              "  expect(toolbarBox!.height).toBeGreaterThan(56);",
+              1,
+          )
+
+          old_card_contract = '''  await expect(plain.locator('.product-copy p')).toHaveCount(0);
+            await expect(described.locator('.product-copy p')).toHaveCount(1);
+            const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
+            const describedStyle = await described.evaluate((node) => getComputedStyle(node));
+            expect(plainStyle.minHeight).toBe('0px');
+            expect(describedStyle.minHeight).toBe('152px');'''
+          new_card_contract = '''  await expect(plain.locator('.product-copy p')).toHaveCount(0);
+            await expect(described.locator('.product-copy p')).toHaveCount(0);
+            const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
+            const describedStyle = await described.evaluate((node) => getComputedStyle(node));
+            expect(plainStyle.minHeight).toBe('0px');
+            expect(describedStyle.minHeight).toBe('0px');'''
+          if old_card_contract not in e2e:
+              raise SystemExit('existing card description containment contract not found')
+          e2e = e2e.replace(old_card_contract, new_card_contract, 1)
+
+          requested_marker = "test('Burger family filter appears below main categories only for Burgers'"
+          if requested_marker not in e2e:
+              e2e += r'''
 
           test('Burger family filter appears below main categories only for Burgers', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
@@ -69,13 +200,45 @@ jobs:
             await expect(dialog).toBeVisible();
             await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
           });
-          EOF
-          npx prettier --write e2e/operations.e2e.ts
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
+          '''
+          e2e_path.write_text(e2e)
+          PY
+          npx prettier --write \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/MenuProductCard.tsx \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
+      - name: Static verification
+        run: |
+          npm run typecheck:e2e
+          npm run typecheck
+          npm run lint
+          npx prettier --check \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/MenuProductCard.tsx \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify requested behavior is RED before implementation
+      - name: Verify the two requested behaviors GREEN
         run: >-
           npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
           "Burger family filter appears below main categories only for Burgers|product description appears only after opening the product card"
+      - name: Verify affected existing UI contracts
+        run: >-
+          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
+          "premium POS visual hierarchy matches approved sizing|final correction keeps header and categories visible during compact search|final correction keeps Extra and product controls fully contained|approved category hierarchy stays two-level|search keeps both category levels visible"
+      - name: Full Operations E2E regression
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit only approved source and regression-test changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/MenuProductCard.tsx \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
+          git diff --cached --quiet && { echo "Expected approved changes were not generated"; exit 1; }
+          git commit -m "fix: contextualize Burger families and card details"
+          git push origin HEAD:ui/tux-pos-refinement
