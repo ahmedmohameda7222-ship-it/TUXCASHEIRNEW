@@ -1,4 +1,4 @@
-name: POS Product Card RED
+name: POS Product Card GREEN
 
 on:
   push:
@@ -6,13 +6,14 @@ on:
       - ui/tux-pos-refinement
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
-    name: product-card-layout-red
+  green:
+    if: "!contains(github.event.head_commit.message, 'fix: position product card price and extras')"
+    name: product-card-layout-green
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -23,9 +24,240 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Append approved product-card RED contract
+      - name: Apply approved product-card implementation
         run: |
-          cat >> e2e/operations.e2e.ts <<'EOF'
+          cat > apps/operations/src/app/MenuProductCard.tsx <<'EOF'
+          import type { Product } from '@tux/domain';
+          import { useState, type MouseEvent } from 'react';
+          import { PlusCircleIcon } from './icons';
+          import { formatMoneyMinor } from './ordersView';
+
+          function ProductMedia({ product }: { readonly product: Product }) {
+            const [failed, setFailed] = useState(false);
+            if (product.imageKey === null || failed) {
+              return (
+                <div className="product-image-fallback" aria-hidden="true">
+                  {product.name
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part.slice(0, 1).toUpperCase())
+                    .join('')}
+                </div>
+              );
+            }
+
+            return (
+              <img
+                className="product-image"
+                src={product.imageKey}
+                alt=""
+                loading="lazy"
+                onError={() => setFailed(true)}
+              />
+            );
+          }
+
+          export function MenuProductCard({
+            product,
+            quantity,
+            busy,
+            onQuickInfo,
+            onDecrement,
+            onAdd,
+            onExtras,
+          }: {
+            readonly product: Product;
+            readonly quantity: number;
+            readonly busy: boolean;
+            readonly onQuickInfo: () => void;
+            readonly onDecrement: () => void;
+            readonly onAdd: () => void;
+            readonly onExtras: () => void;
+          }) {
+            const className = [
+              'product-card',
+              quantity > 0 ? 'product-card-selected' : null,
+              product.soldOut ? 'product-card-sold-out' : null,
+            ]
+              .filter((value) => value !== null)
+              .join(' ');
+
+            function runIndependentAction(
+              event: MouseEvent<HTMLButtonElement>,
+              action: () => void,
+            ): void {
+              event.stopPropagation();
+              action();
+            }
+
+            return (
+              <article className={className}>
+                <button
+                  type="button"
+                  className="product-main"
+                  onClick={onQuickInfo}
+                  aria-label={`Quick Info for ${product.name}`}
+                >
+                  <div className="product-media">
+                    <ProductMedia product={product} />
+                    {quantity > 0 ? (
+                      <span
+                        className="product-quantity-badge"
+                        aria-label={`${quantity} in current order`}
+                      >
+                        {quantity}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="product-copy">
+                    <strong>{product.name}</strong>
+                    {product.soldOut ? <em>Sold Out</em> : null}
+                  </div>
+                  <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
+                </button>
+
+                <footer className="product-card-footer">
+                  <button
+                    type="button"
+                    className="product-extra-action"
+                    disabled={busy || product.soldOut}
+                    onClick={(event) => runIndependentAction(event, onExtras)}
+                  >
+                    <PlusCircleIcon />
+                    <span>Extra</span>
+                  </button>
+                  <div className="product-card-controls">
+                    <div className="product-quantity" aria-label={`${product.name} quantity`}>
+                      <button
+                        type="button"
+                        aria-label={`Remove one ${product.name}`}
+                        disabled={busy || quantity === 0}
+                        onClick={(event) => runIndependentAction(event, onDecrement)}
+                      >
+                        −
+                      </button>
+                      <output>{quantity}</output>
+                      <button
+                        type="button"
+                        aria-label={`Add one ${product.name}`}
+                        disabled={busy || product.soldOut}
+                        onClick={(event) => runIndependentAction(event, onAdd)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </footer>
+              </article>
+            );
+          }
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          workspace = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          text = workspace.read_text()
+          start = text.index('  const productsWithExtras = useMemo(() => {')
+          end = text.index('  const activeCategories = useMemo(', start)
+          text = text[:start] + text[end:]
+          text = text.replace(
+              '                supportsExtras={productsWithExtras.has(product.id)}\n',
+              '',
+          )
+          workspace.write_text(text)
+
+          icons = Path('apps/operations/src/app/icons.tsx')
+          icon_text = icons.read_text()
+          icon_start = icon_text.index('export function PlusCircleIcon')
+          icon_text = icon_text[:icon_start] + '''export function PlusCircleIcon(props: IconProps) {
+            return (
+              <IconFrame {...props} strokeWidth={2}>
+                <circle cx="12" cy="12" r="10" stroke="currentColor" />
+                <path d="M8 12h8" stroke="currentColor" strokeLinecap="round" />
+                <path d="M12 8v8" stroke="currentColor" strokeLinecap="round" />
+              </IconFrame>
+            );
+          }
+          '''
+          icons.write_text(icon_text)
+
+          css = Path('apps/operations/src/styles/final-pos-corrections.css')
+          css_text = css.read_text()
+          marker = '/* User-approved top-right product price and universal Extra action. */'
+          if marker not in css_text:
+              css_text += '''
+
+          /* User-approved top-right product price and universal Extra action. */
+          .product-card {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .product-card > .product-main {
+            width: 100%;
+            grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+            align-items: start;
+          }
+
+          .product-card > .product-main .product-price {
+            min-width: 0;
+            align-self: start;
+            justify-self: end;
+            margin-top: 1px;
+            font-size: 14px;
+            line-height: 18px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+          }
+
+          .product-card-footer {
+            display: flex;
+            grid-template-columns: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: nowrap;
+          }
+
+          .product-card-footer > .product-extra-action {
+            grid-column: auto;
+            justify-self: auto;
+            margin: 0;
+          }
+
+          .product-card-footer > .product-card-controls {
+            grid-column: auto;
+            min-width: max-content;
+            margin-left: auto;
+            justify-self: auto;
+          }
+
+          @media (max-width: 34rem) {
+            .product-card > .product-main {
+              grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+            }
+
+            .product-card-footer {
+              padding-inline: 8px;
+              gap: 6px;
+            }
+          }
+          '''
+          css.write_text(css_text)
+
+          e2e = Path('e2e/operations.e2e.ts')
+          e2e_text = e2e.read_text()
+          old_start = "test('Extra is centered between price and quantity controls on the product card'"
+          if old_start in e2e_text:
+              start = e2e_text.index(old_start)
+              end = e2e_text.index("test('requested compact product card controls do not overlap on 375px mobile'", start)
+              e2e_text = e2e_text[:start] + e2e_text[end:]
+
+          test_marker = "test('approved cards put 14px price top right and Extra bottom left on every product'"
+          if test_marker not in e2e_text:
+              e2e_text += r'''
 
           test('approved cards put 14px price top right and Extra bottom left on every product', async ({ page }) => {
             await enterActiveOrdersForCategoryTests(page);
@@ -66,11 +298,39 @@ jobs:
             expect(cardBox!.x + cardBox!.width - (quantityBox!.x + quantityBox!.width)).toBeLessThanOrEqual(16);
             expect(Math.abs(extraBox!.y + extraBox!.height - (quantityBox!.y + quantityBox!.height))).toBeLessThanOrEqual(2);
           });
-          EOF
-          npx prettier --write e2e/operations.e2e.ts
-      - name: Verify RED test typechecks
-        run: npm run typecheck:e2e
+          '''
+          e2e.write_text(e2e_text)
+          PY
+
+          npx prettier --write \
+            apps/operations/src/app/MenuProductCard.tsx \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/icons.tsx \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
+      - name: Static verification
+        run: |
+          npm run typecheck:e2e
+          npm run typecheck
+          npm run lint
+          npm run format:check
       - name: Install Playwright Chromium
         run: npx playwright install chromium
-      - name: Run approved product-card RED
+      - name: Verify approved product-card GREEN
         run: npx playwright test e2e/operations.e2e.ts --grep "approved cards put 14px price top right"
+      - name: Verify affected card regressions
+        run: npx playwright test e2e/operations.e2e.ts --grep "requested compact product card controls|final correction keeps Extra and product controls fully contained|Quick Info"
+      - name: Verify full Operations E2E
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit verified source and regression contract
+        run: |
+          git config user.name "TUX POS Verification"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            apps/operations/src/app/MenuProductCard.tsx \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/icons.tsx \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
+          git commit -m "fix: position product card price and extras"
+          git push origin HEAD:ui/tux-pos-refinement
