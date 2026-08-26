@@ -1,4 +1,4 @@
-name: POS Refinement Welcome Evidence
+name: POS Refinement Focused Visual Evidence
 
 on:
   push:
@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: pos-refinement-welcome-evidence-${{ github.ref }}
+  group: pos-refinement-focused-evidence-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   evidence:
-    name: task-seven-welcome-exact-tree-evidence
+    name: task-seven-focused-visual-evidence
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -33,56 +33,86 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test -z "$(git status --short)"
           mkdir -p evidence
-          printf 'source_sha=%s\nsource_status=clean\nevidence_transform=none\n' "$SOURCE_SHA" > evidence/WELCOME_MANIFEST.txt
+          printf 'source_sha=%s\nsource_status=clean\nevidence_transform=none\n' "$SOURCE_SHA" > evidence/FOCUSED_MANIFEST.txt
       - name: Install locked dependencies
         run: npm ci
-      - name: Create temporary welcome evidence harness
+      - name: Create temporary focused evidence harness
         run: |
-          cp e2e/operations.e2e.ts e2e/evidence-welcome.e2e.ts
-          cat >> e2e/evidence-welcome.e2e.ts <<'EOF'
+          cp e2e/operations.e2e.ts e2e/evidence-focused.e2e.ts
+          cat >> e2e/evidence-focused.e2e.ts <<'EOF'
 
-          test('evidence welcome persists until CTA using visible content', async ({ page }, testInfo) => {
+          test('evidence focused cash 705 shows received input and smart tenders', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await seedBrowserFallback(page);
-            await page.goto('/');
-            await page.getByLabel('Enter PIN to Start Day').fill('1234');
-            await page.getByRole('button', { name: 'Start Day' }).click();
+            await enterActiveOrdersForCategoryTests(page);
+            await setAppearance(page, 'Light');
 
-            const greeting = page.getByText('Glad you made it in safely.', { exact: true });
-            const action = page.locator('.welcome-action');
-            await expect(greeting).toBeVisible({ timeout: 15_000 });
-            await expect(action).toBeVisible();
+            await page.getByRole('button', { name: 'Add one Johnny’s' }).click();
+            await page.getByLabel('Product families').getByRole('button', { name: 'TUXIFY', exact: true }).click();
+            await page.getByRole('button', { name: 'Add one Triple TUXIFY' }).click();
+            await page.getByLabel('Menu categories').getByRole('button', { name: 'Fries', exact: true }).click();
+            await page.getByRole('button', { name: 'Add one Doppy Fries' }).click();
+            await page.getByRole('button', { name: 'Add one Classic Fries' }).click();
 
-            await page.waitForTimeout(2000);
-            await expect(greeting).toBeVisible();
-            await expect(action).toBeVisible();
+            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', { name: 'Current order' });
+            await expect(cart.locator('.grand-total')).toContainText('705.00');
+            await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+            const cash = cart.getByLabel('Cash received');
+            const tenders = cart.getByLabel('Smart Cash tenders');
+            await expect(cash).toHaveValue('');
+            await expect(cash).toHaveAttribute('placeholder', '0');
+            await expect(tenders.getByRole('button')).toHaveCount(5);
+            await tenders.scrollIntoViewIfNeeded();
+            await expect(cash).toBeVisible();
+            await expect(tenders).toBeVisible();
+            for (const value of ['705.00', '710.00', '720.00', '750.00', '800.00']) {
+              await expect(tenders).toContainText(value);
+            }
             await expectNoHorizontalOverflow(page);
-            await page.screenshot({
-              path: 'evidence/00-1440-welcome-persistent.png',
-              animations: 'disabled',
-              caret: 'hide',
-            });
+            await page.screenshot({ path: 'evidence/08-1440-single-cash-705-visible.png', animations: 'disabled', caret: 'hide' });
+          });
+
+          test('evidence focused wider rail shows one unfocused hairline', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+            await setAppearance(page, 'Light');
+            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+
+            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+            for (let index = 0; index < 5; index += 1) {
+              await separator.focus();
+              await page.keyboard.press('ArrowLeft');
+            }
+            const cart = page.locator('.desktop-cart-wrap');
+            const wider = await cart.boundingBox();
+            expect(wider).not.toBeNull();
+            expect(wider!.width).toBeGreaterThanOrEqual(550);
+            expect(await cart.evaluate((node) => getComputedStyle(node).borderLeftWidth)).toBe('0px');
+
+            await page.getByLabel('Menu categories').getByRole('button', { name: 'Burgers', exact: true }).focus();
+            await expect(separator).not.toBeFocused();
+            expect(await separator.evaluate((node) => getComputedStyle(node, '::before').width)).toBe('1px');
+            await expectNoHorizontalOverflow(page);
+            await page.screenshot({ path: 'evidence/10-1440-resized-wider-rail-single-hairline.png', animations: 'disabled', caret: 'hide' });
           });
           EOF
       - name: Typecheck temporary harness
         run: npx tsc --noEmit -p tsconfig.e2e.json
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture welcome evidence
-        run: >-
-          npx playwright test e2e/evidence-welcome.e2e.ts --project=desktop-browser-fallback --grep
-          "evidence welcome persists until CTA using visible content"
+      - name: Capture focused evidence
+        run: npx playwright test e2e/evidence-focused.e2e.ts --project=desktop-browser-fallback --grep "evidence focused"
       - name: Prove committed source untouched
         if: always()
         run: |
-          rm -f e2e/evidence-welcome.e2e.ts
+          rm -f e2e/evidence-focused.e2e.ts
           git diff --exit-code -- e2e/operations.e2e.ts apps/operations packages
-          printf 'post_capture_source_diff=clean\n' >> evidence/WELCOME_MANIFEST.txt
-      - name: Upload welcome evidence
+          printf 'post_capture_source_diff=clean\n' >> evidence/FOCUSED_MANIFEST.txt
+      - name: Upload focused evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tux-pos-welcome-evidence-22409d8
+          name: tux-pos-focused-evidence-22409d8
           path: |
             evidence/
             test-results/
