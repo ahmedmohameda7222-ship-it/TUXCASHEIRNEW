@@ -24,37 +24,198 @@ function configuration() {
   const inventory = (index: number) => uuid('60000000', index);
   const orderType = (index: number) => uuid('70000000', index);
   const payment = (index: number) => uuid('80000000', index);
-  const products = [
-    ['Classic Smash', 12_000, 1, false, false],
-    ['Double Smash', 16_000, 1, false, false],
-    ['Triple Smash', 20_000, 1, false, false],
-    ['TUX Loaded Burger', 22_000, 1, false, false],
-    ['Crispy Chicken', 14_000, 1, false, false],
-    ['Spicy Chicken', 15_000, 1, false, false],
-    ['Combo Smash + Required Beverage', 19_000, 1, true, false],
-    ['Long Name Layout Stress Burger with Extra Description', 21_000, 1, false, false],
-    ['Sold Out Test Burger', 17_000, 1, false, true],
-    ['Fries', 5_000, 2, false, false],
-    ['Loaded Fries', 8_000, 2, false, false],
-    ['Onion Rings', 6_000, 2, false, false],
-    ['Cola', 3_000, 3, false, false],
-    ['Diet Cola', 3_000, 3, false, false],
-    ['Water', 2_000, 3, false, false],
-    ['Orange Soda', 3_000, 3, false, false],
-    ['Lemon Soda', 3_000, 3, false, false],
-    ['Iced Tea', 4_000, 3, false, false],
-  ].map(([name, priceMinor, categoryIndex, isCombo, soldOut], index) => ({
+  const productRows = [
+    {
+      name: 'Single Smashed Patty',
+      priceMinor: 12_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'Double Smashed Patty',
+      priceMinor: 16_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'Triple Smashed Patty',
+      priceMinor: 20_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: false,
+      description: '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+    },
+    {
+      name: 'TUX Quatro Smashed Patty',
+      priceMinor: 25_000,
+      categoryIndex: 1,
+      family: 'TUX',
+      isCombo: false,
+      soldOut: true,
+      description:
+        '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom',
+    },
+    {
+      name: 'Single TUXIFY',
+      priceMinor: 14_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Double TUXIFY',
+      priceMinor: 18_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 2 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Triple TUXIFY',
+      priceMinor: 22_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 3 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Quatro TUXIFY',
+      priceMinor: 26_000,
+      categoryIndex: 1,
+      family: 'TUXIFY',
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Brioche bun, 4 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
+    },
+    {
+      name: 'Johnny’s',
+      priceMinor: 33_000,
+      categoryIndex: 1,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description:
+        '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
+    },
+    {
+      name: 'Classic Fries',
+      priceMinor: 3_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Potato Wedges',
+      priceMinor: 4_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Chili Fries',
+      priceMinor: 7_000,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Fries, cheese, chili sauce, jalapeno',
+    },
+    {
+      name: 'TUX Fries',
+      priceMinor: 9_500,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce',
+    },
+    {
+      name: 'Doppy Fries',
+      priceMinor: 12_500,
+      categoryIndex: 3,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description:
+        'Fries, smashed patty, bacon, cheese, caramelized onions, ranch sauce, nachos, chopped green onion',
+    },
+    {
+      name: 'Classic Hawawshi',
+      priceMinor: 10_500,
+      categoryIndex: 4,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce',
+    },
+    {
+      name: 'TUX Hawawshi',
+      priceMinor: 12_500,
+      categoryIndex: 4,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce, mozzarella',
+    },
+    {
+      name: 'Soda',
+      priceMinor: 2_000,
+      categoryIndex: 7,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Water',
+      priceMinor: 1_000,
+      categoryIndex: 7,
+      family: null,
+      isCombo: false,
+      soldOut: false,
+      description: null,
+    },
+    {
+      name: 'Combo Smash + Required Beverage',
+      priceMinor: 19_000,
+      categoryIndex: 2,
+      family: null,
+      isCombo: true,
+      soldOut: false,
+      description: null,
+    },
+  ] as const;
+  const products = productRows.map((item, index) => ({
     id: product(index + 1),
     shopId: SHOP,
-    categoryId: category(Number(categoryIndex)),
-    name: String(name),
-    description:
-      index === 7 ? 'Development-only long text used to stress responsive menu layout.' : null,
-    priceMinor: Number(priceMinor),
+    categoryId: category(item.categoryIndex),
+    name: item.name,
+    description: item.description,
+    priceMinor: item.priceMinor,
     imageKey: null,
     active: true,
-    soldOut: Boolean(soldOut),
-    isCombo: Boolean(isCombo),
+    soldOut: item.soldOut,
+    family: item.family,
+    isCombo: item.isCombo,
     sortOrder: index,
   }));
   const inventoryItems = [
@@ -76,8 +237,12 @@ function configuration() {
       updatedAt: '2026-08-20T03:00:00.000Z',
       categories: [
         { id: category(1), shopId: SHOP, name: 'Burgers', sortOrder: 0, active: true },
-        { id: category(2), shopId: SHOP, name: 'Sides', sortOrder: 1, active: true },
-        { id: category(3), shopId: SHOP, name: 'Drinks', sortOrder: 2, active: true },
+        { id: category(2), shopId: SHOP, name: 'Combo', sortOrder: 1, active: true },
+        { id: category(3), shopId: SHOP, name: 'Fries', sortOrder: 2, active: true },
+        { id: category(4), shopId: SHOP, name: 'Hawawshi', sortOrder: 3, active: true },
+        { id: category(5), shopId: SHOP, name: 'Zalabia', sortOrder: 4, active: true },
+        { id: category(6), shopId: SHOP, name: 'Extras', sortOrder: 5, active: true },
+        { id: category(7), shopId: SHOP, name: 'Drinks', sortOrder: 6, active: true },
       ],
       products,
       modifiers: [
@@ -132,9 +297,9 @@ function configuration() {
           sortOrder: 2,
         },
       ],
-      comboBeverageOptions: [13, 14, 15, 16, 17, 18].map((beverageIndex, sortOrder) => ({
+      comboBeverageOptions: [17, 18].map((beverageIndex, sortOrder) => ({
         shopId: SHOP,
-        comboProductId: product(7),
+        comboProductId: product(19),
         beverageProductId: product(beverageIndex),
         sortOrder,
       })),
@@ -154,7 +319,7 @@ function configuration() {
         {
           shopId: SHOP,
           productId: product(5),
-          inventoryItemId: inventory(2),
+          inventoryItemId: inventory(1),
           quantityMicros: 1_000_000,
         },
         {
@@ -413,8 +578,8 @@ async function expectOrderPlaced(page: Page): Promise<void> {
 }
 
 async function addClassicWithModifier(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Quick Info for Classic Smash' }).click();
-  await page.getByRole('button', { name: 'Customize & add' }).click();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Extra', exact: true }).click();
   await page.getByRole('button', { name: 'Add one Extra Cheese' }).click();
   await page.getByRole('button', { name: 'Add to order' }).click();
 }
@@ -433,7 +598,7 @@ async function placeCashOrder(page: Page, testInfo: TestInfo): Promise<void> {
 }
 
 async function placeDeliveryInstapayOrder(page: Page, testInfo: TestInfo): Promise<void> {
-  await page.getByRole('button', { name: 'Add one Double Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
   await cart.getByRole('button', { name: 'Delivery', exact: true }).click();
@@ -451,9 +616,13 @@ async function placeDeliveryInstapayOrder(page: Page, testInfo: TestInfo): Promi
 }
 
 async function placeSplitComboOrder(page: Page, testInfo: TestInfo): Promise<void> {
+  await page
+    .getByLabel('Menu categories')
+    .getByRole('button', { name: 'Combo', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Add one Combo Smash + Required Beverage' }).click();
   const customizer = page.getByRole('dialog', { name: 'Combo Smash + Required Beverage' });
-  await customizer.getByRole('combobox').selectOption({ label: 'Cola' });
+  await customizer.getByRole('combobox').selectOption({ label: 'Soda' });
   await customizer.getByRole('button', { name: 'Add to order' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
@@ -584,7 +753,9 @@ test('Operations V2 full browser-fallback workflow stays durable and responsive'
   if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
   await waitForActiveShell(page);
   await expect(page.getByRole('img', { name: 'TUX' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add one Sold Out Test Burger' })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Add one TUX Quatro Smashed Patty' }),
+  ).toBeDisabled();
   await expectNoHorizontalOverflow(page);
 
   await placeCashOrder(page, testInfo);
@@ -626,8 +797,8 @@ test('category search is progressive and keyboard accessible', async ({ page }) 
   await page.keyboard.press('Control+K');
   await expect(searchInput).toBeVisible();
   await expect(searchInput).toBeFocused();
-  await searchInput.fill('cola');
-  await expect(page.getByRole('button', { name: 'Add one Cola' })).toBeVisible();
+  await searchInput.fill('soda');
+  await expect(page.getByRole('button', { name: 'Add one Soda' })).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(searchInput).toHaveValue('');
@@ -660,22 +831,24 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
   );
 
   const editorItems = page.locator('.category-editor-item');
-  await expect(editorItems).toHaveCount(3);
+  await expect(editorItems).toHaveCount(7);
   await expect(editorItems.nth(0)).toContainText('Burgers');
   await page.getByRole('button', { name: 'Move Burgers right' }).click();
-  await expect(editorItems.nth(0)).toContainText('Sides');
+  await expect(editorItems.nth(0)).toContainText('Combo');
   await expect(editorItems.nth(1)).toContainText('Burgers');
 
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   const categories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(categories.nth(0)).toHaveText('Sides');
+  await expect(categories).toHaveCount(7);
+  await expect(categories.nth(0)).toHaveText('Combo');
   await expect(categories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
 
   await page.reload();
   await waitForActiveShell(page);
   const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(reloadedCategories.nth(0)).toHaveText('Sides');
+  await expect(reloadedCategories).toHaveCount(7);
+  await expect(reloadedCategories.nth(0)).toHaveText('Combo');
   await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
 
@@ -684,16 +857,16 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
   await expect(resetCategories.nth(0)).toHaveText('Burgers');
-  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'center');
+  await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'left');
 });
 
 test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
-  await expect(cart).toContainText('Classic Smash');
+  await expect(cart).toContainText('Single Smashed Patty');
   await closeMobileCartIfOpen(page, testInfo);
 
   await page.getByRole('button', { name: 'Edit categories' }).click();
@@ -717,19 +890,25 @@ test('category persistence failure keeps editor and draft intact', async ({ page
   await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
   await expect(page.getByLabel('Edit categories')).toBeVisible();
   await openCartIfMobile(page, testInfo);
-  await expect(currentOrderCart(page, testInfo)).toContainText('Classic Smash');
+  await expect(currentOrderCart(page, testInfo)).toContainText('Single Smashed Patty');
 });
 
 test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
-  const doubleCard = page.locator('.product-card').filter({ hasText: 'Double Smash' }).first();
+  const classicCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const doubleCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Double Smashed Patty' })
+    .first();
   await expect(classicCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
-  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toHaveCount(0);
+  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
 
   await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
-  const addDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const addDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   const addExtrasSection = addDialog.locator('[aria-labelledby="extras-title"]');
   await expect(addExtrasSection).toBeFocused();
   await addDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
@@ -740,14 +919,14 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('1');
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
-  const classicLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const classicLines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(classicLines).toHaveCount(1);
   await expect(classicLines.nth(0)).toContainText('2× Extra Cheese');
   await expect(classicLines.nth(0)).toContainText('1× Extra Patty');
   await expect(classicLines.nth(0)).toContainText(/200\.00/);
 
   await closeMobileCartIfOpen(page, testInfo);
-  await classicCard.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await classicCard.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await expect(classicCard.locator('.product-quantity-badge')).toHaveText('2');
   await openCartIfMobile(page, testInfo);
   await expect(classicLines).toHaveCount(2);
@@ -756,12 +935,12 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
   await expect(classicLines.nth(1)).toContainText(/120\.00/);
 
   await classicLines.nth(0).getByRole('button', { name: 'Extra', exact: true }).click();
-  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const editDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await expect(editDialog.locator('[aria-labelledby="extras-title"]')).toBeFocused();
   await editDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
   await editDialog.getByRole('button', { name: 'Save item' }).click();
 
-  const updatedLines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const updatedLines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(updatedLines).toHaveCount(2);
   await expect(updatedLines.nth(0)).toContainText('2× Extra Patty');
   await expect(updatedLines.nth(0)).toContainText(/240\.00/);
@@ -788,7 +967,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
   expect(await count.evaluate((node) => getComputedStyle(node).fontSize)).toBe('13px');
   expect(await count.evaluate((node) => getComputedStyle(node).lineHeight)).toBe('16px');
 
-  const lines = cart.locator('.cart-line').filter({ hasText: 'Classic Smash' });
+  const lines = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' });
   await expect(lines).toHaveCount(1);
   const line = lines.first();
   await expect(line).toContainText('1× Extra Cheese');
@@ -804,10 +983,10 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
 
   await lines.first().getByRole('button', { name: '−1', exact: true }).click();
   await expect(lines.first()).toContainText('× 1');
-  await expect(page.locator('.undo-toast')).toContainText('Removed one Classic Smash');
+  await expect(page.locator('.undo-toast')).toContainText('Removed one Single Smashed Patty');
 
   await lines.first().getByRole('button', { name: 'Edit', exact: true }).click();
-  const editDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+  const editDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await expect(editDialog).toBeVisible();
   await expect(editDialog.getByText('Extra Cheese')).toBeVisible();
   await editDialog.getByRole('button', { name: 'Cancel' }).click();
@@ -828,7 +1007,7 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
 test('cash entry stays optional and split stays allocation-only', async ({ page }, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  await page.getByRole('button', { name: 'Add one Double Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   let cart = currentOrderCart(page, testInfo);
 
@@ -854,8 +1033,8 @@ test('cash entry stays optional and split stays allocation-only', async ({ page 
   await expectOrderPlaced(page);
   await closeMobileCartIfOpen(page, testInfo);
 
-  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-  await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   cart = currentOrderCart(page, testInfo);
 
@@ -962,7 +1141,7 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
 
   const categories = page.getByLabel('Menu categories');
   const activeCategory = categories.getByRole('button', { name: 'Burgers', exact: true });
-  const inactiveCategory = categories.getByRole('button', { name: 'Sides', exact: true });
+  const inactiveCategory = categories.getByRole('button', { name: 'Combo', exact: true });
   const activeCategoryStyle = await activeCategory.evaluate((node) => getComputedStyle(node));
   const inactiveCategoryStyle = await inactiveCategory.evaluate((node) => getComputedStyle(node));
   expect(activeCategoryStyle.fontSize).toBe('15px');
@@ -971,32 +1150,19 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
   expect(Number(inactiveCategoryStyle.fontWeight)).toBe(500);
   expect((await activeCategory.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  const stressCard = page
-    .locator('.product-card')
-    .filter({ hasText: 'Long Name Layout Stress Burger with Extra Description' })
-    .first();
+  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
   const productName = stressCard.locator('.product-copy strong');
-  const productDescription = stressCard.locator('.product-copy p');
   const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
-  const productDescriptionStyle = await productDescription.evaluate((node) =>
-    getComputedStyle(node),
-  );
   expect(productNameStyle.fontSize).toBe('15px');
   expect(productNameStyle.lineHeight).toBe('20px');
   expect(Number(productNameStyle.fontWeight)).toBe(600);
-  expect(productDescriptionStyle.fontSize).toBe('14px');
-  expect(productDescriptionStyle.lineHeight).toBe('18px');
-  expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
-  expect(productDescriptionStyle.webkitLineClamp).toBe('2');
-  await expect(productDescription).toHaveText(
-    'Development-only long text used to stress responsive menu layout.',
-  );
+  await expect(stressCard.locator('.product-copy p')).toHaveCount(0);
   expect(
     (await stressCard.locator('.product-price').evaluate((node) => getComputedStyle(node)))
       .fontVariantNumeric,
   ).toContain('tabular-nums');
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
     name: 'Current order',
   });
@@ -1119,12 +1285,12 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('04-category-edit.png');
     await page.getByRole('button', { name: 'Done', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one TUX Loaded Burger' }).click();
-    await page.getByRole('button', { name: 'Add one Spicy Chicken' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple TUXIFY' }).click();
+    await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
     await page.getByLabel('Menu categories').getByRole('button', { name: 'Drinks' }).click();
-    await page.getByRole('button', { name: 'Add one Cola' }).click();
+    await page.getByRole('button', { name: 'Add one Soda' }).click();
 
     let cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
       name: 'Current order',
@@ -1149,8 +1315,8 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await expect(cart.locator('.payment-summary')).toContainText('Change: EGP 95.00');
 
     await startFresh();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
-    await page.getByRole('button', { name: 'Add one Triple Smash' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+    await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
     cart = page.locator('.desktop-cart-wrap').getByRole('complementary', {
       name: 'Current order',
     });
@@ -1163,9 +1329,12 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('06-split-payment-400.png');
 
     await startFresh();
-    const classicCard = page.locator('.product-card').filter({ hasText: 'Classic Smash' }).first();
+    const classicCard = page
+      .locator('.product-card')
+      .filter({ hasText: 'Single Smashed Patty' })
+      .first();
     await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
-    const extrasDialog = page.getByRole('dialog', { name: 'Classic Smash' });
+    const extrasDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
     await extrasDialog.getByRole('button', { name: 'Add one Extra Cheese' }).click();
     await extrasDialog.getByRole('button', { name: 'Add one Extra Patty' }).click();
     await screenshot('07-extras-customizer.png');
@@ -1183,7 +1352,7 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     return;
   }
 
-  await page.getByRole('button', { name: 'Add one Classic Smash' }).click();
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   await openCartIfMobile(page, testInfo);
   await expect(page.locator('.mobile-cart-overlay')).toBeVisible();
   if (testInfo.project.name === 'mobile-browser-fallback') {
@@ -1191,4 +1360,593 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
   } else {
     await screenshot('09-tablet-review-pay.png');
   }
+});
+
+test('final correction keeps header and categories visible during compact search', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const header = page.locator('.operations-header');
+  const headerBox = await header.boundingBox();
+  const headerStyle = await header.evaluate((node) => getComputedStyle(node));
+  expect(headerBox).not.toBeNull();
+  expect(Math.round(headerBox!.height)).toBe(64);
+  expect(headerStyle.paddingLeft).toBe('16px');
+  expect(headerStyle.paddingRight).toBe('16px');
+  const logoBox = await header.getByRole('img', { name: 'TUX' }).boundingBox();
+  expect(logoBox).not.toBeNull();
+  expect(Math.round(logoBox!.height)).toBe(44);
+  const categories = page.getByLabel('Menu categories');
+  await expect(categories).toHaveAttribute('data-alignment', 'left');
+  expect((await categories.evaluate((node) => getComputedStyle(node))).gap).toBe('6px');
+  const toolbarBox = await page.locator('.menu-toolbar').boundingBox();
+  expect(toolbarBox).not.toBeNull();
+  expect(toolbarBox!.height).toBeGreaterThan(56);
+  const actionButtons = page.locator('.category-nav-actions > button');
+  await expect(actionButtons).toHaveCount(2);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit categories');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');
+  await page.getByRole('button', { name: 'Search menu' }).click();
+  await expect(header).toBeVisible();
+  await expect(categories).toBeVisible();
+  const search = page.locator('.category-search-inline');
+  const searchBox = await search.boundingBox();
+  expect(searchBox).not.toBeNull();
+  expect(Math.round(searchBox!.width)).toBe(300);
+  await expect(search.locator('kbd')).toHaveCount(0);
+  const input = page.getByPlaceholder('Search products');
+  await expect(input).toBeFocused();
+  const inputStyle = await input.evaluate((node) => getComputedStyle(node));
+  expect(inputStyle.fontSize).toBe('14px');
+  expect(inputStyle.lineHeight).toBe('18px');
+  expect(Number(inputStyle.fontWeight)).toBe(400);
+  const clear = search.getByRole('button', { name: 'Clear search' });
+  await expect(clear).toHaveText('×');
+  const clearBox = await clear.boundingBox();
+  expect(clearBox).not.toBeNull();
+  expect(Math.round(clearBox!.width)).toBe(44);
+  expect(Math.round(clearBox!.height)).toBe(44);
+});
+
+test('final correction keeps product controls cashier-sized', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const gridStyle = await page.locator('.product-grid').evaluate((node) => getComputedStyle(node));
+  expect(gridStyle.rowGap).toBe('8px');
+  expect(gridStyle.columnGap).toBe('8px');
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  expect((await card.evaluate((node) => getComputedStyle(node))).borderRadius).toBe('12px');
+  const media = await card.locator('.product-media').boundingBox();
+  expect(media).not.toBeNull();
+  expect(Math.round(media!.width)).toBe(68);
+  expect(Math.round(media!.height)).toBe(68);
+  const price = await card.locator('.product-price').evaluate((node) => getComputedStyle(node));
+  expect(price.fontSize).toBe('14px');
+  expect(price.lineHeight).toBe('18px');
+  expect(Number(price.fontWeight)).toBe(500);
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  expect(Math.round((await extra.boundingBox())!.height)).toBe(44);
+  expect(Math.round((await extra.locator('svg').boundingBox())!.width)).toBe(20);
+  const stepper = card.getByLabel('Single Smashed Patty quantity');
+  for (const button of [
+    stepper.getByRole('button', { name: 'Remove one Single Smashed Patty' }),
+    stepper.getByRole('button', { name: 'Add one Single Smashed Patty' }),
+  ]) {
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(44);
+    expect(Math.round(box!.height)).toBe(44);
+  }
+  await stepper.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
+  const badge = card.locator('.product-quantity-badge');
+  const badgeBox = await badge.boundingBox();
+  expect(badgeBox).not.toBeNull();
+  expect(badgeBox!.width).toBeGreaterThanOrEqual(24);
+  expect(badgeBox!.height).toBeGreaterThanOrEqual(24);
+  const badgeStyle = await badge.evaluate((node) => getComputedStyle(node));
+  expect(badgeStyle.fontSize).toBe('13px');
+  expect(badgeStyle.lineHeight).toBe('16px');
+  expect(Number(badgeStyle.fontWeight)).toBe(600);
+});
+
+test('final correction keeps cart and payment controls at visible target sizes', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Extra', exact: true }).click();
+  const customizer = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  await customizer.getByRole('button', { name: 'Add one Extra Cheese' }).click();
+  await customizer.getByRole('button', { name: /Add to order/i }).click();
+  const cart = page
+    .locator('.desktop-cart-wrap')
+    .getByRole('complementary', { name: 'Current order' });
+  const clear = cart.getByRole('button', { name: 'Clear', exact: true });
+  const clearStyle = await clear.evaluate((node) => getComputedStyle(node));
+  expect(clearStyle.fontSize).toBe('14px');
+  expect(clearStyle.lineHeight).toBe('18px');
+  expect(Number(clearStyle.fontWeight)).toBe(500);
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
+  for (const name of ['−1', '+1']) {
+    const box = await line.getByRole('button', { name, exact: true }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBe(44);
+    expect(Math.round(box!.height)).toBe(44);
+  }
+  for (const name of ['Edit', 'Extra']) {
+    const button = line.getByRole('button', { name, exact: true });
+    expect(Math.round((await button.boundingBox())!.height)).toBe(44);
+    const style = await button.evaluate((node) => getComputedStyle(node));
+    expect(style.fontSize).toBe('14px');
+    expect(style.lineHeight).toBe('18px');
+    expect(Number(style.fontWeight)).toBe(500);
+  }
+  expect(
+    Math.round((await cart.getByRole('button', { name: 'Take Away' }).boundingBox())!.height),
+  ).toBe(44);
+  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+  const cash = cart.getByLabel('Cash received');
+  await expect(cash).toHaveValue('');
+  await expect(cash).toHaveAttribute('placeholder', '0');
+  expect(Math.round((await cash.boundingBox())!.height)).toBe(44);
+  const tenders = cart.getByLabel('Smart Cash tenders');
+  expect((await tenders.evaluate((node) => getComputedStyle(node))).gap).toBe('6px');
+  expect(Math.round((await tenders.getByRole('button').first().boundingBox())!.height)).toBe(44);
+  const split = cart.getByRole('button', { name: 'Split payment' });
+  expect(Math.round((await split.boundingBox())!.height)).toBe(44);
+  await split.click();
+  await expect(cart.getByLabel('Method A')).toBeVisible();
+  await expect(cart.getByLabel('Amount A')).toBeVisible();
+  await expect(cart.getByLabel('Method B')).toBeVisible();
+  await expect(cart.getByText('Amount B', { exact: true })).toBeVisible();
+  await expect(cart.getByLabel('Cash received A')).toHaveCount(0);
+  await expect(cart.getByLabel('Cash received B')).toHaveCount(0);
+});
+
+test('final correction resizes Current Order by 24px per keyboard step', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  const cart = page.locator('.desktop-cart-wrap');
+  const before = await cart.boundingBox();
+  expect(before).not.toBeNull();
+  await separator.focus();
+  await page.keyboard.press('ArrowRight');
+  const after = await cart.boundingBox();
+  expect(after).not.toBeNull();
+  expect(Math.round(Math.abs(after!.width - before!.width))).toBe(24);
+});
+
+test('approved category hierarchy stays two-level across idle search and edit', async ({
+  page,
+}) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const primary = page.getByLabel('Menu categories').locator('.category-tab');
+  const expectedPrimary = ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Zalabia', 'Extras', 'Drinks'];
+  await expect(primary).toHaveCount(expectedPrimary.length);
+  for (const [index, name] of expectedPrimary.entries()) {
+    await expect(primary.nth(index)).toHaveText(name);
+  }
+  await expect(primary.nth(0)).toHaveClass(/selected/);
+  await expect(
+    page.getByLabel('Menu categories').getByRole('button', { name: 'All', exact: true }),
+  ).toHaveCount(0);
+
+  const families = page.getByLabel('Product families').getByRole('button');
+  await expect(families).toHaveCount(3);
+  await expect(families.nth(0)).toHaveText('All');
+  await expect(families.nth(1)).toHaveText('TUX');
+  await expect(families.nth(2)).toHaveText('TUXIFY');
+});
+
+test('search keeps both category levels visible and hides edit chrome', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Search menu' }).click();
+
+  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
+  await expect(page.getByLabel('Menu categories').locator('.category-tab')).toHaveCount(7);
+  await expect(page.getByLabel('Product families')).toBeVisible();
+  await expect(page.getByPlaceholder('Search products')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit categories' })).toBeHidden();
+  await expect(page.getByText('Ctrl K', { exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('.category-search-inline').getByRole('button', { name: 'Clear', exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Clear search' })).toBeVisible();
+});
+
+test('category edit contains primary categories only', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Edit categories' }).click();
+
+  await expect(page.getByPlaceholder('Search products')).toBeHidden();
+  await expect(page.getByLabel('Product families')).toBeHidden();
+  const editor = page.locator('.category-editor');
+  const items = editor.locator('.category-editor-item');
+  const expectedPrimary = ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Zalabia', 'Extras', 'Drinks'];
+  await expect(items).toHaveCount(expectedPrimary.length);
+  for (const [index, name] of expectedPrimary.entries()) {
+    await expect(items.nth(index)).toContainText(name);
+  }
+  await expect(editor.getByText('All', { exact: true })).toHaveCount(0);
+  await expect(editor.getByText('TUX', { exact: true })).toHaveCount(0);
+  await expect(editor.getByText('TUXIFY', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+});
+
+test('final correction keeps Extra and product controls fully contained', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+
+  const grid = page.locator('.product-grid');
+  const gridStyle = await grid.evaluate((node) => getComputedStyle(node));
+  expect(gridStyle.rowGap).toBe('8px');
+  expect(gridStyle.columnGap).toBe('8px');
+  expect(gridStyle.alignItems).toBe('start');
+  const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
+  expect(columnCount).toBeGreaterThanOrEqual(1);
+
+  const card = grid.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const minus = card.getByRole('button', { name: 'Remove one Single Smashed Patty' });
+  const plus = card.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  const quantity = card.locator('.product-quantity output');
+  await expect(extra).toBeVisible();
+  await expect(minus).toBeVisible();
+  await expect(quantity).toBeVisible();
+  await expect(plus).toBeVisible();
+
+  const controls = [extra, minus, quantity, plus];
+  for (const control of controls) {
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+    expect(box!.y).toBeGreaterThanOrEqual(cardBox!.y - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+  }
+
+  for (const button of [minus, plus]) {
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+  }
+  const extraBox = await extra.boundingBox();
+  expect(extraBox).not.toBeNull();
+  expect(Math.round(extraBox!.height)).toBeGreaterThanOrEqual(44);
+
+  const footerStyle = await card
+    .locator('.product-card-footer')
+    .evaluate((node) => getComputedStyle(node));
+  expect(footerStyle.minHeight).toBe('52px');
+  expect(footerStyle.display).toBe('grid');
+  expect(footerStyle.rowGap).toBe('8px');
+  const controlsStyle = await card
+    .locator('.product-card-controls')
+    .evaluate((node) => getComputedStyle(node));
+  expect(controlsStyle.flexWrap).toBe('nowrap');
+
+  await page.getByRole('button', { name: 'Fries', exact: true }).click();
+  const plain = grid.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
+  const described = grid.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
+  await expect(plain.locator('.product-copy p')).toHaveCount(0);
+  await expect(described.locator('.product-copy p')).toHaveCount(0);
+  const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
+  const describedStyle = await described.evaluate((node) => getComputedStyle(node));
+  expect(plainStyle.minHeight).toBe('0px');
+  expect(describedStyle.minHeight).toBe('0px');
+
+  const overflow = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.viewport);
+});
+
+test('final correction keeps mobile Review & pay unobstructed with integrated split', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+  await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
+
+  await page.locator('.mobile-cart-trigger').click();
+  const overlay = page.locator('.mobile-cart-overlay');
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator('.mobile-cart-bar strong')).toHaveText('Review & pay');
+  await expect(overlay.locator('strong').filter({ hasText: /^Current order$/i })).toHaveCount(1);
+  await expect(overlay.locator('.cart-title')).toHaveText('Current Order');
+  await expect(page.getByRole('separator', { name: 'Resize Current Order' })).toHaveCount(0);
+
+  const payment = overlay.locator('.payment-section');
+  const split = payment.getByRole('button', { name: 'Split payment' });
+  await expect(split).toBeVisible();
+  const [paymentBox, splitBox] = await Promise.all([payment.boundingBox(), split.boundingBox()]);
+  expect(paymentBox).not.toBeNull();
+  expect(splitBox).not.toBeNull();
+  const paymentPadding = await payment.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  });
+  expect(Math.round(splitBox!.height)).toBe(44);
+  expect(Math.abs(splitBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+
+  await split.click();
+  await overlay.getByLabel('Amount A').fill('320');
+  await overlay.getByLabel('Amount A').blur();
+  await expect(overlay.getByText('Method A', { exact: true })).toBeVisible();
+  await expect(overlay.getByText('Amount A', { exact: true })).toBeVisible();
+  await expect(overlay.getByText('Method B', { exact: true })).toBeVisible();
+  await expect(overlay.getByText('Amount B', { exact: true })).toBeVisible();
+  await expect(overlay.locator('.split-remainder')).toContainText('80.00');
+  await expect(overlay.getByText('Cash received', { exact: true })).toHaveCount(0);
+  await expect(overlay.getByText('Change', { exact: true })).toHaveCount(0);
+
+  const cancel = payment.getByRole('button', { name: 'Cancel split' });
+  const cancelBox = await cancel.boundingBox();
+  expect(cancelBox).not.toBeNull();
+  expect(Math.round(cancelBox!.height)).toBe(44);
+  expect(Math.abs(cancelBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+
+  const scroll = overlay.locator('.cart-scroll');
+  await scroll.evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  await expect(cancel).toBeVisible();
+  const [finalControlBox, totalsBox, placeBox] = await Promise.all([
+    cancel.boundingBox(),
+    overlay.locator('.cart-totals').boundingBox(),
+    overlay.getByRole('button', { name: 'Place Order' }).boundingBox(),
+  ]);
+  expect(finalControlBox).not.toBeNull();
+  expect(totalsBox).not.toBeNull();
+  expect(placeBox).not.toBeNull();
+  expect(totalsBox!.y - (finalControlBox!.y + finalControlBox!.height)).toBeGreaterThanOrEqual(16);
+  expect(placeBox!.y).toBeGreaterThanOrEqual(0);
+  expect(placeBox!.y + placeBox!.height).toBeLessThanOrEqual(812);
+});
+
+test('final correction uses one Current Order separator', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  await expect(separator).toBeVisible();
+  await expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+
+  const separatorLineWidth = await separator.evaluate(
+    (node) => getComputedStyle(node, '::before').width,
+  );
+  expect(separatorLineWidth).toBe('1px');
+
+  const cart = page.locator('.desktop-cart-wrap');
+  const borderLeftWidth = await cart.evaluate((node) => getComputedStyle(node).borderLeftWidth);
+  expect(borderLeftWidth).toBe('0px');
+
+  const initial = await cart.boundingBox();
+  expect(initial).not.toBeNull();
+  await separator.focus();
+  await page.keyboard.press('ArrowLeft');
+  const resized = await cart.boundingBox();
+  expect(resized).not.toBeNull();
+  expect(Math.round(resized!.width - initial!.width)).toBe(24);
+});
+
+test('Burger family filter appears below main categories only for Burgers', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const primary = page.getByLabel('Menu categories');
+  await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
+  const families = page.getByLabel('Product families');
+  await expect(families).toBeVisible();
+  await expect(families.getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
+  await expect(primary.getByRole('button', { name: 'All', exact: true })).toHaveCount(0);
+  const [primaryBox, familyBox] = await Promise.all([
+    primary.boundingBox(),
+    families.boundingBox(),
+  ]);
+  expect(primaryBox).not.toBeNull();
+  expect(familyBox).not.toBeNull();
+  expect(familyBox!.y).toBeGreaterThanOrEqual(primaryBox!.y + primaryBox!.height - 1);
+  await primary.getByRole('button', { name: 'Fries', exact: true }).click();
+  await expect(page.getByLabel('Product families')).toHaveCount(0);
+});
+
+test('product description appears only after opening the product card', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await expect(card.locator('.product-copy p')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+});
+
+test('Quick Info is informational only and has no Customize and add action', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+  await expect(dialog.getByRole('button', { name: 'Customize & add' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
+});
+
+test('requested compact product card controls do not overlap on 375px mobile', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const cards = page.locator('.product-card');
+  const card = cards.filter({ hasText: 'Single Smashed Patty' }).first();
+  const nextCard = cards.filter({ hasText: 'Double Smashed Patty' }).first();
+  await expect(card.locator('.product-copy p')).toHaveCount(0);
+  const price = card.locator('.product-price');
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const quantity = card.locator('.product-quantity');
+  const [cardBox, nextCardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+    card.boundingBox(),
+    nextCard.boundingBox(),
+    price.boundingBox(),
+    extra.boundingBox(),
+    quantity.boundingBox(),
+  ]);
+  expect(cardBox).not.toBeNull();
+  expect(nextCardBox).not.toBeNull();
+  for (const box of [priceBox, extraBox, quantityBox]) {
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+  }
+  expect(nextCardBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height + 7);
+  await extra.click();
+  await expect(page.locator('.product-customizer')).toBeVisible();
+});
+
+test('approved cards put 14px price top right and Extra bottom left on every product', async ({
+  page,
+}) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  for (const categoryName of ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Drinks']) {
+    await page.getByRole('button', { name: categoryName, exact: true }).click();
+    const cards = page.locator('.product-card');
+    const count = await cards.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      await expect(
+        cards.nth(index).getByRole('button', { name: 'Extra', exact: true }),
+      ).toHaveCount(1);
+    }
+  }
+
+  await page.getByRole('button', { name: 'Burgers', exact: true }).click();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const price = card.locator('.product-price');
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const quantity = card.locator('.product-quantity');
+  const [cardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+    card.boundingBox(),
+    price.boundingBox(),
+    extra.boundingBox(),
+    quantity.boundingBox(),
+  ]);
+  expect(cardBox).not.toBeNull();
+  expect(priceBox).not.toBeNull();
+  expect(extraBox).not.toBeNull();
+  expect(quantityBox).not.toBeNull();
+
+  const priceFontSize = await price.evaluate((node) => getComputedStyle(node).fontSize);
+  expect(priceFontSize).toBe('14px');
+  expect(priceBox!.y).toBeLessThan(cardBox!.y + 36);
+  expect(cardBox!.x + cardBox!.width - (priceBox!.x + priceBox!.width)).toBeLessThanOrEqual(16);
+  expect(extraBox!.x - cardBox!.x).toBeLessThanOrEqual(16);
+  expect(extraBox!.y).toBeGreaterThan(cardBox!.y + cardBox!.height / 2);
+  expect(quantityBox!.x).toBeGreaterThan(extraBox!.x + extraBox!.width);
+  expect(cardBox!.x + cardBox!.width - (quantityBox!.x + quantityBox!.width)).toBeLessThanOrEqual(
+    16,
+  );
+  expect(
+    Math.abs(extraBox!.y + extraBox!.height - (quantityBox!.y + quantityBox!.height)),
+  ).toBeLessThanOrEqual(2);
+});
+
+test('product names stay fully readable while Current Order rail resizes', async ({
+  page,
+}, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+  if (!testInfo.project.name.startsWith('desktop')) return;
+
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  const cart = page.locator('.desktop-cart-wrap');
+  const menu = page.locator('.menu-pane');
+  const grid = page.locator('.product-grid');
+
+  async function expectReadableTitles(state: string): Promise<void> {
+    const [cartBox, menuBox, firstCardBox, columns, titles] = await Promise.all([
+      cart.boundingBox(),
+      menu.boundingBox(),
+      page.locator('.product-card').first().boundingBox(),
+      grid.evaluate((node) => getComputedStyle(node).gridTemplateColumns),
+      page.locator('.product-copy strong').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const element = node as HTMLElement;
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const textRect = range.getBoundingClientRect();
+          const box = element.getBoundingClientRect();
+          return {
+            text: element.textContent ?? '',
+            clientHeight: element.clientHeight,
+            scrollHeight: element.scrollHeight,
+            textBottom: textRect.bottom,
+            boxBottom: box.bottom,
+          };
+        }),
+      ),
+    ]);
+
+    console.log(
+      JSON.stringify({
+        state,
+        cartWidth: cartBox?.width ?? null,
+        menuWidth: menuBox?.width ?? null,
+        cardWidth: firstCardBox?.width ?? null,
+        columns,
+      }),
+    );
+
+    for (const title of titles) {
+      expect(
+        title.scrollHeight,
+        `${state}: ${title.text} must not be line-clamped`,
+      ).toBeLessThanOrEqual(title.clientHeight + 1);
+      expect(
+        title.textBottom,
+        `${state}: ${title.text} must stay inside its title box`,
+      ).toBeLessThanOrEqual(title.boxBottom + 1);
+    }
+  }
+
+  await separator.focus();
+  await page.keyboard.press('Home');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeLessThanOrEqual(362);
+  await expectReadableTitles('cart-min-360');
+
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(430);
+  await expectReadableTitles('cart-default-432');
+
+  await separator.focus();
+  await page.keyboard.press('End');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(598);
+  await expectReadableTitles('cart-max-600');
 });

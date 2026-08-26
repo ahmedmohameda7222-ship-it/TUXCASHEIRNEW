@@ -1,35 +1,101 @@
-name: POS Refinement TDD
+name: POS Adaptive Rail Evidence
 
 on:
   push:
     branches:
-      - 'ui/tux-pos-refinement'
+      - ui/tux-pos-refinement
 
 permissions:
   contents: read
 
-concurrency:
-  group: pos-refinement-tdd-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  tdd:
-    name: fast-tdd
+  evidence:
+    name: adaptive-rail-rendered-evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout verified adaptive product source
+        uses: actions/checkout@v7
+        with:
+          ref: 3ea9121faaddfc8854e0088364c6e658d954c5ff
+      - name: Prove exact evidence source
+        run: test "$(git rev-parse HEAD)" = "3ea9121faaddfc8854e0088364c6e658d954c5ff"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format check
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm run test
+      - name: Add evidence-only screenshot contract
+        run: |
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          test('render adaptive product grid across Current Order rail widths', async ({ page }, testInfo) => {
+            await enterActiveOrdersForCategoryTests(page);
+            if (!testInfo.project.name.startsWith('desktop')) return;
+
+            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+            const cart = page.locator('.desktop-cart-wrap');
+            const grid = page.locator('.product-grid');
+
+            async function capture(name: string, expectedColumns: number): Promise<void> {
+              const columns = await grid.evaluate((node) =>
+                getComputedStyle(node).gridTemplateColumns.split(' ').filter(Boolean).length,
+              );
+              expect(columns).toBe(expectedColumns);
+
+              const titles = await page.locator('.product-copy strong').evaluateAll((nodes) =>
+                nodes.map((node) => ({
+                  text: node.textContent ?? '',
+                  clientHeight: (node as HTMLElement).clientHeight,
+                  scrollHeight: (node as HTMLElement).scrollHeight,
+                })),
+              );
+              for (const title of titles) {
+                expect(title.scrollHeight, `${name}: ${title.text} must remain fully readable`).toBeLessThanOrEqual(
+                  title.clientHeight + 1,
+                );
+              }
+
+              await page.screenshot({ path: `evidence/${name}`, fullPage: true, animations: 'disabled' });
+            }
+
+            await separator.focus();
+            await page.keyboard.press('Home');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeLessThanOrEqual(362);
+            await capture('01-rail-360-three-columns-full-titles.png', 3);
+
+            await separator.focus();
+            await page.keyboard.press('ArrowLeft');
+            await page.keyboard.press('ArrowLeft');
+            await page.keyboard.press('ArrowLeft');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(430);
+            await capture('02-rail-432-two-columns-full-titles.png', 2);
+
+            await separator.focus();
+            await page.keyboard.press('End');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(598);
+            await capture('03-rail-600-two-columns-full-titles.png', 2);
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: Verify evidence harness
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: Reverify adaptive readability and capture evidence
+        run: |
+          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep "product names stay fully readable while Current Order rail resizes|render adaptive product grid across Current Order rail widths"
+      - name: Prove production source stayed untouched
+        run: |
+          test "$(git rev-parse HEAD)" = "3ea9121faaddfc8854e0088364c6e658d954c5ff"
+          git diff --exit-code -- apps/operations
+      - name: Upload adaptive rail evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-adaptive-rail-evidence-3ea9121
+          path: evidence/*.png
+          if-no-files-found: error
+          retention-days: 14

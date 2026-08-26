@@ -276,7 +276,8 @@ button:not(:disabled):active {
 
 .product-grid {
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.625rem;
+  align-items: start;
+  gap: 8px;
   padding: var(--tux-space-2) var(--tux-space-4) var(--tux-space-6);
 }
 
@@ -349,10 +350,13 @@ button:not(:disabled):active {
 
 .product-card-footer {
   display: flex;
-  min-height: 3.4rem;
+  height: auto;
+  min-height: 52px;
   align-items: center;
   justify-content: space-between;
   gap: var(--tux-space-2);
+  row-gap: 8px;
+  flex-wrap: wrap;
   padding: var(--tux-space-1) var(--tux-space-2) var(--tux-space-1) var(--tux-space-3);
   border-top: 1px solid var(--tux-border-subtle);
 }
@@ -375,19 +379,19 @@ button:not(:disabled):active {
   min-height: var(--tux-touch-target);
 }
 
-@container tux-menu (min-width: 26rem) {
+@container tux-menu (min-width: 722px) {
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@container tux-menu (min-width: 42rem) {
+@container tux-menu (min-width: 1071px) {
   .product-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@container tux-menu (min-width: 58rem) {
+@container tux-menu (min-width: 1420px) {
   .product-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -395,7 +399,7 @@ button:not(:disabled):active {
 
 /* Structural Current Order rail: hierarchy through dividers, not card-on-card chrome. */
 .desktop-cart-wrap {
-  border-left: 1px solid var(--tux-border-subtle);
+  border-left: 0;
   background: var(--tux-surface-panel);
 }
 
@@ -947,4 +951,523 @@ button:not(:disabled):active {
     max-width: 100%;
     overflow-x: auto;
   }
+}
+
+/* Final correction authority: 2026-08-25. */
+.operations-shell {
+  --tux-floating-header-space: 5.5rem;
+}
+
+.operations-header {
+  height: 64px;
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  padding: 0 16px;
+}
+
+.operations-header .tux-brand {
+  width: auto;
+  height: 44px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  object-fit: contain;
+}
+
+.operations-header .nav-item {
+  min-height: 44px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.operations-header .nav-item-active {
+  font-weight: 600;
+}
+
+.menu-toolbar {
+  min-height: 56px;
+  padding: 5px 8px;
+}
+
+.menu-toolbar:not(.category-mode-edit) {
+  height: 56px;
+}
+
+.menu-toolbar .category-rail {
+  gap: 6px;
+  padding: 0;
+}
+
+.menu-toolbar .category-rail .category-tab {
+  height: 44px;
+  min-height: 44px;
+  padding-inline: 16px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.menu-toolbar .category-rail .category-tab.selected {
+  font-weight: 600;
+}
+
+.menu-toolbar .category-icon-action,
+.menu-toolbar .category-search-clear {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.menu-toolbar .category-icon-action svg,
+.menu-toolbar .category-search-glyph,
+.menu-toolbar .category-search-clear svg {
+  width: 20px;
+  height: 20px;
+}
+
+.product-grid {
+  gap: 8px;
+}
+
+.product-card {
+  min-height: 0;
+  border-radius: 12px;
+}
+
+.product-card:has(.product-copy p) {
+  min-height: 152px;
+}
+
+.product-main {
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+}
+
+.product-media {
+  width: 68px;
+  height: 68px;
+}
+
+.product-image-fallback {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--tux-surface-subtle) 72%, var(--tux-surface-panel));
+}
+
+.product-copy strong {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.product-copy p {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.product-card-footer {
+  min-height: 52px;
+  border-top-color: color-mix(in srgb, var(--tux-border-subtle) 55%, transparent);
+}
+
+.product-price {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.product-extra-action {
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.product-extra-action svg,
+.line-extra-action svg {
+  width: 20px;
+  height: 20px;
+}
+
+.product-quantity {
+  min-height: 44px;
+  background: color-mix(in srgb, var(--tux-surface-subtle) 72%, var(--tux-surface-panel));
+}
+
+.product-card .product-quantity,
+.quantity-control {
+  grid-template-columns: 44px 2rem 44px;
+}
+
+.product-quantity button,
+.quantity-control button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.product-quantity output,
+.quantity-control output {
+  font-size: 15px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-quantity-badge {
+  min-width: 24px;
+  height: 24px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cart-heading,
+.cart-section,
+.cart-totals {
+  padding-inline: 16px;
+}
+
+.cart-heading .cart-title {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.cart-count {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.cart-heading .quiet-action {
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.cart-line {
+  min-height: 96px;
+  border-bottom-color: color-mix(in srgb, var(--tux-border-subtle) 58%, transparent);
+}
+
+.cart-line:has(.line-meta) {
+  min-height: 112px;
+}
+
+.cart-line-top > div > strong {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.cart-line-top > strong {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.cart-line-top > div > span,
+.line-meta,
+.line-note,
+.fee-reference,
+.payment-summary {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.line-actions {
+  gap: 8px;
+}
+
+.line-actions button {
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--tux-border-subtle) 72%, transparent);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-subtle);
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.line-actions button + button {
+  margin-left: 0;
+}
+
+.line-actions button:first-child,
+.line-actions button:last-child {
+  border-radius: var(--tux-radius-sm);
+}
+
+.line-actions button:nth-child(-n + 2) {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.order-type-section .segmented-control,
+.payment-section .payment-methods {
+  padding: 0;
+  border-color: color-mix(in srgb, var(--tux-border-subtle) 65%, transparent);
+  background: transparent;
+}
+
+.order-type-section .segmented-control button,
+.payment-section .payment-methods button,
+.split-payment-action {
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.adjustment-disclosure {
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.money-input-wrap,
+.field-stack input,
+.field-stack select {
+  min-height: 44px;
+}
+
+.money-input-wrap > span {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.payment-section .field-stack > span,
+.payment-section .money-field > label,
+.payment-section .split-remainder > span {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.payment-section select,
+.payment-section .money-input-wrap input,
+.payment-section .split-remainder > strong {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.tender-suggestions {
+  gap: 6px;
+}
+
+.tender-suggestions button {
+  min-height: 44px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.cart-totals dt,
+.cart-totals dd {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.cart-totals dt {
+  font-weight: 400;
+}
+
+.cart-totals dd {
+  font-weight: 500;
+}
+
+.cart-totals .grand-total dt {
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.cart-totals .grand-total dd {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 700;
+}
+
+.place-order-action {
+  min-height: 48px;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+@media (max-width: 74rem) and (min-width: 54.0625rem) {
+  .operations-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+/* Final correction exact geometry fixes. */
+.operations-header .tux-brand {
+  display: block;
+  box-sizing: border-box;
+  width: auto;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.line-actions {
+  align-items: center;
+}
+
+.line-actions button {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  align-self: center;
+}
+
+/* Task 2 approved two-level menu composition. */
+.menu-toolbar:not(.category-mode-edit) {
+  height: auto;
+  min-height: 56px;
+  padding: 0 8px 8px;
+}
+
+.menu-toolbar .category-navigation-stack {
+  gap: 6px;
+}
+
+.menu-toolbar .category-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 56px;
+}
+
+.menu-toolbar .category-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-toolbar .product-family-filter {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.menu-toolbar .product-family-filter button {
+  min-height: 44px;
+  padding-inline: 14px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.menu-toolbar .product-family-filter button.selected {
+  font-weight: 600;
+}
+
+.menu-toolbar .category-search-inline {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 44px;
+  width: clamp(240px, 21vw, 300px);
+  max-width: 320px;
+  height: 44px;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-subtle);
+  overflow: hidden;
+}
+
+.menu-toolbar .category-search-inline .category-search-glyph {
+  margin-left: 10px;
+}
+
+.menu-toolbar .category-search-inline input {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding: 0 8px 0 10px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  outline: none;
+}
+
+.menu-toolbar .category-search-inline .category-search-clear {
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--tux-border-subtle) 60%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (max-width: 54rem) {
+  .menu-toolbar .category-navigation {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .menu-toolbar .category-search-inline {
+    width: clamp(240px, 42vw, 300px);
+  }
+}
+
+/* Task 3 correction: keep two-level category navigation inside the locked 56px toolbar. */
+.menu-toolbar:not(.category-mode-edit) {
+  height: 56px;
+  min-height: 56px;
+  padding: 5px 8px;
+}
+
+.menu-toolbar:not(.category-mode-edit) > .category-navigation-stack {
+  display: flex;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-toolbar:not(.category-mode-edit) .category-navigation {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1 1 auto;
+}
+
+.menu-toolbar:not(.category-mode-edit) .product-family-filter {
+  height: 44px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0;
+}
+
+/* Task 4: keep the complete cashier control group intact when the footer wraps. */
+.product-card-controls {
+  flex-wrap: nowrap;
 }

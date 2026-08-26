@@ -413,7 +413,7 @@
 .desktop-cart-wrap {
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--tux-border-subtle);
+  border-left: 0;
   background: var(--tux-surface-panel);
 }
 
@@ -1510,5 +1510,100 @@
   .category-alignment button,
   .category-editor-actions button {
     flex: 1 1 0;
+  }
+}
+
+/* Final correction category/search composition. */
+.category-navigation-stack {
+  min-height: 44px;
+  gap: 6px;
+}
+
+.category-navigation {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.category-rail {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.category-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.category-nav-actions {
+  gap: 6px;
+}
+
+.product-search.category-search-inline {
+  width: clamp(240px, 21vw, 300px);
+  max-width: 320px;
+  grid-template-columns: 20px minmax(0, 1fr) 44px;
+  gap: 0;
+  min-height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-subtle);
+  overflow: hidden;
+}
+
+.product-search.category-search-inline input {
+  height: 42px;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  outline: 0;
+}
+
+.category-search-glyph {
+  margin-left: 10px;
+  color: var(--tux-text-secondary);
+}
+
+.category-search-clear {
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--tux-border-subtle) 55%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--tux-text-secondary);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.category-search-clear:hover {
+  color: var(--tux-text-primary);
+}
+
+.category-navigation-stack > .segmented-control {
+  min-height: 44px;
+}
+
+@media (max-width: 54rem) {
+  .product-search.category-search-inline {
+    width: clamp(240px, 40vw, 300px);
+  }
+}
+
+@media (max-width: 44rem) {
+  .category-navigation {
+    align-items: start;
+  }
+
+  .category-nav-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .product-search.category-search-inline {
+    width: min(300px, calc(100vw - 7rem));
+    min-width: 240px;
   }
 }

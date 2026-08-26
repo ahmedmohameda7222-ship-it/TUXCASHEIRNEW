@@ -43,7 +43,7 @@ import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } f
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
 const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
-const CART_RESIZE_KEYBOARD_STEP = 16;
+const CART_RESIZE_KEYBOARD_STEP = 24;
 
 function desktopCartResizeMatches(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
@@ -73,6 +73,58 @@ export function reconcileCategoryOrder(
   }
 
   return reconciled;
+}
+
+export function productFamiliesForCategory(
+  products: readonly Product[],
+  categoryId: MenuCategoryId | null,
+): readonly string[] {
+  if (categoryId === null) return [];
+
+  const seen = new Set<string>();
+  const families: string[] = [];
+  const categoryProducts = products
+    .filter((product) => product.active && product.categoryId === categoryId)
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  for (const product of categoryProducts) {
+    const family = product.family?.trim();
+    if (!family || seen.has(family)) continue;
+    seen.add(family);
+    families.push(family);
+  }
+
+  return families;
+}
+
+export function filterProductsForMenu(
+  products: readonly Product[],
+  options: {
+    readonly selectedCategoryId: MenuCategoryId | null;
+    readonly selectedFamily: string | null;
+    readonly search: string;
+  },
+): readonly Product[] {
+  const active = products.filter((product) => product.active);
+  const query = options.search.trim().toLocaleLowerCase();
+
+  if (query.length > 0) {
+    return active
+      .filter((product) => product.name.toLocaleLowerCase().includes(query))
+      .slice()
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+  }
+
+  if (options.selectedCategoryId === null) return [];
+
+  return active
+    .filter((product) => product.categoryId === options.selectedCategoryId)
+    .filter(
+      (product) => options.selectedFamily === null || product.family === options.selectedFamily,
+    )
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
 interface UndoState {
@@ -125,16 +177,12 @@ function restoreDraftContents(current: OrderDraft, snapshot: OrderDraft): OrderD
 
 function QuickInfo({
   product,
-  canCustomize,
   busy,
   onClose,
-  onCustomize,
 }: {
   readonly product: Product;
-  readonly canCustomize: boolean;
   readonly busy: boolean;
   readonly onClose: () => void;
-  readonly onCustomize: () => void;
 }) {
   return (
     <div
@@ -164,11 +212,6 @@ function QuickInfo({
           <button type="button" className="secondary-action" disabled={busy} onClick={onClose}>
             Close
           </button>
-          {canCustomize && !product.soldOut ? (
-            <button type="button" className="primary-action" disabled={busy} onClick={onCustomize}>
-              Customize & add
-            </button>
-          ) : null}
         </div>
       </section>
     </div>
@@ -201,12 +244,12 @@ export function OrdersWorkspace({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [selectedProductFamily, setSelectedProductFamily] = useState<string | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
-  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('center');
+  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
   const [categoryEditSaving, setCategoryEditSaving] = useState(false);
   const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
   const [categoryResetRequested, setCategoryResetRequested] = useState(false);
@@ -256,12 +299,13 @@ export function OrdersWorkspace({
       const categories = result.value.configuration.categories
         .filter((category) => category.active)
         .sort((left, right) => left.sortOrder - right.sortOrder);
+      const defaultCategoryId = categories[0]?.id ?? null;
       setSelectedCategoryId((current) =>
         current !== null && categories.some((category) => category.id === current)
           ? current
-          : (categories[0]?.id ?? null),
+          : defaultCategoryId,
       );
-      setSelectedProductFamily(null);
+      setSelectedFamily(null);
     });
     return () => {
       cancelled = true;
@@ -421,22 +465,11 @@ export function OrdersWorkspace({
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
-  const productsWithExtras = useMemo(() => {
-    if (configuration === null) return new Set<ProductId>();
-    const activeModifierIds = new Set(
-      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
-    );
-    return new Set(
-      configuration.productModifierLinks
-        .filter((link) => activeModifierIds.has(link.modifierId))
-        .map((link) => link.productId),
-    );
-  }, [configuration]);
   const activeCategories = useMemo(
     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
     [categoryPreference, configuredActiveCategories],
   );
-  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'center';
+  const categoryAlignment = categoryPreference?.categoryAlignment ?? 'left';
   const categoryEditorCategories = useMemo(() => {
     const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));
     return categoryEditOrder.flatMap((categoryId) => {
@@ -444,43 +477,29 @@ export function OrdersWorkspace({
       return category === undefined ? [] : [category];
     });
   }, [categoryEditOrder, configuredActiveCategories]);
-  const productFamilies = useMemo(() => {
-    if (configuration === null || selectedCategoryId === null) return [];
-    const seen = new Set<string>();
-    const families: string[] = [];
-    const categoryProducts = configuration.products
-      .filter((product) => product.active && product.categoryId === selectedCategoryId)
-      .slice()
-      .sort((left, right) => left.sortOrder - right.sortOrder);
-    for (const product of categoryProducts) {
-      const family = product.family?.trim();
-      if (!family || seen.has(family)) continue;
-      seen.add(family);
-      families.push(family);
-    }
-    return families;
-  }, [configuration, selectedCategoryId]);
+  const activeFamilies = useMemo(() => {
+    const selectedCategory = activeCategories.find(
+      (category) => category.id === selectedCategoryId,
+    );
+    if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
+    return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
+  }, [activeCategories, configuration, selectedCategoryId]);
 
   useEffect(() => {
-    if (selectedProductFamily !== null && !productFamilies.includes(selectedProductFamily)) {
-      setSelectedProductFamily(null);
+    if (selectedFamily !== null && !activeFamilies.includes(selectedFamily)) {
+      setSelectedFamily(null);
     }
-  }, [productFamilies, selectedProductFamily]);
+  }, [activeFamilies, selectedFamily]);
 
-  const products = useMemo(() => {
-    if (configuration === null) return [];
-    const active = configuration.products.filter((product) => product.active);
-    const query = search.trim().toLocaleLowerCase();
-    const filtered =
-      query.length > 0
-        ? active.filter((product) => product.name.toLocaleLowerCase().includes(query))
-        : active.filter(
-            (product) =>
-              product.categoryId === selectedCategoryId &&
-              (selectedProductFamily === null || product.family === selectedProductFamily),
-          );
-    return [...filtered].sort((left, right) => left.sortOrder - right.sortOrder);
-  }, [configuration, search, selectedCategoryId, selectedProductFamily]);
+  const products = useMemo(
+    () =>
+      filterProductsForMenu(configuration?.products ?? [], {
+        selectedCategoryId,
+        selectedFamily,
+        search,
+      }),
+    [configuration, search, selectedCategoryId, selectedFamily],
+  );
 
   const validation = useMemo(() => {
     if (draft === null || configuration === null) return null;
@@ -536,7 +555,7 @@ export function OrdersWorkspace({
 
   function resetCategoryEdit(): void {
     setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
-    setCategoryEditAlignment('center');
+    setCategoryEditAlignment('left');
     setCategoryEditError(null);
     setCategoryResetRequested(true);
   }
@@ -917,36 +936,6 @@ export function OrdersWorkspace({
                 </div>
               </div>
             </section>
-          ) : categoryMode === 'SEARCH' ? (
-            <div className="product-search category-search-inline">
-              <SearchIcon className="category-search-glyph" />
-              <input
-                ref={searchRef}
-                id="product-search"
-                type="search"
-                aria-label="Search menu"
-                value={search}
-                placeholder="Search products"
-                autoComplete="off"
-                onChange={(event) => {
-                  const nextSearch = event.target.value;
-                  setSearch(nextSearch);
-                  if (nextSearch.trim().length > 0) setSelectedProductFamily(null);
-                }}
-              />
-              <kbd>Ctrl K</kbd>
-              <button
-                type="button"
-                className="category-search-clear"
-                aria-label="Clear search"
-                onClick={() => {
-                  setSearch('');
-                  setCategoryMode('IDLE');
-                }}
-              >
-                Clear
-              </button>
-            </div>
           ) : (
             <div className="field-stack category-navigation-stack">
               <div className="category-navigation">
@@ -966,7 +955,7 @@ export function OrdersWorkspace({
                       }
                       onClick={() => {
                         setSelectedCategoryId(category.id);
-                        setSelectedProductFamily(null);
+                        setSelectedFamily(null);
                         setSearch('');
                       }}
                     >
@@ -975,40 +964,74 @@ export function OrdersWorkspace({
                   ))}
                 </div>
                 <div className="category-nav-actions">
-                  <button
-                    type="button"
-                    className="category-icon-action"
-                    aria-label="Search menu"
-                    title="Search menu"
-                    onClick={() => setCategoryMode('SEARCH')}
-                  >
-                    <SearchIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="category-edit-action"
-                    onClick={beginCategoryEdit}
-                  >
-                    <EditPencilIcon />
-                    <span>Edit categories</span>
-                  </button>
+                  {categoryMode === 'IDLE' ? (
+                    <button
+                      type="button"
+                      className="category-icon-action"
+                      aria-label="Edit categories"
+                      title="Edit categories"
+                      onClick={beginCategoryEdit}
+                    >
+                      <EditPencilIcon />
+                    </button>
+                  ) : null}
+                  {categoryMode === 'SEARCH' ? (
+                    <div className="product-search category-search-inline">
+                      <SearchIcon className="category-search-glyph" />
+                      <input
+                        ref={searchRef}
+                        id="product-search"
+                        type="search"
+                        aria-label="Search menu"
+                        value={search}
+                        placeholder="Search products"
+                        autoComplete="off"
+                        onChange={(event) => setSearch(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="category-search-clear"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        onClick={() => {
+                          setSearch('');
+                          setCategoryMode('IDLE');
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="category-icon-action"
+                      aria-label="Search menu"
+                      title="Search menu"
+                      onClick={() => setCategoryMode('SEARCH')}
+                    >
+                      <SearchIcon />
+                    </button>
+                  )}
                 </div>
               </div>
-              {productFamilies.length > 1 ? (
-                <div className="segmented-control" aria-label="Product families">
+              {activeFamilies.length > 0 ? (
+                <div
+                  className="segmented-control product-family-filter"
+                  aria-label="Product families"
+                >
                   <button
                     type="button"
-                    className={selectedProductFamily === null ? 'selected' : undefined}
-                    onClick={() => setSelectedProductFamily(null)}
+                    className={selectedFamily === null ? 'selected' : undefined}
+                    onClick={() => setSelectedFamily(null)}
                   >
                     All
                   </button>
-                  {productFamilies.map((family) => (
+                  {activeFamilies.map((family) => (
                     <button
                       type="button"
                       key={family}
-                      className={selectedProductFamily === family ? 'selected' : undefined}
-                      onClick={() => setSelectedProductFamily(family)}
+                      className={selectedFamily === family ? 'selected' : undefined}
+                      onClick={() => setSelectedFamily(family)}
                     >
                       {family}
                     </button>
@@ -1035,7 +1058,6 @@ export function OrdersWorkspace({
                 key={product.id}
                 product={product}
                 quantity={productQuantityInDraft(draft, product.id)}
-                supportsExtras={productsWithExtras.has(product.id)}
                 busy={busy}
                 onQuickInfo={() => setQuickInfoProductId(product.id)}
                 onDecrement={() => decrementProduct(product)}
@@ -1131,7 +1153,7 @@ export function OrdersWorkspace({
       {mobileCartOpen ? (
         <div className="mobile-cart-overlay">
           <div className="mobile-cart-bar">
-            <strong>Current order</strong>
+            <strong>Review & pay</strong>
             <button type="button" className="quiet-action" onClick={() => setMobileCartOpen(false)}>
               Close
             </button>
@@ -1176,12 +1198,7 @@ export function OrdersWorkspace({
         <QuickInfo
           product={quickInfoProduct}
           busy={busy}
-          canCustomize={quickInfoProduct.isCombo || productsWithExtras.has(quickInfoProduct.id)}
           onClose={() => setQuickInfoProductId(null)}
-          onCustomize={() => {
-            setQuickInfoProductId(null);
-            setCustomizer({ kind: 'ADD', productId: quickInfoProduct.id });
-          }}
         />
       )}
 

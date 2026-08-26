@@ -1,0 +1,202 @@
+/* Final approved POS correction authority. Keep this last in the Operations style cascade. */
+
+/* Product cards only reserve the ~152px density target when descriptive copy exists. */
+.product-card {
+  min-height: 0;
+}
+
+/* Category edit mode owns its intrinsic height so the scrollable grid cannot cover controls. */
+.menu-toolbar.category-mode-edit {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+}
+
+/* Quantity controls are exactly 44px including their visible borders. */
+.product-quantity,
+.quantity-control {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+}
+
+/* Quantity text is part of the 15/20 high-frequency control typography lock. */
+.product-quantity output,
+.quantity-control output {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+/* The visible/responsive resize handle is 12px while the divider remains a 1px hairline. */
+.cart-resize-separator {
+  width: 12px;
+  min-width: 12px;
+  justify-self: center;
+}
+
+/* Preserve true centered navigation throughout the desktop rail breakpoint. */
+@media (max-width: 74rem) and (min-width: 54.0625rem) {
+  .operations-header {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+}
+
+/* Task 5: keep mobile Review & pay controls clear of fixed totals. */
+@media (max-width: 54rem) {
+  .mobile-cart-overlay .cart-scroll {
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
+  }
+
+  .mobile-cart-overlay .payment-section .split-payment-action {
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    justify-self: stretch;
+  }
+}
+
+/* User-approved Burger subcategory row and product action order. */
+.menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
+  height: auto;
+  min-height: 56px;
+  padding: 5px 8px 8px;
+}
+
+.menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 44px 44px;
+  row-gap: 6px;
+  align-items: stretch;
+}
+
+.menu-toolbar:not(.category-mode-edit)
+  > .category-navigation-stack:has(.product-family-filter)
+  .category-navigation {
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.menu-toolbar:not(.category-mode-edit)
+  > .category-navigation-stack:has(.product-family-filter)
+  .product-family-filter {
+  grid-row: 2;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  align-self: center;
+}
+
+.product-card {
+  height: max-content;
+}
+
+.product-card > .product-main {
+  flex: 0 0 auto;
+}
+
+.product-card-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer > .product-price {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.product-card-footer > .product-extra-action {
+  grid-column: 2;
+  justify-self: center;
+  margin: 0;
+}
+
+.product-card-footer > .product-card-controls {
+  grid-column: 3;
+  min-width: max-content;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer .product-quantity {
+  margin: 0;
+}
+
+@media (max-width: 34rem) {
+  .product-grid {
+    grid-auto-rows: max-content;
+  }
+
+  .product-card-footer {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding-inline: 8px;
+    column-gap: 6px;
+  }
+}
+
+/* User-approved top-right product price and universal Extra action. */
+.product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card > .product-main {
+  width: 100%;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.product-card > .product-main .product-price {
+  min-width: 0;
+  align-self: start;
+  justify-self: end;
+  margin-top: 1px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.product-card-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer > .product-extra-action {
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+}
+
+.product-card-footer > .product-card-controls {
+  grid-column: 3;
+  min-width: max-content;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 34rem) {
+  .product-card > .product-main {
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  }
+
+  .product-card-footer {
+    padding-inline: 8px;
+    column-gap: 6px;
+  }
+}

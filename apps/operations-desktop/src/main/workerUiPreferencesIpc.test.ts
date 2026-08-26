@@ -141,7 +141,7 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
     await expect(runtime.reset()).resolves.toBeUndefined();
     expect(await repository.get(shopId, workerA)).toMatchObject({
       categoryOrder: [],
-      categoryAlignment: 'center',
+      categoryAlignment: 'left',
       syncState: 'DIRTY',
     });
     expect(await repository.get(shopId, workerB)).toEqual(preference(workerB, [categoryB], 'left'));
