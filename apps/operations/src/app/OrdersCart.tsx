@@ -192,16 +192,6 @@ export function OrdersCart({
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
   const methods = activePaymentMethods(configuration);
-  const productsWithExtras = useMemo(() => {
-    const activeModifierIds = new Set(
-      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
-    );
-    return new Set(
-      configuration.productModifierLinks
-        .filter((link) => activeModifierIds.has(link.modifierId))
-        .map((link) => link.productId),
-    );
-  }, [configuration.modifiers, configuration.productModifierLinks]);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
@@ -313,7 +303,6 @@ export function OrdersCart({
             <div className="cart-lines">
               {draft.lines.map((line) => {
                 const lineIssues = issues.filter((issue) => issue.path === `line:${line.id}`);
-                const supportsExtras = productsWithExtras.has(line.productId);
                 return (
                   <article className="cart-line" key={line.id}>
                     <div className="cart-line-top">
@@ -342,34 +331,44 @@ export function OrdersCart({
                       </p>
                     ))}
                     <div className="line-actions" aria-label={`${line.productName} actions`}>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onDecrementLine(line.id)}
+                      <div
+                        className="line-quantity-stepper"
+                        aria-label={`${line.productName} quantity`}
                       >
-                        −1
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onIncrementLine(line.id)}
-                      >
-                        +1
-                      </button>
+                        <button
+                          type="button"
+                          aria-label={`Decrease ${line.productName} quantity`}
+                          disabled={busy}
+                          onClick={() => onDecrementLine(line.id)}
+                        >
+                          −
+                        </button>
+                        <output aria-label={`${line.productName} quantity`}>{line.quantity}</output>
+                        <button
+                          type="button"
+                          aria-label={`Increase ${line.productName} quantity`}
+                          disabled={busy}
+                          onClick={() => onIncrementLine(line.id)}
+                        >
+                          +
+                        </button>
+                      </div>
                       <button type="button" disabled={busy} onClick={() => onEditLine(line.id)}>
                         Edit
                       </button>
-                      {supportsExtras ? (
-                        <button
-                          type="button"
-                          className="line-extra-action"
-                          disabled={busy}
-                          onClick={() => onEditLineExtras(line.id)}
-                        >
-                          {line.modifiers.length > 0 ? <EditPencilIcon /> : <PlusCircleIcon />}
-                          <span>Extra</span>
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        className="line-extra-action"
+                        disabled={busy}
+                        onClick={() => onEditLineExtras(line.id)}
+                      >
+                        {line.modifiers.length > 0 ? (
+                          <EditPencilIcon data-icon="edit-pencil" />
+                        ) : (
+                          <PlusCircleIcon data-icon="plus-circle" />
+                        )}
+                        <span>Extra</span>
+                      </button>
                     </div>
                   </article>
                 );
@@ -467,24 +466,6 @@ export function OrdersCart({
                 }))
               }
             />
-            <MoneyInput
-              id={controlId('delivery-fee')}
-              label="Delivery fee"
-              value={draft.delivery.finalFeeMinor}
-              disabled={busy}
-              onCommit={(finalFeeMinor) =>
-                onMutate((current) => ({
-                  ...current,
-                  delivery: { ...current.delivery, finalFeeMinor },
-                }))
-              }
-            />
-            {draft.delivery.zoneId === null ||
-            draft.delivery.configuredFeeMinor === draft.delivery.finalFeeMinor ? null : (
-              <p className="fee-reference">
-                Zone reference: {formatMoneyMinor(draft.delivery.configuredFeeMinor)}
-              </p>
-            )}
             <SectionIssues
               issues={issues}
               paths={['delivery.phone', 'delivery.name', 'delivery.zone', 'delivery.address']}
@@ -584,18 +565,7 @@ export function OrdersCart({
                       {method.displayName}
                     </button>
                   ))}
-                </div>
-                {methods.length >= 2 ? (
-                  <button
-                    type="button"
-                    className="split-payment-action"
-                    disabled={busy}
-                    onClick={startSplit}
-                  >
-                    Split payment
-                  </button>
-                ) : null}
-
+                </div>{' '}
                 {draft.payment.mode === 'SINGLE' && pricing !== null ? (
                   methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
                     <CashEditor
@@ -616,6 +586,16 @@ export function OrdersCart({
                       }
                     />
                   ) : null
+                ) : null}
+                {methods.length >= 2 ? (
+                  <button
+                    type="button"
+                    className="split-payment-action"
+                    disabled={busy}
+                    onClick={startSplit}
+                  >
+                    Split payment
+                  </button>
                 ) : null}
               </>
             ) : pricing === null ? null : (
@@ -743,12 +723,29 @@ export function OrdersCart({
                 : `− ${formatMoneyMinor(draft.discountMinor)}`}
             </dd>
           </div>
-          {!delivery ? null : (
-            <div>
-              <dt>Delivery</dt>
-              <dd>{formatMoneyMinor(draft.delivery.finalFeeMinor)}</dd>
+          {delivery ? (
+            <div className="delivery-total-editor">
+              <MoneyInput
+                id={controlId('delivery-fee')}
+                label="Delivery"
+                value={draft.delivery.finalFeeMinor}
+                disabled={busy}
+                compact
+                onCommit={(finalFeeMinor) =>
+                  onMutate((current) => ({
+                    ...current,
+                    delivery: { ...current.delivery, finalFeeMinor },
+                  }))
+                }
+              />
+              {draft.delivery.zoneId === null ||
+              draft.delivery.configuredFeeMinor === draft.delivery.finalFeeMinor ? null : (
+                <span className="delivery-zone-reference">
+                  Zone reference: {formatMoneyMinor(draft.delivery.configuredFeeMinor)}
+                </span>
+              )}
             </div>
-          )}
+          ) : null}
           <div className="grand-total">
             <dt>Total</dt>
             <dd>{pricing === null ? '—' : formatMoneyMinor(pricing.totalMinor)}</dd>

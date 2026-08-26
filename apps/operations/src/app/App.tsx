@@ -19,6 +19,7 @@ import {
   type OperationsOrdersClient,
 } from './sessionClient';
 import { connectDesktopSyncStatus } from './syncStatus';
+import { UserIcon } from './icons';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
@@ -312,7 +313,9 @@ function ActiveShell({
               aria-haspopup="menu"
               onClick={() => setMenuOpen((open) => !open)}
             >
-              {session.operator.displayName} <span aria-hidden="true">▾</span>
+              <UserIcon className="operator-user-icon" />
+              <span>{session.operator.displayName}</span>
+              <span aria-hidden="true">▾</span>
             </button>
             {menuOpen ? (
               <div className="operator-menu" role="menu">

@@ -35,11 +35,15 @@ function ExpenseFields({
   values,
   disabled,
   onChange,
+  noteExpanded = true,
+  onToggleNote,
 }: {
   readonly prefix: string;
   readonly values: ExpenseFormValues;
   readonly disabled: boolean;
   readonly onChange: (values: ExpenseFormValues) => void;
+  readonly noteExpanded?: boolean;
+  readonly onToggleNote?: () => void;
 }) {
   return (
     <div className="expense-fields">
@@ -82,17 +86,35 @@ function ExpenseFields({
           </button>
         </div>
       </fieldset>
-      <label className="expense-note-field" htmlFor={`${prefix}-note`}>
-        Note <span>optional</span>
-        <textarea
-          id={`${prefix}-note`}
-          value={values.note}
+      <p className="expense-paid-helper">
+        {values.paidFrom === 'CASH'
+          ? 'Cash reduces Expected Cash at End Day.'
+          : 'Other does not reduce Expected Cash at End Day.'}
+      </p>
+      {onToggleNote === undefined ? null : (
+        <button
+          type="button"
+          className="expense-note-disclosure"
+          aria-expanded={noteExpanded}
           disabled={disabled}
-          maxLength={500}
-          rows={2}
-          onChange={(event) => onChange({ ...values, note: event.target.value })}
-        />
-      </label>
+          onClick={onToggleNote}
+        >
+          {values.note.trim().length > 0 ? 'Note added' : 'Add note'}
+        </button>
+      )}
+      {noteExpanded ? (
+        <label className="expense-note-field" htmlFor={`${prefix}-note`}>
+          Note <span>optional</span>
+          <textarea
+            id={`${prefix}-note`}
+            value={values.note}
+            disabled={disabled}
+            maxLength={500}
+            rows={2}
+            onChange={(event) => onChange({ ...values, note: event.target.value })}
+          />
+        </label>
+      ) : null}
     </div>
   );
 }
@@ -284,6 +306,7 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
   const [expenses, setExpenses] = useState<readonly ExpenseLedgerRecord[]>([]);
   const [totalExpensesMinor, setTotalExpensesMinor] = useState<MoneyMinor>(ZERO_MONEY);
   const [form, setForm] = useState<ExpenseFormValues>(EMPTY_FORM);
+  const [noteExpanded, setNoteExpanded] = useState(false);
   const [createCommandId, setCreateCommandId] = useState(() => crypto.randomUUID());
   const [editTarget, setEditTarget] = useState<ManualExpenseRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ManualExpenseRecord | null>(null);
@@ -326,6 +349,7 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
       return;
     }
     setForm(EMPTY_FORM);
+    setNoteExpanded(false);
     setCreateCommandId(crypto.randomUUID());
     setMessage('Expense saved locally.');
     await refresh();
@@ -347,13 +371,16 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
 
       <form className="expense-add-card" onSubmit={(event) => void addExpense(event)}>
         <div className="expense-add-heading">
-          <div>
-            <p className="eyebrow">Manual expense</p>
-            <h2>Add Expense</h2>
-          </div>
-          <p>Cash reduces drawer Expected Cash at End Day; Other does not.</p>
+          <h2>Add Expense</h2>
         </div>
-        <ExpenseFields prefix="add-expense" values={form} disabled={busy} onChange={setForm} />
+        <ExpenseFields
+          prefix="add-expense"
+          values={form}
+          disabled={busy}
+          onChange={setForm}
+          noteExpanded={noteExpanded}
+          onToggleNote={() => setNoteExpanded((value) => !value)}
+        />
         {error === null ? null : (
           <p className="form-error" role="alert">
             {error}
@@ -376,38 +403,42 @@ export function ExpensesWorkspace({ client }: { readonly client: OperationsExpen
 
       <section className="expense-ledger" aria-labelledby="expense-ledger-title">
         <div className="expense-ledger-heading">
-          <div>
-            <p className="eyebrow">Newest first</p>
-            <h2 id="expense-ledger-title">Current ledger</h2>
-          </div>
-          <span>{expenses.length} entries</span>
+          <h2 id="expense-ledger-title">Current ledger</h2>
+          <span>{expenses.length} entries · Newest first</span>
         </div>
         {expenses.length === 0 ? (
           <div className="expense-empty">
-            <strong>No expenses yet.</strong>
-            <span>This Business Day’s ledger is empty.</span>
+            <strong>No expenses this business day</strong>
           </div>
         ) : (
-          <div className="expense-list">
-            {expenses.map((expense) =>
-              expense.kind === 'MANUAL' ? (
-                <ManualExpenseRow
-                  key={expense.id}
-                  expense={expense}
-                  onEdit={(target) => {
-                    setDialogError(null);
-                    setEditTarget(target);
-                  }}
-                  onDelete={(target) => {
-                    setDialogError(null);
-                    setDeleteTarget(target);
-                  }}
-                />
-              ) : (
-                <DeliveryFailedRow key={expense.id} expense={expense} />
-              ),
-            )}
-          </div>
+          <>
+            <div className="expense-ledger-columns" aria-hidden="true">
+              <span>Time</span>
+              <span>Expense</span>
+              <span>Amount</span>
+              <span>Actions</span>
+            </div>
+            <div className="expense-list">
+              {expenses.map((expense) =>
+                expense.kind === 'MANUAL' ? (
+                  <ManualExpenseRow
+                    key={expense.id}
+                    expense={expense}
+                    onEdit={(target) => {
+                      setDialogError(null);
+                      setEditTarget(target);
+                    }}
+                    onDelete={(target) => {
+                      setDialogError(null);
+                      setDeleteTarget(target);
+                    }}
+                  />
+                ) : (
+                  <DeliveryFailedRow key={expense.id} expense={expense} />
+                ),
+              )}
+            </div>
+          </>
         )}
       </section>
 
