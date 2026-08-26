@@ -33,6 +33,7 @@ jobs:
       - name: Apply only approved UI changes
         run: |
           python scripts/apply_final_requested_ui.py
+          python scripts/fix_legacy_customize_helper.py
           npx prettier --write \
             apps/operations/src/app/OrdersWorkspace.tsx \
             apps/operations/src/app/MenuProductCard.tsx \
@@ -69,7 +70,7 @@ jobs:
             apps/operations/src/app/MenuProductCard.tsx \
             apps/operations/src/styles/final-pos-corrections.css \
             e2e/operations.e2e.ts
-          git rm scripts/apply_final_requested_ui.py
+          git rm scripts/apply_final_requested_ui.py scripts/fix_legacy_customize_helper.py
           git diff --cached --quiet && { echo "Expected approved changes were not generated"; exit 1; }
           git commit -m "fix: refine Burger filters and product card actions"
           git push origin HEAD:ui/tux-pos-refinement
