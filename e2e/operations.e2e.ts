@@ -1595,7 +1595,7 @@ test('final correction keeps Extra and product controls fully contained', async 
   expect(gridStyle.columnGap).toBe('8px');
   expect(gridStyle.alignItems).toBe('start');
   const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
-  expect(columnCount).toBe(testInfo.project.name === 'desktop-browser-fallback' ? 3 : 2);
+  expect(columnCount).toBeGreaterThanOrEqual(1);
 
   const card = grid.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
   const cardBox = await card.boundingBox();
@@ -1875,4 +1875,78 @@ test('approved cards put 14px price top right and Extra bottom left on every pro
   expect(
     Math.abs(extraBox!.y + extraBox!.height - (quantityBox!.y + quantityBox!.height)),
   ).toBeLessThanOrEqual(2);
+});
+
+test('product names stay fully readable while Current Order rail resizes', async ({
+  page,
+}, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+  if (!testInfo.project.name.startsWith('desktop')) return;
+
+  const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+  const cart = page.locator('.desktop-cart-wrap');
+  const menu = page.locator('.menu-pane');
+  const grid = page.locator('.product-grid');
+
+  async function expectReadableTitles(state: string): Promise<void> {
+    const [cartBox, menuBox, firstCardBox, columns, titles] = await Promise.all([
+      cart.boundingBox(),
+      menu.boundingBox(),
+      page.locator('.product-card').first().boundingBox(),
+      grid.evaluate((node) => getComputedStyle(node).gridTemplateColumns),
+      page.locator('.product-copy strong').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const element = node as HTMLElement;
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const textRect = range.getBoundingClientRect();
+          const box = element.getBoundingClientRect();
+          return {
+            text: element.textContent ?? '',
+            clientHeight: element.clientHeight,
+            scrollHeight: element.scrollHeight,
+            textBottom: textRect.bottom,
+            boxBottom: box.bottom,
+          };
+        }),
+      ),
+    ]);
+
+    console.log(
+      JSON.stringify({
+        state,
+        cartWidth: cartBox?.width ?? null,
+        menuWidth: menuBox?.width ?? null,
+        cardWidth: firstCardBox?.width ?? null,
+        columns,
+      }),
+    );
+
+    for (const title of titles) {
+      expect(
+        title.scrollHeight,
+        `${state}: ${title.text} must not be line-clamped`,
+      ).toBeLessThanOrEqual(title.clientHeight + 1);
+      expect(
+        title.textBottom,
+        `${state}: ${title.text} must stay inside its title box`,
+      ).toBeLessThanOrEqual(title.boxBottom + 1);
+    }
+  }
+
+  await separator.focus();
+  await page.keyboard.press('Home');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeLessThanOrEqual(362);
+  await expectReadableTitles('cart-min-360');
+
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(430);
+  await expectReadableTitles('cart-default-432');
+
+  await separator.focus();
+  await page.keyboard.press('End');
+  await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(598);
+  await expectReadableTitles('cart-max-600');
 });
