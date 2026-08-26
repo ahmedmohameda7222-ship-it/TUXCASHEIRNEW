@@ -11,24 +11,22 @@ function css(name: string): string {
 
 // These source-level contracts protect the exact bounded visual fixes in this PR.
 describe('Operations UI alignment contracts', () => {
-  it('centers Orders Board status tabs on desktop and keeps the mobile rail start-aligned', () => {
+  it('centers Orders Board tabs when they fit and falls back safely when they overflow', () => {
     const source = css('orders-board.css');
 
-    expect(source).toMatch(/\.board-tabs\s*\{[^}]*justify-content:\s*center;/s);
-    expect(source).toMatch(
-      /@media \(max-width: 54rem\)[\s\S]*?\.board-tabs\s*\{[^}]*justify-content:\s*flex-start;/,
-    );
+    expect(source).toMatch(/\.board-tabs\s*\{[^}]*justify-content:\s*safe center;/s);
+    expect(source).not.toMatch(/\.board-tabs\s*\{[^}]*justify-content:\s*flex-start;/s);
   });
 
-  it('treats every money input as one composed EGP control with one focus ring', () => {
-    const source = css('final-pos-corrections.css');
-    const baseSource = css('orders.css');
+  it('keeps the MoneyInput composition canonical in orders.css instead of a late override', () => {
+    const source = css('orders.css');
+    const correctionSource = css('final-pos-corrections.css');
 
-    expect(baseSource).toMatch(
+    expect(source).toMatch(
       /\.money-input-wrap\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0,\s*1fr\);[^}]*border:\s*1px solid var\(--tux-border-subtle\);/s,
     );
     expect(source).toMatch(
-      /\.money-input-wrap\s*>\s*input\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+      /\.money-input-wrap\s*>\s*input\s*\{[^}]*width:\s*100%;[^}]*min-height:\s*var\(--tux-control-height-md\);[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
     );
     expect(source).toMatch(
       /\.money-input-wrap\s*>\s*input:focus-visible\s*\{[^}]*outline:\s*none;/s,
@@ -36,9 +34,10 @@ describe('Operations UI alignment contracts', () => {
     expect(source).toMatch(
       /\.money-input-wrap:focus-within\s*\{[^}]*border-color:[^;}]+;[^}]*box-shadow:[^;}]+;/s,
     );
+    expect(correctionSource).not.toContain('.money-input-wrap');
   });
 
-  it('keeps Expense description, amount, and paid-from controls on one visual baseline', () => {
+  it('keeps Add Expense description, amount, and paid-from controls on one visual baseline', () => {
     const source = css('expenses.css');
 
     expect(source).toContain(
@@ -50,6 +49,21 @@ describe('Operations UI alignment contracts', () => {
     );
     expect(source).toMatch(
       /\.expense-fields\s*>\s*\.money-field\s*>\s*label\s*\{[^}]*font-size:\s*var\(--tux-font-size-sm\);[^}]*font-weight:\s*700;[^}]*letter-spacing:\s*0;/s,
+    );
+  });
+
+  it('keeps Edit Expense description, amount, and paid-from controls on one desktop row', () => {
+    const source = css('expenses.css');
+
+    expect(source).toMatch(/\.expense-dialog\s*\{[^}]*width:\s*min\(100%,\s*54rem\);/s);
+    expect(source).not.toMatch(
+      /\.expense-dialog\s+\.expense-fields\s*\{[^}]*grid-template-columns:\s*1fr 1fr;/s,
+    );
+    expect(source).not.toContain(
+      '.expense-dialog .expense-description-field,\n.expense-dialog .expense-note-field {',
+    );
+    expect(source).toMatch(
+      /\.expense-dialog\s+\.expense-note-field\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s,
     );
   });
 });
