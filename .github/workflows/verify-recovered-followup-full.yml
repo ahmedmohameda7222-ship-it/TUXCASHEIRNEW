@@ -1,0 +1,71 @@
+name: Verify Recovered TUX Follow-up Full
+
+on:
+  push:
+    branches:
+      - verify/tux-ops-followup-full
+
+permissions:
+  contents: read
+
+jobs:
+  full-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format check
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Repository migration-chain smoke only
+        run: npm run test:migrations
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Full rendered browser E2E
+        run: npm run test:e2e
+      - name: Upload rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-followup-full-qa
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
