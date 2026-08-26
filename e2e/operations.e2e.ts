@@ -1990,6 +1990,7 @@ test('long-term UI alignment contracts render correctly', async ({ page }, testI
     await expect
       .poll(async () => wrapper.evaluate((node) => getComputedStyle(node).boxShadow))
       .not.toBe('none');
+    await input.blur();
   }
 
   async function expectControlTopsAligned(controls: readonly Locator[]): Promise<void> {
