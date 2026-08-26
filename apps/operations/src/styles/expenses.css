@@ -259,7 +259,7 @@
 }
 
 .expense-dialog {
-  width: min(100%, 42rem);
+  width: min(100%, 54rem);
   padding: var(--tux-space-6);
 }
 .expense-dialog-heading {
@@ -268,10 +268,6 @@
   gap: var(--tux-space-4);
   margin-bottom: var(--tux-space-5);
 }
-.expense-dialog .expense-fields {
-  grid-template-columns: 1fr 1fr;
-}
-.expense-dialog .expense-description-field,
 .expense-dialog .expense-note-field {
   grid-column: 1 / -1;
 }
