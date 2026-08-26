@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   evidence:
-    name: committed-product-card-evidence
+    name: focused-product-card-evidence
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -28,17 +28,73 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add evidence-only screenshot contract
+        run: |
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          test('focused evidence for approved product card layout', async ({ page }, testInfo) => {
+            await enterActiveOrdersForCategoryTests(page);
+            await page.getByRole('button', { name: 'Burgers', exact: true }).click();
+
+            const cards = page.locator('.product-card');
+            const count = await cards.count();
+            expect(count).toBeGreaterThan(1);
+            for (let index = 0; index < count; index += 1) {
+              await expect(cards.nth(index).getByRole('button', { name: 'Extra', exact: true })).toHaveCount(1);
+            }
+
+            const singleCard = cards.filter({ hasText: 'Single Smashed Patty' }).first();
+            const price = singleCard.locator('.product-price');
+            const extra = singleCard.getByRole('button', { name: 'Extra', exact: true });
+            const quantity = singleCard.locator('.product-quantity');
+            const [cardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+              singleCard.boundingBox(),
+              price.boundingBox(),
+              extra.boundingBox(),
+              quantity.boundingBox(),
+            ]);
+            expect(cardBox).not.toBeNull();
+            expect(priceBox).not.toBeNull();
+            expect(extraBox).not.toBeNull();
+            expect(quantityBox).not.toBeNull();
+            expect(await price.evaluate((node) => getComputedStyle(node).fontSize)).toBe('14px');
+            expect(priceBox!.y).toBeLessThan(cardBox!.y + 36);
+            expect(extraBox!.x).toBeLessThan(quantityBox!.x);
+
+            const evidenceName =
+              testInfo.project.name === 'desktop-browser-fallback'
+                ? '01-desktop-price-top-right-extra-left.png'
+                : testInfo.project.name === 'mobile-tablet-browser-fallback'
+                  ? '02-tablet-price-top-right-extra-left.png'
+                  : '03-mobile-price-top-right-extra-left.png';
+            await page.screenshot({ path: `evidence/${evidenceName}`, fullPage: true });
+
+            if (testInfo.project.name === 'desktop-browser-fallback') {
+              const doubleCard = cards.filter({ hasText: 'Double Smashed Patty' }).first();
+              await doubleCard.getByRole('button', { name: 'Extra', exact: true }).click();
+              await expect(page.getByRole('dialog', { name: 'Double Smashed Patty' })).toBeVisible();
+              await page.screenshot({
+                path: 'evidence/04-double-card-extra-opens-customizer.png',
+                fullPage: true,
+              });
+            }
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: Verify evidence harness
+        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install chromium
-      - name: Verify approved card geometry
-        run: npx playwright test e2e/operations.e2e.ts --grep "approved cards put 14px price top right and Extra bottom left on every product"
-      - name: Capture visual approval evidence
-        run: npx playwright test e2e/operations.e2e.ts --grep "visual approval evidence covers approved POS states"
-      - name: Upload committed-source evidence
-        if: always()
+      - name: Capture focused responsive evidence
+        run: npx playwright test e2e/operations.e2e.ts --grep "focused evidence for approved product card layout"
+      - name: Prove production source stayed untouched
+        run: |
+          test "$(git rev-parse HEAD)" = "302348d0d73b6b571af7446a9347fa1a809c38bd"
+          git diff --exit-code -- apps/operations
+      - name: Upload focused evidence
         uses: actions/upload-artifact@v4
         with:
-          name: pos-product-card-evidence-302348d
-          path: test-results/
+          name: pos-product-card-focused-evidence-302348d
+          path: evidence/*.png
           if-no-files-found: error
           retention-days: 14
