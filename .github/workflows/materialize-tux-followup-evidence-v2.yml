@@ -1,0 +1,65 @@
+name: Materialize TUX Follow-up Evidence Harness V2
+
+on:
+  push:
+    branches:
+      - recover/tux-followup-main-deploy-worker4
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout recovery authority
+        uses: actions/checkout@v7
+        with:
+          ref: recover/tux-followup-main-deploy-worker4
+          path: recovery
+
+      - name: Checkout durable implementation branch
+        uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+          fetch-depth: 0
+          path: repo
+
+      - name: Require expected durable branch state
+        working-directory: repo
+        run: test "$(git rev-parse HEAD)" = "dd3e66e3fab261eda7b1b3a47a87161b3806c834"
+
+      - name: Restore rendered evidence coverage
+        working-directory: repo
+        run: |
+          python ../recovery/scripts/recover-tux-followup-evidence.py
+          python ../recovery/scripts/fix-tux-followup-evidence-selection.py
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+
+      - name: Install formatter
+        working-directory: repo
+        run: npm ci --ignore-scripts
+
+      - name: Format and typecheck E2E
+        working-directory: repo
+        run: |
+          npx prettier --write e2e/operations.e2e.ts
+          npm run typecheck:e2e
+          git diff --check
+
+      - name: Commit evidence harness to durable GitHub branch
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: restore follow-up rendered evidence"
+          git push origin HEAD:ui/tux-ops-followup-recovered
