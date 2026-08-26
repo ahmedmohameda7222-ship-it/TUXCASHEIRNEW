@@ -6,7 +6,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pos-refinement-tdd-${{ github.ref }}
@@ -14,22 +14,55 @@ concurrency:
 
 jobs:
   tdd:
-    name: task-six-single-separator-red
+    if: "${{ github.event.head_commit.message != 'fix: use one current-order separator' }}"
+    name: task-six-single-separator-green
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add Task 6 rendered RED contract
+      - name: Apply Task 6 single separator correction and rendered contract
         run: |
-          cat >> e2e/operations.e2e.ts <<'EOF'
+          python - <<'PY'
+          from pathlib import Path
+
+          for css_name in [
+              'apps/operations/src/styles/orders.css',
+              'apps/operations/src/styles/premium.css',
+          ]:
+              path = Path(css_name)
+              css = path.read_text()
+              old = '''.desktop-cart-wrap {
+            min-width: 0;
+            min-height: 0;
+            border-left: 1px solid var(--tux-border-subtle);
+            background: var(--tux-surface-panel);
+          }'''
+              old_premium = '''.desktop-cart-wrap {
+            border-left: 1px solid var(--tux-border-subtle);
+            background: var(--tux-surface-panel);
+          }'''
+              if old in css:
+                  css = css.replace(old, old.replace('border-left: 1px solid var(--tux-border-subtle);', 'border-left: 0;'), 1)
+              elif old_premium in css:
+                  css = css.replace(old_premium, old_premium.replace('border-left: 1px solid var(--tux-border-subtle);', 'border-left: 0;'), 1)
+              else:
+                  raise SystemExit(f'Expected desktop-cart-wrap border was not found in {css_name}')
+              path.write_text(css)
+
+          e2e_path = Path('e2e/operations.e2e.ts')
+          e2e = e2e_path.read_text()
+          marker = "test('final correction uses one Current Order separator'"
+          test_block = r'''
 
           test('final correction uses one Current Order separator', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
@@ -56,13 +89,32 @@ jobs:
             expect(resized).not.toBeNull();
             expect(Math.round(resized!.width - initial!.width)).toBe(24);
           });
-          EOF
-          npx prettier --write e2e/operations.e2e.ts
-      - name: E2E typecheck
-        run: npm run typecheck:e2e
+          '''
+          if marker not in e2e:
+              e2e_path.write_text(e2e + test_block)
+          PY
+          npx prettier --write apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+      - name: Static checks
+        run: |
+          npm run typecheck:e2e
+          npm run lint
+          npm run typecheck
+          npx prettier --check apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css e2e/operations.e2e.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify Task 6 contract is RED before implementation
+      - name: Verify Task 6 targeted separator contract GREEN
         run: >-
           npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
           "final correction uses one Current Order separator"
+      - name: Verify resize and Current Order regression coverage
+        run: npx playwright test e2e/operations.e2e.ts --grep "resize|Current Order"
+      - name: Run complete Operations E2E file
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit Task 6 GREEN state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/styles/orders.css apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+          git diff --cached --quiet && { echo "Expected Task 6 changes were not generated"; exit 1; }
+          git commit -m "fix: use one current-order separator"
+          git push origin HEAD:ui/tux-pos-refinement
