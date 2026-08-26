@@ -1,4 +1,4 @@
-name: POS Adaptive Card RED
+name: POS Adaptive Card GREEN
 
 on:
   push:
@@ -6,31 +6,47 @@ on:
       - ui/tux-pos-refinement
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
-    name: adaptive-product-grid-red
+  green:
+    if: "!contains(github.event.head_commit.message, 'fix: adapt product grid to order rail')"
+    name: adaptive-product-grid-green
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - name: Checkout pre-fix source
-        uses: actions/checkout@v7
-        with:
-          ref: 6329410c17326088d1ec616040ddcc5b35f9da3f
-      - name: Prove pre-fix source
-        run: test "$(git rev-parse HEAD)" = "6329410c17326088d1ec616040ddcc5b35f9da3f"
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add RED regression contract
+      - name: Apply minimum-safe-width grid breakpoints and regression contract
         run: |
-          cat >> e2e/operations.e2e.ts <<'EOF'
+          python - <<'PY'
+          from pathlib import Path
+
+          css = Path('apps/operations/src/styles/premium.css')
+          text = css.read_text()
+          replacements = {
+              '@container tux-menu (min-width: 568px)': '@container tux-menu (min-width: 722px)',
+              '@container tux-menu (min-width: 856px)': '@container tux-menu (min-width: 1071px)',
+              '@container tux-menu (min-width: 1144px)': '@container tux-menu (min-width: 1420px)',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected breakpoint: {old}')
+              text = text.replace(old, new, 1)
+          css.write_text(text)
+
+          e2e = Path('e2e/operations.e2e.ts')
+          test_text = e2e.read_text()
+          marker = "test('product names stay fully readable while Current Order rail resizes'"
+          if marker not in test_text:
+              test_text += r'''
 
           test('product names stay fully readable while Current Order rail resizes', async ({ page }, testInfo) => {
             await enterActiveOrdersForCategoryTests(page);
@@ -72,10 +88,6 @@ jobs:
                   menuWidth: menuBox?.width ?? null,
                   cardWidth: firstCardBox?.width ?? null,
                   columns,
-                  clipped: titles.filter(
-                    (title) =>
-                      title.scrollHeight > title.clientHeight + 1 || title.textBottom > title.boxBottom + 1,
-                  ),
                 }),
               );
 
@@ -84,33 +96,57 @@ jobs:
                   title.scrollHeight,
                   `${state}: ${title.text} must not be line-clamped`,
                 ).toBeLessThanOrEqual(title.clientHeight + 1);
-                expect(title.textBottom, `${state}: ${title.text} must stay inside its title box`).toBeLessThanOrEqual(
-                  title.boxBottom + 1,
-                );
+                expect(
+                  title.textBottom,
+                  `${state}: ${title.text} must stay inside its title box`,
+                ).toBeLessThanOrEqual(title.boxBottom + 1);
               }
             }
 
             await separator.focus();
             await page.keyboard.press('Home');
-            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeLessThanOrEqual(362);
+            await expect
+              .poll(async () => (await cart.boundingBox())?.width ?? 0)
+              .toBeLessThanOrEqual(362);
             await expectReadableTitles('cart-min-360');
 
             await page.keyboard.press('ArrowLeft');
             await page.keyboard.press('ArrowLeft');
             await page.keyboard.press('ArrowLeft');
-            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(430);
+            await expect
+              .poll(async () => (await cart.boundingBox())?.width ?? 0)
+              .toBeGreaterThanOrEqual(430);
             await expectReadableTitles('cart-default-432');
 
             await separator.focus();
             await page.keyboard.press('End');
-            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(598);
+            await expect
+              .poll(async () => (await cart.boundingBox())?.width ?? 0)
+              .toBeGreaterThanOrEqual(598);
             await expectReadableTitles('cart-max-600');
           });
-          EOF
-          npx prettier --write e2e/operations.e2e.ts
-      - name: Verify RED harness compiles
-        run: npm run typecheck:e2e
+          '''
+          e2e.write_text(test_text)
+          PY
+          npx prettier --write apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+      - name: Static verification
+        run: |
+          npm run typecheck:e2e
+          npm run typecheck
+          npm run lint
+          npm run format:check
       - name: Install Playwright Chromium
         run: npx playwright install chromium
-      - name: Observe expected RED
+      - name: Verify adaptive rail GREEN
         run: npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep "product names stay fully readable while Current Order rail resizes"
+      - name: Verify affected product and rail regressions
+        run: npx playwright test e2e/operations.e2e.ts --grep "resize Current Order rail persists|approved cards put 14px price top right|final correction keeps Extra and product controls fully contained|requested compact product card controls"
+      - name: Verify full Operations E2E
+        run: npx playwright test e2e/operations.e2e.ts
+      - name: Commit verified adaptive grid source
+        run: |
+          git config user.name "TUX POS Verification"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+          git commit -m "fix: adapt product grid to order rail"
+          git push origin HEAD:ui/tux-pos-refinement
