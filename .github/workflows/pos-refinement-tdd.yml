@@ -3,14 +3,10 @@ name: POS Final Evidence
 on:
   push:
     branches:
-      - 'ui/tux-pos-refinement'
+      - ui/tux-pos-refinement
 
 permissions:
   contents: read
-
-concurrency:
-  group: pos-final-evidence-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   evidence:
@@ -22,7 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Pin screenshots to the verified UI source commit, not this workflow-only commit.
           ref: 8f5a8b01778f1b2894f5e431f518010ec9252723
       - uses: actions/setup-node@v7
         with:
@@ -30,42 +25,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add evidence-only screenshot checkpoints
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('e2e/operations.e2e.ts')
-          text = path.read_text()
-          desktop_anchor = """    await screenshot('02-default-orders.png');\n    await captureVisualEvidence(page, testInfo);"""
-          desktop_replacement = """    await screenshot('02-default-orders.png');
-    const evidenceCard = page
-      .locator('.product-card')
-      .filter({ hasText: 'Single Smashed Patty' })
-      .first();
-    await evidenceCard
-      .getByRole('button', { name: 'Quick Info for Single Smashed Patty' })
-      .click();
-    await screenshot('02b-quick-info.png');
-    await page
-      .getByRole('dialog', { name: 'Single Smashed Patty' })
-      .getByRole('button', { name: 'Close', exact: true })
-      .click();
-    await captureVisualEvidence(page, testInfo);"""
-          if desktop_anchor not in text:
-              raise SystemExit('desktop evidence anchor not found')
-          text = text.replace(desktop_anchor, desktop_replacement, 1)
-
-          mobile_anchor = """  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();\n  await openCartIfMobile(page, testInfo);"""
-          mobile_replacement = """  if (testInfo.project.name === 'mobile-browser-fallback') {
-    await screenshot('08-mobile-menu.png');
-  }
-  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
-  await openCartIfMobile(page, testInfo);"""
-          if mobile_anchor not in text:
-              raise SystemExit('mobile evidence anchor not found')
-          path.write_text(text.replace(mobile_anchor, mobile_replacement, 1))
-          PY
-          npx prettier --write e2e/operations.e2e.ts
       - name: Verify evidence test typechecks
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
