@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 321612f3d42045a1ea09e3c55ff211edd3597be5
+          ref: 2764235112cd2bb5bfe6b6e473846e050b7c1062
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
