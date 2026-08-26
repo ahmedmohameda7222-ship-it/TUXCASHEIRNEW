@@ -1,4 +1,4 @@
-name: POS Product Card Evidence
+name: POS Adaptive Card RED
 
 on:
   push:
@@ -9,92 +9,108 @@ permissions:
   contents: read
 
 jobs:
-  evidence:
-    name: focused-product-card-evidence
+  red:
+    name: adaptive-product-grid-red
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - name: Checkout verified product source
+      - name: Checkout pre-fix source
         uses: actions/checkout@v7
         with:
-          ref: 302348d0d73b6b571af7446a9347fa1a809c38bd
-      - name: Prove exact evidence source
-        run: test "$(git rev-parse HEAD)" = "302348d0d73b6b571af7446a9347fa1a809c38bd"
+          ref: 6329410c17326088d1ec616040ddcc5b35f9da3f
+      - name: Prove pre-fix source
+        run: test "$(git rev-parse HEAD)" = "6329410c17326088d1ec616040ddcc5b35f9da3f"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Add evidence-only screenshot contract
+      - name: Add RED regression contract
         run: |
           cat >> e2e/operations.e2e.ts <<'EOF'
 
-          test('focused evidence for approved product card layout', async ({ page }, testInfo) => {
+          test('product names stay fully readable while Current Order rail resizes', async ({ page }, testInfo) => {
             await enterActiveOrdersForCategoryTests(page);
-            await page.getByRole('button', { name: 'Burgers', exact: true }).click();
+            if (!testInfo.project.name.startsWith('desktop')) return;
 
-            const cards = page.locator('.product-card');
-            const count = await cards.count();
-            expect(count).toBeGreaterThan(1);
-            for (let index = 0; index < count; index += 1) {
-              await expect(cards.nth(index).getByRole('button', { name: 'Extra', exact: true })).toHaveCount(1);
+            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
+            const cart = page.locator('.desktop-cart-wrap');
+            const menu = page.locator('.menu-pane');
+            const grid = page.locator('.product-grid');
+
+            async function expectReadableTitles(state: string): Promise<void> {
+              const [cartBox, menuBox, firstCardBox, columns, titles] = await Promise.all([
+                cart.boundingBox(),
+                menu.boundingBox(),
+                page.locator('.product-card').first().boundingBox(),
+                grid.evaluate((node) => getComputedStyle(node).gridTemplateColumns),
+                page.locator('.product-copy strong').evaluateAll((nodes) =>
+                  nodes.map((node) => {
+                    const element = node as HTMLElement;
+                    const range = document.createRange();
+                    range.selectNodeContents(element);
+                    const textRect = range.getBoundingClientRect();
+                    const box = element.getBoundingClientRect();
+                    return {
+                      text: element.textContent ?? '',
+                      clientHeight: element.clientHeight,
+                      scrollHeight: element.scrollHeight,
+                      textBottom: textRect.bottom,
+                      boxBottom: box.bottom,
+                    };
+                  }),
+                ),
+              ]);
+
+              console.log(
+                JSON.stringify({
+                  state,
+                  cartWidth: cartBox?.width ?? null,
+                  menuWidth: menuBox?.width ?? null,
+                  cardWidth: firstCardBox?.width ?? null,
+                  columns,
+                  clipped: titles.filter(
+                    (title) =>
+                      title.scrollHeight > title.clientHeight + 1 || title.textBottom > title.boxBottom + 1,
+                  ),
+                }),
+              );
+
+              for (const title of titles) {
+                expect(
+                  title.scrollHeight,
+                  `${state}: ${title.text} must not be line-clamped`,
+                ).toBeLessThanOrEqual(title.clientHeight + 1);
+                expect(title.textBottom, `${state}: ${title.text} must stay inside its title box`).toBeLessThanOrEqual(
+                  title.boxBottom + 1,
+                );
+              }
             }
 
-            const singleCard = cards.filter({ hasText: 'Single Smashed Patty' }).first();
-            const price = singleCard.locator('.product-price');
-            const extra = singleCard.getByRole('button', { name: 'Extra', exact: true });
-            const quantity = singleCard.locator('.product-quantity');
-            const [cardBox, priceBox, extraBox, quantityBox] = await Promise.all([
-              singleCard.boundingBox(),
-              price.boundingBox(),
-              extra.boundingBox(),
-              quantity.boundingBox(),
-            ]);
-            expect(cardBox).not.toBeNull();
-            expect(priceBox).not.toBeNull();
-            expect(extraBox).not.toBeNull();
-            expect(quantityBox).not.toBeNull();
-            expect(await price.evaluate((node) => getComputedStyle(node).fontSize)).toBe('14px');
-            expect(priceBox!.y).toBeLessThan(cardBox!.y + 36);
-            expect(extraBox!.x).toBeLessThan(quantityBox!.x);
+            await separator.focus();
+            await page.keyboard.press('Home');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeLessThanOrEqual(362);
+            await expectReadableTitles('cart-min-360');
 
-            const evidenceName =
-              testInfo.project.name === 'desktop-browser-fallback'
-                ? '01-desktop-price-top-right-extra-left.png'
-                : testInfo.project.name === 'mobile-tablet-browser-fallback'
-                  ? '02-tablet-price-top-right-extra-left.png'
-                  : '03-mobile-price-top-right-extra-left.png';
-            await page.screenshot({ path: `evidence/${evidenceName}`, fullPage: true });
+            await page.keyboard.press('ArrowLeft');
+            await page.keyboard.press('ArrowLeft');
+            await page.keyboard.press('ArrowLeft');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(430);
+            await expectReadableTitles('cart-default-432');
 
-            if (testInfo.project.name === 'desktop-browser-fallback') {
-              const doubleCard = cards.filter({ hasText: 'Double Smashed Patty' }).first();
-              await doubleCard.getByRole('button', { name: 'Extra', exact: true }).click();
-              await expect(page.getByRole('dialog', { name: 'Double Smashed Patty' })).toBeVisible();
-              await page.screenshot({
-                path: 'evidence/04-double-card-extra-opens-customizer.png',
-                fullPage: true,
-              });
-            }
+            await separator.focus();
+            await page.keyboard.press('End');
+            await expect.poll(async () => (await cart.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(598);
+            await expectReadableTitles('cart-max-600');
           });
           EOF
           npx prettier --write e2e/operations.e2e.ts
-      - name: Verify evidence harness
+      - name: Verify RED harness compiles
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install chromium
-      - name: Capture focused responsive evidence
-        run: npx playwright test e2e/operations.e2e.ts --grep "focused evidence for approved product card layout"
-      - name: Prove production source stayed untouched
-        run: |
-          test "$(git rev-parse HEAD)" = "302348d0d73b6b571af7446a9347fa1a809c38bd"
-          git diff --exit-code -- apps/operations
-      - name: Upload focused evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: pos-product-card-focused-evidence-302348d
-          path: evidence/*.png
-          if-no-files-found: error
-          retention-days: 14
+      - name: Observe expected RED
+        run: npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep "product names stay fully readable while Current Order rail resizes"
