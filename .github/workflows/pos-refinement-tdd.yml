@@ -1,4 +1,4 @@
-name: POS Requested UI Desktop Visual QA
+name: POS Final Requested UI RED
 
 on:
   push:
@@ -9,14 +9,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: pos-requested-ui-visual-qa-${{ github.ref }}
+  group: pos-final-requested-ui-red-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  evidence:
-    name: requested-ui-desktop-visual-qa
+  red:
+    name: final-requested-ui-red
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -27,111 +27,79 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply approved candidate transiently and add screenshot harness
+      - name: Add final requested UI RED contracts only
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
+          cat >> e2e/operations.e2e.ts <<'EOF'
 
-          workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
-          workspace = workspace_path.read_text()
-          start = workspace.find('  const activeFamilies = useMemo(')
-          end = workspace.find('\n\n  useEffect(() => {', start)
-          if start < 0 or end < 0:
-              raise SystemExit('activeFamilies anchors not found')
-          workspace = workspace[:start] + '''  const activeFamilies = useMemo(() => {
-            const selectedCategory = activeCategories.find(
-              (category) => category.id === selectedCategoryId,
-            );
-            if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
-            return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
-          }, [activeCategories, configuration, selectedCategoryId]);''' + workspace[end:]
-          workspace_path.write_text(workspace)
-
-          card_path = Path('apps/operations/src/app/MenuProductCard.tsx')
-          card = card_path.read_text()
-          card = re.sub(r"\n\s*const description = product\.description\?\.trim\(\) \?\? '';", '', card, count=1)
-          card = re.sub(r"\n\s*\{description\.length > 0 \? <p>\{description\}</p> : null\}", '', card, count=1)
-          card_path.write_text(card)
-
-          css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
-          css = css_path.read_text() + '''
-
-          /* User-approved Burger subcategory row. */
-          .menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
-            height: auto;
-            min-height: 56px;
-            padding: 5px 8px 8px;
-          }
-          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) .category-navigation {
-            width: 100%;
-            min-height: 44px;
-            flex: 0 0 44px;
-          }
-          .menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) .product-family-filter {
-            width: fit-content;
-            align-self: flex-start;
-            flex: 0 0 44px;
-          }
-          '''
-          css_path.write_text(css)
-
-          e2e_path = Path('e2e/operations.e2e.ts')
-          e2e = e2e_path.read_text() + r'''
-
-          test('requested desktop visual QA screenshots', async ({ page }, testInfo) => {
+          test('Quick Info is informational only and has no Customize and add action', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
-            const primary = page.getByLabel('Menu categories');
-            await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
-            await expect(page.getByLabel('Product families').getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
-            await expect(page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first().locator('.product-copy p')).toHaveCount(0);
-            await page.screenshot({ path: testInfo.outputPath('01-burgers-subrow-no-descriptions.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
-
             const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
             await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
             const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+            await expect(dialog).toBeVisible();
             await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
-            await page.screenshot({ path: testInfo.outputPath('02-quick-info-description.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
-            await page.keyboard.press('Escape');
-            await expect(dialog).toBeHidden();
-
-            await primary.getByRole('button', { name: 'Fries', exact: true }).click();
-            await expect(page.getByLabel('Product families')).toHaveCount(0);
-            await page.screenshot({ path: testInfo.outputPath('03-fries-no-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
+            await expect(dialog.getByRole('button', { name: 'Customize & add' })).toHaveCount(0);
+            await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
           });
-          '''
-          e2e_path.write_text(e2e)
-          PY
-          npx prettier --write \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
-      - name: Typecheck screenshot harness
+
+          test('Extra is centered between price and quantity controls on the product card', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name === 'mobile-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+            const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+            const price = card.locator('.product-price');
+            const extra = card.getByRole('button', { name: 'Extra', exact: true });
+            const quantity = card.locator('.product-quantity');
+            const [priceBox, extraBox, quantityBox, cardBox] = await Promise.all([
+              price.boundingBox(),
+              extra.boundingBox(),
+              quantity.boundingBox(),
+              card.boundingBox(),
+            ]);
+            expect(priceBox).not.toBeNull();
+            expect(extraBox).not.toBeNull();
+            expect(quantityBox).not.toBeNull();
+            expect(cardBox).not.toBeNull();
+            expect(extraBox!.x).toBeGreaterThan(priceBox!.x + priceBox!.width);
+            expect(extraBox!.x + extraBox!.width).toBeLessThan(quantityBox!.x);
+            const gapCenter = (priceBox!.x + priceBox!.width + quantityBox!.x) / 2;
+            const extraCenter = extraBox!.x + extraBox!.width / 2;
+            expect(Math.abs(extraCenter - gapCenter)).toBeLessThanOrEqual(12);
+            expect(extraBox!.x).toBeGreaterThanOrEqual(cardBox!.x);
+            expect(extraBox!.x + extraBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
+          });
+
+          test('requested compact product card controls do not overlap on 375px mobile', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+            const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+            await expect(card.locator('.product-copy p')).toHaveCount(0);
+            const price = card.locator('.product-price');
+            const extra = card.getByRole('button', { name: 'Extra', exact: true });
+            const quantity = card.locator('.product-quantity');
+            const [cardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+              card.boundingBox(),
+              price.boundingBox(),
+              extra.boundingBox(),
+              quantity.boundingBox(),
+            ]);
+            expect(cardBox).not.toBeNull();
+            for (const box of [priceBox, extraBox, quantityBox]) {
+              expect(box).not.toBeNull();
+              expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+              expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+              expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+            }
+            await extra.click();
+            await expect(page.locator('.product-customizer')).toBeVisible();
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: E2E typecheck
         run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture desktop visual QA
+      - name: Verify final requested UI contracts are RED
         run: >-
-          npx playwright test e2e/operations.e2e.ts
-          --project=desktop-browser-fallback
-          --grep "requested desktop visual QA screenshots"
-      - name: Collect screenshots
-        if: always()
-        run: |
-          mkdir -p visual-qa
-          find test-results -type f -name '*.png' -exec cp {} visual-qa/ \;
-          ls -lah visual-qa
-      - name: Upload desktop visual QA
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: requested-ui-desktop-visual-qa
-          path: visual-qa/
-          if-no-files-found: error
-          retention-days: 7
+          npx playwright test e2e/operations.e2e.ts --grep
+          "Quick Info is informational only|Extra is centered between price and quantity controls|requested compact product card controls do not overlap"
