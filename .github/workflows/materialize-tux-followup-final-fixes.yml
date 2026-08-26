@@ -1,0 +1,65 @@
+name: Materialize TUX Follow-up Final Fixes
+
+on:
+  push:
+    branches:
+      - recover/tux-followup-main-deploy-worker4
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-final:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout recovery authority
+        uses: actions/checkout@v7
+        with:
+          ref: recover/tux-followup-main-deploy-worker4
+          path: recovery
+
+      - name: Checkout durable implementation branch
+        uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+          fetch-depth: 0
+          path: repo
+
+      - name: Require expected durable branch state
+        working-directory: repo
+        run: test "$(git rev-parse HEAD)" = "db20ec6dadb3178a39fd5615535bc4c2154015f0"
+
+      - name: Apply final recovered CSS and E2E changes
+        working-directory: repo
+        run: python ../recovery/scripts/recover-tux-followup-final-fixes.py
+
+      - name: Protect Orders Board
+        working-directory: repo
+        run: git diff --exit-code -- apps/operations/src/app/OrdersBoardWorkspace.tsx apps/operations/src/styles/orders-board.css
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+
+      - name: Install formatter
+        working-directory: repo
+        run: npm ci --ignore-scripts
+
+      - name: Format final recovered files
+        working-directory: repo
+        run: npx prettier --write apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+
+      - name: Commit actual final recovered files
+        working-directory: repo
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add apps/operations/src/styles/premium.css e2e/operations.e2e.ts
+          git commit -m "test: align recovered follow-up contracts"
+          git push origin HEAD:ui/tux-ops-followup-recovered
