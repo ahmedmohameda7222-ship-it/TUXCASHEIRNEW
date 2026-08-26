@@ -2129,7 +2129,7 @@ test('follow-up mobile approval evidence is captured from the committed tree', a
   expect(footerBox).not.toBeNull();
   expect(footerBox!.y - (paymentBox!.y + paymentBox!.height)).toBeGreaterThanOrEqual(16);
   await shot('followup-17-review-pay-bottom-375.png');
-  await page.getByRole('button', { name: 'Close order' }).click();
+  await closeMobileCartIfOpen(page, testInfo);
 
   await page.getByRole('button', { name: 'Expenses', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();
