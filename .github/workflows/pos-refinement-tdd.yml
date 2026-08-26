@@ -207,7 +207,7 @@ jobs:
             margin-top: 1px;
             font-size: 14px;
             line-height: 18px;
-            font-weight: 600;
+            font-weight: 500;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
           }
@@ -254,6 +254,12 @@ jobs:
               start = e2e_text.index(old_start)
               end = e2e_text.index("test('requested compact product card controls do not overlap on 375px mobile'", start)
               e2e_text = e2e_text[:start] + e2e_text[end:]
+
+          stale = "  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toHaveCount(0);"
+          approved = "  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();"
+          if stale not in e2e_text:
+              raise SystemExit('stale per-product Extra expectation not found')
+          e2e_text = e2e_text.replace(stale, approved, 1)
 
           test_marker = "test('approved cards put 14px price top right and Extra bottom left on every product'"
           if test_marker not in e2e_text:
@@ -317,7 +323,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
       - name: Verify approved product-card GREEN
-        run: npx playwright test e2e/operations.e2e.ts --grep "approved cards put 14px price top right"
+        run: npx playwright test e2e/operations.e2e.ts --grep "approved cards put 14px price top right|Extra shortcuts preserve customized pricing and fresh adds|final correction keeps product controls cashier-sized"
       - name: Verify affected card regressions
         run: npx playwright test e2e/operations.e2e.ts --grep "requested compact product card controls|final correction keeps Extra and product controls fully contained|Quick Info"
       - name: Verify full Operations E2E
