@@ -48,6 +48,7 @@
 
 .board-tabs {
   display: flex;
+  justify-content: center;
   gap: var(--tux-space-2);
   overflow-x: auto;
   margin-bottom: var(--tux-space-5);
@@ -410,6 +411,9 @@
   }
   .board-search {
     min-width: 0;
+  }
+  .board-tabs {
+    justify-content: flex-start;
   }
   .active-order-grid {
     grid-template-columns: 1fr;

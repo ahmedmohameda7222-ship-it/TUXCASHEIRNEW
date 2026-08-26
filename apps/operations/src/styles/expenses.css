@@ -102,8 +102,17 @@
   font-size: var(--tux-font-size-sm);
   font-weight: 700;
 }
-.expense-fields input,
-.expense-fields textarea {
+.expense-fields > .money-field {
+  gap: var(--tux-space-2);
+}
+.expense-fields > .money-field > label {
+  color: var(--tux-text-primary);
+  font-size: var(--tux-font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.expense-fields > label > input,
+.expense-fields > label > textarea {
   width: 100%;
   min-height: var(--tux-touch-target);
   border: 1px solid var(--tux-border-subtle);
@@ -395,8 +404,8 @@
   line-height: 24px;
   font-weight: 600;
 }
-.expense-fields input,
-.expense-fields textarea,
+.expense-fields > label > input,
+.expense-fields > label > textarea,
 .expense-choice,
 .expense-note-disclosure {
   min-height: 44px;

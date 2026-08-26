@@ -1,5 +1,22 @@
 /* Final approved POS correction authority. Keep this last in the Operations style cascade. */
 
+/* Currency prefix and value render as one composed money control across Operations. */
+.money-input-wrap > input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.money-input-wrap > input:focus-visible {
+  outline: none;
+}
+
+.money-input-wrap:focus-within {
+  border-color: color-mix(in srgb, var(--tux-focus-ring) 55%, var(--tux-border-subtle));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tux-focus-ring) 36%, transparent);
+}
+
 /* Product cards only reserve the ~152px density target when descriptive copy exists. */
 .product-card {
   min-height: 0;
