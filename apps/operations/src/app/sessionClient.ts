@@ -193,7 +193,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           return updated;
         },
         reset: async () => {
-          await workerUiPreferences.update({ categoryOrder: [], categoryAlignment: 'center' });
+          await workerUiPreferences.update({ categoryOrder: [], categoryAlignment: 'left' });
         },
       };
 

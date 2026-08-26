@@ -1607,3 +1607,57 @@
     min-width: 240px;
   }
 }
+
+/* TUX follow-up: Current Order and delivery totals */
+.line-quantity-stepper {
+  display: grid;
+  grid-template-columns: 44px 40px 44px;
+  height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  overflow: hidden;
+  background: var(--tux-surface-subtle);
+  flex: 0 0 auto;
+}
+.line-quantity-stepper button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+.line-quantity-stepper output {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cart-totals dl > .delivery-total-editor {
+  display: grid;
+  gap: 4px;
+}
+.delivery-total-editor .money-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(128px, 160px);
+  align-items: center;
+  gap: 12px;
+}
+.delivery-total-editor .money-input-wrap {
+  min-height: 44px;
+}
+.delivery-total-editor .money-input-wrap input {
+  height: 44px;
+  text-align: right;
+}
+.delivery-zone-reference {
+  grid-column: 1/-1;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--tux-text-secondary);
+  text-align: right;
+}

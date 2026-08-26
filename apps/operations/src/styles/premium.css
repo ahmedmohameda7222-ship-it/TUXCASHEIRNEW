@@ -329,10 +329,8 @@ button:not(:disabled):active {
 }
 
 .product-copy strong {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  overflow: visible;
   font-size: var(--tux-font-size-sm);
   line-height: 1.28;
 }
@@ -385,7 +383,7 @@ button:not(:disabled):active {
   }
 }
 
-@container tux-menu (min-width: 1071px) {
+@container tux-menu (min-width: 900px) {
   .product-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1470,4 +1468,104 @@ button:not(:disabled):active {
 /* Task 4: keep the complete cashier control group intact when the footer wraps. */
 .product-card-controls {
   flex-wrap: nowrap;
+}
+
+/* TUX follow-up: category/search/operator controls */
+.operations-header .operator-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.operator-user-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.menu-toolbar .product-family-filter {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.menu-toolbar .product-family-filter::-webkit-scrollbar {
+  display: none;
+}
+.menu-toolbar .category-search-inline {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  width: clamp(240px, 21vw, 300px);
+  max-width: 320px;
+  min-height: 44px;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-subtle);
+  overflow: hidden;
+}
+.menu-toolbar .category-search-inline .category-search-glyph {
+  width: 20px;
+  height: 20px;
+  place-self: center;
+  margin: 0;
+}
+.menu-toolbar .category-search-inline input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding: 0 8px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  outline: none;
+}
+.menu-toolbar .category-search-inline .category-search-clear {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--tux-border-subtle) 60%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+.menu-toolbar .category-editor-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow: visible;
+  padding-bottom: 0;
+}
+.menu-toolbar .category-editor-item {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+.line-actions .line-quantity-stepper {
+  flex: 0 0 auto;
+}
+.line-actions .line-quantity-stepper button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+.line-actions .line-quantity-stepper button:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+}
+.line-actions .line-quantity-stepper output {
+  color: var(--tux-text-primary);
 }

@@ -223,3 +223,77 @@
     justify-content: space-between;
   }
 }
+
+/* Approved follow-up refinement: restrained Bulk Stock surfaces. */
+.bulk-stock-page-heading h1 {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+}
+.bulk-stock-page-heading > div > p:last-child {
+  font-size: 14px;
+  line-height: 18px;
+}
+.bulk-stock-empty {
+  min-height: 112px;
+  border-radius: 12px;
+  box-shadow: none;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+}
+.bulk-stock-empty h2 {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.bulk-stock-empty p {
+  font-size: 14px;
+  line-height: 18px;
+}
+.bulk-stock-card {
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.bulk-stock-card h2 {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.bulk-stock-card-main > span {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.bulk-stock-balance {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bulk-stock-finished-action,
+.bulk-stock-add-action {
+  min-height: 44px;
+}
+.bulk-stock-dialog {
+  border-radius: 12px;
+  box-shadow: none;
+}
+.bulk-stock-quantity-field input {
+  min-height: 44px;
+}
+.bulk-stock-quantity-field span {
+  font-size: 13px;
+  line-height: 16px;
+}
+.bulk-stock-dialog > .primary-action {
+  min-height: 48px;
+}
+.bulk-stock-undo {
+  background: var(--tux-surface-panel);
+  box-shadow: none;
+}
+.bulk-stock-undo button {
+  min-height: 44px;
+}
