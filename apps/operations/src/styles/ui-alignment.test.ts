@@ -21,7 +21,11 @@ describe('Operations UI alignment contracts', () => {
 
   it('treats every money input as one composed EGP control with one focus ring', () => {
     const source = css('final-pos-corrections.css');
+    const baseSource = css('orders.css');
 
+    expect(baseSource).toMatch(
+      /\.money-input-wrap\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0,\s*1fr\);[^}]*border:\s*1px solid var\(--tux-border-subtle\);/s,
+    );
     expect(source).toMatch(
       /\.money-input-wrap\s*>\s*input\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
     );
