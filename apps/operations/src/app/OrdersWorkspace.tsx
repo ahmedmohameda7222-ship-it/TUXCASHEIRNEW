@@ -177,16 +177,12 @@ function restoreDraftContents(current: OrderDraft, snapshot: OrderDraft): OrderD
 
 function QuickInfo({
   product,
-  canCustomize,
   busy,
   onClose,
-  onCustomize,
 }: {
   readonly product: Product;
-  readonly canCustomize: boolean;
   readonly busy: boolean;
   readonly onClose: () => void;
-  readonly onCustomize: () => void;
 }) {
   return (
     <div
@@ -216,11 +212,6 @@ function QuickInfo({
           <button type="button" className="secondary-action" disabled={busy} onClick={onClose}>
             Close
           </button>
-          {canCustomize && !product.soldOut ? (
-            <button type="button" className="primary-action" disabled={busy} onClick={onCustomize}>
-              Customize & add
-            </button>
-          ) : null}
         </div>
       </section>
     </div>
@@ -497,10 +488,13 @@ export function OrdersWorkspace({
       return category === undefined ? [] : [category];
     });
   }, [categoryEditOrder, configuredActiveCategories]);
-  const activeFamilies = useMemo(
-    () => productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId),
-    [configuration, selectedCategoryId],
-  );
+  const activeFamilies = useMemo(() => {
+    const selectedCategory = activeCategories.find(
+      (category) => category.id === selectedCategoryId,
+    );
+    if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];
+    return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);
+  }, [activeCategories, configuration, selectedCategoryId]);
 
   useEffect(() => {
     if (selectedFamily !== null && !activeFamilies.includes(selectedFamily)) {
@@ -1216,12 +1210,7 @@ export function OrdersWorkspace({
         <QuickInfo
           product={quickInfoProduct}
           busy={busy}
-          canCustomize={quickInfoProduct.isCombo || productsWithExtras.has(quickInfoProduct.id)}
           onClose={() => setQuickInfoProductId(null)}
-          onCustomize={() => {
-            setQuickInfoProductId(null);
-            setCustomizer({ kind: 'ADD', productId: quickInfoProduct.id });
-          }}
         />
       )}
 

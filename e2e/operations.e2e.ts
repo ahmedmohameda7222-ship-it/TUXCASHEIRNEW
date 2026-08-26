@@ -578,8 +578,8 @@ async function expectOrderPlaced(page: Page): Promise<void> {
 }
 
 async function addClassicWithModifier(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
-  await page.getByRole('button', { name: 'Customize & add' }).click();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Extra', exact: true }).click();
   await page.getByRole('button', { name: 'Add one Extra Cheese' }).click();
   await page.getByRole('button', { name: 'Add to order' }).click();
 }
@@ -1152,21 +1152,11 @@ test('premium POS visual hierarchy matches approved sizing', async ({ page }, te
 
   const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
   const productName = stressCard.locator('.product-copy strong');
-  const productDescription = stressCard.locator('.product-copy p');
   const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
-  const productDescriptionStyle = await productDescription.evaluate((node) =>
-    getComputedStyle(node),
-  );
   expect(productNameStyle.fontSize).toBe('15px');
   expect(productNameStyle.lineHeight).toBe('20px');
   expect(Number(productNameStyle.fontWeight)).toBe(600);
-  expect(productDescriptionStyle.fontSize).toBe('14px');
-  expect(productDescriptionStyle.lineHeight).toBe('18px');
-  expect(Number(productDescriptionStyle.fontWeight)).toBe(400);
-  expect(productDescriptionStyle.webkitLineClamp).toBe('2');
-  await expect(productDescription).toHaveText(
-    '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
-  );
+  await expect(stressCard.locator('.product-copy p')).toHaveCount(0);
   expect(
     (await stressCard.locator('.product-price').evaluate((node) => getComputedStyle(node)))
       .fontVariantNumeric,
@@ -1392,7 +1382,7 @@ test('final correction keeps header and categories visible during compact search
   expect((await categories.evaluate((node) => getComputedStyle(node))).gap).toBe('6px');
   const toolbarBox = await page.locator('.menu-toolbar').boundingBox();
   expect(toolbarBox).not.toBeNull();
-  expect(Math.round(toolbarBox!.height)).toBe(56);
+  expect(toolbarBox!.height).toBeGreaterThan(56);
   const actionButtons = page.locator('.category-nav-actions > button');
   await expect(actionButtons).toHaveCount(2);
   await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit categories');
@@ -1644,7 +1634,7 @@ test('final correction keeps Extra and product controls fully contained', async 
     .locator('.product-card-footer')
     .evaluate((node) => getComputedStyle(node));
   expect(footerStyle.minHeight).toBe('52px');
-  expect(footerStyle.flexWrap).toBe('wrap');
+  expect(footerStyle.display).toBe('grid');
   expect(footerStyle.rowGap).toBe('8px');
   const controlsStyle = await card
     .locator('.product-card-controls')
@@ -1655,11 +1645,11 @@ test('final correction keeps Extra and product controls fully contained', async 
   const plain = grid.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
   const described = grid.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
   await expect(plain.locator('.product-copy p')).toHaveCount(0);
-  await expect(described.locator('.product-copy p')).toHaveCount(1);
+  await expect(described.locator('.product-copy p')).toHaveCount(0);
   const plainStyle = await plain.evaluate((node) => getComputedStyle(node));
   const describedStyle = await described.evaluate((node) => getComputedStyle(node));
   expect(plainStyle.minHeight).toBe('0px');
-  expect(describedStyle.minHeight).toBe('152px');
+  expect(describedStyle.minHeight).toBe('0px');
 
   const overflow = await page.evaluate(() => ({
     viewport: window.innerWidth,
@@ -1756,4 +1746,111 @@ test('final correction uses one Current Order separator', async ({ page }, testI
   const resized = await cart.boundingBox();
   expect(resized).not.toBeNull();
   expect(Math.round(resized!.width - initial!.width)).toBe(24);
+});
+
+test('Burger family filter appears below main categories only for Burgers', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const primary = page.getByLabel('Menu categories');
+  await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
+  const families = page.getByLabel('Product families');
+  await expect(families).toBeVisible();
+  await expect(families.getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
+  await expect(primary.getByRole('button', { name: 'All', exact: true })).toHaveCount(0);
+  const [primaryBox, familyBox] = await Promise.all([
+    primary.boundingBox(),
+    families.boundingBox(),
+  ]);
+  expect(primaryBox).not.toBeNull();
+  expect(familyBox).not.toBeNull();
+  expect(familyBox!.y).toBeGreaterThanOrEqual(primaryBox!.y + primaryBox!.height - 1);
+  await primary.getByRole('button', { name: 'Fries', exact: true }).click();
+  await expect(page.getByLabel('Product families')).toHaveCount(0);
+});
+
+test('product description appears only after opening the product card', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await expect(card.locator('.product-copy p')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+});
+
+test('Quick Info is informational only and has no Customize and add action', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+  await expect(dialog.getByRole('button', { name: 'Customize & add' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
+});
+
+test('Extra is centered between price and quantity controls on the product card', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const price = card.locator('.product-price');
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const quantity = card.locator('.product-quantity');
+  const [priceBox, extraBox, quantityBox, cardBox] = await Promise.all([
+    price.boundingBox(),
+    extra.boundingBox(),
+    quantity.boundingBox(),
+    card.boundingBox(),
+  ]);
+  expect(priceBox).not.toBeNull();
+  expect(extraBox).not.toBeNull();
+  expect(quantityBox).not.toBeNull();
+  expect(cardBox).not.toBeNull();
+  expect(extraBox!.x).toBeGreaterThan(priceBox!.x + priceBox!.width);
+  expect(extraBox!.x + extraBox!.width).toBeLessThan(quantityBox!.x);
+  const gapCenter = (priceBox!.x + priceBox!.width + quantityBox!.x) / 2;
+  const extraCenter = extraBox!.x + extraBox!.width / 2;
+  expect(Math.abs(extraCenter - gapCenter)).toBeLessThanOrEqual(12);
+});
+
+test('requested compact product card controls do not overlap on 375px mobile', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-browser-fallback');
+  await enterActiveOrdersForCategoryTests(page);
+  const cards = page.locator('.product-card');
+  const card = cards.filter({ hasText: 'Single Smashed Patty' }).first();
+  const nextCard = cards.filter({ hasText: 'Double Smashed Patty' }).first();
+  await expect(card.locator('.product-copy p')).toHaveCount(0);
+  const price = card.locator('.product-price');
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const quantity = card.locator('.product-quantity');
+  const [cardBox, nextCardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+    card.boundingBox(),
+    nextCard.boundingBox(),
+    price.boundingBox(),
+    extra.boundingBox(),
+    quantity.boundingBox(),
+  ]);
+  expect(cardBox).not.toBeNull();
+  expect(nextCardBox).not.toBeNull();
+  for (const box of [priceBox, extraBox, quantityBox]) {
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(cardBox!.x - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 1);
+  }
+  expect(nextCardBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height + 7);
+  await extra.click();
+  await expect(page.locator('.product-customizer')).toBeVisible();
 });

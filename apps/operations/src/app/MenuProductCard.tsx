@@ -47,7 +47,6 @@ export function MenuProductCard({
   readonly onAdd: () => void;
   readonly onExtras: () => void;
 }) {
-  const description = product.description?.trim() ?? '';
   const className = [
     'product-card',
     quantity > 0 ? 'product-card-selected' : null,
@@ -79,25 +78,24 @@ export function MenuProductCard({
         </div>
         <div className="product-copy">
           <strong>{product.name}</strong>
-          {description.length > 0 ? <p>{description}</p> : null}
           {product.soldOut ? <em>Sold Out</em> : null}
         </div>
       </button>
 
       <footer className="product-card-footer">
         <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
+        {supportsExtras ? (
+          <button
+            type="button"
+            className="product-extra-action"
+            disabled={busy || product.soldOut}
+            onClick={(event) => runIndependentAction(event, onExtras)}
+          >
+            <PlusCircleIcon />
+            <span>Extra</span>
+          </button>
+        ) : null}
         <div className="product-card-controls">
-          {supportsExtras ? (
-            <button
-              type="button"
-              className="product-extra-action"
-              disabled={busy || product.soldOut}
-              onClick={(event) => runIndependentAction(event, onExtras)}
-            >
-              <PlusCircleIcon />
-              <span>Extra</span>
-            </button>
-          ) : null}
           <div className="product-quantity" aria-label={`${product.name} quantity`}>
             <button
               type="button"
