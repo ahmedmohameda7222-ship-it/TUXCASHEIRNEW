@@ -905,7 +905,7 @@ test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page
     .filter({ hasText: 'Double Smashed Patty' })
     .first();
   await expect(classicCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
-  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toHaveCount(0);
+  await expect(doubleCard.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
 
   await classicCard.getByRole('button', { name: 'Extra', exact: true }).click();
   const addDialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
@@ -1797,32 +1797,6 @@ test('Quick Info is informational only and has no Customize and add action', asy
   await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
 });
 
-test('Extra is centered between price and quantity controls on the product card', async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile-browser-fallback');
-  await enterActiveOrdersForCategoryTests(page);
-  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
-  const price = card.locator('.product-price');
-  const extra = card.getByRole('button', { name: 'Extra', exact: true });
-  const quantity = card.locator('.product-quantity');
-  const [priceBox, extraBox, quantityBox, cardBox] = await Promise.all([
-    price.boundingBox(),
-    extra.boundingBox(),
-    quantity.boundingBox(),
-    card.boundingBox(),
-  ]);
-  expect(priceBox).not.toBeNull();
-  expect(extraBox).not.toBeNull();
-  expect(quantityBox).not.toBeNull();
-  expect(cardBox).not.toBeNull();
-  expect(extraBox!.x).toBeGreaterThan(priceBox!.x + priceBox!.width);
-  expect(extraBox!.x + extraBox!.width).toBeLessThan(quantityBox!.x);
-  const gapCenter = (priceBox!.x + priceBox!.width + quantityBox!.x) / 2;
-  const extraCenter = extraBox!.x + extraBox!.width / 2;
-  expect(Math.abs(extraCenter - gapCenter)).toBeLessThanOrEqual(12);
-});
-
 test('requested compact product card controls do not overlap on 375px mobile', async ({
   page,
 }, testInfo) => {
@@ -1853,4 +1827,52 @@ test('requested compact product card controls do not overlap on 375px mobile', a
   expect(nextCardBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height + 7);
   await extra.click();
   await expect(page.locator('.product-customizer')).toBeVisible();
+});
+
+test('approved cards put 14px price top right and Extra bottom left on every product', async ({
+  page,
+}) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  for (const categoryName of ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Drinks']) {
+    await page.getByRole('button', { name: categoryName, exact: true }).click();
+    const cards = page.locator('.product-card');
+    const count = await cards.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      await expect(
+        cards.nth(index).getByRole('button', { name: 'Extra', exact: true }),
+      ).toHaveCount(1);
+    }
+  }
+
+  await page.getByRole('button', { name: 'Burgers', exact: true }).click();
+  const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const price = card.locator('.product-price');
+  const extra = card.getByRole('button', { name: 'Extra', exact: true });
+  const quantity = card.locator('.product-quantity');
+  const [cardBox, priceBox, extraBox, quantityBox] = await Promise.all([
+    card.boundingBox(),
+    price.boundingBox(),
+    extra.boundingBox(),
+    quantity.boundingBox(),
+  ]);
+  expect(cardBox).not.toBeNull();
+  expect(priceBox).not.toBeNull();
+  expect(extraBox).not.toBeNull();
+  expect(quantityBox).not.toBeNull();
+
+  const priceFontSize = await price.evaluate((node) => getComputedStyle(node).fontSize);
+  expect(priceFontSize).toBe('14px');
+  expect(priceBox!.y).toBeLessThan(cardBox!.y + 36);
+  expect(cardBox!.x + cardBox!.width - (priceBox!.x + priceBox!.width)).toBeLessThanOrEqual(16);
+  expect(extraBox!.x - cardBox!.x).toBeLessThanOrEqual(16);
+  expect(extraBox!.y).toBeGreaterThan(cardBox!.y + cardBox!.height / 2);
+  expect(quantityBox!.x).toBeGreaterThan(extraBox!.x + extraBox!.width);
+  expect(cardBox!.x + cardBox!.width - (quantityBox!.x + quantityBox!.width)).toBeLessThanOrEqual(
+    16,
+  );
+  expect(
+    Math.abs(extraBox!.y + extraBox!.height - (quantityBox!.y + quantityBox!.height)),
+  ).toBeLessThanOrEqual(2);
 });

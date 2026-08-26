@@ -143,3 +143,60 @@
     column-gap: 6px;
   }
 }
+
+/* User-approved top-right product price and universal Extra action. */
+.product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card > .product-main {
+  width: 100%;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.product-card > .product-main .product-price {
+  min-width: 0;
+  align-self: start;
+  justify-self: end;
+  margin-top: 1px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.product-card-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer > .product-extra-action {
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+}
+
+.product-card-footer > .product-card-controls {
+  grid-column: 3;
+  min-width: max-content;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 34rem) {
+  .product-card > .product-main {
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  }
+
+  .product-card-footer {
+    padding-inline: 8px;
+    column-gap: 6px;
+  }
+}

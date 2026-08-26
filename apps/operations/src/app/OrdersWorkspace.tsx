@@ -465,17 +465,6 @@ export function OrdersWorkspace({
         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],
     [configuration],
   );
-  const productsWithExtras = useMemo(() => {
-    if (configuration === null) return new Set<ProductId>();
-    const activeModifierIds = new Set(
-      configuration.modifiers.filter((modifier) => modifier.active).map((modifier) => modifier.id),
-    );
-    return new Set(
-      configuration.productModifierLinks
-        .filter((link) => activeModifierIds.has(link.modifierId))
-        .map((link) => link.productId),
-    );
-  }, [configuration]);
   const activeCategories = useMemo(
     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),
     [categoryPreference, configuredActiveCategories],
@@ -1069,7 +1058,6 @@ export function OrdersWorkspace({
                 key={product.id}
                 product={product}
                 quantity={productQuantityInDraft(draft, product.id)}
-                supportsExtras={productsWithExtras.has(product.id)}
                 busy={busy}
                 onQuickInfo={() => setQuickInfoProductId(product.id)}
                 onDecrement={() => decrementProduct(product)}

@@ -31,7 +31,6 @@ function ProductMedia({ product }: { readonly product: Product }) {
 export function MenuProductCard({
   product,
   quantity,
-  supportsExtras,
   busy,
   onQuickInfo,
   onDecrement,
@@ -40,7 +39,6 @@ export function MenuProductCard({
 }: {
   readonly product: Product;
   readonly quantity: number;
-  readonly supportsExtras: boolean;
   readonly busy: boolean;
   readonly onQuickInfo: () => void;
   readonly onDecrement: () => void;
@@ -80,21 +78,19 @@ export function MenuProductCard({
           <strong>{product.name}</strong>
           {product.soldOut ? <em>Sold Out</em> : null}
         </div>
+        <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
       </button>
 
       <footer className="product-card-footer">
-        <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
-        {supportsExtras ? (
-          <button
-            type="button"
-            className="product-extra-action"
-            disabled={busy || product.soldOut}
-            onClick={(event) => runIndependentAction(event, onExtras)}
-          >
-            <PlusCircleIcon />
-            <span>Extra</span>
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="product-extra-action"
+          disabled={busy || product.soldOut}
+          onClick={(event) => runIndependentAction(event, onExtras)}
+        >
+          <PlusCircleIcon />
+          <span>Extra</span>
+        </button>
         <div className="product-card-controls">
           <div className="product-quantity" aria-label={`${product.name} quantity`}>
             <button
