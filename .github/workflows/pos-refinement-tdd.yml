@@ -22,6 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Pin screenshots to the verified UI source commit, not this workflow-only commit.
           ref: 8f5a8b01778f1b2894f5e431f518010ec9252723
       - uses: actions/setup-node@v7
         with:
