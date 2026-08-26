@@ -1,0 +1,131 @@
+name: Apply TUX UI alignment fixes
+
+on:
+  push:
+    branches:
+      - ui/tux-input-alignment-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-input-alignment-fixes
+          fetch-depth: 0
+      - name: Apply bounded CSS fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          board = Path('apps/operations/src/styles/orders-board.css')
+          board_text = board.read_text()
+          old_tabs = """.board-tabs {
+            display: flex;
+            gap: var(--tux-space-2);
+          """
+          new_tabs = """.board-tabs {
+            display: flex;
+            justify-content: center;
+            gap: var(--tux-space-2);
+          """
+          if old_tabs not in board_text:
+              raise SystemExit('Orders Board tabs baseline was not found.')
+          board_text = board_text.replace(old_tabs, new_tabs, 1)
+          old_mobile = """  .board-search {
+            min-width: 0;
+          }
+          """
+          new_mobile = """  .board-search {
+            min-width: 0;
+          }
+          .board-tabs {
+            justify-content: flex-start;
+          }
+          """
+          if old_mobile not in board_text:
+              raise SystemExit('Orders Board mobile baseline was not found.')
+          board_text = board_text.replace(old_mobile, new_mobile, 1)
+          board.write_text(board_text)
+
+          expenses = Path('apps/operations/src/styles/expenses.css')
+          expense_text = expenses.read_text()
+          old_control_rule = """.expense-fields input,
+          .expense-fields textarea {
+          """
+          new_control_rule = """.expense-fields > label > input,
+          .expense-fields > label > textarea {
+          """
+          if expense_text.count(old_control_rule) != 2:
+              raise SystemExit(f'Expected two broad expense input rules, found {expense_text.count(old_control_rule)}.')
+          expense_text = expense_text.replace(old_control_rule, new_control_rule)
+          anchor = """.expense-fields label,
+          .expense-paid-from {
+            display: grid;
+            gap: var(--tux-space-2);
+            margin: 0;
+            color: var(--tux-text-primary);
+            font-size: var(--tux-font-size-sm);
+            font-weight: 700;
+          }
+          """
+          addition = anchor + """.expense-fields > .money-field {
+            gap: var(--tux-space-2);
+          }
+          .expense-fields > .money-field > label {
+            color: var(--tux-text-primary);
+            font-size: var(--tux-font-size-sm);
+            font-weight: 700;
+            letter-spacing: 0;
+          }
+          """
+          if anchor not in expense_text:
+              raise SystemExit('Expense label baseline was not found.')
+          expense_text = expense_text.replace(anchor, addition, 1)
+          expenses.write_text(expense_text)
+
+          final_css = Path('apps/operations/src/styles/final-pos-corrections.css')
+          final_text = final_css.read_text()
+          header = "/* Final approved POS correction authority. Keep this last in the Operations style cascade. */\n"
+          if not final_text.startswith(header):
+              raise SystemExit('Final POS correction authority header was not found.')
+          money_contract = """
+
+          /* Currency prefix and value render as one composed money control across Operations. */
+          .money-input-wrap > input {
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+          }
+
+          .money-input-wrap > input:focus-visible {
+            outline: none;
+          }
+
+          .money-input-wrap:focus-within {
+            border-color: color-mix(in srgb, var(--tux-focus-ring) 55%, var(--tux-border-subtle));
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--tux-focus-ring) 36%, transparent);
+          }
+          """
+          final_text = final_text.replace(header, header + money_contract, 1)
+          final_css.write_text(final_text)
+          PY
+      - name: Format changed files
+        run: npx prettier --write apps/operations/src/styles/orders-board.css apps/operations/src/styles/expenses.css apps/operations/src/styles/final-pos-corrections.css
+      - name: Verify bounded diff
+        run: |
+          git diff --check
+          git diff --name-only | sort
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "apps/operations/src/styles/expenses.css apps/operations/src/styles/final-pos-corrections.css apps/operations/src/styles/orders-board.css "
+      - name: Commit GREEN implementation
+        run: |
+          git config user.name "TUX POS Verification"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/operations/src/styles/orders-board.css apps/operations/src/styles/expenses.css apps/operations/src/styles/final-pos-corrections.css
+          git commit -m "fix: align operational form controls"
+          git push origin HEAD:ui/tux-input-alignment-fixes
