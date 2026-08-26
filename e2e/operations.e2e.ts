@@ -1993,7 +1993,7 @@ test('follow-up desktop approval evidence is captured from the committed tree', 
   await shot('followup-04-current-order-plain-extra-1440.png');
 
   await line.getByRole('button', { name: 'Extra', exact: true }).click();
-  let extras = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+  const extras = page.getByRole('dialog', { name: 'Single Smashed Patty' });
   await extras.getByRole('button', { name: 'Add one Extra Cheese' }).click();
   await extras.getByRole('button', { name: 'Save item' }).click();
   line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
