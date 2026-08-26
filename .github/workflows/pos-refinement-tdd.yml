@@ -1,4 +1,4 @@
-name: POS Refinement Focused Visual Evidence
+name: POS Refinement Final Quality Gate
 
 on:
   push:
@@ -9,14 +9,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: pos-refinement-focused-evidence-${{ github.ref }}
+  group: pos-refinement-final-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  evidence:
-    name: task-seven-focused-visual-evidence
+  verify:
+    name: task-eight-full-quality-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       SOURCE_SHA: 22409d8024764932bf615c8c9bf8b122dfb64889
@@ -28,93 +28,30 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Prove exact clean source
+      - name: Prove exact clean corrected tree
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test -z "$(git status --short)"
-          mkdir -p evidence
-          printf 'source_sha=%s\nsource_status=clean\nevidence_transform=none\n' "$SOURCE_SHA" > evidence/FOCUSED_MANIFEST.txt
+          git log -1 --oneline
       - name: Install locked dependencies
         run: npm ci
-      - name: Create temporary focused evidence harness
-        run: |
-          cp e2e/operations.e2e.ts e2e/evidence-focused.e2e.ts
-          cat >> e2e/evidence-focused.e2e.ts <<'EOF'
-
-          test('evidence focused cash 705 shows received input and smart tenders', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-
-            await page.getByRole('button', { name: 'Add one Johnny’s' }).click();
-            await page.getByLabel('Product families').getByRole('button', { name: 'TUXIFY', exact: true }).click();
-            await page.getByRole('button', { name: 'Add one Triple TUXIFY' }).click();
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Fries', exact: true }).click();
-            await page.getByRole('button', { name: 'Add one Doppy Fries' }).click();
-            await page.getByRole('button', { name: 'Add one Classic Fries' }).click();
-
-            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', { name: 'Current order' });
-            await expect(cart.locator('.grand-total')).toContainText('705.00');
-            await cart.getByRole('button', { name: 'Cash', exact: true }).click();
-            const cash = cart.getByLabel('Cash received');
-            const tenders = cart.getByLabel('Smart Cash tenders');
-            await expect(cash).toHaveValue('');
-            await expect(cash).toHaveAttribute('placeholder', '0');
-            await expect(tenders.getByRole('button')).toHaveCount(5);
-            await tenders.scrollIntoViewIfNeeded();
-            await expect(cash).toBeVisible();
-            await expect(tenders).toBeVisible();
-            for (const value of ['705.00', '710.00', '720.00', '750.00', '800.00']) {
-              await expect(tenders).toContainText(value);
-            }
-            await expectNoHorizontalOverflow(page);
-            await page.screenshot({ path: 'evidence/08-1440-single-cash-705-visible.png', animations: 'disabled', caret: 'hide' });
-          });
-
-          test('evidence focused wider rail shows one unfocused hairline', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-
-            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
-            for (let index = 0; index < 5; index += 1) {
-              await separator.focus();
-              await page.keyboard.press('ArrowLeft');
-            }
-            const cart = page.locator('.desktop-cart-wrap');
-            const wider = await cart.boundingBox();
-            expect(wider).not.toBeNull();
-            expect(wider!.width).toBeGreaterThanOrEqual(550);
-            expect(await cart.evaluate((node) => getComputedStyle(node).borderLeftWidth)).toBe('0px');
-
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Burgers', exact: true }).focus();
-            await expect(separator).not.toBeFocused();
-            expect(await separator.evaluate((node) => getComputedStyle(node, '::before').width)).toBe('1px');
-            await expectNoHorizontalOverflow(page);
-            await page.screenshot({ path: 'evidence/10-1440-resized-wider-rail-single-hairline.png', animations: 'disabled', caret: 'hide' });
-          });
-          EOF
-      - name: Typecheck temporary harness
-        run: npx tsc --noEmit -p tsconfig.e2e.json
+      - name: Format check
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm test
+      - name: Migration tests
+        run: npm run test:migrations
+      - name: Production build
+        run: npm run build
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture focused evidence
-        run: npx playwright test e2e/evidence-focused.e2e.ts --project=desktop-browser-fallback --grep "evidence focused"
-      - name: Prove committed source untouched
-        if: always()
+      - name: Full end-to-end suite
+        run: npm run test:e2e
+      - name: Final source cleanliness proof
         run: |
-          rm -f e2e/evidence-focused.e2e.ts
-          git diff --exit-code -- e2e/operations.e2e.ts apps/operations packages
-          printf 'post_capture_source_diff=clean\n' >> evidence/FOCUSED_MANIFEST.txt
-      - name: Upload focused evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tux-pos-focused-evidence-22409d8
-          path: |
-            evidence/
-            test-results/
-          if-no-files-found: error
-          retention-days: 30
+          test -z "$(git status --short)"
+          git diff --exit-code
