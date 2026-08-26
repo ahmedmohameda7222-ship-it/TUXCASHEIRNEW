@@ -9,6 +9,7 @@ function css(name: string): string {
   return readFileSync(resolve(stylesDirectory, name), 'utf8');
 }
 
+// These source-level contracts protect the exact bounded visual fixes in this PR.
 describe('Operations UI alignment contracts', () => {
   it('centers Orders Board status tabs on desktop and keeps the mobile rail start-aligned', () => {
     const source = css('orders-board.css');
