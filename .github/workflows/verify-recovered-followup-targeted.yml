@@ -1,0 +1,30 @@
+name: Verify Recovered TUX Follow-up Targeted
+
+on:
+  push:
+    branches:
+      - verify/tux-ops-followup-recovered
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run recovered regression targets
+        run: >-
+          npx playwright test e2e/operations.e2e.ts
+          --grep "Current Order keeps cashier controls attached to each line|final correction keeps cart and payment controls at visible target sizes|product names stay fully readable while Current Order rail resizes"
