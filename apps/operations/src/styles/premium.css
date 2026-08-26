@@ -329,10 +329,8 @@ button:not(:disabled):active {
 }
 
 .product-copy strong {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  overflow: visible;
   font-size: var(--tux-font-size-sm);
   line-height: 1.28;
 }

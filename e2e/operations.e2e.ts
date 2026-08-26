@@ -971,17 +971,20 @@ test('Current Order keeps cashier controls attached to each line', async ({ page
   await expect(lines).toHaveCount(1);
   const line = lines.first();
   await expect(line).toContainText('1× Extra Cheese');
-  await expect(line.getByRole('button', { name: '−1', exact: true })).toBeVisible();
-  await expect(line.getByRole('button', { name: '+1', exact: true })).toBeVisible();
+  await expect(line.getByRole('button', { name: /Decrease .* quantity/ })).toBeVisible();
+  await expect(line.getByRole('button', { name: /Increase .* quantity/ })).toBeVisible();
   await expect(line.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
   await expect(line.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
 
-  await line.getByRole('button', { name: '+1', exact: true }).click();
+  await line.getByRole('button', { name: /Increase .* quantity/ }).click();
   await expect(lines).toHaveCount(1);
   await expect(lines.first()).toContainText('× 2');
   await expect(lines.first()).toContainText('1× Extra Cheese');
 
-  await lines.first().getByRole('button', { name: '−1', exact: true }).click();
+  await lines
+    .first()
+    .getByRole('button', { name: /Decrease .* quantity/ })
+    .click();
   await expect(lines.first()).toContainText('× 1');
   await expect(page.locator('.undo-toast')).toContainText('Removed one Single Smashed Patty');
 
@@ -1469,8 +1472,8 @@ test('final correction keeps cart and payment controls at visible target sizes',
   expect(clearStyle.lineHeight).toBe('18px');
   expect(Number(clearStyle.fontWeight)).toBe(500);
   const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
-  for (const name of ['−1', '+1']) {
-    const box = await line.getByRole('button', { name, exact: true }).boundingBox();
+  for (const name of [/Decrease .* quantity/, /Increase .* quantity/]) {
+    const box = await line.getByRole('button', { name }).boundingBox();
     expect(box).not.toBeNull();
     expect(Math.round(box!.width)).toBe(44);
     expect(Math.round(box!.height)).toBe(44);
