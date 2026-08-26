@@ -1,4 +1,4 @@
-name: POS Requested UI Change GREEN
+name: POS Requested UI Visual QA Evidence
 
 on:
   push:
@@ -6,31 +6,28 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: pos-requested-ui-green-${{ github.ref }}
+  group: pos-requested-ui-visual-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  green:
-    if: "${{ github.event.head_commit.message != 'fix: contextualize Burger families and card details' }}"
-    name: requested-ui-green
+  evidence:
+    name: requested-ui-visual-qa
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ui/tux-pos-refinement
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply only the approved Burger-family and card-description changes
+      - name: Apply approved candidate transiently
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -74,9 +71,7 @@ jobs:
 
           css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
           css = css_path.read_text()
-          marker = '/* User-approved Burger subcategory row. */'
-          if marker not in css:
-              css += '''
+          css += '''
 
           /* User-approved Burger subcategory row. */
           .menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
@@ -111,83 +106,36 @@ jobs:
 
           e2e_path = Path('e2e/operations.e2e.ts')
           e2e = e2e_path.read_text()
+          e2e += r'''
 
-          start = e2e.find("  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();")
-          end = e2e.find("\n  expect(\n    (await stressCard.locator('.product-price')", start)
-          if start < 0 or end < 0:
-              raise SystemExit('product-description typography anchors not found')
-          replacement = '''  const stressCard = page.locator('.product-card').filter({ hasText: 'Johnny’s' }).first();
-            const productName = stressCard.locator('.product-copy strong');
-            const productNameStyle = await productName.evaluate((node) => getComputedStyle(node));
-            expect(productNameStyle.fontSize).toBe('15px');
-            expect(productNameStyle.lineHeight).toBe('20px');
-            expect(Number(productNameStyle.fontWeight)).toBe(600);
-            await expect(stressCard.locator('.product-copy p')).toHaveCount(0);'''
-          e2e = e2e[:start] + replacement + e2e[end:]
-
-          old_toolbar = "  expect(Math.round(toolbarBox!.height)).toBe(56);"
-          if old_toolbar not in e2e:
-              raise SystemExit('toolbar height assertion not found')
-          e2e = e2e.replace(old_toolbar, "  expect(toolbarBox!.height).toBeGreaterThan(56);", 1)
-
-          e2e, count = re.subn(
-              r"  await expect\(described\.locator\('\.product-copy p'\)\)\.toHaveCount\(1\);",
-              "  await expect(described.locator('.product-copy p')).toHaveCount(0);",
-              e2e,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit('described-card paragraph assertion not found')
-          e2e, count = re.subn(
-              r"  expect\(describedStyle\.minHeight\)\.toBe\('152px'\);",
-              "  expect(describedStyle.minHeight).toBe('0px');",
-              e2e,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit('described-card min-height assertion not found')
-
-          requested_marker = "test('Burger family filter appears below main categories only for Burgers'"
-          if requested_marker not in e2e:
-              e2e += r'''
-
-          test('Burger family filter appears below main categories only for Burgers', async ({ page }, testInfo) => {
+          test('requested UI visual QA desktop states', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
-
             const primary = page.getByLabel('Menu categories');
             await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
             const families = page.getByLabel('Product families');
-            await expect(families).toBeVisible();
             await expect(families.getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
-            await expect(primary.getByRole('button', { name: 'All', exact: true })).toHaveCount(0);
+            await expect(page.locator('.product-card').first().locator('.product-copy p')).toHaveCount(0);
+            await page.screenshot({ path: testInfo.outputPath('01-desktop-burgers-subrow-no-descriptions.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
 
-            const [primaryBox, familyBox] = await Promise.all([
-              primary.boundingBox(),
-              families.boundingBox(),
-            ]);
-            expect(primaryBox).not.toBeNull();
-            expect(familyBox).not.toBeNull();
-            expect(familyBox!.y).toBeGreaterThanOrEqual(primaryBox!.y + primaryBox!.height - 1);
+            const card = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+            await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+            const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+            await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+            await page.screenshot({ path: testInfo.outputPath('02-desktop-quick-info-description.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
+            await page.keyboard.press('Escape');
 
             await primary.getByRole('button', { name: 'Fries', exact: true }).click();
             await expect(page.getByLabel('Product families')).toHaveCount(0);
+            await page.screenshot({ path: testInfo.outputPath('03-desktop-fries-no-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
           });
 
-          test('product description appears only after opening the product card', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+          test('requested UI visual QA mobile state', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
             await enterActiveOrdersForCategoryTests(page);
-
-            const card = page
-              .locator('.product-card')
-              .filter({ hasText: 'Single Smashed Patty' })
-              .first();
-            await expect(card.locator('.product-copy p')).toHaveCount(0);
-            await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
-
-            const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
-            await expect(dialog).toBeVisible();
-            await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+            await page.getByLabel('Menu categories').getByRole('button', { name: 'Burgers', exact: true }).click();
+            await expect(page.getByLabel('Product families').getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
+            await page.screenshot({ path: testInfo.outputPath('04-mobile-375-burgers-subrow.png'), fullPage: false, animations: 'disabled', caret: 'hide' });
           });
           '''
           e2e_path.write_text(e2e)
@@ -197,37 +145,27 @@ jobs:
             apps/operations/src/app/MenuProductCard.tsx \
             apps/operations/src/styles/final-pos-corrections.css \
             e2e/operations.e2e.ts
-      - name: Static verification
-        run: |
-          npm run typecheck:e2e
-          npm run typecheck
-          npm run lint
-          npx prettier --check \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
+      - name: Typecheck visual harness
+        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify the two requested behaviors GREEN
+      - name: Capture desktop and mobile visual QA
         run: >-
-          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
-          "Burger family filter appears below main categories only for Burgers|product description appears only after opening the product card"
-      - name: Verify affected existing UI contracts
-        run: >-
-          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
-          "premium POS visual hierarchy matches approved sizing|final correction keeps header and categories visible during compact search|final correction keeps Extra and product controls fully contained|approved category hierarchy stays two-level|search keeps both category levels visible"
-      - name: Full Operations E2E regression
-        run: npx playwright test e2e/operations.e2e.ts
-      - name: Commit only approved source and regression-test changes
+          npx playwright test e2e/operations.e2e.ts
+          --project=desktop-browser-fallback
+          --project=mobile-browser-fallback
+          --grep "requested UI visual QA"
+      - name: Collect screenshots
+        if: always()
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            apps/operations/src/app/OrdersWorkspace.tsx \
-            apps/operations/src/app/MenuProductCard.tsx \
-            apps/operations/src/styles/final-pos-corrections.css \
-            e2e/operations.e2e.ts
-          git diff --cached --quiet && { echo "Expected approved changes were not generated"; exit 1; }
-          git commit -m "fix: contextualize Burger families and card details"
-          git push origin HEAD:ui/tux-pos-refinement
+          mkdir -p visual-qa
+          find test-results -type f -name '*.png' -exec cp {} visual-qa/ \;
+          ls -lah visual-qa
+      - name: Upload visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: requested-ui-visual-qa
+          path: visual-qa/
+          if-no-files-found: error
+          retention-days: 7
