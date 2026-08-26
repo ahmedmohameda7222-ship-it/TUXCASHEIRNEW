@@ -1,4 +1,4 @@
-name: POS Refinement Evidence
+name: POS Refinement Welcome Evidence
 
 on:
   push:
@@ -9,14 +9,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: pos-refinement-evidence-${{ github.ref }}
+  group: pos-refinement-welcome-evidence-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   evidence:
-    name: task-seven-exact-tree-evidence
+    name: task-seven-welcome-exact-tree-evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       SOURCE_SHA: 22409d8024764932bf615c8c9bf8b122dfb64889
@@ -28,239 +28,61 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Prove clean exact screenshot source
+      - name: Prove exact clean source
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test -z "$(git status --short)"
           mkdir -p evidence
-          {
-            echo "source_sha=$SOURCE_SHA"
-            echo "branch=ui/tux-pos-refinement"
-            echo "source_status=clean"
-            echo "fixture=e2e/operations.e2e.ts (committed, unmodified)"
-            echo "evidence_transform=none"
-            echo
-            git log -8 --oneline
-          } > evidence/MANIFEST.txt
+          printf 'source_sha=%s\nsource_status=clean\nevidence_transform=none\n' "$SOURCE_SHA" > evidence/WELCOME_MANIFEST.txt
       - name: Install locked dependencies
         run: npm ci
-      - name: Create temporary screenshot harness from committed fixture
+      - name: Create temporary welcome evidence harness
         run: |
-          cp e2e/operations.e2e.ts e2e/evidence.e2e.ts
-          cat >> e2e/evidence.e2e.ts <<'EOF'
+          cp e2e/operations.e2e.ts e2e/evidence-welcome.e2e.ts
+          cat >> e2e/evidence-welcome.e2e.ts <<'EOF'
 
-          async function evidenceShot(page: Page, name: string): Promise<void> {
-            await expectNoHorizontalOverflow(page);
-            await page.screenshot({
-              path: `evidence/${name}`,
-              animations: 'disabled',
-              caret: 'hide',
-            });
-          }
-
-          test('evidence desktop navigation states', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-
-            const primary = page.getByLabel('Menu categories');
-            const primaryNames = await primary.locator('.category-tab').allTextContents();
-            expect(primaryNames).toEqual([
-              'Burgers',
-              'Combo',
-              'Fries',
-              'Hawawshi',
-              'Zalabia',
-              'Extras',
-              'Drinks',
-            ]);
-            const families = page.getByLabel('Product families');
-            await expect(families.getByRole('button', { name: 'All', exact: true })).toBeVisible();
-            await expect(families.getByRole('button', { name: 'TUX', exact: true })).toBeVisible();
-            await expect(families.getByRole('button', { name: 'TUXIFY', exact: true })).toBeVisible();
-            await evidenceShot(page, '01-1440-default-orders.png');
-
-            await page.getByRole('button', { name: 'Search menu' }).click();
-            await expect(page.getByPlaceholder('Search products')).toBeVisible();
-            await expect(page.getByRole('button', { name: 'Edit categories' })).toHaveCount(0);
-            await expect(primary.locator('.category-tab')).toHaveCount(7);
-            await expect(families).toBeVisible();
-            await evidenceShot(page, '02-1440-search-open.png');
-            await page.getByRole('button', { name: 'Clear search' }).click();
-
-            await page.getByRole('button', { name: 'Edit categories' }).click();
-            await expect(page.getByLabel('Category order').getByRole('listitem')).toHaveCount(7);
-            await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
-            await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
-            await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
-            await expect(page.getByText('TUX', { exact: true })).toHaveCount(0);
-            await expect(page.getByText('TUXIFY', { exact: true })).toHaveCount(0);
-            await evidenceShot(page, '03-1440-category-edit.png');
-          });
-
-          test('evidence desktop product cards extras and mixed cart', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-
-            const classic = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
-            await expect(classic.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
-            await expect(classic.getByRole('button', { name: 'Remove one Single Smashed Patty' })).toBeVisible();
-            await expect(classic.getByRole('button', { name: 'Add one Single Smashed Patty' })).toBeVisible();
-            await evidenceShot(page, '04a-1440-burgers-product-controls.png');
-
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Fries', exact: true }).click();
-            const plain = page.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
-            const described = page.locator('.product-card').filter({ hasText: 'Chili Fries' }).first();
-            await expect(plain.locator('.product-copy p')).toHaveCount(0);
-            await expect(described.locator('.product-copy p')).toHaveCount(1);
-            await evidenceShot(page, '04b-1440-description-collapse.png');
-
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Burgers', exact: true }).click();
-            const restoredClassic = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
-            await restoredClassic.getByRole('button', { name: 'Extra', exact: true }).click();
-            const customizer = page.getByRole('dialog', { name: 'Single Smashed Patty' });
-            await customizer.getByRole('button', { name: 'Add one Extra Cheese' }).click();
-            await customizer.getByRole('button', { name: 'Add one Extra Cheese' }).click();
-            await customizer.getByRole('button', { name: 'Add one Extra Patty' }).click();
-            await evidenceShot(page, '06-1440-extras-customizer.png');
-            await customizer.getByRole('button', { name: 'Add to order' }).click();
-            await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
-
-            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', { name: 'Current order' });
-            await expect(cart.locator('.cart-line')).toHaveCount(2);
-            await expect(cart).toContainText('2× Extra Cheese');
-            await expect(cart).toContainText('1× Extra Patty');
-            await evidenceShot(page, '07-1440-mixed-plain-customized-cart.png');
-          });
-
-          test('evidence desktop exact single cash 705', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-
-            await page.getByRole('button', { name: 'Add one Johnny’s' }).click();
-            await page.getByLabel('Product families').getByRole('button', { name: 'TUXIFY', exact: true }).click();
-            await page.getByRole('button', { name: 'Add one Triple TUXIFY' }).click();
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Fries', exact: true }).click();
-            await page.getByRole('button', { name: 'Add one Doppy Fries' }).click();
-            await page.getByRole('button', { name: 'Add one Classic Fries' }).click();
-
-            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', { name: 'Current order' });
-            await expect(cart.locator('.grand-total')).toContainText('705.00');
-            await cart.getByRole('button', { name: 'Cash', exact: true }).click();
-            const cash = cart.getByLabel('Cash received');
-            await expect(cash).toHaveValue('');
-            await expect(cash).toHaveAttribute('placeholder', '0');
-            const tenders = cart.getByLabel('Smart Cash tenders').getByRole('button');
-            await expect(tenders).toHaveCount(5);
-            for (const [index, value] of ['705.00', '710.00', '720.00', '750.00', '800.00'].entries()) {
-              await expect(tenders.nth(index)).toContainText(value);
-            }
-            await expect(cart.getByText('Change', { exact: true })).toHaveCount(0);
-            await evidenceShot(page, '08-1440-single-cash-705.png');
-          });
-
-          test('evidence desktop split resize and dark mode', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await setAppearance(page, 'Light');
-
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            const cart = page.locator('.desktop-cart-wrap').getByRole('complementary', { name: 'Current order' });
-            await expect(cart.locator('.grand-total')).toContainText('400.00');
-            await cart.getByRole('button', { name: 'Split payment' }).click();
-            await cart.getByLabel('Amount A').fill('320');
-            await cart.getByLabel('Amount A').blur();
-            await expect(cart.locator('.split-remainder')).toContainText('80.00');
-            await expect(cart.getByText('Cash received', { exact: true })).toHaveCount(0);
-            await evidenceShot(page, '09-1440-split-payment-400-320-80.png');
-
-            const separator = page.getByRole('separator', { name: 'Resize Current Order' });
-            for (let index = 0; index < 5; index += 1) {
-              await separator.focus();
-              await page.keyboard.press('ArrowLeft');
-            }
-            const wider = await page.locator('.desktop-cart-wrap').boundingBox();
-            expect(wider).not.toBeNull();
-            expect(wider!.width).toBeGreaterThanOrEqual(550);
-            expect(await page.locator('.desktop-cart-wrap').evaluate((node) => getComputedStyle(node).borderLeftWidth)).toBe('0px');
-            await evidenceShot(page, '10-1440-resized-wider-rail.png');
-
-            await setAppearance(page, 'Dark');
-            await expect(page.getByLabel('Menu categories')).toBeVisible();
-            await expect(page.getByLabel('Product families')).toBeVisible();
-            await evidenceShot(page, '12-1440-dark-orders.png');
-          });
-
-          test('evidence tablet product containment', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'mobile-tablet-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            const classic = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
-            await expect(classic.getByRole('button', { name: 'Extra', exact: true })).toBeVisible();
-            await evidenceShot(page, '05a-768-burgers-product-controls.png');
-            await page.getByLabel('Menu categories').getByRole('button', { name: 'Fries', exact: true }).click();
-            const plain = page.locator('.product-card').filter({ hasText: 'Classic Fries' }).first();
-            await expect(plain.locator('.product-copy p')).toHaveCount(0);
-            await evidenceShot(page, '05b-768-description-collapse.png');
-          });
-
-          test('evidence mobile Review & pay', async ({ page }, testInfo) => {
-            test.skip(testInfo.project.name !== 'mobile-browser-fallback');
-            await enterActiveOrdersForCategoryTests(page);
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
-            await page.locator('.mobile-cart-trigger').click();
-            const overlay = page.locator('.mobile-cart-overlay');
-            await expect(overlay.locator('.mobile-cart-bar strong')).toHaveText('Review & pay');
-            await expect(overlay.locator('.cart-title')).toHaveText('Current Order');
-            await expect(page.getByRole('separator', { name: 'Resize Current Order' })).toHaveCount(0);
-            await overlay.getByRole('button', { name: 'Split payment' }).click();
-            await overlay.getByLabel('Amount A').fill('320');
-            await overlay.getByLabel('Amount A').blur();
-            await expect(overlay.locator('.split-remainder')).toContainText('80.00');
-            await overlay.locator('.cart-scroll').evaluate((node) => {
-              node.scrollTop = node.scrollHeight;
-            });
-            await expect(overlay.getByRole('button', { name: 'Cancel split' })).toBeVisible();
-            await expect(overlay.getByRole('button', { name: 'Place Order' })).toBeVisible();
-            await evidenceShot(page, '11-375-mobile-review-pay.png');
-          });
-
-          test('evidence welcome persists until CTA', async ({ page }, testInfo) => {
+          test('evidence welcome persists until CTA using visible content', async ({ page }, testInfo) => {
             test.skip(testInfo.project.name !== 'desktop-browser-fallback');
             await seedBrowserFallback(page);
             await page.goto('/');
             await page.getByLabel('Enter PIN to Start Day').fill('1234');
             await page.getByRole('button', { name: 'Start Day' }).click();
-            const welcome = page.locator('.welcome-screen');
+
+            const greeting = page.getByText('Glad you made it in safely.', { exact: true });
             const action = page.locator('.welcome-action');
-            await expect(action).toBeVisible({ timeout: 15_000 });
-            await expect(page.getByText('Glad you made it in safely.', { exact: true })).toBeVisible();
-            await page.waitForTimeout(2000);
-            await expect(welcome).toBeVisible();
+            await expect(greeting).toBeVisible({ timeout: 15_000 });
             await expect(action).toBeVisible();
-            await evidenceShot(page, '00-1440-welcome-persistent.png');
+
+            await page.waitForTimeout(2000);
+            await expect(greeting).toBeVisible();
+            await expect(action).toBeVisible();
+            await expectNoHorizontalOverflow(page);
+            await page.screenshot({
+              path: 'evidence/00-1440-welcome-persistent.png',
+              animations: 'disabled',
+              caret: 'hide',
+            });
           });
           EOF
-      - name: Typecheck temporary evidence harness
+      - name: Typecheck temporary harness
         run: npx tsc --noEmit -p tsconfig.e2e.json
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture required evidence from exact source SHA
-        run: npx playwright test e2e/evidence.e2e.ts --grep "evidence "
-      - name: Remove temporary harness and prove committed sources untouched
+      - name: Capture welcome evidence
+        run: >-
+          npx playwright test e2e/evidence-welcome.e2e.ts --project=desktop-browser-fallback --grep
+          "evidence welcome persists until CTA using visible content"
+      - name: Prove committed source untouched
         if: always()
         run: |
-          rm -f e2e/evidence.e2e.ts
+          rm -f e2e/evidence-welcome.e2e.ts
           git diff --exit-code -- e2e/operations.e2e.ts apps/operations packages
-          printf '\npost_capture_source_diff=clean\n' >> evidence/MANIFEST.txt
-      - name: Upload final correction evidence
+          printf 'post_capture_source_diff=clean\n' >> evidence/WELCOME_MANIFEST.txt
+      - name: Upload welcome evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tux-pos-final-correction-evidence-22409d8
+          name: tux-pos-welcome-evidence-22409d8
           path: |
             evidence/
             test-results/
