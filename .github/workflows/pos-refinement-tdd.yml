@@ -26,22 +26,97 @@ jobs:
         run: npm ci
       - name: Apply approved product-card implementation
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          cat > apps/operations/src/app/MenuProductCard.tsx <<'EOF'
+          import type { Product } from '@tux/domain';
+          import { useState, type MouseEvent } from 'react';
+          import { PlusCircleIcon } from './icons';
+          import { formatMoneyMinor } from './ordersView';
 
-          card = Path('apps/operations/src/app/MenuProductCard.tsx')
-          text = card.read_text()
-          text = text.replace('  supportsExtras,\n', '', 1)
-          text = text.replace('  readonly supportsExtras: boolean;\n', '', 1)
-          old = '''        <div className="product-copy">
-                  <strong>{product.name}</strong>
-                  {product.soldOut ? <em>Sold Out</em> : null}
+          function ProductMedia({ product }: { readonly product: Product }) {
+            const [failed, setFailed] = useState(false);
+            if (product.imageKey === null || failed) {
+              return (
+                <div className="product-image-fallback" aria-hidden="true">
+                  {product.name
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part.slice(0, 1).toUpperCase())
+                    .join('')}
                 </div>
-              </button>
+              );
+            }
 
-              <footer className="product-card-footer">
-                <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
-                {supportsExtras ? (
+            return (
+              <img
+                className="product-image"
+                src={product.imageKey}
+                alt=""
+                loading="lazy"
+                onError={() => setFailed(true)}
+              />
+            );
+          }
+
+          export function MenuProductCard({
+            product,
+            quantity,
+            busy,
+            onQuickInfo,
+            onDecrement,
+            onAdd,
+            onExtras,
+          }: {
+            readonly product: Product;
+            readonly quantity: number;
+            readonly busy: boolean;
+            readonly onQuickInfo: () => void;
+            readonly onDecrement: () => void;
+            readonly onAdd: () => void;
+            readonly onExtras: () => void;
+          }) {
+            const className = [
+              'product-card',
+              quantity > 0 ? 'product-card-selected' : null,
+              product.soldOut ? 'product-card-sold-out' : null,
+            ]
+              .filter((value) => value !== null)
+              .join(' ');
+
+            function runIndependentAction(
+              event: MouseEvent<HTMLButtonElement>,
+              action: () => void,
+            ): void {
+              event.stopPropagation();
+              action();
+            }
+
+            return (
+              <article className={className}>
+                <button
+                  type="button"
+                  className="product-main"
+                  onClick={onQuickInfo}
+                  aria-label={`Quick Info for ${product.name}`}
+                >
+                  <div className="product-media">
+                    <ProductMedia product={product} />
+                    {quantity > 0 ? (
+                      <span
+                        className="product-quantity-badge"
+                        aria-label={`${quantity} in current order`}
+                      >
+                        {quantity}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="product-copy">
+                    <strong>{product.name}</strong>
+                    {product.soldOut ? <em>Sold Out</em> : null}
+                  </div>
+                  <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
+                </button>
+
+                <footer className="product-card-footer">
                   <button
                     type="button"
                     className="product-extra-action"
@@ -51,36 +126,45 @@ jobs:
                     <PlusCircleIcon />
                     <span>Extra</span>
                   </button>
-                ) : null}
-                <div className="product-card-controls">'''
-          new = '''        <div className="product-copy">
-                  <strong>{product.name}</strong>
-                  {product.soldOut ? <em>Sold Out</em> : null}
-                </div>
-                <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
-              </button>
+                  <div className="product-card-controls">
+                    <div className="product-quantity" aria-label={`${product.name} quantity`}>
+                      <button
+                        type="button"
+                        aria-label={`Remove one ${product.name}`}
+                        disabled={busy || quantity === 0}
+                        onClick={(event) => runIndependentAction(event, onDecrement)}
+                      >
+                        −
+                      </button>
+                      <output>{quantity}</output>
+                      <button
+                        type="button"
+                        aria-label={`Add one ${product.name}`}
+                        disabled={busy || product.soldOut}
+                        onClick={(event) => runIndependentAction(event, onAdd)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </footer>
+              </article>
+            );
+          }
+          EOF
 
-              <footer className="product-card-footer">
-                <button
-                  type="button"
-                  className="product-extra-action"
-                  disabled={busy || product.soldOut}
-                  onClick={(event) => runIndependentAction(event, onExtras)}
-                >
-                  <PlusCircleIcon />
-                  <span>Extra</span>
-                </button>
-                <div className="product-card-controls">'''
-          if old not in text:
-              raise SystemExit('MenuProductCard target block not found')
-          card.write_text(text.replace(old, new, 1))
+          python - <<'PY'
+          from pathlib import Path
 
           workspace = Path('apps/operations/src/app/OrdersWorkspace.tsx')
           text = workspace.read_text()
           start = text.index('  const productsWithExtras = useMemo(() => {')
           end = text.index('  const activeCategories = useMemo(', start)
           text = text[:start] + text[end:]
-          text = text.replace('                supportsExtras={productsWithExtras.has(product.id)}\n', '', 1)
+          text = text.replace(
+              '                supportsExtras={productsWithExtras.has(product.id)}\n',
+              '',
+          )
           workspace.write_text(text)
 
           icons = Path('apps/operations/src/app/icons.tsx')
