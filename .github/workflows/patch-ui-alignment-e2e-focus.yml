@@ -19,25 +19,7 @@ jobs:
           fetch-depth: 0
       - name: Patch rendered focus helper
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('e2e/operations.e2e.ts')
-          text = path.read_text()
-          old = """    await expect
-      .poll(async () => wrapper.evaluate((node) => getComputedStyle(node).boxShadow))
-      .not.toBe('none');
-  }
-"""
-          new = """    await expect
-      .poll(async () => wrapper.evaluate((node) => getComputedStyle(node).boxShadow))
-      .not.toBe('none');
-    await input.blur();
-  }
-"""
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected one focus helper baseline, found {text.count(old)}.')
-          path.write_text(text.replace(old, new, 1))
-          PY
+          python -c "from pathlib import Path; p=Path('e2e/operations.e2e.ts'); t=p.read_text(); old=\"      .not.toBe('none');\\n  }\"; new=\"      .not.toBe('none');\\n    await input.blur();\\n  }\"; assert t.count(old)==1, f'Expected one focus helper baseline, found {t.count(old)}.'; p.write_text(t.replace(old,new,1))"
       - name: Format and verify bounded diff
         run: |
           npx prettier --write e2e/operations.e2e.ts
