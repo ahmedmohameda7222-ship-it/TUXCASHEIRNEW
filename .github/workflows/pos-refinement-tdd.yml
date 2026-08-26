@@ -1,4 +1,4 @@
-name: POS Refinement Final Quality Gate
+name: POS Requested UI Change RED
 
 on:
   push:
@@ -9,68 +9,73 @@ permissions:
   contents: read
 
 concurrency:
-  group: pos-refinement-final-gate-${{ github.ref }}
+  group: pos-requested-ui-red-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: task-eight-full-quality-gate
+  red:
+    name: requested-ui-red
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      SOURCE_SHA: 22409d8024764932bf615c8c9bf8b122dfb64889
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: 22409d8024764932bf615c8c9bf8b122dfb64889
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
-      - name: Prove exact clean corrected tree
-        run: |
-          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          test -z "$(git status --short)"
-          git log -1 --oneline
       - name: Install locked dependencies
         run: npm ci
-      - name: Format check
-        run: npm run format:check
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm test
-      - name: Install PostgreSQL client
+      - name: Add user-requested RED contracts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Migration tests
-        run: npm run test:migrations
-      - name: Production build
-        run: npm run build
+          cat >> e2e/operations.e2e.ts <<'EOF'
+
+          test('Burger family filter appears below main categories only for Burgers', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+
+            const primary = page.getByLabel('Menu categories');
+            await primary.getByRole('button', { name: 'Burgers', exact: true }).click();
+            const families = page.getByLabel('Product families');
+            await expect(families).toBeVisible();
+            await expect(families.getByRole('button')).toHaveText(['All', 'TUX', 'TUXIFY']);
+            await expect(primary.getByRole('button', { name: 'All', exact: true })).toHaveCount(0);
+
+            const [primaryBox, familyBox] = await Promise.all([
+              primary.boundingBox(),
+              families.boundingBox(),
+            ]);
+            expect(primaryBox).not.toBeNull();
+            expect(familyBox).not.toBeNull();
+            expect(familyBox!.y).toBeGreaterThanOrEqual(primaryBox!.y + primaryBox!.height - 1);
+
+            await primary.getByRole('button', { name: 'Fries', exact: true }).click();
+            await expect(page.getByLabel('Product families')).toHaveCount(0);
+          });
+
+          test('product description appears only after opening the product card', async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+            await enterActiveOrdersForCategoryTests(page);
+
+            const card = page
+              .locator('.product-card')
+              .filter({ hasText: 'Single Smashed Patty' })
+              .first();
+            await expect(card.locator('.product-copy p')).toHaveCount(0);
+            await card.getByRole('button', { name: 'Quick Info for Single Smashed Patty' }).click();
+
+            const dialog = page.getByRole('dialog', { name: 'Single Smashed Patty' });
+            await expect(dialog).toBeVisible();
+            await expect(dialog.locator('.quick-info-body p')).toContainText('1 smashed patty');
+          });
+          EOF
+          npx prettier --write e2e/operations.e2e.ts
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Full end-to-end suite
-        run: npm run test:e2e
-      - name: Final source cleanliness proof
-        run: |
-          test -z "$(git status --short)"
-          git diff --exit-code
+      - name: Verify requested behavior is RED before implementation
+        run: >-
+          npx playwright test e2e/operations.e2e.ts --project=desktop-browser-fallback --grep
+          "Burger family filter appears below main categories only for Burgers|product description appears only after opening the product card"
