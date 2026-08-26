@@ -1,0 +1,107 @@
+name: Materialize TUX Follow-up Recovered Branch
+
+on:
+  push:
+    branches:
+      - recover/tux-followup-main-deploy-worker4
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout recovery authority
+        uses: actions/checkout@v7
+        with:
+          ref: recover/tux-followup-main-deploy-worker4
+          path: recovery
+
+      - name: Checkout durable implementation branch
+        uses: actions/checkout@v7
+        with:
+          ref: ui/tux-ops-followup-recovered
+          fetch-depth: 0
+          path: repo
+
+      - name: Require pristine recovered branch base
+        working-directory: repo
+        run: test "$(git rev-parse HEAD)" = "3e2f5e341c5bd9c2ac57f902da964b3e88a8a170"
+
+      - name: Apply recovered implementation
+        working-directory: repo
+        run: |
+          python ../recovery/scripts/recover-tux-followup-core.py
+          python ../recovery/scripts/recover-tux-followup-css.py
+
+      - name: Protect Orders Board and scope
+        working-directory: repo
+        shell: bash
+        run: |
+          git diff --exit-code -- apps/operations/src/app/OrdersBoardWorkspace.tsx apps/operations/src/styles/orders-board.css
+          git diff --check
+          git diff --name-only | sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'EOF'
+          apps/operations/src/app/App.tsx
+          apps/operations/src/app/ExpensesWorkspace.tsx
+          apps/operations/src/app/OrdersCart.tsx
+          apps/operations/src/app/icons.tsx
+          apps/operations/src/app/sessionClient.ts
+          apps/operations/src/styles/brand.css
+          apps/operations/src/styles/bulk-stock.css
+          apps/operations/src/styles/expenses.css
+          apps/operations/src/styles/final-pos-corrections.css
+          apps/operations/src/styles/orders.css
+          apps/operations/src/styles/premium.css
+          EOF
+          diff -u /tmp/expected.txt /tmp/actual.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: repo/package-lock.json
+
+      - name: Install formatter
+        working-directory: repo
+        run: npm ci --ignore-scripts
+
+      - name: Format implementation files
+        working-directory: repo
+        run: |
+          npx prettier --write \
+            apps/operations/src/app/App.tsx \
+            apps/operations/src/app/ExpensesWorkspace.tsx \
+            apps/operations/src/app/OrdersCart.tsx \
+            apps/operations/src/app/icons.tsx \
+            apps/operations/src/app/sessionClient.ts \
+            apps/operations/src/styles/brand.css \
+            apps/operations/src/styles/bulk-stock.css \
+            apps/operations/src/styles/expenses.css \
+            apps/operations/src/styles/final-pos-corrections.css \
+            apps/operations/src/styles/orders.css \
+            apps/operations/src/styles/premium.css
+
+      - name: Commit actual implementation to GitHub
+        working-directory: repo
+        shell: bash
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            apps/operations/src/app/App.tsx \
+            apps/operations/src/app/ExpensesWorkspace.tsx \
+            apps/operations/src/app/OrdersCart.tsx \
+            apps/operations/src/app/icons.tsx \
+            apps/operations/src/app/sessionClient.ts \
+            apps/operations/src/styles/brand.css \
+            apps/operations/src/styles/bulk-stock.css \
+            apps/operations/src/styles/expenses.css \
+            apps/operations/src/styles/final-pos-corrections.css \
+            apps/operations/src/styles/orders.css \
+            apps/operations/src/styles/premium.css
+          git commit -m "fix: recover TUX operations follow-up implementation"
+          git push origin HEAD:ui/tux-ops-followup-recovered
