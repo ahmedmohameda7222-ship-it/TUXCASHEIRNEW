@@ -45,3 +45,19 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 }
+
+/* Task 5: keep mobile Review & pay controls clear of fixed totals. */
+@media (max-width: 54rem) {
+  .mobile-cart-overlay .cart-scroll {
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
+  }
+
+  .mobile-cart-overlay .payment-section .split-payment-action {
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    justify-self: stretch;
+  }
+}

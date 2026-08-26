@@ -1171,7 +1171,7 @@ export function OrdersWorkspace({
       {mobileCartOpen ? (
         <div className="mobile-cart-overlay">
           <div className="mobile-cart-bar">
-            <strong>Current order</strong>
+            <strong>Review & pay</strong>
             <button type="button" className="quiet-action" onClick={() => setMobileCartOpen(false)}>
               Close
             </button>
