@@ -21,153 +21,19 @@ jobs:
       - name: Insert rendered alignment coverage
         run: |
           python - <<'PY'
+          from base64 import b64decode
           from pathlib import Path
 
           path = Path('e2e/operations.e2e.ts')
           text = path.read_text()
           anchor = "\ntest('follow-up desktop approval evidence is captured from the committed tree'"
+          marker = "test('long-term UI alignment contracts render correctly'"
           if text.count(anchor) != 1:
               raise SystemExit(f'Expected one rendered-evidence anchor, found {text.count(anchor)}.')
-          marker = "test('long-term UI alignment contracts render correctly'"
           if marker in text:
               raise SystemExit('Rendered alignment test already exists unexpectedly.')
-
-          insert = r'''
-
-test('long-term UI alignment contracts render correctly', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await enterActiveOrdersForCategoryTests(page);
-
-  async function expectComposedMoneyInput(input: Locator): Promise<void> {
-    const wrapper = input.locator('xpath=..');
-    const [wrapperBox, inputStyles] = await Promise.all([
-      wrapper.boundingBox(),
-      input.evaluate((node) => {
-        const style = getComputedStyle(node);
-        return {
-          borderTopWidth: style.borderTopWidth,
-          borderRightWidth: style.borderRightWidth,
-          borderBottomWidth: style.borderBottomWidth,
-          borderLeftWidth: style.borderLeftWidth,
-          borderRadius: style.borderRadius,
-          backgroundColor: style.backgroundColor,
-          boxShadow: style.boxShadow,
-        };
-      }),
-    ]);
-    expect(wrapperBox).not.toBeNull();
-    expect(wrapperBox!.height).toBeGreaterThanOrEqual(44);
-    expect(inputStyles.borderTopWidth).toBe('0px');
-    expect(inputStyles.borderRightWidth).toBe('0px');
-    expect(inputStyles.borderBottomWidth).toBe('0px');
-    expect(inputStyles.borderLeftWidth).toBe('0px');
-    expect(inputStyles.borderRadius).toBe('0px');
-    expect(inputStyles.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-    expect(inputStyles.boxShadow).toBe('none');
-
-    await input.focus();
-    await expect
-      .poll(async () => wrapper.evaluate((node) => getComputedStyle(node).boxShadow))
-      .not.toBe('none');
-  }
-
-  async function expectControlTopsAligned(controls: readonly Locator[]): Promise<void> {
-    const boxes = await Promise.all(controls.map((control) => control.boundingBox()));
-    for (const box of boxes) expect(box).not.toBeNull();
-    const tops = boxes.map((box) => box!.y);
-    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
-  }
-
-  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
-  const cart = currentOrderCart(page, testInfo);
-  await cart.locator('.adjustment-disclosure').filter({ hasText: 'Discount' }).click();
-  const discount = cart.getByRole('textbox', { name: 'Discount' });
-  await expect(discount).toBeVisible();
-  await expectComposedMoneyInput(discount);
-
-  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
-  const cashReceived = cart.getByLabel('Cash received');
-  await expect(cashReceived).toBeVisible();
-  await expectComposedMoneyInput(cashReceived);
-
-  await page.getByRole('button', { name: 'Orders Board', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Orders Board' })).toBeVisible();
-  const rail = page.locator('.board-tabs');
-  const tabs = rail.getByRole('tab');
-  const [shellBox, firstTabBox, lastTabBox] = await Promise.all([
-    page.locator('.orders-board-shell').boundingBox(),
-    tabs.first().boundingBox(),
-    tabs.last().boundingBox(),
-  ]);
-  expect(shellBox).not.toBeNull();
-  expect(firstTabBox).not.toBeNull();
-  expect(lastTabBox).not.toBeNull();
-  const tabGroupCenter = (firstTabBox!.x + lastTabBox!.x + lastTabBox!.width) / 2;
-  const shellCenter = shellBox!.x + shellBox!.width / 2;
-  expect(Math.abs(tabGroupCenter - shellCenter)).toBeLessThanOrEqual(2);
-
-  await page.setViewportSize({ width: 320, height: 900 });
-  await expect.poll(async () => rail.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
-  await rail.evaluate((node) => {
-    node.scrollLeft = 0;
-  });
-  const [narrowRailBox, narrowFirstBox, initialScrollLeft] = await Promise.all([
-    rail.boundingBox(),
-    tabs.first().boundingBox(),
-    rail.evaluate((node) => node.scrollLeft),
-  ]);
-  expect(narrowRailBox).not.toBeNull();
-  expect(narrowFirstBox).not.toBeNull();
-  expect(initialScrollLeft).toBe(0);
-  expect(narrowFirstBox!.x).toBeGreaterThanOrEqual(narrowRailBox!.x - 1);
-  await tabs.last().scrollIntoViewIfNeeded();
-  const narrowLastBox = await tabs.last().boundingBox();
-  expect(narrowLastBox).not.toBeNull();
-  expect(narrowLastBox!.x + narrowLastBox!.width).toBeLessThanOrEqual(
-    narrowRailBox!.x + narrowRailBox!.width + 1,
-  );
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole('button', { name: 'Expenses', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();
-
-  const addCard = page.locator('.expense-add-card');
-  const addDescription = addCard.getByLabel('Description');
-  const addAmount = addCard.getByLabel('Amount');
-  const addAmountWrap = addAmount.locator('xpath=..');
-  const addPaidOptions = addCard.locator('.expense-paid-options');
-  await expectControlTopsAligned([addDescription, addAmountWrap, addPaidOptions]);
-  await expectComposedMoneyInput(addAmount);
-
-  await addDescription.fill('Alignment regression');
-  await addAmount.fill('25');
-  await addAmount.blur();
-  await addCard.getByRole('button', { name: 'Add Expense', exact: true }).click();
-  const row = page.locator('.expense-row').filter({ hasText: 'Alignment regression' }).first();
-  await expect(row).toBeVisible();
-  await row.getByRole('button', { name: 'Edit', exact: true }).click();
-
-  const dialog = page.getByRole('dialog', { name: 'Edit expense' });
-  await expect(dialog).toBeVisible();
-  const editDescription = dialog.getByLabel('Description');
-  const editAmount = dialog.getByLabel('Amount');
-  const editAmountWrap = editAmount.locator('xpath=..');
-  const editPaidOptions = dialog.locator('.expense-paid-options');
-  await expectControlTopsAligned([editDescription, editAmountWrap, editPaidOptions]);
-  await expectComposedMoneyInput(editAmount);
-
-  const dialogBox = await dialog.boundingBox();
-  expect(dialogBox).not.toBeNull();
-  expect(dialogBox!.width).toBeGreaterThanOrEqual(800);
-  await page.screenshot({
-    path: testInfo.outputPath('ui-alignment-long-term-desktop.png'),
-    animations: 'disabled',
-    caret: 'hide',
-    fullPage: false,
-  });
-});
-'''
+          payload = 'CnRlc3QoJ2xvbmctdGVybSBVSSBhbGlnbm1lbnQgY29udHJhY3RzIHJlbmRlciBjb3JyZWN0bHknLCBhc3luYyAoeyBwYWdlIH0sIHRlc3RJbmZvKSA9PiB7CiAgdGVzdC5za2lwKHRlc3RJbmZvLnByb2plY3QubmFtZSAhPT0gJ2Rlc2t0b3AtYnJvd3Nlci1mYWxsYmFjaycpOwogIGF3YWl0IHBhZ2Uuc2V0Vmlld3BvcnRTaXplKHsgd2lkdGg6IDE0NDAsIGhlaWdodDogOTAwIH0pOwogIGF3YWl0IGVudGVyQWN0aXZlT3JkZXJzRm9yQ2F0ZWdvcnlUZXN0cyhwYWdlKTsKCiAgYXN5bmMgZnVuY3Rpb24gZXhwZWN0Q29tcG9zZWRNb25leUlucHV0KGlucHV0OiBMb2NhdG9yKTogUHJvbWlzZTx2b2lkPiB7CiAgICBjb25zdCB3cmFwcGVyID0gaW5wdXQubG9jYXRvcigneHBhdGg9Li4nKTsKICAgIGNvbnN0IFt3cmFwcGVyQm94LCBpbnB1dFN0eWxlc10gPSBhd2FpdCBQcm9taXNlLmFsbChbCiAgICAgIHdyYXBwZXIuYm91bmRpbmdCb3goKSwKICAgICAgaW5wdXQuZXZhbHVhdGUoKG5vZGUpID0+IHsKICAgICAgICBjb25zdCBzdHlsZSA9IGdldENvbXB1dGVkU3R5bGUobm9kZSk7CiAgICAgICAgcmV0dXJuIHsKICAgICAgICAgIGJvcmRlclRvcFdpZHRoOiBzdHlsZS5ib3JkZXJUb3BXaWR0aCwKICAgICAgICAgIGJvcmRlclJpZ2h0V2lkdGg6IHN0eWxlLmJvcmRlclJpZ2h0V2lkdGgsCiAgICAgICAgICBib3JkZXJCb3R0b21XaWR0aDogc3R5bGUuYm9yZGVyQm90dG9tV2lkdGgsCiAgICAgICAgICBib3JkZXJMZWZ0V2lkdGg6IHN0eWxlLmJvcmRlckxlZnRXaWR0aCwKICAgICAgICAgIGJvcmRlclJhZGl1czogc3R5bGUuYm9yZGVyUmFkaXVzLAogICAgICAgICAgYmFja2dyb3VuZENvbG9yOiBzdHlsZS5iYWNrZ3JvdW5kQ29sb3IsCiAgICAgICAgICBib3hTaGFkb3c6IHN0eWxlLmJveFNoYWRvdywKICAgICAgICB9OwogICAgICB9KSwKICAgIF0pOwogICAgZXhwZWN0KHdyYXBwZXJCb3gpLm5vdC50b0JlTnVsbCgpOwogICAgZXhwZWN0KHdyYXBwZXJCb3ghLmhlaWdodCkudG9CZUdyZWF0ZXJUaGFuT3JFcXVhbCg0NCk7CiAgICBleHBlY3QoaW5wdXRTdHlsZXMuYm9yZGVyVG9wV2lkdGgpLnRvQmUoJzBweCcpOwogICAgZXhwZWN0KGlucHV0U3R5bGVzLmJvcmRlclJpZ2h0V2lkdGgpLnRvQmUoJzBweCcpOwogICAgZXhwZWN0KGlucHV0U3R5bGVzLmJvcmRlckJvdHRvbVdpZHRoKS50b0JlKCcwcHgnKTsKICAgIGV4cGVjdChpbnB1dFN0eWxlcy5ib3JkZXJMZWZ0V2lkdGgpLnRvQmUoJzBweCcpOwogICAgZXhwZWN0KGlucHV0U3R5bGVzLmJvcmRlclJhZGl1cykudG9CZSgnMHB4Jyk7CiAgICBleHBlY3QoaW5wdXRTdHlsZXMuYmFja2dyb3VuZENvbG9yKS50b0JlKCdyZ2JhKDAsIDAsIDAsIDApJyk7CiAgICBleHBlY3QoaW5wdXRTdHlsZXMuYm94U2hhZG93KS50b0JlKCdub25lJyk7CgogICAgYXdhaXQgaW5wdXQuZm9jdXMoKTsKICAgIGF3YWl0IGV4cGVjdAogICAgICAucG9sbChhc3luYyAoKSA9PiB3cmFwcGVyLmV2YWx1YXRlKChub2RlKSA9PiBnZXRDb21wdXRlZFN0eWxlKG5vZGUpLmJveFNoYWRvdykpCiAgICAgIC5ub3QudG9CZSgnbm9uZScpOwogIH0KCiAgYXN5bmMgZnVuY3Rpb24gZXhwZWN0Q29udHJvbFRvcHNBbGlnbmVkKGNvbnRyb2xzOiByZWFkb25seSBMb2NhdG9yW10pOiBQcm9taXNlPHZvaWQ+IHsKICAgIGNvbnN0IGJveGVzID0gYXdhaXQgUHJvbWlzZS5hbGwoY29udHJvbHMubWFwKChjb250cm9sKSA9PiBjb250cm9sLmJvdW5kaW5nQm94KCkpKTsKICAgIGZvciAoY29uc3QgYm94IG9mIGJveGVzKSBleHBlY3QoYm94KS5ub3QudG9CZU51bGwoKTsKICAgIGNvbnN0IHRvcHMgPSBib3hlcy5tYXAoKGJveCkgPT4gYm94IS55KTsKICAgIGV4cGVjdChNYXRoLm1heCguLi50b3BzKSAtIE1hdGgubWluKC4uLnRvcHMpKS50b0JlTGVzc1RoYW5PckVxdWFsKDEpOwogIH0KCiAgYXdhaXQgcGFnZS5nZXRCeVJvbGUoJ2J1dHRvbicsIHsgbmFtZTogJ0FkZCBvbmUgRG91YmxlIFNtYXNoZWQgUGF0dHknIH0pLmNsaWNrKCk7CiAgY29uc3QgY2FydCA9IGN1cnJlbnRPcmRlckNhcnQocGFnZSwgdGVzdEluZm8pOwogIGF3YWl0IGNhcnQubG9jYXRvcignLmFkanVzdG1lbnQtZGlzY2xvc3VyZScpLmZpbHRlcih7IGhhc1RleHQ6ICdEaXNjb3VudCcgfSkuY2xpY2soKTsKICBjb25zdCBkaXNjb3VudCA9IGNhcnQuZ2V0QnlSb2xlKCd0ZXh0Ym94JywgeyBuYW1lOiAnRGlzY291bnQnIH0pOwogIGF3YWl0IGV4cGVjdChkaXNjb3VudCkudG9CZVZpc2libGUoKTsKICBhd2FpdCBleHBlY3RDb21wb3NlZE1vbmV5SW5wdXQoZGlzY291bnQpOwoKICBhd2FpdCBjYXJ0LmdldEJ5Um9sZSgnYnV0dG9uJywgeyBuYW1lOiAnQ2FzaCcsIGV4YWN0OiB0cnVlIH0pLmNsaWNrKCk7CiAgY29uc3QgY2FzaFJlY2VpdmVkID0gY2FydC5nZXRCeUxhYmVsKCdDYXNoIHJlY2VpdmVkJyk7CiAgYXdhaXQgZXhwZWN0KGNhc2hSZWNlaXZlZCkudG9CZVZpc2libGUoKTsKICBhd2FpdCBleHBlY3RDb21wb3NlZE1vbmV5SW5wdXQoY2FzaFJlY2VpdmVkKTsKCiAgYXdhaXQgcGFnZS5nZXRCeVJvbGUoJ2J1dHRvbicsIHsgbmFtZTogJ09yZGVycyBCb2FyZCcsIGV4YWN0OiB0cnVlIH0pLmNsaWNrKCk7CiAgYXdhaXQgZXhwZWN0KHBhZ2UuZ2V0QnlSb2xlKCdoZWFkaW5nJywgeyBuYW1lOiAnT3JkZXJzIEJvYXJkJyB9KSkudG9CZVZpc2libGUoKTsKICBjb25zdCByYWlsID0gcGFnZS5sb2NhdG9yKCcuYm9hcmQtdGFicycpOwogIGNvbnN0IHRhYnMgPSByYWlsLmdldEJ5Um9sZSgndGFiJyk7CiAgY29uc3QgW3NoZWxsQm94LCBmaXJzdFRhYkJveCwgbGFzdFRhYkJveF0gPSBhd2FpdCBQcm9taXNlLmFsbChbCiAgICBwYWdlLmxvY2F0b3IoJy5vcmRlcnMtYm9hcmQtc2hlbGwnKS5ib3VuZGluZ0JveCgpLAogICAgdGFicy5maXJzdCgpLmJvdW5kaW5nQm94KCksCiAgICB0YWJzLmxhc3QoKS5ib3VuZGluZ0JveCgpLAogIF0pOwogIGV4cGVjdChzaGVsbEJveCkubm90LnRvQmVOdWxsKCk7CiAgZXhwZWN0KGZpcnN0VGFiQm94KS5ub3QudG9CZU51bGwoKTsKICBleHBlY3QobGFzdFRhYkJveCkubm90LnRvQmVOdWxsKCk7CiAgY29uc3QgdGFiR3JvdXBDZW50ZXIgPSAoZmlyc3RUYWJCb3ghLnggKyBsYXN0VGFiQm94IS54ICsgbGFzdFRhYkJveCEud2lkdGgpIC8gMjsKICBjb25zdCBzaGVsbENlbnRlciA9IHNoZWxsQm94IS54ICsgc2hlbGxCb3ghLndpZHRoIC8gMjsKICBleHBlY3QoTWF0aC5hYnModGFiR3JvdXBDZW50ZXIgLSBzaGVsbENlbnRlcikpLnRvQmVMZXNzVGhhbk9yRXF1YWwoMik7CgogIGF3YWl0IHBhZ2Uuc2V0Vmlld3BvcnRTaXplKHsgd2lkdGg6IDMyMCwgaGVpZ2h0OiA5MDAgfSk7CiAgYXdhaXQgZXhwZWN0LnBvbGwoYXN5bmMgKCkgPT4gcmFpbC5ldmFsdWF0ZSgobm9kZSkgPT4gbm9kZS5zY3JvbGxXaWR0aCA+IG5vZGUuY2xpZW50V2lkdGgpKS50b0JlKHRydWUpOwogIGF3YWl0IHJhaWwuZXZhbHVhdGUoKG5vZGUpID0+IHsKICAgIG5vZGUuc2Nyb2xsTGVmdCA9IDA7CiAgfSk7CiAgY29uc3QgW25hcnJvd1JhaWxCb3gsIG5hcnJvd0ZpcnN0Qm94LCBpbml0aWFsU2Nyb2xsTGVmdF0gPSBhd2FpdCBQcm9taXNlLmFsbChbCiAgICByYWlsLmJvdW5kaW5nQm94KCksCiAgICB0YWJzLmZpcnN0KCkuYm91bmRpbmdCb3goKSwKICAgIHJhaWwuZXZhbHVhdGUoKG5vZGUpID0+IG5vZGUuc2Nyb2xsTGVmdCksCiAgXSk7CiAgZXhwZWN0KG5hcnJvd1JhaWxCb3gpLm5vdC50b0JlTnVsbCgpOwogIGV4cGVjdChuYXJyb3dGaXJzdEJveCkubm90LnRvQmVOdWxsKCk7CiAgZXhwZWN0KGluaXRpYWxTY3JvbGxMZWZ0KS50b0JlKDApOwogIGV4cGVjdChuYXJyb3dGaXJzdEJveCEueCkudG9CZUdyZWF0ZXJUaGFuT3JFcXVhbChuYXJyb3dSYWlsQm94IS54IC0gMSk7CiAgYXdhaXQgdGFicy5sYXN0KCkuc2Nyb2xsSW50b1ZpZXdJZk5lZWRlZCgpOwogIGNvbnN0IG5hcnJvd0xhc3RCb3ggPSBhd2FpdCB0YWJzLmxhc3QoKS5ib3VuZGluZ0JveCgpOwogIGV4cGVjdChuYXJyb3dMYXN0Qm94KS5ub3QudG9CZU51bGwoKTsKICBleHBlY3QobmFycm93TGFzdEJveCEueCArIG5hcnJvd0xhc3RCb3ghLndpZHRoKS50b0JlTGVzc1RoYW5PckVxdWFsKAogICAgbmFycm93UmFpbEJveCEueCArIG5hcnJvd1JhaWxCb3ghLndpZHRoICsgMSwKICApOwoKICBhd2FpdCBwYWdlLnNldFZpZXdwb3J0U2l6ZSh7IHdpZHRoOiAxNDQwLCBoZWlnaHQ6IDkwMCB9KTsKICBhd2FpdCBwYWdlLmdldEJ5Um9sZSgnYnV0dG9uJywgeyBuYW1lOiAnRXhwZW5zZXMnLCBleGFjdDogdHJ1ZSB9KS5jbGljaygpOwogIGF3YWl0IGV4cGVjdChwYWdlLmdldEJ5Um9sZSgnaGVhZGluZycsIHsgbmFtZTogJ0V4cGVuc2VzJyB9KSkudG9CZVZpc2libGUoKTsKCiAgY29uc3QgYWRkQ2FyZCA9IHBhZ2UubG9jYXRvcignLmV4cGVuc2UtYWRkLWNhcmQnKTsKICBjb25zdCBhZGREZXNjcmlwdGlvbiA9IGFkZENhcmQuZ2V0QnlMYWJlbCgnRGVzY3JpcHRpb24nKTsKICBjb25zdCBhZGRBbW91bnQgPSBhZGRDYXJkLmdldEJ5TGFiZWwoJ0Ftb3VudCcpOwogIGNvbnN0IGFkZEFtb3VudFdyYXAgPSBhZGRBbW91bnQubG9jYXRvcigneHBhdGg9Li4nKTsKICBjb25zdCBhZGRQYWlkT3B0aW9ucyA9IGFkZENhcmQubG9jYXRvcignLmV4cGVuc2UtcGFpZC1vcHRpb25zJyk7CiAgYXdhaXQgZXhwZWN0Q29udHJvbFRvcHNBbGlnbmVkKFthZGREZXNjcmlwdGlvbiwgYWRkQW1vdW50V3JhcCwgYWRkUGFpZE9wdGlvbnNdKTsKICBhd2FpdCBleHBlY3RDb21wb3NlZE1vbmV5SW5wdXQoYWRkQW1vdW50KTsKCiAgYXdhaXQgYWRkRGVzY3JpcHRpb24uZmlsbCgnQWxpZ25tZW50IHJlZ3Jlc3Npb24nKTsKICBhd2FpdCBhZGRBbW91bnQuZmlsbCgnMjUnKTsKICBhd2FpdCBhZGRBbW91bnQuYmx1cigpOwogIGF3YWl0IGFkZENhcmQuZ2V0QnlSb2xlKCdidXR0b24nLCB7IG5hbWU6ICdBZGQgRXhwZW5zZScsIGV4YWN0OiB0cnVlIH0pLmNsaWNrKCk7CiAgY29uc3Qgcm93ID0gcGFnZS5sb2NhdG9yKCcuZXhwZW5zZS1yb3cnKS5maWx0ZXIoeyBoYXNUZXh0OiAnQWxpZ25tZW50IHJlZ3Jlc3Npb24nIH0pLmZpcnN0KCk7CiAgYXdhaXQgZXhwZWN0KHJvdykudG9CZVZpc2libGUoKTsKICBhd2FpdCByb3cuZ2V0QnlSb2xlKCdidXR0b24nLCB7IG5hbWU6ICdFZGl0JywgZXhhY3Q6IHRydWUgfSkuY2xpY2soKTsKCiAgY29uc3QgZGlhbG9nID0gcGFnZS5nZXRCeVJvbGUoJ2RpYWxvZycsIHsgbmFtZTogJ0VkaXQgZXhwZW5zZScgfSk7CiAgYXdhaXQgZXhwZWN0KGRpYWxvZykudG9CZVZpc2libGUoKTsKICBjb25zdCBlZGl0RGVzY3JpcHRpb24gPSBkaWFsb2cuZ2V0QnlMYWJlbCgnRGVzY3JpcHRpb24nKTsKICBjb25zdCBlZGl0QW1vdW50ID0gZGlhbG9nLmdldEJ5TGFiZWwoJ0Ftb3VudCcpOwogIGNvbnN0IGVkaXRBbW91bnRXcmFwID0gZWRpdEFtb3VudC5sb2NhdG9yKCd4cGF0aD0uLicpOwogIGNvbnN0IGVkaXRQYWlkT3B0aW9ucyA9IGRpYWxvZy5sb2NhdG9yKCcuZXhwZW5zZS1wYWlkLW9wdGlvbnMnKTsKICBhd2FpdCBleHBlY3RDb250cm9sVG9wc0FsaWduZWQoW2VkaXREZXNjcmlwdGlvbiwgZWRpdEFtb3VudFdyYXAsIGVkaXRQYWlkT3B0aW9uc10pOwogIGF3YWl0IGV4cGVjdENvbXBvc2VkTW9uZXlJbnB1dChlZGl0QW1vdW50KTsKCiAgY29uc3QgZGlhbG9nQm94ID0gYXdhaXQgZGlhbG9nLmJvdW5kaW5nQm94KCk7CiAgZXhwZWN0KGRpYWxvZ0JveCkubm90LnRvQmVOdWxsKCk7CiAgZXhwZWN0KGRpYWxvZ0JveCEud2lkdGgpLnRvQmVHcmVhdGVyVGhhbk9yRXF1YWwoODAwKTsKICBhd2FpdCBwYWdlLnNjcmVlbnNob3QoewogICAgcGF0aDogdGVzdEluZm8ub3V0cHV0UGF0aCgndWktYWxpZ25tZW50LWxvbmctdGVybS1kZXNrdG9wLnBuZycpLAogICAgYW5pbWF0aW9uczogJ2Rpc2FibGVkJywKICAgIGNhcmV0OiAnaGlkZScsCiAgICBmdWxsUGFnZTogZmFsc2UsCiAgfSk7Cn0pOwo='
+          insert = b64decode(payload).decode()
           path.write_text(text.replace(anchor, insert + anchor, 1))
           PY
 
