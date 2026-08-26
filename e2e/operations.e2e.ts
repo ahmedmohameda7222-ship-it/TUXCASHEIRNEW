@@ -2028,7 +2028,9 @@ test('long-term UI alignment contracts render correctly', async ({ page }, testI
   expect(Math.abs(tabGroupCenter - shellCenter)).toBeLessThanOrEqual(2);
 
   await page.setViewportSize({ width: 320, height: 900 });
-  await expect.poll(async () => rail.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  await expect
+    .poll(async () => rail.evaluate((node) => node.scrollWidth > node.clientWidth))
+    .toBe(true);
   await rail.evaluate((node) => {
     node.scrollLeft = 0;
   });
