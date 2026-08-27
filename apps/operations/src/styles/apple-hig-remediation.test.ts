@@ -98,4 +98,16 @@ describe('Apple/HIG remediation contracts', () => {
       /:focus-visible\s*\{[^}]*outline:\s*3px solid color-mix\(in srgb, var\(--tux-focus-ring\) 70%, transparent\);[^}]*outline-offset:\s*2px;/s,
     );
   });
+
+  it('disables nonessential press motion when reduced motion is requested', () => {
+    const premium = css('premium.css');
+    const final = css('final-pos-corrections.css');
+
+    expect(premium).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*transition-duration:\s*0\.01ms !important;/,
+    );
+    expect(final).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/,
+    );
+  });
 });
