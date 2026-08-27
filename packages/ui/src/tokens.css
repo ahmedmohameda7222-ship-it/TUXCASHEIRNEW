@@ -5,7 +5,7 @@
   --tux-surface-raised: var(--tux-surface-panel);
   --tux-surface-subtle: #f3f6f4;
   --tux-text-primary: #181a19;
-  --tux-text-secondary: #707773;
+  --tux-text-secondary: #6d7470;
   --tux-text-muted: var(--tux-text-secondary);
   --tux-border-subtle: #e3e9e6;
   --tux-border-strong: color-mix(in srgb, var(--tux-border-subtle) 72%, var(--tux-text-secondary));
@@ -13,6 +13,7 @@
   --tux-accent-hover: #195f48;
   --tux-accent-pressed: #14533f;
   --tux-accent-strong: var(--tux-accent-pressed);
+  --tux-accent-text: #14533f;
   --tux-accent-soft: #eaf4ef;
   --tux-accent-hover-soft: #f3f8f5;
   --tux-positive: #2b7a55;
@@ -80,6 +81,7 @@
     --tux-accent-hover: #6dba98;
     --tux-accent-pressed: #4f9b7a;
     --tux-accent-strong: var(--tux-accent-pressed);
+    --tux-accent-text: #5fae8a;
     --tux-accent-soft: #173429;
     --tux-accent-hover-soft: color-mix(
       in srgb,
@@ -105,7 +107,7 @@
   --tux-surface-raised: var(--tux-surface-panel);
   --tux-surface-subtle: #f3f6f4;
   --tux-text-primary: #181a19;
-  --tux-text-secondary: #707773;
+  --tux-text-secondary: #6d7470;
   --tux-text-muted: var(--tux-text-secondary);
   --tux-border-subtle: #e3e9e6;
   --tux-border-strong: color-mix(in srgb, var(--tux-border-subtle) 72%, var(--tux-text-secondary));
@@ -113,6 +115,7 @@
   --tux-accent-hover: #195f48;
   --tux-accent-pressed: #14533f;
   --tux-accent-strong: var(--tux-accent-pressed);
+  --tux-accent-text: #14533f;
   --tux-accent-soft: #eaf4ef;
   --tux-accent-hover-soft: #f3f8f5;
   --tux-positive: #2b7a55;
@@ -141,6 +144,7 @@
   --tux-accent-hover: #6dba98;
   --tux-accent-pressed: #4f9b7a;
   --tux-accent-strong: var(--tux-accent-pressed);
+  --tux-accent-text: #5fae8a;
   --tux-accent-soft: #173429;
   --tux-accent-hover-soft: color-mix(in srgb, var(--tux-accent-soft) 78%, var(--tux-accent-hover));
   --tux-positive: #63b78e;
