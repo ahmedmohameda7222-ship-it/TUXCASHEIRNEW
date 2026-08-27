@@ -90,4 +90,12 @@ describe('Apple/HIG remediation contracts', () => {
     expect(source).toMatch(/\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s);
     expect(source).not.toMatch(/\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s);
   });
+
+  it('keeps keyboard focus immediately visible', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(
+      /:focus-visible\s*\{[^}]*outline:\s*3px solid color-mix\(in srgb, var\(--tux-focus-ring\) 70%, transparent\);[^}]*outline-offset:\s*2px;/s,
+    );
+  });
 });
