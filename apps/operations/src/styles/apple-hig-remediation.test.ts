@@ -86,14 +86,8 @@ describe('Apple/HIG remediation contracts', () => {
   it('uses action accent for increment and keeps decrement neutral', () => {
     const source = css('final-pos-corrections.css');
 
-    expect(source).toMatch(
-      /\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
-    );
-    expect(source).toMatch(
-      /\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s,
-    );
-    expect(source).not.toMatch(
-      /\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s,
-    );
+    expect(source).toMatch(/\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s);
+    expect(source).toMatch(/\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s);
+    expect(source).not.toMatch(/\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s);
   });
 });
