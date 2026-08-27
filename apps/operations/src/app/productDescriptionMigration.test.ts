@@ -11,18 +11,9 @@ const migrationPath = resolve(
 );
 
 const approvedDescriptions = new Map<string, string>([
-  [
-    'Single Smashed Patty',
-    '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce',
-  ],
-  [
-    'Double Smashed Patty',
-    '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
-  ],
-  [
-    'Triple Smashed Patty',
-    '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
-  ],
+  ['Single Smashed Patty', '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce'],
+  ['Double Smashed Patty', '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'],
+  ['Triple Smashed Patty', '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'],
   [
     'TUX Quatro Smashed Patty',
     '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom',
@@ -44,10 +35,7 @@ const approvedDescriptions = new Map<string, string>([
     'Brioche bun, 4 burger beef, American cheese, pickles, chopped onion, ketchup, TUXIFY sauce',
   ],
   ['Chili Fries', 'Fries, cheese, chili sauce, jalapeno'],
-  [
-    'TUX Fries',
-    'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce',
-  ],
+  ['TUX Fries', 'Fries, smashed patty, cheese, pickles, caramelized onions, jalapeno, TUX sauce'],
   [
     'Doppy Fries',
     'Fries, smashed patty, bacon, cheese, caramelized onions, ranch sauce, nachos, chopped green onion',
@@ -57,10 +45,7 @@ const approvedDescriptions = new Map<string, string>([
     '2 large smashed patties, 2 bacon, cheese sauce, caramelized onion, Johnny’s sauce. Served with potato wedges',
   ],
   ['Classic Hawawshi', 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce'],
-  [
-    'TUX Hawawshi',
-    'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce, mozzarella',
-  ],
+  ['TUX Hawawshi', 'Baladi bread, hawawshi meat, onion, TUX Hawawshi sauce, mozzarella'],
 ]);
 
 describe('TUX product description data contract', () => {
