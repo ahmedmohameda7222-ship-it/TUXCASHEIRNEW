@@ -438,3 +438,101 @@
   border-radius: var(--tux-radius-lg);
   background: var(--tux-surface-panel);
 }
+
+/* User-approved Current Order reference controls. */
+.adjustment-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tux-space-2);
+}
+
+.adjustment-disclosure {
+  display: inline-flex;
+  width: 100%;
+  min-height: var(--tux-touch-target);
+  align-items: center;
+  justify-content: center;
+  gap: var(--tux-space-2);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: 0 var(--tux-space-3);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.adjustment-disclosure svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.payment-methods-inline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payment-methods-inline .split-payment-action {
+  width: 100%;
+  min-height: var(--tux-touch-target);
+  margin: 0;
+  border-color: var(--tux-border-subtle);
+  background: var(--tux-surface-raised);
+  padding: 0 var(--tux-space-2);
+}
+
+.line-actions {
+  gap: var(--tux-space-1);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.line-actions > button {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+}
+
+.line-quantity-stepper {
+  display: grid;
+  grid-template-columns: var(--tux-touch-target) 2.4rem var(--tux-touch-target);
+  align-items: center;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  overflow: hidden;
+}
+
+.line-quantity-stepper button {
+  box-sizing: border-box;
+  width: var(--tux-touch-target);
+  height: var(--tux-touch-target);
+  min-height: var(--tux-touch-target);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.line-quantity-stepper output {
+  display: grid;
+  height: var(--tux-touch-target);
+  place-items: center;
+  border-inline: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-raised);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.product-quantity .quantity-increment,
+.line-quantity-stepper .quantity-increment {
+  background: var(--tux-accent-strong);
+  color: var(--tux-action-foreground);
+}
+
+.product-quantity .quantity-increment:hover:not(:disabled),
+.line-quantity-stepper .quantity-increment:hover:not(:disabled) {
+  background: var(--tux-accent-hover);
+  color: var(--tux-action-foreground);
+}
