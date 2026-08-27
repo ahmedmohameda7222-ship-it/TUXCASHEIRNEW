@@ -110,4 +110,12 @@ describe('Apple/HIG remediation contracts', () => {
       /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/,
     );
   });
+
+  it('makes the floating header opaque when reduced transparency is requested', () => {
+    const source = css('premium.css');
+
+    expect(source).toMatch(
+      /@media \(prefers-reduced-transparency: reduce\)\s*\{[\s\S]*\.operations-header\s*\{[^}]*background:\s*var\(--tux-surface-panel\);[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/,
+    );
+  });
 });
