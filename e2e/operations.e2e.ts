@@ -1484,7 +1484,7 @@ test('final correction keeps cart and payment controls at visible target sizes',
     const style = await button.evaluate((node) => getComputedStyle(node));
     expect(style.fontSize).toBe('14px');
     expect(style.lineHeight).toBe('18px');
-    expect(Number(style.fontWeight)).toBe(500);
+    expect(Number(style.fontWeight)).toBe(600);
   }
   expect(
     Math.round((await cart.getByRole('button', { name: 'Take Away' }).boundingBox())!.height),
@@ -2285,4 +2285,88 @@ test('follow-up mobile approval evidence is captured from the committed tree', a
   await stockCard.getByRole('button', { name: 'Add Stock' }).click();
   await expect(page.getByRole('dialog', { name: /Add Stock — Fries Bulk Bag/ })).toBeVisible();
   await shot('followup-21-add-stock-dialog-375.png');
+});
+
+test('cashier-critical controls use the approved operational emphasis', async ({
+  page,
+}, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const productCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const productExtra = productCard.getByRole('button', { name: 'Extra', exact: true });
+  expect(await productExtra.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
+
+  await productCard.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+
+  for (const name of ['Take Away', 'Dine In', 'Delivery', 'Cash', 'Instapay']) {
+    const control = cart.getByRole('button', { name, exact: true });
+    await expect(control).toBeVisible();
+    expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
+  }
+
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
+  for (const name of ['Edit', 'Extra']) {
+    const control = line.getByRole('button', { name, exact: true });
+    await expect(control).toBeVisible();
+    expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
+  }
+});
+
+test('quantity increment is action-colored while decrement stays neutral', async ({
+  page,
+}, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  const productCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const productAdd = productCard.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  await productAdd.click();
+  const productRemove = productCard.getByRole('button', {
+    name: 'Remove one Single Smashed Patty',
+  });
+
+  expect(await productAdd.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await productRemove.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await productAdd.evaluate((node) => getComputedStyle(node).color)).not.toBe(
+    await productRemove.evaluate((node) => getComputedStyle(node).color),
+  );
+
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
+  const lineAdd = line.getByRole('button', { name: /Increase Single Smashed Patty quantity/ });
+  const lineRemove = line.getByRole('button', { name: /Decrease Single Smashed Patty quantity/ });
+
+  expect(await lineAdd.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await lineRemove.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await lineAdd.evaluate((node) => getComputedStyle(node).color)).not.toBe(
+    await lineRemove.evaluate((node) => getComputedStyle(node).color),
+  );
+
+  await expect(productAdd).toHaveAttribute('aria-label', 'Add one Single Smashed Patty');
+  await expect(productRemove).toHaveAttribute('aria-label', 'Remove one Single Smashed Patty');
+  await expect(lineAdd).toHaveAttribute('aria-label', 'Increase Single Smashed Patty quantity');
+  await expect(lineRemove).toHaveAttribute('aria-label', 'Decrease Single Smashed Patty quantity');
+});
+
+test('respects reduced motion for cashier controls', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await enterActiveOrdersForCategoryTests(page);
+
+  const addButton = page.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  await addButton.hover();
+  const box = await addButton.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  expect(await addButton.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
+  await page.mouse.up();
 });
