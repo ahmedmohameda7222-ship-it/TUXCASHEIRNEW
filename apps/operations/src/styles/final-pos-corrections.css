@@ -423,3 +423,18 @@
     transform: none;
   }
 }
+
+/* User-approved Current Order section-card treatment. */
+.cart-scroll {
+  display: grid;
+  align-content: start;
+  gap: var(--tux-space-2);
+  padding: var(--tux-space-2);
+  background: var(--tux-surface-canvas);
+}
+
+.cart-section {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
