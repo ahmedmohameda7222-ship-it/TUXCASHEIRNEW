@@ -1,6 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
@@ -17,6 +17,8 @@ const migrations = readdirSync(migrationsDirectory)
   .sort();
 if (migrations.length === 0) throw new Error('No repository migrations were found.');
 
+const productDescriptionMigration = '20260827010000_tux_menu_product_descriptions.sql';
+
 function psql(args, label) {
   const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
     encoding: 'utf8',
@@ -28,6 +30,186 @@ function psql(args, label) {
     throw new Error(`${label} failed with exit code ${result.status ?? 'unknown'}.`);
   }
   return result.stdout;
+}
+
+function seedProductDescriptionFixture() {
+  psql(
+    [
+      '-c',
+      `insert into public.shops(id, name, active)
+       values ('11000000-0000-4000-8000-000000000001', 'Description Migration Shop', true);
+
+       insert into public.menu_categories(id, shop_id, name, sort_order, active)
+       values (
+         '31000000-0000-4000-8000-000000000001',
+         '11000000-0000-4000-8000-000000000001',
+         'Burgers',
+         0,
+         true
+       );
+
+       insert into public.products(
+         id, shop_id, category_id, name, description, price_minor, image_key,
+         family, active, sold_out, is_combo, sort_order
+       ) values
+       (
+         '41000000-0000-4000-8000-000000000001',
+         '11000000-0000-4000-8000-000000000001',
+         '31000000-0000-4000-8000-000000000001',
+         'Single Smashed Patty',
+         null,
+         12000,
+         null,
+         'TUX',
+         true,
+         false,
+         false,
+         0
+       ),
+       (
+         '41000000-0000-4000-8000-000000000002',
+         '11000000-0000-4000-8000-000000000001',
+         '31000000-0000-4000-8000-000000000001',
+         'Classic Fries',
+         null,
+         3000,
+         null,
+         null,
+         true,
+         false,
+         false,
+         1
+       );
+
+       insert into public.operations_configuration_snapshots(
+         shop_id, version, bundle_json, published_at, published_by_auth_user_id
+       ) values (
+         '11000000-0000-4000-8000-000000000001',
+         7,
+         jsonb_build_object(
+           'snapshot', jsonb_build_object(
+             'shopId', '11000000-0000-4000-8000-000000000001',
+             'version', 7,
+             'updatedAt', '2026-08-20T00:00:00.000Z',
+             'categories', '[]'::jsonb,
+             'products', jsonb_build_array(
+               jsonb_build_object(
+                 'id', '41000000-0000-4000-8000-000000000001',
+                 'shopId', '11000000-0000-4000-8000-000000000001',
+                 'categoryId', '31000000-0000-4000-8000-000000000001',
+                 'name', 'Single Smashed Patty',
+                 'description', null,
+                 'priceMinor', 12000,
+                 'imageKey', null,
+                 'family', 'TUX',
+                 'active', true,
+                 'soldOut', false,
+                 'isCombo', false,
+                 'sortOrder', 0
+               ),
+               jsonb_build_object(
+                 'id', '41000000-0000-4000-8000-000000000002',
+                 'shopId', '11000000-0000-4000-8000-000000000001',
+                 'categoryId', '31000000-0000-4000-8000-000000000001',
+                 'name', 'Classic Fries',
+                 'description', null,
+                 'priceMinor', 3000,
+                 'imageKey', null,
+                 'family', null,
+                 'active', true,
+                 'soldOut', false,
+                 'isCombo', false,
+                 'sortOrder', 1
+               )
+             ),
+             'modifiers', '[]'::jsonb,
+             'productModifierLinks', '[]'::jsonb,
+             'comboBeverageOptions', '[]'::jsonb,
+             'recipeLines', '[]'::jsonb,
+             'orderTypes', '[]'::jsonb,
+             'paymentMethods', '[]'::jsonb,
+             'deliveryZones', '[]'::jsonb
+           ),
+           'inventoryItems', '[]'::jsonb
+         ),
+         '2026-08-20T00:00:00.000Z',
+         null
+       );`,
+    ],
+    'Product description migration fixture',
+  );
+}
+
+function assertProductDescriptionMigration() {
+  psql(
+    [
+      '-c',
+      `do $$
+       declare
+         v_latest_bundle jsonb;
+       begin
+         if (
+           select description from public.products
+           where id = '41000000-0000-4000-8000-000000000001'
+         ) is distinct from '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce' then
+           raise exception 'approved product description was not persisted';
+         end if;
+
+         if (
+           select description from public.products
+           where id = '41000000-0000-4000-8000-000000000002'
+         ) is not null then
+           raise exception 'product without an approved description was modified';
+         end if;
+
+         if (
+           select count(*) from public.operations_configuration_snapshots
+           where shop_id = '11000000-0000-4000-8000-000000000001'
+         ) <> 2 then
+           raise exception 'description migration must publish exactly one new snapshot';
+         end if;
+
+         if (
+           select max(version) from public.operations_configuration_snapshots
+           where shop_id = '11000000-0000-4000-8000-000000000001'
+         ) <> 8 then
+           raise exception 'description migration did not advance configuration version exactly once';
+         end if;
+
+         select bundle_json into v_latest_bundle
+         from public.operations_configuration_snapshots
+         where shop_id = '11000000-0000-4000-8000-000000000001'
+           and version = 8;
+
+         if v_latest_bundle #>> '{snapshot,version}' <> '8' then
+           raise exception 'snapshot JSON version was not advanced';
+         end if;
+
+         if v_latest_bundle #>> '{snapshot,products,0,description}'
+           is distinct from '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce' then
+           raise exception 'snapshot JSON product description was not patched';
+         end if;
+
+         if v_latest_bundle #>> '{snapshot,products,1,description}' is not null then
+           raise exception 'snapshot JSON changed an unapproved product description';
+         end if;
+
+         if v_latest_bundle #>> '{snapshot,updatedAt}' = '2026-08-20T00:00:00.000Z' then
+           raise exception 'snapshot JSON updatedAt was not advanced';
+         end if;
+
+         if (
+           select bundle_json #>> '{snapshot,products,0,description}'
+           from public.operations_configuration_snapshots
+           where shop_id = '11000000-0000-4000-8000-000000000001'
+             and version = 7
+         ) is not null then
+           raise exception 'historical configuration snapshot was mutated';
+         end if;
+       end $$;`,
+    ],
+    'Product description migration assertions',
+  );
 }
 
 psql(
@@ -50,9 +232,17 @@ psql(
 );
 
 for (const migration of migrations) {
+  if (migration === productDescriptionMigration) seedProductDescriptionFixture();
   process.stdout.write(`Applying ${migration}\n`);
   psql(['-f', resolve(migrationsDirectory, migration)], migration);
 }
+
+process.stdout.write(`Replaying ${productDescriptionMigration} to verify idempotency\n`);
+psql(
+  ['-f', resolve(migrationsDirectory, productDescriptionMigration)],
+  `${productDescriptionMigration} idempotency replay`,
+);
+assertProductDescriptionMigration();
 
 psql(
   [
