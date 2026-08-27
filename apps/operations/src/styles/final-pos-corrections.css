@@ -343,7 +343,7 @@
 .split-payment-action {
   font-size: 14px;
   line-height: 18px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .line-actions button {
@@ -365,6 +365,11 @@
   font-size: 20px;
   line-height: 1;
   font-weight: 800;
+}
+
+/* Match the Product Card increment's boundary language to Current Order without changing stepper geometry. */
+.product-quantity .quantity-increment {
+  border-left: 1px solid var(--tux-border-subtle);
 }
 
 /* Selected labels use a legibility token independent from pressed-action color. */
