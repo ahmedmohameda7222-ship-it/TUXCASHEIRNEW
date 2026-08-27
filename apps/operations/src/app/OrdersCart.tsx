@@ -18,7 +18,7 @@ import {
   type PaymentMethodId,
 } from '@tux/domain';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { EditPencilIcon, PlusCircleIcon } from './icons';
+import { EditPencilIcon, MessageIcon, PlusCircleIcon, TagIcon } from './icons';
 import { MoneyInput, OptionalMoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
@@ -481,17 +481,35 @@ export function OrdersCart({
             aria-labelledby={controlId('adjustments-title')}
           >
             <h2 id={controlId('adjustments-title')}>Notes & discount</h2>
-            <button
-              type="button"
-              className="adjustment-disclosure"
-              aria-expanded={noteExpanded}
-              aria-controls={controlId('order-note-editor')}
-              disabled={busy}
-              onClick={() => setNoteExpanded((expanded) => !expanded)}
-            >
-              <span>{draft.orderNote === null ? 'Add order note' : 'Order note'}</span>
-              {draft.orderNote === null ? null : <strong>Added</strong>}
-            </button>
+            <div className="adjustment-actions">
+              <button
+                type="button"
+                className="adjustment-disclosure"
+                aria-expanded={noteExpanded}
+                aria-controls={controlId('order-note-editor')}
+                disabled={busy}
+                onClick={() => setNoteExpanded((expanded) => !expanded)}
+              >
+                <MessageIcon data-icon="message" />
+                <span>{draft.orderNote === null ? 'Add note' : 'Order note'}</span>
+                {draft.orderNote === null ? null : <strong>Added</strong>}
+              </button>
+              <button
+                type="button"
+                className="adjustment-disclosure"
+                aria-expanded={discountExpanded}
+                aria-controls={controlId('discount-editor')}
+                disabled={busy}
+                onClick={() => setDiscountExpanded((expanded) => !expanded)}
+              >
+                <TagIcon data-icon="tag" />
+                <span>
+                  {draft.discountMinor === ZERO_MONEY
+                    ? 'Add discount'
+                    : `Discount · ${formatMoneyMinor(draft.discountMinor)}`}
+                </span>
+              </button>
+            </div>
             {noteExpanded ? (
               <div className="adjustment-editor" id={controlId('order-note-editor')}>
                 <DraftTextField
@@ -509,16 +527,6 @@ export function OrdersCart({
                 />
               </div>
             ) : null}
-            <button
-              type="button"
-              className="adjustment-disclosure"
-              aria-expanded={discountExpanded}
-              aria-controls={controlId('discount-editor')}
-              disabled={busy}
-              onClick={() => setDiscountExpanded((expanded) => !expanded)}
-            >
-              <span>Discount · {formatMoneyMinor(draft.discountMinor)}</span>
-            </button>
             {discountExpanded ? (
               <div className="adjustment-editor" id={controlId('discount-editor')}>
                 <MoneyInput
@@ -551,7 +559,7 @@ export function OrdersCart({
 
             {draft.payment.mode !== 'SPLIT' ? (
               <>
-                <div className="payment-methods">
+                <div className="payment-methods payment-methods-inline">
                   {methods.map((method) => (
                     <button
                       type="button"
@@ -567,7 +575,17 @@ export function OrdersCart({
                       {method.displayName}
                     </button>
                   ))}
-                </div>{' '}
+                  {methods.length >= 2 ? (
+                    <button
+                      type="button"
+                      className="split-payment-action"
+                      disabled={busy}
+                      onClick={startSplit}
+                    >
+                      Split payment
+                    </button>
+                  ) : null}
+                </div>
                 {draft.payment.mode === 'SINGLE' && pricing !== null ? (
                   methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
                     <CashEditor
@@ -588,16 +606,6 @@ export function OrdersCart({
                       }
                     />
                   ) : null
-                ) : null}
-                {methods.length >= 2 ? (
-                  <button
-                    type="button"
-                    className="split-payment-action"
-                    disabled={busy}
-                    onClick={startSplit}
-                  >
-                    Split payment
-                  </button>
                 ) : null}
               </>
             ) : pricing === null ? null : (
