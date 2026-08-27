@@ -400,3 +400,10 @@
   outline: 3px solid color-mix(in srgb, var(--tux-focus-ring) 70%, transparent);
   outline-offset: 2px;
 }
+
+/* Reduced Motion keeps control state changes while removing press displacement. */
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active {
+    transform: none;
+  }
+}
