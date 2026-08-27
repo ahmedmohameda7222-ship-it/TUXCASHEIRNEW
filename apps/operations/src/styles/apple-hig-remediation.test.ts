@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 const stylesDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(stylesDirectory, '..', 'app');
-const repoRoot = resolve(stylesDirectory, '../../../..');
 
 function css(name: string): string {
   return readFileSync(resolve(stylesDirectory, name), 'utf8');
@@ -13,10 +12,6 @@ function css(name: string): string {
 
 function app(name: string): string {
   return readFileSync(resolve(appDirectory, name), 'utf8');
-}
-
-function tokenCss(): string {
-  return readFileSync(resolve(repoRoot, 'packages/ui/src/tokens.css'), 'utf8');
 }
 
 describe('Apple/HIG remediation contracts', () => {
