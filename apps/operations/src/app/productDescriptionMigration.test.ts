@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const appDirectory = dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = resolve(appDirectory, '../../../../..');
+const repositoryRoot = resolve(appDirectory, '../../../..');
 const migrationPath = resolve(
   repositoryRoot,
   'supabase/migrations/20260827010000_tux_menu_product_descriptions.sql',
