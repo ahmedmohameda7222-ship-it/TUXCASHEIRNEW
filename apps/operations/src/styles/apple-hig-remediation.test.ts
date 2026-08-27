@@ -26,7 +26,7 @@ describe('Apple/HIG remediation contracts', () => {
   });
 
   it('makes cashier-critical labels semibold without making the whole control system heavy', () => {
-    const source = css('premium.css');
+    const source = css('final-pos-corrections.css');
 
     expect(source).toMatch(
       /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button,\s*\.split-payment-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
