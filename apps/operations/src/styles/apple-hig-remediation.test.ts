@@ -82,4 +82,18 @@ describe('Apple/HIG remediation contracts', () => {
       /\.operations-header \.nav-item-active,\s*\.menu-toolbar \.category-rail button\.selected,\s*\.menu-toolbar > \.field-stack > \.segmented-control button\.selected,\s*\.order-type-section \.segmented-control button\.selected,\s*\.payment-section \.payment-methods button\.selected\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
     );
   });
+
+  it('uses action accent for increment and keeps decrement neutral', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(
+      /\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
+    );
+    expect(source).toMatch(
+      /\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s,
+    );
+    expect(source).not.toMatch(
+      /\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s,
+    );
+  });
 });
