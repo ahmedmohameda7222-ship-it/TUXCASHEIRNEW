@@ -366,3 +366,9 @@
   line-height: 1;
   font-weight: 800;
 }
+
+/* Selected labels use a legibility token independent from pressed-action color. */
+.order-type-section .segmented-control button.selected,
+.payment-section .payment-methods button.selected {
+  color: var(--tux-accent-text);
+}
