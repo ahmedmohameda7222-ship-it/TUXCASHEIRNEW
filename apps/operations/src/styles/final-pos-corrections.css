@@ -28,11 +28,15 @@
   font-weight: 600;
 }
 
-/* The visible/responsive resize handle is 12px while the divider remains a 1px hairline. */
+/* Preserve the 12px resize hit area without showing a divider line. */
 .cart-resize-separator {
   width: 12px;
   min-width: 12px;
   justify-self: center;
+}
+
+.cart-resize-separator::before {
+  display: none;
 }
 
 /* Keep the desktop Current Order surface rounded like the neighboring menu card. */
