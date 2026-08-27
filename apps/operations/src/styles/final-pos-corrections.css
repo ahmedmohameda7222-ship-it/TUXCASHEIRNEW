@@ -336,3 +336,33 @@
     inset: auto;
   }
 }
+
+/* Apple/HIG remediation: strengthen cashier-critical operational controls. */
+.order-type-section .segmented-control button,
+.payment-section .payment-methods button,
+.split-payment-action {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.line-actions button {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-extra-action {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-quantity .quantity-decrement,
+.product-quantity .quantity-increment,
+.line-quantity-stepper .quantity-decrement,
+.line-quantity-stepper .quantity-increment {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+}
