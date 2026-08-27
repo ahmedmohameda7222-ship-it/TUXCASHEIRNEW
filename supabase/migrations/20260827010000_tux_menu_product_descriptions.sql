@@ -6,8 +6,6 @@
 -- and publishes one new configuration snapshot per affected shop so enrolled devices
 -- discover a higher version and sync the descriptions through the existing pipeline.
 
-lock table public.operations_configuration_snapshots in share row exclusive mode;
-
 with approved_descriptions(name, description) as (
   values
     ('Single Smashed Patty', '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce'),
