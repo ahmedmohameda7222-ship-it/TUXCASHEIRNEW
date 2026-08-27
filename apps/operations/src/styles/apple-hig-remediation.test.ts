@@ -29,10 +29,10 @@ function rgb(hex: string): readonly [number, number, number] {
 }
 
 function luminance(hex: string): number {
-  const channels = rgb(hex).map((channel) =>
+  const [red, green, blue] = rgb(hex).map((channel) =>
     channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  );
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  ) as [number, number, number];
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
 function contrast(left: string, right: string): number {
