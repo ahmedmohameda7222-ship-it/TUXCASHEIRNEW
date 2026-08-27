@@ -118,4 +118,12 @@ describe('Apple/HIG remediation contracts', () => {
       /@media \(prefers-reduced-transparency: reduce\)\s*\{[\s\S]*\.operations-header\s*\{[^}]*background:\s*var\(--tux-surface-panel\);[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/,
     );
   });
+
+  it('provides stronger semantic tokens when increased contrast is requested', () => {
+    const tokens = tokenCss();
+
+    expect(tokens).toMatch(
+      /@media \(prefers-contrast: more\)\s*\{[\s\S]*--tux-text-secondary:[^;]+;[\s\S]*--tux-border-subtle:[^;]+;[\s\S]*--tux-focus-ring:[^;]+;[\s\S]*--tux-accent-text:[^;]+;/,
+    );
+  });
 });
