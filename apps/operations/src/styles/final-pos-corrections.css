@@ -39,6 +39,10 @@
   display: none;
 }
 
+.cart-resize-separator:focus-visible::before {
+  display: block;
+}
+
 /* Keep the desktop Current Order surface rounded like the neighboring menu card. */
 .desktop-cart-wrap {
   border-radius: var(--tux-radius-lg);
