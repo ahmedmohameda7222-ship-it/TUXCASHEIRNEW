@@ -1,0 +1,129 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+
+const stylesDirectory = dirname(fileURLToPath(import.meta.url));
+const appDirectory = resolve(stylesDirectory, '..', 'app');
+const repoRoot = resolve(stylesDirectory, '../../../..');
+
+function css(name: string): string {
+  return readFileSync(resolve(stylesDirectory, name), 'utf8');
+}
+
+function app(name: string): string {
+  return readFileSync(resolve(appDirectory, name), 'utf8');
+}
+
+function tokenCss(): string {
+  return readFileSync(resolve(repoRoot, 'packages/ui/src/tokens.css'), 'utf8');
+}
+
+function rgb(hex: string): readonly [number, number, number] {
+  const value = hex.replace('#', '');
+  return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
+}
+
+function luminance(hex: string): number {
+  const [red, green, blue] = rgb(hex).map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  ) as [number, number, number];
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrast(left: string, right: string): number {
+  const a = luminance(left);
+  const b = luminance(right);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+describe('Apple/HIG remediation contracts', () => {
+  it('uses explicit semantic hooks for both quantity directions', () => {
+    const productCard = app('MenuProductCard.tsx');
+    const ordersCart = app('OrdersCart.tsx');
+
+    for (const source of [productCard, ordersCart]) {
+      expect(source).toContain('className="quantity-decrement"');
+      expect(source).toContain('className="quantity-increment"');
+    }
+  });
+
+  it('makes cashier-critical labels semibold without making the whole control system heavy', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(
+      /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button,\s*\.split-payment-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
+    );
+    expect(source).toMatch(
+      /\.line-actions button\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
+    );
+    expect(source).toMatch(
+      /\.product-extra-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
+    );
+  });
+
+  it('keeps light secondary text at AA contrast for small operational copy', () => {
+    expect(contrast('#6d7470', '#f8faf9')).toBeGreaterThanOrEqual(4.5);
+    expect(tokenCss()).toContain('--tux-text-secondary: #6d7470;');
+  });
+
+  it('separates selected text from pressed-action color in dark mode', () => {
+    const tokens = tokenCss();
+    const styles = css('final-pos-corrections.css');
+
+    expect(tokens).toContain('--tux-accent-text: #14533f;');
+    expect(tokens).toContain('--tux-accent-text: #5fae8a;');
+    expect(contrast('#5fae8a', '#173429')).toBeGreaterThanOrEqual(4.5);
+    expect(styles).toMatch(
+      /\.operations-header \.nav-item-active,\s*\.menu-toolbar \.category-rail button\.selected,\s*\.menu-toolbar > \.field-stack > \.segmented-control button\.selected,\s*\.order-type-section \.segmented-control button\.selected,\s*\.payment-section \.payment-methods button\.selected\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
+    );
+  });
+
+  it('uses action accent for increment and keeps decrement neutral', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(/\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s);
+    expect(source).toMatch(/\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s);
+    expect(source).not.toMatch(/\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s);
+  });
+
+  it('keeps keyboard focus immediately visible', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(
+      /:focus-visible\s*\{[^}]*outline:\s*3px solid color-mix\(in srgb, var\(--tux-focus-ring\) 70%, transparent\);[^}]*outline-offset:\s*2px;/s,
+    );
+  });
+
+  it('disables nonessential press motion when reduced motion is requested', () => {
+    const premium = css('premium.css');
+    const final = css('final-pos-corrections.css');
+
+    expect(premium).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*transition-duration:\s*0\.01ms !important;/,
+    );
+    expect(final).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/,
+    );
+  });
+
+  it('makes the floating header opaque when reduced transparency is requested', () => {
+    const source = css('premium.css');
+
+    expect(source).toMatch(
+      /@media \(prefers-reduced-transparency: reduce\)\s*\{[\s\S]*\.operations-header\s*\{[^}]*background:\s*var\(--tux-surface-panel\);[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/,
+    );
+  });
+
+  it('provides stronger semantic tokens when increased contrast is requested', () => {
+    const tokens = tokenCss();
+
+    expect(tokens).toMatch(
+      /@media \(prefers-contrast: more\)\s*\{[\s\S]*--tux-text-secondary:[^;]+;[\s\S]*--tux-border-subtle:[^;]+;[\s\S]*--tux-focus-ring:[^;]+;[\s\S]*--tux-accent-text:[^;]+;/,
+    );
+  });
+});

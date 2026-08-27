@@ -337,6 +337,7 @@ export function OrdersCart({
                       >
                         <button
                           type="button"
+                          className="quantity-decrement"
                           aria-label={`Decrease ${line.productName} quantity`}
                           disabled={busy}
                           onClick={() => onDecrementLine(line.id)}
@@ -346,6 +347,7 @@ export function OrdersCart({
                         <output aria-label={`${line.productName} quantity`}>{line.quantity}</output>
                         <button
                           type="button"
+                          className="quantity-increment"
                           aria-label={`Increase ${line.productName} quantity`}
                           disabled={busy}
                           onClick={() => onIncrementLine(line.id)}

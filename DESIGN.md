@@ -40,7 +40,7 @@ Colors are expressed through semantic tokens. Components must not scatter raw he
 - Surface primary: `#FFFFFF`
 - Surface secondary: `#F3F6F4`
 - Text primary: `#181A19`
-- Text secondary: `#707773`
+- Text secondary: `#6D7470`
 - Hairline border: `#E3E9E6`
 - Action green: `#1F6B52`
 - Action green hover: `#195F48`
@@ -76,6 +76,7 @@ Dark mode must remain a coherent supported theme rather than a broken inversion.
 
 - Most of the interface is neutral canvas/surface/text/border.
 - Premium green occupies a small visual share and is concentrated on primary action and current selection.
+- Selected-control text uses the dedicated `--tux-accent-text` semantic token so legibility is independent from pressed-action color, especially in dark mode.
 - Do not use a fully green product card to indicate quantity.
 - Do not rely on color alone for state. Pair semantic color with text, iconography, quantity, border, or other explicit state cues.
 - Do not reuse the action-green token as the success-status token.
@@ -107,6 +108,8 @@ Approved hierarchy after Apple Docs review:
 
 Use Regular for content, descriptions, input/payment values, and supporting metadata. Use Medium for controls, prices, and field labels. Use Semibold for product/cart names, selected navigation, section anchors, and primary actions. Reserve Bold for exceptional emphasis, primarily the final monetary total.
 
+Cashier-critical mutually exclusive controls such as Order Type and Payment Method may use Semibold at the existing standard-control size when repeated scan speed warrants stronger recognition. Repeated Edit and Extra actions may use the same Semibold operational emphasis. Do not escalate these controls to Bold/Heavy by default.
+
 Supporting metadata such as item counts is Regular by default; use Medium only when the value is operationally important.
 
 All monetary and quantity values use tabular numerals:
@@ -133,6 +136,7 @@ Do not switch entire monetary labels to a monospace font. Avoid Thin/Light weigh
 - Place Order uses at least a 48px visible height.
 - Segmented controls are appropriate for 2–4 related mutually exclusive options such as order type.
 - Product steppers use direct `− quantity +` manipulation.
+- Quantity steppers distinguish direction through symbol plus semantic color reinforcement: increment uses the TUX action accent, decrement remains neutral, and decrement must not use destructive red unless the action becomes destructive rather than reversible.
 - Secondary controls such as notes and discount use progressive disclosure when they are not needed continuously.
 - Destructive actions remain visually distinct and must not be confused with the premium-green primary action.
 - Keyboard shortcuts and focus behavior already supported by the app must remain intact.
@@ -144,16 +148,20 @@ Motion confirms state; it does not perform.
 - Press feedback: about 100–150ms
 - Most hover/selection transitions: about 150–250ms
 - No bouncing, looping, floating, or decorative perpetual motion
-- Respect `prefers-reduced-motion`
+- Respect `prefers-reduced-motion`; remove nonessential press displacement and effectively suppress nonessential transition duration when reduction is requested.
 - Avoid layout-moving hover effects
 
 ## Accessibility
 
 - Meet WCAG AA contrast for functional text and controls.
 - Keep keyboard access and visible focus states.
+- Keyboard focus indicators must maintain at least 3:1 non-text contrast against adjacent surfaces.
 - Preserve semantic roles and accessible labels where existing E2E/tests depend on them.
 - Do not use color as the sole status indicator.
 - Keep text legible at dense POS sizes; operational information should normally be at least 13px, and 12px is reserved for genuinely tertiary hints.
+- Persistent translucent navigation must provide an opaque `prefers-reduced-transparency: reduce` fallback.
+- Nonessential press/transition motion must respect `prefers-reduced-motion: reduce`.
+- Semantic tokens must provide a `prefers-contrast: more` path for stronger borders, focus, and control text.
 - Verify no horizontal overflow at 375px, 768px, and 1440px viewport widths.
 
 ## Responsive behavior
