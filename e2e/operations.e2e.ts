@@ -1954,6 +1954,143 @@ test('product names stay fully readable while Current Order rail resizes', async
   await expectReadableTitles('cart-max-600');
 });
 
+test('long-term UI alignment contracts render correctly', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterActiveOrdersForCategoryTests(page);
+
+  async function expectComposedMoneyInput(input: Locator): Promise<void> {
+    const wrapper = input.locator('xpath=..');
+    const [wrapperBox, inputStyles] = await Promise.all([
+      wrapper.boundingBox(),
+      input.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return {
+          borderTopWidth: style.borderTopWidth,
+          borderRightWidth: style.borderRightWidth,
+          borderBottomWidth: style.borderBottomWidth,
+          borderLeftWidth: style.borderLeftWidth,
+          borderRadius: style.borderRadius,
+          backgroundColor: style.backgroundColor,
+          boxShadow: style.boxShadow,
+        };
+      }),
+    ]);
+    expect(wrapperBox).not.toBeNull();
+    expect(wrapperBox!.height).toBeGreaterThanOrEqual(44);
+    expect(inputStyles.borderTopWidth).toBe('0px');
+    expect(inputStyles.borderRightWidth).toBe('0px');
+    expect(inputStyles.borderBottomWidth).toBe('0px');
+    expect(inputStyles.borderLeftWidth).toBe('0px');
+    expect(inputStyles.borderRadius).toBe('0px');
+    expect(inputStyles.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(inputStyles.boxShadow).toBe('none');
+
+    await input.focus();
+    await expect
+      .poll(async () => wrapper.evaluate((node) => getComputedStyle(node).boxShadow))
+      .not.toBe('none');
+    await input.blur();
+  }
+
+  async function expectControlTopsAligned(controls: readonly Locator[]): Promise<void> {
+    const boxes = await Promise.all(controls.map((control) => control.boundingBox()));
+    for (const box of boxes) expect(box).not.toBeNull();
+    const tops = boxes.map((box) => box!.y);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
+  }
+
+  await page.getByRole('button', { name: 'Add one Double Smashed Patty' }).click();
+  const cart = currentOrderCart(page, testInfo);
+  await cart.locator('.adjustment-disclosure').filter({ hasText: 'Discount' }).click();
+  const discount = cart.getByRole('textbox', { name: 'Discount' });
+  await expect(discount).toBeVisible();
+  await expectComposedMoneyInput(discount);
+
+  await cart.getByRole('button', { name: 'Cash', exact: true }).click();
+  const cashReceived = cart.getByLabel('Cash received');
+  await expect(cashReceived).toBeVisible();
+  await expectComposedMoneyInput(cashReceived);
+
+  await page.getByRole('button', { name: 'Orders Board', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Orders Board' })).toBeVisible();
+  const rail = page.locator('.board-tabs');
+  const tabs = rail.getByRole('tab');
+  const [shellBox, firstTabBox, lastTabBox] = await Promise.all([
+    page.locator('.orders-board-shell').boundingBox(),
+    tabs.first().boundingBox(),
+    tabs.last().boundingBox(),
+  ]);
+  expect(shellBox).not.toBeNull();
+  expect(firstTabBox).not.toBeNull();
+  expect(lastTabBox).not.toBeNull();
+  const tabGroupCenter = (firstTabBox!.x + lastTabBox!.x + lastTabBox!.width) / 2;
+  const shellCenter = shellBox!.x + shellBox!.width / 2;
+  expect(Math.abs(tabGroupCenter - shellCenter)).toBeLessThanOrEqual(2);
+
+  await page.setViewportSize({ width: 320, height: 900 });
+  await expect
+    .poll(async () => rail.evaluate((node) => node.scrollWidth > node.clientWidth))
+    .toBe(true);
+  await rail.evaluate((node) => {
+    node.scrollLeft = 0;
+  });
+  const [narrowRailBox, narrowFirstBox, initialScrollLeft] = await Promise.all([
+    rail.boundingBox(),
+    tabs.first().boundingBox(),
+    rail.evaluate((node) => node.scrollLeft),
+  ]);
+  expect(narrowRailBox).not.toBeNull();
+  expect(narrowFirstBox).not.toBeNull();
+  expect(initialScrollLeft).toBe(0);
+  expect(narrowFirstBox!.x).toBeGreaterThanOrEqual(narrowRailBox!.x - 1);
+  await tabs.last().scrollIntoViewIfNeeded();
+  const narrowLastBox = await tabs.last().boundingBox();
+  expect(narrowLastBox).not.toBeNull();
+  expect(narrowLastBox!.x + narrowLastBox!.width).toBeLessThanOrEqual(
+    narrowRailBox!.x + narrowRailBox!.width + 1,
+  );
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Expenses', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();
+
+  const addCard = page.locator('.expense-add-card');
+  const addDescription = addCard.getByLabel('Description');
+  const addAmount = addCard.getByLabel('Amount');
+  const addAmountWrap = addAmount.locator('xpath=..');
+  const addPaidOptions = addCard.locator('.expense-paid-options');
+  await expectControlTopsAligned([addDescription, addAmountWrap, addPaidOptions]);
+  await expectComposedMoneyInput(addAmount);
+
+  await addDescription.fill('Alignment regression');
+  await addAmount.fill('25');
+  await addAmount.blur();
+  await addCard.getByRole('button', { name: 'Add Expense', exact: true }).click();
+  const row = page.locator('.expense-row').filter({ hasText: 'Alignment regression' }).first();
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Edit expense' });
+  await expect(dialog).toBeVisible();
+  const editDescription = dialog.getByLabel('Description');
+  const editAmount = dialog.getByLabel('Amount');
+  const editAmountWrap = editAmount.locator('xpath=..');
+  const editPaidOptions = dialog.locator('.expense-paid-options');
+  await expectControlTopsAligned([editDescription, editAmountWrap, editPaidOptions]);
+  await expectComposedMoneyInput(editAmount);
+
+  const dialogBox = await dialog.boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect(dialogBox!.width).toBeGreaterThanOrEqual(800);
+  await page.screenshot({
+    path: testInfo.outputPath('ui-alignment-long-term-desktop.png'),
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: false,
+  });
+});
+
 test('follow-up desktop approval evidence is captured from the committed tree', async ({
   page,
 }, testInfo) => {
@@ -2129,7 +2266,7 @@ test('follow-up mobile approval evidence is captured from the committed tree', a
   expect(footerBox).not.toBeNull();
   expect(footerBox!.y - (paymentBox!.y + paymentBox!.height)).toBeGreaterThanOrEqual(16);
   await shot('followup-17-review-pay-bottom-375.png');
-  await page.getByRole('button', { name: 'Close order' }).click();
+  await closeMobileCartIfOpen(page, testInfo);
 
   await page.getByRole('button', { name: 'Expenses', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Expenses' })).toBeVisible();

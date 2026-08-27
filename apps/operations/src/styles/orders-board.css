@@ -48,6 +48,7 @@
 
 .board-tabs {
   display: flex;
+  justify-content: safe center;
   gap: var(--tux-space-2);
   overflow-x: auto;
   margin-bottom: var(--tux-space-5);

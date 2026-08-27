@@ -155,7 +155,6 @@
 .field-stack input,
 .field-stack select,
 .field-stack textarea,
-.money-input-wrap input,
 .customizer-section textarea {
   width: 100%;
   min-height: var(--tux-control-height-md);
@@ -588,8 +587,7 @@
 }
 
 .field-stack input,
-.field-stack select,
-.money-input-wrap input {
+.field-stack select {
   padding: 0 var(--tux-space-3);
 }
 
@@ -618,10 +616,26 @@
   font-weight: 800;
 }
 
-.money-input-wrap input {
+.money-input-wrap > input {
+  width: 100%;
+  min-height: var(--tux-control-height-md);
   border: 0;
+  border-radius: 0;
   background: transparent;
+  color: var(--tux-text-primary);
+  box-shadow: none;
+  padding: 0 var(--tux-space-3);
+  font-size: var(--tux-font-size-sm);
   text-align: right;
+}
+
+.money-input-wrap > input:focus-visible {
+  outline: none;
+}
+
+.money-input-wrap:focus-within {
+  border-color: color-mix(in srgb, var(--tux-focus-ring) 55%, var(--tux-border-subtle));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tux-focus-ring) 36%, transparent);
 }
 
 .money-field-compact {
