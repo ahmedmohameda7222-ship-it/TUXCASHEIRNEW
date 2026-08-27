@@ -66,4 +66,12 @@ describe('Operations UI alignment contracts', () => {
       /\.expense-dialog\s+\.expense-note-field\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s,
     );
   });
+
+  it('keeps the desktop Current Order panel rounded like its neighboring menu card', () => {
+    const source = css('final-pos-corrections.css');
+
+    expect(source).toMatch(
+      /\.desktop-cart-wrap\s*\{[^}]*border-radius:\s*var\(--tux-radius-lg\);[^}]*overflow:\s*hidden;/s,
+    );
+  });
 });
