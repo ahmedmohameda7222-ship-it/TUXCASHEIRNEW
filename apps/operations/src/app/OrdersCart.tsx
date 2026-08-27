@@ -18,7 +18,12 @@ import {
   type PaymentMethodId,
 } from '@tux/domain';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { EditPencilIcon, MessageIcon, PlusCircleIcon, TagIcon } from './icons';
+import {
+  EditPencilIcon,
+  MessageIcon,
+  PlusCircleIcon,
+  TagIcon,
+} from './icons';
 import { MoneyInput, OptionalMoneyInput } from './MoneyInput';
 import { formatMoneyMinor } from './ordersView';
 
