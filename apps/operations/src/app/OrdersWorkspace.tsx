@@ -832,7 +832,7 @@ export function OrdersWorkspace({
       className="orders-workspace"
       style={
         desktopCartResizable
-          ? { gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px` }
+          ? { gridTemplateColumns: `minmax(0, 1fr) 4px ${cartWidth}px` }
           : undefined
       }
     >
