@@ -95,6 +95,7 @@ export function MenuProductCard({
           <div className="product-quantity" aria-label={`${product.name} quantity`}>
             <button
               type="button"
+              className="quantity-decrement"
               aria-label={`Remove one ${product.name}`}
               disabled={busy || quantity === 0}
               onClick={(event) => runIndependentAction(event, onDecrement)}
@@ -104,6 +105,7 @@ export function MenuProductCard({
             <output>{quantity}</output>
             <button
               type="button"
+              className="quantity-increment"
               aria-label={`Add one ${product.name}`}
               disabled={busy || product.soldOut}
               onClick={(event) => runIndependentAction(event, onAdd)}
