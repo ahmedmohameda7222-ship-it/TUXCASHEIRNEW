@@ -74,4 +74,14 @@ describe('Operations UI alignment contracts', () => {
       /\.desktop-cart-wrap\s*\{[^}]*border-radius:\s*var\(--tux-radius-lg\);[^}]*overflow:\s*hidden;/s,
     );
   });
+
+  it('hides the visual Current Order divider while preserving the resize hit area', () => {
+    const source = css('orders.css');
+    const correctionSource = css('final-pos-corrections.css');
+
+    expect(source).toMatch(/\.cart-resize-separator\s*\{[^}]*cursor:\s*col-resize;/s);
+    expect(correctionSource).toMatch(
+      /\.cart-resize-separator::before\s*\{[^}]*display:\s*none;/s,
+    );
+  });
 });
