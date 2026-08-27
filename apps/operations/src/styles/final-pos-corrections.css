@@ -385,12 +385,23 @@
   color: var(--tux-accent-text);
 }
 
-.quantity-increment:hover:not(:disabled) {
+/* Current Order has a stronger generic line-action selector, so preserve direction semantics explicitly. */
+.line-actions .quantity-decrement {
+  color: var(--tux-text-primary);
+}
+
+.line-actions .quantity-increment {
+  color: var(--tux-accent-text);
+}
+
+.quantity-increment:hover:not(:disabled),
+.line-actions .quantity-increment:hover:not(:disabled) {
   background: var(--tux-accent-hover-soft);
   color: var(--tux-accent-text);
 }
 
-.quantity-decrement:hover:not(:disabled) {
+.quantity-decrement:hover:not(:disabled),
+.line-actions .quantity-decrement:hover:not(:disabled) {
   background: color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
   color: var(--tux-text-primary);
 }
