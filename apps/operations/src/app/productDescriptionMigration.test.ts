@@ -11,9 +11,18 @@ const migrationPath = resolve(
 );
 
 const approvedDescriptions = new Map<string, string>([
-  ['Single Smashed Patty', '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce'],
-  ['Double Smashed Patty', '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'],
-  ['Triple Smashed Patty', '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce'],
+  [
+    'Single Smashed Patty',
+    '1 smashed patty, cheese, TUX sauce, tomatoes, pickles, lettuce',
+  ],
+  [
+    'Double Smashed Patty',
+    '2 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+  ],
+  [
+    'Triple Smashed Patty',
+    '3 smashed patties, cheese, TUX sauce, tomatoes, pickles, lettuce',
+  ],
   [
     'TUX Quatro Smashed Patty',
     '4 smashed patties, cheese sauce, TUX sauce, pickles, caramelized onions, mushroom',
