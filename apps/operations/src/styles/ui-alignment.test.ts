@@ -79,7 +79,9 @@ describe('Operations UI alignment contracts', () => {
     const source = css('orders.css');
     const correctionSource = css('final-pos-corrections.css');
 
-    expect(source).toMatch(/\.cart-resize-separator\s*\{[^}]*cursor:\s*col-resize;/s);
+    expect(source).toMatch(
+      /\.cart-resize-separator\s*\{[^}]*cursor:\s*col-resize;/s,
+    );
     expect(correctionSource).toMatch(
       /\.cart-resize-separator::before\s*\{[^}]*display:\s*none;/s,
     );
