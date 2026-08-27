@@ -4,29 +4,38 @@
 
 **Goal:** Improve TUX Operations’ high-frequency cashier controls and close the concrete Apple/HIG accessibility contradictions found in the 2026-08-27 repo audit without changing business behavior or redesigning approved flows.
 
-**Architecture:** Keep the existing React/TypeScript component structure and TUX semantic-token system. Phase A makes the requested POS controls more legible and differentiates increment/decrement with semantics plus color reinforcement; Phase B fixes concrete accessibility gaps at the token/CSS layer so the same behavior applies consistently across light/dark themes and system accessibility preferences. Do not redesign Orders Board, change routes, change business/domain logic, or introduce new component abstractions unless a task below explicitly requires it.
+**Architecture:** Preserve the existing React/TypeScript component structure and TUX semantic-token system. Phase A strengthens the cashier controls the user explicitly called out; Phase B fixes concrete accessibility gaps at token/CSS level so light/dark themes and system accessibility preferences remain coherent; Phase C adds rendered verification and reconciles the enduring design authority. No business/domain logic or route architecture changes are authorized.
 
 **Tech Stack:** React 19, TypeScript 6, CSS custom properties, Vitest 4, Playwright 1.62, Vite 8, Electron 43, npm workspaces.
 
 **Spec:** `DESIGN.md`
 
+## External Apple guidance used by the approved audit
+
+- Buttons: `https://developer.apple.com/design/human-interface-guidelines/buttons`
+- Accessibility: `https://developer.apple.com/design/human-interface-guidelines/accessibility`
+- Color: `https://developer.apple.com/design/human-interface-guidelines/color`
+- Motion: `https://developer.apple.com/design/human-interface-guidelines/motion`
+- Focus and selection: `https://developer.apple.com/design/human-interface-guidelines/focus-and-selection`
+- Segmented controls: `https://developer.apple.com/design/human-interface-guidelines/segmented-controls`
+
 ## Audit authority
 
-Implementation must also preserve the approved 2026-08-27 audit decisions that led to this plan:
+Implementation must preserve these approved 2026-08-27 audit decisions:
 
-- High-frequency POS order-type and payment labels become `600` Semibold, not `800` Heavy.
-- `Edit` and `Extra` operational labels become `600` Semibold.
-- Quantity `+` and `−` glyphs remain heavy (`800`) and 44×44 px.
-- `+` uses TUX action green as reinforcement; `−` remains neutral and must not use destructive red.
-- Color is never the sole indicator: the explicit `+` / `−` symbols and accessible names remain intact.
-- Current light/dark themes, rounded Current Order panel, resize behavior, mobile flow, keyboard behavior, and business logic remain unchanged.
+- High-frequency Order Type and Payment Method labels use `14px / 18px / 600` Semibold, not `800` Heavy.
+- `Edit` and `Extra` operational labels use `14px / 18px / 600` Semibold.
+- Quantity `+` and `−` glyphs remain heavy (`800`) and inside 44×44 px targets.
+- `+` uses the TUX action accent as reinforcement; `−` remains neutral and must not use destructive red.
+- Color is never the sole direction cue: explicit `+` / `−` glyphs and accessible names remain intact.
+- Current light/dark themes, rounded Current Order panel, resize behavior, mobile Review & pay flow, keyboard behavior, and business logic remain unchanged.
 - Fix the six concrete audit failures: reduced motion, reduced transparency, increased contrast, weak focus visibility, light secondary-text contrast, and dark selected-accent contrast.
-- Defer subjective follow-up redesigns (Orders Board tab restyling, reducing repeated `Mark Done` prominence, global screen-title rescaling) to a separate explicitly approved design task.
+- Defer subjective follow-up redesigns — Orders Board tab restyling, repeated `Mark Done` prominence, global title rescaling — to a separate explicit design approval.
 
 ## Baseline
 
 - Planning baseline: `main` at `039ca29720ba2d32c3d75d9d8fc1a1b7d4fa42d1`.
-- Before implementation, re-read `DESIGN.md`, verify current `main`, and preserve any newer compatible work.
+- Before implementation, re-read `DESIGN.md`, verify the actual current `main`, and preserve any newer compatible work.
 - Create one isolated implementation worktree/branch from the then-current `main`; do not implement on this docs branch.
 - Recommended implementation branch: `ui/apple-hig-operations-remediation`.
 - Create a Draft PR against `main` after the first meaningful RED→GREEN commit.
@@ -35,39 +44,39 @@ Implementation must also preserve the approved 2026-08-27 audit decisions that l
 
 ## Global Constraints
 
-- Use the system UI stack already defined in the repo; do not bundle SF Pro or proprietary Apple fonts.
+- Use the existing system font stack; do not bundle SF Pro or proprietary Apple font files.
 - Keep high-frequency interaction targets at least `44px × 44px`.
 - Keep Place Order at least `48px` visible height.
-- Preserve all existing `aria-label`, role, keyboard, and focus contracts unless a task explicitly strengthens them.
+- Preserve existing `aria-label`, role, keyboard, and focus contracts unless a task explicitly strengthens them.
 - Use semantic CSS tokens; do not scatter new raw colors through component styles.
-- Do not use TUX destructive red for decrement because decrement is reversible direct manipulation, not deletion.
+- Decrement is reversible direct manipulation, so it must not use `--tux-destructive`.
 - Use RED→GREEN TDD for every production change.
-- Use `superpowers:systematic-debugging` for any unexpected failure.
-- Use `superpowers:verification-before-completion` before claiming the implementation is ready.
-- Do not apply or add Supabase migrations for this UI-only work.
-- Do not change order placement, payment logic, stock logic, persistence, sync, or printing behavior.
-- Do not alter the approved Menu-to-Current-Order 8px structural gap.
+- Use `superpowers:systematic-debugging` for unexpected failures.
+- Use `superpowers:verification-before-completion` before claiming readiness.
+- Do not add or apply Supabase migrations for this UI-only work.
+- Do not change order placement, payment logic, stock logic, persistence, sync, printing, or receipt behavior.
+- Do not alter the approved Menu-to-Current-Order 8px structural gap or Current Order 12px invisible resize target.
 
 ## File map
 
 **Primary production files**
 
-- `apps/operations/src/app/MenuProductCard.tsx` — product-card quantity increment/decrement controls and Extra action markup.
-- `apps/operations/src/app/OrdersCart.tsx` — Current Order quantity controls, Edit/Extra actions, order-type controls, payment controls.
-- `apps/operations/src/styles/premium.css` — canonical refined Operations visual hierarchy, control typography, hover/selected/focus styling, system-preference media queries.
-- `packages/ui/src/tokens.css` — light/dark semantic color tokens and increased-contrast overrides.
+- `apps/operations/src/app/MenuProductCard.tsx` — product quantity buttons and product Extra markup.
+- `apps/operations/src/app/OrdersCart.tsx` — Current Order quantity buttons, Edit/Extra, Order Type, and Payment controls.
+- `apps/operations/src/styles/premium.css` — canonical refined Operations hierarchy, control typography, focus, and system-preference fallbacks.
+- `packages/ui/src/tokens.css` — semantic light/dark/increased-contrast tokens.
 
 **Tests / QA**
 
-- Create `apps/operations/src/styles/apple-hig-remediation.test.ts` — source/token contracts plus contrast calculations for this bounded remediation.
-- Modify `e2e/operations.e2e.ts` — rendered computed-style assertions for cashier-critical controls and reduced-motion behavior.
-- Existing full suite remains authoritative: `npm run format:check`, `npm run lint`, `npm run test`, `npm run typecheck`, `npm run build`, `npm run test:e2e`, Windows package, and `Required quality gate`.
+- Create `apps/operations/src/styles/apple-hig-remediation.test.ts` — source/token contracts and numeric contrast checks.
+- Modify `e2e/operations.e2e.ts` — rendered computed-style and reduced-motion coverage using existing `enterActiveOrdersForCategoryTests`, `openCartIfMobile`, and `currentOrderCart` helpers.
+- Existing permanent suite remains authoritative: format, lint, unit/integration, typecheck, builds, provisioning smoke, migration-chain smoke, Edge Function typecheck, rendered Playwright E2E, Windows package, Required quality gate.
 
 ---
 
 ## Phase A — High-frequency cashier controls
 
-### Task 1: Lock semantic quantity-button hooks and cashier-control typography
+### Task 1: Add semantic quantity hooks and strengthen cashier-critical typography
 
 **Files:**
 - Modify: `apps/operations/src/app/MenuProductCard.tsx`
@@ -76,13 +85,13 @@ Implementation must also preserve the approved 2026-08-27 audit decisions that l
 - Create/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
 
 **Interfaces:**
-- Consumes: existing button accessible names (`Add one …`, `Remove one …`, `Increase … quantity`, `Decrease … quantity`).
-- Produces: reusable CSS hooks `.quantity-increment` and `.quantity-decrement` on both product-card and Current Order steppers.
-- Produces: scoped `600` weights for order type, payment methods, Edit, line Extra, and product Extra.
+- Consumes existing accessible names: `Add one …`, `Remove one …`, `Increase … quantity`, `Decrease … quantity`.
+- Produces `.quantity-increment` and `.quantity-decrement` CSS hooks on both product-card and Current Order steppers.
+- Produces scoped `600` typography for Order Type, Payment Method, Edit, line Extra, and product Extra.
 
-- [ ] **Step 1: Create the failing source contract for cashier-critical typography and quantity semantics**
+- [ ] **Step 1: Create the failing source contract**
 
-Create `apps/operations/src/styles/apple-hig-remediation.test.ts` with:
+Create `apps/operations/src/styles/apple-hig-remediation.test.ts`:
 
 ```ts
 import { readFileSync } from 'node:fs';
@@ -92,6 +101,7 @@ import { describe, expect, it } from 'vitest';
 
 const stylesDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(stylesDirectory, '..', 'app');
+const repoRoot = resolve(stylesDirectory, '../../../..');
 
 function css(name: string): string {
   return readFileSync(resolve(stylesDirectory, name), 'utf8');
@@ -101,8 +111,12 @@ function app(name: string): string {
   return readFileSync(resolve(appDirectory, name), 'utf8');
 }
 
+function tokenCss(): string {
+  return readFileSync(resolve(repoRoot, 'packages/ui/src/tokens.css'), 'utf8');
+}
+
 describe('Apple/HIG remediation contracts', () => {
-  it('uses explicit semantic hooks for both quantity stepper directions', () => {
+  it('uses explicit semantic hooks for both quantity directions', () => {
     const productCard = app('MenuProductCard.tsx');
     const ordersCart = app('OrdersCart.tsx');
 
@@ -116,7 +130,7 @@ describe('Apple/HIG remediation contracts', () => {
     const source = css('premium.css');
 
     expect(source).toMatch(
-      /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
+      /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button,\s*\.split-payment-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
     );
     expect(source).toMatch(
       /\.line-actions button\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
@@ -130,17 +144,15 @@ describe('Apple/HIG remediation contracts', () => {
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
-Run:
-
 ```bash
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 ```
 
-Expected: FAIL because the semantic classes do not exist yet and refined cashier controls still use `font-weight: 500`.
+Expected: FAIL because the semantic classes do not exist and refined cashier controls still use `font-weight: 500`.
 
-- [ ] **Step 3: Add semantic quantity hooks without changing accessible names or behavior**
+- [ ] **Step 3: Add semantic classes without changing behavior**
 
-In `MenuProductCard.tsx`, add only the class names to the existing decrement/increment buttons:
+In `MenuProductCard.tsx`, preserve the existing handlers/ARIA and add only:
 
 ```tsx
 <button
@@ -166,7 +178,7 @@ In `MenuProductCard.tsx`, add only the class names to the existing decrement/inc
 </button>
 ```
 
-In `OrdersCart.tsx`, add the same classes to the existing Current Order stepper buttons:
+In `OrdersCart.tsx`, preserve the existing handlers/ARIA and add:
 
 ```tsx
 <button
@@ -192,11 +204,9 @@ In `OrdersCart.tsx`, add the same classes to the existing Current Order stepper 
 </button>
 ```
 
-Do not change event handlers, disabled conditions, text, or ARIA labels.
+- [ ] **Step 4: Raise only approved operational labels to `600`**
 
-- [ ] **Step 4: Raise only the approved high-frequency labels to Semibold**
-
-In `premium.css`, change the final refined order/payment rule from `500` to `600`:
+In the final refined rules in `premium.css`, use:
 
 ```css
 .order-type-section .segmented-control button,
@@ -208,8 +218,6 @@ In `premium.css`, change the final refined order/payment rule from `500` to `600
   font-weight: 600;
 }
 ```
-
-Change the refined Current Order action rule to:
 
 ```css
 .line-actions button {
@@ -224,8 +232,6 @@ Change the refined Current Order action rule to:
 }
 ```
 
-Change product Extra to:
-
 ```css
 .product-extra-action {
   min-height: 44px;
@@ -235,11 +241,11 @@ Change product Extra to:
 }
 ```
 
-Keep all existing dimensions, colors, borders, selected states, and hover states unchanged in this task.
+This intentionally applies the stronger weight to the whole mutually exclusive Order Type group, including Dine In, and the whole Payment Method group, not only labels present in the screenshot.
 
-- [ ] **Step 5: Restore heavy glyph weight specifically inside steppers**
+- [ ] **Step 5: Preserve heavy quantity glyphs in both steppers**
 
-Add after the refined stepper geometry rules in `premium.css`:
+Add after the refined stepper geometry rules:
 
 ```css
 .product-quantity .quantity-decrement,
@@ -252,11 +258,7 @@ Add after the refined stepper geometry rules in `premium.css`:
 }
 ```
 
-This prevents the broader `.line-actions button { font-weight: 600; }` rule from visually weakening Current Order `+` / `−` glyphs.
-
-- [ ] **Step 6: Run the focused test and verify GREEN**
-
-Run:
+- [ ] **Step 6: Run focused test and verify GREEN**
 
 ```bash
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
@@ -264,17 +266,15 @@ npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 7: Run the existing style/UI regression tests**
-
-Run:
+- [ ] **Step 7: Run existing visual contracts**
 
 ```bash
 npm test -- apps/operations/src/styles/ui-alignment.test.ts apps/operations/src/styles/cart-divider.test.ts
 ```
 
-Expected: PASS; Current Order rounding, gap, resize target, and other approved corrections remain locked.
+Expected: PASS; Current Order rounding, 8px structural gap, hidden divider, keyboard focus restoration, and 12px resize hit area remain intact.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Commit and open Draft PR**
 
 ```bash
 git add apps/operations/src/app/MenuProductCard.tsx \
@@ -284,102 +284,13 @@ git add apps/operations/src/app/MenuProductCard.tsx \
 git commit -m "ui: strengthen cashier-critical controls"
 ```
 
-After this commit, open a Draft PR against `main` if one does not exist yet.
-
----
-
-### Task 2: Differentiate increment and decrement without misusing destructive color
-
-**Files:**
-- Modify: `apps/operations/src/styles/premium.css`
-- Modify/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
-
-**Interfaces:**
-- Consumes: `.quantity-increment` / `.quantity-decrement` from Task 1.
-- Consumes: existing `--tux-accent-strong`, `--tux-accent-hover-soft`, `--tux-text-primary`, `--tux-surface-subtle` tokens.
-- Produces: distinct direction styling while preserving symbol-based meaning.
-
-- [ ] **Step 1: Extend the test with a failing color-semantics contract**
-
-Add inside the existing describe block:
-
-```ts
-it('uses action green for increment and keeps decrement neutral', () => {
-  const source = css('premium.css');
-
-  expect(source).toMatch(
-    /\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
-  );
-  expect(source).toMatch(
-    /\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s,
-  );
-  expect(source).not.toMatch(
-    /\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s,
-  );
-});
-```
-
-This intentionally refers to `--tux-accent-text`, which Task 3 will introduce. For this task, first use the temporary existing semantic action token `--tux-accent-strong`, then update the assertion in the same RED→GREEN cycle only after Task 3 lands. To keep every task independently green, use this Task 2 test initially:
-
-```ts
-expect(source).toMatch(
-  /\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-strong\);/s,
-);
-```
-
-- [ ] **Step 2: Run focused test and verify RED**
-
-```bash
-npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
-```
-
-Expected: FAIL because direction-specific color rules do not exist.
-
-- [ ] **Step 3: Add minimal direction styling in `premium.css`**
-
-```css
-.quantity-decrement {
-  color: var(--tux-text-primary);
-}
-
-.quantity-increment {
-  color: var(--tux-accent-strong);
-}
-
-.quantity-increment:hover:not(:disabled) {
-  background: var(--tux-accent-hover-soft);
-  color: var(--tux-accent-strong);
-}
-
-.quantity-decrement:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
-  color: var(--tux-text-primary);
-}
-```
-
-Do not introduce red, success green, labels, icons, or layout changes.
-
-- [ ] **Step 4: Run focused test and verify GREEN**
-
-```bash
-npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add apps/operations/src/styles/premium.css \
-  apps/operations/src/styles/apple-hig-remediation.test.ts
-git commit -m "ui: distinguish quantity increment and decrement"
-```
+Open one Draft PR against `main` after this commit.
 
 ---
 
 ## Phase B — Concrete Apple/HIG audit remediation
 
-### Task 3: Separate selected-control text color from pressed-action color and fix light secondary contrast
+### Task 2: Introduce selected-text semantics and fix concrete color contrast failures
 
 **Files:**
 - Modify: `packages/ui/src/tokens.css`
@@ -387,23 +298,17 @@ git commit -m "ui: distinguish quantity increment and decrement"
 - Modify/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
 
 **Interfaces:**
-- Produces new semantic token `--tux-accent-text`.
+- Produces `--tux-accent-text` separate from pressed-action color.
 - Light `--tux-accent-text`: `#14533f`.
 - Dark `--tux-accent-text`: `#5fae8a`.
-- Light `--tux-text-secondary`: `#6d7470` in both default light root and explicit `[data-theme='light']` root.
-- Selected text and quantity increment consume `--tux-accent-text`; pressed primary-action surfaces continue consuming `--tux-accent-pressed` / `--tux-accent-strong`.
+- Light `--tux-text-secondary`: `#6d7470` in both default and explicit light roots.
+- Selected control text consumes `--tux-accent-text`; primary pressed backgrounds continue consuming existing pressed/action tokens.
 
-- [ ] **Step 1: Add token parsing and contrast helpers to the test file**
+- [ ] **Step 1: Add numeric contrast helpers**
 
 Add above the describe block:
 
 ```ts
-const repoRoot = resolve(stylesDirectory, '../../../..');
-
-function tokenCss(): string {
-  return readFileSync(resolve(repoRoot, 'packages/ui/src/tokens.css'), 'utf8');
-}
-
 function rgb(hex: string): readonly [number, number, number] {
   const value = hex.replace('#', '');
   return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255) as [
@@ -427,15 +332,15 @@ function contrast(left: string, right: string): number {
 }
 ```
 
-- [ ] **Step 2: Add failing token/contrast contracts**
+- [ ] **Step 2: Add failing token contracts**
 
 ```ts
-it('keeps light secondary text at WCAG AA for small operational copy', () => {
+it('keeps light secondary text at AA contrast for small operational copy', () => {
   expect(contrast('#6d7470', '#f8faf9')).toBeGreaterThanOrEqual(4.5);
   expect(tokenCss()).toContain('--tux-text-secondary: #6d7470;');
 });
 
-it('separates selected-control text from pressed-action color in dark mode', () => {
+it('separates selected text from pressed-action color in dark mode', () => {
   const tokens = tokenCss();
   const styles = css('premium.css');
 
@@ -452,59 +357,54 @@ it('separates selected-control text from pressed-action color in dark mode', () 
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 ```
 
-Expected: FAIL because the new token and adjusted light secondary value do not exist.
+Expected: FAIL because the new token and revised secondary text value do not exist.
 
-- [ ] **Step 4: Update light tokens in `packages/ui/src/tokens.css`**
+- [ ] **Step 4: Update light semantic tokens**
 
-In `:root` and `:root[data-theme='light']`, change:
+In both `:root` and `:root[data-theme='light']`:
 
 ```css
 --tux-text-secondary: #6d7470;
 --tux-accent-text: #14533f;
 ```
 
-Keep:
+Keep the action/pressed relationship unchanged:
 
 ```css
 --tux-accent-pressed: #14533f;
 --tux-accent-strong: var(--tux-accent-pressed);
 ```
 
-The new text token is semantically separate even though light mode initially shares the same numeric color.
+- [ ] **Step 5: Add dark selected-text token**
 
-- [ ] **Step 5: Add the dark selected-text token**
-
-In both dark token blocks (`prefers-color-scheme: dark` and explicit `[data-theme='dark']`):
+In both dark token blocks:
 
 ```css
 --tux-accent-text: #5fae8a;
 ```
 
-Keep the pressed action token unchanged:
+Keep:
 
 ```css
 --tux-accent-pressed: #4f9b7a;
 --tux-accent-strong: var(--tux-accent-pressed);
 ```
 
-- [ ] **Step 6: Route selected text and increment glyphs through `--tux-accent-text`**
+- [ ] **Step 6: Route refined selected text through the new token**
 
-In `premium.css`, replace selected-control text uses for these refined controls:
+In `premium.css`, use `var(--tux-accent-text)` for selected-control text where the refined layer currently uses `var(--tux-accent-strong)`, including:
 
 ```css
 .operations-header .nav-item-active,
 .menu-toolbar .category-rail button.selected,
 .menu-toolbar > .field-stack > .segmented-control button.selected,
 .order-type-section .segmented-control button.selected,
-.payment-section .payment-methods button.selected,
-.quantity-increment {
+.payment-section .payment-methods button.selected {
   color: var(--tux-accent-text);
 }
 ```
 
-Do not replace primary-action backgrounds or pressed-state tokens.
-
-Also update the Task 2 test assertion from `--tux-accent-strong` to `--tux-accent-text`.
+Do not replace primary-action backgrounds, hover backgrounds, or pressed-action tokens.
 
 - [ ] **Step 7: Run focused test and verify GREEN**
 
@@ -525,6 +425,85 @@ git commit -m "fix: strengthen operations color contrast"
 
 ---
 
+### Task 3: Differentiate increment and decrement using symbol plus semantic color
+
+**Files:**
+- Modify: `apps/operations/src/styles/premium.css`
+- Modify/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
+
+**Interfaces:**
+- Consumes `.quantity-increment` / `.quantity-decrement` from Task 1.
+- Consumes `--tux-accent-text` from Task 2.
+- Produces distinct direction styling without destructive semantics.
+
+- [ ] **Step 1: Add failing direction-color contract**
+
+```ts
+it('uses action accent for increment and keeps decrement neutral', () => {
+  const source = css('premium.css');
+
+  expect(source).toMatch(
+    /\.quantity-increment\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
+  );
+  expect(source).toMatch(
+    /\.quantity-decrement\s*\{[^}]*color:\s*var\(--tux-text-primary\);/s,
+  );
+  expect(source).not.toMatch(
+    /\.quantity-decrement\s*\{[^}]*var\(--tux-destructive\)/s,
+  );
+});
+```
+
+- [ ] **Step 2: Run focused test and verify RED**
+
+```bash
+npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
+```
+
+Expected: FAIL because direction-specific color rules do not exist.
+
+- [ ] **Step 3: Add minimal scoped styling**
+
+```css
+.quantity-decrement {
+  color: var(--tux-text-primary);
+}
+
+.quantity-increment {
+  color: var(--tux-accent-text);
+}
+
+.quantity-increment:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+  color: var(--tux-accent-text);
+}
+
+.quantity-decrement:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
+  color: var(--tux-text-primary);
+}
+```
+
+Do not add labels, new icons, red, or layout changes.
+
+- [ ] **Step 4: Run focused test and verify GREEN**
+
+```bash
+npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/operations/src/styles/premium.css \
+  apps/operations/src/styles/apple-hig-remediation.test.ts
+git commit -m "ui: distinguish quantity increment and decrement"
+```
+
+---
+
 ### Task 4: Strengthen keyboard focus visibility
 
 **Files:**
@@ -532,13 +511,13 @@ git commit -m "fix: strengthen operations color contrast"
 - Modify/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
 
 **Interfaces:**
-- Consumes: existing `--tux-focus-ring` token.
-- Produces: a 3px focus outline mixed at `70%`, preserving the existing 2px offset.
+- Consumes `--tux-focus-ring`.
+- Produces a 3px focus outline at a `70%` token mix with the existing 2px offset.
 
-- [ ] **Step 1: Add a failing focus contract**
+- [ ] **Step 1: Add failing focus contract**
 
 ```ts
-it('keeps keyboard focus strong enough to locate immediately', () => {
+it('keeps keyboard focus immediately visible', () => {
   const source = css('premium.css');
 
   expect(source).toMatch(
@@ -554,9 +533,9 @@ it('keeps keyboard focus strong enough to locate immediately', () => {
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 ```
 
-Expected: FAIL because the current premium override uses `36%`.
+Expected: FAIL because the refined layer currently mixes the focus ring at `36%`.
 
-- [ ] **Step 3: Replace the weak premium focus rule**
+- [ ] **Step 3: Replace only the weak refined focus rule**
 
 ```css
 :focus-visible {
@@ -565,9 +544,9 @@ Expected: FAIL because the current premium override uses `36%`.
 }
 ```
 
-Do not remove the special `.cart-resize-separator:focus-visible::before` behavior in `final-pos-corrections.css`.
+Do not remove `.cart-resize-separator:focus-visible::before` from `final-pos-corrections.css`.
 
-- [ ] **Step 4: Run focused and existing divider tests**
+- [ ] **Step 4: Run focused and divider tests**
 
 ```bash
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts apps/operations/src/styles/cart-divider.test.ts
@@ -594,19 +573,19 @@ git commit -m "fix: strengthen keyboard focus visibility"
 
 **Interfaces:**
 - Produces `@media (prefers-reduced-motion: reduce)` behavior.
-- Removes press translation and nonessential transition motion without changing layout or disabled behavior.
+- Removes the 1px press translation and effectively eliminates nonessential transition duration without altering selection/focus/disabled states.
 
-- [ ] **Step 1: Add the failing source contract**
+- [ ] **Step 1: Add failing source contract**
 
 ```ts
 it('disables nonessential control motion when reduced motion is requested', () => {
   const source = css('premium.css');
 
   expect(source).toMatch(
-    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button,\s*input,\s*select,\s*textarea\s*\{[^}]*transition-duration:\s*0\.01ms;/,
   );
   expect(source).toMatch(
-    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button,\s*input,\s*select,\s*textarea\s*\{[^}]*transition-duration:\s*0\.01ms;/,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/,
   );
 });
 ```
@@ -636,8 +615,6 @@ Expected: FAIL because no reduced-motion rule exists.
 }
 ```
 
-Do not remove focus, hover, selected, or disabled visual state changes.
-
 - [ ] **Step 4: Run focused test and verify GREEN**
 
 ```bash
@@ -646,29 +623,28 @@ npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Add rendered reduced-motion coverage to `e2e/operations.e2e.ts`**
+- [ ] **Step 5: Add rendered reduced-motion E2E using the existing setup helper**
 
-Reuse the existing browser seeding/sign-in helpers in that file. Add a test that calls:
-
-```ts
-await page.emulateMedia({ reducedMotion: 'reduce' });
-```
-
-Then after reaching Orders, assert an enabled product `+` button computes to no press transform after `mouse.down()`:
+Add to `e2e/operations.e2e.ts`:
 
 ```ts
-const addButton = page.getByRole('button', { name: /Add one Single Smashed Patty/ });
-await addButton.hover();
-await page.mouse.down();
-expect(await addButton.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
-await page.mouse.up();
+test('respects reduced motion for cashier controls', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await enterActiveOrdersForCategoryTests(page);
+
+  const addButton = page.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  await addButton.hover();
+  const box = await addButton.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  expect(await addButton.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
+  await page.mouse.up();
+});
 ```
 
-Use the existing test setup helpers rather than creating a second seed/bootstrap path.
-
-- [ ] **Step 6: Run the specific Playwright test**
-
-Run the exact test title you added, for example:
+- [ ] **Step 6: Run the exact Playwright test**
 
 ```bash
 npm run test:e2e -- --grep "respects reduced motion for cashier controls"
@@ -687,20 +663,20 @@ git commit -m "fix: respect reduced motion in operations controls"
 
 ---
 
-### Task 6: Provide an opaque reduced-transparency header fallback
+### Task 6: Provide an opaque reduced-transparency fallback
 
 **Files:**
 - Modify: `apps/operations/src/styles/premium.css`
 - Modify/Test: `apps/operations/src/styles/apple-hig-remediation.test.ts`
 
 **Interfaces:**
-- Produces `@media (prefers-reduced-transparency: reduce)` fallback for the only approved glass-like persistent navigation surface.
-- Keeps header geometry, borders, radius, and layout unchanged.
+- Produces `@media (prefers-reduced-transparency: reduce)` for the persistent floating Operations header.
+- Keeps header dimensions, radius, border, and navigation layout unchanged.
 
 - [ ] **Step 1: Add failing reduced-transparency contract**
 
 ```ts
-it('provides an opaque operations header when reduced transparency is requested', () => {
+it('makes the floating header opaque when reduced transparency is requested', () => {
   const source = css('premium.css');
 
   expect(source).toMatch(
@@ -717,7 +693,7 @@ npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 
 Expected: FAIL because no reduced-transparency media query exists.
 
-- [ ] **Step 3: Add the fallback at the end of `premium.css`**
+- [ ] **Step 3: Add fallback**
 
 ```css
 @media (prefers-reduced-transparency: reduce) {
@@ -747,7 +723,7 @@ git commit -m "fix: add reduced transparency fallback"
 
 ---
 
-### Task 7: Add increased-contrast token overrides
+### Task 7: Add increased-contrast semantic-token overrides
 
 **Files:**
 - Modify: `packages/ui/src/tokens.css`
@@ -755,8 +731,7 @@ git commit -m "fix: add reduced transparency fallback"
 
 **Interfaces:**
 - Produces `@media (prefers-contrast: more)` token overrides.
-- Does not change default light/dark appearance.
-- Increased contrast strengthens borders, secondary text, focus ring, and selected-control text while preserving semantic roles.
+- Default light/dark appearance remains unchanged when the preference is not active.
 
 - [ ] **Step 1: Add failing increased-contrast contract**
 
@@ -765,7 +740,7 @@ it('provides stronger semantic tokens when increased contrast is requested', () 
   const tokens = tokenCss();
 
   expect(tokens).toMatch(
-    /@media \(prefers-contrast: more\)\s*\{[\s\S]*--tux-border-subtle:[^;]+;[\s\S]*--tux-focus-ring:[^;]+;[\s\S]*--tux-accent-text:[^;]+;/,
+    /@media \(prefers-contrast: more\)\s*\{[\s\S]*--tux-text-secondary:[^;]+;[\s\S]*--tux-border-subtle:[^;]+;[\s\S]*--tux-focus-ring:[^;]+;[\s\S]*--tux-accent-text:[^;]+;/,
   );
 });
 ```
@@ -776,11 +751,9 @@ it('provides stronger semantic tokens when increased contrast is requested', () 
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 ```
 
-Expected: FAIL because no `prefers-contrast` override exists.
+Expected: FAIL because `tokens.css` has no increased-contrast override.
 
-- [ ] **Step 3: Add increased-contrast overrides at the end of `tokens.css`**
-
-Use semantic token derivation instead of raw component colors:
+- [ ] **Step 3: Add the media query last in `tokens.css`**
 
 ```css
 @media (prefers-contrast: more) {
@@ -793,7 +766,7 @@ Use semantic token derivation instead of raw component colors:
 }
 ```
 
-Because explicit theme roots already redefine the base semantic tokens, this media query must remain last in `tokens.css` so it wins after light/dark theme selection.
+The media query stays after explicit light/dark theme blocks so the accessibility preference wins regardless of selected theme.
 
 - [ ] **Step 4: Run focused test and verify GREEN**
 
@@ -803,7 +776,7 @@ npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Run token consumers’ unit/style suite**
+- [ ] **Step 5: Run existing style contracts**
 
 ```bash
 npm test -- apps/operations/src/styles/apple-hig-remediation.test.ts apps/operations/src/styles/ui-alignment.test.ts
@@ -821,48 +794,51 @@ git commit -m "fix: support increased contrast preferences"
 
 ---
 
-## Phase C — Rendered cashier QA and final verification
+## Phase C — Rendered cashier QA and authority reconciliation
 
-### Task 8: Verify computed styles for the exact requested controls
+### Task 8: Verify the exact requested controls in rendered Playwright
 
 **Files:**
 - Modify/Test: `e2e/operations.e2e.ts`
 
 **Interfaces:**
-- Consumes: seeded fixture order types `Take Away`, `Dine In`, `Delivery`; payment methods `Cash`, `Instapay`.
-- Consumes: product fixture `Single Smashed Patty`.
-- Produces: rendered evidence that requested controls have the intended hierarchy and quantity direction is visually distinct in both product card and Current Order.
+- Uses existing `enterActiveOrdersForCategoryTests(page)` for deterministic browser-fallback setup.
+- Uses `openCartIfMobile(page, testInfo)` and `currentOrderCart(page, testInfo)` so the same test works across desktop and mobile projects.
+- Uses fixture labels `Take Away`, `Dine In`, `Delivery`, `Cash`, `Instapay`, and product `Single Smashed Patty`.
 
-- [ ] **Step 1: Add a rendered typography test**
-
-Using the file’s existing seed/bootstrap helpers, add a test titled:
+- [ ] **Step 1: Add rendered typography coverage with exact existing helpers**
 
 ```ts
-test('cashier-critical controls use the approved operational emphasis', async ({ page }) => {
-  // existing seed + sign-in helper calls here, exactly as neighboring Orders tests use them
+test('cashier-critical controls use the approved operational emphasis', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
 
-  const takeAway = page.getByRole('button', { name: 'Take Away' });
-  const delivery = page.getByRole('button', { name: 'Delivery' });
+  const productCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const productExtra = productCard.getByRole('button', { name: 'Extra', exact: true });
+  expect(await productExtra.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
 
-  for (const control of [takeAway, delivery]) {
+  await productCard.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+
+  for (const name of ['Take Away', 'Dine In', 'Delivery', 'Cash', 'Instapay']) {
+    const control = cart.getByRole('button', { name, exact: true });
     await expect(control).toBeVisible();
     expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
   }
 
-  await page.getByRole('button', { name: /Add one Single Smashed Patty/ }).click();
-
-  const cash = page.getByRole('button', { name: 'Cash' });
-  const instapay = page.getByRole('button', { name: 'Instapay' });
-  for (const control of [cash, instapay]) {
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
+  for (const name of ['Edit', 'Extra']) {
+    const control = line.getByRole('button', { name, exact: true });
     await expect(control).toBeVisible();
     expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
   }
 });
 ```
 
-Do not duplicate setup logic; copy the exact setup calls from the closest existing Orders E2E test.
-
-- [ ] **Step 2: Run the new typography test and verify it passes**
+- [ ] **Step 2: Run the exact typography test**
 
 ```bash
 npm run test:e2e -- --grep "cashier-critical controls use the approved operational emphasis"
@@ -870,28 +846,46 @@ npm run test:e2e -- --grep "cashier-critical controls use the approved operation
 
 Expected: PASS.
 
-- [ ] **Step 3: Add a rendered quantity-direction test**
+- [ ] **Step 3: Add rendered quantity-direction coverage for both steppers**
 
 ```ts
-test('quantity increment is action-colored while decrement stays neutral', async ({ page }) => {
-  // existing seed + sign-in helper calls here, exactly as neighboring Orders tests use them
+test('quantity increment is action-colored while decrement stays neutral', async ({ page }, testInfo) => {
+  await enterActiveOrdersForCategoryTests(page);
 
-  const addButton = page.getByRole('button', { name: /Add one Single Smashed Patty/ });
-  await addButton.click();
+  const productCard = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
+  const productAdd = productCard.getByRole('button', { name: 'Add one Single Smashed Patty' });
+  await productAdd.click();
+  const productRemove = productCard.getByRole('button', { name: 'Remove one Single Smashed Patty' });
 
-  const removeButton = page.getByRole('button', { name: /Remove one Single Smashed Patty/ });
-  const addColor = await addButton.evaluate((node) => getComputedStyle(node).color);
-  const removeColor = await removeButton.evaluate((node) => getComputedStyle(node).color);
+  expect(await productAdd.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await productRemove.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await productAdd.evaluate((node) => getComputedStyle(node).color)).not.toBe(
+    await productRemove.evaluate((node) => getComputedStyle(node).color),
+  );
 
-  expect(addColor).not.toBe(removeColor);
-  await expect(addButton).toHaveAttribute('aria-label', /Add one Single Smashed Patty/);
-  await expect(removeButton).toHaveAttribute('aria-label', /Remove one Single Smashed Patty/);
+  await openCartIfMobile(page, testInfo);
+  const cart = currentOrderCart(page, testInfo);
+  const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
+  const lineAdd = line.getByRole('button', { name: /Increase Single Smashed Patty quantity/ });
+  const lineRemove = line.getByRole('button', { name: /Decrease Single Smashed Patty quantity/ });
+
+  expect(await lineAdd.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await lineRemove.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('800');
+  expect(await lineAdd.evaluate((node) => getComputedStyle(node).color)).not.toBe(
+    await lineRemove.evaluate((node) => getComputedStyle(node).color),
+  );
+
+  await expect(productAdd).toHaveAttribute('aria-label', 'Add one Single Smashed Patty');
+  await expect(productRemove).toHaveAttribute('aria-label', 'Remove one Single Smashed Patty');
+  await expect(lineAdd).toHaveAttribute('aria-label', 'Increase Single Smashed Patty quantity');
+  await expect(lineRemove).toHaveAttribute('aria-label', 'Decrease Single Smashed Patty quantity');
 });
 ```
 
-The test intentionally asserts distinction plus semantics rather than hard-coding one browser’s RGB serialization.
-
-- [ ] **Step 4: Run the new quantity test**
+- [ ] **Step 4: Run the exact quantity test**
 
 ```bash
 npm run test:e2e -- --grep "quantity increment is action-colored while decrement stays neutral"
@@ -899,59 +893,63 @@ npm run test:e2e -- --grep "quantity increment is action-colored while decrement
 
 Expected: PASS.
 
-- [ ] **Step 5: Capture rendered QA evidence at desktop and mobile widths through the existing Playwright artifact flow**
-
-Run the full E2E suite locally when the environment is available:
+- [ ] **Step 5: Run all three new rendered tests together**
 
 ```bash
-npm run test:e2e
+npm run test:e2e -- --grep "cashier-critical controls|quantity increment|respects reduced motion"
 ```
 
-At minimum inspect the generated report/evidence for:
+Expected: PASS on configured desktop/mobile Playwright projects.
 
-- desktop 1440px: Delivery / Take Away and Cash / InstaPay remain readable and aligned;
-- product-card `+ / −`: direction is immediately distinguishable without red;
-- Current Order `+ / −`: same semantic treatment as product card;
-- Edit and Extra remain 44px high and visibly stronger;
-- dark mode selected labels remain readable;
-- mobile Review & pay flow has no overflow or clipped controls.
+- [ ] **Step 6: Inspect rendered evidence produced by the existing artifact flow**
 
-Do not approve screenshot-only evidence if computed-style or behavior tests fail.
+Check the existing Playwright report/test-results output for:
 
-- [ ] **Step 6: Commit**
+- 1440px desktop: Order Type and Payment labels are stronger without clipping.
+- Product-card `+ / −`: immediately distinguishable, no red decrement.
+- Current Order `+ / −`: same semantic treatment as product cards.
+- Edit and Extra remain 44px high and align with the existing line-action geometry.
+- Dark mode selected labels remain legible.
+- Mobile Review & pay has no horizontal overflow or clipped action controls.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add e2e/operations.e2e.ts
-git commit -m "test: cover cashier control emphasis and quantity semantics"
+git commit -m "test: cover Apple HIG cashier control remediation"
 ```
 
 ---
 
-### Task 9: Documentation reconciliation and full permanent verification
+### Task 9: Reconcile `DESIGN.md` and run full permanent verification
 
 **Files:**
 - Modify: `DESIGN.md`
 - Test: entire repository
 
 **Interfaces:**
-- Updates the enduring design authority so later work does not reintroduce the audited contradictions.
-- Does not add new product requirements beyond what this plan implements.
+- Updates the enduring design authority to prevent regression.
+- Adds no new product behavior beyond Tasks 1–8.
 
-- [ ] **Step 1: Update `DESIGN.md` with the exact implemented rules**
+- [ ] **Step 1: Add the implemented typography exception under `## Typography`**
 
-Under **Typography**, add:
+Add:
 
 ```markdown
 Cashier-critical mutually exclusive controls such as Order Type and Payment Method may use Semibold at the existing standard-control size when repeated scan speed warrants stronger recognition. Do not escalate these controls to Bold/Heavy by default.
 ```
 
-Under **Interaction targets and controls**, add:
+- [ ] **Step 2: Add the quantity-direction rule under `## Interaction targets and controls`**
+
+Add:
 
 ```markdown
 Quantity steppers distinguish direction through symbol plus semantic color reinforcement: increment uses the TUX action accent, decrement remains neutral, and decrement must not use destructive red unless the action becomes destructive rather than reversible.
 ```
 
-Under **Accessibility**, add:
+- [ ] **Step 3: Add exact accessibility preference rules under `## Accessibility`**
+
+Add:
 
 ```markdown
 - Persistent translucent navigation must provide an opaque `prefers-reduced-transparency: reduce` fallback.
@@ -960,13 +958,12 @@ Under **Accessibility**, add:
 - Keyboard focus indicators must maintain at least 3:1 non-text contrast against adjacent surfaces.
 ```
 
-Do not change the existing rules that reserve Bold for exceptional emphasis or require 44px targets.
+Do not remove the existing rules reserving Bold for exceptional emphasis or requiring 44px targets.
 
-- [ ] **Step 2: Run formatting first and inspect the diff**
+- [ ] **Step 4: Format and inspect the exact diff before broad verification**
 
 ```bash
 npm run format
-
 git diff --check
 git diff -- DESIGN.md \
   apps/operations/src/app/MenuProductCard.tsx \
@@ -977,9 +974,9 @@ git diff -- DESIGN.md \
   e2e/operations.e2e.ts
 ```
 
-Expected: only the planned files and planned semantics changed. No business logic, unrelated formatting churn, or `final-pos-corrections.css` gap/rounding edits.
+Expected: only planned files/semantics changed. No business logic, unrelated formatting churn, Supabase migrations, or `final-pos-corrections.css` gap/rounding changes.
 
-- [ ] **Step 3: Run all local permanent checks**
+- [ ] **Step 5: Run all local permanent checks**
 
 ```bash
 npm run format:check
@@ -987,28 +984,21 @@ npm run lint
 npm run test
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 Expected: all commands exit 0.
 
-- [ ] **Step 4: Run rendered browser E2E**
-
-```bash
-npm run test:e2e
-```
-
-Expected: all Playwright tests pass.
-
-- [ ] **Step 5: Commit documentation reconciliation**
+- [ ] **Step 6: Commit authority reconciliation**
 
 ```bash
 git add DESIGN.md
 git commit -m "docs: codify Apple HIG operations accessibility rules"
 ```
 
-- [ ] **Step 6: Push exact head and wait for `TUX V2 CI` on the PR**
+- [ ] **Step 7: Push exact head and require full `TUX V2 CI`**
 
-Required permanent gates from `.github/workflows/ci.yml`:
+The PR must pass every permanent gate defined in `.github/workflows/ci.yml`:
 
 1. Format check
 2. Lint
@@ -1023,66 +1013,68 @@ Required permanent gates from `.github/workflows/ci.yml`:
 11. Unsigned Windows x64 package
 12. Required quality gate
 
-No gate may be skipped because this is UI-only work.
+No gate may be skipped because the change is UI-only.
 
-- [ ] **Step 7: Review the exact-head PR diff and review threads**
+- [ ] **Step 8: Audit the exact-head PR before completion claim**
 
-Confirm:
+Confirm all of the following directly from the exact PR head/diff:
 
-- No Supabase migration was added or applied.
+- No migration was added or applied.
 - No domain/application/server behavior changed.
-- No Vercel deployment was created from the feature branch.
-- The Menu-to-Current-Order 8px structural gap remains unchanged.
-- Product and Current Order steppers both use semantic increment/decrement classes.
-- Increment uses action accent; decrement is neutral and not destructive red.
-- Delivery / Take Away / Cash / InstaPay / Edit / Extra compute to `font-weight: 600`.
-- All quantity glyphs remain 44px targets and `font-weight: 800`.
+- No feature-branch Vercel deploy was created.
+- Menu-to-Current-Order 8px structural gap remains unchanged.
+- Current Order 12px invisible resize target remains unchanged.
+- Product and Current Order steppers both use `.quantity-increment` / `.quantity-decrement`.
+- Increment uses `--tux-accent-text`; decrement is neutral and never destructive red.
+- Order Type / Payment / Edit / Extra compute to `600`.
+- Quantity glyphs compute to `800` inside 44px targets.
 - `prefers-reduced-motion`, `prefers-reduced-transparency`, and `prefers-contrast` contracts exist.
-- Light secondary text and dark selected text meet the numeric contrast tests.
-- Focus ring no longer uses the old `36%` mix.
-- All unresolved review threads are addressed before merge approval.
+- Light secondary text and dark selected text pass the numeric contrast tests.
+- Focus ring no longer contains the old `36%` mix.
+- All PR review threads are resolved or explicitly addressed.
 
-- [ ] **Step 8: Use verification-before-completion and stop before merge**
+- [ ] **Step 9: Use verification-before-completion and stop before merge**
 
-Re-run or freshly inspect the exact-head permanent CI result. Report:
+Freshly inspect the exact-head CI result and report:
 
 - implementation branch;
 - PR number and exact head SHA;
 - commits created;
-- RED evidence per task;
-- final GREEN local and CI evidence;
+- RED evidence per production task;
+- final GREEN local + CI evidence;
 - rendered QA result;
-- any intentionally deferred design recommendations.
+- intentionally deferred design recommendations.
 
 Do **not** merge until the user explicitly asks.
 
 ---
 
-## Deferred follow-up design decisions — not part of this implementation
+## Deferred follow-up design decisions — not part of this plan
 
-The audit identified these as plausible improvements, but they require a separate design approval because they change visual hierarchy rather than merely fixing a concrete contradiction:
+These audit observations require a separate design approval because they change hierarchy rather than fixing a concrete contradiction:
 
-1. Convert Orders Board `Active / Done / Cancelled / Returned` pills into the same segmented-control visual language used elsewhere.
+1. Convert Orders Board `Active / Done / Cancelled / Returned` pills into the same segmented visual language used elsewhere.
 2. Rebalance repeated green `Mark Done` actions on dense Orders Board views so the accent does not lose priority meaning.
-3. Normalize major screen-title sizes across Orders Board, Expenses, and Bulk Stock.
-4. Broaden typography normalization beyond the explicitly requested cashier-critical controls.
+3. Normalize major screen-title scales across Orders Board, Expenses, and Bulk Stock.
+4. Broaden typography normalization beyond the explicitly approved cashier-critical controls.
 
 Do not implement these four items under this plan.
 
 ## Final acceptance criteria
 
-The implementation is ready for user review only when all of the following are true:
+The implementation is ready for user review only when all are true:
 
-- Delivery / Take Away / Cash / InstaPay are rendered at `14px / 18px / 600`.
-- Edit and Extra are rendered at `14px / 18px / 600`.
+- Take Away / Dine In / Delivery render at `14px / 18px / 600`.
+- Cash / Instapay render at `14px / 18px / 600`.
+- Edit and Extra render at `14px / 18px / 600`.
 - Product-card and Current Order `+ / −` controls remain 44×44 px.
-- `+` and `−` glyphs are heavy (`800`).
-- `+` uses action accent and `−` remains neutral; neither meaning depends on color alone.
+- `+` and `−` glyphs render at weight `800`.
+- `+` uses the action accent and `−` remains neutral; direction never depends on color alone.
 - Decrement never uses destructive red.
 - Light secondary operational text meets at least 4.5:1 against the approved canvas in the regression calculation.
-- Dark selected-control text meets at least 4.5:1 against the selected soft-accent surface in the regression calculation.
-- Focus indicator uses the strengthened 70% focus-ring mix and retains a visible keyboard focus state.
-- Reduced Motion removes press translation and reduces transition duration.
+- Dark selected-control text meets at least 4.5:1 against the soft selected surface in the regression calculation.
+- Focus uses the strengthened 70% ring mix and retains visible keyboard focus.
+- Reduced Motion removes press translation and effectively removes nonessential transition duration.
 - Reduced Transparency makes the persistent Operations header opaque and removes backdrop blur.
 - Increased Contrast strengthens semantic tokens without changing default theme behavior.
 - Existing mobile/desktop flows, Current Order rounding/gap/resize behavior, business logic, accessibility names, and keyboard paths remain intact.
