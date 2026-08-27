@@ -165,11 +165,7 @@
       var(--tux-text-primary) 78%,
       var(--tux-surface-canvas)
     );
-    --tux-border-subtle: color-mix(
-      in srgb,
-      var(--tux-text-primary) 32%,
-      var(--tux-surface-panel)
-    );
+    --tux-border-subtle: color-mix(in srgb, var(--tux-text-primary) 32%, var(--tux-surface-panel));
     --tux-focus-ring: var(--tux-accent);
     --tux-accent-text: var(--tux-accent);
   }
