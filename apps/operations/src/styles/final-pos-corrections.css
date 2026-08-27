@@ -368,6 +368,9 @@
 }
 
 /* Selected labels use a legibility token independent from pressed-action color. */
+.operations-header .nav-item-active,
+.menu-toolbar .category-rail button.selected,
+.menu-toolbar > .field-stack > .segmented-control button.selected,
 .order-type-section .segmented-control button.selected,
 .payment-section .payment-methods button.selected {
   color: var(--tux-accent-text);
