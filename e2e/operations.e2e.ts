@@ -2306,8 +2306,12 @@ test('cashier-critical controls use the approved operational emphasis', async ({
   for (const name of ['Take Away', 'Dine In', 'Delivery', 'Cash', 'Instapay']) {
     const control = cart.getByRole('button', { name, exact: true });
     await expect(control).toBeVisible();
-    expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
+    expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('700');
   }
+
+  const splitPayment = cart.getByRole('button', { name: 'Split payment', exact: true });
+  await expect(splitPayment).toBeVisible();
+  expect(await splitPayment.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('700');
 
   const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
   for (const name of ['Edit', 'Extra']) {
@@ -2337,6 +2341,9 @@ test('quantity increment is action-colored while decrement stays neutral', async
   expect(await productAdd.evaluate((node) => getComputedStyle(node).color)).not.toBe(
     await productRemove.evaluate((node) => getComputedStyle(node).color),
   );
+  const productAddStyle = await productAdd.evaluate((node) => getComputedStyle(node));
+  expect(productAddStyle.borderLeftWidth).toBe('1px');
+  expect(productAddStyle.borderLeftStyle).toBe('solid');
 
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
