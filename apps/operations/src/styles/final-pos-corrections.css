@@ -49,6 +49,17 @@
   overflow: hidden;
 }
 
+/* Let the original 8px workspace separator define the visible Menu-to-Current-Order gap. */
+@media (min-width: 54.0625rem) {
+  .menu-toolbar {
+    margin-right: 0;
+  }
+
+  .product-grid {
+    padding-right: 0;
+  }
+}
+
 /* Preserve true centered navigation throughout the desktop rail breakpoint. */
 @media (max-width: 74rem) and (min-width: 54.0625rem) {
   .operations-header {
