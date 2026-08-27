@@ -78,6 +78,8 @@ describe('Apple/HIG remediation contracts', () => {
     expect(tokens).toContain('--tux-accent-text: #14533f;');
     expect(tokens).toContain('--tux-accent-text: #5fae8a;');
     expect(contrast('#5fae8a', '#173429')).toBeGreaterThanOrEqual(4.5);
-    expect(styles).toContain('color: var(--tux-accent-text);');
+    expect(styles).toMatch(
+      /\.operations-header \.nav-item-active,\s*\.menu-toolbar \.category-rail button\.selected,\s*\.menu-toolbar > \.field-stack > \.segmented-control button\.selected,\s*\.order-type-section \.segmented-control button\.selected,\s*\.payment-section \.payment-methods button\.selected\s*\{[^}]*color:\s*var\(--tux-accent-text\);/s,
+    );
   });
 });
