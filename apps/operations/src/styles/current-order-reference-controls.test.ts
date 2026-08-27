@@ -20,8 +20,8 @@ describe('Current Order approved reference controls', () => {
     const icons = app('icons.tsx');
     const source = css('final-pos-corrections.css');
 
-    expect(cart).toContain(
-      "import { EditPencilIcon, MessageIcon, PlusCircleIcon, TagIcon } from './icons';",
+    expect(cart).toMatch(
+      /import\s*\{[\s\S]*?EditPencilIcon,[\s\S]*?MessageIcon,[\s\S]*?PlusCircleIcon,[\s\S]*?TagIcon,[\s\S]*?\}\s*from '\.\/icons';/,
     );
     expect(cart).toMatch(
       /className="adjustment-actions"[\s\S]*?<MessageIcon[^>]*data-icon="message"[\s\S]*?Add note[\s\S]*?<TagIcon[^>]*data-icon="tag"[\s\S]*?Add discount/,
