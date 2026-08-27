@@ -18,10 +18,12 @@ test('hides the Current Order divider while preserving resize and keyboard focus
   );
 });
 
-test('uses a 4px visual gap while preserving the 12px resize hit area', () => {
+test('uses an 8px structural gap without extra menu-side inset', () => {
   const workspace = readFileSync(resolve(appDirectory, 'OrdersWorkspace.tsx'), 'utf8');
   const corrections = readFileSync(resolve(stylesDirectory, 'final-pos-corrections.css'), 'utf8');
 
-  expect(workspace).toContain('gridTemplateColumns: `minmax(0, 1fr) 4px ${cartWidth}px`');
+  expect(workspace).toContain('gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px`');
   expect(corrections).toContain('.cart-resize-separator {\n  width: 12px;\n  min-width: 12px;');
+  expect(corrections).toContain('.menu-toolbar {\n    margin-right: 0;\n  }');
+  expect(corrections).toContain('.product-grid {\n    padding-right: 0;\n  }');
 });
