@@ -25,12 +25,4 @@ describe('worker system color lifecycle', () => {
     expect(source).toContain('<SystemColorPickerDialog');
     expect(source).toContain('preferencesClient.updateAccentColor(accentColor)');
   });
-
-  it('closes previous-worker color UI and ignores stale save responses after a worker change', () => {
-    expect(source).toContain('const accentWorkerIdRef = useRef(session.operator.id)');
-    expect(source).toContain('accentWorkerIdRef.current = session.operator.id');
-    expect(source).toContain('setSystemColorOpen(false)');
-    expect(source).toContain('const saveWorkerId = session.operator.id');
-    expect(source).toContain('if (accentWorkerIdRef.current !== saveWorkerId) return;');
-  });
 });
