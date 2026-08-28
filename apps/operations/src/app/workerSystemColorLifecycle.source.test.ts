@@ -8,7 +8,7 @@ describe('worker system color lifecycle', () => {
     expect(source).toContain('createWorkerUiPreferencesClient');
     expect(source).toContain('session.operator.id');
     expect(source).toContain('accentHydrated');
-    expect(source).toContain('preferencesClient.load()');
+    expect(source).toMatch(/preferencesClient\s*\.\s*load\(\)/);
     expect(source).toContain('clearSystemAccentPalette(document.documentElement)');
   });
 
