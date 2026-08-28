@@ -27,7 +27,7 @@ jobs:
         run: npm ci
       - name: Reverify Task 6 production patch
         run: python .github/scripts/unified-menu-edit-patcher.py
-      - name: Replace legacy split-editor rendered acceptance
+      - name: Reconcile all legacy split-editor rendered acceptance
         run: python .github/scripts/unified-menu-edit-e2e.py
       - name: Format final implementation and rendered acceptance
         run: |
