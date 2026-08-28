@@ -1701,7 +1701,9 @@ test('final correction keeps mobile Review & pay unobstructed with integrated sp
     const style = getComputedStyle(node);
     return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   });
-  expect(Math.abs(methodsRowBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+  expect(Math.abs(methodsRowBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(
+    2,
+  );
   for (const box of [cashBox!, instapayBox!, splitBox!]) {
     expect(Math.round(box.height)).toBe(44);
   }
