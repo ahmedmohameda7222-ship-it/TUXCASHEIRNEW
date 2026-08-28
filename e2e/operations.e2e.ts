@@ -1678,17 +1678,37 @@ test('final correction keeps mobile Review & pay unobstructed with integrated sp
   await expect(page.getByRole('separator', { name: 'Resize Current Order' })).toHaveCount(0);
 
   const payment = overlay.locator('.payment-section');
-  const split = payment.getByRole('button', { name: 'Split payment' });
+  const methodsRow = payment.locator('.payment-methods-inline');
+  const cash = methodsRow.getByRole('button', { name: 'Cash', exact: true });
+  const instapay = methodsRow.getByRole('button', { name: 'Instapay', exact: true });
+  const split = methodsRow.getByRole('button', { name: 'Split payment', exact: true });
+  await expect(cash).toBeVisible();
+  await expect(instapay).toBeVisible();
   await expect(split).toBeVisible();
-  const [paymentBox, splitBox] = await Promise.all([payment.boundingBox(), split.boundingBox()]);
+  const [paymentBox, methodsRowBox, cashBox, instapayBox, splitBox] = await Promise.all([
+    payment.boundingBox(),
+    methodsRow.boundingBox(),
+    cash.boundingBox(),
+    instapay.boundingBox(),
+    split.boundingBox(),
+  ]);
   expect(paymentBox).not.toBeNull();
+  expect(methodsRowBox).not.toBeNull();
+  expect(cashBox).not.toBeNull();
+  expect(instapayBox).not.toBeNull();
   expect(splitBox).not.toBeNull();
   const paymentPadding = await payment.evaluate((node) => {
     const style = getComputedStyle(node);
     return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   });
-  expect(Math.round(splitBox!.height)).toBe(44);
-  expect(Math.abs(splitBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+  expect(Math.abs(methodsRowBox!.width - (paymentBox!.width - paymentPadding))).toBeLessThanOrEqual(2);
+  for (const box of [cashBox!, instapayBox!, splitBox!]) {
+    expect(Math.round(box.height)).toBe(44);
+  }
+  const paymentTops = [cashBox!.y, instapayBox!.y, splitBox!.y];
+  expect(Math.max(...paymentTops) - Math.min(...paymentTops)).toBeLessThanOrEqual(1);
+  const paymentWidths = [cashBox!.width, instapayBox!.width, splitBox!.width];
+  expect(Math.max(...paymentWidths) - Math.min(...paymentWidths)).toBeLessThanOrEqual(2);
 
   await split.click();
   await overlay.getByLabel('Amount A').fill('320');
@@ -2303,15 +2323,17 @@ test('cashier-critical controls use the approved operational emphasis', async ({
   await openCartIfMobile(page, testInfo);
   const cart = currentOrderCart(page, testInfo);
 
-  for (const name of ['Take Away', 'Dine In', 'Delivery', 'Cash', 'Instapay']) {
+  for (const name of ['Take Away', 'Delivery', 'Cash', 'Instapay']) {
     const control = cart.getByRole('button', { name, exact: true });
     await expect(control).toBeVisible();
     expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('700');
   }
 
-  const splitPayment = cart.getByRole('button', { name: 'Split payment', exact: true });
-  await expect(splitPayment).toBeVisible();
-  expect(await splitPayment.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('700');
+  for (const name of ['Dine In', 'Split payment']) {
+    const control = cart.getByRole('button', { name, exact: true });
+    await expect(control).toBeVisible();
+    expect(await control.evaluate((node) => getComputedStyle(node).fontWeight)).toBe('600');
+  }
 
   const line = cart.locator('.cart-line').filter({ hasText: 'Single Smashed Patty' }).first();
   for (const name of ['Edit', 'Extra']) {
