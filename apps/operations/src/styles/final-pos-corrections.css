@@ -566,13 +566,13 @@
 }
 
 .product-quantity .quantity-increment,
-.line-quantity-stepper .quantity-increment {
+.orders-cart .line-quantity-stepper .quantity-increment {
   background: var(--tux-accent-strong);
   color: var(--tux-action-foreground);
 }
 
 .product-quantity .quantity-increment:hover:not(:disabled),
-.line-quantity-stepper .quantity-increment:hover:not(:disabled) {
+.orders-cart .line-quantity-stepper .quantity-increment:hover:not(:disabled) {
   background: var(--tux-accent-hover);
   color: var(--tux-action-foreground);
 }
