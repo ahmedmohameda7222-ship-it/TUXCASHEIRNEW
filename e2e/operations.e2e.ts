@@ -2714,7 +2714,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
     'Demo Worker Two',
     '1234',
     'Demo Worker One',
-    defaultLightAccent,
+    workerTwoLightAccent,
   );
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
 
