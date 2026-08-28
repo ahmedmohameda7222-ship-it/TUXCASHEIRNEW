@@ -18,11 +18,16 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('SearchIcon');
   });
 
-  it('uses Pencil to activate one pressed menu edit session and blocks Search during it', () => {
+  it('uses Pencil to activate one pressed menu edit session and suppresses search shortcuts during it', () => {
     expect(ordersWorkspaceSource).toContain('menuEditActive');
     expect(ordersWorkspaceSource).toContain('setMenuEditActive(true)');
     expect(ordersWorkspaceSource).toContain('aria-pressed={menuEditActive}');
-    expect(ordersWorkspaceSource).toContain('if (menuEditActive) return;');
+    expect(ordersWorkspaceSource).toMatch(
+      /if \(\(event\.ctrlKey \|\| event\.metaKey\) && event\.key\.toLowerCase\(\) === 'k'\) \{\s*event\.preventDefault\(\);\s*if \(menuEditActive\) return;/,
+    );
+    expect(ordersWorkspaceSource).toMatch(
+      /if \(event\.key === '\/' && !targetIsEditor\) \{\s*event\.preventDefault\(\);\s*if \(menuEditActive\) return;/,
+    );
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
 
