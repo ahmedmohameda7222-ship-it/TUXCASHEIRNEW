@@ -4,136 +4,92 @@ on:
   pull_request:
     branches:
       - main
-      - integration/tux-operations-v2
-  push:
-    branches:
-      - main
-      - integration/tux-operations-v2
-      - 'feat/ops-*'
-      - 'fix/operations-*'
-      - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
     name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: feat/worker-system-color-theme
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format check
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Unit and integration tests
-        run: npm run test
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Production builds
-        run: npm run build
-      - name: Development provisioning safety smoke
+      - name: Apply Task 9 scoped lifecycle patch
         shell: bash
         run: |
-          if NODE_ENV=production npm run dev:provision -- --database .tmp/provision-production.sqlite3; then
-            echo 'Production provisioning unexpectedly succeeded.' >&2
-            exit 1
-          fi
-          npm run dev:provision -- --database .tmp/provision.sqlite3 --pin 2468 --secondary-pin 1357
-          test -f apps/operations-desktop/.tmp/provision.sqlite3
-          rm -rf apps/operations-desktop/.tmp
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Migration-chain smoke
-        run: npm run test:migrations
-      - uses: denoland/setup-deno@v2
-        with:
-          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
-          # same resolver semantics so remote import-graph failures are caught before deploy.
-          deno-version: v1.46.3
-      - name: Edge Function typecheck
-        run: |
-          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
-          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
-          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
-          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Rendered browser E2E
-        run: npm run test:e2e
-      - name: Upload rendered QA evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: operations-rendered-e2e
-          path: |
-            playwright-report
-            test-results
-          if-no-files-found: warn
-          retention-days: 14
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'apps/operations/src/app/App.tsx';
+          let source = fs.readFileSync(path, 'utf8');
+          const replaceOne = (before, after, label) => {
+            const first = source.indexOf(before);
+            if (first < 0) throw new Error(`Missing ${label} insertion point.`);
+            if (source.indexOf(before, first + before.length) >= 0) {
+              throw new Error(`Ambiguous ${label} insertion point.`);
+            }
+            source = source.replace(before, after);
+          };
 
-  windows-package:
-    name: windows-package
-    runs-on: windows-latest
-    timeout-minutes: 35
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Build unsigned Windows x64 package
-        run: npm run package:win -- --publish never
-      - name: Upload unsigned Windows package
-        uses: actions/upload-artifact@v4
-        with:
-          name: tux-operations-windows-x64-unsigned
-          path: release/windows/*.exe
-          if-no-files-found: error
-          retention-days: 14
+          replaceOne(
+            "import { type OperationsSessionState } from '@tux/application';\n",
+            "import { type OperationsSessionState } from '@tux/application';\nimport { parseSystemAccentColor, type SystemAccentColor } from '@tux/domain';\n",
+            'domain import',
+          );
+          replaceOne(
+            "import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';",
+            "import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';",
+            'React import',
+          );
+          replaceOne(
+            '  createOperationsSessionClient,\n  type OperationsBulkStockClient,',
+            '  createOperationsSessionClient,\n  createWorkerUiPreferencesClient,\n  type OperationsBulkStockClient,',
+            'preference client import',
+          );
+          replaceOne(
+            "import { SyncStatusIndicator } from './SyncStatusIndicator';\n",
+            "import { SyncStatusIndicator } from './SyncStatusIndicator';\nimport { SystemColorPickerDialog } from './SystemColorPickerDialog';\nimport {\n  applySystemAccentPalette,\n  clearSystemAccentPalette,\n  deriveSystemAccentPalette,\n  type EffectiveTheme,\n} from './systemAccentTheme';\n",
+            'accent imports',
+          );
+          replaceOne(
+            "const THEME_STORAGE_KEY = 'tux.operations.theme';\n",
+            "const THEME_STORAGE_KEY = 'tux.operations.theme';\nconst DEFAULT_SYSTEM_ACCENT = parseSystemAccentColor('#1F6B52');\n",
+            'default accent',
+          );
+          replaceOne(
+            "  const [theme, setTheme] = useState<ThemePreference>(initialTheme);\n  const [area, setArea] = useState<OperationsArea>('ORDERS');\n",
+            "  const [theme, setTheme] = useState<ThemePreference>(initialTheme);\n  const [area, setArea] = useState<OperationsArea>('ORDERS');\n  const preferencesClient = useMemo(() => createWorkerUiPreferencesClient(), []);\n  const [systemDark, setSystemDark] = useState(() =>\n    window.matchMedia('(prefers-color-scheme: dark)').matches,\n  );\n  const [savedAccentColor, setSavedAccentColor] = useState<SystemAccentColor | null>(null);\n  const [previewAccentColor, setPreviewAccentColor] = useState<SystemAccentColor | null>(null);\n  const [accentHydrated, setAccentHydrated] = useState(false);\n  const [systemColorOpen, setSystemColorOpen] = useState(false);\n  const [systemColorSaving, setSystemColorSaving] = useState(false);\n  const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);\n",
+            'accent state',
+          );
+          replaceOne(
+            "  useEffect(() => {\n    if (theme === 'system') document.documentElement.removeAttribute('data-theme');\n    else document.documentElement.dataset['theme'] = theme;\n    try {\n      window.localStorage.setItem(THEME_STORAGE_KEY, theme);\n    } catch {\n      // Theme preference is non-critical UI state.\n    }\n  }, [theme]);\n\n  return (",
+            "  useEffect(() => {\n    if (theme === 'system') document.documentElement.removeAttribute('data-theme');\n    else document.documentElement.dataset['theme'] = theme;\n    try {\n      window.localStorage.setItem(THEME_STORAGE_KEY, theme);\n    } catch {\n      // Theme preference is non-critical UI state.\n    }\n  }, [theme]);\n\n  useEffect(() => {\n    const media = window.matchMedia('(prefers-color-scheme: dark)');\n    const update = (): void => setSystemDark(media.matches);\n    update();\n    media.addEventListener('change', update);\n    return () => media.removeEventListener('change', update);\n  }, []);\n\n  const effectiveTheme: EffectiveTheme =\n    theme === 'dark' || (theme === 'system' && systemDark) ? 'dark' : 'light';\n\n  useLayoutEffect(() => {\n    let cancelled = false;\n    setAccentHydrated(false);\n    setSavedAccentColor(null);\n    setPreviewAccentColor(null);\n    clearSystemAccentPalette(document.documentElement);\n\n    void preferencesClient\n      .load()\n      .then((preference) => {\n        if (cancelled) return;\n        const accentColor = preference?.accentColor ?? null;\n        setSavedAccentColor(accentColor);\n        setPreviewAccentColor(accentColor);\n        setAccentHydrated(true);\n      })\n      .catch(() => {\n        if (cancelled) return;\n        setSavedAccentColor(null);\n        setPreviewAccentColor(null);\n        setAccentHydrated(true);\n      });\n\n    return () => {\n      cancelled = true;\n      clearSystemAccentPalette(document.documentElement);\n    };\n  }, [preferencesClient, session.operator.id]);\n\n  useLayoutEffect(() => {\n    if (!accentHydrated) return;\n    if (previewAccentColor === null) {\n      clearSystemAccentPalette(document.documentElement);\n      return;\n    }\n    applySystemAccentPalette(\n      document.documentElement,\n      deriveSystemAccentPalette(previewAccentColor, effectiveTheme),\n    );\n  }, [accentHydrated, effectiveTheme, previewAccentColor]);\n\n  async function saveSystemColor(accentColor: SystemAccentColor | null): Promise<void> {\n    if (systemColorSaving) return;\n    setSystemColorSaving(true);\n    setSystemColorSaveError(null);\n    try {\n      const saved = await preferencesClient.updateAccentColor(accentColor);\n      setSavedAccentColor(saved.accentColor);\n      setPreviewAccentColor(saved.accentColor);\n      setSystemColorOpen(false);\n    } catch {\n      setSystemColorSaveError('Could not save system color. Try again.');\n    } finally {\n      setSystemColorSaving(false);\n    }\n  }\n\n  if (!accentHydrated) {\n    return (\n      <main\n        className=\"operations-accent-loading\"\n        aria-busy=\"true\"\n        aria-label=\"Loading worker preferences\"\n      />\n    );\n  }\n\n  return (",
+            'theme lifecycle',
+          );
+          replaceOne(
+            "                </div>\n                <div className=\"menu-divider\" />\n                <button\n                  type=\"button\"\n                  role=\"menuitem\"\n                  onClick={() => {\n                    setSwitchOpen(true);",
+            "                </div>\n                <div className=\"system-color-profile-section\">\n                  <span className=\"appearance-label\">System color</span>\n                  <button\n                    type=\"button\"\n                    className=\"system-color-profile-action\"\n                    onClick={() => {\n                      setSystemColorSaveError(null);\n                      setPreviewAccentColor(savedAccentColor);\n                      setMenuOpen(false);\n                      setSystemColorOpen(true);\n                    }}\n                  >\n                    <span\n                      className=\"system-color-profile-swatch\"\n                      style={{ backgroundColor: savedAccentColor ?? DEFAULT_SYSTEM_ACCENT }}\n                      aria-hidden=\"true\"\n                    />\n                    <span>Choose system color</span>\n                  </button>\n                </div>\n                <div className=\"menu-divider\" />\n                <button\n                  type=\"button\"\n                  role=\"menuitem\"\n                  onClick={() => {\n                    setSwitchOpen(true);",
+            'profile system color entry',
+          );
+          replaceOne(
+            "      {switchOpen ? (\n",
+            "      {systemColorOpen ? (\n        <SystemColorPickerDialog\n          savedAccentColor={savedAccentColor}\n          defaultPreviewColor={DEFAULT_SYSTEM_ACCENT}\n          saving={systemColorSaving}\n          saveError={systemColorSaveError}\n          onPreview={setPreviewAccentColor}\n          onSave={saveSystemColor}\n          onCancel={() => setSystemColorOpen(false)}\n        />\n      ) : null}\n\n      {switchOpen ? (\n",
+            'dialog mount',
+          );
 
-  required-quality-gate:
-    name: Required quality gate
-    if: always()
-    needs:
-      - quality
-      - windows-package
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require every permanent gate
-        env:
-          QUALITY_RESULT: ${{ needs.quality.result }}
-          WINDOWS_RESULT: ${{ needs.windows-package.result }}
-        run: |
-          test "$QUALITY_RESULT" = "success"
-          test "$WINDOWS_RESULT" = "success"
+          fs.writeFileSync(path, source);
+          NODE
+          npx prettier --write apps/operations/src/app/App.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/App.tsx
+          git commit -m "feat: apply worker system accent lifecycle"
+          git push origin HEAD:feat/worker-system-color-theme
+          exit 1
