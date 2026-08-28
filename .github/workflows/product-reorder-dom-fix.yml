@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   apply-fix:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -58,9 +58,9 @@ jobs:
               raise SystemExit(f'Expected exactly one product editor CSS marker, found {css_source.count(marker)}')
           css.write_text(css_source.replace(marker, replacement))
           PY
-      - name: Format, commit, and remove temporary workflow
+      - name: Commit fix and remove temporary workflow
         run: |
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css
+          git diff --check
           git rm .github/workflows/product-reorder-dom-fix.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
