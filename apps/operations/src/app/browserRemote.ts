@@ -11,6 +11,7 @@ import {
   type ProductId,
   type Shop,
   type ShopId,
+  type SystemAccentColor,
   type Worker,
   type WorkerId,
 } from '@tux/domain';
@@ -93,6 +94,7 @@ function parseRemoteWorkerUiPreferences(value: Record<string, unknown>): RemoteW
     categoryOrder: parsed.categoryOrder,
     categoryAlignment: parsed.categoryAlignment,
     productOrder: parsed.productOrder,
+    accentColor: parsed.accentColor,
     serverVersion: parsed.serverVersion,
     updatedAt: parsed.updatedAt,
   };
@@ -235,6 +237,7 @@ export class VercelBrowserRemoteGateway
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
+    readonly accentColor: SystemAccentColor | null;
   }): Promise<RemoteWorkerUiPreferences> {
     const response = await fetch('/api/worker-ui-preferences', {
       method: 'PUT',
