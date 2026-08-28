@@ -343,6 +343,11 @@
 .split-payment-action {
   font-size: 14px;
   line-height: 18px;
+  font-weight: 600;
+}
+
+.order-type-section .segmented-control button.cashier-critical-label,
+.payment-section .payment-methods button.cashier-critical-label {
   font-weight: 700;
 }
 
