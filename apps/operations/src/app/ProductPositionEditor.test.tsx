@@ -81,6 +81,8 @@ describe('ProductPositionEditor', () => {
     expect(markup).toContain('Reset');
     expect(markup).toContain('Cancel');
     expect(markup).toContain('Save');
+    expect(markup).toContain('style="display:flex;flex-direction:column"');
+    expect(markup).toContain('style="flex:1"');
     expect(markup).not.toContain('Extra');
     expect(markup).not.toContain('Add one');
   });
