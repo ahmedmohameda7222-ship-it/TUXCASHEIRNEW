@@ -46,11 +46,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Prettier diagnostic
-        run: |
-          npx prettier --write apps/operations-desktop/src/preload/index.ts
-          git diff -- apps/operations-desktop/src/preload/index.ts
-          exit 1
+      - name: Format check
+        run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
