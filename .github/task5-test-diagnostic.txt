@@ -1,0 +1,1519 @@
+
+> tux-v2@0.0.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/TUXCASHEIRNEW/TUXCASHEIRNEW[39m
+
+ [32m✓[39m apps/operations-desktop/src/main/ordersBoard.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 333[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/endDay.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 375[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/orders.integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 535[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/browser/indexedDbMigrations.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m packages/sync/src/remoteMaterializer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/expenses.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 229[2mms[22m[39m
+ [32m✓[39m packages/application/src/workerUiPreferences.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/bulkStock.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 183[2mms[22m[39m
+ [32m✓[39m packages/application/src/ordersAtomicDelivery.sqlite.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+ [32m✓[39m packages/domain/src/draftOperations.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m packages/domain/src/syncContract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m packages/application/src/configurationSync.sqlite.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m packages/application/src/endDaySummary.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/sqlite/SqliteOperationsDatabase.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m server/workerUiPreferencesGateway.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m packages/domain/src/endDay.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/OrdersWorkspace.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxDependency.sqlite.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 181[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxHardening.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxSync.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/apple-hig-remediation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/session.integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 172[2mms[22m[39m
+ [32m✓[39m packages/sync/src/supabaseDeviceSession.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m packages/domain/src/expense.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m packages/domain/src/orderLifecycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/application/src/expensesIdempotency.sqlite.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m packages/domain/src/payment.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+[90mstdout[2m | apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts
+[22m[39mDownloading Electron binary...
+
+ [32m✓[39m apps/operations/src/styles/current-order-reference-controls.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/menuProductOrder.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/sync.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m packages/domain/src/bulkStock.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/sync/src/httpTransport.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/productDescriptionMigration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m packages/domain/src/orderDraftParser.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/ui-alignment.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/ProductPositionEditor.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+[90mstdout[2m | apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts
+[22m[39mDownloading Electron binary...
+
+ [32m✓[39m apps/operations/src/app/workerUiPreferenceEditing.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [31m❯[39m apps/operations/src/app/unifiedMenuEditMode.source.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 25[2mms[22m[39m
+     [32m✓[39m removes the standalone Manage order entry point while retaining the existing edit/search controls[32m 3[2mms[22m[39m
+     [32m✓[39m uses Pencil to activate one pressed menu edit session and blocks Search during it[32m 1[2mms[22m[39m
+     [32m✓[39m keeps category tabs in the header and makes those same tabs reorderable in edit mode[32m 1[2mms[22m[39m
+     [32m✓[39m keeps Product Cards in the menu grid and reorders them from the same unified draft[32m 1[2mms[22m[39m
+[31m     [31m×[31m persists category and product layout together through one Reset Cancel Save surface[39m[32m 18[2mms[22m[39m
+ [32m✓[39m packages/printing/src/receipt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m packages/domain/src/workerUiPreferences.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/automaticSync.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/current-order-rounded-sections.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m packages/sync/src/syncHealth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/syncStatusBridge.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 87[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/sqlite/customerContactIdentity.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m packages/domain/src/configurationBundle.family.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/product-position-editor.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/syncStatusResult.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/syncStatus.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/domain/src/tender.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/cartWidthPreference.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/cart-divider.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m packages/domain/src/businessDay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m packages/domain/src/pricing.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/domain/src/phone.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/sync/src/scheduler.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 63[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/welcomeCopy.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/sync/src/remoteReceipt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/application/src/printerConfiguration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/operational-control-emphasis.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/sessionResult.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/pinVerifier.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 83[2mms[22m[39m
+ [32m✓[39m server/workerUiPreferencesProductOrderMigration.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/orderPrinter.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/security.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/application/src/session.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/domain/src/quantity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/domain/src/money.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/config/src/runtimeConfig.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m packages/application/src/result.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m apps/operations/src/app/unifiedMenuEditMode.source.test.ts[2m > [22munified menu edit entry point[2m > [22mpersists category and product layout together through one Reset Cancel Save surface
+[31m[1mAssertionError[22m: expected 'import type {\n  OperationsSessionSta…' to contain '>Reset<'[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- >Reset<[39m
+[31m+ import type {[39m
+[31m+   OperationsSessionState,[39m
+[31m+   OrdersWorkspace as OrdersWorkspaceData,[39m
+[31m+ } from '@tux/application';[39m
+[31m+ import {[39m
+[31m+   ZERO_MONEY,[39m
+[31m+   addProductUnit,[39m
+[31m+   decrementDraftLine,[39m
+[31m+   decrementProductUnit,[39m
+[31m+   duplicateDraftLineUnit,[39m
+[31m+   normalizeEgyptianPhone,[39m
+[31m+   parseEntityId,[39m
+[31m+   productQuantityInDraft,[39m
+[31m+   replaceDraftLineCustomization,[39m
+[31m+   validateOrderDraft,[39m
+[31m+   type CategoryAlignment,[39m
+[31m+   type DraftLineCustomization,[39m
+[31m+   type DraftLineId,[39m
+[31m+   type MenuCategory,[39m
+[31m+   type MenuCategoryId,[39m
+[31m+   type OrderDraft,[39m
+[31m+   type OrderId,[39m
+[31m+   type OrderValidationIssue,[39m
+[31m+   type Product,[39m
+[31m+   type ProductId,[39m
+[31m+   type WorkerUiPreferences,[39m
+[31m+ } from '@tux/domain';[39m
+[31m+ import { useEffect, useMemo, useRef, useState } from 'react';[39m
+[31m+ import {[39m
+[31m+   CART_WIDTH_MAX_PX,[39m
+[31m+   CART_WIDTH_MIN,[39m
+[31m+   clampCartWidth,[39m
+[31m+   readCartWidth,[39m
+[31m+   writeCartWidth,[39m
+[31m+ } from './cartWidthPreference';[39m
+[31m+ import { EditPencilIcon, SearchIcon } from './icons';[39m
+[31m+ import { MenuProductCard } from './MenuProductCard';[39m
+[31m+ import {[39m
+[31m+   filterProductsForMenu as filterProductsForMenuWithPreference,[39m
+[31m+   moveProductWithinCategory,[39m
+[31m+   reconcileProductOrder,[39m
+[31m+ } from './menuProductOrder';[39m
+[31m+ import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';[39m
+[31m+ import { OrdersCart, type DraftMutation } from './OrdersCart';[39m
+[31m+ import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';[39m
+[31m+ import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';[39m
+[31m+ import { menuEditPreferenceInput } from './workerUiPreferenceEditing';[39m
+[31m+[39m
+[31m+ type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;[39m
+[31m+[39m
+[31m+ const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';[39m
+[31m+ const CART_RESIZE_KEYBOARD_STEP = 24;[39m
+[31m+[39m
+[31m+ function desktopCartResizeMatches(): boolean {[39m
+[31m+   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ export function reconcileCategoryOrder([39m
+[31m+   activeCategories: readonly MenuCategory[],[39m
+[31m+   preference: WorkerUiPreferences | null,[39m
+[31m+ ): readonly MenuCategory[] {[39m
+[31m+   if (preference === null || preference.categoryOrder.length === 0) return activeCategories;[39m
+[31m+[39m
+[31m+   const byId = new Map(activeCategories.map((category) => [category.id, category]));[39m
+[31m+   const reconciled: MenuCategory[] = [];[39m
+[31m+   const seen = new Set<MenuCategoryId>();[39m
+[31m+[39m
+[31m+   for (const categoryId of preference.categoryOrder) {[39m
+[31m+     const category = byId.get(categoryId);[39m
+[31m+     if (category === undefined || seen.has(categoryId)) continue;[39m
+[31m+     reconciled.push(category);[39m
+[31m+     seen.add(categoryId);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   for (const category of activeCategories) {[39m
+[31m+     if (seen.has(category.id)) continue;[39m
+[31m+     reconciled.push(category);[39m
+[31m+     seen.add(category.id);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   return reconciled;[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ export function productFamiliesForCategory([39m
+[31m+   products: readonly Product[],[39m
+[31m+   categoryId: MenuCategoryId | null,[39m
+[31m+ ): readonly string[] {[39m
+[31m+   if (categoryId === null) return [];[39m
+[31m+[39m
+[31m+   const seen = new Set<string>();[39m
+[31m+   const families: string[] = [];[39m
+[31m+   const categoryProducts = products[39m
+[31m+     .filter((product) => product.active && product.categoryId === categoryId)[39m
+[31m+     .slice()[39m
+[31m+     .sort((left, right) => left.sortOrder - right.sortOrder);[39m
+[31m+[39m
+[31m+   for (const product of categoryProducts) {[39m
+[31m+     const family = product.family?.trim();[39m
+[31m+     if (!family || seen.has(family)) continue;[39m
+[31m+     seen.add(family);[39m
+[31m+     families.push(family);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   return families;[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ export function filterProductsForMenu([39m
+[31m+   products: readonly Product[],[39m
+[31m+   options: {[39m
+[31m+     readonly selectedCategoryId: MenuCategoryId | null;[39m
+[31m+     readonly selectedFamily: string | null;[39m
+[31m+     readonly search: string;[39m
+[31m+   },[39m
+[31m+ ): readonly Product[] {[39m
+[31m+   const active = products.filter((product) => product.active);[39m
+[31m+   const query = options.search.trim().toLocaleLowerCase();[39m
+[31m+[39m
+[31m+   if (query.length > 0) {[39m
+[31m+     return active[39m
+[31m+       .filter((product) => product.name.toLocaleLowerCase().includes(query))[39m
+[31m+       .slice()[39m
+[31m+       .sort((left, right) => left.sortOrder - right.sortOrder);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   if (options.selectedCategoryId === null) return [];[39m
+[31m+[39m
+[31m+   return active[39m
+[31m+     .filter((product) => product.categoryId === options.selectedCategoryId)[39m
+[31m+     .filter([39m
+[31m+       (product) => options.selectedFamily === null || product.family === options.selectedFamily,[39m
+[31m+     )[39m
+[31m+     .slice()[39m
+[31m+     .sort((left, right) => left.sortOrder - right.sortOrder);[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ interface UndoState {[39m
+[31m+   readonly snapshot: OrderDraft;[39m
+[31m+   readonly message: string;[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ interface PrintNoticeState {[39m
+[31m+   readonly orderId: OrderId;[39m
+[31m+   readonly displayOrderNo: number;[39m
+[31m+   readonly kind: 'FAILED' | 'UNKNOWN';[39m
+[31m+   readonly message: string;[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ function ProductImage({ product }: { readonly product: Product }) {[39m
+[31m+   const [failed, setFailed] = useState(false);[39m
+[31m+   if (product.imageKey === null || failed) {[39m
+[31m+     return ([39m
+[31m+       <div className="product-image-fallback" aria-hidden="true">[39m
+[31m+         {product.name[39m
+[31m+           .split(/\s+/)[39m
+[31m+           .slice(0, 2)[39m
+[31m+           .map((part) => part.slice(0, 1).toUpperCase())[39m
+[31m+           .join('')}[39m
+[31m+       </div>[39m
+[31m+     );[39m
+[31m+   }[39m
+[31m+   return ([39m
+[31m+     <img[39m
+[31m+       className="product-image"[39m
+[31m+       src={product.imageKey}[39m
+[31m+       alt=""[39m
+[31m+       loading="lazy"[39m
+[31m+       onError={() => setFailed(true)}[39m
+[31m+     />[39m
+[31m+   );[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ function restoreDraftContents(current: OrderDraft, snapshot: OrderDraft): OrderDraft {[39m
+[31m+   return {[39m
+[31m+     ...current,[39m
+[31m+     orderTypeId: snapshot.orderTypeId,[39m
+[31m+     lines: snapshot.lines,[39m
+[31m+     orderNote: snapshot.orderNote,[39m
+[31m+     discountMinor: snapshot.discountMinor,[39m
+[31m+     delivery: snapshot.delivery,[39m
+[31m+     payment: snapshot.payment,[39m
+[31m+   };[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ function QuickInfo({[39m
+[31m+   product,[39m
+[31m+   busy,[39m
+[31m+   onClose,[39m
+[31m+ }: {[39m
+[31m+   readonly product: Product;[39m
+[31m+   readonly busy: boolean;[39m
+[31m+   readonly onClose: () => void;[39m
+[31m+ }) {[39m
+[31m+   return ([39m
+[31m+     <div[39m
+[31m+       className="orders-overlay"[39m
+[31m+       role="presentation"[39m
+[31m+       onMouseDown={(event) => {[39m
+[31m+         if (event.currentTarget === event.target && !busy) onClose();[39m
+[31m+       }}[39m
+[31m+     >[39m
+[31m+       <section[39m
+[31m+         className="quick-info"[39m
+[31m+         role="dialog"[39m
+[31m+         aria-modal="true"[39m
+[31m+         aria-labelledby="quick-info-title"[39m
+[31m+       >[39m
+[31m+         <div className="quick-info-media">[39m
+[31m+           <ProductImage product={product} />[39m
+[31m+         </div>[39m
+[31m+         <div className="quick-info-body">[39m
+[31m+           <span className="drawer-kicker">Quick Info</span>[39m
+[31m+           <h2 id="quick-info-title">{product.name}</h2>[39m
+[31m+           <strong>{formatMoneyMinor(product.priceMinor)}</strong>[39m
+[31m+           <p>{product.description?.trim() || 'No product description has been added yet.'}</p>[39m
+[31m+           {product.soldOut ? <span className="sold-out-label">Sold Out</span> : null}[39m
+[31m+         </div>[39m
+[31m+         <div className="drawer-footer">[39m
+[31m+           <button type="button" className="secondary-action" disabled={busy} onClick={onClose}>[39m
+[31m+             Close[39m
+[31m+           </button>[39m
+[31m+         </div>[39m
+[31m+       </section>[39m
+[31m+     </div>[39m
+[31m+   );[39m
+[31m+ }[39m
+[31m+[39m
+[31m+ export function OrdersWorkspace({[39m
+[31m+   session,[39m
+[31m+   client,[39m
+[31m+ }: {[39m
+[31m+   readonly session: ActiveSession;[39m
+[31m+   readonly client: OperationsOrdersClient;[39m
+[31m+ }) {[39m
+[31m+   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);[39m
+[31m+   const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);[39m
+[31m+   const searchRef = useRef<HTMLInputElement>(null);[39m
+[31m+   const draftRef = useRef<OrderDraft | null>(null);[39m
+[31m+   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());[39m
+[31m+   const pendingSaveCountRef = useRef(0);[39m
+[31m+   const undoTimerRef = useRef<number | null>(null);[39m
+[31m+   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);[39m
+[31m+[39m
+[31m+   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);[39m
+[31m+   const [draft, setDraft] = useState<OrderDraft | null>(null);[39m
+[31m+   const [loading, setLoading] = useState(true);[39m
+[31m+   const [saving, setSaving] = useState(false);[39m
+[31m+   const [placing, setPlacing] = useState(false);[39m
+[31m+   const [reprinting, setReprinting] = useState(false);[39m
+[31m+   const [printNotice, setPrintNotice] = useState<PrintNoticeState | null>(null);[39m
+[31m+   const [globalError, setGlobalError] = useState<string | null>(null);[39m
+[31m+   const [successMessage, setSuccessMessage] = useState<string | null>(null);[39m
+[31m+   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);[39m
+[31m+   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);[39m
+[31m+   const [search, setSearch] = useState('');[39m
+[31m+   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');[39m
+[31m+   const [menuEditActive, setMenuEditActive] = useState(false);[39m
+[31m+   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);[39m
+[31m+   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);[39m
+[31m+   const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');[39m
+[31m+   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);[39m
+[31m+   const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);[39m
+[31m+   const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);[39m
+[31m+   const [menuEditSaving, setMenuEditSaving] = useState(false);[39m
+[31m+   const [menuEditError, setMenuEditError] = useState<string | null>(null);[39m
+[31m+   const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);[39m
+[31m+   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);[39m
+[31m+   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);[39m
+[31m+   const [showValidation, setShowValidation] = useState(false);[39m
+[31m+   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);[39m
+[31m+   const [undo, setUndo] = useState<UndoState | null>(null);[39m
+[31m+   const [mobileCartOpen, setMobileCartOpen] = useState(false);[39m
+[31m+   const [desktopCartResizable, setDesktopCartResizable] = useState(desktopCartResizeMatches);[39m
+[31m+   const [cartWidth, setCartWidth] = useState(() =>[39m
+[31m+     typeof window === 'undefined'[39m
+[31m+       ? CART_WIDTH_MIN[39m
+[31m+       : readCartWidth(window.localStorage, window.innerWidth),[39m
+[31m+   );[39m
+[31m+[39m
+[31m+   function commitCartWidth(nextWidth: number): void {[39m
+[31m+     const next = clampCartWidth(nextWidth, window.innerWidth);[39m
+[31m+     setCartWidth(next);[39m
+[31m+     writeCartWidth(window.localStorage, next);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function setCurrentDraft(next: OrderDraft): void {[39m
+[31m+     draftRef.current = next;[39m
+[31m+     setDraft(next);[39m
+[31m+     setWorkspace((current) => (current === null ? null : { ...current, draft: next }));[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     let cancelled = false;[39m
+[31m+     setLoading(true);[39m
+[31m+     setGlobalError(null);[39m
+[31m+     void client.loadWorkspace(draftScopeId).then((result) => {[39m
+[31m+       if (cancelled) return;[39m
+[31m+       setLoading(false);[39m
+[31m+       if (!result.ok) {[39m
+[31m+         setGlobalError(result.error.message);[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       setWorkspace(result.value);[39m
+[31m+       if (result.value.recoveryState === 'PREVIOUS_ORDER_ALREADY_SAVED') {[39m
+[31m+         setSuccessMessage('Previous order was already saved. A new cart is ready.');[39m
+[31m+       }[39m
+[31m+       draftRef.current = result.value.draft;[39m
+[31m+       setDraft(result.value.draft);[39m
+[31m+       const categories = result.value.configuration.categories[39m
+[31m+         .filter((category) => category.active)[39m
+[31m+         .sort((left, right) => left.sortOrder - right.sortOrder);[39m
+[31m+       const defaultCategoryId = categories[0]?.id ?? null;[39m
+[31m+       setSelectedCategoryId((current) =>[39m
+[31m+         current !== null && categories.some((category) => category.id === current)[39m
+[31m+           ? current[39m
+[31m+           : defaultCategoryId,[39m
+[31m+       );[39m
+[31m+       setSelectedFamily(null);[39m
+[31m+     });[39m
+[31m+     return () => {[39m
+[31m+       cancelled = true;[39m
+[31m+     };[39m
+[31m+   }, [client, draftScopeId, session.businessDayId, session.operator.id]);[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     let cancelled = false;[39m
+[31m+     setCategoryPreference(null);[39m
+[31m+     setCategoryMode('IDLE');[39m
+[31m+     setMenuEditActive(false);[39m
+[31m+     setMenuEditError(null);[39m
+[31m+     setMenuEditResetRequested(false);[39m
+[31m+     setSearch('');[39m
+[31m+     void preferencesClient[39m
+[31m+       .load()[39m
+[31m+       .then((preference) => {[39m
+[31m+         if (!cancelled) setCategoryPreference(preference);[39m
+[31m+       })[39m
+[31m+       .catch(() => {[39m
+[31m+         if (!cancelled) setCategoryPreference(null);[39m
+[31m+       });[39m
+[31m+     return () => {[39m
+[31m+       cancelled = true;[39m
+[31m+     };[39m
+[31m+   }, [preferencesClient, session.operator.id]);[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     if (categoryMode === 'SEARCH') searchRef.current?.focus();[39m
+[31m+   }, [categoryMode]);[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     function onKeyDown(event: KeyboardEvent): void {[39m
+[31m+       const target = event.target;[39m
+[31m+       const targetIsEditor =[39m
+[31m+         target instanceof HTMLInputElement ||[39m
+[31m+         target instanceof HTMLTextAreaElement ||[39m
+[31m+         target instanceof HTMLSelectElement;[39m
+[31m+       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {[39m
+[31m+         if (menuEditActive) return;[39m
+[31m+         event.preventDefault();[39m
+[31m+         setCategoryMode('SEARCH');[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       if (event.key === '/' && !targetIsEditor && !menuEditActive) {[39m
+[31m+         event.preventDefault();[39m
+[31m+         setCategoryMode('SEARCH');[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       if (event.key === 'Escape' && categoryMode === 'SEARCH') {[39m
+[31m+         event.preventDefault();[39m
+[31m+         if (search.length > 0) {[39m
+[31m+           setSearch('');[39m
+[31m+           searchRef.current?.focus();[39m
+[31m+         } else {[39m
+[31m+           setCategoryMode('IDLE');[39m
+[31m+         }[39m
+[31m+       }[39m
+[31m+     }[39m
+[31m+     window.addEventListener('keydown', onKeyDown);[39m
+[31m+     return () => window.removeEventListener('keydown', onKeyDown);[39m
+[31m+   }, [categoryMode, menuEditActive, search]);[39m
+[31m+[39m
+[31m+   useEffect([39m
+[31m+     () => () => {[39m
+[31m+       if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);[39m
+[31m+     },[39m
+[31m+     [],[39m
+[31m+   );[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     const media = window.matchMedia(DESKTOP_CART_RESIZE_QUERY);[39m
+[31m+     const sync = () => setDesktopCartResizable(media.matches);[39m
+[31m+     sync();[39m
+[31m+     media.addEventListener('change', sync);[39m
+[31m+     return () => media.removeEventListener('change', sync);[39m
+[31m+   }, []);[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     function clampToViewport(): void {[39m
+[31m+       if (!desktopCartResizeMatches()) return;[39m
+[31m+       setCartWidth((current) => {[39m
+[31m+         const next = clampCartWidth(current, window.innerWidth);[39m
+[31m+         if (next !== current) writeCartWidth(window.localStorage, next);[39m
+[31m+         return next;[39m
+[31m+       });[39m
+[31m+     }[39m
+[31m+[39m
+[31m+     clampToViewport();[39m
+[31m+     window.addEventListener('resize', clampToViewport);[39m
+[31m+     return () => window.removeEventListener('resize', clampToViewport);[39m
+[31m+   }, []);[39m
+[31m+[39m
+[31m+   function beginPendingSave(): void {[39m
+[31m+     pendingSaveCountRef.current += 1;[39m
+[31m+     setSaving(true);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function endPendingSave(): void {[39m
+[31m+     pendingSaveCountRef.current = Math.max(0, pendingSaveCountRef.current - 1);[39m
+[31m+     if (pendingSaveCountRef.current === 0) setSaving(false);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function enqueueMutation(mutation: DraftMutation): void {[39m
+[31m+     beginPendingSave();[39m
+[31m+     const run = saveQueueRef.current.then(async () => {[39m
+[31m+       const current = draftRef.current;[39m
+[31m+       if (current === null) return;[39m
+[31m+       let proposed: OrderDraft;[39m
+[31m+       try {[39m
+[31m+         proposed = mutation(current);[39m
+[31m+       } catch (error) {[39m
+[31m+         setGlobalError([39m
+[31m+           error instanceof Error ? error.message : 'Could not update the order draft.',[39m
+[31m+         );[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       if (proposed === current) return;[39m
+[31m+       setCurrentDraft(proposed);[39m
+[31m+       const result = await client.saveDraft(proposed);[39m
+[31m+       if (!result.ok) {[39m
+[31m+         setCurrentDraft(current);[39m
+[31m+         setGlobalError(result.error.message);[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       setCurrentDraft(result.value);[39m
+[31m+       setGlobalError(null);[39m
+[31m+     });[39m
+[31m+     saveQueueRef.current = run[39m
+[31m+       .catch((error: unknown) => {[39m
+[31m+         setGlobalError(error instanceof Error ? error.message : 'Could not save the order draft.');[39m
+[31m+       })[39m
+[31m+       .finally(endPendingSave);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function showUndo(snapshot: OrderDraft, message: string): void {[39m
+[31m+     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);[39m
+[31m+     setUndo({ snapshot, message });[39m
+[31m+     undoTimerRef.current = window.setTimeout(() => {[39m
+[31m+       setUndo(null);[39m
+[31m+       undoTimerRef.current = null;[39m
+[31m+     }, 7_000);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function undoLastDraftChange(): void {[39m
+[31m+     const currentUndo = undo;[39m
+[31m+     if (currentUndo === null) return;[39m
+[31m+     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);[39m
+[31m+     undoTimerRef.current = null;[39m
+[31m+     setUndo(null);[39m
+[31m+     enqueueMutation((current) => restoreDraftContents(current, currentUndo.snapshot));[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   const configuration = workspace?.configuration ?? null;[39m
+[31m+   const configuredActiveCategories = useMemo([39m
+[31m+     () =>[39m
+[31m+       configuration?.categories[39m
+[31m+         .filter((category) => category.active)[39m
+[31m+         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],[39m
+[31m+     [configuration],[39m
+[31m+   );[39m
+[31m+   const activeCategories = useMemo([39m
+[31m+     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),[39m
+[31m+     [categoryPreference, configuredActiveCategories],[39m
+[31m+   );[39m
+[31m+   const categoryAlignment = categoryPreference?.categoryAlignment ?? 'left';[39m
+[31m+   const categoryEditorCategories = useMemo(() => {[39m
+[31m+     const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));[39m
+[31m+     return categoryEditOrder.flatMap((categoryId) => {[39m
+[31m+       const category = byId.get(categoryId);[39m
+[31m+       return category === undefined ? [] : [category];[39m
+[31m+     });[39m
+[31m+   }, [categoryEditOrder, configuredActiveCategories]);[39m
+[31m+   const activeFamilies = useMemo(() => {[39m
+[31m+     const selectedCategory = activeCategories.find([39m
+[31m+       (category) => category.id === selectedCategoryId,[39m
+[31m+     );[39m
+[31m+     if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];[39m
+[31m+     return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);[39m
+[31m+   }, [activeCategories, configuration, selectedCategoryId]);[39m
+[31m+[39m
+[31m+   useEffect(() => {[39m
+[31m+     if (selectedFamily !== null && !activeFamilies.includes(selectedFamily)) {[39m
+[31m+       setSelectedFamily(null);[39m
+[31m+     }[39m
+[31m+   }, [activeFamilies, selectedFamily]);[39m
+[31m+[39m
+[31m+   const products = useMemo([39m
+[31m+     () =>[39m
+[31m+       filterProductsForMenuWithPreference([39m
+[31m+         configuration?.products ?? [],[39m
+[31m+         {[39m
+[31m+           selectedCategoryId,[39m
+[31m+           selectedFamily,[39m
+[31m+           search,[39m
+[31m+         },[39m
+[31m+         categoryPreference,[39m
+[31m+       ),[39m
+[31m+     [categoryPreference, configuration, search, selectedCategoryId, selectedFamily],[39m
+[31m+   );[39m
+[31m+   const menuEditProducts = useMemo(() => {[39m
+[31m+     if (selectedCategoryId === null) return [];[39m
+[31m+     const byId = new Map([39m
+[31m+       (configuration?.products ?? [])[39m
+[31m+         .filter((product) => product.active)[39m
+[31m+         .map((product) => [product.id, product]),[39m
+[31m+     );[39m
+[31m+     return menuEditProductOrder.flatMap((productId) => {[39m
+[31m+       const product = byId.get(productId);[39m
+[31m+       return product !== undefined && product.categoryId === selectedCategoryId ? [product] : [];[39m
+[31m+     });[39m
+[31m+   }, [configuration, menuEditProductOrder, selectedCategoryId]);[39m
+[31m+[39m
+[31m+   const validation = useMemo(() => {[39m
+[31m+     if (draft === null || configuration === null) return null;[39m
+[31m+     return validateOrderDraft(draft, configuration);[39m
+[31m+   }, [configuration, draft]);[39m
+[31m+   const visibleIssues: readonly OrderValidationIssue[] =[39m
+[31m+     showValidation && validation !== null && !validation.valid ? validation.issues : [];[39m
+[31m+[39m
+[31m+   const totalQuantity = draft?.lines.reduce((total, line) => total + line.quantity, 0) ?? 0;[39m
+[31m+   const quickInfoProduct =[39m
+[31m+     quickInfoProductId === null[39m
+[31m+       ? null[39m
+[31m+       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);[39m
+[31m+[39m
+[31m+   function beginMenuEdit(): void {[39m
+[31m+     setCategoryMode('IDLE');[39m
+[31m+     setSearch('');[39m
+[31m+     setSelectedFamily(null);[39m
+[31m+     setMenuEditError(null);[39m
+[31m+     setMenuEditResetRequested(false);[39m
+[31m+     setCategoryEditOrder(activeCategories.map((category) => category.id));[39m
+[31m+     setCategoryEditAlignment(categoryAlignment);[39m
+[31m+     setMenuEditProductOrder([39m
+[31m+       reconcileProductOrder(configuration?.products ?? [], categoryPreference).map([39m
+[31m+         (product) => product.id,[39m
+[31m+       ),[39m
+[31m+     );[39m
+[31m+     setDraggedCategoryId(null);[39m
+[31m+     setDraggedProductId(null);[39m
+[31m+     setMenuEditActive(true);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function resetMenuEdit(): void {[39m
+[31m+     setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));[39m
+[31m+     setCategoryEditAlignment('left');[39m
+[31m+     setMenuEditProductOrder([39m
+[31m+       reconcileProductOrder(configuration?.products ?? [], null).map((product) => product.id),[39m
+[31m+     );[39m
+[31m+     setDraggedCategoryId(null);[39m
+[31m+     setDraggedProductId(null);[39m
+[31m+     setMenuEditError(null);[39m
+[31m+     setMenuEditResetRequested(true);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function cancelMenuEdit(): void {[39m
+[31m+     if (menuEditSaving) return;[39m
+[31m+     setMenuEditActive(false);[39m
+[31m+     setDraggedCategoryId(null);[39m
+[31m+     setDraggedProductId(null);[39m
+[31m+     setMenuEditError(null);[39m
+[31m+     setMenuEditResetRequested(false);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   async function saveMenuEdit(): Promise<void> {[39m
+[31m+     if (menuEditSaving) return;[39m
+[31m+     setMenuEditSaving(true);[39m
+[31m+     setMenuEditError(null);[39m
+[31m+     try {[39m
+[31m+       const saved = await preferencesClient.update([39m
+[31m+         menuEditPreferenceInput([39m
+[31m+           categoryEditOrder,[39m
+[31m+           categoryEditAlignment,[39m
+[31m+           menuEditProductOrder,[39m
+[31m+           menuEditResetRequested,[39m
+[31m+         ),[39m
+[31m+       );[39m
+[31m+       setCategoryPreference(saved);[39m
+[31m+       setMenuEditActive(false);[39m
+[31m+       setMenuEditResetRequested(false);[39m
+[31m+       setDraggedCategoryId(null);[39m
+[31m+       setDraggedProductId(null);[39m
+[31m+       setSuccessMessage('Menu layout saved');[39m
+[31m+       window.setTimeout(() => setSuccessMessage(null), 4_500);[39m
+[31m+     } catch {[39m
+[31m+       setMenuEditError('Could not save menu layout. Try again.');[39m
+[31m+     } finally {[39m
+[31m+       setMenuEditSaving(false);[39m
+[31m+     }[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function moveDraggedCategory(targetId: MenuCategoryId): void {[39m
+[31m+     const sourceId = draggedCategoryId;[39m
+[31m+     if (sourceId === null || sourceId === targetId) return;[39m
+[31m+     setMenuEditResetRequested(false);[39m
+[31m+     setCategoryEditOrder((current) => {[39m
+[31m+       const sourceIndex = current.indexOf(sourceId);[39m
+[31m+       const targetIndex = current.indexOf(targetId);[39m
+[31m+       if (sourceIndex < 0 || targetIndex < 0) return current;[39m
+[31m+       const next = [...current];[39m
+[31m+       const [moved] = next.splice(sourceIndex, 1);[39m
+[31m+       if (moved === undefined) return current;[39m
+[31m+       next.splice(targetIndex, 0, moved);[39m
+[31m+       return next;[39m
+[31m+     });[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function moveDraggedProduct(targetId: ProductId): void {[39m
+[31m+     const sourceId = draggedProductId;[39m
+[31m+     if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;[39m
+[31m+     setMenuEditResetRequested(false);[39m
+[31m+     const productCategoryById = new Map([39m
+[31m+       (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),[39m
+[31m+     );[39m
+[31m+     setMenuEditProductOrder((current) => {[39m
+[31m+       const categoryProductIds = current.filter([39m
+[31m+         (productId) => productCategoryById.get(productId) === selectedCategoryId,[39m
+[31m+       );[39m
+[31m+       return moveProductWithinCategory(current, categoryProductIds, sourceId, targetId);[39m
+[31m+     });[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function addProduct(product: Product): void {[39m
+[31m+     if (draftRef.current === null || configuration === null || product.soldOut) return;[39m
+[31m+     if (product.isCombo) {[39m
+[31m+       setCustomizer({ kind: 'ADD', productId: product.id });[39m
+[31m+       return;[39m
+[31m+     }[39m
+[31m+     enqueueMutation((current) =>[39m
+[31m+       addProductUnit({[39m
+[31m+         draft: current,[39m
+[31m+         configuration,[39m
+[31m+         productId: product.id,[39m
+[31m+         lineId: parseEntityId<DraftLineId>(crypto.randomUUID()),[39m
+[31m+         addedSequence: nextDraftAddedSequence(current),[39m
+[31m+       }),[39m
+[31m+     );[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function decrementProduct(product: Product): void {[39m
+[31m+     const current = draftRef.current;[39m
+[31m+     if (current === null || productQuantityInDraft(current, product.id) === 0) return;[39m
+[31m+     showUndo(current, `Removed one ${product.name}`);[39m
+[31m+     enqueueMutation((candidate) => decrementProductUnit(candidate, product.id));[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function decrementLine(lineId: DraftLineId): void {[39m
+[31m+     const current = draftRef.current;[39m
+[31m+     const line = current?.lines.find((candidate) => candidate.id === lineId);[39m
+[31m+     if (current === null || line === undefined) return;[39m
+[31m+     showUndo(current, `Removed one ${line.productName}`);[39m
+[31m+     enqueueMutation((candidate) => decrementDraftLine(candidate, lineId));[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function incrementLine(lineId: DraftLineId): void {[39m
+[31m+     if (draftRef.current === null || configuration === null) return;[39m
+[31m+     enqueueMutation((current) =>[39m
+[31m+       duplicateDraftLineUnit({[39m
+[31m+         draft: current,[39m
+[31m+         configuration,[39m
+[31m+         lineId,[39m
+[31m+         newLineId: parseEntityId<DraftLineId>(crypto.randomUUID()),[39m
+[31m+         addedSequence: nextDraftAddedSequence(current),[39m
+[31m+       }),[39m
+[31m+     );[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function submitCustomization(customization: DraftLineCustomization): void {[39m
+[31m+     if (customizer === null || configuration === null) return;[39m
+[31m+     if (customizer.kind === 'ADD') {[39m
+[31m+       const target = customizer;[39m
+[31m+       enqueueMutation((current) =>[39m
+[31m+         addProductUnit({[39m
+[31m+           draft: current,[39m
+[31m+           configuration,[39m
+[31m+           productId: target.productId,[39m
+[31m+           lineId: parseEntityId<DraftLineId>(crypto.randomUUID()),[39m
+[31m+           addedSequence: nextDraftAddedSequence(current),[39m
+[31m+           customization,[39m
+[31m+         }),[39m
+[31m+       );[39m
+[31m+     } else {[39m
+[31m+       const target = customizer;[39m
+[31m+       enqueueMutation((current) =>[39m
+[31m+         replaceDraftLineCustomization({[39m
+[31m+           draft: current,[39m
+[31m+           lineId: target.lineId,[39m
+[31m+           configuration,[39m
+[31m+           customization,[39m
+[31m+         }),[39m
+[31m+       );[39m
+[31m+     }[39m
+[31m+     setCustomizer(null);[39m
+[31m+     setQuickInfoProductId(null);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function confirmClear(): void {[39m
+[31m+     const current = draftRef.current;[39m
+[31m+     if (current === null) return;[39m
+[31m+     showUndo(current, 'Order cleared');[39m
+[31m+     enqueueMutation((candidate) => ({[39m
+[31m+       ...candidate,[39m
+[31m+       lines: [],[39m
+[31m+       orderNote: null,[39m
+[31m+       discountMinor: ZERO_MONEY,[39m
+[31m+       delivery: {[39m
+[31m+         ...candidate.delivery,[39m
+[31m+         displayPhone: '',[39m
+[31m+         normalizedPhone: '',[39m
+[31m+         customerName: '',[39m
+[31m+         address: '',[39m
+[31m+         zoneId: null,[39m
+[31m+         zoneLabel: '',[39m
+[31m+         configuredFeeMinor: ZERO_MONEY,[39m
+[31m+         finalFeeMinor: ZERO_MONEY,[39m
+[31m+       },[39m
+[31m+       payment: { mode: 'NONE' },[39m
+[31m+     }));[39m
+[31m+     setClearConfirmOpen(false);[39m
+[31m+     setShowValidation(false);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   function commitDeliveryPhone(displayPhone: string): void {[39m
+[31m+     if (configuration === null || workspace === null) return;[39m
+[31m+     const normalized = normalizeEgyptianPhone(displayPhone);[39m
+[31m+     enqueueMutation((current) => ({[39m
+[31m+       ...current,[39m
+[31m+       delivery: {[39m
+[31m+         ...current.delivery,[39m
+[31m+         displayPhone,[39m
+[31m+         normalizedPhone: normalized.normalizedPhone,[39m
+[31m+       },[39m
+[31m+     }));[39m
+[31m+     if (!normalized.valid) return;[39m
+[31m+[39m
+[31m+     const normalizedPhone = normalized.normalizedPhone;[39m
+[31m+     void saveQueueRef.current.then(async () => {[39m
+[31m+       const result = await client.findCustomerByPhone(workspace.shopId, normalizedPhone);[39m
+[31m+       if (!result.ok) {[39m
+[31m+         setGlobalError(result.error.message);[39m
+[31m+         return;[39m
+[31m+       }[39m
+[31m+       const contact = result.value;[39m
+[31m+       if (contact === null) return;[39m
+[31m+       enqueueMutation((current) => {[39m
+[31m+         if (current.delivery.normalizedPhone !== normalizedPhone) return current;[39m
+[31m+         const zone =[39m
+[31m+           contact.latestZoneId === null[39m
+[31m+             ? null[39m
+[31m+             : (configuration.deliveryZones.find([39m
+[31m+                 (candidate) => candidate.id === contact.latestZoneId && candidate.active,[39m
+[31m+               ) ?? null);[39m
+[31m+         const withContact: OrderDraft = {[39m
+[31m+           ...current,[39m
+[31m+           delivery: {[39m
+[31m+             ...current.delivery,[39m
+[31m+             customerName: contact.name,[39m
+[31m+             address: contact.latestAddress ?? current.delivery.address,[39m
+[31m+           },[39m
+[31m+         };[39m
+[31m+         return zone === null[39m
+[31m+           ? withContact[39m
+[31m+           : {[39m
+[31m+               ...withContact,[39m
+[31m+               delivery: {[39m
+[31m+                 ...withContact.delivery,[39m
+[31m+                 zoneId: zone.id,[39m
+[31m+                 zoneLabel: zone.name,[39m
+[31m+                 configuredFeeMinor: zone.feeMinor,[39m
+[31m+                 finalFeeMinor: zone.feeMinor,[39m
+[31m+               },[39m
+[31m+             };[39m
+[31m+       });[39m
+[31m+     });[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   async function placeOrder(): Promise<void> {[39m
+[31m+     await saveQueueRef.current;[39m
+[31m+     const current = draftRef.current;[39m
+[31m+     if (current === null || configuration === null) return;[39m
+[31m+     const checked = validateOrderDraft(current, configuration);[39m
+[31m+     if (!checked.valid) {[39m
+[31m+       setShowValidation(true);[39m
+[31m+       setGlobalError(checked.issues[0]?.message ?? 'Check the order details.');[39m
+[31m+       return;[39m
+[31m+     }[39m
+[31m+[39m
+[31m+     setPlacing(true);[39m
+[31m+     setGlobalError(null);[39m
+[31m+     const result = await client.placeOrder(current);[39m
+[31m+     setPlacing(false);[39m
+[31m+     if (!result.ok) {[39m
+[31m+       setShowValidation(true);[39m
+[31m+       setGlobalError(result.error.message);[39m
+[31m+       return;[39m
+[31m+     }[39m
+[31m+[39m
+[31m+     setCurrentDraft(result.value.nextDraft);[39m
+[31m+     setShowValidation(false);[39m
+[31m+     setSearch('');[39m
+[31m+     setMobileCartOpen(false);[39m
+[31m+     setUndo(null);[39m
+[31m+     const prefix = result.value.replayed ? 'Recovered' : 'Placed';[39m
+[31m+     setSuccessMessage(`${prefix} order #${result.value.order.displayOrderNo}`);[39m
+[31m+     window.setTimeout(() => setSuccessMessage(null), 4_500);[39m
+[31m+[39m
+[31m+     const printFailed = result.value.postCommitWarnings.includes('PRINT_FAILED');[39m
+[31m+     const printUnknown = result.value.postCommitWarnings.includes('PRINT_STATUS_UNKNOWN');[39m
+[31m+     if (printFailed || printUnknown) {[39m
+[31m+       setPrintNotice({[39m
+[31m+         orderId: result.value.order.id,[39m
+[31m+         displayOrderNo: result.value.order.displayOrderNo,[39m
+[31m+         kind: printFailed ? 'FAILED' : 'UNKNOWN',[39m
+[31m+         message: printFailed[39m
+[31m+           ? 'The order is saved locally, but the receipt did not print.'[39m
+[31m+           : 'The order was recovered safely. Receipt print status is unknown, so it was not printed again automatically.',[39m
+[31m+       });[39m
+[31m+     } else {[39m
+[31m+       setPrintNotice(null);[39m
+[31m+     }[39m
+[31m+[39m
+[31m+     const otherWarnings = result.value.postCommitWarnings.filter([39m
+[31m+       (warning) => warning !== 'PRINT_FAILED' && warning !== 'PRINT_STATUS_UNKNOWN',[39m
+[31m+     );[39m
+[31m+     if (otherWarnings.length > 0) {[39m
+[31m+       setGlobalError([39m
+[31m+         `Order #${result.value.order.displayOrderNo} is saved locally. Follow-up issue: ${otherWarnings.join(', ')}`,[39m
+[31m+       );[39m
+[31m+     }[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   async function reprintReceipt(): Promise<void> {[39m
+[31m+     const notice = printNotice;[39m
+[31m+     if (notice === null || reprinting) return;[39m
+[31m+[39m
+[31m+     setReprinting(true);[39m
+[31m+     const result = await client.reprintOrder(notice.orderId);[39m
+[31m+     setReprinting(false);[39m
+[31m+     if (!result.ok) {[39m
+[31m+       setPrintNotice({[39m
+[31m+         ...notice,[39m
+[31m+         kind: 'FAILED',[39m
+[31m+         message: `Order #${notice.displayOrderNo} is still saved locally. ${result.error.message}`,[39m
+[31m+       });[39m
+[31m+       return;[39m
+[31m+     }[39m
+[31m+[39m
+[31m+     setPrintNotice(null);[39m
+[31m+     setSuccessMessage(`Receipt reprinted for order #${result.value.displayOrderNo}`);[39m
+[31m+     window.setTimeout(() => setSuccessMessage(null), 4_500);[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   if (loading) {[39m
+[31m+     return <main className="orders-loading" aria-label="Loading Orders" />;[39m
+[31m+   }[39m
+[31m+   if (workspace === null || draft === null || configuration === null) {[39m
+[31m+     return ([39m
+[31m+       <main className="orders-unavailable">[39m
+[31m+         <h1>Orders unavailable</h1>[39m
+[31m+         <p>{globalError ?? 'The local Orders workspace could not be loaded.'}</p>[39m
+[31m+       </main>[39m
+[31m+     );[39m
+[31m+   }[39m
+[31m+[39m
+[31m+   const busy = saving || placing;[39m
+[31m+[39m
+[31m+   return ([39m
+[31m+     <main[39m
+[31m+       className="orders-workspace"[39m
+[31m+       style={[39m
+[31m+         desktopCartResizable[39m
+[31m+           ? { gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px` }[39m
+[31m+           : undefined[39m
+[31m+       }[39m
+[31m+     >[39m
+[31m+       <section className="menu-pane" aria-label="Menu">[39m
+[31m+         <>[39m
+[31m+           <div[39m
+[31m+             className={[39m
+[31m+               menuEditActive[39m
+[31m+                 ? 'menu-toolbar category-mode-edit'[39m
+[31m+                 : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`[39m
+[31m+             }[39m
+[31m+           >[39m
+[31m+             <div className="field-stack category-navigation-stack">[39m
+[31m+               <div className="category-navigation">[39m
+[31m+                 <div[39m
+[31m+                   className="category-rail"[39m
+[31m+                   aria-label="Menu categories"[39m
+[31m+                   data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}[39m
+[31m+                 >[39m
+[31m+                   {(menuEditActive ? categoryEditorCategories : activeCategories).map([39m
+[31m+                     (category) => ([39m
+[31m+                       <button[39m
+[31m+                         type="button"[39m
+[31m+                         key={category.id}[39m
+[31m+                         className={[[39m
+[31m+                           'category-tab',[39m
+[31m+                           selectedCategoryId === category.id ? 'selected' : '',[39m
+[31m+                           menuEditActive ? 'category-tab-reordering' : '',[39m
+[31m+                           draggedCategoryId === category.id ? 'category-tab-dragging' : '',[39m
+[31m+                         ][39m
+[31m+                           .filter(Boolean)[39m
+[31m+                           .join(' ')}[39m
+[31m+                         draggable={menuEditActive && draggedCategoryId !== category.id}[39m
+[31m+                         onDragStart={(event) => {[39m
+[31m+                           if (!menuEditActive) return;[39m
+[31m+                           setDraggedCategoryId(category.id);[39m
+[31m+                           event.dataTransfer.effectAllowed = 'move';[39m
+[31m+                           event.dataTransfer.setData('text/plain', category.id);[39m
+[31m+                         }}[39m
+[31m+                         onDragEnter={(event) => {[39m
+[31m+                           if (!menuEditActive || draggedCategoryId === null) return;[39m
+[31m+                           event.preventDefault();[39m
+[31m+                           moveDraggedCategory(category.id);[39m
+[31m+                         }}[39m
+[31m+                         onDragOver={(event) => {[39m
+[31m+                           if (menuEditActive && draggedCategoryId !== null) event.preventDefault();[39m
+[31m+                         }}[39m
+[31m+                         onDragEnd={() => setDraggedCategoryId(null)}[39m
+[31m+                         onDrop={(event) => {[39m
+[31m+                           event.preventDefault();[39m
+[31m+                           setDraggedCategoryId(null);[39m
+[31m+                         }}[39m
+[31m+                         onClick={() => {[39m
+[31m+                           setSelectedCategoryId(category.id);[39m
+[31m+                           setSelectedFamily(null);[39m
+[31m+                           setSearch('');[39m
+[31m+                         }}[39m
+[31m+                       >[39m
+[31m+                         {category.name}[39m
+[31m+                       </button>[39m
+[31m+                     ),[39m
+[31m+                   )}[39m
+[31m+                 </div>[39m
+[31m+                 <div className="category-nav-actions">[39m
+[31m+                   {menuEditActive ? ([39m
+[31m+                     <div[39m
+[31m+                       className="category-alignment category-alignment-inline"[39m
+[31m+                       role="group"[39m
+[31m+                       aria-label="Category alignment"[39m
+[31m+                     >[39m
+[31m+                       {(['left', 'center', 'right'] as const).map((alignment) => ([39m
+[31m+                         <button[39m
+[31m+                           type="button"[39m
+[31m+                           key={alignment}[39m
+[31m+                           aria-pressed={categoryEditAlignment === alignment}[39m
+[31m+                           onClick={() => {[39m
+[31m+                             setCategoryEditAlignment(alignment);[39m
+[31m+                             setMenuEditResetRequested(false);[39m
+[31m+                           }}[39m
+[31m+                         >[39m
+[31m+                           {alignment === 'left'[39m
+[31m+                             ? 'Left'[39m
+[31m+                             : alignment === 'center'[39m
+[31m+                               ? 'Center'[39m
+[31m+                               : 'Right'}[39m
+[31m+                         </button>[39m
+[31m+                       ))}[39m
+[31m+                     </div>[39m
+[31m+                   ) : null}[39m
+[31m+                   {categoryMode === 'IDLE' ? ([39m
+[31m+                     <button[39m
+[31m+                       type="button"[39m
+[31m+                       className={[39m
+[31m+                         menuEditActive[39m
+[31m+                           ? 'category-icon-action category-edit-active'[39m
+[31m+                           : 'category-icon-action'[39m
+[31m+                       }[39m
+[31m+                       aria-label="Edit menu"[39m
+[31m+                       title="Edit menu"[39m
+[31m+                       aria-pressed={menuEditActive}[39m
+[31m+                       onClick={() => {[39m
+[31m+                         if (!menuEditActive) beginMenuEdit();[39m
+[31m+                       }}[39m
+[31m+                     >[39m
+[31m+                       <EditPencilIcon />[39m
+[31m+                     </button>[39m
+[31m+                   ) : null}[39m
+[31m+                   {!menuEditActive && categoryMode === 'SEARCH' ? ([39m
+[31m+                     <div className="product-search category-search-inline">[39m
+[31m+                       <SearchIcon className="category-search-glyph" />[39m
+[31m+                       <input[39m
+[31m+                         ref={searchRef}[39m
+[31m+                         id="product-search"[39m
+[31m+                         type="search"[39m
+[31m+                         aria-label="Search menu"[39m
+[31m+                         value={search}[39m
+[31m+                         placeholder="Search products"[39m
+[31m+                         autoComplete="off"[39m
+[31m+                         onChange={(event) => setSearch(event.target.value)}[39m
+[31m+                       />[39m
+[31m+                       <button[39m
+[31m+                         type="button"[39m
+[31m+                         className="category-search-clear"[39m
+[31m+                         aria-label="Clear search"[39m
+[31m+                         title="Clear search"[39m
+[31m+                         onClick={() => {[39m
+[31m+                           setSearch('');[39m
+[31m+                           setCategoryMode('IDLE');[39m
+[31m+                         }}[39m
+[31m+                       >[39m
+[31m+                         ×[39m
+[31m+                       </button>[39m
+[31m+                     </div>[39m
+[31m+                   ) : !menuEditActive ? ([39m
+[31m+                     <button[39m
+[31m+                       type="button"[39m
+[31m+                       className="category-icon-action"[39m
+[31m+                       aria-label="Search menu"[39m
+[31m+                       title="Search menu"[39m
+[31m+                       onClick={() => setCategoryMode('SEARCH')}[39m
+[31m+                     >[39m
+[31m+                       <SearchIcon />[39m
+[31m+                     </button>[39m
+[31m+                   ) : null}[39m
+[31m+                 </div>[39m
+[31m+               </div>[39m
+[31m+               {!menuEditActive && activeFamilies.length > 0 ? ([39m
+[31m+                 <div[39m
+[31m+                   className="segmented-control product-family-filter"[39m
+[31m+                   aria-label="Product families"[39m
+[31m+                 >[39m
+[31m+                   <button[39m
+[31m+                     type="button"[39m
+[31m+                     className={selectedFamily === null ? 'selected' : undefined}[39m
+[31m+                     onClick={() => setSelectedFamily(null)}[39m
+[31m+                   >[39m
+[31m+                     All[39m
+[31m+                   </button>[39m
+[31m+                   {activeFamilies.map((family) => ([39m
+[31m+                     <button[39m
+[31m+                       type="button"[39m
+[31m+                       key={family}[39m
+[31m+                       className={selectedFamily === family ? 'selected' : undefined}[39m
+[31m+                       onClick={() => setSelectedFamily(family)}[39m
+[31m+                     >[39m
+[31m+                       {family}[39m
+[31m+                     </button>[39m
+[31m+                   ))}[39m
+[31m+                 </div>[39m
+[31m+               ) : null}[39m
+[31m+             </div>[39m
+[31m+           </div>[39m
+[31m+[39m
+[31m+           <div className="product-grid" aria-live="polite">[39m
+[31m+             {menuEditActive ? ([39m
+[31m+               menuEditProducts.length === 0 ? ([39m
+[31m+                 <div className="menu-empty">[39m
+[31m+                   <strong>No products found</strong>[39m
+[31m+                   <span>This category has no active products.</span>[39m
+[31m+                 </div>[39m
+[31m+               ) : ([39m
+[31m+                 menuEditProducts.map((product) => ([39m
+[31m+                   <article[39m
+[31m+                     key={product.id}[39m
+[31m+                     className={[[39m
+[31m+                       'product-card',[39m
+[31m+                       'menu-edit-product-card',[39m
+[31m+                       draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',[39m
+[31m+                     ][39m
+[31m+                       .filter(Boolean)[39m
+[31m+                       .join(' ')}[39m
+[31m+                     draggable={menuEditActive && draggedProductId !== product.id}[39m
+[31m+                     tabIndex={0}[39m
+[31m+                     aria-label={`Reorder ${product.name}`}[39m
+[31m+                     onDragStart={(event) => {[39m
+[31m+                       setDraggedProductId(product.id);[39m
+[31m+                       event.dataTransfer.effectAllowed = 'move';[39m
+[31m+                       event.dataTransfer.setData('text/plain', product.id);[39m
+[31m+                     }}[39m
+[31m+                     onDragEnter={(event) => {[39m
+[31m+                       if (draggedProductId === null) return;[39m
+[31m+                       event.preventDefault();[39m
+[31m+                       moveDraggedProduct(product.id);[39m
+[31m+                     }}[39m
+[31m+                     onDragOver={(event) => {[39m
+[31m+                       if (draggedProductId !== null) event.preventDefault();[39m
+[31m+                     }}[39m
+[31m+                     onDragEnd={() => setDraggedProductId(null)}[39m
+[31m+                     onDrop={(event) => {[39m
+[31m+                       event.preventDefault();[39m
+[31m+                       setDraggedProductId(null);[39m
+[31m+                     }}[39m
+[31m+                   >[39m
+[31m+                     <div className="product-main">[39m
+[31m+                       <div className="product-media">[39m
+[31m+                         <ProductImage product={product} />[39m
+[31m+                       </div>[39m
+[31m+                       <div className="product-copy">[39m
+[31m+                         <strong>{product.name}</strong>[39m
+[31m+                         {product.description?.trim() ? <p>{product.description}</p> : null}[39m
+[31m+                       </div>[39m
+[31m+                       <strong className="product-price">[39m
+[31m+                         {formatMoneyMinor(product.priceMinor)}[39m
+[31m+                       </strong>[39m
+[31m+                     </div>[39m
+[31m+                     <div className="menu-edit-product-hint" aria-hidden="true">[39m
+[31m+                       Drag to reorder[39m
+[31m+                     </div>[39m
+[31m+                   </article>[39m
+[31m+                 ))[39m
+[31m+               )[39m
+[31m+             ) : products.length === 0 ? ([39m
+[31m+               <div className="menu-empty">[39m
+[31m+                 <strong>No products found</strong>[39m
+[31m+                 <span>[39m
+[31m+                   {search.length > 0[39m
+[31m+                     ? 'Try another search.'[39m
+[31m+                     : 'This category has no active products.'}[39m
+[31m+                 </span>[39m
+[31m+               </div>[39m
+[31m+             ) : ([39m
+[31m+               products.map((product) => ([39m
+[31m+                 <MenuProductCard[39m
+[31m+                   key={product.id}[39m
+[31m+                   product={product}[39m
+[31m+                   quantity={productQuantityInDraft(draft, product.id)}[39m
+[31m+                   busy={busy}[39m
+[31m+                   onQuickInfo={() => setQuickInfoProductId(product.id)}[39m
+[31m+                   onDecrement={() => decrementProduct(product)}[39m
+[31m+                   onAdd={() => addProduct(product)}[39m
+[31m+                   onExtras={() =>[39m
+[31m+                     setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })[39m
+[31m+                   }[39m
+[31m+                 />[39m
+[31m+               ))[39m
+[31m+             )}[39m
+[31m+           </div>[39m
+[31m+[39m
+[31m+           {menuEditActive ? ([39m
+[31m+             <div className="menu-edit-actions" aria-label="Menu edit actions">[39m
+[31m+               <div className="menu-edit-action-status">[39m
+[31m+                 {menuEditError === null ? null : ([39m
+[31m+                   <span className="category-editor-error" role="alert">[39m
+[31m+                     {menuEditError}[39m
+[31m+                   </span>[39m
+[31m+                 )}[39m
+[31m+                 <button[39m
+[31m+                   type="button"[39m
+[31m+                   className="text-action"[39m
+[31m+                   disabled={menuEditSaving}[39m
+[31m+                   onClick={resetMenuEdit}[39m
+[31m+                 >[39m
+[31m+                   Reset[39m
+[31m+                 </button>[39m
+[31m+               </div>[39m
+[31m+               <div className="menu-edit-actions-primary">[39m
+[31m+                 <button[39m
+[31m+                   type="button"[39m
+[31m+                   className="secondary-action"[39m
+[31m+                   disabled={menuEditSaving}[39m
+[31m+                   onClick={cancelMenuEdit}[39m
+[31m+                 >[39m
+[31m+                   Cancel[39m
+[31m+                 </button>[39m
+[31m+                 <button[39m
+[31m+                   type="button"[39m
+[31m+                   className="primary-action"[39m
+[31m+                   disabled={menuEditSaving}[39m
+[31m+                   onClick={() => void saveMenuEdit()}[39m
+[31m+                 >[39m
+[31m+                   {menuEditSaving ? 'Saving…' : 'Save'}[39m
+[31m+                 </button>[39m
+[31m+               </div>[39m
+[31m+             </div>[39m
+[31m+           ) : null}[39m
+[31m+         </>[39m
+[31m+       </section>[39m
+[31m+[39m
+[31m+       {desktopCartResizable ? ([39m
+[31m+         <div[39m
+[31m+           className="cart-resize-separator"[39m
+[31m+           role="separator"[39m
+[31m+           aria-label="Resize Current Order"[39m
+[31m+           aria-orientation="vertical"[39m
+[31m+           aria-valuemin={CART_WIDTH_MIN}[39m
+[31m+           aria-valuemax={Math.floor(Math.min(CART_WIDTH_MAX_PX, window.innerWidth * 0.45))}[39m
+[31m+           aria-valuenow={Math.round(cartWidth)}[39m
+[31m+           tabIndex={0}[39m
+[31m+           onKeyDown={(event) => {[39m
+[31m+             if (event.key === 'ArrowLeft') {[39m
+[31m+               event.preventDefault();[39m
+[31m+               commitCartWidth(cartWidth + CART_RESIZE_KEYBOARD_STEP);[39m
+[31m+             } else if (event.key === 'ArrowRight') {[39m
+[31m+               event.preventDefault();[39m
+[31m+               commitCartWidth(cartWidth - CART_RESIZE_KEYBOARD_STEP);[39m
+[31m+             } else if (event.key === 'Home') {[39m
+[31m+               event.preventDefault();[39m
+[31m+               commitCartWidth(CART_WIDTH_MIN);[39m
+[31m+             } else if (event.key === 'End') {[39m
+[31m+               event.preventDefault();[39m
+[31m+               commitCartWidth(CART_WIDTH_MAX_PX);[39m
+[31m+             }[39m
+[31m+           }}[39m
+[31m+           onPointerDown={(event) => {[39m
+[31m+             cartResizeRef.current = { startX: event.clientX, startWidth: cartWidth };[39m
+[31m+             event.currentTarget.setPointerCapture(event.pointerId);[39m
+[31m+           }}[39m
+[31m+           onPointerMove={(event) => {[39m
+[31m+             const drag = cartResizeRef.current;[39m
+[31m+             if (drag === null || !event.currentTarget.hasPointerCapture(event.pointerId)) return;[39m
+[31m+             commitCartWidth(drag.startWidth + drag.startX - event.clientX);[39m
+[31m+           }}[39m
+[31m+           onPointerUp={(event) => {[39m
+[31m+             if (event.currentTarget.hasPointerCapture(event.pointerId)) {[39m
+[31m+               event.currentTarget.releasePointerCapture(event.pointerId);[39m
+[31m+             }[39m
+[31m+             cartResizeRef.current = null;[39m
+[31m+           }}[39m
+[31m+           onPointerCancel={(event) => {[39m
+[31m+             if (event.currentTarget.hasPointerCapture(event.pointerId)) {[39m
+[31m+               event.currentTarget.releasePointerCapture(event.pointerId);[39m
+[31m+             }[39m
+[31m+             cartResizeRef.current = null;[39m
+[31m+           }}[39m
+[31m+         />[39m
+[31m+       ) : null}[39m
+[31m+[39m
+[31m+       <div className="desktop-cart-wrap">[39m
+[31m+         <OrdersCart[39m
+[31m+           draft={draft}[39m
+[31m+           configuration={configuration}[39m
+[31m+           issues={visibleIssues}[39m
+[31m+           busy={saving}[39m
+[31m+           placing={placing}[39m
+[31m+           onMutate={enqueueMutation}[39m
+[31m+           onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}[39m
+[31m+           onEditLineExtras={(lineId) =>[39m
+[31m+             setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })[39m
+[31m+           }[39m
+[31m+           onDecrementLine={decrementLine}[39m
+[31m+           onIncrementLine={incrementLine}[39m
+[31m+           onClear={() => setClearConfirmOpen(true)}[39m
+[31m+           onDeliveryPhoneCommit={commitDeliveryPhone}[39m
+[31m+           onPlace={() => void placeOrder()}[39m
+[31m+         />[39m
+[31m+       </div>[39m
+[31m+[39m
+[31m+       <button[39m
+[31m+         type="button"[39m
+[31m+         className="mobile-cart-trigger"[39m
+[31m+         onClick={() => setMobileCartOpen(true)}[39m
+[31m+         disabled={draft.lines.length === 0}[39m
+[31m+       >[39m
+[31m+         <span>Order · {totalQuantity}</span>[39m
+[31m+         <strong>Review & pay</strong>[39m
+[31m+       </button>[39m
+[31m+[39m
+[31m+       {mobileCartOpen ? ([39m
+[31m+         <div className="mobile-cart-overlay">[39m
+[31m+           <div className="mobile-cart-bar">[39m
+[31m+             <strong>Review & pay</strong>[39m
+[31m+             <button type="button" className="quiet-action" onClick={() => setMobileCartOpen(false)}>[39m
+[31m+               Close[39m
+[31m+             </button>[39m
+[31m+           </div>[39m
+[31m+           <OrdersCart[39m
+[31m+             draft={draft}[39m
+[31m+             configuration={configuration}[39m
+[31m+             issues={visibleIssues}[39m
+[31m+             busy={saving}[39m
+[31m+             placing={placing}[39m
+[31m+             onMutate={enqueueMutation}[39m
+[31m+             onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}[39m
+[31m+             onEditLineExtras={(lineId) =>[39m
+[31m+               setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })[39m
+[31m+             }[39m
+[31m+             onDecrementLine={decrementLine}[39m
+[31m+             onIncrementLine={incrementLine}[39m
+[31m+             onClear={() => setClearConfirmOpen(true)}[39m
+[31m+             onDeliveryPhoneCommit={commitDeliveryPhone}[39m
+[31m+             onPlace={() => void placeOrder()}[39m
+[31m+           />[39m
+[31m+         </div>[39m
+[31m+       ) : null}[39m
+[31m+[39m
+[31m+       {customizer === null ? null : ([39m
+[31m+         <ProductCustomizer[39m
+[31m+           key={[39m
+[31m+             customizer.kind === 'ADD'[39m
+[31m+               ? `add:${customizer.productId}:${customizer.focusSection ?? 'FULL'}`[39m
+[31m+               : `edit:${customizer.lineId}:${customizer.focusSection ?? 'FULL'}`[39m
+[31m+           }[39m
+[31m+           target={customizer}[39m
+[31m+           draft={draft}[39m
+[31m+           configuration={configuration}[39m
+[31m+           busy={busy}[39m
+[31m+           onCancel={() => setCustomizer(null)}[39m
+[31m+           onSubmit={submitCustomization}[39m
+[31m+         />[39m
+[31m+       )}[39m
+[31m+[39m
+[31m+       {quickInfoProduct === null ? null : ([39m
+[31m+         <QuickInfo[39m
+[31m+           product={quickInfoProduct}[39m
+[31m+           busy={busy}[39m
+[31m+           onClose={() => setQuickInfoProductId(null)}[39m
+[31m+         />[39m
+[31m+       )}[39m
+[31m+[39m
+[31m+       {clearConfirmOpen ? ([39m
+[31m+         <div className="orders-overlay" role="presentation">[39m
+[31m+           <section[39m
+[31m+             className="confirm-dialog"[39m
+[31m+             role="dialog"[39m
+[31m+             aria-modal="true"[39m
+[31m+             aria-labelledby="clear-title"[39m
+[31m+           >[39m
+[31m+             <h2 id="clear-title">Clear this order?</h2>[39m
+[31m+             <p>This only clears the current draft. No placed order is changed.</p>[39m
+[31m+             <div className="dialog-actions">[39m
+[31m+               <button[39m
+[31m+                 type="button"[39m
+[31m+                 className="secondary-action"[39m
+[31m+                 onClick={() => setClearConfirmOpen(false)}[39m
+[31m+               >[39m
+[31m+                 Keep order[39m
+[31m+               </button>[39m
+[31m+               <button type="button" className="destructive-action" onClick={confirmClear}>[39m
+[31m+                 Clear order[39m
+[31m+               </button>[39m
+[31m+             </div>[39m
+[31m+           </section>[39m
+[31m+         </div>[39m
+[31m+       ) : null}[39m
+[31m+[39m
+[31m+       {undo === null ? null : ([39m
+[31m+         <div className="undo-toast" role="status">[39m
+[31m+           <span>{undo.message}</span>[39m
+[31m+           <button type="button" onClick={undoLastDraftChange}>[39m
+[31m+             Undo[39m
+[31m+           </button>[39m
+[31m+         </div>[39m
+[31m+       )}[39m
+[31m+       {successMessage === null ? null : ([39m
+[31m+         <div className="success-toast" role="status">[39m
+[31m+           {successMessage}[39m
+[31m+         </div>[39m
+[31m+       )}[39m
+[31m+       {printNotice === null ? null : ([39m
+[31m+         <div className="print-notice" role="status">[39m
+[31m+           <div>[39m
+[31m+             <strong>Order #{printNotice.displayOrderNo} saved locally</strong>[39m
+[31m+             <span>{printNotice.message}</span>[39m
+[31m+           </div>[39m
+[31m+           <div className="print-notice-actions">[39m
+[31m+             <button[39m
+[31m+               type="button"[39m
+[31m+               className="secondary-action"[39m
+[31m+               disabled={reprinting}[39m
+[31m+               onClick={() => void reprintReceipt()}[39m
+[31m+             >[39m
+[31m+               {reprinting[39m
+[31m+                 ? 'Printing…'[39m
+[31m+                 : printNotice.kind === 'FAILED'[39m
+[31m+                   ? 'Retry print'[39m
+[31m+                   : 'Reprint receipt'}[39m
+[31m+             </button>[39m
+[31m+             <button[39m
+[31m+               type="button"[39m
+[31m+               className="quiet-action"[39m
+[31m+               disabled={reprinting}[39m
+[31m+               onClick={() => setPrintNotice(null)}[39m
+[31m+             >[39m
+[31m+               Dismiss[39m
+[31m+             </button>[39m
+[31m+           </div>[39m
+[31m+         </div>[39m
+[31m+       )}[39m
+[31m+       {globalError === null ? null : ([39m
+[31m+         <div className="global-error orders-error" role="alert">[39m
+[31m+           <span>{globalError}</span>[39m
+[31m+           <button type="button" onClick={() => setGlobalError(null)}>[39m
+[31m+             Dismiss[39m
+[31m+           </button>[39m
+[31m+         </div>[39m
+[31m+       )}[39m
+[31m+     </main>[39m
+[31m+   );[39m
+[31m+ }[39m
+[31m+[39m
+
+[36m [2m❯[22m apps/operations/src/app/unifiedMenuEditMode.source.test.ts:[2m49:35[22m[39m
+    [90m 47|[39m     [34mexpect[39m(ordersWorkspaceSource)[33m.[39m[34mtoContain[39m([32m'function cancelMenuEdit'[39m)[33m;[39m
+    [90m 48|[39m     expect(ordersWorkspaceSource).toContain('aria-label="Menu edit act…
+    [90m 49|[39m     [34mexpect[39m(ordersWorkspaceSource)[33m.[39m[34mtoContain[39m([32m'>Reset<'[39m)[33m;[39m
+    [90m   |[39m                                   [31m^[39m
+    [90m 50|[39m     [34mexpect[39m(ordersWorkspaceSource)[33m.[39m[34mtoContain[39m([32m'>Cancel<'[39m)[33m;[39m
+    [90m 51|[39m     [34mexpect[39m(ordersWorkspaceSource)[33m.[39m[34mtoContain[39m([32m"'Saving…' : 'Save'"[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m71 passed[39m[22m[90m (72)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m305 passed[39m[22m[90m (306)[39m
+[2m   Start at [22m 10:54:10
+[2m   Duration [22m 9.01s[2m (transform 2.03s, setup 0ms, import 10.64s, tests 3.43s, environment 11ms)[22m
+
+
+::error file=/home/runner/work/TUXCASHEIRNEW/TUXCASHEIRNEW/apps/operations/src/app/unifiedMenuEditMode.source.test.ts,title=apps/operations/src/app/unifiedMenuEditMode.source.test.ts > unified menu edit entry point > persists category and product layout together through one Reset Cancel Save surface,line=49,column=35::AssertionError: expected 'import type {\n  OperationsSessionSta…' to contain '>Reset<'%0A%0A- Expected%0A+ Received%0A%0A- >Reset<%0A+ import type {%0A+   OperationsSessionState,%0A+   OrdersWorkspace as OrdersWorkspaceData,%0A+ } from '@tux/application';%0A+ import {%0A+   ZERO_MONEY,%0A+   addProductUnit,%0A+   decrementDraftLine,%0A+   decrementProductUnit,%0A+   duplicateDraftLineUnit,%0A+   normalizeEgyptianPhone,%0A+   parseEntityId,%0A+   productQuantityInDraft,%0A+   replaceDraftLineCustomization,%0A+   validateOrderDraft,%0A+   type CategoryAlignment,%0A+   type DraftLineCustomization,%0A+   type DraftLineId,%0A+   type MenuCategory,%0A+   type MenuCategoryId,%0A+   type OrderDraft,%0A+   type OrderId,%0A+   type OrderValidationIssue,%0A+   type Product,%0A+   type ProductId,%0A+   type WorkerUiPreferences,%0A+ } from '@tux/domain';%0A+ import { useEffect, useMemo, useRef, useState } from 'react';%0A+ import {%0A+   CART_WIDTH_MAX_PX,%0A+   CART_WIDTH_MIN,%0A+   clampCartWidth,%0A+   readCartWidth,%0A+   writeCartWidth,%0A+ } from './cartWidthPreference';%0A+ import { EditPencilIcon, SearchIcon } from './icons';%0A+ import { MenuProductCard } from './MenuProductCard';%0A+ import {%0A+   filterProductsForMenu as filterProductsForMenuWithPreference,%0A+   moveProductWithinCategory,%0A+   reconcileProductOrder,%0A+ } from './menuProductOrder';%0A+ import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';%0A+ import { OrdersCart, type DraftMutation } from './OrdersCart';%0A+ import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';%0A+ import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';%0A+ import { menuEditPreferenceInput } from './workerUiPreferenceEditing';%0A+%0A+ type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;%0A+%0A+ const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';%0A+ const CART_RESIZE_KEYBOARD_STEP = 24;%0A+%0A+ function desktopCartResizeMatches(): boolean {%0A+   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;%0A+ }%0A+%0A+ export function reconcileCategoryOrder(%0A+   activeCategories: readonly MenuCategory[],%0A+   preference: WorkerUiPreferences | null,%0A+ ): readonly MenuCategory[] {%0A+   if (preference === null || preference.categoryOrder.length === 0) return activeCategories;%0A+%0A+   const byId = new Map(activeCategories.map((category) => [category.id, category]));%0A+   const reconciled: MenuCategory[] = [];%0A+   const seen = new Set<MenuCategoryId>();%0A+%0A+   for (const categoryId of preference.categoryOrder) {%0A+     const category = byId.get(categoryId);%0A+     if (category === undefined || seen.has(categoryId)) continue;%0A+     reconciled.push(category);%0A+     seen.add(categoryId);%0A+   }%0A+%0A+   for (const category of activeCategories) {%0A+     if (seen.has(category.id)) continue;%0A+     reconciled.push(category);%0A+     seen.add(category.id);%0A+   }%0A+%0A+   return reconciled;%0A+ }%0A+%0A+ export function productFamiliesForCategory(%0A+   products: readonly Product[],%0A+   categoryId: MenuCategoryId | null,%0A+ ): readonly string[] {%0A+   if (categoryId === null) return [];%0A+%0A+   const seen = new Set<string>();%0A+   const families: string[] = [];%0A+   const categoryProducts = products%0A+     .filter((product) => product.active && product.categoryId === categoryId)%0A+     .slice()%0A+     .sort((left, right) => left.sortOrder - right.sortOrder);%0A+%0A+   for (const product of categoryProducts) {%0A+     const family = product.family?.trim();%0A+     if (!family || seen.has(family)) continue;%0A+     seen.add(family);%0A+     families.push(family);%0A+   }%0A+%0A+   return families;%0A+ }%0A+%0A+ export function filterProductsForMenu(%0A+   products: readonly Product[],%0A+   options: {%0A+     readonly selectedCategoryId: MenuCategoryId | null;%0A+     readonly selectedFamily: string | null;%0A+     readonly search: string;%0A+   },%0A+ ): readonly Product[] {%0A+   const active = products.filter((product) => product.active);%0A+   const query = options.search.trim().toLocaleLowerCase();%0A+%0A+   if (query.length > 0) {%0A+     return active%0A+       .filter((product) => product.name.toLocaleLowerCase().includes(query))%0A+       .slice()%0A+       .sort((left, right) => left.sortOrder - right.sortOrder);%0A+   }%0A+%0A+   if (options.selectedCategoryId === null) return [];%0A+%0A+   return active%0A+     .filter((product) => product.categoryId === options.selectedCategoryId)%0A+     .filter(%0A+       (product) => options.selectedFamily === null || product.family === options.selectedFamily,%0A+     )%0A+     .slice()%0A+     .sort((left, right) => left.sortOrder - right.sortOrder);%0A+ }%0A+%0A+ interface UndoState {%0A+   readonly snapshot: OrderDraft;%0A+   readonly message: string;%0A+ }%0A+%0A+ interface PrintNoticeState {%0A+   readonly orderId: OrderId;%0A+   readonly displayOrderNo: number;%0A+   readonly kind: 'FAILED' | 'UNKNOWN';%0A+   readonly message: string;%0A+ }%0A+%0A+ function ProductImage({ product }: { readonly product: Product }) {%0A+   const [failed, setFailed] = useState(false);%0A+   if (product.imageKey === null || failed) {%0A+     return (%0A+       <div className="product-image-fallback" aria-hidden="true">%0A+         {product.name%0A+           .split(/\s+/)%0A+           .slice(0, 2)%0A+           .map((part) => part.slice(0, 1).toUpperCase())%0A+           .join('')}%0A+       </div>%0A+     );%0A+   }%0A+   return (%0A+     <img%0A+       className="product-image"%0A+       src={product.imageKey}%0A+       alt=""%0A+       loading="lazy"%0A+       onError={() => setFailed(true)}%0A+     />%0A+   );%0A+ }%0A+%0A+ function restoreDraftContents(current: OrderDraft, snapshot: OrderDraft): OrderDraft {%0A+   return {%0A+     ...current,%0A+     orderTypeId: snapshot.orderTypeId,%0A+     lines: snapshot.lines,%0A+     orderNote: snapshot.orderNote,%0A+     discountMinor: snapshot.discountMinor,%0A+     delivery: snapshot.delivery,%0A+     payment: snapshot.payment,%0A+   };%0A+ }%0A+%0A+ function QuickInfo({%0A+   product,%0A+   busy,%0A+   onClose,%0A+ }: {%0A+   readonly product: Product;%0A+   readonly busy: boolean;%0A+   readonly onClose: () => void;%0A+ }) {%0A+   return (%0A+     <div%0A+       className="orders-overlay"%0A+       role="presentation"%0A+       onMouseDown={(event) => {%0A+         if (event.currentTarget === event.target && !busy) onClose();%0A+       }}%0A+     >%0A+       <section%0A+         className="quick-info"%0A+         role="dialog"%0A+         aria-modal="true"%0A+         aria-labelledby="quick-info-title"%0A+       >%0A+         <div className="quick-info-media">%0A+           <ProductImage product={product} />%0A+         </div>%0A+         <div className="quick-info-body">%0A+           <span className="drawer-kicker">Quick Info</span>%0A+           <h2 id="quick-info-title">{product.name}</h2>%0A+           <strong>{formatMoneyMinor(product.priceMinor)}</strong>%0A+           <p>{product.description?.trim() || 'No product description has been added yet.'}</p>%0A+           {product.soldOut ? <span className="sold-out-label">Sold Out</span> : null}%0A+         </div>%0A+         <div className="drawer-footer">%0A+           <button type="button" className="secondary-action" disabled={busy} onClick={onClose}>%0A+             Close%0A+           </button>%0A+         </div>%0A+       </section>%0A+     </div>%0A+   );%0A+ }%0A+%0A+ export function OrdersWorkspace({%0A+   session,%0A+   client,%0A+ }: {%0A+   readonly session: ActiveSession;%0A+   readonly client: OperationsOrdersClient;%0A+ }) {%0A+   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);%0A+   const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);%0A+   const searchRef = useRef<HTMLInputElement>(null);%0A+   const draftRef = useRef<OrderDraft | null>(null);%0A+   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());%0A+   const pendingSaveCountRef = useRef(0);%0A+   const undoTimerRef = useRef<number | null>(null);%0A+   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);%0A+%0A+   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);%0A+   const [draft, setDraft] = useState<OrderDraft | null>(null);%0A+   const [loading, setLoading] = useState(true);%0A+   const [saving, setSaving] = useState(false);%0A+   const [placing, setPlacing] = useState(false);%0A+   const [reprinting, setReprinting] = useState(false);%0A+   const [printNotice, setPrintNotice] = useState<PrintNoticeState | null>(null);%0A+   const [globalError, setGlobalError] = useState<string | null>(null);%0A+   const [successMessage, setSuccessMessage] = useState<string | null>(null);%0A+   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);%0A+   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);%0A+   const [search, setSearch] = useState('');%0A+   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');%0A+   const [menuEditActive, setMenuEditActive] = useState(false);%0A+   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);%0A+   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);%0A+   const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');%0A+   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);%0A+   const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);%0A+   const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);%0A+   const [menuEditSaving, setMenuEditSaving] = useState(false);%0A+   const [menuEditError, setMenuEditError] = useState<string | null>(null);%0A+   const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);%0A+   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);%0A+   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);%0A+   const [showValidation, setShowValidation] = useState(false);%0A+   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);%0A+   const [undo, setUndo] = useState<UndoState | null>(null);%0A+   const [mobileCartOpen, setMobileCartOpen] = useState(false);%0A+   const [desktopCartResizable, setDesktopCartResizable] = useState(desktopCartResizeMatches);%0A+   const [cartWidth, setCartWidth] = useState(() =>%0A+     typeof window === 'undefined'%0A+       ? CART_WIDTH_MIN%0A+       : readCartWidth(window.localStorage, window.innerWidth),%0A+   );%0A+%0A+   function commitCartWidth(nextWidth: number): void {%0A+     const next = clampCartWidth(nextWidth, window.innerWidth);%0A+     setCartWidth(next);%0A+     writeCartWidth(window.localStorage, next);%0A+   }%0A+%0A+   function setCurrentDraft(next: OrderDraft): void {%0A+     draftRef.current = next;%0A+     setDraft(next);%0A+     setWorkspace((current) => (current === null ? null : { ...current, draft: next }));%0A+   }%0A+%0A+   useEffect(() => {%0A+     let cancelled = false;%0A+     setLoading(true);%0A+     setGlobalError(null);%0A+     void client.loadWorkspace(draftScopeId).then((result) => {%0A+       if (cancelled) return;%0A+       setLoading(false);%0A+       if (!result.ok) {%0A+         setGlobalError(result.error.message);%0A+         return;%0A+       }%0A+       setWorkspace(result.value);%0A+       if (result.value.recoveryState === 'PREVIOUS_ORDER_ALREADY_SAVED') {%0A+         setSuccessMessage('Previous order was already saved. A new cart is ready.');%0A+       }%0A+       draftRef.current = result.value.draft;%0A+       setDraft(result.value.draft);%0A+       const categories = result.value.configuration.categories%0A+         .filter((category) => category.active)%0A+         .sort((left, right) => left.sortOrder - right.sortOrder);%0A+       const defaultCategoryId = categories[0]?.id ?? null;%0A+       setSelectedCategoryId((current) =>%0A+         current !== null && categories.some((category) => category.id === current)%0A+           ? current%0A+           : defaultCategoryId,%0A+       );%0A+       setSelectedFamily(null);%0A+     });%0A+     return () => {%0A+       cancelled = true;%0A+     };%0A+   }, [client, draftScopeId, session.businessDayId, session.operator.id]);%0A+%0A+   useEffect(() => {%0A+     let cancelled = false;%0A+     setCategoryPreference(null);%0A+     setCategoryMode('IDLE');%0A+     setMenuEditActive(false);%0A+     setMenuEditError(null);%0A+     setMenuEditResetRequested(false);%0A+     setSearch('');%0A+     void preferencesClient%0A+       .load()%0A+       .then((preference) => {%0A+         if (!cancelled) setCategoryPreference(preference);%0A+       })%0A+       .catch(() => {%0A+         if (!cancelled) setCategoryPreference(null);%0A+       });%0A+     return () => {%0A+       cancelled = true;%0A+     };%0A+   }, [preferencesClient, session.operator.id]);%0A+%0A+   useEffect(() => {%0A+     if (categoryMode === 'SEARCH') searchRef.current?.focus();%0A+   }, [categoryMode]);%0A+%0A+   useEffect(() => {%0A+     function onKeyDown(event: KeyboardEvent): void {%0A+       const target = event.target;%0A+       const targetIsEditor =%0A+         target instanceof HTMLInputElement ||%0A+         target instanceof HTMLTextAreaElement ||%0A+         target instanceof HTMLSelectElement;%0A+       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {%0A+         if (menuEditActive) return;%0A+         event.preventDefault();%0A+         setCategoryMode('SEARCH');%0A+         return;%0A+       }%0A+       if (event.key === '/' && !targetIsEditor && !menuEditActive) {%0A+         event.preventDefault();%0A+         setCategoryMode('SEARCH');%0A+         return;%0A+       }%0A+       if (event.key === 'Escape' && categoryMode === 'SEARCH') {%0A+         event.preventDefault();%0A+         if (search.length > 0) {%0A+           setSearch('');%0A+           searchRef.current?.focus();%0A+         } else {%0A+           setCategoryMode('IDLE');%0A+         }%0A+       }%0A+     }%0A+     window.addEventListener('keydown', onKeyDown);%0A+     return () => window.removeEventListener('keydown', onKeyDown);%0A+   }, [categoryMode, menuEditActive, search]);%0A+%0A+   useEffect(%0A+     () => () => {%0A+       if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);%0A+     },%0A+     [],%0A+   );%0A+%0A+   useEffect(() => {%0A+     const media = window.matchMedia(DESKTOP_CART_RESIZE_QUERY);%0A+     const sync = () => setDesktopCartResizable(media.matches);%0A+     sync();%0A+     media.addEventListener('change', sync);%0A+     return () => media.removeEventListener('change', sync);%0A+   }, []);%0A+%0A+   useEffect(() => {%0A+     function clampToViewport(): void {%0A+       if (!desktopCartResizeMatches()) return;%0A+       setCartWidth((current) => {%0A+         const next = clampCartWidth(current, window.innerWidth);%0A+         if (next !== current) writeCartWidth(window.localStorage, next);%0A+         return next;%0A+       });%0A+     }%0A+%0A+     clampToViewport();%0A+     window.addEventListener('resize', clampToViewport);%0A+     return () => window.removeEventListener('resize', clampToViewport);%0A+   }, []);%0A+%0A+   function beginPendingSave(): void {%0A+     pendingSaveCountRef.current += 1;%0A+     setSaving(true);%0A+   }%0A+%0A+   function endPendingSave(): void {%0A+     pendingSaveCountRef.current = Math.max(0, pendingSaveCountRef.current - 1);%0A+     if (pendingSaveCountRef.current === 0) setSaving(false);%0A+   }%0A+%0A+   function enqueueMutation(mutation: DraftMutation): void {%0A+     beginPendingSave();%0A+     const run = saveQueueRef.current.then(async () => {%0A+       const current = draftRef.current;%0A+       if (current === null) return;%0A+       let proposed: OrderDraft;%0A+       try {%0A+         proposed = mutation(current);%0A+       } catch (error) {%0A+         setGlobalError(%0A+           error instanceof Error ? error.message : 'Could not update the order draft.',%0A+         );%0A+         return;%0A+       }%0A+       if (proposed === current) return;%0A+       setCurrentDraft(proposed);%0A+       const result = await client.saveDraft(proposed);%0A+       if (!result.ok) {%0A+         setCurrentDraft(current);%0A+         setGlobalError(result.error.message);%0A+         return;%0A+       }%0A+       setCurrentDraft(result.value);%0A+       setGlobalError(null);%0A+     });%0A+     saveQueueRef.current = run%0A+       .catch((error: unknown) => {%0A+         setGlobalError(error instanceof Error ? error.message : 'Could not save the order draft.');%0A+       })%0A+       .finally(endPendingSave);%0A+   }%0A+%0A+   function showUndo(snapshot: OrderDraft, message: string): void {%0A+     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);%0A+     setUndo({ snapshot, message });%0A+     undoTimerRef.current = window.setTimeout(() => {%0A+       setUndo(null);%0A+       undoTimerRef.current = null;%0A+     }, 7_000);%0A+   }%0A+%0A+   function undoLastDraftChange(): void {%0A+     const currentUndo = undo;%0A+     if (currentUndo === null) return;%0A+     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);%0A+     undoTimerRef.current = null;%0A+     setUndo(null);%0A+     enqueueMutation((current) => restoreDraftContents(current, currentUndo.snapshot));%0A+   }%0A+%0A+   const configuration = workspace?.configuration ?? null;%0A+   const configuredActiveCategories = useMemo(%0A+     () =>%0A+       configuration?.categories%0A+         .filter((category) => category.active)%0A+         .sort((left, right) => left.sortOrder - right.sortOrder) ?? [],%0A+     [configuration],%0A+   );%0A+   const activeCategories = useMemo(%0A+     () => reconcileCategoryOrder(configuredActiveCategories, categoryPreference),%0A+     [categoryPreference, configuredActiveCategories],%0A+   );%0A+   const categoryAlignment = categoryPreference?.categoryAlignment ?? 'left';%0A+   const categoryEditorCategories = useMemo(() => {%0A+     const byId = new Map(configuredActiveCategories.map((category) => [category.id, category]));%0A+     return categoryEditOrder.flatMap((categoryId) => {%0A+       const category = byId.get(categoryId);%0A+       return category === undefined ? [] : [category];%0A+     });%0A+   }, [categoryEditOrder, configuredActiveCategories]);%0A+   const activeFamilies = useMemo(() => {%0A+     const selectedCategory = activeCategories.find(%0A+       (category) => category.id === selectedCategoryId,%0A+     );%0A+     if (selectedCategory?.name.trim().toLocaleLowerCase() !== 'burgers') return [];%0A+     return productFamiliesForCategory(configuration?.products ?? [], selectedCategoryId);%0A+   }, [activeCategories, configuration, selectedCategoryId]);%0A+%0A+   useEffect(() => {%0A+     if (selectedFamily !== null && !activeFamilies.includes(selectedFamily)) {%0A+       setSelectedFamily(null);%0A+     }%0A+   }, [activeFamilies, selectedFamily]);%0A+%0A+   const products = useMemo(%0A+     () =>%0A+       filterProductsForMenuWithPreference(%0A+         configuration?.products ?? [],%0A+         {%0A+           selectedCategoryId,%0A+           selectedFamily,%0A+           search,%0A+         },%0A+         categoryPreference,%0A+       ),%0A+     [categoryPreference, configuration, search, selectedCategoryId, selectedFamily],%0A+   );%0A+   const menuEditProducts = useMemo(() => {%0A+     if (selectedCategoryId === null) return [];%0A+     const byId = new Map(%0A+       (configuration?.products ?? [])%0A+         .filter((product) => product.active)%0A+         .map((product) => [product.id, product]),%0A+     );%0A+     return menuEditProductOrder.flatMap((productId) => {%0A+       const product = byId.get(productId);%0A+       return product !== undefined && product.categoryId === selectedCategoryId ? [product] : [];%0A+     });%0A+   }, [configuration, menuEditProductOrder, selectedCategoryId]);%0A+%0A+   const validation = useMemo(() => {%0A+     if (draft === null || configuration === null) return null;%0A+     return validateOrderDraft(draft, configuration);%0A+   }, [configuration, draft]);%0A+   const visibleIssues: readonly OrderValidationIssue[] =%0A+     showValidation && validation !== null && !validation.valid ? validation.issues : [];%0A+%0A+   const totalQuantity = draft?.lines.reduce((total, line) => total + line.quantity, 0) ?? 0;%0A+   const quickInfoProduct =%0A+     quickInfoProductId === null%0A+       ? null%0A+       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);%0A+%0A+   function beginMenuEdit(): void {%0A+     setCategoryMode('IDLE');%0A+     setSearch('');%0A+     setSelectedFamily(null);%0A+     setMenuEditError(null);%0A+     setMenuEditResetRequested(false);%0A+     setCategoryEditOrder(activeCategories.map((category) => category.id));%0A+     setCategoryEditAlignment(categoryAlignment);%0A+     setMenuEditProductOrder(%0A+       reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(%0A+         (product) => product.id,%0A+       ),%0A+     );%0A+     setDraggedCategoryId(null);%0A+     setDraggedProductId(null);%0A+     setMenuEditActive(true);%0A+   }%0A+%0A+   function resetMenuEdit(): void {%0A+     setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));%0A+     setCategoryEditAlignment('left');%0A+     setMenuEditProductOrder(%0A+       reconcileProductOrder(configuration?.products ?? [], null).map((product) => product.id),%0A+     );%0A+     setDraggedCategoryId(null);%0A+     setDraggedProductId(null);%0A+     setMenuEditError(null);%0A+     setMenuEditResetRequested(true);%0A+   }%0A+%0A+   function cancelMenuEdit(): void {%0A+     if (menuEditSaving) return;%0A+     setMenuEditActive(false);%0A+     setDraggedCategoryId(null);%0A+     setDraggedProductId(null);%0A+     setMenuEditError(null);%0A+     setMenuEditResetRequested(false);%0A+   }%0A+%0A+   async function saveMenuEdit(): Promise<void> {%0A+     if (menuEditSaving) return;%0A+     setMenuEditSaving(true);%0A+     setMenuEditError(null);%0A+     try {%0A+       const saved = await preferencesClient.update(%0A+         menuEditPreferenceInput(%0A+           categoryEditOrder,%0A+           categoryEditAlignment,%0A+           menuEditProductOrder,%0A+           menuEditResetRequested,%0A+         ),%0A+       );%0A+       setCategoryPreference(saved);%0A+       setMenuEditActive(false);%0A+       setMenuEditResetRequested(false);%0A+       setDraggedCategoryId(null);%0A+       setDraggedProductId(null);%0A+       setSuccessMessage('Menu layout saved');%0A+       window.setTimeout(() => setSuccessMessage(null), 4_500);%0A+     } catch {%0A+       setMenuEditError('Could not save menu layout. Try again.');%0A+     } finally {%0A+       setMenuEditSaving(false);%0A+     }%0A+   }%0A+%0A+   function moveDraggedCategory(targetId: MenuCategoryId): void {%0A+     const sourceId = draggedCategoryId;%0A+     if (sourceId === null || sourceId === targetId) return;%0A+     setMenuEditResetRequested(false);%0A+     setCategoryEditOrder((current) => {%0A+       const sourceIndex = current.indexOf(sourceId);%0A+       const targetIndex = current.indexOf(targetId);%0A+       if (sourceIndex < 0 || targetIndex < 0) return current;%0A+       const next = [...current];%0A+       const [moved] = next.splice(sourceIndex, 1);%0A+       if (moved === undefined) return current;%0A+       next.splice(targetIndex, 0, moved);%0A+       return next;%0A+     });%0A+   }%0A+%0A+   function moveDraggedProduct(targetId: ProductId): void {%0A+     const sourceId = draggedProductId;%0A+     if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;%0A+     setMenuEditResetRequested(false);%0A+     const productCategoryById = new Map(%0A+       (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),%0A+     );%0A+     setMenuEditProductOrder((current) => {%0A+       const categoryProductIds = current.filter(%0A+         (productId) => productCategoryById.get(productId) === selectedCategoryId,%0A+       );%0A+       return moveProductWithinCategory(current, categoryProductIds, sourceId, targetId);%0A+     });%0A+   }%0A+%0A+   function addProduct(product: Product): void {%0A+     if (draftRef.current === null || configuration === null || product.soldOut) return;%0A+     if (product.isCombo) {%0A+       setCustomizer({ kind: 'ADD', productId: product.id });%0A+       return;%0A+     }%0A+     enqueueMutation((current) =>%0A+       addProductUnit({%0A+         draft: current,%0A+         configuration,%0A+         productId: product.id,%0A+         lineId: parseEntityId<DraftLineId>(crypto.randomUUID()),%0A+         addedSequence: nextDraftAddedSequence(current),%0A+       }),%0A+     );%0A+   }%0A+%0A+   function decrementProduct(product: Product): void {%0A+     const current = draftRef.current;%0A+     if (current === null || productQuantityInDraft(current, product.id) === 0) return;%0A+     showUndo(current, `Removed one ${product.name}`);%0A+     enqueueMutation((candidate) => decrementProductUnit(candidate, product.id));%0A+   }%0A+%0A+   function decrementLine(lineId: DraftLineId): void {%0A+     const current = draftRef.current;%0A+     const line = current?.lines.find((candidate) => candidate.id === lineId);%0A+     if (current === null || line === undefined) return;%0A+     showUndo(current, `Removed one ${line.productName}`);%0A+     enqueueMutation((candidate) => decrementDraftLine(candidate, lineId));%0A+   }%0A+%0A+   function incrementLine(lineId: DraftLineId): void {%0A+     if (draftRef.current === null || configuration === null) return;%0A+     enqueueMutation((current) =>%0A+       duplicateDraftLineUnit({%0A+         draft: current,%0A+         configuration,%0A+         lineId,%0A+         newLineId: parseEntityId<DraftLineId>(crypto.randomUUID()),%0A+         addedSequence: nextDraftAddedSequence(current),%0A+       }),%0A+     );%0A+   }%0A+%0A+   function submitCustomization(customization: DraftLineCustomization): void {%0A+     if (customizer === null || configuration === null) return;%0A+     if (customizer.kind === 'ADD') {%0A+       const target = customizer;%0A+       enqueueMutation((current) =>%0A+         addProductUnit({%0A+           draft: current,%0A+           configuration,%0A+           productId: target.productId,%0A+           lineId: parseEntityId<DraftLineId>(crypto.randomUUID()),%0A+           addedSequence: nextDraftAddedSequence(current),%0A+           customization,%0A+         }),%0A+       );%0A+     } else {%0A+       const target = customizer;%0A+       enqueueMutation((current) =>%0A+         replaceDraftLineCustomization({%0A+           draft: current,%0A+           lineId: target.lineId,%0A+           configuration,%0A+           customization,%0A+         }),%0A+       );%0A+     }%0A+     setCustomizer(null);%0A+     setQuickInfoProductId(null);%0A+   }%0A+%0A+   function confirmClear(): void {%0A+     const current = draftRef.current;%0A+     if (current === null) return;%0A+     showUndo(current, 'Order cleared');%0A+     enqueueMutation((candidate) => ({%0A+       ...candidate,%0A+       lines: [],%0A+       orderNote: null,%0A+       discountMinor: ZERO_MONEY,%0A+       delivery: {%0A+         ...candidate.delivery,%0A+         displayPhone: '',%0A+         normalizedPhone: '',%0A+         customerName: '',%0A+         address: '',%0A+         zoneId: null,%0A+         zoneLabel: '',%0A+         configuredFeeMinor: ZERO_MONEY,%0A+         finalFeeMinor: ZERO_MONEY,%0A+       },%0A+       payment: { mode: 'NONE' },%0A+     }));%0A+     setClearConfirmOpen(false);%0A+     setShowValidation(false);%0A+   }%0A+%0A+   function commitDeliveryPhone(displayPhone: string): void {%0A+     if (configuration === null || workspace === null) return;%0A+     const normalized = normalizeEgyptianPhone(displayPhone);%0A+     enqueueMutation((current) => ({%0A+       ...current,%0A+       delivery: {%0A+         ...current.delivery,%0A+         displayPhone,%0A+         normalizedPhone: normalized.normalizedPhone,%0A+       },%0A+     }));%0A+     if (!normalized.valid) return;%0A+%0A+     const normalizedPhone = normalized.normalizedPhone;%0A+     void saveQueueRef.current.then(async () => {%0A+       const result = await client.findCustomerByPhone(workspace.shopId, normalizedPhone);%0A+       if (!result.ok) {%0A+         setGlobalError(result.error.message);%0A+         return;%0A+       }%0A+       const contact = result.value;%0A+       if (contact === null) return;%0A+       enqueueMutation((current) => {%0A+         if (current.delivery.normalizedPhone !== normalizedPhone) return current;%0A+         const zone =%0A+           contact.latestZoneId === null%0A+             ? null%0A+             : (configuration.deliveryZones.find(%0A+                 (candidate) => candidate.id === contact.latestZoneId && candidate.active,%0A+               ) ?? null);%0A+         const withContact: OrderDraft = {%0A+           ...current,%0A+           delivery: {%0A+             ...current.delivery,%0A+             customerName: contact.name,%0A+             address: contact.latestAddress ?? current.delivery.address,%0A+           },%0A+         };%0A+         return zone === null%0A+           ? withContact%0A+           : {%0A+               ...withContact,%0A+               delivery: {%0A+                 ...withContact.delivery,%0A+                 zoneId: zone.id,%0A+                 zoneLabel: zone.name,%0A+                 configuredFeeMinor: zone.feeMinor,%0A+                 finalFeeMinor: zone.feeMinor,%0A+               },%0A+             };%0A+       });%0A+     });%0A+   }%0A+%0A+   async function placeOrder(): Promise<void> {%0A+     await saveQueueRef.current;%0A+     const current = draftRef.current;%0A+     if (current === null || configuration === null) return;%0A+     const checked = validateOrderDraft(current, configuration);%0A+     if (!checked.valid) {%0A+       setShowValidation(true);%0A+       setGlobalError(checked.issues[0]?.message ?? 'Check the order details.');%0A+       return;%0A+     }%0A+%0A+     setPlacing(true);%0A+     setGlobalError(null);%0A+     const result = await client.placeOrder(current);%0A+     setPlacing(false);%0A+     if (!result.ok) {%0A+       setShowValidation(true);%0A+       setGlobalError(result.error.message);%0A+       return;%0A+     }%0A+%0A+     setCurrentDraft(result.value.nextDraft);%0A+     setShowValidation(false);%0A+     setSearch('');%0A+     setMobileCartOpen(false);%0A+     setUndo(null);%0A+     const prefix = result.value.replayed ? 'Recovered' : 'Placed';%0A+     setSuccessMessage(`${prefix} order #${result.value.order.displayOrderNo}`);%0A+     window.setTimeout(() => setSuccessMessage(null), 4_500);%0A+%0A+     const printFailed = result.value.postCommitWarnings.includes('PRINT_FAILED');%0A+     const printUnknown = result.value.postCommitWarnings.includes('PRINT_STATUS_UNKNOWN');%0A+     if (printFailed || printUnknown) {%0A+       setPrintNotice({%0A+         orderId: result.value.order.id,%0A+         displayOrderNo: result.value.order.displayOrderNo,%0A+         kind: printFailed ? 'FAILED' : 'UNKNOWN',%0A+         message: printFailed%0A+           ? 'The order is saved locally, but the receipt did not print.'%0A+           : 'The order was recovered safely. Receipt print status is unknown, so it was not printed again automatically.',%0A+       });%0A+     } else {%0A+       setPrintNotice(null);%0A+     }%0A+%0A+     const otherWarnings = result.value.postCommitWarnings.filter(%0A+       (warning) => warning !== 'PRINT_FAILED' && warning !== 'PRINT_STATUS_UNKNOWN',%0A+     );%0A+     if (otherWarnings.length > 0) {%0A+       setGlobalError(%0A+         `Order #${result.value.order.displayOrderNo} is saved locally. Follow-up issue: ${otherWarnings.join(', ')}`,%0A+       );%0A+     }%0A+   }%0A+%0A+   async function reprintReceipt(): Promise<void> {%0A+     const notice = printNotice;%0A+     if (notice === null || reprinting) return;%0A+%0A+     setReprinting(true);%0A+     const result = await client.reprintOrder(notice.orderId);%0A+     setReprinting(false);%0A+     if (!result.ok) {%0A+       setPrintNotice({%0A+         ...notice,%0A+         kind: 'FAILED',%0A+         message: `Order #${notice.displayOrderNo} is still saved locally. ${result.error.message}`,%0A+       });%0A+       return;%0A+     }%0A+%0A+     setPrintNotice(null);%0A+     setSuccessMessage(`Receipt reprinted for order #${result.value.displayOrderNo}`);%0A+     window.setTimeout(() => setSuccessMessage(null), 4_500);%0A+   }%0A+%0A+   if (loading) {%0A+     return <main className="orders-loading" aria-label="Loading Orders" />;%0A+   }%0A+   if (workspace === null || draft === null || configuration === null) {%0A+     return (%0A+       <main className="orders-unavailable">%0A+         <h1>Orders unavailable</h1>%0A+         <p>{globalError ?? 'The local Orders workspace could not be loaded.'}</p>%0A+       </main>%0A+     );%0A+   }%0A+%0A+   const busy = saving || placing;%0A+%0A+   return (%0A+     <main%0A+       className="orders-workspace"%0A+       style={%0A+         desktopCartResizable%0A+           ? { gridTemplateColumns: `minmax(0, 1fr) 0.5rem ${cartWidth}px` }%0A+           : undefined%0A+       }%0A+     >%0A+       <section className="menu-pane" aria-label="Menu">%0A+         <>%0A+           <div%0A+             className={%0A+               menuEditActive%0A+                 ? 'menu-toolbar category-mode-edit'%0A+                 : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`%0A+             }%0A+           >%0A+             <div className="field-stack category-navigation-stack">%0A+               <div className="category-navigation">%0A+                 <div%0A+                   className="category-rail"%0A+                   aria-label="Menu categories"%0A+                   data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}%0A+                 >%0A+                   {(menuEditActive ? categoryEditorCategories : activeCategories).map(%0A+                     (category) => (%0A+                       <button%0A+                         type="button"%0A+                         key={category.id}%0A+                         className={[%0A+                           'category-tab',%0A+                           selectedCategoryId === category.id ? 'selected' : '',%0A+                           menuEditActive ? 'category-tab-reordering' : '',%0A+                           draggedCategoryId === category.id ? 'category-tab-dragging' : '',%0A+                         ]%0A+                           .filter(Boolean)%0A+                           .join(' ')}%0A+                         draggable={menuEditActive && draggedCategoryId !== category.id}%0A+                         onDragStart={(event) => {%0A+                           if (!menuEditActive) return;%0A+                           setDraggedCategoryId(category.id);%0A+                           event.dataTransfer.effectAllowed = 'move';%0A+                           event.dataTransfer.setData('text/plain', category.id);%0A+                         }}%0A+                         onDragEnter={(event) => {%0A+                           if (!menuEditActive || draggedCategoryId === null) return;%0A+                           event.preventDefault();%0A+                           moveDraggedCategory(category.id);%0A+                         }}%0A+                         onDragOver={(event) => {%0A+                           if (menuEditActive && draggedCategoryId !== null) event.preventDefault();%0A+                         }}%0A+                         onDragEnd={() => setDraggedCategoryId(null)}%0A+                         onDrop={(event) => {%0A+                           event.preventDefault();%0A+                           setDraggedCategoryId(null);%0A+                         }}%0A+                         onClick={() => {%0A+                           setSelectedCategoryId(category.id);%0A+                           setSelectedFamily(null);%0A+                           setSearch('');%0A+                         }}%0A+                       >%0A+                         {category.name}%0A+                       </button>%0A+                     ),%0A+                   )}%0A+                 </div>%0A+                 <div className="category-nav-actions">%0A+                   {menuEditActive ? (%0A+                     <div%0A+                       className="category-alignment category-alignment-inline"%0A+                       role="group"%0A+                       aria-label="Category alignment"%0A+                     >%0A+                       {(['left', 'center', 'right'] as const).map((alignment) => (%0A+                         <button%0A+                           type="button"%0A+                           key={alignment}%0A+                           aria-pressed={categoryEditAlignment === alignment}%0A+                           onClick={() => {%0A+                             setCategoryEditAlignment(alignment);%0A+                             setMenuEditResetRequested(false);%0A+                           }}%0A+                         >%0A+                           {alignment === 'left'%0A+                             ? 'Left'%0A+                             : alignment === 'center'%0A+                               ? 'Center'%0A+                               : 'Right'}%0A+                         </button>%0A+                       ))}%0A+                     </div>%0A+                   ) : null}%0A+                   {categoryMode === 'IDLE' ? (%0A+                     <button%0A+                       type="button"%0A+                       className={%0A+                         menuEditActive%0A+                           ? 'category-icon-action category-edit-active'%0A+                           : 'category-icon-action'%0A+                       }%0A+                       aria-label="Edit menu"%0A+                       title="Edit menu"%0A+                       aria-pressed={menuEditActive}%0A+                       onClick={() => {%0A+                         if (!menuEditActive) beginMenuEdit();%0A+                       }}%0A+                     >%0A+                       <EditPencilIcon />%0A+                     </button>%0A+                   ) : null}%0A+                   {!menuEditActive && categoryMode === 'SEARCH' ? (%0A+                     <div className="product-search category-search-inline">%0A+                       <SearchIcon className="category-search-glyph" />%0A+                       <input%0A+                         ref={searchRef}%0A+                         id="product-search"%0A+                         type="search"%0A+                         aria-label="Search menu"%0A+                         value={search}%0A+                         placeholder="Search products"%0A+                         autoComplete="off"%0A+                         onChange={(event) => setSearch(event.target.value)}%0A+                       />%0A+                       <button%0A+                         type="button"%0A+                         className="category-search-clear"%0A+                         aria-label="Clear search"%0A+                         title="Clear search"%0A+                         onClick={() => {%0A+                           setSearch('');%0A+                           setCategoryMode('IDLE');%0A+                         }}%0A+                       >%0A+                         ×%0A+                       </button>%0A+                     </div>%0A+                   ) : !menuEditActive ? (%0A+                     <button%0A+                       type="button"%0A+                       className="category-icon-action"%0A+                       aria-label="Search menu"%0A+                       title="Search menu"%0A+                       onClick={() => setCategoryMode('SEARCH')}%0A+                     >%0A+                       <SearchIcon />%0A+                     </button>%0A+                   ) : null}%0A+                 </div>%0A+               </div>%0A+               {!menuEditActive && activeFamilies.length > 0 ? (%0A+                 <div%0A+                   className="segmented-control product-family-filter"%0A+                   aria-label="Product families"%0A+                 >%0A+                   <button%0A+                     type="button"%0A+                     className={selectedFamily === null ? 'selected' : undefined}%0A+                     onClick={() => setSelectedFamily(null)}%0A+                   >%0A+                     All%0A+                   </button>%0A+                   {activeFamilies.map((family) => (%0A+                     <button%0A+                       type="button"%0A+                       key={family}%0A+                       className={selectedFamily === family ? 'selected' : undefined}%0A+                       onClick={() => setSelectedFamily(family)}%0A+                     >%0A+                       {family}%0A+                     </button>%0A+                   ))}%0A+                 </div>%0A+               ) : null}%0A+             </div>%0A+           </div>%0A+%0A+           <div className="product-grid" aria-live="polite">%0A+             {menuEditActive ? (%0A+               menuEditProducts.length === 0 ? (%0A+                 <div className="menu-empty">%0A+                   <strong>No products found</strong>%0A+                   <span>This category has no active products.</span>%0A+                 </div>%0A+               ) : (%0A+                 menuEditProducts.map((product) => (%0A+                   <article%0A+                     key={product.id}%0A+                     className={[%0A+                       'product-card',%0A+                       'menu-edit-product-card',%0A+                       draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',%0A+                     ]%0A+                       .filter(Boolean)%0A+                       .join(' ')}%0A+                     draggable={menuEditActive && draggedProductId !== product.id}%0A+                     tabIndex={0}%0A+                     aria-label={`Reorder ${product.name}`}%0A+                     onDragStart={(event) => {%0A+                       setDraggedProductId(product.id);%0A+                       event.dataTransfer.effectAllowed = 'move';%0A+                       event.dataTransfer.setData('text/plain', product.id);%0A+                     }}%0A+                     onDragEnter={(event) => {%0A+                       if (draggedProductId === null) return;%0A+                       event.preventDefault();%0A+                       moveDraggedProduct(product.id);%0A+                     }}%0A+                     onDragOver={(event) => {%0A+                       if (draggedProductId !== null) event.preventDefault();%0A+                     }}%0A+                     onDragEnd={() => setDraggedProductId(null)}%0A+                     onDrop={(event) => {%0A+                       event.preventDefault();%0A+                       setDraggedProductId(null);%0A+                     }}%0A+                   >%0A+                     <div className="product-main">%0A+                       <div className="product-media">%0A+                         <ProductImage product={product} />%0A+                       </div>%0A+                       <div className="product-copy">%0A+                         <strong>{product.name}</strong>%0A+                         {product.description?.trim() ? <p>{product.description}</p> : null}%0A+                       </div>%0A+                       <strong className="product-price">%0A+                         {formatMoneyMinor(product.priceMinor)}%0A+                       </strong>%0A+                     </div>%0A+                     <div className="menu-edit-product-hint" aria-hidden="true">%0A+                       Drag to reorder%0A+                     </div>%0A+                   </article>%0A+                 ))%0A+               )%0A+             ) : products.length === 0 ? (%0A+               <div className="menu-empty">%0A+                 <strong>No products found</strong>%0A+                 <span>%0A+                   {search.length > 0%0A+                     ? 'Try another search.'%0A+                     : 'This category has no active products.'}%0A+                 </span>%0A+               </div>%0A+             ) : (%0A+               products.map((product) => (%0A+                 <MenuProductCard%0A+                   key={product.id}%0A+                   product={product}%0A+                   quantity={productQuantityInDraft(draft, product.id)}%0A+                   busy={busy}%0A+                   onQuickInfo={() => setQuickInfoProductId(product.id)}%0A+                   onDecrement={() => decrementProduct(product)}%0A+                   onAdd={() => addProduct(product)}%0A+                   onExtras={() =>%0A+                     setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })%0A+                   }%0A+                 />%0A+               ))%0A+             )}%0A+           </div>%0A+%0A+           {menuEditActive ? (%0A+             <div className="menu-edit-actions" aria-label="Menu edit actions">%0A+               <div className="menu-edit-action-status">%0A+                 {menuEditError === null ? null : (%0A+                   <span className="category-editor-error" role="alert">%0A+                     {menuEditError}%0A+                   </span>%0A+                 )}%0A+                 <button%0A+                   type="button"%0A+                   className="text-action"%0A+                   disabled={menuEditSaving}%0A+                   onClick={resetMenuEdit}%0A+                 >%0A+                   Reset%0A+                 </button>%0A+               </div>%0A+               <div className="menu-edit-actions-primary">%0A+                 <button%0A+                   type="button"%0A+                   className="secondary-action"%0A+                   disabled={menuEditSaving}%0A+                   onClick={cancelMenuEdit}%0A+                 >%0A+                   Cancel%0A+                 </button>%0A+                 <button%0A+                   type="button"%0A+                   className="primary-action"%0A+                   disabled={menuEditSaving}%0A+                   onClick={() => void saveMenuEdit()}%0A+                 >%0A+                   {menuEditSaving ? 'Saving…' : 'Save'}%0A+                 </button>%0A+               </div>%0A+             </div>%0A+           ) : null}%0A+         </>%0A+       </section>%0A+%0A+       {desktopCartResizable ? (%0A+         <div%0A+           className="cart-resize-separator"%0A+           role="separator"%0A+           aria-label="Resize Current Order"%0A+           aria-orientation="vertical"%0A+           aria-valuemin={CART_WIDTH_MIN}%0A+           aria-valuemax={Math.floor(Math.min(CART_WIDTH_MAX_PX, window.innerWidth * 0.45))}%0A+           aria-valuenow={Math.round(cartWidth)}%0A+           tabIndex={0}%0A+           onKeyDown={(event) => {%0A+             if (event.key === 'ArrowLeft') {%0A+               event.preventDefault();%0A+               commitCartWidth(cartWidth + CART_RESIZE_KEYBOARD_STEP);%0A+             } else if (event.key === 'ArrowRight') {%0A+               event.preventDefault();%0A+               commitCartWidth(cartWidth - CART_RESIZE_KEYBOARD_STEP);%0A+             } else if (event.key === 'Home') {%0A+               event.preventDefault();%0A+               commitCartWidth(CART_WIDTH_MIN);%0A+             } else if (event.key === 'End') {%0A+               event.preventDefault();%0A+               commitCartWidth(CART_WIDTH_MAX_PX);%0A+             }%0A+           }}%0A+           onPointerDown={(event) => {%0A+             cartResizeRef.current = { startX: event.clientX, startWidth: cartWidth };%0A+             event.currentTarget.setPointerCapture(event.pointerId);%0A+           }}%0A+           onPointerMove={(event) => {%0A+             const drag = cartResizeRef.current;%0A+             if (drag === null || !event.currentTarget.hasPointerCapture(event.pointerId)) return;%0A+             commitCartWidth(drag.startWidth + drag.startX - event.clientX);%0A+           }}%0A+           onPointerUp={(event) => {%0A+             if (event.currentTarget.hasPointerCapture(event.pointerId)) {%0A+               event.currentTarget.releasePointerCapture(event.pointerId);%0A+             }%0A+             cartResizeRef.current = null;%0A+           }}%0A+           onPointerCancel={(event) => {%0A+             if (event.currentTarget.hasPointerCapture(event.pointerId)) {%0A+               event.currentTarget.releasePointerCapture(event.pointerId);%0A+             }%0A+             cartResizeRef.current = null;%0A+           }}%0A+         />%0A+       ) : null}%0A+%0A+       <div className="desktop-cart-wrap">%0A+         <OrdersCart%0A+           draft={draft}%0A+           configuration={configuration}%0A+           issues={visibleIssues}%0A+           busy={saving}%0A+           placing={placing}%0A+           onMutate={enqueueMutation}%0A+           onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}%0A+           onEditLineExtras={(lineId) =>%0A+             setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })%0A+           }%0A+           onDecrementLine={decrementLine}%0A+           onIncrementLine={incrementLine}%0A+           onClear={() => setClearConfirmOpen(true)}%0A+           onDeliveryPhoneCommit={commitDeliveryPhone}%0A+           onPlace={() => void placeOrder()}%0A+         />%0A+       </div>%0A+%0A+       <button%0A+         type="button"%0A+         className="mobile-cart-trigger"%0A+         onClick={() => setMobileCartOpen(true)}%0A+         disabled={draft.lines.length === 0}%0A+       >%0A+         <span>Order · {totalQuantity}</span>%0A+         <strong>Review & pay</strong>%0A+       </button>%0A+%0A+       {mobileCartOpen ? (%0A+         <div className="mobile-cart-overlay">%0A+           <div className="mobile-cart-bar">%0A+             <strong>Review & pay</strong>%0A+             <button type="button" className="quiet-action" onClick={() => setMobileCartOpen(false)}>%0A+               Close%0A+             </button>%0A+           </div>%0A+           <OrdersCart%0A+             draft={draft}%0A+             configuration={configuration}%0A+             issues={visibleIssues}%0A+             busy={saving}%0A+             placing={placing}%0A+             onMutate={enqueueMutation}%0A+             onEditLine={(lineId) => setCustomizer({ kind: 'EDIT', lineId })}%0A+             onEditLineExtras={(lineId) =>%0A+               setCustomizer({ kind: 'EDIT', lineId, focusSection: 'EXTRAS' })%0A+             }%0A+             onDecrementLine={decrementLine}%0A+             onIncrementLine={incrementLine}%0A+             onClear={() => setClearConfirmOpen(true)}%0A+             onDeliveryPhoneCommit={commitDeliveryPhone}%0A+             onPlace={() => void placeOrder()}%0A+           />%0A+         </div>%0A+       ) : null}%0A+%0A+       {customizer === null ? null : (%0A+         <ProductCustomizer%0A+           key={%0A+             customizer.kind === 'ADD'%0A+               ? `add:${customizer.productId}:${customizer.focusSection ?? 'FULL'}`%0A+               : `edit:${customizer.lineId}:${customizer.focusSection ?? 'FULL'}`%0A+           }%0A+           target={customizer}%0A+           draft={draft}%0A+           configuration={configuration}%0A+           busy={busy}%0A+           onCancel={() => setCustomizer(null)}%0A+           onSubmit={submitCustomization}%0A+         />%0A+       )}%0A+%0A+       {quickInfoProduct === null ? null : (%0A+         <QuickInfo%0A+           product={quickInfoProduct}%0A+           busy={busy}%0A+           onClose={() => setQuickInfoProductId(null)}%0A+         />%0A+       )}%0A+%0A+       {clearConfirmOpen ? (%0A+         <div className="orders-overlay" role="presentation">%0A+           <section%0A+             className="confirm-dialog"%0A+             role="dialog"%0A+             aria-modal="true"%0A+             aria-labelledby="clear-title"%0A+           >%0A+             <h2 id="clear-title">Clear this order?</h2>%0A+             <p>This only clears the current draft. No placed order is changed.</p>%0A+             <div className="dialog-actions">%0A+               <button%0A+                 type="button"%0A+                 className="secondary-action"%0A+                 onClick={() => setClearConfirmOpen(false)}%0A+               >%0A+                 Keep order%0A+               </button>%0A+               <button type="button" className="destructive-action" onClick={confirmClear}>%0A+                 Clear order%0A+               </button>%0A+             </div>%0A+           </section>%0A+         </div>%0A+       ) : null}%0A+%0A+       {undo === null ? null : (%0A+         <div className="undo-toast" role="status">%0A+           <span>{undo.message}</span>%0A+           <button type="button" onClick={undoLastDraftChange}>%0A+             Undo%0A+           </button>%0A+         </div>%0A+       )}%0A+       {successMessage === null ? null : (%0A+         <div className="success-toast" role="status">%0A+           {successMessage}%0A+         </div>%0A+       )}%0A+       {printNotice === null ? null : (%0A+         <div className="print-notice" role="status">%0A+           <div>%0A+             <strong>Order #{printNotice.displayOrderNo} saved locally</strong>%0A+             <span>{printNotice.message}</span>%0A+           </div>%0A+           <div className="print-notice-actions">%0A+             <button%0A+               type="button"%0A+               className="secondary-action"%0A+               disabled={reprinting}%0A+               onClick={() => void reprintReceipt()}%0A+             >%0A+               {reprinting%0A+                 ? 'Printing…'%0A+                 : printNotice.kind === 'FAILED'%0A+                   ? 'Retry print'%0A+                   : 'Reprint receipt'}%0A+             </button>%0A+             <button%0A+               type="button"%0A+               className="quiet-action"%0A+               disabled={reprinting}%0A+               onClick={() => setPrintNotice(null)}%0A+             >%0A+               Dismiss%0A+             </button>%0A+           </div>%0A+         </div>%0A+       )}%0A+       {globalError === null ? null : (%0A+         <div className="global-error orders-error" role="alert">%0A+           <span>{globalError}</span>%0A+           <button type="button" onClick={() => setGlobalError(null)}>%0A+             Dismiss%0A+           </button>%0A+         </div>%0A+       )}%0A+     </main>%0A+   );%0A+ }%0A+%0A%0A ❯ apps/operations/src/app/unifiedMenuEditMode.source.test.ts:49:35%0A%0A
