@@ -11,7 +11,9 @@ import {
 } from '@tux/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ProductPositionEditor } from './ProductPositionEditor';
+import * as productPositionEditor from './ProductPositionEditor';
+
+const { ProductPositionEditor } = productPositionEditor;
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -81,5 +83,19 @@ describe('ProductPositionEditor', () => {
     expect(markup).toContain('Save');
     expect(markup).not.toContain('Extra');
     expect(markup).not.toContain('Add one');
+  });
+
+  it('handles pickup keyboard commands only when the card itself owns the event', () => {
+    expect('shouldHandleProductReorderCardKeyEvent' in productPositionEditor).toBe(true);
+    if (!('shouldHandleProductReorderCardKeyEvent' in productPositionEditor)) return;
+
+    const shouldHandle = productPositionEditor.shouldHandleProductReorderCardKeyEvent;
+    expect(shouldHandle).toBeTypeOf('function');
+    if (typeof shouldHandle !== 'function') return;
+
+    const card = {};
+    const childButton = {};
+    expect(shouldHandle(card, card)).toBe(true);
+    expect(shouldHandle(childButton, card)).toBe(false);
   });
 });
