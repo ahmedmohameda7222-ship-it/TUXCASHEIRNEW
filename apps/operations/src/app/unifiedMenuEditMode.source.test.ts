@@ -39,4 +39,16 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('menu-edit-product-card');
     expect(ordersWorkspaceSource).toContain('moveProductWithinCategory');
   });
+
+  it('persists category and product layout together through one Reset Cancel Save surface', () => {
+    expect(ordersWorkspaceSource).toContain('menuEditPreferenceInput');
+    expect(ordersWorkspaceSource).toContain('function saveMenuEdit');
+    expect(ordersWorkspaceSource).toContain('function resetMenuEdit');
+    expect(ordersWorkspaceSource).toContain('function cancelMenuEdit');
+    expect(ordersWorkspaceSource).toContain('aria-label="Menu edit actions"');
+    expect(ordersWorkspaceSource).toContain('>Reset<');
+    expect(ordersWorkspaceSource).toContain('>Cancel<');
+    expect(ordersWorkspaceSource).toContain("'Saving…' : 'Save'");
+    expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
+  });
 });
