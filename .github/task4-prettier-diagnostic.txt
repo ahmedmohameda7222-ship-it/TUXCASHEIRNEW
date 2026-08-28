@@ -1,0 +1,8 @@
+[[31merror[39m] apps/operations/src/app/OrdersWorkspace.tsx: SyntaxError: Expected corresponding closing tag for JSX fragment. (1086:15)
+[[31merror[39m]   1084 |               )}
+[[31merror[39m]   1085 |             </div>
+[[31merror[39m] > 1086 |             </div>
+[[31merror[39m]        |               ^
+[[31merror[39m]   1087 |           </>
+[[31merror[39m]   1088 |       </section>
+[[31merror[39m]   1089 |
