@@ -46,11 +46,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format write no-op verification
-        shell: bash
-        run: |
-          npm run format
-          git diff --exit-code
       - name: Format check
         run: npm run format:check
       - name: Lint
