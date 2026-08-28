@@ -11,6 +11,7 @@ const workerB = '33333333-3333-4333-8333-333333333332';
 const categoryA = '44444444-4444-4444-8444-444444444441';
 const productA = '55555555-5555-4555-8555-555555555551';
 const productB = '55555555-5555-4555-8555-555555555552';
+const customAccent = '#1E3A8A';
 
 interface ResponseCapture {
   readonly response: GatewayResponse;
@@ -67,13 +68,14 @@ function request(input: {
   } as GatewayRequest;
 }
 
-function remoteRow(workerId: string, serverVersion: number) {
+function remoteRow(workerId: string, serverVersion: number, accentColor: string | null = null) {
   return {
     shop_id: shopA,
     worker_id: workerId,
     category_order: [categoryA],
     category_alignment: 'center',
     product_order: [productB, productA],
+    accent_color: accentColor,
     server_version: serverVersion,
     updated_at: `2026-08-25T03:0${serverVersion}:00.000Z`,
   };
@@ -139,12 +141,14 @@ describe('handleWorkerUiPreferences', () => {
     expect(capture.body()).toEqual({ status: 'NOT_FOUND' });
   });
 
-  it('returns and forwards worker-specific product ordering on accepted PUTs', async () => {
+  it('returns and forwards the complete worker preference on accepted PUTs', async () => {
     const upstream = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 1)]), { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerA, 2)]), { status: 200 }),
+        new Response(JSON.stringify([remoteRow(workerA, 1, customAccent)]), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRow(workerA, 2, customAccent)]), { status: 200 }),
       );
     vi.stubGlobal('fetch', upstream);
 
@@ -161,6 +165,7 @@ describe('handleWorkerUiPreferences', () => {
             categoryOrder: [categoryA],
             categoryAlignment: 'center',
             productOrder: [productB, productA],
+            accentColor: customAccent,
           },
         }),
         capture.response,
@@ -173,6 +178,7 @@ describe('handleWorkerUiPreferences', () => {
     expect(first.response.statusCode).toBe(200);
     expect(first.body()['serverVersion']).toBe(1);
     expect(first.body()['productOrder']).toEqual([productB, productA]);
+    expect(first.body()['accentColor']).toBe(customAccent);
     expect(second.body()['serverVersion']).toBe(2);
     expect(upstream).toHaveBeenCalledTimes(2);
     const firstInit = upstream.mock.calls[0]?.[1] as RequestInit;
@@ -182,19 +188,82 @@ describe('handleWorkerUiPreferences', () => {
       p_category_order: [categoryA],
       p_category_alignment: 'center',
       p_product_order: [productB, productA],
+      p_accent_color: customAccent,
     });
   });
 
-  it('selects product order while targeting worker preferences independently', async () => {
+  it('accepts null accent as the exact TUX-default worker preference', async () => {
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([remoteRow(workerA, 1, null)]), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', upstream);
+    const capture = responseCapture();
+
+    await handleWorkerUiPreferences(
+      request({
+        method: 'PUT',
+        url: '/api/worker-ui-preferences',
+        shopId: shopA,
+        body: {
+          shopId: shopA,
+          workerId: workerA,
+          categoryOrder: [],
+          categoryAlignment: 'left',
+          productOrder: [],
+          accentColor: null,
+        },
+      }),
+      capture.response,
+    );
+
+    expect(capture.response.statusCode).toBe(200);
+    const init = upstream.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(init.body))['p_accent_color']).toBeNull();
+    expect(capture.body()['accentColor']).toBeNull();
+  });
+
+  it('rejects non-canonical accent colors before contacting Supabase', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const capture = responseCapture();
+
+    await handleWorkerUiPreferences(
+      request({
+        method: 'PUT',
+        url: '/api/worker-ui-preferences',
+        shopId: shopA,
+        body: {
+          shopId: shopA,
+          workerId: workerA,
+          categoryOrder: [],
+          categoryAlignment: 'left',
+          productOrder: [],
+          accentColor: '#1e3a8a',
+        },
+      }),
+      capture.response,
+    );
+
+    expect(capture.response.statusCode).toBe(400);
+    expect(capture.body()).toEqual({ error: 'invalid_worker_ui_preferences_request' });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('selects product order and accent while targeting worker preferences independently', async () => {
     const upstream = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 3)]), { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerB, 7)]), { status: 200 }),
+        new Response(JSON.stringify([remoteRow(workerA, 3, customAccent)]), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRow(workerB, 7, null)]), { status: 200 }),
       );
     vi.stubGlobal('fetch', upstream);
 
-    for (const workerId of [workerA, workerB]) {
+    for (const [workerId, expectedAccent] of [
+      [workerA, customAccent],
+      [workerB, null],
+    ] as const) {
       const capture = responseCapture();
       await handleWorkerUiPreferences(
         request({
@@ -206,6 +275,7 @@ describe('handleWorkerUiPreferences', () => {
       );
       expect(capture.body()['workerId']).toBe(workerId);
       expect(capture.body()['productOrder']).toEqual([productB, productA]);
+      expect(capture.body()['accentColor']).toBe(expectedAccent);
     }
 
     const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
@@ -213,5 +283,6 @@ describe('handleWorkerUiPreferences', () => {
     expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
     expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
     expect(firstUrl.searchParams.get('select')).toContain('product_order');
+    expect(firstUrl.searchParams.get('select')).toContain('accent_color');
   });
 });
