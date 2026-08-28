@@ -67,8 +67,16 @@ describe('Current Order approved reference controls', () => {
     expect(source).toMatch(
       /\.line-actions > button\s*\{[^}]*min-height:\s*40px;[^}]*padding:\s*0 10px;[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;/s,
     );
+  });
+
+  it('locks the Current Order increment to the same green fill tokens as the product-item increment', () => {
+    const source = css('final-pos-corrections.css');
+
     expect(source).toMatch(
-      /\.line-quantity-stepper \.quantity-increment\s*\{[^}]*background:\s*var\(--tux-accent-strong\);[^}]*color:\s*var\(--tux-action-foreground\);/s,
+      /\.product-quantity \.quantity-increment,\s*\.orders-cart \.line-quantity-stepper \.quantity-increment\s*\{[^}]*background:\s*var\(--tux-accent-strong\);[^}]*color:\s*var\(--tux-action-foreground\);/s,
+    );
+    expect(source).toMatch(
+      /\.product-quantity \.quantity-increment:hover:not\(:disabled\),\s*\.orders-cart \.line-quantity-stepper \.quantity-increment:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--tux-accent-hover\);[^}]*color:\s*var\(--tux-action-foreground\);/s,
     );
   });
 
