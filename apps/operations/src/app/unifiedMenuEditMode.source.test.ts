@@ -21,6 +21,14 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('if (menuEditActive) return;');
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
-});
 
-// Task 2 GREEN verification checkpoint.
+  it('keeps category tabs in the header and makes those same tabs reorderable in edit mode', () => {
+    expect(ordersWorkspaceSource).not.toContain('<strong>Category layout</strong>');
+    expect(ordersWorkspaceSource).not.toContain('className="category-editor"');
+    expect(ordersWorkspaceSource).toContain('category-tab-reordering');
+    expect(ordersWorkspaceSource).toContain('draggable={menuEditActive');
+    expect(ordersWorkspaceSource).toContain(
+      'data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}',
+    );
+  });
+});
