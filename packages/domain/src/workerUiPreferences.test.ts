@@ -18,7 +18,15 @@ describe('parseWorkerUiPreferences', () => {
   });
 
   it('keeps older persisted preferences backward compatible by defaulting product order', () => {
-    const { productOrder: _productOrder, ...legacyPreferences } = validPreferences;
+    const legacyPreferences = {
+      shopId: validPreferences.shopId,
+      workerId: validPreferences.workerId,
+      categoryOrder: validPreferences.categoryOrder,
+      categoryAlignment: validPreferences.categoryAlignment,
+      updatedAt: validPreferences.updatedAt,
+      serverVersion: validPreferences.serverVersion,
+      syncState: validPreferences.syncState,
+    } as const;
 
     expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
       ...legacyPreferences,
