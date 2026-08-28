@@ -23,6 +23,14 @@ describe('Product position editor visual contract', () => {
     );
   });
 
+  it('keeps the editor column resilient when the optional save error is present', () => {
+    const source = css();
+    expect(source).toMatch(
+      /\.product-position-editor\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s,
+    );
+    expect(source).toMatch(/\.product-reorder-grid\s*\{[^}]*flex:\s*1;/s);
+  });
+
   it('keeps move and commit actions accessible and the commit bar sticky', () => {
     const source = css();
     expect(source).toMatch(
