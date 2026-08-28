@@ -2524,7 +2524,10 @@ async function openWorkerSystemColorDialog(page: Page, workerName: string): Prom
 }
 
 async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
+  const defaultCheckbox = dialog.locator("input[type='checkbox']");
+  if (await defaultCheckbox.isChecked()) await defaultCheckbox.uncheck();
   const picker = dialog.locator("input[type='color']");
+  await expect(picker).toBeEnabled();
   await picker.evaluate((node, nextColor) => {
     const input = node as HTMLInputElement;
     input.value = nextColor;
