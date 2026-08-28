@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const e2e = readFileSync(new URL('../../../../e2e/worker-system-color.e2e.ts', import.meta.url), 'utf8');
+const e2e = readFileSync(
+  new URL('../../../../e2e/worker-system-color.e2e.ts', import.meta.url),
+  'utf8',
+);
 const source = e2e.replace(/\s+/g, ' ');
 
 describe('worker system color rendered QA contract', () => {

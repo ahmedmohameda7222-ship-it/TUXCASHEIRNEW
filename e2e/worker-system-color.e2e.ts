@@ -23,9 +23,7 @@ function minimalConfiguration() {
       shopId: SHOP,
       version: 1,
       updatedAt: '2026-08-28T12:00:00.000Z',
-      categories: [
-        { id: CATEGORY, shopId: SHOP, name: 'Burgers', sortOrder: 0, active: true },
-      ],
+      categories: [{ id: CATEGORY, shopId: SHOP, name: 'Burgers', sortOrder: 0, active: true }],
       products: [
         {
           id: PRODUCT,
@@ -142,7 +140,10 @@ async function seedBrowserFallback(page: Page): Promise<void> {
       });
 
       await new Promise<void>((resolve, reject) => {
-        const tx = database.transaction(['shops', 'workers', 'configurationSnapshots'], 'readwrite');
+        const tx = database.transaction(
+          ['shops', 'workers', 'configurationSnapshots'],
+          'readwrite',
+        );
         tx.objectStore('shops').put({ id: shopId, name: 'TUX E2E Shop', active: true });
         tx.objectStore('workers').put({
           id: workerId,
@@ -180,7 +181,9 @@ async function seedBrowserFallback(page: Page): Promise<void> {
 }
 
 async function waitForActiveShell(page: Page): Promise<void> {
-  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 async function enterActiveOrders(page: Page): Promise<void> {
@@ -290,8 +293,12 @@ async function assertApprovedDialog(page: Page, dialog: Locator): Promise<void> 
   await expect(dialog.locator("input[type='number']")).toHaveCount(0);
   await expect(dialog.getByText('HEX', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText('RGB', { exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Pick from screen', exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Reset to TUX default', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Pick from screen', exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    dialog.getByRole('button', { name: 'Reset to TUX default', exact: true }),
+  ).toHaveCount(0);
   await expect(dialog.locator("input[type='color']")).toBeFocused();
 
   const viewport = page.viewportSize();
@@ -409,13 +416,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
   await setWorkerAppearance(page, 'Demo Worker One', 'Light');
 
-  await switchWorker(
-    page,
-    'Demo Worker One',
-    '5678',
-    'Demo Worker Two',
-    workerOneLightAccent,
-  );
+  await switchWorker(page, 'Demo Worker One', '5678', 'Demo Worker Two', workerOneLightAccent);
   await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
   dialog = await openSystemColorDialog(page, 'Demo Worker Two');
   await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
@@ -426,21 +427,9 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   expect(workerTwoLightAccent).not.toBe(defaultLightAccent);
   expect(workerTwoLightAccent).not.toBe(workerOneLightAccent);
 
-  await switchWorker(
-    page,
-    'Demo Worker Two',
-    '1234',
-    'Demo Worker One',
-    workerTwoLightAccent,
-  );
+  await switchWorker(page, 'Demo Worker Two', '1234', 'Demo Worker One', workerTwoLightAccent);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
-  await switchWorker(
-    page,
-    'Demo Worker One',
-    '5678',
-    'Demo Worker Two',
-    workerOneLightAccent,
-  );
+  await switchWorker(page, 'Demo Worker One', '5678', 'Demo Worker Two', workerOneLightAccent);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerTwoLightAccent);
 
   dialog = await openSystemColorDialog(page, 'Demo Worker Two');
@@ -462,13 +451,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await switchWorker(
-    page,
-    'Demo Worker Two',
-    '1234',
-    'Demo Worker One',
-    defaultLightAccent,
-  );
+  await switchWorker(page, 'Demo Worker Two', '1234', 'Demo Worker One', defaultLightAccent);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
 
   await page.setViewportSize({ width: 1280, height: 720 });
