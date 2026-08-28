@@ -1,5 +1,5 @@
 import { pbkdf2Sync } from 'node:crypto';
-import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const SHOP = '10000000-0000-4000-8000-000000000001';
 const WORKER = '20000000-0000-4000-8000-000000000001';
