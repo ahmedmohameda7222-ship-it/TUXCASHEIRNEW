@@ -253,6 +253,14 @@ CREATE TABLE IF NOT EXISTS worker_ui_preferences (
 );
 `,
   },
+  {
+    version: 7,
+    name: 'worker_ui_product_order',
+    sql: `
+ALTER TABLE worker_ui_preferences
+ADD COLUMN product_order_json TEXT NOT NULL DEFAULT '[]';
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {
