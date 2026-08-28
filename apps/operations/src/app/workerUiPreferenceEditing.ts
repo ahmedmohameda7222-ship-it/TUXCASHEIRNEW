@@ -5,7 +5,7 @@ import type {
   WorkerUiPreferences,
 } from '@tux/domain';
 
-export interface WorkerUiPreferenceUpdateInput {
+export interface WorkerMenuLayoutUpdateInput {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
@@ -16,7 +16,7 @@ export function categoryLayoutPreferenceInput(
   categoryOrder: readonly MenuCategoryId[],
   categoryAlignment: CategoryAlignment,
   reset: boolean,
-): WorkerUiPreferenceUpdateInput {
+): WorkerMenuLayoutUpdateInput {
   return {
     categoryOrder: reset ? [] : categoryOrder,
     categoryAlignment: reset ? 'left' : categoryAlignment,
@@ -28,7 +28,7 @@ export function productOrderPreferenceInput(
   preference: WorkerUiPreferences | null,
   productOrder: readonly ProductId[],
   reset: boolean,
-): WorkerUiPreferenceUpdateInput {
+): WorkerMenuLayoutUpdateInput {
   return {
     categoryOrder: preference?.categoryOrder ?? [],
     categoryAlignment: preference?.categoryAlignment ?? 'left',
@@ -41,7 +41,7 @@ export function menuEditPreferenceInput(
   categoryAlignment: CategoryAlignment,
   productOrder: readonly ProductId[],
   reset: boolean,
-): WorkerUiPreferenceUpdateInput {
+): WorkerMenuLayoutUpdateInput {
   return reset
     ? {
         categoryOrder: [],
