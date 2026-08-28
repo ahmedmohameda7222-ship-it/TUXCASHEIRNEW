@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   filterProductsForMenu,
+  moveCategoryProductId,
   productFamiliesForCategory,
   reconcileCategoryOrder,
 } from './OrdersWorkspace';
@@ -89,6 +90,29 @@ describe('reconcileCategoryOrder', () => {
       sides,
       drinks,
     ]);
+  });
+});
+
+describe('moveCategoryProductId', () => {
+  const productA = parseEntityId<ProductId>('44444444-4444-4444-8444-000000000101');
+  const productB = parseEntityId<ProductId>('44444444-4444-4444-8444-000000000102');
+  const productC = parseEntityId<ProductId>('44444444-4444-4444-8444-000000000103');
+
+  it('moves one product to the target slot inside the category order', () => {
+    expect(moveCategoryProductId([productA, productB, productC], productA, productC)).toEqual([
+      productB,
+      productC,
+      productA,
+    ]);
+  });
+
+  it('does not mutate the category order when source or target is unavailable', () => {
+    const outside = parseEntityId<ProductId>('44444444-4444-4444-8444-999999999999');
+    const order = [productA, productB, productC] as const;
+
+    expect(moveCategoryProductId(order, outside, productB)).toBe(order);
+    expect(moveCategoryProductId(order, productA, outside)).toBe(order);
+    expect(moveCategoryProductId(order, productB, productB)).toBe(order);
   });
 });
 
