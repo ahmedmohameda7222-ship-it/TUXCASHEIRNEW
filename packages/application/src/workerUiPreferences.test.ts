@@ -300,7 +300,11 @@ describe('WorkerUiPreferencesService', () => {
   });
 
   it('does not replace local state when the remote version is not newer', async () => {
-    const local = preference({ categoryOrder: [categoryB], accentColor: customAccent, serverVersion: 4 });
+    const local = preference({
+      categoryOrder: [categoryB],
+      accentColor: customAccent,
+      serverVersion: 4,
+    });
     const repository = new MemoryRepository(local);
     const gateway = new RecordingGateway();
     gateway.getResult = remote({ categoryOrder: [categoryA], serverVersion: 4 });
