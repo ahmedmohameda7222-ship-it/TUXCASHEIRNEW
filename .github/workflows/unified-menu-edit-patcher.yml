@@ -24,16 +24,20 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format RED test only
-        run: npx prettier --write apps/operations/src/app/workerUiPreferenceEditing.test.ts
-      - name: Commit RED test formatting
+      - name: Apply Task 5 production patch
+        run: python .github/scripts/unified-menu-edit-patcher.py
+      - name: Format Task 5 files
+        run: |
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/app/workerUiPreferenceEditing.ts apps/operations/src/app/workerUiPreferenceEditing.test.ts
+          git diff --check
+      - name: Task 5 GREEN unit gate
+        run: npm run test
+      - name: Commit Task 5 production change
         run: |
           git config user.name "tux-implementation-bot"
           git config user.email "tux-implementation-bot@users.noreply.github.com"
-          if ! git diff --quiet -- apps/operations/src/app/workerUiPreferenceEditing.test.ts; then
-            git add apps/operations/src/app/workerUiPreferenceEditing.test.ts
-            git commit -m "test: format unified menu preference contract"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/app/workerUiPreferenceEditing.ts apps/operations/src/app/workerUiPreferenceEditing.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: save unified menu edit draft"
             git push origin HEAD:ui/unified-menu-edit-mode
           fi
-      - name: Task 5 RED unit gate
-        run: npm run test
