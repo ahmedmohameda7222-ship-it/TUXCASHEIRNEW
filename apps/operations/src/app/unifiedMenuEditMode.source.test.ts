@@ -56,6 +56,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
   });
 
+  // Saving freezes every persisted menu-layout control after the payload is captured.
   it('freezes every edit interaction while the final preference save is in flight', () => {
     expect(ordersWorkspaceSource).toMatch(
       /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedCategoryId\s*!==\s*category\.id\s*\}/,
