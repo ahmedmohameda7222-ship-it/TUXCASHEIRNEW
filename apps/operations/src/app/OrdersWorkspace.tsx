@@ -546,14 +546,6 @@ export function OrdersWorkspace({
     setCategoryMode('EDIT');
   }
 
-  function beginProductReorder(): void {
-    if (selectedCategoryId === null) return;
-    setCategoryMode('IDLE');
-    setSearch('');
-    setSelectedFamily(null);
-    setProductReorderCategoryId(selectedCategoryId);
-  }
-
   function moveCategory(categoryId: MenuCategoryId, direction: -1 | 1): void {
     setCategoryEditOrder((current) => {
       const index = current.indexOf(categoryId);
@@ -1004,25 +996,15 @@ export function OrdersWorkspace({
                     </div>
                     <div className="category-nav-actions">
                       {categoryMode === 'IDLE' ? (
-                        <>
-                          <button
-                            type="button"
-                            className="category-manage-order-action"
-                            disabled={selectedCategoryId === null}
-                            onClick={beginProductReorder}
-                          >
-                            Manage order
-                          </button>
-                          <button
-                            type="button"
-                            className="category-icon-action"
-                            aria-label="Edit categories"
-                            title="Edit categories"
-                            onClick={beginCategoryEdit}
-                          >
-                            <EditPencilIcon />
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          className="category-icon-action"
+                          aria-label="Edit categories"
+                          title="Edit categories"
+                          onClick={beginCategoryEdit}
+                        >
+                          <EditPencilIcon />
+                        </button>
                       ) : null}
                       {categoryMode === 'SEARCH' ? (
                         <div className="product-search category-search-inline">
