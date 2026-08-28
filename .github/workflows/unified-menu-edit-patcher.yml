@@ -40,10 +40,13 @@ jobs:
                   "  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');\n"
                   "  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);\n",
               ),
-              ("    setCategoryEditError(null);\n", ""),
               (
-                  "    setCategoryEditError(null);\n    setCategoryResetRequested(false);\n    setDraggedCategoryId(null);\n",
-                  "    setDraggedCategoryId(null);\n",
+                  "    setSearch('');\n    setCategoryEditError(null);\n    void preferencesClient\n",
+                  "    setSearch('');\n    void preferencesClient\n",
+              ),
+              (
+                  "    setCategoryEditAlignment(categoryAlignment);\n    setCategoryEditError(null);\n    setCategoryResetRequested(false);\n    setDraggedCategoryId(null);\n",
+                  "    setCategoryEditAlignment(categoryAlignment);\n    setDraggedCategoryId(null);\n",
               ),
           ]
 
