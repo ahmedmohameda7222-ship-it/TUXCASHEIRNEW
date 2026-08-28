@@ -35,11 +35,14 @@ import {
 } from './cartWidthPreference';
 import { EditPencilIcon, SearchIcon } from './icons';
 import { MenuProductCard } from './MenuProductCard';
-import { filterProductsForMenu as filterProductsForMenuWithPreference } from './menuProductOrder';
+import {
+  filterProductsForMenu as filterProductsForMenuWithPreference,
+  moveProductWithinCategory,
+  reconcileProductOrder,
+} from './menuProductOrder';
 import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
-import { ProductPositionEditor } from './ProductPositionEditor';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
@@ -254,9 +257,8 @@ export function OrdersWorkspace({
   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
   const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [productReorderCategoryId, setProductReorderCategoryId] = useState<MenuCategoryId | null>(
-    null,
-  );
+  const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
+  const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -320,7 +322,6 @@ export function OrdersWorkspace({
     setCategoryPreference(null);
     setCategoryMode('IDLE');
     setMenuEditActive(false);
-    setProductReorderCategoryId(null);
     setSearch('');
     void preferencesClient
       .load()
@@ -508,11 +509,18 @@ export function OrdersWorkspace({
       ),
     [categoryPreference, configuration, search, selectedCategoryId, selectedFamily],
   );
-  const productReorderCategory =
-    productReorderCategoryId === null
-      ? null
-      : (configuredActiveCategories.find((category) => category.id === productReorderCategoryId) ??
-        null);
+  const menuEditProducts = useMemo(() => {
+    if (selectedCategoryId === null) return [];
+    const byId = new Map(
+      (configuration?.products ?? [])
+        .filter((product) => product.active)
+        .map((product) => [product.id, product]),
+    );
+    return menuEditProductOrder.flatMap((productId) => {
+      const product = byId.get(productId);
+      return product !== undefined && product.categoryId === selectedCategoryId ? [product] : [];
+    });
+  }, [configuration, menuEditProductOrder, selectedCategoryId]);
 
   const validation = useMemo(() => {
     if (draft === null || configuration === null) return null;
@@ -528,11 +536,16 @@ export function OrdersWorkspace({
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
   function beginMenuEdit(): void {
-    setProductReorderCategoryId(null);
     setSearch('');
     setCategoryEditOrder(activeCategories.map((category) => category.id));
     setCategoryEditAlignment(categoryAlignment);
+    setMenuEditProductOrder(
+      reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
+        (product) => product.id,
+      ),
+    );
     setDraggedCategoryId(null);
+    setDraggedProductId(null);
     setMenuEditActive(true);
   }
 
@@ -548,6 +561,20 @@ export function OrdersWorkspace({
       if (moved === undefined) return current;
       next.splice(targetIndex, 0, moved);
       return next;
+    });
+  }
+
+  function moveDraggedProduct(targetId: ProductId): void {
+    const sourceId = draggedProductId;
+    if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;
+    const productCategoryById = new Map(
+      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+    );
+    setMenuEditProductOrder((current) => {
+      const categoryProductIds = current.filter(
+        (productId) => productCategoryById.get(productId) === selectedCategoryId,
+      );
+      return moveProductWithinCategory(current, categoryProductIds, sourceId, targetId);
     });
   }
 
@@ -805,217 +832,257 @@ export function OrdersWorkspace({
       }
     >
       <section className="menu-pane" aria-label="Menu">
-        {productReorderCategory === null ? (
-          <>
-            <div
-              className={
-                menuEditActive
-                  ? 'menu-toolbar category-mode-edit'
-                  : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
-              }
-            >
-              <div className="field-stack category-navigation-stack">
-                <div className="category-navigation">
-                  <div
-                    className="category-rail"
-                    aria-label="Menu categories"
-                    data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
-                  >
-                    {(menuEditActive ? categoryEditorCategories : activeCategories).map(
-                      (category) => (
-                        <button
-                          type="button"
-                          key={category.id}
-                          className={[
-                            'category-tab',
-                            selectedCategoryId === category.id ? 'selected' : '',
-                            menuEditActive ? 'category-tab-reordering' : '',
-                            draggedCategoryId === category.id ? 'category-tab-dragging' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          draggable={menuEditActive && draggedCategoryId !== category.id}
-                          onDragStart={(event) => {
-                            if (!menuEditActive) return;
-                            setDraggedCategoryId(category.id);
-                            event.dataTransfer.effectAllowed = 'move';
-                            event.dataTransfer.setData('text/plain', category.id);
-                          }}
-                          onDragEnter={(event) => {
-                            if (!menuEditActive || draggedCategoryId === null) return;
-                            event.preventDefault();
-                            moveDraggedCategory(category.id);
-                          }}
-                          onDragOver={(event) => {
-                            if (menuEditActive && draggedCategoryId !== null)
-                              event.preventDefault();
-                          }}
-                          onDragEnd={() => setDraggedCategoryId(null)}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            setDraggedCategoryId(null);
-                          }}
-                          onClick={() => {
-                            setSelectedCategoryId(category.id);
-                            setSelectedFamily(null);
-                            setSearch('');
-                          }}
-                        >
-                          {category.name}
-                        </button>
-                      ),
-                    )}
-                  </div>
-                  <div className="category-nav-actions">
-                    {menuEditActive ? (
-                      <div
-                        className="category-alignment category-alignment-inline"
-                        role="group"
-                        aria-label="Category alignment"
-                      >
-                        {(['left', 'center', 'right'] as const).map((alignment) => (
-                          <button
-                            type="button"
-                            key={alignment}
-                            aria-pressed={categoryEditAlignment === alignment}
-                            onClick={() => setCategoryEditAlignment(alignment)}
-                          >
-                            {alignment === 'left'
-                              ? 'Left'
-                              : alignment === 'center'
-                                ? 'Center'
-                                : 'Right'}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    {categoryMode === 'IDLE' ? (
+        <>
+          <div
+            className={
+              menuEditActive
+                ? 'menu-toolbar category-mode-edit'
+                : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
+            }
+          >
+            <div className="field-stack category-navigation-stack">
+              <div className="category-navigation">
+                <div
+                  className="category-rail"
+                  aria-label="Menu categories"
+                  data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
+                >
+                  {(menuEditActive ? categoryEditorCategories : activeCategories).map(
+                    (category) => (
                       <button
                         type="button"
-                        className={
-                          menuEditActive
-                            ? 'category-icon-action category-edit-active'
-                            : 'category-icon-action'
-                        }
-                        aria-label="Edit menu"
-                        title="Edit menu"
-                        aria-pressed={menuEditActive}
+                        key={category.id}
+                        className={[
+                          'category-tab',
+                          selectedCategoryId === category.id ? 'selected' : '',
+                          menuEditActive ? 'category-tab-reordering' : '',
+                          draggedCategoryId === category.id ? 'category-tab-dragging' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        draggable={menuEditActive && draggedCategoryId !== category.id}
+                        onDragStart={(event) => {
+                          if (!menuEditActive) return;
+                          setDraggedCategoryId(category.id);
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', category.id);
+                        }}
+                        onDragEnter={(event) => {
+                          if (!menuEditActive || draggedCategoryId === null) return;
+                          event.preventDefault();
+                          moveDraggedCategory(category.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (menuEditActive && draggedCategoryId !== null) event.preventDefault();
+                        }}
+                        onDragEnd={() => setDraggedCategoryId(null)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setDraggedCategoryId(null);
+                        }}
                         onClick={() => {
-                          if (!menuEditActive) beginMenuEdit();
+                          setSelectedCategoryId(category.id);
+                          setSelectedFamily(null);
+                          setSearch('');
                         }}
                       >
-                        <EditPencilIcon />
+                        {category.name}
                       </button>
-                    ) : null}
-                    {!menuEditActive && categoryMode === 'SEARCH' ? (
-                      <div className="product-search category-search-inline">
-                        <SearchIcon className="category-search-glyph" />
-                        <input
-                          ref={searchRef}
-                          id="product-search"
-                          type="search"
-                          aria-label="Search menu"
-                          value={search}
-                          placeholder="Search products"
-                          autoComplete="off"
-                          onChange={(event) => setSearch(event.target.value)}
-                        />
+                    ),
+                  )}
+                </div>
+                <div className="category-nav-actions">
+                  {menuEditActive ? (
+                    <div
+                      className="category-alignment category-alignment-inline"
+                      role="group"
+                      aria-label="Category alignment"
+                    >
+                      {(['left', 'center', 'right'] as const).map((alignment) => (
                         <button
                           type="button"
-                          className="category-search-clear"
-                          aria-label="Clear search"
-                          title="Clear search"
-                          onClick={() => {
-                            setSearch('');
-                            setCategoryMode('IDLE');
-                          }}
+                          key={alignment}
+                          aria-pressed={categoryEditAlignment === alignment}
+                          onClick={() => setCategoryEditAlignment(alignment)}
                         >
-                          ×
+                          {alignment === 'left'
+                            ? 'Left'
+                            : alignment === 'center'
+                              ? 'Center'
+                              : 'Right'}
                         </button>
-                      </div>
-                    ) : !menuEditActive ? (
-                      <button
-                        type="button"
-                        className="category-icon-action"
-                        aria-label="Search menu"
-                        title="Search menu"
-                        onClick={() => setCategoryMode('SEARCH')}
-                      >
-                        <SearchIcon />
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {!menuEditActive && activeFamilies.length > 0 ? (
-                  <div
-                    className="segmented-control product-family-filter"
-                    aria-label="Product families"
-                  >
+                      ))}
+                    </div>
+                  ) : null}
+                  {categoryMode === 'IDLE' ? (
                     <button
                       type="button"
-                      className={selectedFamily === null ? 'selected' : undefined}
-                      onClick={() => setSelectedFamily(null)}
+                      className={
+                        menuEditActive
+                          ? 'category-icon-action category-edit-active'
+                          : 'category-icon-action'
+                      }
+                      aria-label="Edit menu"
+                      title="Edit menu"
+                      aria-pressed={menuEditActive}
+                      onClick={() => {
+                        if (!menuEditActive) beginMenuEdit();
+                      }}
                     >
-                      All
+                      <EditPencilIcon />
                     </button>
-                    {activeFamilies.map((family) => (
+                  ) : null}
+                  {!menuEditActive && categoryMode === 'SEARCH' ? (
+                    <div className="product-search category-search-inline">
+                      <SearchIcon className="category-search-glyph" />
+                      <input
+                        ref={searchRef}
+                        id="product-search"
+                        type="search"
+                        aria-label="Search menu"
+                        value={search}
+                        placeholder="Search products"
+                        autoComplete="off"
+                        onChange={(event) => setSearch(event.target.value)}
+                      />
                       <button
                         type="button"
-                        key={family}
-                        className={selectedFamily === family ? 'selected' : undefined}
-                        onClick={() => setSelectedFamily(family)}
+                        className="category-search-clear"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        onClick={() => {
+                          setSearch('');
+                          setCategoryMode('IDLE');
+                        }}
                       >
-                        {family}
+                        ×
                       </button>
-                    ))}
-                  </div>
-                ) : null}
+                    </div>
+                  ) : !menuEditActive ? (
+                    <button
+                      type="button"
+                      className="category-icon-action"
+                      aria-label="Search menu"
+                      title="Search menu"
+                      onClick={() => setCategoryMode('SEARCH')}
+                    >
+                      <SearchIcon />
+                    </button>
+                  ) : null}
+                </div>
               </div>
+              {!menuEditActive && activeFamilies.length > 0 ? (
+                <div
+                  className="segmented-control product-family-filter"
+                  aria-label="Product families"
+                >
+                  <button
+                    type="button"
+                    className={selectedFamily === null ? 'selected' : undefined}
+                    onClick={() => setSelectedFamily(null)}
+                  >
+                    All
+                  </button>
+                  {activeFamilies.map((family) => (
+                    <button
+                      type="button"
+                      key={family}
+                      className={selectedFamily === family ? 'selected' : undefined}
+                      onClick={() => setSelectedFamily(family)}
+                    >
+                      {family}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
+          </div>
 
-            <div className="product-grid" aria-live="polite">
-              {products.length === 0 ? (
+          <div className="product-grid" aria-live="polite">
+            {menuEditActive ? (
+              menuEditProducts.length === 0 ? (
                 <div className="menu-empty">
                   <strong>No products found</strong>
-                  <span>
-                    {search.length > 0
-                      ? 'Try another search.'
-                      : 'This category has no active products.'}
-                  </span>
+                  <span>This category has no active products.</span>
                 </div>
               ) : (
-                products.map((product) => (
-                  <MenuProductCard
+                menuEditProducts.map((product) => (
+                  <article
                     key={product.id}
-                    product={product}
-                    quantity={productQuantityInDraft(draft, product.id)}
-                    busy={busy}
-                    onQuickInfo={() => setQuickInfoProductId(product.id)}
-                    onDecrement={() => decrementProduct(product)}
-                    onAdd={() => addProduct(product)}
-                    onExtras={() =>
-                      setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })
-                    }
-                  />
+                    className={[
+                      'product-card',
+                      'menu-edit-product-card',
+                      draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    draggable={menuEditActive && draggedProductId !== product.id}
+                    tabIndex={0}
+                    aria-label={`Reorder ${product.name}`}
+                    onDragStart={(event) => {
+                      setDraggedProductId(product.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', product.id);
+                    }}
+                    onDragEnter={(event) => {
+                      if (draggedProductId === null) return;
+                      event.preventDefault();
+                      moveDraggedProduct(product.id);
+                    }}
+                    onDragOver={(event) => {
+                      if (draggedProductId !== null) event.preventDefault();
+                    }}
+                    onDragEnd={() => setDraggedProductId(null)}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      setDraggedProductId(null);
+                    }}
+                  >
+                    <div className="product-main">
+                      <div className="product-media">
+                        <ProductImage product={product} />
+                      </div>
+                      <div className="product-copy">
+                        <strong>{product.name}</strong>
+                        {product.description?.trim() ? <p>{product.description}</p> : null}
+                      </div>
+                      <strong className="product-price">
+                        {formatMoneyMinor(product.priceMinor)}
+                      </strong>
+                    </div>
+                    <div className="menu-edit-product-hint" aria-hidden="true">
+                      Drag to reorder
+                    </div>
+                  </article>
                 ))
-              )}
-            </div>
-          </>
-        ) : (
-          <ProductPositionEditor
-            category={productReorderCategory}
-            products={configuration.products}
-            preference={categoryPreference}
-            preferenceClient={preferencesClient}
-            onSaved={(savedPreference) => {
-              setCategoryPreference(savedPreference);
-              setProductReorderCategoryId(null);
-              setSuccessMessage(`${productReorderCategory.name} product order saved`);
-              window.setTimeout(() => setSuccessMessage(null), 4_500);
-            }}
-            onCancel={() => setProductReorderCategoryId(null)}
-          />
-        )}
+              )
+            ) : products.length === 0 ? (
+              <div className="menu-empty">
+                <strong>No products found</strong>
+                <span>
+                  {search.length > 0
+                    ? 'Try another search.'
+                    : 'This category has no active products.'}
+                </span>
+              </div>
+            ) : (
+              products.map((product) => (
+                <MenuProductCard
+                  key={product.id}
+                  product={product}
+                  quantity={productQuantityInDraft(draft, product.id)}
+                  busy={busy}
+                  onQuickInfo={() => setQuickInfoProductId(product.id)}
+                  onDecrement={() => decrementProduct(product)}
+                  onAdd={() => addProduct(product)}
+                  onExtras={() =>
+                    setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })
+                  }
+                />
+              ))
+            )}
+          </div>
+        </>
       </section>
 
       {desktopCartResizable ? (
