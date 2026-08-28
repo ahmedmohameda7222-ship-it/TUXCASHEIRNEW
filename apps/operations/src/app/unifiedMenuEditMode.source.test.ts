@@ -32,3 +32,5 @@ describe('unified menu edit entry point', () => {
     );
   });
 });
+
+// Task 3 GREEN verification checkpoint.
