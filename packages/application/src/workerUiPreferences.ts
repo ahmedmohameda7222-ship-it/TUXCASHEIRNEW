@@ -6,6 +6,7 @@ import {
   type MenuCategoryId,
   type ProductId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
   type WorkerUiPreferences,
 } from '@tux/domain';
@@ -17,6 +18,7 @@ export interface RemoteWorkerUiPreferences {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
+  readonly accentColor: SystemAccentColor | null;
   readonly serverVersion: number;
   readonly updatedAt: Instant;
 }
@@ -32,10 +34,11 @@ export interface WorkerUiPreferencesRemoteGateway {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
+    readonly accentColor: SystemAccentColor | null;
   }): Promise<RemoteWorkerUiPreferences>;
 }
 
-export interface WorkerUiPreferencesUpdate {
+export interface WorkerUiMenuLayoutUpdate {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
@@ -119,20 +122,50 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     this.#now = now;
   }
 
-  async update(
-    shopId: ShopId,
-    workerId: WorkerId,
-    input: WorkerUiPreferencesUpdate,
-  ): Promise<WorkerUiPreferences> {
+  async #currentOrDefault(shopId: ShopId, workerId: WorkerId): Promise<WorkerUiPreferences> {
     const current = await this.#repository.get(shopId, workerId);
-    const next = parseWorkerUiPreferences({
+    if (current !== null) return current;
+    return parseWorkerUiPreferences({
       shopId,
       workerId,
+      categoryOrder: [],
+      categoryAlignment: 'left',
+      productOrder: [],
+      accentColor: null,
+      updatedAt: this.#now(),
+      serverVersion: 0,
+      syncState: 'CLEAN',
+    });
+  }
+
+  async updateMenuLayout(
+    shopId: ShopId,
+    workerId: WorkerId,
+    input: WorkerUiMenuLayoutUpdate,
+  ): Promise<WorkerUiPreferences> {
+    const current = await this.#currentOrDefault(shopId, workerId);
+    const next = parseWorkerUiPreferences({
+      ...current,
       categoryOrder: input.categoryOrder,
       categoryAlignment: input.categoryAlignment,
       productOrder: input.productOrder,
       updatedAt: this.#now(),
-      serverVersion: current?.serverVersion ?? 0,
+      syncState: 'DIRTY',
+    });
+    await this.#repository.put(next);
+    return next;
+  }
+
+  async updateAccentColor(
+    shopId: ShopId,
+    workerId: WorkerId,
+    accentColor: SystemAccentColor | null,
+  ): Promise<WorkerUiPreferences> {
+    const current = await this.#currentOrDefault(shopId, workerId);
+    const next = parseWorkerUiPreferences({
+      ...current,
+      accentColor,
+      updatedAt: this.#now(),
       syncState: 'DIRTY',
     });
     await this.#repository.put(next);
@@ -148,12 +181,11 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         categoryOrder: local.categoryOrder,
         categoryAlignment: local.categoryAlignment,
         productOrder: local.productOrder,
+        accentColor: local.accentColor,
       });
       await this.#repository.put(
         parseWorkerUiPreferences({
-          ...local,
-          serverVersion: remote.serverVersion,
-          updatedAt: remote.updatedAt,
+          ...remote,
           syncState: 'CLEAN',
         }),
       );
