@@ -11,7 +11,15 @@ import {
 
 const LIGHT_PANEL = { r: 255, g: 255, b: 255 };
 const DARK_PANEL = { r: 20, g: 24, b: 22 };
-const MATRIX = ['#1F6B52', '#1E3A8A', '#7E22CE', '#DC2626', '#FACC15', '#050505', '#FAFAFA'] as const;
+const MATRIX = [
+  '#1F6B52',
+  '#1E3A8A',
+  '#7E22CE',
+  '#DC2626',
+  '#FACC15',
+  '#050505',
+  '#FAFAFA',
+] as const;
 
 describe('system accent theme', () => {
   it('normalizes draft HEX and converts RGB deterministically', () => {
@@ -36,7 +44,9 @@ describe('system accent theme', () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
         const panel = theme === 'light' ? LIGHT_PANEL : DARK_PANEL;
         const accent = systemAccentColorToRgb(parseSystemAccentColor(palette.accent));
-        const foreground = systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground));
+        const foreground = systemAccentColorToRgb(
+          parseSystemAccentColor(palette.actionForeground),
+        );
         const soft = systemAccentColorToRgb(parseSystemAccentColor(palette.soft));
         const text = systemAccentColorToRgb(parseSystemAccentColor(palette.text));
         const focus = systemAccentColorToRgb(parseSystemAccentColor(palette.focusRing));
