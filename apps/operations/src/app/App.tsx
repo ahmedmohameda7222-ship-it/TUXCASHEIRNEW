@@ -1,5 +1,6 @@
 import { type OperationsSessionState } from '@tux/application';
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { parseSystemAccentColor, type SystemAccentColor } from '@tux/domain';
+import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
 import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
@@ -12,6 +13,7 @@ import {
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
+  createWorkerUiPreferencesClient,
   type OperationsBulkStockClient,
   type OperationsEndDayClient,
   type OperationsExpensesClient,
@@ -21,6 +23,13 @@ import {
 import { connectDesktopSyncStatus } from './syncStatus';
 import { UserIcon } from './icons';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
+import { SystemColorPickerDialog } from './SystemColorPickerDialog';
+import {
+  applySystemAccentPalette,
+  clearSystemAccentPalette,
+  deriveSystemAccentPalette,
+  type EffectiveTheme,
+} from './systemAccentTheme';
 import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
 type ScreenState =
@@ -35,6 +44,7 @@ type ScreenState =
 type ThemePreference = 'system' | 'light' | 'dark';
 type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES' | 'BULK_STOCK';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
+const DEFAULT_SYSTEM_ACCENT = parseSystemAccentColor('#1F6B52');
 
 function initialTheme(): ThemePreference {
   try {
@@ -256,6 +266,16 @@ function ActiveShell({
   const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
+  const preferencesClient = useMemo(() => createWorkerUiPreferencesClient(), []);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+  );
+  const [savedAccentColor, setSavedAccentColor] = useState<SystemAccentColor | null>(null);
+  const [previewAccentColor, setPreviewAccentColor] = useState<SystemAccentColor | null>(null);
+  const [accentHydrated, setAccentHydrated] = useState(false);
+  const [systemColorOpen, setSystemColorOpen] = useState(false);
+  const [systemColorSaving, setSystemColorSaving] = useState(false);
+  const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
@@ -266,6 +286,84 @@ function ActiveShell({
       // Theme preference is non-critical UI state.
     }
   }, [theme]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = (): void => setSystemDark(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  const effectiveTheme: EffectiveTheme =
+    theme === 'dark' || (theme === 'system' && systemDark) ? 'dark' : 'light';
+
+  useLayoutEffect(() => {
+    let cancelled = false;
+    setAccentHydrated(false);
+    setSavedAccentColor(null);
+    setPreviewAccentColor(null);
+    clearSystemAccentPalette(document.documentElement);
+
+    void preferencesClient
+      .load()
+      .then((preference) => {
+        if (cancelled) return;
+        const accentColor = preference?.accentColor ?? null;
+        setSavedAccentColor(accentColor);
+        setPreviewAccentColor(accentColor);
+        setAccentHydrated(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSavedAccentColor(null);
+        setPreviewAccentColor(null);
+        setAccentHydrated(true);
+      });
+
+    return () => {
+      cancelled = true;
+      clearSystemAccentPalette(document.documentElement);
+    };
+  }, [preferencesClient, session.operator.id]);
+
+  useLayoutEffect(() => {
+    if (!accentHydrated) return;
+    if (previewAccentColor === null) {
+      clearSystemAccentPalette(document.documentElement);
+      return;
+    }
+    applySystemAccentPalette(
+      document.documentElement,
+      deriveSystemAccentPalette(previewAccentColor, effectiveTheme),
+    );
+  }, [accentHydrated, effectiveTheme, previewAccentColor]);
+
+  async function saveSystemColor(accentColor: SystemAccentColor | null): Promise<void> {
+    if (systemColorSaving) return;
+    setSystemColorSaving(true);
+    setSystemColorSaveError(null);
+    try {
+      const saved = await preferencesClient.updateAccentColor(accentColor);
+      setSavedAccentColor(saved.accentColor);
+      setPreviewAccentColor(saved.accentColor);
+      setSystemColorOpen(false);
+    } catch {
+      setSystemColorSaveError('Could not save system color. Try again.');
+    } finally {
+      setSystemColorSaving(false);
+    }
+  }
+
+  if (!accentHydrated) {
+    return (
+      <main
+        className="operations-accent-loading"
+        aria-busy="true"
+        aria-label="Loading worker preferences"
+      />
+    );
+  }
 
   return (
     <div className="operations-shell">
@@ -343,6 +441,26 @@ function ActiveShell({
                     ))}
                   </div>
                 </div>
+                <div className="system-color-profile-section">
+                  <span className="appearance-label">System color</span>
+                  <button
+                    type="button"
+                    className="system-color-profile-action"
+                    onClick={() => {
+                      setSystemColorSaveError(null);
+                      setPreviewAccentColor(savedAccentColor);
+                      setMenuOpen(false);
+                      setSystemColorOpen(true);
+                    }}
+                  >
+                    <span
+                      className="system-color-profile-swatch"
+                      style={{ backgroundColor: savedAccentColor ?? DEFAULT_SYSTEM_ACCENT }}
+                      aria-hidden="true"
+                    />
+                    <span>Choose system color</span>
+                  </button>
+                </div>
                 <div className="menu-divider" />
                 <button
                   type="button"
@@ -412,6 +530,18 @@ function ActiveShell({
             setEndDayOpen(false);
             await onBusinessDayClosed();
           }}
+        />
+      ) : null}
+
+      {systemColorOpen ? (
+        <SystemColorPickerDialog
+          savedAccentColor={savedAccentColor}
+          defaultPreviewColor={DEFAULT_SYSTEM_ACCENT}
+          saving={systemColorSaving}
+          saveError={systemColorSaveError}
+          onPreview={setPreviewAccentColor}
+          onSave={saveSystemColor}
+          onCancel={() => setSystemColorOpen(false)}
         />
       ) : null}
 
