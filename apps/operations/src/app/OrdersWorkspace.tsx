@@ -44,6 +44,7 @@ import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
+import { menuEditPreferenceInput } from './workerUiPreferenceEditing';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
@@ -259,6 +260,9 @@ export function OrdersWorkspace({
   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
   const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
   const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);
+  const [menuEditSaving, setMenuEditSaving] = useState(false);
+  const [menuEditError, setMenuEditError] = useState<string | null>(null);
+  const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -322,6 +326,8 @@ export function OrdersWorkspace({
     setCategoryPreference(null);
     setCategoryMode('IDLE');
     setMenuEditActive(false);
+    setMenuEditError(null);
+    setMenuEditResetRequested(false);
     setSearch('');
     void preferencesClient
       .load()
@@ -536,7 +542,11 @@ export function OrdersWorkspace({
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
   function beginMenuEdit(): void {
+    setCategoryMode('IDLE');
     setSearch('');
+    setSelectedFamily(null);
+    setMenuEditError(null);
+    setMenuEditResetRequested(false);
     setCategoryEditOrder(activeCategories.map((category) => category.id));
     setCategoryEditAlignment(categoryAlignment);
     setMenuEditProductOrder(
@@ -549,9 +559,58 @@ export function OrdersWorkspace({
     setMenuEditActive(true);
   }
 
+  function resetMenuEdit(): void {
+    setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
+    setCategoryEditAlignment('left');
+    setMenuEditProductOrder(
+      reconcileProductOrder(configuration?.products ?? [], null).map((product) => product.id),
+    );
+    setDraggedCategoryId(null);
+    setDraggedProductId(null);
+    setMenuEditError(null);
+    setMenuEditResetRequested(true);
+  }
+
+  function cancelMenuEdit(): void {
+    if (menuEditSaving) return;
+    setMenuEditActive(false);
+    setDraggedCategoryId(null);
+    setDraggedProductId(null);
+    setMenuEditError(null);
+    setMenuEditResetRequested(false);
+  }
+
+  async function saveMenuEdit(): Promise<void> {
+    if (menuEditSaving) return;
+    setMenuEditSaving(true);
+    setMenuEditError(null);
+    try {
+      const saved = await preferencesClient.update(
+        menuEditPreferenceInput(
+          categoryEditOrder,
+          categoryEditAlignment,
+          menuEditProductOrder,
+          menuEditResetRequested,
+        ),
+      );
+      setCategoryPreference(saved);
+      setMenuEditActive(false);
+      setMenuEditResetRequested(false);
+      setDraggedCategoryId(null);
+      setDraggedProductId(null);
+      setSuccessMessage('Menu layout saved');
+      window.setTimeout(() => setSuccessMessage(null), 4_500);
+    } catch {
+      setMenuEditError('Could not save menu layout. Try again.');
+    } finally {
+      setMenuEditSaving(false);
+    }
+  }
+
   function moveDraggedCategory(targetId: MenuCategoryId): void {
     const sourceId = draggedCategoryId;
     if (sourceId === null || sourceId === targetId) return;
+    setMenuEditResetRequested(false);
     setCategoryEditOrder((current) => {
       const sourceIndex = current.indexOf(sourceId);
       const targetIndex = current.indexOf(targetId);
@@ -567,6 +626,7 @@ export function OrdersWorkspace({
   function moveDraggedProduct(targetId: ProductId): void {
     const sourceId = draggedProductId;
     if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;
+    setMenuEditResetRequested(false);
     const productCategoryById = new Map(
       (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
     );
@@ -903,7 +963,10 @@ export function OrdersWorkspace({
                           type="button"
                           key={alignment}
                           aria-pressed={categoryEditAlignment === alignment}
-                          onClick={() => setCategoryEditAlignment(alignment)}
+                          onClick={() => {
+                            setCategoryEditAlignment(alignment);
+                            setMenuEditResetRequested(false);
+                          }}
                         >
                           {alignment === 'left'
                             ? 'Left'
@@ -1082,6 +1145,44 @@ export function OrdersWorkspace({
               ))
             )}
           </div>
+
+          {menuEditActive ? (
+            <div className="menu-edit-actions" aria-label="Menu edit actions">
+              <div className="menu-edit-action-status">
+                {menuEditError === null ? null : (
+                  <span className="category-editor-error" role="alert">
+                    {menuEditError}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="text-action"
+                  disabled={menuEditSaving}
+                  onClick={resetMenuEdit}
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="menu-edit-actions-primary">
+                <button
+                  type="button"
+                  className="secondary-action"
+                  disabled={menuEditSaving}
+                  onClick={cancelMenuEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="primary-action"
+                  disabled={menuEditSaving}
+                  onClick={() => void saveMenuEdit()}
+                >
+                  {menuEditSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : null}
         </>
       </section>
 
