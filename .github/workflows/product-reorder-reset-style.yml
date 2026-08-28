@@ -1,0 +1,27 @@
+name: Product Reorder Reset Style
+
+on:
+  push:
+    branches:
+      - feat/apple-product-card-reorder
+
+jobs:
+  apply-style:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/apple-product-card-reorder
+      - name: Apply quiet Reset styling
+        shell: bash
+        run: |
+          python3 -c "from pathlib import Path; import base64; p=Path('apps/operations/src/styles/final-pos-corrections.css'); s=p.read_text(); old=base64.b64decode('LnByb2R1Y3QtcmVvcmRlci1hY3Rpb25zID4gLnRleHQtYWN0aW9uLAoucHJvZHVjdC1yZW9yZGVyLWFjdGlvbnMtcHJpbWFyeSA+IGJ1dHRvbiB7CiAgbWluLWhlaWdodDogNDRweDsKfQ==').decode(); new=base64.b64decode('LnByb2R1Y3QtcmVvcmRlci1hY3Rpb25zID4gLnRleHQtYWN0aW9uIHsKICBtaW4taGVpZ2h0OiA0NHB4OwogIGJvcmRlcjogMDsKICBib3JkZXItcmFkaXVzOiB2YXIoLS10dXgtcmFkaXVzLXNtKTsKICBiYWNrZ3JvdW5kOiB0cmFuc3BhcmVudDsKICBjb2xvcjogdmFyKC0tdHV4LXRleHQtc2Vjb25kYXJ5KTsKICBwYWRkaW5nOiAwIDEycHg7CiAgZm9udC1zaXplOiAxNHB4OwogIGxpbmUtaGVpZ2h0OiAxOHB4OwogIGZvbnQtd2VpZ2h0OiA2MDA7Cn0KCi5wcm9kdWN0LXJlb3JkZXItYWN0aW9ucyA+IC50ZXh0LWFjdGlvbjpob3Zlcjpub3QoOmRpc2FibGVkKSB7CiAgYmFja2dyb3VuZDogdmFyKC0tdHV4LWFjY2VudC1ob3Zlci1zb2Z0KTsKICBjb2xvcjogdmFyKC0tdHV4LXRleHQtcHJpbWFyeSk7Cn0KCi5wcm9kdWN0LXJlb3JkZXItYWN0aW9ucy1wcmltYXJ5ID4gYnV0dG9uIHsKICBtaW4taGVpZ2h0OiA0NHB4Owp9').decode(); assert s.count(old)==1, 'Reset styling source block mismatch'; p.write_text(s.replace(old,new))"
+          git diff --check
+          git rm .github/workflows/product-reorder-reset-style.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/styles/final-pos-corrections.css
+          git commit -m "style: polish product reorder Reset action"
+          git push origin HEAD:feat/apple-product-card-reorder
