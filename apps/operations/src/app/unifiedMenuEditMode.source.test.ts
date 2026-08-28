@@ -22,3 +22,5 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
 });
+
+// Task 2 GREEN verification checkpoint.
