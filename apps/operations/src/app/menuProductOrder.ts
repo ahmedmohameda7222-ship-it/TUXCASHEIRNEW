@@ -60,6 +60,39 @@ export function moveProductWithinCategory(
   });
 }
 
+export function resetProductCategoryOrder(
+  order: readonly ProductId[],
+  canonicalCategoryProductIds: readonly ProductId[],
+): readonly ProductId[] {
+  const categorySet = new Set(canonicalCategoryProductIds);
+  if (canonicalCategoryProductIds.length === 0) return order;
+
+  let categoryIndex = 0;
+  return order.map((productId) => {
+    if (!categorySet.has(productId)) return productId;
+    const replacement = canonicalCategoryProductIds[categoryIndex];
+    categoryIndex += 1;
+    return replacement ?? productId;
+  });
+}
+
+export function moveProductWithinCategoryByOffset(
+  order: readonly ProductId[],
+  categoryProductIds: readonly ProductId[],
+  sourceId: ProductId,
+  offset: -1 | 1,
+): readonly ProductId[] {
+  const categorySet = new Set(categoryProductIds);
+  if (!categorySet.has(sourceId)) return order;
+
+  const currentCategoryOrder = order.filter((productId) => categorySet.has(productId));
+  const sourceIndex = currentCategoryOrder.indexOf(sourceId);
+  const targetId = currentCategoryOrder[sourceIndex + offset];
+  if (sourceIndex < 0 || targetId === undefined) return order;
+
+  return moveProductWithinCategory(order, categoryProductIds, sourceId, targetId);
+}
+
 export function filterProductsForMenu(
   products: readonly Product[],
   options: {
