@@ -30,6 +30,36 @@ export function reconcileProductOrder(
   return reconciled;
 }
 
+export function moveProductWithinCategory(
+  order: readonly ProductId[],
+  categoryProductIds: readonly ProductId[],
+  sourceId: ProductId,
+  targetId: ProductId,
+): readonly ProductId[] {
+  if (sourceId === targetId) return order;
+
+  const categorySet = new Set(categoryProductIds);
+  if (!categorySet.has(sourceId) || !categorySet.has(targetId)) return order;
+
+  const categoryOrder = order.filter((productId) => categorySet.has(productId));
+  const sourceIndex = categoryOrder.indexOf(sourceId);
+  const targetIndex = categoryOrder.indexOf(targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return order;
+
+  const reorderedCategory = categoryOrder.slice();
+  const [moved] = reorderedCategory.splice(sourceIndex, 1);
+  if (moved === undefined) return order;
+  reorderedCategory.splice(targetIndex, 0, moved);
+
+  let categoryIndex = 0;
+  return order.map((productId) => {
+    if (!categorySet.has(productId)) return productId;
+    const replacement = reorderedCategory[categoryIndex];
+    categoryIndex += 1;
+    return replacement ?? productId;
+  });
+}
+
 export function filterProductsForMenu(
   products: readonly Product[],
   options: {
