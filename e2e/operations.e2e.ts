@@ -1387,9 +1387,10 @@ test('final correction keeps header and categories visible during compact search
   expect(toolbarBox).not.toBeNull();
   expect(toolbarBox!.height).toBeGreaterThan(56);
   const actionButtons = page.locator('.category-nav-actions > button');
-  await expect(actionButtons).toHaveCount(2);
-  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit categories');
-  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');
+  await expect(actionButtons).toHaveCount(3);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Manage order');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Edit categories');
+  await expect(actionButtons.nth(2)).toHaveAccessibleName('Search menu');
   await page.getByRole('button', { name: 'Search menu' }).click();
   await expect(header).toBeVisible();
   await expect(categories).toBeVisible();
