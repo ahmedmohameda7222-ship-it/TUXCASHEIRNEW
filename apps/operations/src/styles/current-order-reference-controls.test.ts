@@ -36,32 +36,47 @@ describe('Current Order approved reference controls', () => {
     );
   });
 
-  it('keeps Cash, Instapay, and Split payment in the same equal-width payment row', () => {
+  it('renders Cash, Instapay, and Split payment as three separate compact cards without icons', () => {
     const cart = app('OrdersCart.tsx');
     const source = css('final-pos-corrections.css');
 
     expect(cart).toMatch(
       /className="payment-methods payment-methods-inline"[\s\S]*?methods\.map[\s\S]*?className="split-payment-action"[\s\S]*?Split payment[\s\S]*?<\/div>/,
     );
+    expect(cart).not.toMatch(/payment-methods-inline[\s\S]*?<[^>]+Icon/);
     expect(source).toMatch(
-      /\.payment-methods-inline\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/s,
+      /\.payment-methods-inline\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[^}]*gap:\s*4px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
     );
     expect(source).toMatch(
-      /\.payment-methods-inline \.split-payment-action\s*\{[^}]*width:\s*100%;[^}]*min-height:\s*var\(--tux-touch-target\);/s,
+      /\.payment-section \.payment-methods-inline > button\s*\{[^}]*min-height:\s*44px;[^}]*border:\s*1px solid var\(--tux-border-subtle\);[^}]*border-radius:\s*var\(--tux-radius-sm\);[^}]*background:\s*var\(--tux-surface-panel\);[^}]*font-size:\s*14px;/s,
+    );
+    expect(source).toMatch(
+      /\.payment-section \.payment-methods-inline > button\.selected\s*\{[^}]*background:\s*var\(--tux-accent-soft\);/s,
     );
   });
 
-  it('renders quantity as one segmented minus-number-plus control with a green increment', () => {
+  it('renders compact item actions as one segmented stepper plus smaller Edit and Extra controls', () => {
     const source = css('final-pos-corrections.css');
 
     expect(source).toMatch(
-      /\.line-quantity-stepper\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*var\(--tux-touch-target\) 2\.4rem var\(--tux-touch-target\);[^}]*border:\s*1px solid var\(--tux-border-subtle\);[^}]*border-radius:\s*var\(--tux-radius-sm\);[^}]*overflow:\s*hidden;/s,
+      /\.line-quantity-stepper\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*40px 2\.25rem 40px;[^}]*border:\s*1px solid var\(--tux-border-subtle\);[^}]*border-radius:\s*var\(--tux-radius-sm\);[^}]*overflow:\s*hidden;/s,
     );
     expect(source).toMatch(
-      /\.line-quantity-stepper output\s*\{[^}]*display:\s*grid;[^}]*place-items:\s*center;[^}]*border-inline:\s*1px solid var\(--tux-border-subtle\);/s,
+      /\.line-quantity-stepper button\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;[^}]*min-height:\s*40px;/s,
     );
     expect(source).toMatch(
-      /\.product-quantity \.quantity-increment,\s*\.line-quantity-stepper \.quantity-increment\s*\{[^}]*background:\s*var\(--tux-accent-strong\);[^}]*color:\s*var\(--tux-action-foreground\);/s,
+      /\.line-actions > button\s*\{[^}]*min-height:\s*40px;[^}]*padding:\s*0 10px;[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;/s,
+    );
+    expect(source).toMatch(
+      /\.line-quantity-stepper \.quantity-increment\s*\{[^}]*background:\s*var\(--tux-accent-strong\);[^}]*color:\s*var\(--tux-action-foreground\);/s,
+    );
+  });
+
+  it('keeps Place Order compact and amount-aligned', () => {
+    const source = css('premium.css');
+
+    expect(source).toMatch(
+      /\.place-order-action\s*\{[^}]*width:\s*100%;[^}]*min-height:\s*3rem;[^}]*justify-content:\s*space-between;[^}]*border-radius:\s*var\(--tux-radius-md\);/s,
     );
   });
 });
