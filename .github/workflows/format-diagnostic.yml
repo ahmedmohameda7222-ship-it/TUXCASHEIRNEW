@@ -1,0 +1,27 @@
+name: Format Diagnostic
+
+on:
+  push:
+    branches:
+      - feat/apple-product-card-reorder
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Print Prettier diff
+        run: |
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/ProductPositionEditor.tsx
+          git diff -- apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/ProductPositionEditor.tsx
+          test -z "$(git status --porcelain -- apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/ProductPositionEditor.tsx)"
