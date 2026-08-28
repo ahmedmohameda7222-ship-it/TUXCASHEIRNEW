@@ -68,11 +68,7 @@ function request(input: {
   } as GatewayRequest;
 }
 
-function remoteRow(
-  workerId: string,
-  serverVersion: number,
-  accentColor: string | null = null,
-) {
+function remoteRow(workerId: string, serverVersion: number, accentColor: string | null = null) {
   return {
     shop_id: shopA,
     worker_id: workerId,
