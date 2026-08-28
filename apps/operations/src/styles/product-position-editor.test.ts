@@ -33,6 +33,13 @@ describe('Product position editor visual contract', () => {
     );
   });
 
+  it('styles Reset as a quiet premium action instead of native browser chrome', () => {
+    const source = css();
+    expect(source).toMatch(
+      /\.product-reorder-actions\s*>\s*\.text-action\s*\{[^}]*min-height:\s*44px;[^}]*border:\s*0;[^}]*border-radius:[^;}]*;[^}]*background:\s*transparent;[^}]*color:\s*var\(--tux-text-secondary\);[^}]*padding:\s*0\s+12px;[^}]*font-size:\s*14px;/s,
+    );
+  });
+
   it('removes reorder motion when reduced motion is requested', () => {
     const source = css();
     expect(source).toMatch(
