@@ -35,3 +35,22 @@ export function productOrderPreferenceInput(
     productOrder: reset ? [] : productOrder,
   };
 }
+
+export function menuEditPreferenceInput(
+  categoryOrder: readonly MenuCategoryId[],
+  categoryAlignment: CategoryAlignment,
+  productOrder: readonly ProductId[],
+  reset: boolean,
+): WorkerUiPreferenceUpdateInput {
+  return reset
+    ? {
+        categoryOrder: [],
+        categoryAlignment: 'left',
+        productOrder: [],
+      }
+    : {
+        categoryOrder,
+        categoryAlignment,
+        productOrder,
+      };
+}
