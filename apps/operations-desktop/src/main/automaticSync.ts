@@ -7,6 +7,7 @@ import {
   type MenuCategoryId,
   type ProductId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
 } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
@@ -41,6 +42,7 @@ function parseRemoteWorkerUiPreferences(value: unknown): RemoteWorkerUiPreferenc
           categoryOrder: (value as Record<string, unknown>)['category_order'],
           categoryAlignment: (value as Record<string, unknown>)['category_alignment'],
           productOrder: (value as Record<string, unknown>)['product_order'],
+          accentColor: (value as Record<string, unknown>)['accent_color'],
           serverVersion: (value as Record<string, unknown>)['server_version'],
           updatedAt: (value as Record<string, unknown>)['updated_at'],
           syncState: 'CLEAN',
@@ -53,6 +55,7 @@ function parseRemoteWorkerUiPreferences(value: unknown): RemoteWorkerUiPreferenc
     categoryOrder: parsed.categoryOrder,
     categoryAlignment: parsed.categoryAlignment,
     productOrder: parsed.productOrder,
+    accentColor: parsed.accentColor,
     serverVersion: parsed.serverVersion,
     updatedAt: parsed.updatedAt,
   };
@@ -99,7 +102,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
     target.searchParams.set('worker_id', `eq.${workerId}`);
     target.searchParams.set(
       'select',
-      'shop_id,worker_id,category_order,category_alignment,product_order,server_version,updated_at',
+      'shop_id,worker_id,category_order,category_alignment,product_order,accent_color,server_version,updated_at',
     );
     target.searchParams.set('limit', '1');
 
@@ -123,6 +126,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
+    readonly accentColor: SystemAccentColor | null;
   }): Promise<RemoteWorkerUiPreferences> {
     const headers = await this.#headersForShop(input.shopId);
     const response = await this.#fetcher(
@@ -140,6 +144,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
           p_category_order: input.categoryOrder,
           p_category_alignment: input.categoryAlignment,
           p_product_order: input.productOrder,
+          p_accent_color: input.accentColor,
         }),
         signal: AbortSignal.timeout(10_000),
       },
