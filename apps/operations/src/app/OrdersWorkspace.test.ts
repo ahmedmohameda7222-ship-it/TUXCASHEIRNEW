@@ -65,6 +65,7 @@ function preference(categoryOrder: readonly MenuCategoryId[]): WorkerUiPreferenc
     workerId,
     categoryOrder,
     categoryAlignment: 'right',
+    productOrder: [],
     serverVersion: 4,
     updatedAt: instant(new Date('2026-08-25T04:00:00.000Z')),
     syncState: 'CLEAN',
