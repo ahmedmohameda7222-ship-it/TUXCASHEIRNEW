@@ -55,6 +55,11 @@ const IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';
 const IPC_END_DAY_PREVIEW = 'tux:end-day:preview';
 const IPC_END_DAY_CLOSE = 'tux:end-day:close';
 
+type WorkerMenuLayoutInput = Parameters<
+  TuxDesktopApi['workerUiPreferences']['updateMenuLayout']
+>[0];
+type WorkerAccentInput = Parameters<TuxDesktopApi['workerUiPreferences']['updateAccentColor']>[0];
+
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
     getVersion: async () => {
@@ -89,18 +94,20 @@ const api: TuxDesktopApi = Object.freeze({
       const value: unknown = await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_LOAD);
       return value === null ? null : parseWorkerUiPreferences(value);
     },
-    updateMenuLayout: async (
-      input: Parameters<TuxDesktopApi['workerUiPreferences']['updateMenuLayout']>[0],
-    ) =>
-      parseWorkerUiPreferences(
-        (await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT, input)) as unknown,
-      ),
-    updateAccentColor: async (
-      accentColor: Parameters<TuxDesktopApi['workerUiPreferences']['updateAccentColor']>[0],
-    ) =>
-      parseWorkerUiPreferences(
-        (await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT, accentColor)) as unknown,
-      ),
+    updateMenuLayout: async (input: WorkerMenuLayoutInput) => {
+      const value: unknown = await ipcRenderer.invoke(
+        IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT,
+        input,
+      );
+      return parseWorkerUiPreferences(value);
+    },
+    updateAccentColor: async (accentColor: WorkerAccentInput) => {
+      const value: unknown = await ipcRenderer.invoke(
+        IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT,
+        accentColor,
+      );
+      return parseWorkerUiPreferences(value);
+    },
     resetMenuLayout: async () => {
       await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT);
     },
