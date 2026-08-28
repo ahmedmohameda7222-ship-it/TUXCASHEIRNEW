@@ -33,12 +33,26 @@ describe('worker UI preference editing', () => {
     expect('categoryLayoutPreferenceInput' in editing).toBe(true);
     if (!('categoryLayoutPreferenceInput' in editing)) return;
 
-    expect(editing.categoryLayoutPreferenceInput(preference, [categoryA, categoryB], 'center', false)).toEqual({
+    expect(
+      editing.categoryLayoutPreferenceInput(
+        preference,
+        [categoryA, categoryB],
+        'center',
+        false,
+      ),
+    ).toEqual({
       categoryOrder: [categoryA, categoryB],
       categoryAlignment: 'center',
       productOrder: [productB, productA],
     });
-    expect(editing.categoryLayoutPreferenceInput(preference, [categoryA, categoryB], 'center', true)).toEqual({
+    expect(
+      editing.categoryLayoutPreferenceInput(
+        preference,
+        [categoryA, categoryB],
+        'center',
+        true,
+      ),
+    ).toEqual({
       categoryOrder: [],
       categoryAlignment: 'left',
       productOrder: [productB, productA],
