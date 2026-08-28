@@ -11,6 +11,7 @@ import {
   type OperationsConfigurationSnapshot,
   type OutboxEvent,
   type OutboxEventId,
+  type ProductId,
   type ShopId,
   type WorkerId,
 } from '@tux/domain';
@@ -21,6 +22,8 @@ const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222')
 const secondWorkerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222223');
 const categoryAId = parseEntityId<MenuCategoryId>('23222222-2222-4222-8222-222222222221');
 const categoryBId = parseEntityId<MenuCategoryId>('23222222-2222-4222-8222-222222222222');
+const productAId = parseEntityId<ProductId>('24222222-2222-4222-8222-222222222221');
+const productBId = parseEntityId<ProductId>('24222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const outboxId = parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444444');
 
@@ -68,6 +71,7 @@ function preference(worker: WorkerId, serverVersion = 0) {
     workerId: worker,
     categoryOrder: [categoryBId, categoryAId],
     categoryAlignment: 'center' as const,
+    productOrder: worker === secondWorkerId ? [productAId, productBId] : [productBId, productAId],
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
@@ -159,6 +163,7 @@ describe('SqliteOperationsDatabase', () => {
       ...preference(workerId, 3),
       categoryOrder: [categoryAId],
       categoryAlignment: 'right' as const,
+      productOrder: [productAId, productBId],
       syncState: 'CLEAN' as const,
     };
     await database.transaction(async (transaction) => {

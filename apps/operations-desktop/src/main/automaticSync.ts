@@ -5,6 +5,7 @@ import {
   type CategoryAlignment,
   type Instant,
   type MenuCategoryId,
+  type ProductId,
   type ShopId,
   type WorkerId,
 } from '@tux/domain';
@@ -39,6 +40,7 @@ function parseRemoteWorkerUiPreferences(value: unknown): RemoteWorkerUiPreferenc
           workerId: (value as Record<string, unknown>)['worker_id'],
           categoryOrder: (value as Record<string, unknown>)['category_order'],
           categoryAlignment: (value as Record<string, unknown>)['category_alignment'],
+          productOrder: (value as Record<string, unknown>)['product_order'],
           serverVersion: (value as Record<string, unknown>)['server_version'],
           updatedAt: (value as Record<string, unknown>)['updated_at'],
           syncState: 'CLEAN',
@@ -50,6 +52,7 @@ function parseRemoteWorkerUiPreferences(value: unknown): RemoteWorkerUiPreferenc
     workerId: parsed.workerId,
     categoryOrder: parsed.categoryOrder,
     categoryAlignment: parsed.categoryAlignment,
+    productOrder: parsed.productOrder,
     serverVersion: parsed.serverVersion,
     updatedAt: parsed.updatedAt,
   };
@@ -96,7 +99,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
     target.searchParams.set('worker_id', `eq.${workerId}`);
     target.searchParams.set(
       'select',
-      'shop_id,worker_id,category_order,category_alignment,server_version,updated_at',
+      'shop_id,worker_id,category_order,category_alignment,product_order,server_version,updated_at',
     );
     target.searchParams.set('limit', '1');
 
@@ -119,6 +122,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
     readonly workerId: WorkerId;
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }): Promise<RemoteWorkerUiPreferences> {
     const headers = await this.#headersForShop(input.shopId);
     const response = await this.#fetcher(
@@ -135,6 +139,7 @@ export class SupabaseDesktopWorkerUiPreferencesGateway implements WorkerUiPrefer
           p_worker_id: input.workerId,
           p_category_order: input.categoryOrder,
           p_category_alignment: input.categoryAlignment,
+          p_product_order: input.productOrder,
         }),
         signal: AbortSignal.timeout(10_000),
       },

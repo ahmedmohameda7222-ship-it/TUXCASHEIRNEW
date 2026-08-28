@@ -3,6 +3,7 @@ import {
   parseEntityId,
   type CategoryAlignment,
   type MenuCategoryId,
+  type ProductId,
   type ShopId,
   type WorkerId,
   type WorkerUiPreferences,
@@ -20,6 +21,8 @@ const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333331');
 const categoryB = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333332');
+const productA = parseEntityId<ProductId>('44444444-4444-4444-8444-444444444441');
+const productB = parseEntityId<ProductId>('44444444-4444-4444-8444-444444444442');
 
 function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPreferences {
   return {
@@ -27,6 +30,7 @@ function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPrefe
     workerId,
     categoryOrder: [categoryA],
     categoryAlignment: 'center',
+    productOrder: [],
     updatedAt: instant('2026-08-25T03:00:00.000Z'),
     serverVersion: 3,
     syncState: 'CLEAN',
@@ -40,6 +44,7 @@ function remote(overrides: Partial<RemoteWorkerUiPreferences> = {}): RemoteWorke
     workerId,
     categoryOrder: [categoryA],
     categoryAlignment: 'center',
+    productOrder: [],
     updatedAt: instant('2026-08-25T03:05:00.000Z'),
     serverVersion: 4,
     ...overrides,
@@ -72,6 +77,7 @@ class MemoryRepository implements WorkerUiPreferencesRepository {
 
 class RecordingGateway implements WorkerUiPreferencesRemoteGateway {
   readonly calls: string[] = [];
+  readonly putInputs: unknown[] = [];
   getResult: RemoteWorkerUiPreferences | null = null;
   putResult: RemoteWorkerUiPreferences = remote();
   putError: Error | null = null;
@@ -86,8 +92,10 @@ class RecordingGateway implements WorkerUiPreferencesRemoteGateway {
     readonly workerId: WorkerId;
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }) {
     this.calls.push(`put:${input.categoryAlignment}:${input.categoryOrder.join(',')}`);
+    this.putInputs.push(input);
     if (this.putError !== null) throw this.putError;
     return this.putResult;
   }
@@ -108,6 +116,7 @@ describe('WorkerUiPreferencesService', () => {
     const result = await service.update(shopId, workerId, {
       categoryOrder: [categoryB, categoryA],
       categoryAlignment: 'right',
+      productOrder: [],
     });
 
     expect(result).toEqual(
@@ -121,6 +130,24 @@ describe('WorkerUiPreferencesService', () => {
     );
     expect(repository.value).toEqual(result);
     expect(gateway.calls).toEqual([]);
+  });
+
+  it('persists a non-empty product order in the local worker preference update', async () => {
+    const repository = new MemoryRepository(preference({ serverVersion: 7 }));
+    const gateway = new RecordingGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-25T03:10:00.000Z'),
+    );
+    const update = {
+      categoryOrder: [categoryA],
+      categoryAlignment: 'center' as const,
+      productOrder: [productB, productA],
+    };
+
+    const result = await service.update(shopId, workerId, update);
+
+    expect(result.productOrder).toEqual([productB, productA]);
+    expect(repository.value?.productOrder).toEqual([productB, productA]);
   });
 
   it('pushes DIRTY local state before any pull and accepts the authoritative remote version', async () => {
@@ -150,6 +177,24 @@ describe('WorkerUiPreferencesService', () => {
     );
   });
 
+  it('includes product order when pushing a DIRTY worker preference', async () => {
+    const repository = new MemoryRepository(
+      preference({ productOrder: [productB, productA], syncState: 'DIRTY' }),
+    );
+    const gateway = new RecordingGateway();
+    gateway.putResult = remote({ serverVersion: 4 });
+    const service = new WorkerUiPreferencesService(repository, gateway);
+
+    await service.syncOnce(shopId, workerId);
+
+    expect(gateway.putInputs).toHaveLength(1);
+    expect(gateway.putInputs[0]).toMatchObject({
+      shopId,
+      workerId,
+      productOrder: [productB, productA],
+    });
+  });
+
   it('pulls a newer remote preference into CLEAN local state', async () => {
     const repository = new MemoryRepository(preference({ serverVersion: 3 }));
     const gateway = new RecordingGateway();
@@ -163,7 +208,10 @@ describe('WorkerUiPreferencesService', () => {
     await service.syncOnce(shopId, workerId);
 
     expect(gateway.calls).toEqual(['get']);
-    expect(repository.value).toEqual({ ...gateway.getResult, syncState: 'CLEAN' });
+    expect(repository.value).toEqual({
+      ...gateway.getResult,
+      syncState: 'CLEAN',
+    });
   });
 
   it('does not replace local state when the remote version is not newer', async () => {
@@ -186,7 +234,10 @@ describe('WorkerUiPreferencesService', () => {
 
     await service.syncOnce(shopId, workerId);
 
-    expect(repository.value).toEqual({ ...gateway.getResult, syncState: 'CLEAN' });
+    expect(repository.value).toEqual({
+      ...gateway.getResult,
+      syncState: 'CLEAN',
+    });
   });
 
   it('keeps DIRTY local data when the remote push fails', async () => {

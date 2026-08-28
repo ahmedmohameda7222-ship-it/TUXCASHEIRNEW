@@ -6,14 +6,32 @@ const validPreferences = {
   workerId: '22222222-2222-4222-8222-222222222222',
   categoryOrder: ['33333333-3333-4333-8333-333333333331', '33333333-3333-4333-8333-333333333332'],
   categoryAlignment: 'center',
+  productOrder: ['44444444-4444-4444-8444-444444444441', '44444444-4444-4444-8444-444444444442'],
   updatedAt: '2026-08-25T02:00:00.000Z',
   serverVersion: 4,
   syncState: 'DIRTY',
 } as const;
 
 describe('parseWorkerUiPreferences', () => {
-  it('validates and rehydrates worker UI preferences', () => {
+  it('validates and rehydrates worker UI preferences including product order', () => {
     expect(parseWorkerUiPreferences(validPreferences)).toEqual(validPreferences);
+  });
+
+  it('keeps older persisted preferences backward compatible by defaulting product order', () => {
+    const legacyPreferences = {
+      shopId: validPreferences.shopId,
+      workerId: validPreferences.workerId,
+      categoryOrder: validPreferences.categoryOrder,
+      categoryAlignment: validPreferences.categoryAlignment,
+      updatedAt: validPreferences.updatedAt,
+      serverVersion: validPreferences.serverVersion,
+      syncState: validPreferences.syncState,
+    } as const;
+
+    expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
+      ...legacyPreferences,
+      productOrder: [],
+    });
   });
 
   it.each(['top', '', 'CENTER'])('rejects invalid category alignment %s', (categoryAlignment) => {
@@ -29,6 +47,15 @@ describe('parseWorkerUiPreferences', () => {
         categoryOrder: [validPreferences.categoryOrder[0], validPreferences.categoryOrder[0]],
       }),
     ).toThrow('categoryOrder');
+  });
+
+  it('rejects duplicate product IDs', () => {
+    expect(() =>
+      parseWorkerUiPreferences({
+        ...validPreferences,
+        productOrder: [validPreferences.productOrder[0], validPreferences.productOrder[0]],
+      }),
+    ).toThrow('productOrder');
   });
 
   it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])(

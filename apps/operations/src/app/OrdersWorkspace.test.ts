@@ -10,11 +10,8 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
-import {
-  filterProductsForMenu,
-  productFamiliesForCategory,
-  reconcileCategoryOrder,
-} from './OrdersWorkspace';
+import { productFamiliesForCategory, reconcileCategoryOrder } from './OrdersWorkspace';
+import { filterProductsForMenu } from './menuProductOrder';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -59,12 +56,16 @@ const burgers = category(1, 'Burgers');
 const sides = category(2, 'Sides');
 const drinks = category(3, 'Drinks');
 
-function preference(categoryOrder: readonly MenuCategoryId[]): WorkerUiPreferences {
+function preference(
+  categoryOrder: readonly MenuCategoryId[],
+  productOrder: readonly ProductId[] = [],
+): WorkerUiPreferences {
   return {
     shopId,
     workerId,
     categoryOrder,
     categoryAlignment: 'right',
+    productOrder,
     serverVersion: 4,
     updatedAt: instant(new Date('2026-08-25T04:00:00.000Z')),
     syncState: 'CLEAN',
@@ -161,6 +162,39 @@ describe('filterProductsForMenu', () => {
         search: '',
       }).map((item) => item.name),
     ).toEqual(['Single Smashed Patty', 'Single TUXIFY', "Johnny's"]);
+  });
+
+  it('uses the worker product order, drops stale IDs, and appends new products canonically', () => {
+    const staleId = parseEntityId<ProductId>('44444444-4444-4444-8444-999999999999');
+    const workerPreference = preference([], [products[2]!.id, staleId, products[0]!.id]);
+
+    expect(
+      filterProductsForMenu(
+        products,
+        {
+          selectedCategoryId: burgers.id,
+          selectedFamily: null,
+          search: '',
+        },
+        workerPreference,
+      ).map((item) => item.name),
+    ).toEqual(["Johnny's", 'Single Smashed Patty', 'Single TUXIFY']);
+  });
+
+  it('preserves the worker product order through global search', () => {
+    const workerPreference = preference([], [products[1]!.id, products[0]!.id, products[2]!.id]);
+
+    expect(
+      filterProductsForMenu(
+        products,
+        {
+          selectedCategoryId: burgers.id,
+          selectedFamily: null,
+          search: 'single',
+        },
+        workerPreference,
+      ).map((item) => item.name),
+    ).toEqual(['Single TUXIFY', 'Single Smashed Patty']);
   });
 
   it('filters the selected category by family', () => {

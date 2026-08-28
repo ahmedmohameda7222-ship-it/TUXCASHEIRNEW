@@ -12,6 +12,7 @@ interface StoredWorkerUiPreferences {
   readonly workerId: string;
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: WorkerUiPreferences['categoryAlignment'];
+  readonly productOrder: readonly string[];
   readonly updatedAt: string;
   readonly serverVersion: number;
   readonly syncState: WorkerUiPreferences['syncState'];
@@ -28,6 +29,7 @@ function stored(preferences: WorkerUiPreferences): StoredWorkerUiPreferences {
     workerId: preferences.workerId,
     categoryOrder: preferences.categoryOrder,
     categoryAlignment: preferences.categoryAlignment,
+    productOrder: preferences.productOrder,
     updatedAt: preferences.updatedAt,
     serverVersion: preferences.serverVersion,
     syncState: preferences.syncState,

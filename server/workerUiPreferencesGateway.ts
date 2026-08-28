@@ -16,6 +16,7 @@ interface WorkerUiPreferenceInput {
   readonly workerId: string;
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: 'left' | 'center' | 'right';
+  readonly productOrder: readonly string[];
 }
 
 interface RemoteWorkerUiPreference {
@@ -23,6 +24,7 @@ interface RemoteWorkerUiPreference {
   readonly workerId: string;
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: 'left' | 'center' | 'right';
+  readonly productOrder: readonly string[];
   readonly serverVersion: number;
   readonly updatedAt: string;
 }
@@ -31,11 +33,11 @@ function requiredUuid(value: unknown): string | null {
   return typeof value === 'string' && UUID_PATTERN.test(value) ? value : null;
 }
 
-function parseCategoryOrder(value: unknown): readonly string[] | null {
+function parseIdOrder(value: unknown): readonly string[] | null {
   if (!Array.isArray(value)) return null;
   const parsed: string[] = [];
-  for (const categoryId of value) {
-    const id = requiredUuid(categoryId);
+  for (const rawId of value) {
+    const id = requiredUuid(rawId);
     if (id === null || parsed.includes(id)) return null;
     parsed.push(id);
   }
@@ -45,12 +47,14 @@ function parseCategoryOrder(value: unknown): readonly string[] | null {
 function parseInput(value: Readonly<Record<string, unknown>>): WorkerUiPreferenceInput | null {
   const shopId = requiredUuid(value['shopId']);
   const workerId = requiredUuid(value['workerId']);
-  const categoryOrder = parseCategoryOrder(value['categoryOrder']);
+  const categoryOrder = parseIdOrder(value['categoryOrder']);
   const categoryAlignment = value['categoryAlignment'];
+  const productOrder = parseIdOrder(value['productOrder']);
   if (
     shopId === null ||
     workerId === null ||
     categoryOrder === null ||
+    productOrder === null ||
     typeof categoryAlignment !== 'string' ||
     !ALIGNMENTS.has(categoryAlignment)
   ) {
@@ -61,6 +65,7 @@ function parseInput(value: Readonly<Record<string, unknown>>): WorkerUiPreferenc
     workerId,
     categoryOrder,
     categoryAlignment: categoryAlignment as WorkerUiPreferenceInput['categoryAlignment'],
+    productOrder,
   };
 }
 
@@ -69,14 +74,16 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
   const row = value as Record<string, unknown>;
   const shopId = requiredUuid(row['shop_id']);
   const workerId = requiredUuid(row['worker_id']);
-  const categoryOrder = parseCategoryOrder(row['category_order']);
+  const categoryOrder = parseIdOrder(row['category_order']);
   const categoryAlignment = row['category_alignment'];
+  const productOrder = parseIdOrder(row['product_order']);
   const serverVersion = row['server_version'];
   const updatedAt = row['updated_at'];
   if (
     shopId === null ||
     workerId === null ||
     categoryOrder === null ||
+    productOrder === null ||
     typeof categoryAlignment !== 'string' ||
     !ALIGNMENTS.has(categoryAlignment) ||
     typeof serverVersion !== 'number' ||
@@ -92,6 +99,7 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
     workerId,
     categoryOrder,
     categoryAlignment: categoryAlignment as RemoteWorkerUiPreference['categoryAlignment'],
+    productOrder,
     serverVersion,
     updatedAt,
   };
@@ -145,7 +153,13 @@ export async function handleWorkerUiPreferences(
     const shopId = requiredUuid(url.searchParams.get('shopId'));
     const workerId = requiredUuid(url.searchParams.get('workerId'));
     if (shopId !== null && workerId !== null) {
-      input = { shopId, workerId, categoryOrder: [], categoryAlignment: 'center' };
+      input = {
+        shopId,
+        workerId,
+        categoryOrder: [],
+        categoryAlignment: 'center',
+        productOrder: [],
+      };
     }
   } else {
     try {
@@ -172,7 +186,7 @@ export async function handleWorkerUiPreferences(
       target.searchParams.set('worker_id', `eq.${input.workerId}`);
       target.searchParams.set(
         'select',
-        'shop_id,worker_id,category_order,category_alignment,server_version,updated_at',
+        'shop_id,worker_id,category_order,category_alignment,product_order,server_version,updated_at',
       );
       target.searchParams.set('limit', '1');
       upstream = await fetch(target, {
@@ -198,6 +212,7 @@ export async function handleWorkerUiPreferences(
           p_worker_id: input.workerId,
           p_category_order: input.categoryOrder,
           p_category_alignment: input.categoryAlignment,
+          p_product_order: input.productOrder,
         }),
         signal: AbortSignal.timeout(10_000),
       });
@@ -237,6 +252,7 @@ export async function handleWorkerUiPreferences(
     workerId: preference.workerId,
     categoryOrder: preference.categoryOrder,
     categoryAlignment: preference.categoryAlignment,
+    productOrder: preference.productOrder,
     serverVersion: preference.serverVersion,
     updatedAt: preference.updatedAt,
   });

@@ -9,6 +9,8 @@ const deviceId = '22222222-2222-4222-8222-222222222222';
 const workerA = '33333333-3333-4333-8333-333333333331';
 const workerB = '33333333-3333-4333-8333-333333333332';
 const categoryA = '44444444-4444-4444-8444-444444444441';
+const productA = '55555555-5555-4555-8555-555555555551';
+const productB = '55555555-5555-4555-8555-555555555552';
 
 interface ResponseCapture {
   readonly response: GatewayResponse;
@@ -71,6 +73,7 @@ function remoteRow(workerId: string, serverVersion: number) {
     worker_id: workerId,
     category_order: [categoryA],
     category_alignment: 'center',
+    product_order: [productB, productA],
     server_version: serverVersion,
     updated_at: `2026-08-25T03:0${serverVersion}:00.000Z`,
   };
@@ -136,7 +139,7 @@ describe('handleWorkerUiPreferences', () => {
     expect(capture.body()).toEqual({ status: 'NOT_FOUND' });
   });
 
-  it('returns authoritative version 1 then 2 from successive accepted PUTs', async () => {
+  it('returns and forwards worker-specific product ordering on accepted PUTs', async () => {
     const upstream = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 1)]), { status: 200 }))
@@ -157,6 +160,7 @@ describe('handleWorkerUiPreferences', () => {
             workerId: workerA,
             categoryOrder: [categoryA],
             categoryAlignment: 'center',
+            productOrder: [productB, productA],
           },
         }),
         capture.response,
@@ -168,11 +172,20 @@ describe('handleWorkerUiPreferences', () => {
     const second = await performPut();
     expect(first.response.statusCode).toBe(200);
     expect(first.body()['serverVersion']).toBe(1);
+    expect(first.body()['productOrder']).toEqual([productB, productA]);
     expect(second.body()['serverVersion']).toBe(2);
     expect(upstream).toHaveBeenCalledTimes(2);
+    const firstInit = upstream.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(firstInit.body))).toEqual({
+      p_shop_id: shopA,
+      p_worker_id: workerA,
+      p_category_order: [categoryA],
+      p_category_alignment: 'center',
+      p_product_order: [productB, productA],
+    });
   });
 
-  it('targets worker preferences independently', async () => {
+  it('selects product order while targeting worker preferences independently', async () => {
     const upstream = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([remoteRow(workerA, 3)]), { status: 200 }))
@@ -192,11 +205,13 @@ describe('handleWorkerUiPreferences', () => {
         capture.response,
       );
       expect(capture.body()['workerId']).toBe(workerId);
+      expect(capture.body()['productOrder']).toEqual([productB, productA]);
     }
 
-    const firstUrl = String(upstream.mock.calls[0]?.[0]);
-    const secondUrl = String(upstream.mock.calls[1]?.[0]);
-    expect(firstUrl).toContain(encodeURIComponent(workerA));
-    expect(secondUrl).toContain(encodeURIComponent(workerB));
+    const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
+    const secondUrl = new URL(String(upstream.mock.calls[1]?.[0]));
+    expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
+    expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
+    expect(firstUrl.searchParams.get('select')).toContain('product_order');
   });
 });

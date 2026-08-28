@@ -8,6 +8,7 @@ import {
   parseWorkerUiPreferences,
   type CategoryAlignment,
   type MenuCategoryId,
+  type ProductId,
   type Shop,
   type ShopId,
   type Worker,
@@ -91,6 +92,7 @@ function parseRemoteWorkerUiPreferences(value: Record<string, unknown>): RemoteW
     workerId: parsed.workerId,
     categoryOrder: parsed.categoryOrder,
     categoryAlignment: parsed.categoryAlignment,
+    productOrder: parsed.productOrder,
     serverVersion: parsed.serverVersion,
     updatedAt: parsed.updatedAt,
   };
@@ -232,6 +234,7 @@ export class VercelBrowserRemoteGateway
     readonly workerId: WorkerId;
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }): Promise<RemoteWorkerUiPreferences> {
     const response = await fetch('/api/worker-ui-preferences', {
       method: 'PUT',
