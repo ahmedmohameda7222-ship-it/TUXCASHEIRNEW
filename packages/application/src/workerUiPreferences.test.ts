@@ -1,10 +1,12 @@
 import {
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type CategoryAlignment,
   type MenuCategoryId,
   type ProductId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
   type WorkerUiPreferences,
 } from '@tux/domain';
@@ -23,6 +25,7 @@ const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-3333333
 const categoryB = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333332');
 const productA = parseEntityId<ProductId>('44444444-4444-4444-8444-444444444441');
 const productB = parseEntityId<ProductId>('44444444-4444-4444-8444-444444444442');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPreferences {
   return {
@@ -31,6 +34,7 @@ function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPrefe
     categoryOrder: [categoryA],
     categoryAlignment: 'center',
     productOrder: [],
+    accentColor: null,
     updatedAt: instant('2026-08-25T03:00:00.000Z'),
     serverVersion: 3,
     syncState: 'CLEAN',
@@ -45,6 +49,7 @@ function remote(overrides: Partial<RemoteWorkerUiPreferences> = {}): RemoteWorke
     categoryOrder: [categoryA],
     categoryAlignment: 'center',
     productOrder: [],
+    accentColor: null,
     updatedAt: instant('2026-08-25T03:05:00.000Z'),
     serverVersion: 4,
     ...overrides,
@@ -93,6 +98,7 @@ class RecordingGateway implements WorkerUiPreferencesRemoteGateway {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
+    readonly accentColor: SystemAccentColor | null;
   }) {
     this.calls.push(`put:${input.categoryAlignment}:${input.categoryOrder.join(',')}`);
     this.putInputs.push(input);
@@ -106,14 +112,14 @@ afterEach(() => {
 });
 
 describe('WorkerUiPreferencesService', () => {
-  it('updates local state first, marks it DIRTY, and preserves the current server version', async () => {
+  it('updates menu layout locally first, marks it DIRTY, and preserves server version', async () => {
     const repository = new MemoryRepository(preference({ serverVersion: 7 }));
     const gateway = new RecordingGateway();
     const service = new WorkerUiPreferencesService(repository, gateway, () =>
       instant('2026-08-25T03:10:00.000Z'),
     );
 
-    const result = await service.update(shopId, workerId, {
+    const result = await service.updateMenuLayout(shopId, workerId, {
       categoryOrder: [categoryB, categoryA],
       categoryAlignment: 'right',
       productOrder: [],
@@ -132,6 +138,75 @@ describe('WorkerUiPreferencesService', () => {
     expect(gateway.calls).toEqual([]);
   });
 
+  it('changes accent without overwriting menu layout', async () => {
+    const repository = new MemoryRepository(
+      preference({
+        categoryOrder: [categoryA, categoryB],
+        categoryAlignment: 'right',
+        productOrder: [productA],
+        accentColor: null,
+        serverVersion: 7,
+      }),
+    );
+    const gateway = new RecordingGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-25T03:10:00.000Z'),
+    );
+
+    const saved = await service.updateAccentColor(shopId, workerId, customAccent);
+
+    expect(saved).toMatchObject({
+      categoryOrder: [categoryA, categoryB],
+      categoryAlignment: 'right',
+      productOrder: [productA],
+      accentColor: '#1E3A8A',
+      serverVersion: 7,
+      syncState: 'DIRTY',
+      updatedAt: instant('2026-08-25T03:10:00.000Z'),
+    });
+  });
+
+  it('changes menu layout without overwriting accent', async () => {
+    const repository = new MemoryRepository(preference({ accentColor: customAccent }));
+    const gateway = new RecordingGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-25T03:10:00.000Z'),
+    );
+
+    const saved = await service.updateMenuLayout(shopId, workerId, {
+      categoryOrder: [categoryB],
+      categoryAlignment: 'center',
+      productOrder: [productB],
+    });
+
+    expect(saved.categoryOrder).toEqual([categoryB]);
+    expect(saved.categoryAlignment).toBe('center');
+    expect(saved.productOrder).toEqual([productB]);
+    expect(saved.accentColor).toBe('#1E3A8A');
+  });
+
+  it('creates default menu layout on a first color-only update', async () => {
+    const repository = new MemoryRepository(null);
+    const gateway = new RecordingGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-25T03:10:00.000Z'),
+    );
+
+    const saved = await service.updateAccentColor(shopId, workerId, customAccent);
+
+    expect(saved).toEqual({
+      shopId,
+      workerId,
+      categoryOrder: [],
+      categoryAlignment: 'left',
+      productOrder: [],
+      accentColor: '#1E3A8A',
+      updatedAt: instant('2026-08-25T03:10:00.000Z'),
+      serverVersion: 0,
+      syncState: 'DIRTY',
+    });
+  });
+
   it('persists a non-empty product order in the local worker preference update', async () => {
     const repository = new MemoryRepository(preference({ serverVersion: 7 }));
     const gateway = new RecordingGateway();
@@ -144,7 +219,7 @@ describe('WorkerUiPreferencesService', () => {
       productOrder: [productB, productA],
     };
 
-    const result = await service.update(shopId, workerId, update);
+    const result = await service.updateMenuLayout(shopId, workerId, update);
 
     expect(result.productOrder).toEqual([productB, productA]);
     expect(repository.value?.productOrder).toEqual([productB, productA]);
@@ -159,6 +234,7 @@ describe('WorkerUiPreferencesService', () => {
     gateway.putResult = remote({
       categoryOrder: [categoryB],
       categoryAlignment: 'left',
+      accentColor: customAccent,
       serverVersion: 4,
     });
     const service = new WorkerUiPreferencesService(repository, gateway);
@@ -170,6 +246,7 @@ describe('WorkerUiPreferencesService', () => {
       preference({
         categoryOrder: [categoryB],
         categoryAlignment: 'left',
+        accentColor: customAccent,
         updatedAt: instant('2026-08-25T03:05:00.000Z'),
         serverVersion: 4,
         syncState: 'CLEAN',
@@ -177,12 +254,16 @@ describe('WorkerUiPreferencesService', () => {
     );
   });
 
-  it('includes product order when pushing a DIRTY worker preference', async () => {
+  it('includes the complete preference when pushing DIRTY local state', async () => {
     const repository = new MemoryRepository(
-      preference({ productOrder: [productB, productA], syncState: 'DIRTY' }),
+      preference({
+        productOrder: [productB, productA],
+        accentColor: customAccent,
+        syncState: 'DIRTY',
+      }),
     );
     const gateway = new RecordingGateway();
-    gateway.putResult = remote({ serverVersion: 4 });
+    gateway.putResult = remote({ accentColor: customAccent, serverVersion: 4 });
     const service = new WorkerUiPreferencesService(repository, gateway);
 
     await service.syncOnce(shopId, workerId);
@@ -191,7 +272,10 @@ describe('WorkerUiPreferencesService', () => {
     expect(gateway.putInputs[0]).toMatchObject({
       shopId,
       workerId,
+      categoryOrder: [categoryA],
+      categoryAlignment: 'center',
       productOrder: [productB, productA],
+      accentColor: '#1E3A8A',
     });
   });
 
@@ -201,6 +285,7 @@ describe('WorkerUiPreferencesService', () => {
     gateway.getResult = remote({
       categoryOrder: [categoryB],
       categoryAlignment: 'right',
+      accentColor: customAccent,
       serverVersion: 4,
     });
     const service = new WorkerUiPreferencesService(repository, gateway);
@@ -215,7 +300,7 @@ describe('WorkerUiPreferencesService', () => {
   });
 
   it('does not replace local state when the remote version is not newer', async () => {
-    const local = preference({ categoryOrder: [categoryB], serverVersion: 4 });
+    const local = preference({ categoryOrder: [categoryB], accentColor: customAccent, serverVersion: 4 });
     const repository = new MemoryRepository(local);
     const gateway = new RecordingGateway();
     gateway.getResult = remote({ categoryOrder: [categoryA], serverVersion: 4 });
@@ -229,7 +314,7 @@ describe('WorkerUiPreferencesService', () => {
   it('installs remote state when no local preference exists', async () => {
     const repository = new MemoryRepository(null);
     const gateway = new RecordingGateway();
-    gateway.getResult = remote({ categoryAlignment: 'left' });
+    gateway.getResult = remote({ categoryAlignment: 'left', accentColor: customAccent });
     const service = new WorkerUiPreferencesService(repository, gateway);
 
     await service.syncOnce(shopId, workerId);
@@ -241,7 +326,11 @@ describe('WorkerUiPreferencesService', () => {
   });
 
   it('keeps DIRTY local data when the remote push fails', async () => {
-    const local = preference({ categoryOrder: [categoryB], syncState: 'DIRTY' });
+    const local = preference({
+      categoryOrder: [categoryB],
+      accentColor: customAccent,
+      syncState: 'DIRTY',
+    });
     const repository = new MemoryRepository(local);
     const gateway = new RecordingGateway();
     gateway.putError = new Error('offline');
