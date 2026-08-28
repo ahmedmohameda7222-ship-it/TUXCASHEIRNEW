@@ -164,7 +164,11 @@ describe('WorkerUiPreferencesService', () => {
     await service.syncOnce(shopId, workerId);
 
     expect(gateway.calls).toEqual(['get']);
-    expect(repository.value).toEqual({ ...gateway.getResult, productOrder: [], syncState: 'CLEAN' });
+    expect(repository.value).toEqual({
+      ...gateway.getResult,
+      productOrder: [],
+      syncState: 'CLEAN',
+    });
   });
 
   it('does not replace local state when the remote version is not newer', async () => {
@@ -187,7 +191,11 @@ describe('WorkerUiPreferencesService', () => {
 
     await service.syncOnce(shopId, workerId);
 
-    expect(repository.value).toEqual({ ...gateway.getResult, productOrder: [], syncState: 'CLEAN' });
+    expect(repository.value).toEqual({
+      ...gateway.getResult,
+      productOrder: [],
+      syncState: 'CLEAN',
+    });
   });
 
   it('keeps DIRTY local data when the remote push fails', async () => {
