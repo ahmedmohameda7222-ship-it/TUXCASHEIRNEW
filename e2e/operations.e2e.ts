@@ -814,15 +814,50 @@ test('category search is progressive and keyboard accessible', async ({ page }) 
   await expect(searchInput).toBeHidden();
 });
 
-test('category editor persists alignment and keyboard reorder', async ({ page }) => {
+test('unified menu edit persists one combined worker layout with keyboard and rollback', async ({
+  page,
+}, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-  const searchButton = page.getByRole('button', { name: 'Search menu' });
-  const editButton = page.getByRole('button', { name: 'Edit categories' });
+  const editButton = page.getByRole('button', { name: 'Edit menu' });
   await expect(editButton).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Manage order' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit categories' })).toHaveCount(0);
+
   await editButton.click();
-  await expect(searchButton).toBeHidden();
+  await expect(editButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Search menu' })).toBeHidden();
+  await expect(page.getByRole('group', { name: 'Product families' })).toBeHidden();
   await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
+
+  const categories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(categories).toHaveCount(7);
+  await expect(categories.nth(0)).toHaveText('Burgers');
+  await expect(categories.nth(1)).toHaveText('Combo');
+
+  const burgers = page.getByLabel('Menu categories').getByRole('button', {
+    name: 'Burgers',
+    exact: true,
+  });
+  await burgers.focus();
+  await page.keyboard.press('Space');
+  await expect(burgers).toHaveClass(/category-tab-grabbed/);
+  await expect(
+    page.locator('.menu-pane .sr-only').filter({ hasText: 'Burgers picked up' }),
+  ).toContainText('Burgers picked up');
+  await page.keyboard.press('ArrowRight');
+  await expect(categories.nth(0)).toHaveText('Combo');
+  await page.keyboard.press('Escape');
+  await expect(categories.nth(0)).toHaveText('Burgers');
+
+  await burgers.focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Space');
+  await expect(categories.nth(0)).toHaveText('Combo');
+  await expect(categories.nth(1)).toHaveText('Burgers');
 
   await page.getByRole('button', { name: 'Right', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Right', exact: true })).toHaveAttribute(
@@ -830,37 +865,92 @@ test('category editor persists alignment and keyboard reorder', async ({ page })
     'true',
   );
 
-  const editorItems = page.locator('.category-editor-item');
-  await expect(editorItems).toHaveCount(7);
-  await expect(editorItems.nth(0)).toContainText('Burgers');
-  await page.getByRole('button', { name: 'Move Burgers right' }).click();
-  await expect(editorItems.nth(0)).toContainText('Combo');
-  await expect(editorItems.nth(1)).toContainText('Burgers');
+  let reorderCards = page.locator('.menu-edit-product-card');
+  await expect(reorderCards).toHaveCount(9);
+  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
+  await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
 
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
-  const categories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(categories).toHaveCount(7);
-  await expect(categories.nth(0)).toHaveText('Combo');
-  await expect(categories.nth(1)).toHaveText('Burgers');
+  await reorderCards.nth(1).focus();
+  await page.keyboard.press('Space');
+  await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await page.keyboard.press('ArrowLeft');
+  await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
+  await page.keyboard.press('Escape');
+  reorderCards = page.locator('.menu-edit-product-card');
+  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
+
+  await reorderCards.nth(1).focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Space');
+  await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
+
+  expect(
+    await categories.nth(0).evaluate((node) => getComputedStyle(node).animationName),
+  ).toContain('menu-edit-jiggle');
+  expect(
+    await reorderCards.nth(0).evaluate((node) => getComputedStyle(node).animationName),
+  ).toContain('menu-edit-jiggle');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await categories.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe(
+    'none',
+  );
+  expect(await reorderCards.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe(
+    'none',
+  );
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath('unified-menu-edit.png'),
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: false,
+  });
+
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Menu layout saved' })).toBeVisible();
+
+  let persistedCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(persistedCategories.nth(0)).toHaveText('Combo');
+  await expect(persistedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+  let menuCards = page.locator('.product-grid .product-card');
+  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
 
   await page.reload();
   await waitForActiveShell(page);
-  const reloadedCategories = page.getByLabel('Menu categories').locator('.category-tab');
-  await expect(reloadedCategories).toHaveCount(7);
-  await expect(reloadedCategories.nth(0)).toHaveText('Combo');
-  await expect(reloadedCategories.nth(1)).toHaveText('Burgers');
+  persistedCategories = page.getByLabel('Menu categories').locator('.category-tab');
+  await expect(persistedCategories.nth(0)).toHaveText('Combo');
+  await expect(persistedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
+  menuCards = page.locator('.product-grid .product-card');
+  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
 
-  await page.getByRole('button', { name: 'Edit categories' }).click();
+  await page.getByRole('button', { name: 'Edit menu' }).click();
+  reorderCards = page.locator('.menu-edit-product-card');
+  await reorderCards.nth(0).focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Space');
+  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  menuCards = page.locator('.product-grid .product-card');
+  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
+
+  await page.getByRole('button', { name: 'Edit menu' }).click();
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   const resetCategories = page.getByLabel('Menu categories').locator('.category-tab');
   await expect(resetCategories.nth(0)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'left');
+  menuCards = page.locator('.product-grid .product-card');
+  await expect(menuCards.nth(0)).toContainText('Single Smashed Patty');
 });
 
-test('category persistence failure keeps editor and draft intact', async ({ page }, testInfo) => {
+test('unified menu edit persistence failure keeps the draft and order intact', async ({
+  page,
+}, testInfo) => {
   await enterActiveOrdersForCategoryTests(page);
 
   await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
@@ -869,7 +959,8 @@ test('category persistence failure keeps editor and draft intact', async ({ page
   await expect(cart).toContainText('Single Smashed Patty');
   await closeMobileCartIfOpen(page, testInfo);
 
-  await page.getByRole('button', { name: 'Edit categories' }).click();
+  const editButton = page.getByRole('button', { name: 'Edit menu' });
+  await editButton.click();
   await page.getByRole('button', { name: 'Right', exact: true }).click();
 
   await page.evaluate(() => {
@@ -885,66 +976,23 @@ test('category persistence failure keeps editor and draft intact', async ({ page
     };
   });
 
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-  await expect(page.getByRole('alert')).toHaveText('Could not save category layout. Try again.');
-  await expect(page.getByLabel('Edit categories')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveText('Could not save menu layout. Try again.');
+  await expect(editButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
   await openCartIfMobile(page, testInfo);
   await expect(currentOrderCart(page, testInfo)).toContainText('Single Smashed Patty');
 });
 
-test('worker product order editor persists keyboard reorder, cancel, and reset', async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+test('unified menu edit exposes no isolated product-order editor', async ({ page }) => {
   await enterActiveOrdersForCategoryTests(page);
-
-  await page.getByRole('button', { name: 'Manage order' }).click();
-  await expect(page.getByRole('heading', { name: 'Reordering Burgers' })).toBeVisible();
-
-  let reorderCards = page.locator('.product-card-reordering');
-  await expect(reorderCards).toHaveCount(9);
-  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
-  await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
-
-  await reorderCards.nth(1).focus();
-  await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowLeft');
-  await page.keyboard.press('Space');
-  await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
-  await expect(reorderCards.nth(1)).toContainText('Single Smashed Patty');
-  await page.screenshot({
-    path: testInfo.outputPath('product-reorder-desktop.png'),
-    fullPage: true,
-  });
-
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Burgers product order saved' }),
-  ).toBeVisible();
-  let menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
-
-  await page.reload();
-  await waitForActiveShell(page);
-  menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
-
-  await page.getByRole('button', { name: 'Manage order' }).click();
-  reorderCards = page.locator('.product-card-reordering');
-  await page.getByRole('button', { name: 'Move Single Smashed Patty earlier' }).click();
-  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
-
-  await page.getByRole('button', { name: 'Manage order' }).click();
-  await page.getByRole('button', { name: 'Reset', exact: true }).click();
-  reorderCards = page.locator('.product-card-reordering');
-  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Single Smashed Patty');
+  await expect(page.getByRole('button', { name: 'Manage order' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Edit menu' }).click();
+  await expect(page.getByRole('heading', { name: /Reordering Burgers/ })).toHaveCount(0);
+  await expect(page.locator('.product-position-editor')).toHaveCount(0);
+  await expect(page.locator('.menu-edit-product-card')).toHaveCount(9);
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
 });
 
 test('Extra shortcuts preserve customized pricing and fresh adds', async ({ page }, testInfo) => {
@@ -1337,10 +1385,11 @@ test('visual approval evidence covers approved POS states', async ({ page }, tes
     await screenshot('03-expanded-search.png');
     await page.keyboard.press('Escape');
 
-    await page.getByRole('button', { name: 'Edit categories' }).click();
-    await expect(page.getByLabel('Edit categories')).toBeVisible();
-    await screenshot('04-category-edit.png');
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit menu' }).click();
+    await expect(page.getByLabel('Menu edit actions')).toBeVisible();
+    await expect(page.locator('.menu-edit-product-card').first()).toBeVisible();
+    await screenshot('04-unified-menu-edit.png');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
     await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
     await page.getByRole('button', { name: 'Add one Triple Smashed Patty' }).click();
@@ -1441,10 +1490,9 @@ test('final correction keeps header and categories visible during compact search
   expect(toolbarBox).not.toBeNull();
   expect(toolbarBox!.height).toBeGreaterThan(56);
   const actionButtons = page.locator('.category-nav-actions > button');
-  await expect(actionButtons).toHaveCount(3);
-  await expect(actionButtons.nth(0)).toHaveAccessibleName('Manage order');
-  await expect(actionButtons.nth(1)).toHaveAccessibleName('Edit categories');
-  await expect(actionButtons.nth(2)).toHaveAccessibleName('Search menu');
+  await expect(actionButtons).toHaveCount(2);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit menu');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');
   await page.getByRole('button', { name: 'Search menu' }).click();
   await expect(header).toBeVisible();
   await expect(categories).toBeVisible();
@@ -1611,7 +1659,7 @@ test('search keeps both category levels visible and hides edit chrome', async ({
   await expect(page.getByLabel('Menu categories').locator('.category-tab')).toHaveCount(7);
   await expect(page.getByLabel('Product families')).toBeVisible();
   await expect(page.getByPlaceholder('Search products')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Edit categories' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toBeHidden();
   await expect(page.getByText('Ctrl K', { exact: true })).toHaveCount(0);
   await expect(
     page.locator('.category-search-inline').getByRole('button', { name: 'Clear', exact: true }),
@@ -1619,26 +1667,26 @@ test('search keeps both category levels visible and hides edit chrome', async ({
   await expect(page.getByRole('button', { name: 'Clear search' })).toBeVisible();
 });
 
-test('category edit contains primary categories only', async ({ page }) => {
+test('unified menu edit keeps primary categories and Product Cards in place', async ({ page }) => {
   await enterActiveOrdersForCategoryTests(page);
 
-  await page.getByRole('button', { name: 'Edit categories' }).click();
+  await page.getByRole('button', { name: 'Edit menu' }).click();
 
   await expect(page.getByPlaceholder('Search products')).toBeHidden();
   await expect(page.getByLabel('Product families')).toBeHidden();
-  const editor = page.locator('.category-editor');
-  const items = editor.locator('.category-editor-item');
+  const primary = page.getByLabel('Menu categories').locator('.category-tab');
   const expectedPrimary = ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Zalabia', 'Extras', 'Drinks'];
-  await expect(items).toHaveCount(expectedPrimary.length);
+  await expect(primary).toHaveCount(expectedPrimary.length);
   for (const [index, name] of expectedPrimary.entries()) {
-    await expect(items.nth(index)).toContainText(name);
+    await expect(primary.nth(index)).toHaveText(name);
   }
-  await expect(editor.getByText('All', { exact: true })).toHaveCount(0);
-  await expect(editor.getByText('TUX', { exact: true })).toHaveCount(0);
-  await expect(editor.getByText('TUXIFY', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.category-editor')).toHaveCount(0);
   await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+  await expect(page.locator('.menu-edit-product-card')).toHaveCount(9);
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 });
 
 test('final correction keeps Extra and product controls fully contained', async ({
