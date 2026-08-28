@@ -360,13 +360,14 @@ export function OrdersWorkspace({
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        if (menuEditActive) return;
         event.preventDefault();
+        if (menuEditActive) return;
         setCategoryMode('SEARCH');
         return;
       }
-      if (event.key === '/' && !targetIsEditor && !menuEditActive) {
+      if (event.key === '/' && !targetIsEditor) {
         event.preventDefault();
+        if (menuEditActive) return;
         setCategoryMode('SEARCH');
         return;
       }
