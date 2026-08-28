@@ -36,26 +36,31 @@ describe('parseWorkerUiPreferences', () => {
     ).toBe('#1E3A8A');
   });
 
-  it('keeps older persisted preferences backward compatible by defaulting product order and accent', () => {
-    const legacyPreferences = {
-      shopId: validPreferences.shopId,
-      workerId: validPreferences.workerId,
-      categoryOrder: validPreferences.categoryOrder,
-      categoryAlignment: validPreferences.categoryAlignment,
-      updatedAt: validPreferences.updatedAt,
-      serverVersion: validPreferences.serverVersion,
-      syncState: validPreferences.syncState,
-    } as const;
+  it(
+    'keeps older persisted preferences backward compatible by defaulting product order and accent',
+    () => {
+      const legacyPreferences = {
+        shopId: validPreferences.shopId,
+        workerId: validPreferences.workerId,
+        categoryOrder: validPreferences.categoryOrder,
+        categoryAlignment: validPreferences.categoryAlignment,
+        updatedAt: validPreferences.updatedAt,
+        serverVersion: validPreferences.serverVersion,
+        syncState: validPreferences.syncState,
+      } as const;
 
-    expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
-      ...legacyPreferences,
-      productOrder: [],
-      accentColor: null,
-    });
-  });
+      expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
+        ...legacyPreferences,
+        productOrder: [],
+        accentColor: null,
+      });
+    },
+  );
 
   it('treats an explicit null accent as the TUX default', () => {
-    expect(parseWorkerUiPreferences({ ...validPreferences, accentColor: null }).accentColor).toBeNull();
+    expect(
+      parseWorkerUiPreferences({ ...validPreferences, accentColor: null }).accentColor,
+    ).toBeNull();
   });
 
   it.each(['top', '', 'CENTER'])('rejects invalid category alignment %s', (categoryAlignment) => {
