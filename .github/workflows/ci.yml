@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -40,62 +40,12 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: feat/worker-system-color-theme
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 6 scoped codemod
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-
-          const workspacePath = 'apps/operations/src/app/OrdersWorkspace.tsx';
-          const workspaceBefore = fs.readFileSync(workspacePath, 'utf8');
-          const genericCalls = workspaceBefore.match(/preferencesClient\.update\(/g) ?? [];
-          const scopedCalls = workspaceBefore.match(/preferencesClient\.updateMenuLayout\(/g) ?? [];
-          let workspaceAfter = workspaceBefore;
-          if (genericCalls.length === 1 && scopedCalls.length === 0) {
-            workspaceAfter = workspaceBefore.replace(
-              'preferencesClient.update(',
-              'preferencesClient.updateMenuLayout(',
-            );
-          } else if (!(genericCalls.length === 0 && scopedCalls.length === 1)) {
-            throw new Error(
-              `Unexpected OrdersWorkspace preference calls: generic=${genericCalls.length}, scoped=${scopedCalls.length}`,
-            );
-          }
-          fs.writeFileSync(workspacePath, workspaceAfter);
-
-          const productTestPath = 'apps/operations/src/app/ProductPositionEditor.test.tsx';
-          const productTestBefore = fs.readFileSync(productTestPath, 'utf8');
-          let productTestAfter = productTestBefore;
-          if (!productTestBefore.includes('accentColor: null,')) {
-            const needle = '  productOrder: [products[1]!.id, products[0]!.id],\n';
-            if (!productTestBefore.includes(needle)) {
-              throw new Error('ProductPositionEditor fixture insertion point not found.');
-            }
-            productTestAfter = productTestBefore.replace(
-              needle,
-              `${needle}  accentColor: null,\n`,
-            );
-          }
-          fs.writeFileSync(productTestPath, productTestAfter);
-          NODE
-          if git diff --quiet -- apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/ProductPositionEditor.test.tsx; then
-            echo 'Task 6 scoped codemod already applied.'
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/ProductPositionEditor.test.tsx
-          git commit -m "refactor: keep menu edit layout scoped"
-          git push origin HEAD:feat/worker-system-color-theme
-          exit 1
       - name: Format check
         run: npm run format:check
       - name: Lint
@@ -124,6 +74,8 @@ jobs:
         run: npm run test:migrations
       - uses: denoland/setup-deno@v2
         with:
+          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
+          # same resolver semantics so remote import-graph failures are caught before deploy.
           deno-version: v1.46.3
       - name: Edge Function typecheck
         run: |
