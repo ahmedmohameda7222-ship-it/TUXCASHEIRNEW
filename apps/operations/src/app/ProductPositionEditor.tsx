@@ -45,6 +45,13 @@ function canonicalCategoryProductIds(
     .map((product) => product.id);
 }
 
+export function shouldHandleProductReorderCardKeyEvent(
+  eventTarget: unknown,
+  currentTarget: unknown,
+): boolean {
+  return eventTarget === currentTarget;
+}
+
 export function ProductPositionEditor({
   category,
   products,
@@ -161,7 +168,11 @@ export function ProductPositionEditor({
   }
 
   return (
-    <section className="product-position-editor" aria-labelledby="product-position-editor-title">
+    <section
+      className="product-position-editor"
+      aria-labelledby="product-position-editor-title"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
       <header className="product-reorder-cue">
         <div>
           <span className="product-reorder-kicker">Reordering</span>
@@ -180,6 +191,7 @@ export function ProductPositionEditor({
         className="product-grid product-reorder-grid"
         role="list"
         aria-label={`${category.name} product order`}
+        style={{ flex: 1 }}
       >
         {categoryProducts.map((product, index) => {
           const isDragging = draggingId === product.id;
@@ -219,7 +231,12 @@ export function ProductPositionEditor({
               }}
               onDragEnd={() => setDraggingId(null)}
               onKeyDown={(event) => {
-                if (saving) return;
+                if (
+                  saving ||
+                  !shouldHandleProductReorderCardKeyEvent(event.target, event.currentTarget)
+                ) {
+                  return;
+                }
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   togglePickup(product.id);
