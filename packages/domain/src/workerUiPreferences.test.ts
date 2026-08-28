@@ -31,9 +31,9 @@ describe('parseWorkerUiPreferences', () => {
   });
 
   it('normalizes a persisted worker accent', () => {
-    expect(parseWorkerUiPreferences({ ...validPreferences, accentColor: '#1e3a8a' }).accentColor).toBe(
-      '#1E3A8A',
-    );
+    expect(
+      parseWorkerUiPreferences({ ...validPreferences, accentColor: '#1e3a8a' }).accentColor,
+    ).toBe('#1E3A8A');
   });
 
   it('keeps older persisted preferences backward compatible by defaulting product order and accent', () => {
