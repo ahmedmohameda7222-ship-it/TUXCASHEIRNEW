@@ -1,0 +1,207 @@
+from pathlib import Path
+
+path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+source = path.read_text()
+
+import_line = "import { categoryLayoutPreferenceInput } from './workerUiPreferenceEditing';\n"
+if import_line not in source:
+    raise SystemExit('categoryLayoutPreferenceInput import not found')
+source = source.replace(import_line, '', 1)
+
+state_start = source.index(
+    "  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');\n"
+)
+drag_line = "  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);\n"
+drag_start = source.index(drag_line, state_start)
+state_replacement = (
+    "  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');\n"
+    + drag_line
+)
+source = source[:state_start] + state_replacement + source[drag_start + len(drag_line):]
+
+# The independent category editor error/reset setters are dead after the category editor
+# lifecycle is replaced below. Remove the remaining session-reset references now.
+source = source.replace('    setCategoryEditError(null);\n', '')
+source = source.replace('    setCategoryResetRequested(false);\n', '')
+
+functions_start = source.index('  function moveCategory(')
+functions_end = source.index('  function addProduct(', functions_start)
+source = source[:functions_start] + '''  function moveDraggedCategory(targetId: MenuCategoryId): void {
+    const sourceId = draggedCategoryId;
+    if (sourceId === null || sourceId === targetId) return;
+    setCategoryEditOrder((current) => {
+      const sourceIndex = current.indexOf(sourceId);
+      const targetIndex = current.indexOf(targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (moved === undefined) return current;
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }
+
+''' + source[functions_end:]
+
+render_start = source.index('              {menuEditActive ? (\n')
+render_end = source.index('            </div>\n\n            <div className="product-grid"', render_start)
+inline_categories = '''              <div className="field-stack category-navigation-stack">
+                <div className="category-navigation">
+                  <div
+                    className="category-rail"
+                    aria-label="Menu categories"
+                    data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
+                  >
+                    {(menuEditActive ? categoryEditorCategories : activeCategories).map(
+                      (category) => (
+                        <button
+                          type="button"
+                          key={category.id}
+                          className={[
+                            'category-tab',
+                            selectedCategoryId === category.id ? 'selected' : '',
+                            menuEditActive ? 'category-tab-reordering' : '',
+                            draggedCategoryId === category.id ? 'category-tab-dragging' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          draggable={menuEditActive && draggedCategoryId !== category.id}
+                          onDragStart={(event) => {
+                            if (!menuEditActive) return;
+                            setDraggedCategoryId(category.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', category.id);
+                          }}
+                          onDragEnter={(event) => {
+                            if (!menuEditActive || draggedCategoryId === null) return;
+                            event.preventDefault();
+                            moveDraggedCategory(category.id);
+                          }}
+                          onDragOver={(event) => {
+                            if (menuEditActive && draggedCategoryId !== null) event.preventDefault();
+                          }}
+                          onDragEnd={() => setDraggedCategoryId(null)}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            setDraggedCategoryId(null);
+                          }}
+                          onClick={() => {
+                            setSelectedCategoryId(category.id);
+                            setSelectedFamily(null);
+                            setSearch('');
+                          }}
+                        >
+                          {category.name}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <div className="category-nav-actions">
+                    {menuEditActive ? (
+                      <div
+                        className="category-alignment category-alignment-inline"
+                        role="group"
+                        aria-label="Category alignment"
+                      >
+                        {(['left', 'center', 'right'] as const).map((alignment) => (
+                          <button
+                            type="button"
+                            key={alignment}
+                            aria-pressed={categoryEditAlignment === alignment}
+                            onClick={() => setCategoryEditAlignment(alignment)}
+                          >
+                            {alignment === 'left'
+                              ? 'Left'
+                              : alignment === 'center'
+                                ? 'Center'
+                                : 'Right'}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {categoryMode === 'IDLE' ? (
+                      <button
+                        type="button"
+                        className={
+                          menuEditActive
+                            ? 'category-icon-action category-edit-active'
+                            : 'category-icon-action'
+                        }
+                        aria-label="Edit menu"
+                        title="Edit menu"
+                        aria-pressed={menuEditActive}
+                        onClick={() => {
+                          if (!menuEditActive) beginMenuEdit();
+                        }}
+                      >
+                        <EditPencilIcon />
+                      </button>
+                    ) : null}
+                    {!menuEditActive && categoryMode === 'SEARCH' ? (
+                      <div className="product-search category-search-inline">
+                        <SearchIcon className="category-search-glyph" />
+                        <input
+                          ref={searchRef}
+                          id="product-search"
+                          type="search"
+                          aria-label="Search menu"
+                          value={search}
+                          placeholder="Search products"
+                          autoComplete="off"
+                          onChange={(event) => setSearch(event.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="category-search-clear"
+                          aria-label="Clear search"
+                          title="Clear search"
+                          onClick={() => {
+                            setSearch('');
+                            setCategoryMode('IDLE');
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : !menuEditActive ? (
+                      <button
+                        type="button"
+                        className="category-icon-action"
+                        aria-label="Search menu"
+                        title="Search menu"
+                        onClick={() => setCategoryMode('SEARCH')}
+                      >
+                        <SearchIcon />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                {!menuEditActive && activeFamilies.length > 0 ? (
+                  <div
+                    className="segmented-control product-family-filter"
+                    aria-label="Product families"
+                  >
+                    <button
+                      type="button"
+                      className={selectedFamily === null ? 'selected' : undefined}
+                      onClick={() => setSelectedFamily(null)}
+                    >
+                      All
+                    </button>
+                    {activeFamilies.map((family) => (
+                      <button
+                        type="button"
+                        key={family}
+                        className={selectedFamily === family ? 'selected' : undefined}
+                        onClick={() => setSelectedFamily(family)}
+                      >
+                        {family}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+'''
+source = source[:render_start] + inline_categories + source[render_end:]
+
+path.write_text(source)
