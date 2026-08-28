@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
@@ -10,40 +11,33 @@ new_import = """import {
   reconcileProductOrder,
 } from './menuProductOrder';
 """
-if source.count(old_import) != 1:
-    raise SystemExit('menu product order import not found exactly once')
-source = source.replace(old_import, new_import, 1)
+if 'moveProductWithinCategory' not in source:
+    source = source.replace(old_import, new_import, 1)
+source = source.replace("import { ProductPositionEditor } from './ProductPositionEditor';\n", '', 1)
 
-position_import = "import { ProductPositionEditor } from './ProductPositionEditor';\n"
-if source.count(position_import) != 1:
-    raise SystemExit('ProductPositionEditor import not found exactly once')
-source = source.replace(position_import, '', 1)
+if 'menuEditProductOrder' not in source:
+    dragged_category_state = (
+        '  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);\n'
+    )
+    source = source.replace(
+        dragged_category_state,
+        dragged_category_state
+        + '  const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);\n'
+        + '  const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);\n',
+        1,
+    )
 
-old_state = """  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [productReorderCategoryId, setProductReorderCategoryId] = useState<MenuCategoryId | null>(
-    null,
-  );
-"""
-new_state = """  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
-  const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);
-"""
-if source.count(old_state) != 1:
-    raise SystemExit('product reorder state block not found exactly once')
-source = source.replace(old_state, new_state, 1)
+source, removed_state = re.subn(
+    r"  const \[productReorderCategoryId, setProductReorderCategoryId\] = useState<MenuCategoryId \| null>\(\n    null,\n  \);\n",
+    '',
+    source,
+    count=1,
+)
+if removed_state != 1 and 'productReorderCategoryId' in source:
+    raise SystemExit('Could not remove productReorderCategoryId state')
+source = re.sub(r'^\s*setProductReorderCategoryId\(null\);\n', '', source, flags=re.MULTILINE)
 
-if source.count('    setProductReorderCategoryId(null);\n') != 2:
-    raise SystemExit('expected exactly two product reorder reset references')
-source = source.replace('    setProductReorderCategoryId(null);\n', '', 2)
-
-old_product_const = """  const productReorderCategory =
-    productReorderCategoryId === null
-      ? null
-      : (configuredActiveCategories.find((category) => category.id === productReorderCategoryId) ??
-        null);
-
-"""
-new_product_const = """  const menuEditProducts = useMemo(() => {
+menu_edit_products = """  const menuEditProducts = useMemo(() => {
     if (selectedCategoryId === null) return [];
     const byId = new Map(
       (configuration?.products ?? [])
@@ -57,34 +51,35 @@ new_product_const = """  const menuEditProducts = useMemo(() => {
   }, [configuration, menuEditProductOrder, selectedCategoryId]);
 
 """
-if source.count(old_product_const) != 1:
-    raise SystemExit('product reorder category const not found exactly once')
-source = source.replace(old_product_const, new_product_const, 1)
+source, replaced_const = re.subn(
+    r"  const productReorderCategory =[\s\S]*?\n\n  const validation",
+    menu_edit_products + '  const validation',
+    source,
+    count=1,
+)
+if replaced_const != 1 and 'const menuEditProducts' not in source:
+    raise SystemExit('Could not replace productReorderCategory derived state')
 
-old_begin = """    setCategoryEditOrder(activeCategories.map((category) => category.id));
-    setCategoryEditAlignment(categoryAlignment);
-    setDraggedCategoryId(null);
-    setMenuEditActive(true);
-"""
-new_begin = """    setCategoryEditOrder(activeCategories.map((category) => category.id));
-    setCategoryEditAlignment(categoryAlignment);
+if 'reconcileProductOrder(configuration?.products ?? [], categoryPreference)' not in source:
+    source = source.replace(
+        '    setCategoryEditAlignment(categoryAlignment);\n',
+        """    setCategoryEditAlignment(categoryAlignment);
     setMenuEditProductOrder(
       reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
         (product) => product.id,
       ),
     );
-    setDraggedCategoryId(null);
-    setDraggedProductId(null);
-    setMenuEditActive(true);
-"""
-if source.count(old_begin) != 1:
-    raise SystemExit('begin menu edit block not found exactly once')
-source = source.replace(old_begin, new_begin, 1)
+""",
+        1,
+    )
+    source = source.replace(
+        '    setDraggedCategoryId(null);\n    setMenuEditActive(true);\n',
+        '    setDraggedCategoryId(null);\n    setDraggedProductId(null);\n    setMenuEditActive(true);\n',
+        1,
+    )
 
-anchor = "  function addProduct(product: Product): void {\n"
-if source.count(anchor) != 1:
-    raise SystemExit('addProduct anchor not found exactly once')
-move_product = '''  function moveDraggedProduct(targetId: ProductId): void {
+if 'function moveDraggedProduct' not in source:
+    move_product = '''  function moveDraggedProduct(targetId: ProductId): void {
     const sourceId = draggedProductId;
     if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;
     const productCategoryById = new Map(
@@ -99,34 +94,27 @@ move_product = '''  function moveDraggedProduct(targetId: ProductId): void {
   }
 
 '''
-source = source.replace(anchor, move_product + anchor, 1)
+    source = source.replace('  function addProduct(product: Product): void {\n', move_product + '  function addProduct(product: Product): void {\n', 1)
 
-section_open = '''      <section className="menu-pane" aria-label="Menu">
-        {productReorderCategory === null ? (
-          <>
-'''
-if source.count(section_open) != 1:
-    raise SystemExit('menu pane product editor conditional opening not found')
 source = source.replace(
-    section_open,
-    '''      <section className="menu-pane" aria-label="Menu">
-        <>
-''',
+    '        {productReorderCategory === null ? (\n          <>\n',
+    '        <>\n',
     1,
 )
-
-editor_start = source.find('        ) : (\n          <ProductPositionEditor')
-editor_end_marker = '        )}\n      </section>'
-editor_end = source.find(editor_end_marker, editor_start)
-if editor_start < 0 or editor_end < 0:
-    raise SystemExit('ProductPositionEditor render branch not found')
-source = source[:editor_start] + '      </section>' + source[editor_end + len(editor_end_marker):]
+source, removed_editor = re.subn(
+    r"\n        \) : \(\n          <ProductPositionEditor[\s\S]*?\n        \)\}\n",
+    '\n',
+    source,
+    count=1,
+)
+if removed_editor != 1 and '<ProductPositionEditor' in source:
+    raise SystemExit('Could not remove ProductPositionEditor render branch')
 
 product_grid_start = source.find('            <div className="product-grid" aria-live="polite">')
 product_grid_end_marker = '            </div>\n          </>'
 product_grid_end = source.find(product_grid_end_marker, product_grid_start)
 if product_grid_start < 0 or product_grid_end < 0:
-    raise SystemExit('product grid block not found')
+    raise SystemExit('Could not locate product grid')
 
 product_grid = '''            <div className="product-grid" aria-live="polite">
               {menuEditActive ? (
@@ -214,5 +202,10 @@ product_grid = '''            <div className="product-grid" aria-live="polite">
             </div>
 '''
 source = source[:product_grid_start] + product_grid + source[product_grid_end:]
+
+if 'productReorderCategoryId' in source or '<ProductPositionEditor' in source:
+    raise SystemExit('Legacy product reorder path remains after Task 4 transform')
+if 'menuEditProductOrder' not in source or 'menu-edit-product-card' not in source:
+    raise SystemExit('Task 4 inline product draft was not installed')
 
 path.write_text(source)
