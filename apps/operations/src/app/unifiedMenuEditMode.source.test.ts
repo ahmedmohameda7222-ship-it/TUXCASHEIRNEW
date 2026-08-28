@@ -10,6 +10,7 @@ const menuEditStyles = readFileSync(
   'utf8',
 );
 
+// Unified edit evidence uses the same single-session contract exercised here.
 describe('unified menu edit entry point', () => {
   it('removes the standalone Manage order entry point while retaining the existing edit/search controls', () => {
     expect(ordersWorkspaceSource).not.toContain('Manage order');
