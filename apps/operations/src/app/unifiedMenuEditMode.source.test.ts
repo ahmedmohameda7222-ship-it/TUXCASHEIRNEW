@@ -31,6 +31,12 @@ describe('unified menu edit entry point', () => {
       'data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}',
     );
   });
-});
 
-// Task 3 GREEN verification checkpoint.
+  it('keeps Product Cards in the menu grid and reorders them from the same unified draft', () => {
+    expect(ordersWorkspaceSource).not.toContain('<ProductPositionEditor');
+    expect(ordersWorkspaceSource).not.toContain('productReorderCategoryId');
+    expect(ordersWorkspaceSource).toContain('menuEditProductOrder');
+    expect(ordersWorkspaceSource).toContain('menu-edit-product-card');
+    expect(ordersWorkspaceSource).toContain('moveProductWithinCategory');
+  });
+});
