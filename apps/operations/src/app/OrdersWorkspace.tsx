@@ -257,7 +257,9 @@ export function OrdersWorkspace({
   const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
   const [categoryResetRequested, setCategoryResetRequested] = useState(false);
   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [productReorderCategoryId, setProductReorderCategoryId] = useState<MenuCategoryId | null>(null);
+  const [productReorderCategoryId, setProductReorderCategoryId] = useState<MenuCategoryId | null>(
+    null,
+  );
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -874,7 +876,11 @@ export function OrdersWorkspace({
                       <strong>Category layout</strong>
                       <span>Drag categories or use the move controls.</span>
                     </div>
-                    <div className="category-alignment" role="group" aria-label="Category alignment">
+                    <div
+                      className="category-alignment"
+                      role="group"
+                      aria-label="Category alignment"
+                    >
                       {(['left', 'center', 'right'] as const).map((alignment) => (
                         <button
                           type="button"

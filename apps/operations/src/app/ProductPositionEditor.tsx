@@ -1,9 +1,4 @@
-import type {
-  MenuCategory,
-  Product,
-  ProductId,
-  WorkerUiPreferences,
-} from '@tux/domain';
+import type { MenuCategory, Product, ProductId, WorkerUiPreferences } from '@tux/domain';
 import { useMemo, useRef, useState } from 'react';
 import {
   moveProductWithinCategory,
@@ -88,7 +83,9 @@ export function ProductPositionEditor({
     const position = categoryOnly.indexOf(productId);
     const product = byId.get(productId);
     if (product !== undefined && position >= 0) {
-      setAnnouncement(`${product.name} moved to position ${position + 1} of ${categoryOnly.length}.`);
+      setAnnouncement(
+        `${product.name} moved to position ${position + 1} of ${categoryOnly.length}.`,
+      );
     }
   }
 
@@ -152,7 +149,9 @@ export function ProductPositionEditor({
     setSaving(true);
     setError(null);
     try {
-      const saved = await preferenceClient.update(productOrderPreferenceInput(preference, order, false));
+      const saved = await preferenceClient.update(
+        productOrderPreferenceInput(preference, order, false),
+      );
       onSaved(saved);
     } catch {
       setError('Could not save product order. Try again.');
@@ -177,7 +176,11 @@ export function ProductPositionEditor({
         </div>
       )}
 
-      <div className="product-grid product-reorder-grid" role="list" aria-label={`${category.name} product order`}>
+      <div
+        className="product-grid product-reorder-grid"
+        role="list"
+        aria-label={`${category.name} product order`}
+      >
         {categoryProducts.map((product, index) => {
           const isDragging = draggingId === product.id;
           const isGrabbed = grabbedId === product.id;
@@ -244,7 +247,12 @@ export function ProductPositionEditor({
                       {productInitials(product)}
                     </div>
                   ) : (
-                    <img className="product-image" src={product.imageKey} alt="" draggable={false} />
+                    <img
+                      className="product-image"
+                      src={product.imageKey}
+                      alt=""
+                      draggable={false}
+                    />
                   )}
                 </div>
                 <div className="product-copy">
@@ -295,7 +303,12 @@ export function ProductPositionEditor({
           <button type="button" className="secondary-action" disabled={saving} onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" className="primary-action" disabled={saving} onClick={() => void save()}>
+          <button
+            type="button"
+            className="primary-action"
+            disabled={saving}
+            onClick={() => void save()}
+          >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
