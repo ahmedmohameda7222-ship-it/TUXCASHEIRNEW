@@ -35,4 +35,14 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("colorScheme: 'light'");
     expect(source).toContain("getPropertyValue('--tux-accent')");
   });
+
+  it('covers action contrast, tablet/mobile usability, and approval evidence', () => {
+    expect(source).toContain('renderedActionContrast');
+    expect(source).toContain('toBeGreaterThanOrEqual(4.5)');
+    expect(source).toContain("test('worker system color picker is usable on tablet and mobile'");
+    expect(source).toContain("test.skip(testInfo.project.name === 'desktop-browser-fallback')");
+    expect(source).toContain("'system-color-light-blue-desktop.png'");
+    expect(source).toContain("'system-color-dark-blue-desktop.png'");
+    expect(source).toContain("'system-color-picker-mobile.png'");
+  });
 });
