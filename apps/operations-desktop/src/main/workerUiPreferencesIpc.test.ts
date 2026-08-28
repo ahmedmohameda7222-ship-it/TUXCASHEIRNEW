@@ -112,6 +112,7 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
     const updated = await runtime.update({
       categoryOrder: [categoryA, categoryB],
       categoryAlignment: 'center',
+      productOrder: [],
     });
     expect(updated.workerId).toBe(workerB);
     expect(updated.syncState).toBe('DIRTY');
@@ -122,6 +123,7 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
       workerId: workerB,
       categoryOrder: [categoryA, categoryB],
       categoryAlignment: 'center',
+      productOrder: [],
       syncState: 'DIRTY',
     });
   });
@@ -143,6 +145,7 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
     expect(await repository.get(shopId, workerA)).toMatchObject({
       categoryOrder: [],
       categoryAlignment: 'left',
+      productOrder: [],
       syncState: 'DIRTY',
     });
     expect(await repository.get(shopId, workerB)).toEqual(preference(workerB, [categoryB], 'left'));
@@ -163,7 +166,11 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
 
     await expect(runtime.load()).rejects.toThrow('Active worker session required.');
     await expect(
-      runtime.update({ categoryOrder: [categoryA], categoryAlignment: 'left' }),
+      runtime.update({
+        categoryOrder: [categoryA],
+        categoryAlignment: 'left',
+        productOrder: [],
+      }),
     ).rejects.toThrow('Active worker session required.');
     await expect(runtime.reset()).rejects.toThrow('Active worker session required.');
     expect(repository.values.size).toBe(0);
