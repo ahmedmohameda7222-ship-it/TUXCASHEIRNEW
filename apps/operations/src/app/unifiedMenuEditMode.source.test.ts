@@ -5,6 +5,10 @@ const ordersWorkspaceSource = readFileSync(
   new URL('./OrdersWorkspace.tsx', import.meta.url),
   'utf8',
 );
+const menuEditStyles = readFileSync(
+  new URL('../styles/final-pos-corrections.css', import.meta.url),
+  'utf8',
+);
 
 describe('unified menu edit entry point', () => {
   it('removes the standalone Manage order entry point while retaining the existing edit/search controls', () => {
@@ -50,5 +54,25 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('onClick={cancelMenuEdit}');
     expect(ordersWorkspaceSource).toContain("'Saving…' : 'Save'");
     expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
+  });
+
+  it('supports keyboard reordering for categories and Product Cards', () => {
+    expect(ordersWorkspaceSource).toContain('function moveCategoryByOffset');
+    expect(ordersWorkspaceSource).toContain('moveProductWithinCategoryByOffset');
+    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowLeft'");
+    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowRight'");
+    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowUp'");
+    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowDown'");
+  });
+
+  it('jiggles both reorder surfaces continuously with staggered timing and respects Reduced Motion', () => {
+    expect(menuEditStyles).toContain('@keyframes menu-edit-jiggle');
+    expect(menuEditStyles).toContain('.category-tab-reordering');
+    expect(menuEditStyles).toContain('.menu-edit-product-card');
+    expect(menuEditStyles).toContain('animation: menu-edit-jiggle');
+    expect(menuEditStyles).toContain(':nth-child(2n)');
+    expect(menuEditStyles).toContain(':nth-child(3n)');
+    expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(menuEditStyles).toContain('animation: none');
   });
 });
