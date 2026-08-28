@@ -18,6 +18,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('SearchIcon');
   });
 
+  // Edit mode consumes app-search shortcuts instead of handing them to the browser.
   it('uses Pencil to activate one pressed menu edit session and suppresses search shortcuts during it', () => {
     expect(ordersWorkspaceSource).toContain('menuEditActive');
     expect(ordersWorkspaceSource).toContain('setMenuEditActive(true)');
