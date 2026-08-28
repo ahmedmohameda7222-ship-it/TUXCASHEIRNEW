@@ -1,13 +1,10 @@
-name: Task 11 default picker correction
-
+name: Task 11 picker correction
 on:
   push:
     branches:
       - feat/worker-system-color-theme
-
 permissions:
   contents: write
-
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -16,47 +13,18 @@ jobs:
         with:
           ref: feat/worker-system-color-theme
           fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Correct native picker interaction
-        shell: bash
+      - name: Patch test helper
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('e2e/operations.e2e.ts')
           source = path.read_text()
-          old = '''async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
-  const picker = dialog.locator("input[type='color']");
-  await picker.evaluate((node, nextColor) => {
-    const input = node as HTMLInputElement;
-    input.value = nextColor;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, color);
-  await expect(picker).toHaveValue(color);
-}'''
-          new = '''async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
-  const defaultCheckbox = dialog.locator("input[type='checkbox']");
-  if (await defaultCheckbox.isChecked()) await defaultCheckbox.uncheck();
-  const picker = dialog.locator("input[type='color']");
-  await expect(picker).toBeEnabled();
-  await picker.evaluate((node, nextColor) => {
-    const input = node as HTMLInputElement;
-    input.value = nextColor;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, color);
-  await expect(picker).toHaveValue(color);
-}'''
-          if old not in source:
-              raise SystemExit('Expected native picker helper not found')
-          path.write_text(source.replace(old, new, 1))
+          needle = "  const picker = dialog.locator(\"input[type='color']\");\n  await picker.evaluate((node, nextColor) => {"
+          replacement = "  const defaultCheckbox = dialog.locator(\"input[type='checkbox']\");\n  if (await defaultCheckbox.isChecked()) await defaultCheckbox.uncheck();\n  const picker = dialog.locator(\"input[type='color']\");\n  await expect(picker).toBeEnabled();\n  await picker.evaluate((node, nextColor) => {"
+          if needle not in source:
+              raise SystemExit('picker helper marker not found')
+          path.write_text(source.replace(needle, replacement, 1))
           PY
-          npx prettier --write e2e/operations.e2e.ts
           git config user.name "TUX implementation bot"
           git config user.email "actions@users.noreply.github.com"
           git add e2e/operations.e2e.ts
