@@ -12,7 +12,8 @@ describe('moveProductWithinCategory', () => {
   it('moves within category slots without disturbing products from other categories', () => {
     expect('moveProductWithinCategory' in menuProductOrder).toBe(true);
     if (!('moveProductWithinCategory' in menuProductOrder)) return;
-    const moveProductWithinCategory = menuProductOrder.moveProductWithinCategory;
+    const moveProductWithinCategory =
+      menuProductOrder.moveProductWithinCategory;
     expect(moveProductWithinCategory).toBeTypeOf('function');
     if (typeof moveProductWithinCategory !== 'function') return;
 
@@ -35,7 +36,8 @@ describe('moveProductWithinCategory', () => {
   it('leaves the order unchanged when either product is outside the selected category', () => {
     expect('moveProductWithinCategory' in menuProductOrder).toBe(true);
     if (!('moveProductWithinCategory' in menuProductOrder)) return;
-    const moveProductWithinCategory = menuProductOrder.moveProductWithinCategory;
+    const moveProductWithinCategory =
+      menuProductOrder.moveProductWithinCategory;
     expect(moveProductWithinCategory).toBeTypeOf('function');
     if (typeof moveProductWithinCategory !== 'function') return;
 
