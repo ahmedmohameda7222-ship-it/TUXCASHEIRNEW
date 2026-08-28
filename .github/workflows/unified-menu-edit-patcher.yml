@@ -24,32 +24,20 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply Task 6 production patch
+      - name: Apply full Task 6 keyboard pickup patch
         run: python .github/scripts/unified-menu-edit-patcher.py
       - name: Format Task 6 files
         run: |
           npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
           git diff --check
-      - name: Capture Task 6 GREEN diagnostic
-        run: |
-          set +e
-          npm run test > /tmp/task6-test.log 2>&1
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            cp /tmp/task6-test.log .github/task6-test-diagnostic.txt
-            git config user.name "tux-implementation-bot"
-            git config user.email "tux-implementation-bot@users.noreply.github.com"
-            git add .github/task6-test-diagnostic.txt
-            git commit -m "chore: capture task 6 test diagnostic"
-            git push origin HEAD:ui/unified-menu-edit-mode
-            exit "$status"
-          fi
+      - name: Task 6 GREEN unit gate
+        run: npm run test
       - name: Commit Task 6 production change
         run: |
           git config user.name "tux-implementation-bot"
           git config user.email "tux-implementation-bot@users.noreply.github.com"
           git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
           if ! git diff --cached --quiet; then
-            git commit -m "feat: add keyboard reorder and edit jiggle"
+            git commit -m "feat: add keyboard pickup and edit jiggle"
             git push origin HEAD:ui/unified-menu-edit-mode
           fi
