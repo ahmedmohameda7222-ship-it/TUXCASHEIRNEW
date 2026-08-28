@@ -2523,9 +2523,21 @@ async function openWorkerSystemColorDialog(page: Page, workerName: string): Prom
   return dialog;
 }
 
+async function installDeterministicEyeDropper(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    class DeterministicEyeDropper {
+      async open(): Promise<{ sRGBHex: string }> {
+        return { sRGBHex: '#facc15' };
+      }
+    }
+    Object.defineProperty(window, 'EyeDropper', {
+      configurable: true,
+      value: DeterministicEyeDropper,
+    });
+  });
+}
+
 async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
-  const defaultCheckbox = dialog.locator("input[type='checkbox']");
-  if (await defaultCheckbox.isChecked()) await defaultCheckbox.uncheck();
   const picker = dialog.locator("input[type='color']");
   await expect(picker).toBeEnabled();
   await picker.evaluate((node, nextColor) => {
@@ -2535,6 +2547,23 @@ async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, color);
   await expect(picker).toHaveValue(color);
+}
+
+async function chooseHexSystemColor(dialog: Locator, color: string): Promise<void> {
+  const hex = dialog.getByLabel('HEX');
+  await hex.fill(color);
+  await expect(hex).toHaveValue(color.toUpperCase());
+}
+
+async function chooseRgbSystemColor(
+  dialog: Locator,
+  rgb: { r: number; g: number; b: number },
+  expectedHex: string,
+): Promise<void> {
+  await dialog.getByLabel('Red').fill(String(rgb.r));
+  await dialog.getByLabel('Green').fill(String(rgb.g));
+  await dialog.getByLabel('Blue').fill(String(rgb.b));
+  await expect(dialog.getByLabel('HEX')).toHaveValue(expectedHex.toUpperCase());
 }
 
 async function setWorkerAppearance(
@@ -2555,12 +2584,36 @@ async function setWorkerAppearance(
 }
 
 async function assertSystemColorDialogGeometry(page: Page, dialog: Locator): Promise<void> {
-  await expect(dialog.getByText('System Color', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('Default', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Current color', { exact: true })).toBeVisible();
+  const nativePicker = dialog.getByLabel('Visual color picker');
+  const hex = dialog.getByLabel('HEX');
+  const red = dialog.getByLabel('Red');
+  const green = dialog.getByLabel('Green');
+  const blue = dialog.getByLabel('Blue');
   await expect(dialog.locator("input[type='color']")).toHaveCount(1);
-  await expect(dialog.locator("input[type='checkbox']")).toHaveCount(1);
-  await expect(dialog.locator("input[type='text']")).toHaveCount(0);
-  await expect(dialog.locator('.system-color-row')).toHaveCount(2);
+  await expect(dialog.locator("input[type='checkbox']")).toHaveCount(0);
+  await expect(dialog.locator("input[type='text']")).toHaveCount(1);
+  await expect(dialog.locator("input[type='number']")).toHaveCount(3);
+  await expect(dialog.locator('.system-color-rgb-grid')).toHaveCount(1);
+  await expect(hex).toBeFocused();
+  for (const channel of [red, green, blue]) {
+    await expect(channel).toHaveAttribute('min', '0');
+    await expect(channel).toHaveAttribute('max', '255');
+  }
+  const pickFromScreen = dialog.getByRole('button', {
+    name: 'Pick from screen',
+    exact: true,
+  });
+  const reset = dialog.getByRole('button', {
+    name: 'Reset to TUX default',
+    exact: true,
+  });
+  const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+  const save = dialog.getByRole('button', { name: 'Save', exact: true });
+  await expect(pickFromScreen).toBeVisible();
+  await expect(reset).toBeVisible();
+  await expect(cancel).toBeVisible();
+  await expect(save).toBeVisible();
 
   const viewport = page.viewportSize();
   const dialogBox = await dialog.boundingBox();
@@ -2571,17 +2624,21 @@ async function assertSystemColorDialogGeometry(page: Page, dialog: Locator): Pro
   expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
   expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport!.height + 1);
 
-  const rows = dialog.locator('.system-color-row');
-  for (let index = 0; index < 2; index += 1) {
-    const rowBox = await rows.nth(index).boundingBox();
-    expect(rowBox).not.toBeNull();
-    expect(rowBox!.x).toBeGreaterThanOrEqual(dialogBox!.x - 1);
-    expect(rowBox!.x + rowBox!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
-    expect(rowBox!.y).toBeGreaterThanOrEqual(dialogBox!.y - 1);
-    expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(dialogBox!.y + dialogBox!.height + 1);
+  const interactive = [nativePicker, hex, red, green, blue, pickFromScreen, reset, cancel, save];
+  for (const control of interactive) {
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(43);
+    expect(box!.x).toBeGreaterThanOrEqual(dialogBox!.x - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
   }
-  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+
+  await nativePicker.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(save).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(nativePicker).toBeFocused();
+  await hex.focus();
 }
 
 async function switchWorkerForSystemColor(
@@ -2606,6 +2663,7 @@ async function switchWorkerForSystemColor(
 
 test('worker system color is isolated, persistent, and responsive', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await installDeterministicEyeDropper(page);
   await page.setViewportSize({ width: 1366, height: 768 });
   await enterActiveOrdersForCategoryTests(page);
   await setWorkerAppearance(page, 'Demo Worker One', 'Light');
@@ -2619,14 +2677,14 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   const defaultLightAccent = await renderedSystemAccent(page);
   let dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
   await assertSystemColorDialogGeometry(page, dialog);
-  await chooseNativeSystemColor(dialog, '#1e3a8a');
+  await chooseHexSystemColor(dialog, '#1e3a8a');
   await expect.poll(() => renderedSystemAccent(page)).not.toBe(defaultLightAccent);
   const workerOneLightAccent = await renderedSystemAccent(page);
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
 
   dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
-  await chooseNativeSystemColor(dialog, '#1e3a8a');
+  await chooseHexSystemColor(dialog, '#1e3a8a');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
@@ -2679,8 +2737,18 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   );
   await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
   dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-  await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
-  await chooseNativeSystemColor(dialog, '#7e22ce');
+  const pickFromScreen = dialog.getByRole('button', {
+    name: 'Pick from screen',
+    exact: true,
+  });
+  await pickFromScreen.click();
+  await expect(dialog.getByLabel('HEX')).toHaveValue('#FACC15');
+  await expect(dialog.getByText('#FACC15', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
+
+  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
+  await chooseRgbSystemColor(dialog, { r: 126, g: 34, b: 206 }, '#7e22ce');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const workerTwoLightAccent = await renderedSystemAccent(page);
   expect(workerTwoLightAccent).not.toBe(workerOneLightAccent);
@@ -2704,8 +2772,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerTwoLightAccent);
 
   dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-  const defaultCheckbox = dialog.locator("input[type='checkbox']");
-  await defaultCheckbox.check();
+  await dialog.getByRole('button', { name: 'Reset to TUX default', exact: true }).click();
   await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await page.reload();
@@ -2727,6 +2794,15 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
   await assertSystemColorDialogGeometry(page, dialog);
   await expect(dialog.locator("input[type='color']")).toHaveValue('#1e3a8a');
+  await chooseNativeSystemColor(dialog, '#dc2626');
+  await expect.poll(() => renderedSystemAccent(page)).not.toBe(workerOneLightAccent);
+  await chooseNativeSystemColor(dialog, '#fafafa');
+  const lightNearWhiteAccent = await renderedSystemAccent(page);
+  expect(lightNearWhiteAccent).not.toBe('#fafafa');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
+
+  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
   await page.screenshot({
     path: testInfo.outputPath('system-color-dialog-1280x720-light.png'),
     animations: 'disabled',
@@ -2738,6 +2814,13 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await setWorkerAppearance(page, 'Demo Worker One', 'Dark');
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneDarkAccent);
   await expectNoHorizontalOverflow(page);
+  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
+  await assertSystemColorDialogGeometry(page, dialog);
+  await chooseNativeSystemColor(dialog, '#050505');
+  const darkNearBlackAccent = await renderedSystemAccent(page);
+  expect(darkNearBlackAccent).not.toBe('#050505');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneDarkAccent);
   await page.screenshot({
     path: testInfo.outputPath('system-color-worker-one-1280x720-dark.png'),
     animations: 'disabled',
