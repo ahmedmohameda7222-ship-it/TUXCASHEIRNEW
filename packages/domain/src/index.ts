@@ -122,8 +122,10 @@ export {
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
 export {
+  parseSystemAccentColor,
   parseWorkerUiPreferences,
   type CategoryAlignment,
+  type SystemAccentColor,
   type WorkerUiPreferences,
   type WorkerUiPreferencesSyncState,
 } from './workerUiPreferences';
