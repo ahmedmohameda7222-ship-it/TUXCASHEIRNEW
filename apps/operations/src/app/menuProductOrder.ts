@@ -30,15 +30,6 @@ export function reconcileProductOrder(
   return reconciled;
 }
 
-export function moveProductWithinCategory(
-  order: readonly ProductId[],
-  _categoryProductIds: readonly ProductId[],
-  _sourceId: ProductId,
-  _targetId: ProductId,
-): readonly ProductId[] {
-  return order;
-}
-
 export function filterProductsForMenu(
   products: readonly Product[],
   options: {
