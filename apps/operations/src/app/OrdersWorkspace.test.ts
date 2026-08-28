@@ -110,55 +110,121 @@ describe('productFamiliesForCategory', () => {
         sortOrder: 1,
       }),
       product(3, {
-        name: 'Classic Smash',
+        name: 'Single TUXIFY',
         categoryId: burgers.id,
-        family: 'Classic',
+        family: 'TUXIFY',
         sortOrder: 2,
       }),
-      product(4, {
-        name: 'Hidden burger',
+      product(4, { name: "Johnny's", categoryId: burgers.id, family: null, sortOrder: 3 }),
+      product(5, {
+        name: 'Blank family',
         categoryId: burgers.id,
-        family: 'Hidden',
-        sortOrder: 3,
+        family: '   ',
+        sortOrder: 4,
+      }),
+      product(6, {
+        name: 'Inactive family',
+        categoryId: burgers.id,
+        family: 'HIDDEN',
+        sortOrder: 5,
         active: false,
       }),
-      product(5, {
-        name: 'Fries',
-        categoryId: sides.id,
-        family: 'Sides',
-        sortOrder: 0,
-      }),
+      product(7, { name: 'Soda', categoryId: drinks.id, family: 'DRINKS', sortOrder: 6 }),
     ];
 
-    expect(productFamiliesForCategory(products, burgers.id)).toEqual(['TUX', 'Classic']);
+    expect(productFamiliesForCategory(products, burgers.id)).toEqual(['TUX', 'TUXIFY']);
+    expect(productFamiliesForCategory(products, null)).toEqual([]);
   });
 });
 
-describe('menu product ordering', () => {
-  it('keeps the worker order while filtering to the selected category', () => {
-    const burgerA = product(1, {
-      name: 'Burger A',
+describe('filterProductsForMenu', () => {
+  const products = [
+    product(1, {
+      name: 'Single Smashed Patty',
       categoryId: burgers.id,
+      family: 'TUX',
       sortOrder: 0,
-    });
-    const burgerB = product(2, {
-      name: 'Burger B',
+    }),
+    product(2, {
+      name: 'Single TUXIFY',
       categoryId: burgers.id,
+      family: 'TUXIFY',
       sortOrder: 1,
-    });
-    const fries = product(3, {
-      name: 'Fries',
-      categoryId: sides.id,
-      sortOrder: 0,
-    });
+    }),
+    product(3, { name: "Johnny's", categoryId: burgers.id, family: null, sortOrder: 2 }),
+    product(4, { name: 'Soda', categoryId: drinks.id, family: null, sortOrder: 3 }),
+  ];
+
+  it('shows every active product in the selected category when the secondary filter is All', () => {
+    expect(
+      filterProductsForMenu(products, {
+        selectedCategoryId: burgers.id,
+        selectedFamily: null,
+        search: '',
+      }).map((item) => item.name),
+    ).toEqual(['Single Smashed Patty', 'Single TUXIFY', "Johnny's"]);
+  });
+
+  it('uses the worker product order, drops stale IDs, and appends new products canonically', () => {
+    const staleId = parseEntityId<ProductId>('44444444-4444-4444-8444-999999999999');
+    const workerPreference = preference([], [products[2]!.id, staleId, products[0]!.id]);
 
     expect(
       filterProductsForMenu(
-        [burgerA, burgerB, fries],
-        burgers.id,
-        null,
-        preference([], [fries.id, burgerB.id, burgerA.id]),
+        products,
+        {
+          selectedCategoryId: burgers.id,
+          selectedFamily: null,
+          search: '',
+        },
+        workerPreference,
       ).map((item) => item.name),
-    ).toEqual(['Burger B', 'Burger A']);
+    ).toEqual(["Johnny's", 'Single Smashed Patty', 'Single TUXIFY']);
+  });
+
+  it('preserves the worker product order through global search', () => {
+    const workerPreference = preference([], [products[1]!.id, products[0]!.id, products[2]!.id]);
+
+    expect(
+      filterProductsForMenu(
+        products,
+        {
+          selectedCategoryId: burgers.id,
+          selectedFamily: null,
+          search: 'single',
+        },
+        workerPreference,
+      ).map((item) => item.name),
+    ).toEqual(['Single TUXIFY', 'Single Smashed Patty']);
+  });
+
+  it('filters the selected category by family', () => {
+    expect(
+      filterProductsForMenu(products, {
+        selectedCategoryId: burgers.id,
+        selectedFamily: 'TUXIFY',
+        search: '',
+      }).map((item) => item.name),
+    ).toEqual(['Single TUXIFY']);
+  });
+
+  it('keeps search global instead of constraining it to the selected category or family', () => {
+    expect(
+      filterProductsForMenu(products, {
+        selectedCategoryId: burgers.id,
+        selectedFamily: 'TUX',
+        search: 'soda',
+      }).map((item) => item.name),
+    ).toEqual(['Soda']);
+  });
+
+  it('shows no products without a selected top-level category when search is empty', () => {
+    expect(
+      filterProductsForMenu(products, {
+        selectedCategoryId: null,
+        selectedFamily: null,
+        search: '',
+      }),
+    ).toEqual([]);
   });
 });
