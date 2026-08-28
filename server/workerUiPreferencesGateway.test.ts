@@ -68,11 +68,7 @@ function request(input: {
   } as GatewayRequest;
 }
 
-function remoteRow(
-  workerId: string,
-  serverVersion: number,
-  accentColor: string | null = null,
-) {
+function remoteRow(workerId: string, serverVersion: number, accentColor: string | null = null) {
   return {
     shop_id: shopA,
     worker_id: workerId,
@@ -253,40 +249,43 @@ describe('handleWorkerUiPreferences', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it('selects product order and accent while targeting worker preferences independently', async () => {
-    const upstream = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerA, 3, customAccent)]), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerB, 7, null)]), { status: 200 }),
-      );
-    vi.stubGlobal('fetch', upstream);
+  it(
+    'selects product order and accent while targeting worker preferences independently',
+    async () => {
+      const upstream = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([remoteRow(workerA, 3, customAccent)]), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify([remoteRow(workerB, 7, null)]), { status: 200 }),
+        );
+      vi.stubGlobal('fetch', upstream);
 
-    for (const [workerId, expectedAccent] of [
-      [workerA, customAccent],
-      [workerB, null],
-    ] as const) {
-      const capture = responseCapture();
-      await handleWorkerUiPreferences(
-        request({
-          method: 'GET',
-          url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerId}`,
-          shopId: shopA,
-        }),
-        capture.response,
-      );
-      expect(capture.body()['workerId']).toBe(workerId);
-      expect(capture.body()['productOrder']).toEqual([productB, productA]);
-      expect(capture.body()['accentColor']).toBe(expectedAccent);
-    }
+      for (const [workerId, expectedAccent] of [
+        [workerA, customAccent],
+        [workerB, null],
+      ] as const) {
+        const capture = responseCapture();
+        await handleWorkerUiPreferences(
+          request({
+            method: 'GET',
+            url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerId}`,
+            shopId: shopA,
+          }),
+          capture.response,
+        );
+        expect(capture.body()['workerId']).toBe(workerId);
+        expect(capture.body()['productOrder']).toEqual([productB, productA]);
+        expect(capture.body()['accentColor']).toBe(expectedAccent);
+      }
 
-    const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
-    const secondUrl = new URL(String(upstream.mock.calls[1]?.[0]));
-    expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
-    expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
-    expect(firstUrl.searchParams.get('select')).toContain('product_order');
-    expect(firstUrl.searchParams.get('select')).toContain('accent_color');
-  });
+      const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
+      const secondUrl = new URL(String(upstream.mock.calls[1]?.[0]));
+      expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
+      expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
+      expect(firstUrl.searchParams.get('select')).toContain('product_order');
+      expect(firstUrl.searchParams.get('select')).toContain('accent_color');
+    },
+  );
 });
