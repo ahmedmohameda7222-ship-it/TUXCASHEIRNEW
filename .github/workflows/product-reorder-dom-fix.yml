@@ -1,6 +1,9 @@
 name: Product Reorder DOM Fix
 
-on: push
+on:
+  push:
+    branches:
+      - feat/apple-product-card-reorder
 
 jobs:
   apply-fix:
@@ -11,53 +14,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: feat/apple-product-card-reorder
-      - name: Apply DOM contract fix
+      - name: Update rendered category action contract
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          workspace = Path("apps/operations/src/app/OrdersWorkspace.tsx")
-          source = workspace.read_text()
-          old = """                          <button
-                            type=\"button\"
-                            className=\"category-manage-order-action\"
-                            disabled={selectedCategoryId === null}
-                            onClick={beginProductReorder}
-                          >
-                            Manage order
-                          </button>"""
-          new = """                          <span className=\"category-manage-order-wrap\">
-                            <button
-                              type=\"button\"
-                              className=\"category-manage-order-action\"
-                              disabled={selectedCategoryId === null}
-                              onClick={beginProductReorder}
-                            >
-                              Manage order
-                            </button>
-                          </span>"""
-          if source.count(old) != 1:
-              raise SystemExit("Manage order block mismatch")
-          workspace.write_text(source.replace(old, new))
-
-          css = Path("apps/operations/src/styles/final-pos-corrections.css")
-          css_source = css.read_text()
-          marker = "/* Approved worker-specific Product Card position editor. */\n.category-manage-order-action {"
-          replacement = """/* Approved worker-specific Product Card position editor. */
-.category-manage-order-wrap {
-  display: contents;
-}
-
-.category-manage-order-action {"""
-          if css_source.count(marker) != 1:
-              raise SystemExit("Product reorder CSS marker mismatch")
-          css.write_text(css_source.replace(marker, replacement))
-          PY
+          python3 -c "from pathlib import Path; p=Path('e2e/operations.e2e.ts'); s=p.read_text(); old=\"  await expect(actionButtons).toHaveCount(2);\\n  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit categories');\\n  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');\"; new=\"  await expect(actionButtons).toHaveCount(3);\\n  await expect(actionButtons.nth(0)).toHaveAccessibleName('Manage order');\\n  await expect(actionButtons.nth(1)).toHaveAccessibleName('Edit categories');\\nn  await expect(actionButtons.nth(2)).toHaveAccessibleName('Search menu');\"; assert s.count(old)==1, 'category action contract mismatch'; p.write_text(s.replace(old,new))"
+          python3 -c "from pathlib import Path; p=Path('e2e/operations.e2e.ts'); s=p.read_text(); p.write_text(s.replace('\\nn  await expect(actionButtons.nth(2))','\\n  await expect(actionButtons.nth(2))'))"
           git diff --check
           git rm .github/workflows/product-reorder-dom-fix.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css
-          git commit -m "fix: preserve category nav action contract"
+          git add e2e/operations.e2e.ts
+          git commit -m "test: align category actions with product reorder"
           git push origin HEAD:feat/apple-product-card-reorder
