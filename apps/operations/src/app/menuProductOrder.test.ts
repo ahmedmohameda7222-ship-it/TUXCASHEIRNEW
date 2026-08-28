@@ -42,12 +42,7 @@ describe('moveProductWithinCategory', () => {
     const burgerB = product(3);
 
     expect(
-      moveProductWithinCategory(
-        [burgerA, friesA, burgerB],
-        [burgerA, burgerB],
-        friesA,
-        burgerB,
-      ),
+      moveProductWithinCategory([burgerA, friesA, burgerB], [burgerA, burgerB], friesA, burgerB),
     ).toEqual([burgerA, friesA, burgerB]);
   });
 });
