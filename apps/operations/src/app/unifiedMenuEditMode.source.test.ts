@@ -51,7 +51,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('moveProductWithinCategory');
   });
 
-  it('persists category and product layout together through one Reset Cancel Save surface', () => {
+  it('persists category and product layout together through the menu-layout-only API', () => {
     expect(ordersWorkspaceSource).toContain('menuEditPreferenceInput');
     expect(ordersWorkspaceSource).toContain('function saveMenuEdit');
     expect(ordersWorkspaceSource).toContain('function resetMenuEdit');
@@ -60,7 +60,8 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('onClick={resetMenuEdit}');
     expect(ordersWorkspaceSource).toContain('onClick={cancelMenuEdit}');
     expect(ordersWorkspaceSource).toContain("'Saving…' : 'Save'");
-    expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
+    expect(ordersWorkspaceSource.match(/preferencesClient\.updateMenuLayout\(/g)).toHaveLength(1);
+    expect(ordersWorkspaceSource).not.toContain('preferencesClient.update(');
   });
 
   // Saving freezes every persisted menu-layout control after the payload is captured.
