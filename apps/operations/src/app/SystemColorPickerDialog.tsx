@@ -112,7 +112,7 @@ export function SystemColorPickerDialog({
               type="color"
               value={pickerColor}
               disabled={saving}
-              onChange={(event) => chooseColor(event.target.value)}
+              onInput={(event) => chooseColor(event.currentTarget.value)}
               aria-label="System Color"
             />
           </label>
