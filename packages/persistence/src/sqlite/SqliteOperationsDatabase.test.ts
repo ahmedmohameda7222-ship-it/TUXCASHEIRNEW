@@ -6,6 +6,7 @@ import {
   createOpenBusinessDay,
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type BusinessDayId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
@@ -26,6 +27,7 @@ const productAId = parseEntityId<ProductId>('24222222-2222-4222-8222-22222222222
 const productBId = parseEntityId<ProductId>('24222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const outboxId = parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444444');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 async function seedFoundation(database: SqliteOperationsDatabase): Promise<void> {
   await database.transaction(async (transaction) => {
@@ -72,6 +74,7 @@ function preference(worker: WorkerId, serverVersion = 0) {
     categoryOrder: [categoryBId, categoryAId],
     categoryAlignment: 'center' as const,
     productOrder: worker === secondWorkerId ? [productAId, productBId] : [productBId, productAId],
+    accentColor: null,
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
@@ -164,6 +167,7 @@ describe('SqliteOperationsDatabase', () => {
       categoryOrder: [categoryAId],
       categoryAlignment: 'right' as const,
       productOrder: [productAId, productBId],
+      accentColor: customAccent,
       syncState: 'CLEAN' as const,
     };
     await database.transaction(async (transaction) => {
