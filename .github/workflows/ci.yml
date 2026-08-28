@@ -46,8 +46,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Prettier diagnostic
-        run: npx prettier apps/operations/src/app/menuProductOrder.test.ts
       - name: Format check
         run: npm run format:check
       - name: Lint
