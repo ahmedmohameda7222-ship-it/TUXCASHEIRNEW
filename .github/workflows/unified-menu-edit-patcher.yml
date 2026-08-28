@@ -13,6 +13,7 @@ permissions:
 jobs:
   patch:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
@@ -24,20 +25,42 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply full Task 6 keyboard pickup patch
+      - name: Reverify Task 6 production patch
         run: python .github/scripts/unified-menu-edit-patcher.py
-      - name: Format Task 6 files
+      - name: Replace legacy split-editor rendered acceptance
+        run: python .github/scripts/unified-menu-edit-e2e.py
+      - name: Format final implementation and rendered acceptance
         run: |
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
+          npx prettier --write \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/unifiedMenuEditMode.source.test.ts \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
           git diff --check
-      - name: Task 6 GREEN unit gate
+      - name: Unit and integration regression gate
         run: npm run test
-      - name: Commit Task 6 production change
+      - name: E2E typecheck
+        run: npm run typecheck:e2e
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: Render unified Menu Edit Mode across approved responsive projects
+        run: npx playwright test e2e/operations.e2e.ts --grep "unified menu edit"
+      - name: Commit rendered acceptance and remove temporary implementation scaffolding
         run: |
           git config user.name "tux-implementation-bot"
           git config user.email "tux-implementation-bot@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
-          if ! git diff --cached --quiet; then
-            git commit -m "feat: add keyboard pickup and edit jiggle"
-            git push origin HEAD:ui/unified-menu-edit-mode
-          fi
+          git add \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            apps/operations/src/app/unifiedMenuEditMode.source.test.ts \
+            apps/operations/src/styles/final-pos-corrections.css \
+            e2e/operations.e2e.ts
+          git rm -f \
+            .github/scripts/unified-menu-edit-patcher.py \
+            .github/scripts/unified-menu-edit-e2e.py \
+            .github/task4-prettier-diagnostic.txt \
+            .github/task5-test-diagnostic.txt \
+            .github/task6-test-diagnostic.txt \
+            .github/workflows/unified-menu-edit-patcher.yml \
+            scripts/apply-unified-menu-task3.py
+          git commit -m "test: verify unified menu edit rendered behavior"
+          git push origin HEAD:ui/unified-menu-edit-mode
