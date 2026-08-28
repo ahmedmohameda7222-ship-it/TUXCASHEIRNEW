@@ -19,7 +19,6 @@ permissions:
 jobs:
   format-rendered-contract-source:
     name: format-rendered-contract-source
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.sha == '070dd9845df68d8a2b2c94ed6cd6f1f0d5b272e7'
     permissions:
       contents: write
     runs-on: ubuntu-latest
