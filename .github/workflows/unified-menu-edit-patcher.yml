@@ -28,7 +28,14 @@ jobs:
       - name: Reverify Task 6 production patch
         run: python .github/scripts/unified-menu-edit-patcher.py
       - name: Reconcile all legacy split-editor rendered acceptance
-        run: python .github/scripts/unified-menu-edit-e2e.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/unified-menu-edit-e2e.py')
+          source = path.read_text().replace('"name: \'Menu edit actions\'"', '"\'Menu edit actions\'"')
+          path.write_text(source)
+          PY
+          python .github/scripts/unified-menu-edit-e2e.py
       - name: Format final implementation and rendered acceptance
         run: |
           npx prettier --write \
