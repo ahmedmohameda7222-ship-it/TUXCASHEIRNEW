@@ -1,0 +1,111 @@
+name: Unified Menu Edit Patcher
+
+on:
+  push:
+    branches:
+      - ui/unified-menu-edit-mode
+    paths:
+      - .github/workflows/unified-menu-edit-patcher.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ui/unified-menu-edit-mode
+          fetch-depth: 0
+      - name: Apply Task 2 production patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          source = path.read_text()
+
+          replacements = [
+              (
+                  "  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');\n",
+                  "  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');\n"
+                  "  const [menuEditActive, setMenuEditActive] = useState(false);\n",
+              ),
+              (
+                  "    setCategoryMode('IDLE');\n    setProductReorderCategoryId(null);\n",
+                  "    setCategoryMode('IDLE');\n    setMenuEditActive(false);\n    setProductReorderCategoryId(null);\n",
+              ),
+              (
+                  "      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {\n        if (categoryMode === 'EDIT' || productReorderCategoryId !== null) return;\n",
+                  "      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {\n        if (menuEditActive) return;\n",
+              ),
+              (
+                  "      if (\n        event.key === '/' &&\n        !targetIsEditor &&\n        categoryMode !== 'EDIT' &&\n        productReorderCategoryId === null\n      ) {\n",
+                  "      if (event.key === '/' && !targetIsEditor && !menuEditActive) {\n",
+              ),
+              (
+                  "  }, [categoryMode, productReorderCategoryId, search]);\n",
+                  "  }, [categoryMode, menuEditActive, search]);\n",
+              ),
+              (
+                  "  function beginCategoryEdit(): void {\n",
+                  "  function beginMenuEdit(): void {\n",
+              ),
+              (
+                  "    setDraggedCategoryId(null);\n    setCategoryMode('EDIT');\n  }\n",
+                  "    setDraggedCategoryId(null);\n    setMenuEditActive(true);\n  }\n",
+              ),
+              (
+                  "      setCategoryPreference(saved);\n      setCategoryMode('IDLE');\n",
+                  "      setCategoryPreference(saved);\n      setMenuEditActive(false);\n      setCategoryMode('IDLE');\n",
+              ),
+              (
+                  "            <div className={`menu-toolbar category-mode-${categoryMode.toLowerCase()}`}>\n              {categoryMode === 'EDIT' ? (\n",
+                  "            <div\n              className={\n                menuEditActive\n                  ? 'menu-toolbar category-mode-edit'\n                  : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`\n              }\n            >\n              {menuEditActive ? (\n",
+              ),
+              (
+                  "                  <div className=\"category-editor-toolbar\">\n                    <div>\n",
+                  "                  <div className=\"category-editor-toolbar\">\n                    <div>\n",
+              ),
+              (
+                  "                      {categoryMode === 'IDLE' ? (\n                        <button\n                          type=\"button\"\n                          className=\"category-icon-action\"\n                          aria-label=\"Edit categories\"\n                          title=\"Edit categories\"\n                          onClick={beginCategoryEdit}\n                        >\n",
+                  "                      {categoryMode === 'IDLE' ? (\n                        <button\n                          type=\"button\"\n                          className={\n                            menuEditActive\n                              ? 'category-icon-action category-edit-active'\n                              : 'category-icon-action'\n                          }\n                          aria-label=\"Edit menu\"\n                          title=\"Edit menu\"\n                          aria-pressed={menuEditActive}\n                          onClick={beginMenuEdit}\n                        >\n",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:100]!r}')
+              source = source.replace(old, new, 1)
+
+          marker = "                  <div className=\"category-editor-toolbar\">\n"
+          active_button = (
+              "                  <div className=\"category-editor-toolbar\">\n"
+              "                    <button\n"
+              "                      type=\"button\"\n"
+              "                      className=\"category-icon-action category-edit-active\"\n"
+              "                      aria-label=\"Edit menu\"\n"
+              "                      title=\"Edit menu\"\n"
+              "                      aria-pressed={menuEditActive}\n"
+              "                      disabled\n"
+              "                    >\n"
+              "                      <EditPencilIcon />\n"
+              "                    </button>\n"
+          )
+          if source.count(marker) != 1:
+              raise SystemExit('Expected category editor toolbar marker once')
+          source = source.replace(marker, active_button, 1)
+
+          path.write_text(source)
+          PY
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx
+          git diff --check
+      - name: Commit Task 2 production change
+        run: |
+          git config user.name "tux-implementation-bot"
+          git config user.email "tux-implementation-bot@users.noreply.github.com"
+          git add apps/operations/src/app/OrdersWorkspace.tsx
+          git commit -m "feat: activate unified menu edit session"
+          git push origin HEAD:ui/unified-menu-edit-mode
