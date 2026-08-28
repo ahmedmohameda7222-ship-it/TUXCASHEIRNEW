@@ -1,5 +1,5 @@
 import type { OperationsSessionResult, WorkerUiPreferencesService } from '@tux/application';
-import { parseEntityId, type MenuCategoryId } from '@tux/domain';
+import { parseEntityId, type MenuCategoryId, type ProductId } from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import type { TuxWorkerUiPreferencesApi } from '@tux/platform-contracts';
 import type { BrowserWindow } from 'electron';
@@ -27,8 +27,10 @@ function parseUpdateInput(value: unknown): Parameters<TuxWorkerUiPreferencesApi[
   assertObjectPayload(value);
   const categoryOrder = value['categoryOrder'];
   const categoryAlignment = value['categoryAlignment'];
+  const productOrder = value['productOrder'];
   if (
     !Array.isArray(categoryOrder) ||
+    !Array.isArray(productOrder) ||
     (categoryAlignment !== 'left' &&
       categoryAlignment !== 'center' &&
       categoryAlignment !== 'right')
@@ -43,6 +45,12 @@ function parseUpdateInput(value: unknown): Parameters<TuxWorkerUiPreferencesApi[
       return parseEntityId<MenuCategoryId>(categoryId);
     }),
     categoryAlignment,
+    productOrder: productOrder.map((productId) => {
+      if (typeof productId !== 'string') {
+        throw new TypeError('Worker UI preference product IDs must be strings.');
+      }
+      return parseEntityId<ProductId>(productId);
+    }),
   };
 }
 
@@ -83,7 +91,7 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
   }
 
   async reset(): Promise<void> {
-    await this.update({ categoryOrder: [], categoryAlignment: 'left' });
+    await this.update({ categoryOrder: [], categoryAlignment: 'left', productOrder: [] });
   }
 
   register(window: BrowserWindow): void {
