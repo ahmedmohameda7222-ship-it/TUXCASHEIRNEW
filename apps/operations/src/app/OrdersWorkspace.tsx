@@ -615,7 +615,7 @@ export function OrdersWorkspace({
     productPickupSnapshotRef.current = null;
     setMenuEditError(null);
     try {
-      const saved = await preferencesClient.update(
+      const saved = await preferencesClient.updateMenuLayout(
         menuEditPreferenceInput(
           categoryEditOrder,
           categoryEditAlignment,
