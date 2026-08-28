@@ -57,6 +57,31 @@ export function PlusCircleIcon(props: IconProps) {
   );
 }
 
+export function MessageIcon(props: IconProps) {
+  return (
+    <IconFrame {...props} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 9h8" stroke="currentColor" />
+      <path d="M8 13h6" stroke="currentColor" />
+      <path
+        d="M9 18h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3h-3l-3 3l-3 -3z"
+        stroke="currentColor"
+      />
+    </IconFrame>
+  );
+}
+
+export function TagIcon(props: IconProps) {
+  return (
+    <IconFrame {...props} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" stroke="currentColor" />
+      <path
+        d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.426 2.426 0 0 0 3.42 0l5.58 -5.58a2.426 2.426 0 0 0 0 -3.42l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z"
+        stroke="currentColor"
+      />
+    </IconFrame>
+  );
+}
+
 export function UserIcon(props: IconProps) {
   return (
     <IconFrame {...props} data-icon="user">

@@ -52,11 +52,14 @@ describe('Apple/HIG remediation contracts', () => {
     }
   });
 
-  it('keeps high-frequency order and payment choices bold without making every cart action heavy', () => {
+  it('keeps cashier choices semibold by default and bolds only explicitly critical labels', () => {
     const source = css('final-pos-corrections.css');
 
     expect(source).toMatch(
-      /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button,\s*\.split-payment-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*700;/s,
+      /\.order-type-section \.segmented-control button,\s*\.payment-section \.payment-methods button,\s*\.split-payment-action\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
+    );
+    expect(source).toMatch(
+      /\.order-type-section \.segmented-control button\.cashier-critical-label,\s*\.payment-section \.payment-methods button\.cashier-critical-label\s*\{[^}]*font-weight:\s*700;/s,
     );
     expect(source).toMatch(
       /\.line-actions button\s*\{[^}]*font-size:\s*14px;[^}]*line-height:\s*18px;[^}]*font-weight:\s*600;/s,
