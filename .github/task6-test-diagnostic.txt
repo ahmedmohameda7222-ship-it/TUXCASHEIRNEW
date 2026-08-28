@@ -1,0 +1,1032 @@
+
+> tux-v2@0.0.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/TUXCASHEIRNEW/TUXCASHEIRNEW[39m
+
+ [32m✓[39m apps/operations-desktop/src/main/ordersBoard.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 273[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/endDay.integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 292[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/orders.integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 441[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/browser/indexedDbMigrations.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m packages/sync/src/remoteMaterializer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/expenses.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 188[2mms[22m[39m
+ [32m✓[39m packages/application/src/workerUiPreferences.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m packages/domain/src/draftOperations.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m packages/domain/src/syncContract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/application/src/ordersAtomicDelivery.sqlite.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1320[2mms[22m[39m
+     [33m[2m✓[22m[39m updates an existing contact inside the same checkout transaction [33m 622[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls back the complete checkout and does not consume the display number when contact persistence fails [33m 486[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/bulkStock.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1399[2mms[22m[39m
+     [33m[2m✓[22m[39m uses a compensating movement for short Undo and rejects a second or late Undo [33m 908[2mms[22m[39m
+ [32m✓[39m packages/application/src/configurationSync.sqlite.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 524[2mms[22m[39m
+     [33m[2m✓[22m[39m uses the same validated atomic path for initial provisioning and newer remote versions [33m 470[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/sqlite/SqliteOperationsDatabase.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m packages/application/src/endDaySummary.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m server/workerUiPreferencesGateway.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m packages/domain/src/endDay.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxDependency.sqlite.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/OrdersWorkspace.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxHardening.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m packages/sync/src/outboxSync.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/apple-hig-remediation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/session.integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m packages/sync/src/supabaseDeviceSession.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m packages/domain/src/expense.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m packages/domain/src/orderLifecycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m packages/application/src/expensesIdempotency.sqlite.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m packages/domain/src/payment.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/current-order-reference-controls.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/sync.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 40[2mms[22m[39m
+[90mstdout[2m | apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts
+[22m[39mDownloading Electron binary...
+
+ [32m✓[39m apps/operations-desktop/src/main/workerUiPreferencesIpc.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/unifiedMenuEditMode.source.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/menuProductOrder.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m packages/sync/src/httpTransport.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m packages/domain/src/bulkStock.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/productDescriptionMigration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m packages/domain/src/orderDraftParser.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/ui-alignment.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/ProductPositionEditor.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+[90mstdout[2m | apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts
+[22m[39mDownloading Electron binary...
+
+ [32m✓[39m apps/operations/src/app/workerUiPreferenceEditing.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/workerUiPreferencesRemote.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m packages/printing/src/receipt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m packages/domain/src/workerUiPreferences.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/automaticSync.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/current-order-rounded-sections.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/sync/src/syncHealth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/syncStatusBridge.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m packages/persistence/src/sqlite/customerContactIdentity.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m packages/domain/src/configurationBundle.family.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [31m❯[39m apps/operations/src/styles/product-position-editor.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 13[2mms[22m[39m
+[31m     [31m×[31m provides a compact management entry and clear reorder state without changing card dimensions[39m[32m 9[2mms[22m[39m
+     [32m✓[39m keeps move and commit actions accessible and the commit bar sticky[32m 1[2mms[22m[39m
+     [32m✓[39m styles Reset as a quiet premium action instead of native browser chrome[32m 0[2mms[22m[39m
+     [32m✓[39m removes reorder motion when reduced motion is requested[32m 1[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/syncStatusResult.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/syncStatus.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m packages/domain/src/tender.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/cart-divider.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/cartWidthPreference.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m packages/domain/src/businessDay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m packages/domain/src/pricing.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/domain/src/phone.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m packages/sync/src/scheduler.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m packages/sync/src/remoteReceipt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m apps/operations/src/app/welcomeCopy.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m packages/application/src/printerConfiguration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m apps/operations/src/styles/operational-control-emphasis.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/preload/sessionResult.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m server/workerUiPreferencesProductOrderMigration.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/pinVerifier.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/orderPrinter.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/application/src/session.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m apps/operations-desktop/src/main/security.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/domain/src/quantity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/domain/src/money.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/config/src/runtimeConfig.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m packages/application/src/result.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m apps/operations/src/styles/product-position-editor.test.ts[2m > [22mProduct position editor visual contract[2m > [22mprovides a compact management entry and clear reorder state without changing card dimensions
+[31m[1mAssertionError[22m: expected '/* Final approved POS correction auth…' to match /\.category-manage-order-action\s*\{[…/s[39m
+
+[32m- Expected:[39m
+/\.category-manage-order-action\s*\{[^}]*min-height:\s*44px;[^}]*padding:[^;}]*;/s
+
+[31m+ Received:[39m
+"/* Final approved POS correction authority. Keep this last in the Operations style cascade. */
+
+/* Product cards only reserve the ~152px density target when descriptive copy exists. */
+.product-card {
+  min-height: 0;
+}
+
+/* Category edit mode owns its intrinsic height so the scrollable grid cannot cover controls. */
+.menu-toolbar.category-mode-edit {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+}
+
+/* Quantity controls are exactly 44px including their visible borders. */
+.product-quantity,
+.quantity-control {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+}
+
+/* Quantity text is part of the 15/20 high-frequency control typography lock. */
+.product-quantity output,
+.quantity-control output {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+/* Preserve the 12px resize hit area without showing a divider line. */
+.cart-resize-separator {
+  width: 12px;
+  min-width: 12px;
+  justify-self: center;
+}
+
+.cart-resize-separator::before {
+  display: none;
+}
+
+.cart-resize-separator:focus-visible::before {
+  display: block;
+}
+
+/* Keep the desktop Current Order surface rounded like the neighboring menu card. */
+.desktop-cart-wrap {
+  border-radius: var(--tux-radius-lg);
+  overflow: hidden;
+}
+
+/* Let the original 8px workspace separator define the visible Menu-to-Current-Order gap. */
+@media (min-width: 54.0625rem) {
+  .menu-toolbar {
+    margin-right: 0;
+  }
+
+  .product-grid {
+    padding-right: 0;
+  }
+}
+
+/* Preserve true centered navigation throughout the desktop rail breakpoint. */
+@media (max-width: 74rem) and (min-width: 54.0625rem) {
+  .operations-header {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+}
+
+/* Task 5: keep mobile Review & pay controls clear of fixed totals. */
+@media (max-width: 54rem) {
+  .mobile-cart-overlay .cart-scroll {
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
+  }
+
+  .mobile-cart-overlay .payment-section .split-payment-action {
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    justify-self: stretch;
+  }
+}
+
+/* User-approved Burger subcategory row and product action order. */
+.menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {
+  height: auto;
+  min-height: 56px;
+  padding: 5px 8px 8px;
+}
+
+.menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 44px 44px;
+  row-gap: 6px;
+  align-items: stretch;
+}
+
+.menu-toolbar:not(.category-mode-edit)
+  > .category-navigation-stack:has(.product-family-filter)
+  .category-navigation {
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.menu-toolbar:not(.category-mode-edit)
+  > .category-navigation-stack:has(.product-family-filter)
+  .product-family-filter {
+  grid-row: 2;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  align-self: center;
+}
+
+.product-card {
+  height: max-content;
+}
+
+.product-card > .product-main {
+  flex: 0 0 auto;
+}
+
+.product-card-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer > .product-price {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.product-card-footer > .product-extra-action {
+  grid-column: 2;
+  justify-self: center;
+  margin: 0;
+}
+
+.product-card-footer > .product-card-controls {
+  grid-column: 3;
+  min-width: max-content;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer .product-quantity {
+  margin: 0;
+}
+
+@media (max-width: 34rem) {
+  .product-grid {
+    grid-auto-rows: max-content;
+  }
+
+  .product-card-footer {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding-inline: 8px;
+    column-gap: 6px;
+  }
+}
+
+/* User-approved top-right product price and universal Extra action. */
+.product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card > .product-main {
+  width: 100%;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.product-card > .product-main .product-price {
+  min-width: 0;
+  align-self: start;
+  justify-self: end;
+  margin-top: 1px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.product-card-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.product-card-footer > .product-extra-action {
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+}
+
+.product-card-footer > .product-card-controls {
+  grid-column: 3;
+  min-width: max-content;
+  justify-self: end;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 34rem) {
+  .product-card > .product-main {
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  }
+
+  .product-card-footer {
+    padding-inline: 8px;
+    column-gap: 6px;
+  }
+}
+
+/* TUX follow-up: compact mobile Operations shell */
+@media (max-width: 54rem) {
+  .operations-shell {
+    --tux-floating-header-space: 7rem;
+    padding-top: var(--tux-space-2);
+  }
+  .operations-header {
+    grid-template-areas: 'brand actions' 'nav nav';
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 8px;
+    width: calc(100% - 16px);
+    height: auto;
+    min-height: 0;
+    margin: 0 8px 8px;
+    padding: 6px 8px;
+  }
+  .operations-brand-slot {
+    grid-area: brand;
+  }
+  .header-actions {
+    grid-area: actions;
+    justify-self: end;
+  }
+  .operations-nav {
+    grid-area: nav;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0;
+  }
+  .operations-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .operations-header .tux-brand {
+    width: auto;
+    height: 36px;
+    min-width: 0;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 0;
+  }
+  .operations-header .nav-item,
+  .operations-header .operator-trigger {
+    min-height: 44px;
+  }
+  .menu-toolbar {
+    gap: 4px;
+    margin-inline: 8px;
+    padding: 4px 6px 6px;
+  }
+  .menu-toolbar .category-navigation {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+  }
+  .menu-toolbar .category-rail {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .menu-toolbar .category-rail::-webkit-scrollbar {
+    display: none;
+  }
+  .menu-toolbar .category-rail .category-tab {
+    height: 44px;
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+  .menu-toolbar .category-nav-actions {
+    gap: 4px;
+  }
+  .menu-toolbar .category-nav-actions > button {
+    box-sizing: border-box;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .menu-toolbar .product-family-filter {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .menu-toolbar .product-family-filter::-webkit-scrollbar {
+    display: none;
+  }
+  .product-grid {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .mobile-cart-overlay .orders-cart {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+    height: 100%;
+  }
+  .mobile-cart-overlay .cart-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
+  }
+  .mobile-cart-overlay .cart-totals {
+    position: relative;
+    inset: auto;
+  }
+}
+
+/* Apple/HIG remediation: strengthen cashier-critical operational controls. */
+.order-type-section .segmented-control button,
+.payment-section .payment-methods button,
+.split-payment-action {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.order-type-section .segmented-control button.cashier-critical-label,
+.payment-section .payment-methods button.cashier-critical-label {
+  font-weight: 700;
+}
+
+.line-actions button {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-extra-action {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-quantity .quantity-decrement,
+.product-quantity .quantity-increment,
+.line-quantity-stepper .quantity-decrement,
+.line-quantity-stepper .quantity-increment {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+/* Match the Product Card increment's boundary language to Current Order without changing stepper geometry. */
+.product-quantity .quantity-increment {
+  border-left: 1px solid var(--tux-border-subtle);
+}
+
+/* Selected labels use a legibility token independent from pressed-action color. */
+.operations-header .nav-item-active,
+.menu-toolbar .category-rail button.selected,
+.menu-toolbar > .field-stack > .segmented-control button.selected,
+.order-type-section .segmented-control button.selected,
+.payment-section .payment-methods button.selected {
+  color: var(--tux-accent-text);
+}
+
+/* Quantity direction remains semantic without treating decrement as destructive. */
+.quantity-decrement {
+  color: var(--tux-text-primary);
+}
+
+.quantity-increment {
+  color: var(--tux-accent-text);
+}
+
+/* Current Order has a stronger generic line-action selector, so preserve direction semantics explicitly. */
+.line-actions .quantity-decrement {
+  color: var(--tux-text-primary);
+}
+
+.line-actions .quantity-increment {
+  color: var(--tux-accent-text);
+}
+
+.quantity-increment:hover:not(:disabled),
+.line-actions .quantity-increment:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+  color: var(--tux-accent-text);
+}
+
+.quantity-decrement:hover:not(:disabled),
+.line-actions .quantity-decrement:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
+  color: var(--tux-text-primary);
+}
+
+/* Keyboard focus remains immediately visible over the refined surfaces. */
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tux-focus-ring) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion keeps control state changes while removing press displacement. */
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active {
+    transform: none;
+  }
+}
+
+/* Approved Current Order: one rounded outer surface with tightly nested section cards. */
+.cart-scroll {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 4px;
+  background: var(--tux-surface-panel);
+}
+
+.cart-section {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.cart-totals {
+  margin: 0 4px 4px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+  box-shadow: none;
+}
+
+.place-order-action {
+  min-height: 3rem;
+  justify-content: space-between;
+}
+
+/* User-approved Current Order reference controls. */
+.adjustment-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tux-space-2);
+}
+
+.adjustment-disclosure {
+  display: inline-flex;
+  width: 100%;
+  min-height: var(--tux-touch-target);
+  align-items: center;
+  justify-content: center;
+  gap: var(--tux-space-2);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: 0 var(--tux-space-3);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.adjustment-disclosure svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.payment-methods-inline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.payment-section .payment-methods-inline > button {
+  min-height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-panel);
+  padding: 0 8px;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.payment-section .payment-methods-inline > button.selected {
+  border-color: color-mix(in srgb, var(--tux-accent) 18%, var(--tux-border-subtle));
+  background: var(--tux-accent-soft);
+  color: var(--tux-accent-text);
+}
+
+.payment-methods-inline .split-payment-action {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.line-actions {
+  gap: var(--tux-space-1);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.line-actions > button {
+  min-height: 40px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  padding: 0 10px;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.line-quantity-stepper {
+  display: grid;
+  grid-template-columns: 40px 2.25rem 40px;
+  align-items: center;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  overflow: hidden;
+}
+
+.line-quantity-stepper button {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.line-quantity-stepper output {
+  display: grid;
+  height: 40px;
+  place-items: center;
+  border-inline: 1px solid var(--tux-border-subtle);
+  background: var(--tux-surface-raised);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.product-quantity .quantity-increment,
+.orders-cart .line-quantity-stepper .quantity-increment {
+  background: var(--tux-accent-strong);
+  color: var(--tux-action-foreground);
+}
+
+.product-quantity .quantity-increment:hover:not(:disabled),
+.orders-cart .line-quantity-stepper .quantity-increment:hover:not(:disabled) {
+  background: var(--tux-accent-hover);
+  color: var(--tux-action-foreground);
+}
+
+/* Legacy ProductPositionEditor styles remain for its isolated component tests. */
+
+.product-position-editor {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.product-reorder-cue {
+  margin: 0 var(--tux-space-4) var(--tux-space-2);
+  padding: var(--tux-space-3) var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+}
+
+.product-reorder-cue h2,
+.product-reorder-cue p {
+  margin: 0;
+}
+
+.product-reorder-cue h2 {
+  margin-top: 2px;
+  font-size: 16px;
+  line-height: 21px;
+  font-weight: 700;
+}
+
+.product-reorder-cue p {
+  margin-top: 4px;
+  color: var(--tux-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.product-reorder-kicker,
+.product-reorder-position {
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.product-reorder-error {
+  margin: 0 var(--tux-space-4) var(--tux-space-2);
+  border: 1px solid color-mix(in srgb, var(--tux-destructive) 36%, var(--tux-border-subtle));
+  border-radius: var(--tux-radius-sm);
+  background: color-mix(in srgb, var(--tux-destructive) 6%, var(--tux-surface-panel));
+  color: var(--tux-destructive);
+  padding: var(--tux-space-2) var(--tux-space-3);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.product-reorder-grid {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: calc(var(--tux-space-4) + 72px);
+}
+
+.product-card-reordering {
+  cursor: grab;
+  user-select: none;
+  touch-action: manipulation;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    background-color 140ms ease;
+}
+
+.product-card-reordering:active {
+  cursor: grabbing;
+}
+
+.product-card-dragging,
+.product-card-grabbed {
+  border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
+  background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.product-reorder-main {
+  min-height: 0;
+}
+
+.product-reorder-main .product-copy {
+  min-width: 0;
+}
+
+.product-name-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--tux-space-2);
+}
+
+.product-reorder-handle {
+  color: var(--tux-text-secondary);
+  font-size: 18px;
+  line-height: 18px;
+  letter-spacing: -0.15em;
+}
+
+.product-reorder-footer {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--tux-border-subtle);
+}
+
+.product-reorder-move {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 650;
+}
+
+.product-reorder-move:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+}
+
+.product-reorder-move:disabled {
+  opacity: 0.36;
+}
+
+.product-reorder-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--tux-border-subtle);
+  background: color-mix(in srgb, var(--tux-surface-panel) 94%, transparent);
+  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
+  backdrop-filter: blur(14px) saturate(112%);
+  -webkit-backdrop-filter: blur(14px) saturate(112%);
+}
+
+.product-reorder-actions > .text-action {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--tux-radius-sm);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-reorder-actions > .text-action:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+  color: var(--tux-text-primary);
+}
+
+.product-reorder-actions-primary > button {
+  min-height: 44px;
+}
+
+.product-reorder-actions-primary {
+  display: flex;
+  gap: 8px;
+}
+
+.product-reorder-actions-primary > button {
+  min-width: 92px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+}
+
+@media (max-width: 54rem) {
+  .product-reorder-cue {
+    margin-inline: 8px;
+    padding-inline: 12px;
+  }
+
+  .product-reorder-grid {
+    padding-inline: 8px;
+  }
+
+  .product-reorder-actions {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card-reordering {
+    transition: none;
+  }
+
+  .product-card-dragging,
+  .product-card-grabbed {
+    transform: none;
+  }
+}
+
+/* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */
+.menu-edit-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--tux-border-subtle);
+  background: color-mix(in srgb, var(--tux-surface-panel) 94%, transparent);
+  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
+  backdrop-filter: blur(14px) saturate(112%);
+  -webkit-backdrop-filter: blur(14px) saturate(112%);
+}
+
+.menu-edit-action-status,
+.menu-edit-actions-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-edit-actions button {
+  min-height: 44px;
+}
+
+.menu-edit-actions > .menu-edit-action-status > .text-action {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--tux-radius-sm);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.category-tab-reordering,
+.menu-edit-product-card {
+  cursor: grab;
+  user-select: none;
+  touch-action: manipulation;
+  transform-origin: center;
+}
+
+.category-tab-dragging,
+.menu-edit-product-card-dragging {
+  border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
+  background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
+}
+
+.menu-edit-product-hint {
+  padding: 0 8px 8px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+@keyframes menu-edit-jiggle {
+  0%,
+  100% {
+    transform: rotate(-0.2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.2deg) translateY(-0.5px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .category-tab-reordering {
+    animation: menu-edit-jiggle 1.8s ease-in-out infinite;
+  }
+
+  .menu-edit-product-card {
+    animation: menu-edit-jiggle 1.95s ease-in-out infinite;
+  }
+
+  .category-tab-reordering:nth-child(2n),
+  .menu-edit-product-card:nth-child(2n) {
+    animation-delay: -0.45s;
+  }
+
+  .category-tab-reordering:nth-child(3n),
+  .menu-edit-product-card:nth-child(3n) {
+    animation-delay: -0.9s;
+  }
+}
+
+@media (max-width: 54rem) {
+  .menu-edit-actions {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-tab-reordering,
+  .menu-edit-product-card {
+    animation: none;
+    transform: none;
+  }
+}
+"
+
+[36m [2m❯[22m apps/operations/src/styles/product-position-editor.test.ts:[2m15:20[22m[39m
+    [90m 13|[39m   it('provides a compact management entry and clear reorder state with…
+    [90m 14|[39m     [35mconst[39m source [33m=[39m [34mcss[39m()[33m;[39m
+    [90m 15|[39m     [34mexpect[39m(source)[33m.[39m[34mtoMatch[39m(
+    [90m   |[39m                    [31m^[39m
+    [90m 16|[39m       /\.category-manage-order-action\s*\{[^}]*min-height:\s*44px;[^}]…
+    [90m 17|[39m     )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m71 passed[39m[22m[90m (72)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m307 passed[39m[22m[90m (308)[39m
+[2m   Start at [22m 10:59:36
+[2m   Duration [22m 10.00s[2m (transform 1.99s, setup 0ms, import 10.86s, tests 5.80s, environment 11ms)[22m
+
+
+::error file=/home/runner/work/TUXCASHEIRNEW/TUXCASHEIRNEW/apps/operations/src/styles/product-position-editor.test.ts,title=apps/operations/src/styles/product-position-editor.test.ts > Product position editor visual contract > provides a compact management entry and clear reorder state without changing card dimensions,line=15,column=20::AssertionError: expected '/* Final approved POS correction auth…' to match /\.category-manage-order-action\s*\{[…/s%0A%0A- Expected:%0A/\.category-manage-order-action\s*\{[^}]*min-height:\s*44px;[^}]*padding:[^;}]*;/s%0A%0A+ Received:%0A"/* Final approved POS correction authority. Keep this last in the Operations style cascade. */%0A%0A/* Product cards only reserve the ~152px density target when descriptive copy exists. */%0A.product-card {%0A  min-height: 0;%0A}%0A%0A/* Category edit mode owns its intrinsic height so the scrollable grid cannot cover controls. */%0A.menu-toolbar.category-mode-edit {%0A  position: relative;%0A  z-index: 1;%0A  flex: 0 0 auto;%0A}%0A%0A/* Quantity controls are exactly 44px including their visible borders. */%0A.product-quantity,%0A.quantity-control {%0A  box-sizing: border-box;%0A  height: 44px;%0A  min-height: 44px;%0A}%0A%0A/* Quantity text is part of the 15/20 high-frequency control typography lock. */%0A.product-quantity output,%0A.quantity-control output {%0A  font-size: 15px;%0A  line-height: 20px;%0A  font-weight: 600;%0A}%0A%0A/* Preserve the 12px resize hit area without showing a divider line. */%0A.cart-resize-separator {%0A  width: 12px;%0A  min-width: 12px;%0A  justify-self: center;%0A}%0A%0A.cart-resize-separator::before {%0A  display: none;%0A}%0A%0A.cart-resize-separator:focus-visible::before {%0A  display: block;%0A}%0A%0A/* Keep the desktop Current Order surface rounded like the neighboring menu card. */%0A.desktop-cart-wrap {%0A  border-radius: var(--tux-radius-lg);%0A  overflow: hidden;%0A}%0A%0A/* Let the original 8px workspace separator define the visible Menu-to-Current-Order gap. */%0A@media (min-width: 54.0625rem) {%0A  .menu-toolbar {%0A    margin-right: 0;%0A  }%0A%0A  .product-grid {%0A    padding-right: 0;%0A  }%0A}%0A%0A/* Preserve true centered navigation throughout the desktop rail breakpoint. */%0A@media (max-width: 74rem) and (min-width: 54.0625rem) {%0A  .operations-header {%0A    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);%0A  }%0A}%0A%0A/* Task 5: keep mobile Review & pay controls clear of fixed totals. */%0A@media (max-width: 54rem) {%0A  .mobile-cart-overlay .cart-scroll {%0A    padding-bottom: 16px;%0A    scroll-padding-bottom: 16px;%0A  }%0A%0A  .mobile-cart-overlay .payment-section .split-payment-action {%0A    box-sizing: border-box;%0A    width: 100%25;%0A    height: 44px;%0A    min-height: 44px;%0A    justify-self: stretch;%0A  }%0A}%0A%0A/* User-approved Burger subcategory row and product action order. */%0A.menu-toolbar:not(.category-mode-edit):has(.product-family-filter) {%0A  height: auto;%0A  min-height: 56px;%0A  padding: 5px 8px 8px;%0A}%0A%0A.menu-toolbar:not(.category-mode-edit) > .category-navigation-stack:has(.product-family-filter) {%0A  display: grid;%0A  width: 100%25;%0A  grid-template-columns: minmax(0, 1fr);%0A  grid-template-rows: 44px 44px;%0A  row-gap: 6px;%0A  align-items: stretch;%0A}%0A%0A.menu-toolbar:not(.category-mode-edit)%0A  > .category-navigation-stack:has(.product-family-filter)%0A  .category-navigation {%0A  grid-row: 1;%0A  width: 100%25;%0A  min-width: 0;%0A  min-height: 44px;%0A}%0A%0A.menu-toolbar:not(.category-mode-edit)%0A  > .category-navigation-stack:has(.product-family-filter)%0A  .product-family-filter {%0A  grid-row: 2;%0A  width: fit-content;%0A  max-width: 100%25;%0A  justify-self: start;%0A  align-self: center;%0A}%0A%0A.product-card {%0A  height: max-content;%0A}%0A%0A.product-card > .product-main {%0A  flex: 0 0 auto;%0A}%0A%0A.product-card-footer {%0A  display: grid;%0A  grid-template-columns: auto minmax(0, 1fr) auto;%0A  align-items: center;%0A  column-gap: 8px;%0A  row-gap: 8px;%0A  flex-wrap: nowrap;%0A}%0A%0A.product-card-footer > .product-price {%0A  grid-column: 1;%0A  justify-self: start;%0A}%0A%0A.product-card-footer > .product-extra-action {%0A  grid-column: 2;%0A  justify-self: center;%0A  margin: 0;%0A}%0A%0A.product-card-footer > .product-card-controls {%0A  grid-column: 3;%0A  min-width: max-content;%0A  justify-self: end;%0A  flex-wrap: nowrap;%0A}%0A%0A.product-card-footer .product-quantity {%0A  margin: 0;%0A}%0A%0A@media (max-width: 34rem) {%0A  .product-grid {%0A    grid-auto-rows: max-content;%0A  }%0A%0A  .product-card-footer {%0A    grid-template-columns: auto minmax(0, 1fr) auto;%0A    padding-inline: 8px;%0A    column-gap: 6px;%0A  }%0A}%0A%0A/* User-approved top-right product price and universal Extra action. */%0A.product-card {%0A  display: flex;%0A  flex-direction: column;%0A}%0A%0A.product-card > .product-main {%0A  width: 100%25;%0A  grid-template-columns: 4.5rem minmax(0, 1fr) auto;%0A  align-items: start;%0A}%0A%0A.product-card > .product-main .product-price {%0A  min-width: 0;%0A  align-self: start;%0A  justify-self: end;%0A  margin-top: 1px;%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 500;%0A  font-variant-numeric: tabular-nums;%0A  white-space: nowrap;%0A}%0A%0A.product-card-footer {%0A  display: grid;%0A  grid-template-columns: auto minmax(0, 1fr) auto;%0A  align-items: center;%0A  column-gap: 8px;%0A  row-gap: 8px;%0A  flex-wrap: nowrap;%0A}%0A%0A.product-card-footer > .product-extra-action {%0A  grid-column: 1;%0A  justify-self: start;%0A  margin: 0;%0A}%0A%0A.product-card-footer > .product-card-controls {%0A  grid-column: 3;%0A  min-width: max-content;%0A  justify-self: end;%0A  flex-wrap: nowrap;%0A}%0A%0A@media (max-width: 34rem) {%0A  .product-card > .product-main {%0A    grid-template-columns: 4.5rem minmax(0, 1fr) auto;%0A  }%0A%0A  .product-card-footer {%0A    padding-inline: 8px;%0A    column-gap: 6px;%0A  }%0A}%0A%0A/* TUX follow-up: compact mobile Operations shell */%0A@media (max-width: 54rem) {%0A  .operations-shell {%0A    --tux-floating-header-space: 7rem;%0A    padding-top: var(--tux-space-2);%0A  }%0A  .operations-header {%0A    grid-template-areas: 'brand actions' 'nav nav';%0A    grid-template-columns: auto minmax(0, 1fr);%0A    gap: 4px 8px;%0A    width: calc(100%25 - 16px);%0A    height: auto;%0A    min-height: 0;%0A    margin: 0 8px 8px;%0A    padding: 6px 8px;%0A  }%0A  .operations-brand-slot {%0A    grid-area: brand;%0A  }%0A  .header-actions {%0A    grid-area: actions;%0A    justify-self: end;%0A  }%0A  .operations-nav {%0A    grid-area: nav;%0A    width: 100%25;%0A    min-width: 0;%0A    justify-self: stretch;%0A    overflow-x: auto;%0A    scrollbar-width: none;%0A    -ms-overflow-style: none;%0A    padding-bottom: 0;%0A  }%0A  .operations-nav::-webkit-scrollbar {%0A    display: none;%0A  }%0A  .operations-header .tux-brand {%0A    width: auto;%0A    height: 36px;%0A    min-width: 0;%0A    min-height: 36px;%0A    max-height: 36px;%0A    padding: 0;%0A  }%0A  .operations-header .nav-item,%0A  .operations-header .operator-trigger {%0A    min-height: 44px;%0A  }%0A  .menu-toolbar {%0A    gap: 4px;%0A    margin-inline: 8px;%0A    padding: 4px 6px 6px;%0A  }%0A  .menu-toolbar .category-navigation {%0A    grid-template-columns: minmax(0, 1fr) auto;%0A    gap: 4px;%0A  }%0A  .menu-toolbar .category-rail {%0A    min-width: 0;%0A    overflow-x: auto;%0A    scrollbar-width: none;%0A    -ms-overflow-style: none;%0A  }%0A  .menu-toolbar .category-rail::-webkit-scrollbar {%0A    display: none;%0A  }%0A  .menu-toolbar .category-rail .category-tab {%0A    height: 44px;%0A    min-height: 44px;%0A    padding-inline: 12px;%0A  }%0A  .menu-toolbar .category-nav-actions {%0A    gap: 4px;%0A  }%0A  .menu-toolbar .category-nav-actions > button {%0A    box-sizing: border-box;%0A    width: 44px;%0A    min-width: 44px;%0A    height: 44px;%0A    min-height: 44px;%0A    padding: 0;%0A  }%0A  .menu-toolbar .product-family-filter {%0A    overflow-x: auto;%0A    scrollbar-width: none;%0A    -ms-overflow-style: none;%0A  }%0A  .menu-toolbar .product-family-filter::-webkit-scrollbar {%0A    display: none;%0A  }%0A  .product-grid {%0A    padding-bottom: calc(76px + env(safe-area-inset-bottom));%0A  }%0A  .mobile-cart-overlay .orders-cart {%0A    display: grid;%0A    grid-template-rows: auto minmax(0, 1fr) auto;%0A    min-height: 0;%0A    height: 100%25;%0A  }%0A  .mobile-cart-overlay .cart-scroll {%0A    min-height: 0;%0A    overflow-y: auto;%0A    padding-bottom: 16px;%0A    scroll-padding-bottom: 16px;%0A  }%0A  .mobile-cart-overlay .cart-totals {%0A    position: relative;%0A    inset: auto;%0A  }%0A}%0A%0A/* Apple/HIG remediation: strengthen cashier-critical operational controls. */%0A.order-type-section .segmented-control button,%0A.payment-section .payment-methods button,%0A.split-payment-action {%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.order-type-section .segmented-control button.cashier-critical-label,%0A.payment-section .payment-methods button.cashier-critical-label {%0A  font-weight: 700;%0A}%0A%0A.line-actions button {%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.product-extra-action {%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.product-quantity .quantity-decrement,%0A.product-quantity .quantity-increment,%0A.line-quantity-stepper .quantity-decrement,%0A.line-quantity-stepper .quantity-increment {%0A  font-size: 20px;%0A  line-height: 1;%0A  font-weight: 800;%0A}%0A%0A/* Match the Product Card increment's boundary language to Current Order without changing stepper geometry. */%0A.product-quantity .quantity-increment {%0A  border-left: 1px solid var(--tux-border-subtle);%0A}%0A%0A/* Selected labels use a legibility token independent from pressed-action color. */%0A.operations-header .nav-item-active,%0A.menu-toolbar .category-rail button.selected,%0A.menu-toolbar > .field-stack > .segmented-control button.selected,%0A.order-type-section .segmented-control button.selected,%0A.payment-section .payment-methods button.selected {%0A  color: var(--tux-accent-text);%0A}%0A%0A/* Quantity direction remains semantic without treating decrement as destructive. */%0A.quantity-decrement {%0A  color: var(--tux-text-primary);%0A}%0A%0A.quantity-increment {%0A  color: var(--tux-accent-text);%0A}%0A%0A/* Current Order has a stronger generic line-action selector, so preserve direction semantics explicitly. */%0A.line-actions .quantity-decrement {%0A  color: var(--tux-text-primary);%0A}%0A%0A.line-actions .quantity-increment {%0A  color: var(--tux-accent-text);%0A}%0A%0A.quantity-increment:hover:not(:disabled),%0A.line-actions .quantity-increment:hover:not(:disabled) {%0A  background: var(--tux-accent-hover-soft);%0A  color: var(--tux-accent-text);%0A}%0A%0A.quantity-decrement:hover:not(:disabled),%0A.line-actions .quantity-decrement:hover:not(:disabled) {%0A  background: color-mix(in srgb, var(--tux-text-primary) 5%25, transparent);%0A  color: var(--tux-text-primary);%0A}%0A%0A/* Keyboard focus remains immediately visible over the refined surfaces. */%0A:focus-visible {%0A  outline: 3px solid color-mix(in srgb, var(--tux-focus-ring) 70%25, transparent);%0A  outline-offset: 2px;%0A}%0A%0A/* Reduced Motion keeps control state changes while removing press displacement. */%0A@media (prefers-reduced-motion: reduce) {%0A  button:not(:disabled):active {%0A    transform: none;%0A  }%0A}%0A%0A/* Approved Current Order: one rounded outer surface with tightly nested section cards. */%0A.cart-scroll {%0A  display: grid;%0A  align-content: start;%0A  gap: 4px;%0A  padding: 4px;%0A  background: var(--tux-surface-panel);%0A}%0A%0A.cart-section {%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-lg);%0A  background: var(--tux-surface-panel);%0A}%0A%0A.cart-totals {%0A  margin: 0 4px 4px;%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-lg);%0A  background: var(--tux-surface-panel);%0A  box-shadow: none;%0A}%0A%0A.place-order-action {%0A  min-height: 3rem;%0A  justify-content: space-between;%0A}%0A%0A/* User-approved Current Order reference controls. */%0A.adjustment-actions {%0A  display: grid;%0A  grid-template-columns: repeat(2, minmax(0, 1fr));%0A  gap: var(--tux-space-2);%0A}%0A%0A.adjustment-disclosure {%0A  display: inline-flex;%0A  width: 100%25;%0A  min-height: var(--tux-touch-target);%0A  align-items: center;%0A  justify-content: center;%0A  gap: var(--tux-space-2);%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-sm);%0A  background: var(--tux-surface-raised);%0A  color: var(--tux-text-primary);%0A  padding: 0 var(--tux-space-3);%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.adjustment-disclosure svg {%0A  width: 18px;%0A  height: 18px;%0A  flex: 0 0 auto;%0A}%0A%0A.payment-methods-inline {%0A  grid-template-columns: repeat(3, minmax(0, 1fr));%0A  gap: 4px;%0A  padding: 0;%0A  border: 0;%0A  background: transparent;%0A}%0A%0A.payment-section .payment-methods-inline > button {%0A  min-height: 44px;%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-sm);%0A  background: var(--tux-surface-panel);%0A  padding: 0 8px;%0A  font-size: 14px;%0A  line-height: 18px;%0A}%0A%0A.payment-section .payment-methods-inline > button.selected {%0A  border-color: color-mix(in srgb, var(--tux-accent) 18%25, var(--tux-border-subtle));%0A  background: var(--tux-accent-soft);%0A  color: var(--tux-accent-text);%0A}%0A%0A.payment-methods-inline .split-payment-action {%0A  width: 100%25;%0A  min-height: 44px;%0A  margin: 0;%0A  padding: 0 8px;%0A}%0A%0A.line-actions {%0A  gap: var(--tux-space-1);%0A  border: 0;%0A  border-radius: 0;%0A  overflow: visible;%0A}%0A%0A.line-actions > button {%0A  min-height: 40px;%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-sm);%0A  padding: 0 10px;%0A  font-size: 14px;%0A  line-height: 18px;%0A}%0A%0A.line-quantity-stepper {%0A  display: grid;%0A  grid-template-columns: 40px 2.25rem 40px;%0A  align-items: center;%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-sm);%0A  background: var(--tux-surface-raised);%0A  overflow: hidden;%0A}%0A%0A.line-quantity-stepper button {%0A  box-sizing: border-box;%0A  width: 40px;%0A  height: 40px;%0A  min-height: 40px;%0A  border: 0;%0A  border-radius: 0;%0A  padding: 0;%0A}%0A%0A.line-quantity-stepper output {%0A  display: grid;%0A  height: 40px;%0A  place-items: center;%0A  border-inline: 1px solid var(--tux-border-subtle);%0A  background: var(--tux-surface-raised);%0A  font-size: 15px;%0A  line-height: 20px;%0A  font-weight: 600;%0A}%0A%0A.product-quantity .quantity-increment,%0A.orders-cart .line-quantity-stepper .quantity-increment {%0A  background: var(--tux-accent-strong);%0A  color: var(--tux-action-foreground);%0A}%0A%0A.product-quantity .quantity-increment:hover:not(:disabled),%0A.orders-cart .line-quantity-stepper .quantity-increment:hover:not(:disabled) {%0A  background: var(--tux-accent-hover);%0A  color: var(--tux-action-foreground);%0A}%0A%0A/* Legacy ProductPositionEditor styles remain for its isolated component tests. */%0A%0A.product-position-editor {%0A  display: grid;%0A  grid-template-rows: auto minmax(0, 1fr) auto;%0A  min-width: 0;%0A  min-height: 0;%0A  flex: 1;%0A}%0A%0A.product-reorder-cue {%0A  margin: 0 var(--tux-space-4) var(--tux-space-2);%0A  padding: var(--tux-space-3) var(--tux-space-4);%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-lg);%0A  background: var(--tux-surface-panel);%0A}%0A%0A.product-reorder-cue h2,%0A.product-reorder-cue p {%0A  margin: 0;%0A}%0A%0A.product-reorder-cue h2 {%0A  margin-top: 2px;%0A  font-size: 16px;%0A  line-height: 21px;%0A  font-weight: 700;%0A}%0A%0A.product-reorder-cue p {%0A  margin-top: 4px;%0A  color: var(--tux-text-secondary);%0A  font-size: 13px;%0A  line-height: 18px;%0A}%0A%0A.product-reorder-kicker,%0A.product-reorder-position {%0A  color: var(--tux-text-secondary);%0A  font-size: 12px;%0A  line-height: 16px;%0A  font-weight: 600;%0A}%0A%0A.product-reorder-error {%0A  margin: 0 var(--tux-space-4) var(--tux-space-2);%0A  border: 1px solid color-mix(in srgb, var(--tux-destructive) 36%25, var(--tux-border-subtle));%0A  border-radius: var(--tux-radius-sm);%0A  background: color-mix(in srgb, var(--tux-destructive) 6%25, var(--tux-surface-panel));%0A  color: var(--tux-destructive);%0A  padding: var(--tux-space-2) var(--tux-space-3);%0A  font-size: 13px;%0A  line-height: 18px;%0A}%0A%0A.product-reorder-grid {%0A  min-height: 0;%0A  padding-top: 0;%0A  padding-bottom: calc(var(--tux-space-4) + 72px);%0A}%0A%0A.product-card-reordering {%0A  cursor: grab;%0A  user-select: none;%0A  touch-action: manipulation;%0A  transition:%0A    border-color 140ms ease,%0A    box-shadow 140ms ease,%0A    transform 140ms ease,%0A    background-color 140ms ease;%0A}%0A%0A.product-card-reordering:active {%0A  cursor: grabbing;%0A}%0A%0A.product-card-dragging,%0A.product-card-grabbed {%0A  border-color: color-mix(in srgb, var(--tux-accent) 58%25, var(--tux-border-subtle));%0A  background: color-mix(in srgb, var(--tux-accent-soft) 28%25, var(--tux-surface-panel));%0A  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%25, transparent);%0A  transform: translateY(-2px) scale(1.01);%0A}%0A%0A.product-reorder-main {%0A  min-height: 0;%0A}%0A%0A.product-reorder-main .product-copy {%0A  min-width: 0;%0A}%0A%0A.product-name-row {%0A  display: grid;%0A  grid-template-columns: minmax(0, 1fr) auto;%0A  align-items: start;%0A  gap: var(--tux-space-2);%0A}%0A%0A.product-reorder-handle {%0A  color: var(--tux-text-secondary);%0A  font-size: 18px;%0A  line-height: 18px;%0A  letter-spacing: -0.15em;%0A}%0A%0A.product-reorder-footer {%0A  display: flex;%0A  min-height: 52px;%0A  align-items: center;%0A  justify-content: flex-end;%0A  gap: 4px;%0A  padding: 4px 8px;%0A  border-top: 1px solid var(--tux-border-subtle);%0A}%0A%0A.product-reorder-move {%0A  min-width: 44px;%0A  min-height: 44px;%0A  border: 1px solid var(--tux-border-subtle);%0A  border-radius: var(--tux-radius-sm);%0A  background: var(--tux-surface-raised);%0A  color: var(--tux-text-primary);%0A  padding: 0;%0A  font-size: 18px;%0A  line-height: 1;%0A  font-weight: 650;%0A}%0A%0A.product-reorder-move:hover:not(:disabled) {%0A  background: var(--tux-accent-hover-soft);%0A}%0A%0A.product-reorder-move:disabled {%0A  opacity: 0.36;%0A}%0A%0A.product-reorder-actions {%0A  position: sticky;%0A  z-index: 2;%0A  bottom: 0;%0A  display: flex;%0A  min-height: 64px;%0A  align-items: center;%0A  justify-content: space-between;%0A  gap: var(--tux-space-3);%0A  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));%0A  border-top: 1px solid var(--tux-border-subtle);%0A  background: color-mix(in srgb, var(--tux-surface-panel) 94%25, transparent);%0A  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%25, transparent);%0A  backdrop-filter: blur(14px) saturate(112%25);%0A  -webkit-backdrop-filter: blur(14px) saturate(112%25);%0A}%0A%0A.product-reorder-actions > .text-action {%0A  min-height: 44px;%0A  border: 0;%0A  border-radius: var(--tux-radius-sm);%0A  background: transparent;%0A  color: var(--tux-text-secondary);%0A  padding: 0 12px;%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.product-reorder-actions > .text-action:hover:not(:disabled) {%0A  background: var(--tux-accent-hover-soft);%0A  color: var(--tux-text-primary);%0A}%0A%0A.product-reorder-actions-primary > button {%0A  min-height: 44px;%0A}%0A%0A.product-reorder-actions-primary {%0A  display: flex;%0A  gap: 8px;%0A}%0A%0A.product-reorder-actions-primary > button {%0A  min-width: 92px;%0A}%0A%0A.sr-only {%0A  position: absolute;%0A  width: 1px;%0A  height: 1px;%0A  margin: -1px;%0A  overflow: hidden;%0A  clip: rect(0, 0, 0, 0);%0A  white-space: nowrap;%0A  border: 0;%0A  padding: 0;%0A}%0A%0A@media (max-width: 54rem) {%0A  .product-reorder-cue {%0A    margin-inline: 8px;%0A    padding-inline: 12px;%0A  }%0A%0A  .product-reorder-grid {%0A    padding-inline: 8px;%0A  }%0A%0A  .product-reorder-actions {%0A    padding-inline: 8px;%0A  }%0A}%0A%0A@media (prefers-reduced-motion: reduce) {%0A  .product-card-reordering {%0A    transition: none;%0A  }%0A%0A  .product-card-dragging,%0A  .product-card-grabbed {%0A    transform: none;%0A  }%0A}%0A%0A/* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */%0A.menu-edit-actions {%0A  position: sticky;%0A  z-index: 2;%0A  bottom: 0;%0A  display: flex;%0A  min-height: 64px;%0A  align-items: center;%0A  justify-content: space-between;%0A  gap: var(--tux-space-3);%0A  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));%0A  border-top: 1px solid var(--tux-border-subtle);%0A  background: color-mix(in srgb, var(--tux-surface-panel) 94%25, transparent);%0A  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%25, transparent);%0A  backdrop-filter: blur(14px) saturate(112%25);%0A  -webkit-backdrop-filter: blur(14px) saturate(112%25);%0A}%0A%0A.menu-edit-action-status,%0A.menu-edit-actions-primary {%0A  display: flex;%0A  align-items: center;%0A  gap: 8px;%0A}%0A%0A.menu-edit-actions button {%0A  min-height: 44px;%0A}%0A%0A.menu-edit-actions > .menu-edit-action-status > .text-action {%0A  min-height: 44px;%0A  border: 0;%0A  border-radius: var(--tux-radius-sm);%0A  background: transparent;%0A  color: var(--tux-text-secondary);%0A  padding: 0 12px;%0A  font-size: 14px;%0A  line-height: 18px;%0A  font-weight: 600;%0A}%0A%0A.category-tab-reordering,%0A.menu-edit-product-card {%0A  cursor: grab;%0A  user-select: none;%0A  touch-action: manipulation;%0A  transform-origin: center;%0A}%0A%0A.category-tab-dragging,%0A.menu-edit-product-card-dragging {%0A  border-color: color-mix(in srgb, var(--tux-accent) 58%25, var(--tux-border-subtle));%0A  background: color-mix(in srgb, var(--tux-accent-soft) 28%25, var(--tux-surface-panel));%0A  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%25, transparent);%0A}%0A%0A.menu-edit-product-hint {%0A  padding: 0 8px 8px;%0A  color: var(--tux-text-secondary);%0A  font-size: 12px;%0A  line-height: 16px;%0A  font-weight: 600;%0A}%0A%0A@keyframes menu-edit-jiggle {%0A  0%25,%0A  100%25 {%0A    transform: rotate(-0.2deg) translateY(0);%0A  }%0A  50%25 {%0A    transform: rotate(0.2deg) translateY(-0.5px);%0A  }%0A}%0A%0A@media (prefers-reduced-motion: no-preference) {%0A  .category-tab-reordering {%0A    animation: menu-edit-jiggle 1.8s ease-in-out infinite;%0A  }%0A%0A  .menu-edit-product-card {%0A    animation: menu-edit-jiggle 1.95s ease-in-out infinite;%0A  }%0A%0A  .category-tab-reordering:nth-child(2n),%0A  .menu-edit-product-card:nth-child(2n) {%0A    animation-delay: -0.45s;%0A  }%0A%0A  .category-tab-reordering:nth-child(3n),%0A  .menu-edit-product-card:nth-child(3n) {%0A    animation-delay: -0.9s;%0A  }%0A}%0A%0A@media (max-width: 54rem) {%0A  .menu-edit-actions {%0A    padding-inline: 8px;%0A  }%0A}%0A%0A@media (prefers-reduced-motion: reduce) {%0A  .category-tab-reordering,%0A  .menu-edit-product-card {%0A    animation: none;%0A    transform: none;%0A  }%0A}%0A"%0A%0A ❯ apps/operations/src/styles/product-position-editor.test.ts:15:20%0A%0A
