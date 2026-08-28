@@ -133,7 +133,9 @@ describe('IndexedDB migration registry', () => {
     const name = `tux-indexeddb-fresh-${crypto.randomUUID()}`;
     const database = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
-      expect([...database.objectStoreNames]).toEqual(expect.arrayContaining([...INDEXED_DB_STORES]));
+      expect([...database.objectStoreNames]).toEqual(
+        expect.arrayContaining([...INDEXED_DB_STORES]),
+      );
       expect([...database.objectStoreNames]).toContain('workerUiPreferences');
       const transaction = database.transaction(
         ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
