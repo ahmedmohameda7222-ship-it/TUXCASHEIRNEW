@@ -68,6 +68,7 @@ function preference(worker: WorkerId, serverVersion = 0) {
     workerId: worker,
     categoryOrder: [categoryBId, categoryAId],
     categoryAlignment: 'center' as const,
+    productOrder: [],
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
