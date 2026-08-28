@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { parseSystemAccentColor } from '@tux/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SystemColorPickerDialog } from './SystemColorPickerDialog';
+
+const source = readFileSync(new URL('./SystemColorPickerDialog.tsx', import.meta.url), 'utf8');
 
 describe('SystemColorPickerDialog', () => {
   it('renders the approved two-row native color and Default transaction surface', () => {
@@ -51,5 +54,10 @@ describe('SystemColorPickerDialog', () => {
     expect(markup).toContain('type="checkbox"');
     expect(markup).toContain('checked=""');
     expect(markup).toContain('value="#1F6B52"');
+  });
+
+  it('returns focus to the persistent operator trigger when the modal closes', () => {
+    expect(source).toContain("document.querySelector<HTMLElement>('.operator-trigger')");
+    expect(source).toMatch(/return \(\) => returnFocusTarget\?\.focus\(\);/);
   });
 });
