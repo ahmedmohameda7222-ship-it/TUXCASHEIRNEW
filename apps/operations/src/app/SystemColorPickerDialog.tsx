@@ -68,7 +68,7 @@ export function SystemColorPickerDialog({
   const [draftAccentColor, setDraftAccentColor] = useState<SystemAccentColor | null>(
     savedAccentColor,
   );
-  const [hexDraft, setHexDraft] = useState(initialVisibleColor);
+  const [hexDraft, setHexDraft] = useState<string>(initialVisibleColor);
   const [rgbDraft, setRgbDraft] = useState<Record<keyof RgbColor, string>>(
     rgbStrings(initialVisibleColor),
   );
