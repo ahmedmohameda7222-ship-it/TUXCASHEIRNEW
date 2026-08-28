@@ -46,9 +46,9 @@ replace_test(
   await burgers.focus();
   await page.keyboard.press('Space');
   await expect(burgers).toHaveClass(/category-tab-grabbed/);
-  await expect(page.locator('.menu-pane .sr-only').filter({ hasText: 'Burgers picked up' })).toContainText(
-    'Burgers picked up',
-  );
+  await expect(
+    page.locator('.menu-pane .sr-only').filter({ hasText: 'Burgers picked up' }),
+  ).toContainText('Burgers picked up');
   await page.keyboard.press('ArrowRight');
   await expect(categories.nth(0)).toHaveText('Combo');
   await page.keyboard.press('Escape');
@@ -94,8 +94,12 @@ replace_test(
     'menu-edit-jiggle',
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  expect(await categories.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
-  expect(await reorderCards.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+  expect(await categories.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe(
+    'none',
+  );
+  expect(await reorderCards.nth(0).evaluate((node) => getComputedStyle(node).animationName)).toBe(
+    'none',
+  );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   await expectNoHorizontalOverflow(page);
@@ -200,6 +204,31 @@ replace_test(
 });''',
 )
 
+replace_test(
+    'category edit contains primary categories only',
+    r'''test('unified menu edit keeps primary categories and Product Cards in place', async ({ page }) => {
+  await enterActiveOrdersForCategoryTests(page);
+
+  await page.getByRole('button', { name: 'Edit menu' }).click();
+
+  await expect(page.getByPlaceholder('Search products')).toBeHidden();
+  await expect(page.getByLabel('Product families')).toBeHidden();
+  const primary = page.getByLabel('Menu categories').locator('.category-tab');
+  const expectedPrimary = ['Burgers', 'Combo', 'Fries', 'Hawawshi', 'Zalabia', 'Extras', 'Drinks'];
+  await expect(primary).toHaveCount(expectedPrimary.length);
+  for (const [index, name] of expectedPrimary.entries()) {
+    await expect(primary.nth(index)).toHaveText(name);
+  }
+  await expect(page.locator('.category-editor')).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Category alignment' })).toBeVisible();
+  await expect(page.locator('.menu-edit-product-card')).toHaveCount(9);
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+});''',
+)
+
 legacy_visual = '''    await page.getByRole('button', { name: 'Edit categories' }).click();
     await expect(page.getByLabel('Edit categories')).toBeVisible();
     await screenshot('04-category-edit.png');
@@ -215,9 +244,26 @@ if legacy_visual not in source:
     raise SystemExit('Could not locate legacy visual-approval category editor block')
 source = source.replace(legacy_visual, unified_visual, 1)
 
-for legacy in ["name: 'Edit categories'", "name: 'Manage order'", '.category-editor-item', '.product-card-reordering']:
-    if legacy in source:
-        raise SystemExit(f'Legacy split edit-mode acceptance remains: {legacy}')
+legacy_actions = '''  const actionButtons = page.locator('.category-nav-actions > button');
+  await expect(actionButtons).toHaveCount(3);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Manage order');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Edit categories');
+  await expect(actionButtons.nth(2)).toHaveAccessibleName('Search menu');
+'''
+unified_actions = '''  const actionButtons = page.locator('.category-nav-actions > button');
+  await expect(actionButtons).toHaveCount(2);
+  await expect(actionButtons.nth(0)).toHaveAccessibleName('Edit menu');
+  await expect(actionButtons.nth(1)).toHaveAccessibleName('Search menu');
+'''
+if legacy_actions not in source:
+    raise SystemExit('Could not locate legacy three-action header contract')
+source = source.replace(legacy_actions, unified_actions, 1)
+
+legacy_search_edit = "  await expect(page.getByRole('button', { name: 'Edit categories' })).toBeHidden();\n"
+unified_search_edit = "  await expect(page.getByRole('button', { name: 'Edit menu' })).toBeHidden();\n"
+if legacy_search_edit not in source:
+    raise SystemExit('Could not locate legacy search/edit visibility assertion')
+source = source.replace(legacy_search_edit, unified_search_edit, 1)
 
 for required in [
     "name: 'Edit menu'",
@@ -225,6 +271,7 @@ for required in [
     "name: 'Menu edit actions'",
     "reducedMotion: 'reduce'",
     "hasText: 'Menu layout saved'",
+    "toHaveCount(2)",
 ]:
     if required not in source:
         raise SystemExit(f'Unified edit-mode rendered acceptance missing: {required}')
