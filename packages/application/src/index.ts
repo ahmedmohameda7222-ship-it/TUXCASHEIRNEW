@@ -1,77 +1,72 @@
-export { calculateDayInventoryExpected, describeDayInventory } from './dayInventory';
-export type { DayInventorySummary, DayInventorySummaryInput } from './dayInventory';
-export { createBulkStockOperation } from './bulkStock';
-export type { BulkStockOperation, BulkStockOperationInput } from './bulkStock';
-export { buildEndDaySummary } from './endDaySummary';
-export type { EndDaySummary, EndDaySummaryInput } from './endDaySummary';
-export { executeEndDay } from './endDay';
+export { OperationsBulkStockService } from './bulkStock';
 export type {
-  EndDayAuditPort,
-  EndDayInventoryPort,
-  EndDayOrdersPort,
-  EndDayOutboxPort,
-  EndDayPort,
-  EndDayRequest,
-  EndDayResult,
+  AddBulkStockInput,
+  BulkStockBoard,
+  BulkStockBoardItem,
+  BulkStockBoardResult,
+  BulkStockMovementInput,
+  BulkStockMutation,
+  BulkStockMutationResult,
+  BulkStockRuntime,
+  UndoBulkStockInput,
+} from './bulkStock';
+export { ApplicationCommandCoordinator } from './commandCoordinator';
+export { OperationsConfigurationSyncService } from './configurationSync';
+export type {
+  ConfigurationApplicationResult,
+  InboundConfigurationProvider,
+} from './configurationSync';
+export { CoordinatedOperationsSessionService } from './coordinatedSession';
+export { OperationsEndDayService } from './endDay';
+export type {
+  EndDayCloseResult,
+  EndDayCloseResultValue,
+  EndDayGate,
+  EndDayGateResult,
+  EndDayPaymentMethod,
+  EndDayPreview,
+  EndDayPreviewLine,
+  EndDayPreviewResult,
+  EndDayRuntime,
+  EndDayVarianceInput,
 } from './endDay';
-export { createManualExpense } from './expense';
-export type { ManualExpenseCreationInput } from './expense';
-export { executeExpenseWrite } from './expenseWrite';
+export type { ApplicationError, ApplicationErrorCode } from './errors';
+export { OperationsExpensesService } from './expenses';
 export type {
-  ExpenseAuditPort,
-  ExpenseOutboxPort,
-  ExpensePort,
-  ExpenseWriteRequest,
-  ExpenseWriteResult,
-} from './expenseWrite';
+  EditManualExpenseInput,
+  ExpenseMutationResult,
+  ExpensesLedger,
+  ExpensesLedgerResult,
+  ExpensesRuntime,
+  ManualExpenseInput,
+} from './expenses';
+export { unavailableOrderPrinter } from './orderPrinter';
 export {
-  calculatePaymentTotal,
-  commitOrder,
-  prepareOrderCommit,
-  validateOrderCommit,
+  DEFAULT_RECEIPT_PRINTER_CONFIGURATION,
+  parseReceiptPrinterConfiguration,
+} from './printerConfiguration';
+export type { ReceiptPaperWidthMm, ReceiptPrinterConfiguration } from './printerConfiguration';
+export type { OrderPrintAttempt, OrderPrinter } from './orderPrinter';
+export { createEmptyOrderDraft, OperationsOrdersService } from './orders';
+export { OperationsOrdersBoardService } from './ordersBoard';
+export type {
+  CancelOrderInput,
+  OrderTransitionResult,
+  OrdersBoardResult,
+  OrdersBoardRuntime,
+  OrdersBoardSnapshot,
+  ReturnDeliveryInput,
+} from './ordersBoard';
+export type {
+  OrderPlacement,
+  OrderPlacementError,
+  OrderPlacementResult,
+  OrdersRuntime,
+  OrdersWorkspace,
+  OrdersWorkspaceResult,
 } from './orders';
-export type {
-  InventoryItemReader,
-  OrderCommitContext,
-  OrderCommitInput,
-  OrderCommitPlan,
-  OrderCommitResult,
-  OrderPersistence,
-  OrderTypeReader,
-  PaymentMethodReader,
-  PreparedOrderCommit,
-  RecipeReader,
-  TenderInput,
-} from './orders';
-export {
-  calculateExpectedInventory,
-  calculateInventoryVariance,
-  parseCountedInventory,
-} from './inventory';
-export { closeBusinessDay, openBusinessDay } from './businessDay';
-export {
-  cancelOrder,
-  markOrderDone,
-  returnDeliveryOrder,
-  undoDoneOrder,
-} from './orderLifecycle';
-export { getOrdersBoardSnapshot } from './ordersBoard';
-export type { OrderLifecyclePort, OrdersBoardPort, OrdersBoardSnapshot } from './ordersBoard';
-export { validatePrinterConfiguration } from './printerConfiguration';
-export type { PrinterConfiguration } from './printerConfiguration';
-export { publishConfiguration } from './configuration';
-export type { ConfigurationPublishPort, ConfigurationPublishRequest } from './configuration';
-export {
-  ConfigurationOutboxBridge,
-  ConfigurationSyncService,
-} from './configurationSync';
-export type {
-  ConfigurationRemoteGateway,
-  ConfigurationRemoteResult,
-  ConfigurationSyncPort,
-} from './configurationSync';
 export { err, ok } from './result';
-export type { AppResult } from './result';
+export type { Result } from './result';
 export { greetingForHour, OperationsSessionService } from './session';
 export type {
   OperationsSessionResult,
