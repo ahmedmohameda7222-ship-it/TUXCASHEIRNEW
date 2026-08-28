@@ -1,65 +1,59 @@
 name: Product Reorder DOM Fix
 
-on:
-  push:
-    branches:
-      - feat/apple-product-card-reorder
-
-permissions:
-  contents: write
+on: push
 
 jobs:
   apply-fix:
-    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
           ref: feat/apple-product-card-reorder
-      - name: Preserve the two direct icon-action buttons
+      - name: Apply DOM contract fix
+        shell: bash
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
 
-          workspace = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          workspace = Path("apps/operations/src/app/OrdersWorkspace.tsx")
           source = workspace.read_text()
-          old = '''                          <button
-                            type="button"
-                            className="category-manage-order-action"
+          old = """                          <button
+                            type=\"button\"
+                            className=\"category-manage-order-action\"
                             disabled={selectedCategoryId === null}
                             onClick={beginProductReorder}
                           >
                             Manage order
-                          </button>'''
-          new = '''                          <span className="category-manage-order-wrap">
+                          </button>"""
+          new = """                          <span className=\"category-manage-order-wrap\">
                             <button
-                              type="button"
-                              className="category-manage-order-action"
+                              type=\"button\"
+                              className=\"category-manage-order-action\"
                               disabled={selectedCategoryId === null}
                               onClick={beginProductReorder}
                             >
                               Manage order
                             </button>
-                          </span>'''
+                          </span>"""
           if source.count(old) != 1:
-              raise SystemExit(f'Expected exactly one Manage order block, found {source.count(old)}')
+              raise SystemExit("Manage order block mismatch")
           workspace.write_text(source.replace(old, new))
 
-          css = Path('apps/operations/src/styles/final-pos-corrections.css')
+          css = Path("apps/operations/src/styles/final-pos-corrections.css")
           css_source = css.read_text()
-          marker = '/* Approved worker-specific Product Card position editor. */\n.category-manage-order-action {'
-          replacement = '''/* Approved worker-specific Product Card position editor. */
+          marker = "/* Approved worker-specific Product Card position editor. */\n.category-manage-order-action {"
+          replacement = """/* Approved worker-specific Product Card position editor. */
 .category-manage-order-wrap {
   display: contents;
 }
 
-.category-manage-order-action {'''
+.category-manage-order-action {"""
           if css_source.count(marker) != 1:
-              raise SystemExit(f'Expected exactly one product editor CSS marker, found {css_source.count(marker)}')
+              raise SystemExit("Product reorder CSS marker mismatch")
           css.write_text(css_source.replace(marker, replacement))
           PY
-      - name: Commit fix and remove temporary workflow
-        run: |
           git diff --check
           git rm .github/workflows/product-reorder-dom-fix.yml
           git config user.name "github-actions[bot]"
