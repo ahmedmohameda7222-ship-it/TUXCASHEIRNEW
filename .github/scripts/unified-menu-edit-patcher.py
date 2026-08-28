@@ -201,7 +201,11 @@ product_grid = '''            <div className="product-grid" aria-live="polite">
               )}
             </div>
 '''
-source = source[:product_grid_start] + product_grid + source[product_grid_end:]
+source = (
+    source[:product_grid_start]
+    + product_grid
+    + source[product_grid_end + len('            </div>\n'):]
+)
 
 if 'productReorderCategoryId' in source or '<ProductPositionEditor' in source:
     raise SystemExit('Legacy product reorder path remains after Task 4 transform')
