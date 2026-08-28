@@ -64,4 +64,34 @@ describe('worker UI preference editing', () => {
       productOrder: [],
     });
   });
+
+  it('builds one unified menu-edit payload and resets all three preference fields together', () => {
+    expect('menuEditPreferenceInput' in editing).toBe(true);
+    if (!('menuEditPreferenceInput' in editing)) return;
+
+    expect(
+      editing.menuEditPreferenceInput(
+        [categoryA, categoryB],
+        'center',
+        [productA, productB],
+        false,
+      ),
+    ).toEqual({
+      categoryOrder: [categoryA, categoryB],
+      categoryAlignment: 'center',
+      productOrder: [productA, productB],
+    });
+    expect(
+      editing.menuEditPreferenceInput(
+        [categoryA, categoryB],
+        'center',
+        [productA, productB],
+        true,
+      ),
+    ).toEqual({
+      categoryOrder: [],
+      categoryAlignment: 'left',
+      productOrder: [],
+    });
+  });
 });
