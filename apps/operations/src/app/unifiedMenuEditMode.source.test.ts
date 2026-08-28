@@ -46,8 +46,8 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('function resetMenuEdit');
     expect(ordersWorkspaceSource).toContain('function cancelMenuEdit');
     expect(ordersWorkspaceSource).toContain('aria-label="Menu edit actions"');
-    expect(ordersWorkspaceSource).toContain('>Reset<');
-    expect(ordersWorkspaceSource).toContain('>Cancel<');
+    expect(ordersWorkspaceSource).toContain('onClick={resetMenuEdit}');
+    expect(ordersWorkspaceSource).toContain('onClick={cancelMenuEdit}');
     expect(ordersWorkspaceSource).toContain("'Saving…' : 'Save'");
     expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
   });
