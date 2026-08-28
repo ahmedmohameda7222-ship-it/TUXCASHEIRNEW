@@ -31,13 +31,20 @@ describe('system accent token contract', () => {
     expect(bypasses).toEqual([]);
   });
 
-  it('keeps interaction colors accent-driven while preserving semantic positive color', () => {
+  it('keeps interaction colors accent-driven while semantic status colors stay independent', () => {
     const premium = readFileSync(new URL('./premium.css', import.meta.url), 'utf8');
     const systemColor = readFileSync(new URL('./system-color-picker.css', import.meta.url), 'utf8');
+    const tokens = readFileSync(
+      new URL('../../../../packages/ui/src/tokens.css', import.meta.url),
+      'utf8',
+    );
 
     expect(premium).toContain('var(--tux-accent');
-    expect(premium).toContain('var(--tux-positive');
     expect(systemColor).toContain('var(--tux-accent');
     expect(systemColor).not.toContain('#1F6B52');
+    expect(tokens).toContain('--tux-positive:');
+    expect(tokens).toContain('--tux-positive-soft:');
+    expect(tokens).toContain('--tux-warning:');
+    expect(tokens).toContain('--tux-destructive:');
   });
 });
