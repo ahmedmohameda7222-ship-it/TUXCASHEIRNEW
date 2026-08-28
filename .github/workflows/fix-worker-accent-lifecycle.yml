@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/worker-system-color-theme
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
