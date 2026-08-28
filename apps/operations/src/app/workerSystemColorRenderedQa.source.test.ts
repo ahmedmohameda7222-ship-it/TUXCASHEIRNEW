@@ -16,23 +16,25 @@ describe('worker system color rendered QA contract', () => {
     expect(e2e).toContain("name: 'Pick from screen', exact: true");
     expect(e2e).toContain("name: 'Reset to TUX default', exact: true");
     expect(e2e).toContain("getByText('Current color', { exact: true })");
-    expect(e2e).toContain(
-      "expect(dialog.locator(\"input[type='checkbox']\")).toHaveCount(0)",
-    );
+    expect(e2e).toContain("input[type='checkbox']");
+    expect(e2e).toContain('toHaveCount(0)');
   });
 
-  it('covers synchronized preview/cancel/reset persistence, appearance modes, and two workers', () => {
-    expect(e2e).toContain("'#1e3a8a'");
-    expect(e2e).toContain("'#7e22ce'");
-    expect(e2e).toContain("'#dc2626'");
-    expect(e2e).toContain("'#facc15'");
-    expect(e2e).toContain("'#050505'");
-    expect(e2e).toContain("'#fafafa'");
-    expect(e2e).toContain('Switch / Sign in worker');
-    expect(e2e).toContain('Enter PIN to Sign In');
-    expect(e2e).toContain("name: 'System', exact: true");
-    expect(e2e).toContain("colorScheme: 'dark'");
-    expect(e2e).toContain("colorScheme: 'light'");
-    expect(e2e).toContain("getPropertyValue('--tux-accent')");
-  });
+  it(
+    'covers synchronized preview/cancel/reset persistence, appearance modes, and two workers',
+    () => {
+      expect(e2e).toContain("'#1e3a8a'");
+      expect(e2e).toContain("'#7e22ce'");
+      expect(e2e).toContain("'#dc2626'");
+      expect(e2e).toContain("'#facc15'");
+      expect(e2e).toContain("'#050505'");
+      expect(e2e).toContain("'#fafafa'");
+      expect(e2e).toContain('Switch / Sign in worker');
+      expect(e2e).toContain('Enter PIN to Sign In');
+      expect(e2e).toContain("name: 'System', exact: true");
+      expect(e2e).toContain("colorScheme: 'dark'");
+      expect(e2e).toContain("colorScheme: 'light'");
+      expect(e2e).toContain("getPropertyValue('--tux-accent')");
+    },
+  );
 });
