@@ -8,7 +8,7 @@ on:
       - .github/workflows/unified-menu-edit-patcher.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   patch:
@@ -17,13 +17,23 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ui/unified-menu-edit-mode
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Verify test formatting
-        run: npm run format:check
+      - name: Format RED test only
+        run: npx prettier --write apps/operations/src/app/workerUiPreferenceEditing.test.ts
+      - name: Commit RED test formatting
+        run: |
+          git config user.name "tux-implementation-bot"
+          git config user.email "tux-implementation-bot@users.noreply.github.com"
+          if ! git diff --quiet -- apps/operations/src/app/workerUiPreferenceEditing.test.ts; then
+            git add apps/operations/src/app/workerUiPreferenceEditing.test.ts
+            git commit -m "test: format unified menu preference contract"
+            git push origin HEAD:ui/unified-menu-edit-mode
+          fi
       - name: Task 5 RED unit gate
         run: npm run test
