@@ -64,9 +64,9 @@ describe('unified menu edit entry point', () => {
       'draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}',
     );
     expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
-    expect(ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0).toBeGreaterThanOrEqual(
-      4,
-    );
+    expect(
+      ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(4);
   });
 
   it('supports keyboard pickup drop move and cancel for categories and Product Cards', () => {
