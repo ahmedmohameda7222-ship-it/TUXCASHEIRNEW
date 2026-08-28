@@ -9,11 +9,10 @@ type MoveProductWithinCategory = (
   targetId: ProductId,
 ) => readonly ProductId[];
 
-const moveProductWithinCategory = (
-  menuProductOrder as unknown as {
-    moveProductWithinCategory?: MoveProductWithinCategory;
-  }
-).moveProductWithinCategory;
+const moveProductWithinCategory = Reflect.get(
+  menuProductOrder,
+  'moveProductWithinCategory',
+) as MoveProductWithinCategory | undefined;
 
 function product(index: number): ProductId {
   return parseEntityId<ProductId>(
