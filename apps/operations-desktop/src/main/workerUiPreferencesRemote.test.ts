@@ -1,9 +1,11 @@
 import {
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type MenuCategoryId,
   type ProductId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
 } from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,15 +17,17 @@ const workerA = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222221');
 const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333331');
 const productA = parseEntityId<ProductId>('55555555-5555-4555-8555-555555555551');
 const productB = parseEntityId<ProductId>('55555555-5555-4555-8555-555555555552');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 const deviceId = '44444444-4444-4444-8444-444444444444';
 
-function remoteRow(serverVersion = 4) {
+function remoteRow(serverVersion = 4, accentColor: SystemAccentColor | null = customAccent) {
   return {
     shop_id: shopA,
     worker_id: workerA,
     category_order: [categoryA],
     category_alignment: 'center',
     product_order: [productB, productA],
+    accent_color: accentColor,
     server_version: serverVersion,
     updated_at: `2026-08-25T03:0${serverVersion}:00.000Z`,
   };
@@ -47,7 +51,7 @@ function sessionManager() {
 }
 
 describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
-  it('loads one worker preference through the authenticated Supabase REST table', async () => {
+  it('loads the complete worker preference through authenticated Supabase REST', async () => {
     const fetcher = vi.fn().mockResolvedValue(
       new Response(JSON.stringify([remoteRow()]), {
         status: 200,
@@ -67,6 +71,7 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
       categoryOrder: [categoryA],
       categoryAlignment: 'center',
       productOrder: [productB, productA],
+      accentColor: customAccent,
       serverVersion: 4,
       updatedAt: instant('2026-08-25T03:04:00.000Z'),
     });
@@ -76,7 +81,21 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
     expect(url.searchParams.get('shop_id')).toBe(`eq.${shopA}`);
     expect(url.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
     expect(url.searchParams.get('select')).toContain('product_order');
+    expect(url.searchParams.get('select')).toContain('accent_color');
     expect(manager.authorizationHeaders).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads null accent as the exact TUX default preference', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([remoteRow(4, null)])));
+    const gateway = new SupabaseDesktopWorkerUiPreferencesGateway({
+      projectUrl: 'https://project.supabase.co',
+      sessionManager: sessionManager(),
+      fetcher,
+    });
+
+    await expect(gateway.getWorkerUiPreferences(shopA, workerA)).resolves.toMatchObject({
+      accentColor: null,
+    });
   });
 
   it('returns null when the worker has no remote preference', async () => {
@@ -104,7 +123,7 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('writes product order through the monotonic RPC and returns the authoritative version', async () => {
+  it('writes accent and layout through the monotonic RPC and returns authoritative state', async () => {
     const fetcher = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(remoteRow(7)), {
         status: 200,
@@ -124,11 +143,13 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
       categoryOrder: [categoryA],
       categoryAlignment: 'right',
       productOrder: [productB, productA],
+      accentColor: customAccent,
     });
 
     expect(result.serverVersion).toBe(7);
     expect(result.workerId).toBe(workerA);
     expect(result.productOrder).toEqual([productB, productA]);
+    expect(result.accentColor).toBe(customAccent);
     const [target, init] = fetcher.mock.calls[0] ?? [];
     expect(String(target)).toBe(
       'https://project.supabase.co/rest/v1/rpc/put_worker_ui_preferences',
@@ -148,6 +169,7 @@ describe('SupabaseDesktopWorkerUiPreferencesGateway', () => {
       p_category_order: [categoryA],
       p_category_alignment: 'right',
       p_product_order: [productB, productA],
+      p_accent_color: customAccent,
     });
   });
 });
