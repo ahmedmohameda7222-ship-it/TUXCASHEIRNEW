@@ -38,6 +38,7 @@ import { MenuProductCard } from './MenuProductCard';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
   moveProductWithinCategory,
+  moveProductWithinCategoryByOffset,
   reconcileProductOrder,
 } from './menuProductOrder';
 import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
@@ -239,6 +240,8 @@ export function OrdersWorkspace({
   const pendingSaveCountRef = useRef(0);
   const undoTimerRef = useRef<number | null>(null);
   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const categoryPickupSnapshotRef = useRef<readonly MenuCategoryId[] | null>(null);
+  const productPickupSnapshotRef = useRef<readonly ProductId[] | null>(null);
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -260,6 +263,9 @@ export function OrdersWorkspace({
   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
   const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
   const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);
+  const [grabbedCategoryId, setGrabbedCategoryId] = useState<MenuCategoryId | null>(null);
+  const [grabbedProductId, setGrabbedProductId] = useState<ProductId | null>(null);
+  const [menuEditAnnouncement, setMenuEditAnnouncement] = useState('');
   const [menuEditSaving, setMenuEditSaving] = useState(false);
   const [menuEditError, setMenuEditError] = useState<string | null>(null);
   const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);
@@ -556,6 +562,13 @@ export function OrdersWorkspace({
     );
     setDraggedCategoryId(null);
     setDraggedProductId(null);
+    setGrabbedCategoryId(null);
+    setGrabbedProductId(null);
+    categoryPickupSnapshotRef.current = null;
+    productPickupSnapshotRef.current = null;
+    setMenuEditAnnouncement(
+      'Menu edit mode. Pick up a category or product with Enter or Space, move it with arrow keys, and press Escape to cancel a pickup.',
+    );
     setMenuEditActive(true);
   }
 
@@ -567,6 +580,11 @@ export function OrdersWorkspace({
     );
     setDraggedCategoryId(null);
     setDraggedProductId(null);
+    setGrabbedCategoryId(null);
+    setGrabbedProductId(null);
+    categoryPickupSnapshotRef.current = null;
+    productPickupSnapshotRef.current = null;
+    setMenuEditAnnouncement('Menu layout reset to defaults. Save to keep the reset.');
     setMenuEditError(null);
     setMenuEditResetRequested(true);
   }
@@ -576,6 +594,11 @@ export function OrdersWorkspace({
     setMenuEditActive(false);
     setDraggedCategoryId(null);
     setDraggedProductId(null);
+    setGrabbedCategoryId(null);
+    setGrabbedProductId(null);
+    categoryPickupSnapshotRef.current = null;
+    productPickupSnapshotRef.current = null;
+    setMenuEditAnnouncement('');
     setMenuEditError(null);
     setMenuEditResetRequested(false);
   }
@@ -598,6 +621,11 @@ export function OrdersWorkspace({
       setMenuEditResetRequested(false);
       setDraggedCategoryId(null);
       setDraggedProductId(null);
+      setGrabbedCategoryId(null);
+      setGrabbedProductId(null);
+      categoryPickupSnapshotRef.current = null;
+      productPickupSnapshotRef.current = null;
+      setMenuEditAnnouncement('');
       setSuccessMessage('Menu layout saved');
       window.setTimeout(() => setSuccessMessage(null), 4_500);
     } catch {
@@ -605,6 +633,107 @@ export function OrdersWorkspace({
     } finally {
       setMenuEditSaving(false);
     }
+  }
+
+  function moveCategoryByOffset(categoryId: MenuCategoryId, offset: -1 | 1): void {
+    setMenuEditResetRequested(false);
+    setCategoryEditOrder((current) => {
+      const sourceIndex = current.indexOf(categoryId);
+      const targetIndex = sourceIndex + offset;
+      if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
+      const next = [...current];
+      [next[sourceIndex], next[targetIndex]] = [next[targetIndex]!, next[sourceIndex]!];
+      const category = configuredActiveCategories.find((candidate) => candidate.id === categoryId);
+      setMenuEditAnnouncement(
+        `${category?.name ?? 'Category'} moved to position ${targetIndex + 1} of ${next.length}.`,
+      );
+      return next;
+    });
+  }
+
+  function toggleCategoryPickup(categoryId: MenuCategoryId): void {
+    const category = configuredActiveCategories.find((candidate) => candidate.id === categoryId);
+    if (grabbedCategoryId === categoryId) {
+      setGrabbedCategoryId(null);
+      categoryPickupSnapshotRef.current = null;
+      setMenuEditAnnouncement(`${category?.name ?? 'Category'} dropped.`);
+      return;
+    }
+    categoryPickupSnapshotRef.current = categoryEditOrder;
+    setGrabbedProductId(null);
+    productPickupSnapshotRef.current = null;
+    setGrabbedCategoryId(categoryId);
+    setMenuEditAnnouncement(
+      `${category?.name ?? 'Category'} picked up. Use Left or Right Arrow to move, Enter or Space to drop, or Escape to cancel.`,
+    );
+  }
+
+  function cancelCategoryPickup(): void {
+    if (grabbedCategoryId === null) return;
+    const category = configuredActiveCategories.find(
+      (candidate) => candidate.id === grabbedCategoryId,
+    );
+    const snapshot = categoryPickupSnapshotRef.current;
+    if (snapshot !== null) setCategoryEditOrder(snapshot);
+    setGrabbedCategoryId(null);
+    categoryPickupSnapshotRef.current = null;
+    setMenuEditAnnouncement(`${category?.name ?? 'Category'} movement cancelled.`);
+  }
+
+  function moveProductByOffset(productId: ProductId, offset: -1 | 1): void {
+    if (selectedCategoryId === null) return;
+    setMenuEditResetRequested(false);
+    const productCategoryById = new Map(
+      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+    );
+    setMenuEditProductOrder((current) => {
+      const categoryProductIds = current.filter(
+        (candidateId) => productCategoryById.get(candidateId) === selectedCategoryId,
+      );
+      const next = moveProductWithinCategoryByOffset(
+        current,
+        categoryProductIds,
+        productId,
+        offset,
+      );
+      if (next !== current) {
+        const categoryOnly = next.filter(
+          (candidateId) => productCategoryById.get(candidateId) === selectedCategoryId,
+        );
+        const product = configuration?.products.find((candidate) => candidate.id === productId);
+        setMenuEditAnnouncement(
+          `${product?.name ?? 'Product'} moved to position ${categoryOnly.indexOf(productId) + 1} of ${categoryOnly.length}.`,
+        );
+      }
+      return next;
+    });
+  }
+
+  function toggleProductPickup(productId: ProductId): void {
+    const product = configuration?.products.find((candidate) => candidate.id === productId);
+    if (grabbedProductId === productId) {
+      setGrabbedProductId(null);
+      productPickupSnapshotRef.current = null;
+      setMenuEditAnnouncement(`${product?.name ?? 'Product'} dropped.`);
+      return;
+    }
+    productPickupSnapshotRef.current = menuEditProductOrder;
+    setGrabbedCategoryId(null);
+    categoryPickupSnapshotRef.current = null;
+    setGrabbedProductId(productId);
+    setMenuEditAnnouncement(
+      `${product?.name ?? 'Product'} picked up. Use arrow keys to move, Enter or Space to drop, or Escape to cancel.`,
+    );
+  }
+
+  function cancelProductPickup(): void {
+    if (grabbedProductId === null) return;
+    const product = configuration?.products.find((candidate) => candidate.id === grabbedProductId);
+    const snapshot = productPickupSnapshotRef.current;
+    if (snapshot !== null) setMenuEditProductOrder(snapshot);
+    setGrabbedProductId(null);
+    productPickupSnapshotRef.current = null;
+    setMenuEditAnnouncement(`${product?.name ?? 'Product'} movement cancelled.`);
   }
 
   function moveDraggedCategory(targetId: MenuCategoryId): void {
@@ -917,6 +1046,7 @@ export function OrdersWorkspace({
                           selectedCategoryId === category.id ? 'selected' : '',
                           menuEditActive ? 'category-tab-reordering' : '',
                           draggedCategoryId === category.id ? 'category-tab-dragging' : '',
+                          grabbedCategoryId === category.id ? 'category-tab-grabbed' : '',
                         ]
                           .filter(Boolean)
                           .join(' ')}
@@ -939,6 +1069,27 @@ export function OrdersWorkspace({
                         onDrop={(event) => {
                           event.preventDefault();
                           setDraggedCategoryId(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (!menuEditActive || menuEditSaving) return;
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            toggleCategoryPickup(category.id);
+                            return;
+                          }
+                          if (event.key === 'Escape' && grabbedCategoryId === category.id) {
+                            event.preventDefault();
+                            cancelCategoryPickup();
+                            return;
+                          }
+                          if (grabbedCategoryId !== category.id) return;
+                          if (event.key === 'ArrowLeft') {
+                            event.preventDefault();
+                            moveCategoryByOffset(category.id, -1);
+                          } else if (event.key === 'ArrowRight') {
+                            event.preventDefault();
+                            moveCategoryByOffset(category.id, 1);
+                          }
                         }}
                         onClick={() => {
                           setSelectedCategoryId(category.id);
@@ -1076,6 +1227,7 @@ export function OrdersWorkspace({
                       'product-card',
                       'menu-edit-product-card',
                       draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',
+                      grabbedProductId === product.id ? 'menu-edit-product-card-grabbed' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -1099,6 +1251,27 @@ export function OrdersWorkspace({
                     onDrop={(event) => {
                       event.preventDefault();
                       setDraggedProductId(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (menuEditSaving) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleProductPickup(product.id);
+                        return;
+                      }
+                      if (event.key === 'Escape' && grabbedProductId === product.id) {
+                        event.preventDefault();
+                        cancelProductPickup();
+                        return;
+                      }
+                      if (grabbedProductId !== product.id) return;
+                      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        moveProductByOffset(product.id, -1);
+                      } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        moveProductByOffset(product.id, 1);
+                      }
                     }}
                   >
                     <div className="product-main">
@@ -1145,6 +1318,12 @@ export function OrdersWorkspace({
               ))
             )}
           </div>
+
+          {menuEditActive ? (
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+              {menuEditAnnouncement}
+            </div>
+          ) : null}
 
           {menuEditActive ? (
             <div className="menu-edit-actions" aria-label="Menu edit actions">
