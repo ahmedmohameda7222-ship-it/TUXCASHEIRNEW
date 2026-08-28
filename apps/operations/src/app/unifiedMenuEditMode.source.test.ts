@@ -57,11 +57,11 @@ describe('unified menu edit entry point', () => {
   });
 
   it('freezes every edit interaction while the final preference save is in flight', () => {
-    expect(ordersWorkspaceSource).toContain(
-      'draggable={menuEditActive && !menuEditSaving && draggedCategoryId !== category.id}',
+    expect(ordersWorkspaceSource).toMatch(
+      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedCategoryId\s*!==\s*category\.id\s*\}/,
     );
-    expect(ordersWorkspaceSource).toContain(
-      'draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}',
+    expect(ordersWorkspaceSource).toMatch(
+      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedProductId\s*!==\s*product\.id\s*\}/,
     );
     expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
     expect(
