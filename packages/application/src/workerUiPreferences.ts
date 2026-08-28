@@ -4,6 +4,7 @@ import {
   type CategoryAlignment,
   type Instant,
   type MenuCategoryId,
+  type ProductId,
   type ShopId,
   type WorkerId,
   type WorkerUiPreferences,
@@ -15,6 +16,7 @@ export interface RemoteWorkerUiPreferences {
   readonly workerId: WorkerId;
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
+  readonly productOrder: readonly ProductId[];
   readonly serverVersion: number;
   readonly updatedAt: Instant;
 }
@@ -29,12 +31,14 @@ export interface WorkerUiPreferencesRemoteGateway {
     readonly workerId: WorkerId;
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }): Promise<RemoteWorkerUiPreferences>;
 }
 
 export interface WorkerUiPreferencesUpdate {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
+  readonly productOrder: readonly ProductId[];
 }
 
 export interface WorkerUiPreferencesSyncIdentity {
@@ -126,6 +130,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
       workerId,
       categoryOrder: input.categoryOrder,
       categoryAlignment: input.categoryAlignment,
+      productOrder: input.productOrder,
       updatedAt: this.#now(),
       serverVersion: current?.serverVersion ?? 0,
       syncState: 'DIRTY',
@@ -142,6 +147,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         workerId,
         categoryOrder: local.categoryOrder,
         categoryAlignment: local.categoryAlignment,
+        productOrder: local.productOrder,
       });
       await this.#repository.put(
         parseWorkerUiPreferences({
