@@ -13,7 +13,9 @@ describe('worker UI preference product-order migration', () => {
     if (!existsSync(migrationPath)) return;
 
     const sql = readFileSync(migrationPath, 'utf8');
-    expect(sql).toContain("add column if not exists product_order jsonb not null default '[]'::jsonb");
+    expect(sql).toContain(
+      "add column if not exists product_order jsonb not null default '[]'::jsonb",
+    );
     expect(sql).toContain('p_product_order jsonb');
     expect(sql).toContain("jsonb_typeof(p_product_order) <> 'array'");
     expect(sql).toContain('product_order = excluded.product_order');
