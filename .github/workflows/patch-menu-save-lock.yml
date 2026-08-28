@@ -39,3 +39,5 @@ jobs:
           git diff --cached --check
           git commit -m "fix: freeze menu edits while saving"
           git push origin HEAD:ui/unified-menu-edit-mode
+
+# Rerun after making the save-lock source contract formatting-safe.
