@@ -17,34 +17,6 @@ permissions:
   contents: read
 
 jobs:
-  format-rendered-contract-source:
-    name: format-rendered-contract-source
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: feat/worker-system-color-theme
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - name: Format and commit source contract
-        shell: bash
-        run: |
-          npx prettier --write apps/operations/src/app/workerSystemColorRenderedQa.source.test.ts
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/workerSystemColorRenderedQa.source.test.ts
-          if git diff --cached --quiet; then
-            echo "No formatting changes required."
-            exit 0
-          fi
-          git commit -m "style: format rendered system color contract"
-          git push origin HEAD:feat/worker-system-color-theme
-
   quality:
     name: quality
     runs-on: ubuntu-latest
