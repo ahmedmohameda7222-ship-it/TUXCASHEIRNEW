@@ -183,7 +183,9 @@ describe('SqliteOperationsDatabase', () => {
         .all()
         .map((row) => String(row['name']));
       expect(columns).toContain('accent_color');
-      await expect(createSqliteWorkerUiPreferencesRepository(database).get(shopId, workerId)).resolves.toMatchObject({
+      await expect(
+        createSqliteWorkerUiPreferencesRepository(database).get(shopId, workerId),
+      ).resolves.toMatchObject({
         accentColor: null,
       });
     } finally {
