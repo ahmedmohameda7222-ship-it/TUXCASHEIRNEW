@@ -3,6 +3,7 @@ import {
   instant,
   parseEntityId,
   type MenuCategoryId,
+  type ProductId,
   type ShopId,
   type WorkerId,
 } from '@tux/domain';
@@ -22,6 +23,8 @@ const preferenceWorkerAId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222
 const preferenceWorkerBId = parseEntityId<WorkerId>('82222222-2222-4222-8222-222222222222');
 const preferenceCategoryAId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333331');
 const preferenceCategoryBId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333332');
+const preferenceProductAId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444441');
+const preferenceProductBId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444442');
 
 function preference(workerId: WorkerId, serverVersion = 0) {
   return {
@@ -29,7 +32,10 @@ function preference(workerId: WorkerId, serverVersion = 0) {
     workerId,
     categoryOrder: [preferenceCategoryBId, preferenceCategoryAId],
     categoryAlignment: 'right' as const,
-    productOrder: [],
+    productOrder:
+      workerId === preferenceWorkerBId
+        ? [preferenceProductAId, preferenceProductBId]
+        : [preferenceProductBId, preferenceProductAId],
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
@@ -269,6 +275,7 @@ describe('IndexedDB migration registry', () => {
         ...preference(preferenceWorkerAId, 2),
         categoryOrder: [preferenceCategoryAId],
         categoryAlignment: 'left' as const,
+        productOrder: [preferenceProductAId, preferenceProductBId],
         syncState: 'CLEAN' as const,
       };
       await database.transaction((transaction) => transaction.workerUiPreferences.put(updated));
