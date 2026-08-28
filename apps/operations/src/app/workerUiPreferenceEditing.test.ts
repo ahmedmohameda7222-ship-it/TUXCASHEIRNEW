@@ -82,12 +82,7 @@ describe('worker UI preference editing', () => {
       productOrder: [productA, productB],
     });
     expect(
-      editing.menuEditPreferenceInput(
-        [categoryA, categoryB],
-        'center',
-        [productA, productB],
-        true,
-      ),
+      editing.menuEditPreferenceInput([categoryA, categoryB], 'center', [productA, productB], true),
     ).toEqual({
       categoryOrder: [],
       categoryAlignment: 'left',
