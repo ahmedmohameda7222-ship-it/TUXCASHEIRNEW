@@ -90,3 +90,5 @@ describe('unified menu edit entry point', () => {
     expect(menuEditStyles).toContain('animation: none');
   });
 });
+
+// This file also serves as the clean-head CI verification trigger after temporary workflow cleanup.
