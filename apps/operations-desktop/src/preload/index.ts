@@ -27,11 +27,9 @@ const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
-const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT =
-  'tux:worker-ui-preferences:update-menu-layout';
+const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT = 'tux:worker-ui-preferences:update-menu-layout';
 const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
-const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT =
-  'tux:worker-ui-preferences:reset-menu-layout';
+const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT = 'tux:worker-ui-preferences:reset-menu-layout';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
