@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import {
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type MenuCategoryId,
   type ProductId,
   type ShopId,
@@ -25,6 +26,7 @@ const preferenceCategoryAId = parseEntityId<MenuCategoryId>('83333333-3333-4333-
 const preferenceCategoryBId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333332');
 const preferenceProductAId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444441');
 const preferenceProductBId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444442');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 function preference(workerId: WorkerId, serverVersion = 0) {
   return {
@@ -36,6 +38,7 @@ function preference(workerId: WorkerId, serverVersion = 0) {
       workerId === preferenceWorkerBId
         ? [preferenceProductAId, preferenceProductBId]
         : [preferenceProductBId, preferenceProductAId],
+    accentColor: null,
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
@@ -130,9 +133,7 @@ describe('IndexedDB migration registry', () => {
     const name = `tux-indexeddb-fresh-${crypto.randomUUID()}`;
     const database = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
-      expect([...database.objectStoreNames]).toEqual(
-        expect.arrayContaining([...INDEXED_DB_STORES]),
-      );
+      expect([...database.objectStoreNames]).toEqual(expect.arrayContaining([...INDEXED_DB_STORES]));
       expect([...database.objectStoreNames]).toContain('workerUiPreferences');
       const transaction = database.transaction(
         ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
@@ -276,6 +277,7 @@ describe('IndexedDB migration registry', () => {
         categoryOrder: [preferenceCategoryAId],
         categoryAlignment: 'left' as const,
         productOrder: [preferenceProductAId, preferenceProductBId],
+        accentColor: customAccent,
         syncState: 'CLEAN' as const,
       };
       await database.transaction((transaction) => transaction.workerUiPreferences.put(updated));
