@@ -16,7 +16,7 @@ describe('worker system color rendered QA contract', () => {
     expect(e2e).toContain("name: 'Pick from screen', exact: true");
     expect(e2e).toContain("name: 'Reset to TUX default', exact: true");
     expect(e2e).toContain("getByText('Current color', { exact: true })");
-    expect(e2e).toContain("input[type='checkbox']")).toContain('toHaveCount(0)');
+    expect(e2e).toContain("expect(dialog.locator(\"input[type='checkbox']\")).toHaveCount(0)");
   });
 
   it('covers synchronized preview/cancel/reset persistence, appearance modes, and two workers', () => {
