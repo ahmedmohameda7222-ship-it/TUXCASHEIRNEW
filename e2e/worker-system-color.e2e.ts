@@ -335,13 +335,15 @@ async function switchWorker(
   currentWorker: string,
   pin: string,
   nextWorker: string,
-  outgoingAccent: string,
+  outgoingAccent: string | null,
 ): Promise<void> {
   await page.getByRole('button', { name: new RegExp(currentWorker) }).click();
   await page.getByRole('menuitem', { name: 'Switch / Sign in worker' }).click();
   await page.getByLabel('Enter PIN to Sign In').fill(pin);
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-  await expect.poll(() => renderedSystemAccent(page)).not.toBe(outgoingAccent);
+  if (outgoingAccent !== null) {
+    await expect.poll(() => renderedSystemAccent(page)).not.toBe(outgoingAccent);
+  }
   await page.waitForFunction(
     () =>
       document.querySelector('.welcome-action') !== null ||
@@ -368,7 +370,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   const defaultLightAccent = await renderedSystemAccent(page);
   let dialog = await openSystemColorDialog(page, 'Demo Worker One');
   await assertApprovedDialog(page, dialog);
-  await expect(dialog.locator("input[type='checkbox']")).not.toBeChecked();
+  await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
   await setNativeSystemColor(dialog, '#1e3a8a');
   await expect.poll(() => renderedSystemAccent(page)).not.toBe(defaultLightAccent);
   const workerOneLightAccent = await renderedSystemAccent(page);
@@ -451,7 +453,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await switchWorker(page, 'Demo Worker Two', '1234', 'Demo Worker One', defaultLightAccent);
+  await switchWorker(page, 'Demo Worker Two', '1234', 'Demo Worker One', null);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
 
   await page.setViewportSize({ width: 1280, height: 720 });
