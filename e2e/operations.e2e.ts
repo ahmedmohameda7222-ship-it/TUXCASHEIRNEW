@@ -2242,10 +2242,12 @@ test('follow-up desktop approval evidence is captured from the committed tree', 
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Edit categories' }).click();
-  await expect(page.getByLabel('Edit categories')).toBeVisible();
-  await shot('followup-03-orders-category-edit-1440.png');
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const editMenu = page.getByRole('button', { name: 'Edit menu' });
+  await editMenu.click();
+  await expect(editMenu).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByLabel('Menu edit actions')).toBeVisible();
+  await shot('followup-03-orders-menu-edit-1440.png');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
   let cart = currentOrderCart(page, testInfo);
