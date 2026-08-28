@@ -10,11 +10,9 @@ function css(): string {
 }
 
 describe('Product position editor visual contract', () => {
-  it('provides a compact management entry and clear reorder state without changing card dimensions', () => {
+  it('keeps the legacy isolated reorder state without restoring the removed Manage order entry point', () => {
     const source = css();
-    expect(source).toMatch(
-      /\.category-manage-order-action\s*\{[^}]*min-height:\s*44px;[^}]*padding:[^;}]*;/s,
-    );
+    expect(source).not.toMatch(/\.category-manage-order-action\s*\{/);
     expect(source).toMatch(
       /\.product-card-reordering\s*\{[^}]*cursor:\s*grab;[^}]*transition:[^;}]*;/s,
     );

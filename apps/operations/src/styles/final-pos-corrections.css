@@ -577,24 +577,7 @@
   color: var(--tux-action-foreground);
 }
 
-/* Approved worker-specific Product Card position editor. */
-.category-manage-order-action {
-  min-height: 44px;
-  border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-sm);
-  background: var(--tux-surface-raised);
-  color: var(--tux-text-primary);
-  padding: 0 12px;
-  font-size: 14px;
-  line-height: 18px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.category-manage-order-action:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--tux-accent) 22%, var(--tux-border-subtle));
-  background: var(--tux-accent-hover-soft);
-}
+/* Legacy ProductPositionEditor styles remain for its isolated component tests. */
 
 .product-position-editor {
   display: grid;
@@ -792,12 +775,6 @@
 }
 
 @media (max-width: 54rem) {
-  .menu-toolbar .category-nav-actions > .category-manage-order-action {
-    width: auto;
-    min-width: max-content;
-    padding: 0 10px;
-  }
-
   .product-reorder-cue {
     margin-inline: 8px;
     padding-inline: 12px;
@@ -819,6 +796,125 @@
 
   .product-card-dragging,
   .product-card-grabbed {
+    transform: none;
+  }
+}
+
+/* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */
+.menu-edit-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--tux-border-subtle);
+  background: color-mix(in srgb, var(--tux-surface-panel) 94%, transparent);
+  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
+  backdrop-filter: blur(14px) saturate(112%);
+  -webkit-backdrop-filter: blur(14px) saturate(112%);
+}
+
+.menu-edit-action-status,
+.menu-edit-actions-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-edit-actions button {
+  min-height: 44px;
+}
+
+.menu-edit-actions > .menu-edit-action-status > .text-action {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--tux-radius-sm);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.category-tab-reordering,
+.menu-edit-product-card {
+  cursor: grab;
+  user-select: none;
+  touch-action: manipulation;
+  transform-origin: center;
+}
+
+.category-tab-dragging,
+.category-tab-grabbed,
+.menu-edit-product-card-dragging,
+.menu-edit-product-card-grabbed {
+  animation-play-state: paused;
+  border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
+  background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.menu-edit-product-hint {
+  padding: 0 8px 8px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+@keyframes menu-edit-jiggle {
+  0%,
+  100% {
+    transform: rotate(-0.2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.2deg) translateY(-0.5px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .category-tab-reordering {
+    animation: menu-edit-jiggle 1.8s ease-in-out infinite;
+  }
+
+  .menu-edit-product-card {
+    animation: menu-edit-jiggle 1.95s ease-in-out infinite;
+  }
+
+  .category-tab-reordering:nth-child(2n),
+  .menu-edit-product-card:nth-child(2n) {
+    animation-delay: -0.45s;
+  }
+
+  .category-tab-reordering:nth-child(3n),
+  .menu-edit-product-card:nth-child(3n) {
+    animation-delay: -0.9s;
+  }
+}
+
+@media (max-width: 54rem) {
+  .menu-edit-actions {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-tab-reordering,
+  .menu-edit-product-card {
+    animation: none;
+    transform: none;
+  }
+
+  .category-tab-dragging,
+  .category-tab-grabbed,
+  .menu-edit-product-card-dragging,
+  .menu-edit-product-card-grabbed {
     transform: none;
   }
 }
