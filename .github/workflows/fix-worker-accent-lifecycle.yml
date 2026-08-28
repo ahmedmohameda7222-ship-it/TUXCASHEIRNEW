@@ -1,0 +1,99 @@
+name: Temporary worker accent lifecycle fix
+
+on:
+  push:
+    branches:
+      - feat/worker-system-color-theme
+
+permissions:
+  contents: write
+
+jobs:
+  fix-worker-accent-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/worker-system-color-theme
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply minimal worker identity guard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/operations/src/app/App.tsx')
+          source = path.read_text()
+
+          state_needle = "  const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);\n"
+          state_replacement = state_needle + "  const accentWorkerIdRef = useRef(session.operator.id);\n"
+          if source.count(state_needle) != 1:
+              raise SystemExit(f'Expected one accent state insertion point, found {source.count(state_needle)}')
+          source = source.replace(state_needle, state_replacement, 1)
+
+          effect_needle = "  useLayoutEffect(() => {\n    let cancelled = false;\n    setAccentHydrated(false);\n"
+          effect_replacement = "  useLayoutEffect(() => {\n    let cancelled = false;\n    accentWorkerIdRef.current = session.operator.id;\n    setSystemColorOpen(false);\n    setSystemColorSaving(false);\n    setSystemColorSaveError(null);\n    setAccentHydrated(false);\n"
+          if source.count(effect_needle) != 1:
+              raise SystemExit(f'Expected one worker hydration effect insertion point, found {source.count(effect_needle)}')
+          source = source.replace(effect_needle, effect_replacement, 1)
+
+          save_needle = """  async function saveSystemColor(accentColor: SystemAccentColor | null): Promise<void> {
+    if (systemColorSaving) return;
+    setSystemColorSaving(true);
+    setSystemColorSaveError(null);
+    try {
+      const saved = await preferencesClient.updateAccentColor(accentColor);
+      setSavedAccentColor(saved.accentColor);
+      setPreviewAccentColor(saved.accentColor);
+      setSystemColorOpen(false);
+    } catch {
+      setSystemColorSaveError('Could not save system color. Try again.');
+    } finally {
+      setSystemColorSaving(false);
+    }
+  }
+"""
+          save_replacement = """  async function saveSystemColor(accentColor: SystemAccentColor | null): Promise<void> {
+    if (systemColorSaving) return;
+    const saveWorkerId = session.operator.id;
+    setSystemColorSaving(true);
+    setSystemColorSaveError(null);
+    try {
+      const saved = await preferencesClient.updateAccentColor(accentColor);
+      if (accentWorkerIdRef.current !== saveWorkerId) return;
+      setSavedAccentColor(saved.accentColor);
+      setPreviewAccentColor(saved.accentColor);
+      setSystemColorOpen(false);
+    } catch {
+      if (accentWorkerIdRef.current !== saveWorkerId) return;
+      setSystemColorSaveError('Could not save system color. Try again.');
+    } finally {
+      if (accentWorkerIdRef.current === saveWorkerId) setSystemColorSaving(false);
+    }
+  }
+"""
+          if source.count(save_needle) != 1:
+              raise SystemExit(f'Expected one saveSystemColor block, found {source.count(save_needle)}')
+          source = source.replace(save_needle, save_replacement, 1)
+          path.write_text(source)
+          PY
+          npx prettier --write apps/operations/src/app/App.tsx
+          npx vitest run apps/operations/src/app/workerSystemColorLifecycle.source.test.ts
+          npm run typecheck
+          npm run format:check
+      - name: Commit production fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-worker-accent-lifecycle.yml
+          git add apps/operations/src/app/App.tsx
+          git diff --cached --check
+          git commit -m 'fix: guard system color across worker changes'
+          git push origin HEAD:feat/worker-system-color-theme
