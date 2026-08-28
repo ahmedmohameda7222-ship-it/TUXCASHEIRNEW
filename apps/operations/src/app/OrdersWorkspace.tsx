@@ -606,6 +606,12 @@ export function OrdersWorkspace({
   async function saveMenuEdit(): Promise<void> {
     if (menuEditSaving) return;
     setMenuEditSaving(true);
+    setDraggedCategoryId(null);
+    setDraggedProductId(null);
+    setGrabbedCategoryId(null);
+    setGrabbedProductId(null);
+    categoryPickupSnapshotRef.current = null;
+    productPickupSnapshotRef.current = null;
     setMenuEditError(null);
     try {
       const saved = await preferencesClient.update(
@@ -1050,19 +1056,24 @@ export function OrdersWorkspace({
                         ]
                           .filter(Boolean)
                           .join(' ')}
-                        draggable={menuEditActive && draggedCategoryId !== category.id}
+                        draggable={
+                          menuEditActive && !menuEditSaving && draggedCategoryId !== category.id
+                        }
                         onDragStart={(event) => {
+                          if (menuEditSaving) return;
                           if (!menuEditActive) return;
                           setDraggedCategoryId(category.id);
                           event.dataTransfer.effectAllowed = 'move';
                           event.dataTransfer.setData('text/plain', category.id);
                         }}
                         onDragEnter={(event) => {
+                          if (menuEditSaving) return;
                           if (!menuEditActive || draggedCategoryId === null) return;
                           event.preventDefault();
                           moveDraggedCategory(category.id);
                         }}
                         onDragOver={(event) => {
+                          if (menuEditSaving) return;
                           if (menuEditActive && draggedCategoryId !== null) event.preventDefault();
                         }}
                         onDragEnd={() => setDraggedCategoryId(null)}
@@ -1113,6 +1124,7 @@ export function OrdersWorkspace({
                         <button
                           type="button"
                           key={alignment}
+                          disabled={menuEditSaving}
                           aria-pressed={categoryEditAlignment === alignment}
                           onClick={() => {
                             setCategoryEditAlignment(alignment);
@@ -1231,20 +1243,23 @@ export function OrdersWorkspace({
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    draggable={menuEditActive && draggedProductId !== product.id}
+                    draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}
                     tabIndex={0}
                     aria-label={`Reorder ${product.name}`}
                     onDragStart={(event) => {
+                      if (menuEditSaving) return;
                       setDraggedProductId(product.id);
                       event.dataTransfer.effectAllowed = 'move';
                       event.dataTransfer.setData('text/plain', product.id);
                     }}
                     onDragEnter={(event) => {
+                      if (menuEditSaving) return;
                       if (draggedProductId === null) return;
                       event.preventDefault();
                       moveDraggedProduct(product.id);
                     }}
                     onDragOver={(event) => {
+                      if (menuEditSaving) return;
                       if (draggedProductId !== null) event.preventDefault();
                     }}
                     onDragEnd={() => setDraggedProductId(null)}
