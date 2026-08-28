@@ -44,6 +44,7 @@ function remote(overrides: Partial<RemoteWorkerUiPreferences> = {}): RemoteWorke
     workerId,
     categoryOrder: [categoryA],
     categoryAlignment: 'center',
+    productOrder: [],
     updatedAt: instant('2026-08-25T03:05:00.000Z'),
     serverVersion: 4,
     ...overrides,
@@ -91,6 +92,7 @@ class RecordingGateway implements WorkerUiPreferencesRemoteGateway {
     readonly workerId: WorkerId;
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }) {
     this.calls.push(`put:${input.categoryAlignment}:${input.categoryOrder.join(',')}`);
     this.putInputs.push(input);
@@ -114,6 +116,7 @@ describe('WorkerUiPreferencesService', () => {
     const result = await service.update(shopId, workerId, {
       categoryOrder: [categoryB, categoryA],
       categoryAlignment: 'right',
+      productOrder: [],
     });
 
     expect(result).toEqual(
@@ -207,7 +210,6 @@ describe('WorkerUiPreferencesService', () => {
     expect(gateway.calls).toEqual(['get']);
     expect(repository.value).toEqual({
       ...gateway.getResult,
-      productOrder: [],
       syncState: 'CLEAN',
     });
   });
@@ -234,7 +236,6 @@ describe('WorkerUiPreferencesService', () => {
 
     expect(repository.value).toEqual({
       ...gateway.getResult,
-      productOrder: [],
       syncState: 'CLEAN',
     });
   });
