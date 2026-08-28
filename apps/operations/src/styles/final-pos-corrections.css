@@ -749,7 +749,23 @@
   -webkit-backdrop-filter: blur(14px) saturate(112%);
 }
 
-.product-reorder-actions > .text-action,
+.product-reorder-actions > .text-action {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--tux-radius-sm);
+  background: transparent;
+  color: var(--tux-text-secondary);
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.product-reorder-actions > .text-action:hover:not(:disabled) {
+  background: var(--tux-accent-hover-soft);
+  color: var(--tux-text-primary);
+}
+
 .product-reorder-actions-primary > button {
   min-height: 44px;
 }
