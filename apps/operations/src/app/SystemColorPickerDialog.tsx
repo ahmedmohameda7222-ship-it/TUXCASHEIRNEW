@@ -30,7 +30,9 @@ export function SystemColorPickerDialog({
   const pickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const returnFocusTarget = document.querySelector<HTMLElement>('.operator-trigger');
     pickerRef.current?.focus();
+    return () => returnFocusTarget?.focus();
   }, []);
 
   useEffect(() => {
