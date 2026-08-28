@@ -24,7 +24,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Apply production patch
+      - name: Apply structural Task 4 patch
         run: python .github/scripts/unified-menu-edit-patcher.py
       - name: Format and verify patch
         run: |
