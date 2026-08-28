@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const ordersWorkspaceSource = readFileSync(new URL('./OrdersWorkspace.tsx', import.meta.url), 'utf8');
+const ordersWorkspaceSource = readFileSync(
+  new URL('./OrdersWorkspace.tsx', import.meta.url),
+  'utf8',
+);
 
 describe('unified menu edit entry point', () => {
   it('removes the standalone Manage order entry point while retaining the existing edit/search controls', () => {
