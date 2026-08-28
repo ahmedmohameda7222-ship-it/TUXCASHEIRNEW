@@ -46,6 +46,7 @@ function preference(
     workerId,
     categoryOrder,
     categoryAlignment,
+    productOrder: [],
     updatedAt: instant('2026-08-25T03:00:00.000Z'),
     serverVersion: 2,
     syncState: 'CLEAN',
