@@ -31,36 +31,31 @@ describe('parseWorkerUiPreferences', () => {
   });
 
   it('normalizes a persisted worker accent', () => {
-    expect(
-      parseWorkerUiPreferences({ ...validPreferences, accentColor: '#1e3a8a' }).accentColor,
-    ).toBe('#1E3A8A');
+    const parsed = parseWorkerUiPreferences({ ...validPreferences, accentColor: '#1e3a8a' });
+    expect(parsed.accentColor).toBe('#1E3A8A');
   });
 
-  it(
-    'keeps older persisted preferences backward compatible by defaulting product order and accent',
-    () => {
-      const legacyPreferences = {
-        shopId: validPreferences.shopId,
-        workerId: validPreferences.workerId,
-        categoryOrder: validPreferences.categoryOrder,
-        categoryAlignment: validPreferences.categoryAlignment,
-        updatedAt: validPreferences.updatedAt,
-        serverVersion: validPreferences.serverVersion,
-        syncState: validPreferences.syncState,
-      } as const;
+  it('defaults legacy product order and accent', () => {
+    const legacyPreferences = {
+      shopId: validPreferences.shopId,
+      workerId: validPreferences.workerId,
+      categoryOrder: validPreferences.categoryOrder,
+      categoryAlignment: validPreferences.categoryAlignment,
+      updatedAt: validPreferences.updatedAt,
+      serverVersion: validPreferences.serverVersion,
+      syncState: validPreferences.syncState,
+    } as const;
 
-      expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
-        ...legacyPreferences,
-        productOrder: [],
-        accentColor: null,
-      });
-    },
-  );
+    expect(parseWorkerUiPreferences(legacyPreferences)).toEqual({
+      ...legacyPreferences,
+      productOrder: [],
+      accentColor: null,
+    });
+  });
 
   it('treats an explicit null accent as the TUX default', () => {
-    expect(
-      parseWorkerUiPreferences({ ...validPreferences, accentColor: null }).accentColor,
-    ).toBeNull();
+    const parsed = parseWorkerUiPreferences({ ...validPreferences, accentColor: null });
+    expect(parsed.accentColor).toBeNull();
   });
 
   it.each(['top', '', 'CENTER'])('rejects invalid category alignment %s', (categoryAlignment) => {
