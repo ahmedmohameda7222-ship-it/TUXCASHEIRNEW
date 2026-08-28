@@ -56,6 +56,19 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
   });
 
+  it('freezes every edit interaction while the final preference save is in flight', () => {
+    expect(ordersWorkspaceSource).toContain(
+      'draggable={menuEditActive && !menuEditSaving && draggedCategoryId !== category.id}',
+    );
+    expect(ordersWorkspaceSource).toContain(
+      'draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}',
+    );
+    expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
+    expect(ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      4,
+    );
+  });
+
   it('supports keyboard pickup drop move and cancel for categories and Product Cards', () => {
     expect(ordersWorkspaceSource).toContain('grabbedCategoryId');
     expect(ordersWorkspaceSource).toContain('grabbedProductId');
@@ -90,5 +103,3 @@ describe('unified menu edit entry point', () => {
     expect(menuEditStyles).toContain('animation: none');
   });
 });
-
-// This file also serves as the clean-head CI verification trigger after temporary workflow cleanup.
