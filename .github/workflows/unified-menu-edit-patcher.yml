@@ -24,16 +24,20 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format Task 6 RED contract
-        run: npx prettier --write apps/operations/src/app/unifiedMenuEditMode.source.test.ts
-      - name: Commit RED formatting if needed
+      - name: Apply Task 6 production patch
+        run: python .github/scripts/unified-menu-edit-patcher.py
+      - name: Format Task 6 files
+        run: |
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
+          git diff --check
+      - name: Task 6 GREEN unit gate
+        run: npm run test
+      - name: Commit Task 6 production change
         run: |
           git config user.name "tux-implementation-bot"
           git config user.email "tux-implementation-bot@users.noreply.github.com"
-          if ! git diff --quiet -- apps/operations/src/app/unifiedMenuEditMode.source.test.ts; then
-            git add apps/operations/src/app/unifiedMenuEditMode.source.test.ts
-            git commit -m "test: format keyboard motion contract"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add keyboard reorder and edit jiggle"
             git push origin HEAD:ui/unified-menu-edit-mode
           fi
-      - name: Task 6 RED unit gate
-        run: npm run test
