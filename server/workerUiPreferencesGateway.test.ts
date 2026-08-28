@@ -68,17 +68,21 @@ function request(input: {
   } as GatewayRequest;
 }
 
-function remoteRow(workerId: string, serverVersion: number, accentColor: string | null = null) {
+function remoteRow(workerId: string, serverVersion: number) {
   return {
     shop_id: shopA,
     worker_id: workerId,
     category_order: [categoryA],
     category_alignment: 'center',
     product_order: [productB, productA],
-    accent_color: accentColor,
+    accent_color: null,
     server_version: serverVersion,
     updated_at: `2026-08-25T03:0${serverVersion}:00.000Z`,
   };
+}
+
+function remoteRowWithAccent(workerId: string, serverVersion: number) {
+  return { ...remoteRow(workerId, serverVersion), accent_color: customAccent };
 }
 
 beforeEach(() => {
@@ -141,14 +145,14 @@ describe('handleWorkerUiPreferences', () => {
     expect(capture.body()).toEqual({ status: 'NOT_FOUND' });
   });
 
-  it('returns and forwards the complete worker preference on accepted PUTs', async () => {
+  it('returns and forwards worker-specific product ordering on accepted PUTs', async () => {
     const upstream = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerA, 1, customAccent)]), { status: 200 }),
+        new Response(JSON.stringify([remoteRowWithAccent(workerA, 1)]), { status: 200 }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify([remoteRow(workerA, 2, customAccent)]), { status: 200 }),
+        new Response(JSON.stringify([remoteRowWithAccent(workerA, 2)]), { status: 200 }),
       );
     vi.stubGlobal('fetch', upstream);
 
@@ -192,13 +196,12 @@ describe('handleWorkerUiPreferences', () => {
     });
   });
 
-  it('accepts null accent as the exact TUX-default worker preference', async () => {
-    const upstream = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify([remoteRow(workerA, 1, null)]), { status: 200 }),
-    );
+  it('forwards null accent as TUX default', async () => {
+    const upstream = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify([remoteRow(workerA, 1)]), { status: 200 }));
     vi.stubGlobal('fetch', upstream);
     const capture = responseCapture();
-
     await handleWorkerUiPreferences(
       request({
         method: 'PUT',
@@ -226,7 +229,6 @@ describe('handleWorkerUiPreferences', () => {
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     const capture = responseCapture();
-
     await handleWorkerUiPreferences(
       request({
         method: 'PUT',
@@ -249,43 +251,37 @@ describe('handleWorkerUiPreferences', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it(
-    'selects product order and accent while targeting worker preferences independently',
-    async () => {
-      const upstream = vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify([remoteRow(workerA, 3, customAccent)]), { status: 200 }),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify([remoteRow(workerB, 7, null)]), { status: 200 }),
-        );
-      vi.stubGlobal('fetch', upstream);
+  it('selects product order while targeting worker preferences independently', async () => {
+    const upstream = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRowWithAccent(workerA, 3)]), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([remoteRow(workerB, 7)]), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', upstream);
 
-      for (const [workerId, expectedAccent] of [
-        [workerA, customAccent],
-        [workerB, null],
-      ] as const) {
-        const capture = responseCapture();
-        await handleWorkerUiPreferences(
-          request({
-            method: 'GET',
-            url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerId}`,
-            shopId: shopA,
-          }),
-          capture.response,
-        );
-        expect(capture.body()['workerId']).toBe(workerId);
-        expect(capture.body()['productOrder']).toEqual([productB, productA]);
-        expect(capture.body()['accentColor']).toBe(expectedAccent);
-      }
+    for (const workerId of [workerA, workerB]) {
+      const capture = responseCapture();
+      await handleWorkerUiPreferences(
+        request({
+          method: 'GET',
+          url: `/api/worker-ui-preferences?shopId=${shopA}&workerId=${workerId}`,
+          shopId: shopA,
+        }),
+        capture.response,
+      );
+      expect(capture.body()['workerId']).toBe(workerId);
+      expect(capture.body()['productOrder']).toEqual([productB, productA]);
+      expect(capture.body()['accentColor']).toBe(workerId === workerA ? customAccent : null);
+    }
 
-      const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
-      const secondUrl = new URL(String(upstream.mock.calls[1]?.[0]));
-      expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
-      expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
-      expect(firstUrl.searchParams.get('select')).toContain('product_order');
-      expect(firstUrl.searchParams.get('select')).toContain('accent_color');
-    },
-  );
+    const firstUrl = new URL(String(upstream.mock.calls[0]?.[0]));
+    const secondUrl = new URL(String(upstream.mock.calls[1]?.[0]));
+    expect(firstUrl.searchParams.get('worker_id')).toBe(`eq.${workerA}`);
+    expect(secondUrl.searchParams.get('worker_id')).toBe(`eq.${workerB}`);
+    expect(firstUrl.searchParams.get('select')).toContain('product_order');
+    expect(firstUrl.searchParams.get('select')).toContain('accent_color');
+  });
 });
