@@ -32,10 +32,7 @@ describe('system accent theme', () => {
       b: 138,
     });
     expect(rgbToSystemAccentColor({ r: 30, g: 58, b: 138 })).toBe('#1E3A8A');
-    expect(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 })).toBeCloseTo(
-      21,
-      2,
-    );
+    expect(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 })).toBeCloseTo(21, 2);
   });
 
   for (const theme of ['light', 'dark'] as const) {
@@ -44,9 +41,7 @@ describe('system accent theme', () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
         const panel = theme === 'light' ? LIGHT_PANEL : DARK_PANEL;
         const accent = systemAccentColorToRgb(parseSystemAccentColor(palette.accent));
-        const foreground = systemAccentColorToRgb(
-          parseSystemAccentColor(palette.actionForeground),
-        );
+        const foreground = systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground));
         const soft = systemAccentColorToRgb(parseSystemAccentColor(palette.soft));
         const text = systemAccentColorToRgb(parseSystemAccentColor(palette.text));
         const focus = systemAccentColorToRgb(parseSystemAccentColor(palette.focusRing));
