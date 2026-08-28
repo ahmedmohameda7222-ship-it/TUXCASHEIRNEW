@@ -56,22 +56,36 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource.match(/preferencesClient\.update\(/g)).toHaveLength(1);
   });
 
-  it('supports keyboard reordering for categories and Product Cards', () => {
-    expect(ordersWorkspaceSource).toContain('function moveCategoryByOffset');
-    expect(ordersWorkspaceSource).toContain('moveProductWithinCategoryByOffset');
+  it('supports keyboard pickup drop move and cancel for categories and Product Cards', () => {
+    expect(ordersWorkspaceSource).toContain('grabbedCategoryId');
+    expect(ordersWorkspaceSource).toContain('grabbedProductId');
+    expect(ordersWorkspaceSource).toContain('categoryPickupSnapshotRef');
+    expect(ordersWorkspaceSource).toContain('productPickupSnapshotRef');
+    expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
+    expect(ordersWorkspaceSource).toContain('function toggleCategoryPickup');
+    expect(ordersWorkspaceSource).toContain('function cancelCategoryPickup');
+    expect(ordersWorkspaceSource).toContain('function toggleProductPickup');
+    expect(ordersWorkspaceSource).toContain('function cancelProductPickup');
+    expect(ordersWorkspaceSource).toContain('category-tab-grabbed');
+    expect(ordersWorkspaceSource).toContain('menu-edit-product-card-grabbed');
+    expect(ordersWorkspaceSource).toContain("event.key === 'Enter' || event.key === ' '");
+    expect(ordersWorkspaceSource).toContain("event.key === 'Escape'");
     expect(ordersWorkspaceSource).toContain("event.key === 'ArrowLeft'");
     expect(ordersWorkspaceSource).toContain("event.key === 'ArrowRight'");
     expect(ordersWorkspaceSource).toContain("event.key === 'ArrowUp'");
     expect(ordersWorkspaceSource).toContain("event.key === 'ArrowDown'");
+    expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
 
-  it('jiggles both reorder surfaces continuously with staggered timing and respects Reduced Motion', () => {
+  it('jiggles both reorder surfaces continuously with staggered timing and distinct grabbed state while respecting Reduced Motion', () => {
     expect(menuEditStyles).toContain('@keyframes menu-edit-jiggle');
     expect(menuEditStyles).toContain('.category-tab-reordering');
     expect(menuEditStyles).toContain('.menu-edit-product-card');
     expect(menuEditStyles).toContain('animation: menu-edit-jiggle');
     expect(menuEditStyles).toContain(':nth-child(2n)');
     expect(menuEditStyles).toContain(':nth-child(3n)');
+    expect(menuEditStyles).toContain('.category-tab-grabbed');
+    expect(menuEditStyles).toContain('.menu-edit-product-card-grabbed');
     expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
     expect(menuEditStyles).toContain('animation: none');
   });
