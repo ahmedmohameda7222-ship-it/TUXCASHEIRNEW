@@ -1,4 +1,10 @@
-import { parseEntityId, type MenuCategoryId, type ShopId, type WorkerId } from './ids';
+import {
+  parseEntityId,
+  type MenuCategoryId,
+  type ProductId,
+  type ShopId,
+  type WorkerId,
+} from './ids';
 import { instant, type Instant } from './time';
 
 export type CategoryAlignment = 'left' | 'center' | 'right';
@@ -9,6 +15,7 @@ export interface WorkerUiPreferences {
   readonly workerId: WorkerId;
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
+  readonly productOrder: readonly ProductId[];
   readonly updatedAt: Instant;
   readonly serverVersion: number;
   readonly syncState: WorkerUiPreferencesSyncState;
@@ -61,6 +68,24 @@ function categoryOrder(value: unknown): readonly MenuCategoryId[] {
   return parsed;
 }
 
+function productOrder(value: unknown): readonly ProductId[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new TypeError('WorkerUiPreferences.productOrder must be an array.');
+  }
+  const parsed = value.map((productId, index) => {
+    try {
+      return parseEntityId<ProductId>(text(productId, `productOrder[${index}]`));
+    } catch (cause) {
+      throw new TypeError(`WorkerUiPreferences.productOrder[${index}] is invalid.`, { cause });
+    }
+  });
+  if (new Set(parsed).size !== parsed.length) {
+    throw new TypeError('WorkerUiPreferences.productOrder must not contain duplicate product IDs.');
+  }
+  return parsed;
+}
+
 export function parseWorkerUiPreferences(value: unknown): WorkerUiPreferences {
   const preferences = record(value);
   const serverVersion = preferences['serverVersion'];
@@ -78,6 +103,7 @@ export function parseWorkerUiPreferences(value: unknown): WorkerUiPreferences {
       workerId: parseEntityId<WorkerId>(text(preferences['workerId'], 'workerId')),
       categoryOrder: categoryOrder(preferences['categoryOrder']),
       categoryAlignment: categoryAlignment(preferences['categoryAlignment']),
+      productOrder: productOrder(preferences['productOrder']),
       updatedAt: instant(text(preferences['updatedAt'], 'updatedAt')),
       serverVersion,
       syncState: syncState(preferences['syncState']),
