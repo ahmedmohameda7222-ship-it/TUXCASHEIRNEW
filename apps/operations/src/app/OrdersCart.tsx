@@ -390,7 +390,16 @@ export function OrdersCart({
               <button
                 type="button"
                 key={orderType.id}
-                className={draft.orderTypeId === orderType.id ? 'selected' : undefined}
+                className={
+                  [
+                    draft.orderTypeId === orderType.id ? 'selected' : null,
+                    orderType.behavior === 'TAKE_AWAY' || orderType.behavior === 'DELIVERY'
+                      ? 'cashier-critical-label'
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
                 disabled={busy}
                 onClick={() => selectOrderType(orderType.id)}
               >
@@ -565,9 +574,17 @@ export function OrdersCart({
                       type="button"
                       key={method.id}
                       className={
-                        draft.payment.mode === 'SINGLE' && draft.payment.methodId === method.id
-                          ? 'selected'
-                          : undefined
+                        [
+                          draft.payment.mode === 'SINGLE' && draft.payment.methodId === method.id
+                            ? 'selected'
+                            : null,
+                          method.logicType === 'CASH' ||
+                          method.displayName.trim().toLowerCase() === 'instapay'
+                            ? 'cashier-critical-label'
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' ') || undefined
                       }
                       disabled={busy}
                       onClick={() => selectSingleMethod(method)}
