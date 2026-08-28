@@ -1,6 +1,7 @@
 import {
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type MenuCategoryId,
   type ProductId,
   type ShopId,
@@ -16,6 +17,7 @@ const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-0000000
 const categoryB = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-000000000002');
 const productA = parseEntityId<ProductId>('44444444-4444-4444-8444-000000000001');
 const productB = parseEntityId<ProductId>('44444444-4444-4444-8444-000000000002');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 const preference: WorkerUiPreferences = {
   shopId,
@@ -23,13 +25,14 @@ const preference: WorkerUiPreferences = {
   categoryOrder: [categoryB, categoryA],
   categoryAlignment: 'right',
   productOrder: [productB, productA],
+  accentColor: customAccent,
   serverVersion: 4,
   updatedAt: instant(new Date('2026-08-28T06:00:00.000Z')),
   syncState: 'CLEAN',
 };
 
 describe('worker UI preference editing', () => {
-  it('preserves product order while saving or resetting category layout', () => {
+  it('preserves product order while saving or resetting category layout without copying accent', () => {
     expect('categoryLayoutPreferenceInput' in editing).toBe(true);
     if (!('categoryLayoutPreferenceInput' in editing)) return;
 
@@ -49,7 +52,7 @@ describe('worker UI preference editing', () => {
     });
   });
 
-  it('preserves category layout while saving or resetting product positions', () => {
+  it('preserves category layout while saving or resetting product positions without copying accent', () => {
     expect('productOrderPreferenceInput' in editing).toBe(true);
     if (!('productOrderPreferenceInput' in editing)) return;
 
@@ -65,7 +68,7 @@ describe('worker UI preference editing', () => {
     });
   });
 
-  it('builds one unified menu-edit payload and resets all three preference fields together', () => {
+  it('builds one unified menu-layout payload with no accent field', () => {
     expect('menuEditPreferenceInput' in editing).toBe(true);
     if (!('menuEditPreferenceInput' in editing)) return;
 
