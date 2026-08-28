@@ -10,11 +10,8 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
-import {
-  filterProductsForMenu,
-  productFamiliesForCategory,
-  reconcileCategoryOrder,
-} from './OrdersWorkspace';
+import { productFamiliesForCategory, reconcileCategoryOrder } from './OrdersWorkspace';
+import { filterProductsForMenu } from './menuProductOrder';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
