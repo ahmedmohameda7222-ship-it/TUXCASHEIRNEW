@@ -2515,6 +2515,31 @@ async function renderedSystemAccent(page: Page): Promise<string> {
     );
 }
 
+async function renderedActionContrast(page: Page): Promise<number> {
+  return page.locator('html').evaluate((node) => {
+    const style = getComputedStyle(node);
+    const parseHex = (value: string): [number, number, number] => {
+      const match = /^#([0-9a-f]{6})$/i.exec(value.trim());
+      if (match === null) throw new Error(`Expected canonical HEX color, got ${value}`);
+      const hex = match[1]!;
+      return [
+        Number.parseInt(hex.slice(0, 2), 16),
+        Number.parseInt(hex.slice(2, 4), 16),
+        Number.parseInt(hex.slice(4, 6), 16),
+      ];
+    };
+    const linearChannel = (channel: number): number => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = ([r, g, b]: [number, number, number]): number =>
+      0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b);
+    const accent = luminance(parseHex(style.getPropertyValue('--tux-accent')));
+    const foreground = luminance(parseHex(style.getPropertyValue('--tux-action-foreground')));
+    return (Math.max(accent, foreground) + 0.05) / (Math.min(accent, foreground) + 0.05);
+  });
+}
+
 async function openWorkerSystemColorDialog(page: Page, workerName: string): Promise<Locator> {
   await page.getByRole('button', { name: new RegExp(workerName) }).click();
   await page.getByRole('button', { name: 'Choose system color', exact: true }).click();
@@ -2680,6 +2705,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await chooseHexSystemColor(dialog, '#1e3a8a');
   await expect.poll(() => renderedSystemAccent(page)).not.toBe(defaultLightAccent);
   const workerOneLightAccent = await renderedSystemAccent(page);
+  expect(await renderedActionContrast(page)).toBeGreaterThanOrEqual(4.5);
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
 
@@ -2691,7 +2717,7 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: testInfo.outputPath('system-color-worker-one-1366x768-light.png'),
+    path: testInfo.outputPath('system-color-light-blue-desktop.png'),
     animations: 'disabled',
     caret: 'hide',
     fullPage: false,
@@ -2707,12 +2733,13 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
 
   await setWorkerAppearance(page, 'Demo Worker One', 'Dark');
   const workerOneDarkAccent = await renderedSystemAccent(page);
+  expect(await renderedActionContrast(page)).toBeGreaterThanOrEqual(4.5);
   expect(workerOneDarkAccent).not.toBe(workerOneLightAccent);
   dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
   await expect(dialog.locator("input[type='color']")).toHaveValue('#1e3a8a');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.screenshot({
-    path: testInfo.outputPath('system-color-worker-one-1366x768-dark.png'),
+    path: testInfo.outputPath('system-color-dark-blue-desktop.png'),
     animations: 'disabled',
     caret: 'hide',
     fullPage: false,
@@ -2827,4 +2854,34 @@ test('worker system color is isolated, persistent, and responsive', async ({ pag
     caret: 'hide',
     fullPage: false,
   });
+});
+
+test('worker system color picker is usable on tablet and mobile', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'desktop-browser-fallback');
+  await installDeterministicEyeDropper(page);
+  await enterActiveOrdersForCategoryTests(page);
+  await setWorkerAppearance(page, 'Demo Worker One', 'Light');
+  await expectNoHorizontalOverflow(page);
+
+  const savedAccent = await renderedSystemAccent(page);
+  const dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
+  await assertSystemColorDialogGeometry(page, dialog);
+  await chooseHexSystemColor(dialog, '#1e3a8a');
+  await expect.poll(() => renderedSystemAccent(page)).not.toBe(savedAccent);
+  expect(await renderedActionContrast(page)).toBeGreaterThanOrEqual(4.5);
+
+  await page.screenshot({
+    path: testInfo.outputPath(
+      testInfo.project.name === 'mobile-browser-fallback'
+        ? 'system-color-picker-mobile.png'
+        : 'system-color-picker-tablet.png',
+    ),
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: false,
+  });
+
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect.poll(() => renderedSystemAccent(page)).toBe(savedAccent);
+  await expectNoHorizontalOverflow(page);
 });
