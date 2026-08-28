@@ -4,310 +4,136 @@ on:
   pull_request:
     branches:
       - main
+      - integration/tux-operations-v2
+  push:
+    branches:
+      - main
+      - integration/tux-operations-v2
+      - 'feat/ops-*'
+      - 'fix/operations-*'
+      - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  update-rendered-worker-color-acceptance:
+  quality:
+    name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: feat/worker-system-color-theme
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Update the approved Task 11 rendered acceptance block
+      - name: Format check
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm run test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production builds
+        run: npm run build
+      - name: Development provisioning safety smoke
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('e2e/operations.e2e.ts')
-          text = path.read_text()
-
-          def replace_exact(old: str, new: str, expected: int = 1) -> None:
-              global text
-              count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f'expected {expected} occurrence(s), found {count}: {old[:80]!r}')
-              text = text.replace(old, new)
-
-          replace_exact(
-          '''async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
-            const defaultCheckbox = dialog.locator("input[type='checkbox']");
-            if (await defaultCheckbox.isChecked()) await defaultCheckbox.uncheck();
-            const picker = dialog.locator("input[type='color']");
-            await expect(picker).toBeEnabled();
-            await picker.evaluate((node, nextColor) => {
-              const input = node as HTMLInputElement;
-              input.value = nextColor;
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-            }, color);
-            await expect(picker).toHaveValue(color);
-          }
-          ''',
-          '''async function installDeterministicEyeDropper(page: Page): Promise<void> {
-            await page.addInitScript(() => {
-              class DeterministicEyeDropper {
-                async open(): Promise<{ sRGBHex: string }> {
-                  return { sRGBHex: '#facc15' };
-                }
-              }
-              Object.defineProperty(window, 'EyeDropper', {
-                configurable: true,
-                value: DeterministicEyeDropper,
-              });
-            });
-          }
-
-          async function chooseNativeSystemColor(dialog: Locator, color: string): Promise<void> {
-            const picker = dialog.locator("input[type='color']");
-            await expect(picker).toBeEnabled();
-            await picker.evaluate((node, nextColor) => {
-              const input = node as HTMLInputElement;
-              input.value = nextColor;
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-            }, color);
-            await expect(picker).toHaveValue(color);
-          }
-
-          async function chooseHexSystemColor(dialog: Locator, color: string): Promise<void> {
-            const hex = dialog.getByLabel('HEX');
-            await hex.fill(color);
-            await expect(hex).toHaveValue(color.toUpperCase());
-          }
-
-          async function chooseRgbSystemColor(
-            dialog: Locator,
-            rgb: { r: number; g: number; b: number },
-            expectedHex: string,
-          ): Promise<void> {
-            await dialog.getByLabel('Red').fill(String(rgb.r));
-            await dialog.getByLabel('Green').fill(String(rgb.g));
-            await dialog.getByLabel('Blue').fill(String(rgb.b));
-            await expect(dialog.getByLabel('HEX')).toHaveValue(expectedHex.toUpperCase());
-          }
-          '''
-          )
-
-          old_geometry = '''async function assertSystemColorDialogGeometry(page: Page, dialog: Locator): Promise<void> {
-            await expect(dialog.getByText('System Color', { exact: true })).toBeVisible();
-            await expect(dialog.getByText('Default', { exact: true })).toBeVisible();
-            await expect(dialog.locator("input[type='color']")).toHaveCount(1);
-            await expect(dialog.locator("input[type='checkbox']")).toHaveCount(1);
-            await expect(dialog.locator("input[type='text']")).toHaveCount(0);
-            await expect(dialog.locator('.system-color-row')).toHaveCount(2);
-
-            const viewport = page.viewportSize();
-            const dialogBox = await dialog.boundingBox();
-            expect(viewport).not.toBeNull();
-            expect(dialogBox).not.toBeNull();
-            expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
-            expect(dialogBox!.y).toBeGreaterThanOrEqual(0);
-            expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
-            expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport!.height + 1);
-
-            const rows = dialog.locator('.system-color-row');
-            for (let index = 0; index < 2; index += 1) {
-              const rowBox = await rows.nth(index).boundingBox();
-              expect(rowBox).not.toBeNull();
-              expect(rowBox!.x).toBeGreaterThanOrEqual(dialogBox!.x - 1);
-              expect(rowBox!.x + rowBox!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
-              expect(rowBox!.y).toBeGreaterThanOrEqual(dialogBox!.y - 1);
-              expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(dialogBox!.y + dialogBox!.height + 1);
-            }
-            await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
-            await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
-          }
-          '''
-          new_geometry = '''async function assertSystemColorDialogGeometry(page: Page, dialog: Locator): Promise<void> {
-            await expect(dialog.getByText('Current color', { exact: true })).toBeVisible();
-            const nativePicker = dialog.getByLabel('Visual color picker');
-            const hex = dialog.getByLabel('HEX');
-            const red = dialog.getByLabel('Red');
-            const green = dialog.getByLabel('Green');
-            const blue = dialog.getByLabel('Blue');
-            await expect(dialog.locator("input[type='color']")).toHaveCount(1);
-            await expect(dialog.locator("input[type='checkbox']")).toHaveCount(0);
-            await expect(dialog.locator("input[type='text']")).toHaveCount(1);
-            await expect(dialog.locator("input[type='number']")).toHaveCount(3);
-            await expect(dialog.locator('.system-color-rgb-grid')).toHaveCount(1);
-            await expect(hex).toBeFocused();
-            for (const channel of [red, green, blue]) {
-              await expect(channel).toHaveAttribute('min', '0');
-              await expect(channel).toHaveAttribute('max', '255');
-            }
-            const pickFromScreen = dialog.getByRole('button', {
-              name: 'Pick from screen', exact: true,
-            });
-            const reset = dialog.getByRole('button', {
-              name: 'Reset to TUX default', exact: true,
-            });
-            const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
-            const save = dialog.getByRole('button', { name: 'Save', exact: true });
-            await expect(pickFromScreen).toBeVisible();
-            await expect(reset).toBeVisible();
-            await expect(cancel).toBeVisible();
-            await expect(save).toBeVisible();
-
-            const viewport = page.viewportSize();
-            const dialogBox = await dialog.boundingBox();
-            expect(viewport).not.toBeNull();
-            expect(dialogBox).not.toBeNull();
-            expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
-            expect(dialogBox!.y).toBeGreaterThanOrEqual(0);
-            expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
-            expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport!.height + 1);
-
-            const interactive = [nativePicker, hex, red, green, blue, pickFromScreen, reset, cancel, save];
-            for (const control of interactive) {
-              const box = await control.boundingBox();
-              expect(box).not.toBeNull();
-              expect(box!.height).toBeGreaterThanOrEqual(43);
-              expect(box!.x).toBeGreaterThanOrEqual(dialogBox!.x - 1);
-              expect(box!.x + box!.width).toBeLessThanOrEqual(dialogBox!.x + dialogBox!.width + 1);
-            }
-
-            await nativePicker.focus();
-            await page.keyboard.press('Shift+Tab');
-            await expect(save).toBeFocused();
-            await page.keyboard.press('Tab');
-            await expect(nativePicker).toBeFocused();
-            await hex.focus();
-          }
-          '''
-          replace_exact(old_geometry, new_geometry)
-
-          replace_exact(
-          "  test.skip(testInfo.project.name !== 'desktop-browser-fallback');\n  await page.setViewportSize({ width: 1366, height: 768 });",
-          "  test.skip(testInfo.project.name !== 'desktop-browser-fallback');\n  await installDeterministicEyeDropper(page);\n  await page.setViewportSize({ width: 1366, height: 768 });"
-          )
-
-          old_call = "  await chooseNativeSystemColor(dialog, '#1e3a8a');"
-          if text.count(old_call) != 2:
-              raise SystemExit(f'expected two worker-one native calls, found {text.count(old_call)}')
-          text = text.replace(old_call, "  await chooseHexSystemColor(dialog, '#1e3a8a');")
-
-          replace_exact(
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-            await expect(dialog.locator("input[type='checkbox']")).toBeChecked();
-            await chooseNativeSystemColor(dialog, '#7e22ce');
-            await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-            const workerTwoLightAccent = await renderedSystemAccent(page);
-          ''',
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-            const pickFromScreen = dialog.getByRole('button', {
-              name: 'Pick from screen', exact: true,
-            });
-            await pickFromScreen.click();
-            await expect(dialog.getByLabel('HEX')).toHaveValue('#FACC15');
-            await expect(dialog.getByText('#FACC15', { exact: true })).toBeVisible();
-            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-            await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
-
-            dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-            await chooseRgbSystemColor(dialog, { r: 126, g: 34, b: 206 }, '#7e22ce');
-            await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-            const workerTwoLightAccent = await renderedSystemAccent(page);
-          '''
-          )
-
-          replace_exact(
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-            const defaultCheckbox = dialog.locator("input[type='checkbox']");
-            await defaultCheckbox.check();
-            await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
-            await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-          ''',
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker Two');
-            await dialog
-              .getByRole('button', { name: 'Reset to TUX default', exact: true })
-              .click();
-            await expect.poll(() => renderedSystemAccent(page)).toBe(defaultLightAccent);
-            await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-          '''
-          )
-
-          replace_exact(
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
-            await assertSystemColorDialogGeometry(page, dialog);
-            await expect(dialog.locator("input[type='color']")).toHaveValue('#1e3a8a');
-            await page.screenshot({
-              path: testInfo.outputPath('system-color-dialog-1280x720-light.png'),
-              animations: 'disabled',
-              caret: 'hide',
-              fullPage: false,
-            });
-            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-
-            await setWorkerAppearance(page, 'Demo Worker One', 'Dark');
-            await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneDarkAccent);
-            await expectNoHorizontalOverflow(page);
-            await page.screenshot({
-              path: testInfo.outputPath('system-color-worker-one-1280x720-dark.png'),
-              animations: 'disabled',
-              caret: 'hide',
-              fullPage: false,
-            });
-          ''',
-          '''  dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
-            await assertSystemColorDialogGeometry(page, dialog);
-            await expect(dialog.locator("input[type='color']")).toHaveValue('#1e3a8a');
-            await chooseNativeSystemColor(dialog, '#dc2626');
-            await expect.poll(() => renderedSystemAccent(page)).not.toBe(workerOneLightAccent);
-            await chooseNativeSystemColor(dialog, '#fafafa');
-            const lightNearWhiteAccent = await renderedSystemAccent(page);
-            expect(lightNearWhiteAccent).not.toBe('#fafafa');
-            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-            await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneLightAccent);
-
-            dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
-            await page.screenshot({
-              path: testInfo.outputPath('system-color-dialog-1280x720-light.png'),
-              animations: 'disabled',
-              caret: 'hide',
-              fullPage: false,
-            });
-            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-
-            await setWorkerAppearance(page, 'Demo Worker One', 'Dark');
-            await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneDarkAccent);
-            await expectNoHorizontalOverflow(page);
-            dialog = await openWorkerSystemColorDialog(page, 'Demo Worker One');
-            await assertSystemColorDialogGeometry(page, dialog);
-            await chooseNativeSystemColor(dialog, '#050505');
-            const darkNearBlackAccent = await renderedSystemAccent(page);
-            expect(darkNearBlackAccent).not.toBe('#050505');
-            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-            await expect.poll(() => renderedSystemAccent(page)).toBe(workerOneDarkAccent);
-            await page.screenshot({
-              path: testInfo.outputPath('system-color-worker-one-1280x720-dark.png'),
-              animations: 'disabled',
-              caret: 'hide',
-              fullPage: false,
-            });
-          '''
-          )
-
-          path.write_text(text)
-          PY
-          npx prettier --write e2e/operations.e2e.ts
-          git diff --check
-          if git diff --quiet; then
-            echo 'No rendered acceptance update was produced.' >&2
+          if NODE_ENV=production npm run dev:provision -- --database .tmp/provision-production.sqlite3; then
+            echo 'Production provisioning unexpectedly succeeded.' >&2
             exit 1
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add e2e/operations.e2e.ts
-          git commit -m 'test: cover approved worker system color dialog'
-          git push origin HEAD:feat/worker-system-color-theme
-          exit 1
+          npm run dev:provision -- --database .tmp/provision.sqlite3 --pin 2468 --secondary-pin 1357
+          test -f apps/operations-desktop/.tmp/provision.sqlite3
+          rm -rf apps/operations-desktop/.tmp
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Migration-chain smoke
+        run: npm run test:migrations
+      - uses: denoland/setup-deno@v2
+        with:
+          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
+          # same resolver semantics so remote import-graph failures are caught before deploy.
+          deno-version: v1.46.3
+      - name: Edge Function typecheck
+        run: |
+          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
+          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered browser E2E
+        run: npm run test:e2e
+      - name: Upload rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-rendered-e2e
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-package:
+    name: windows-package
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build unsigned Windows x64 package
+        run: npm run package:win -- --publish never
+      - name: Upload unsigned Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-operations-windows-x64-unsigned
+          path: release/windows/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  required-quality-gate:
+    name: Required quality gate
+    if: always()
+    needs:
+      - quality
+      - windows-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every permanent gate
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          WINDOWS_RESULT: ${{ needs.windows-package.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$WINDOWS_RESULT" = "success"
