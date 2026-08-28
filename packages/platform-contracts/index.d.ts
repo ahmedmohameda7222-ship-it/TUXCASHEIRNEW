@@ -6,7 +6,12 @@ import type {
   OperationsOrdersService,
   OperationsSessionResult,
 } from '@tux/application';
-import type { CategoryAlignment, MenuCategoryId, WorkerUiPreferences } from '@tux/domain';
+import type {
+  CategoryAlignment,
+  MenuCategoryId,
+  ProductId,
+  WorkerUiPreferences,
+} from '@tux/domain';
 
 export type TuxSyncHealthSnapshot =
   | {
@@ -56,6 +61,7 @@ export interface TuxWorkerUiPreferencesApi {
   update(input: {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
+    readonly productOrder: readonly ProductId[];
   }): Promise<WorkerUiPreferences>;
   reset(): Promise<void>;
 }
