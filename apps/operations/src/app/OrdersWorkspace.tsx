@@ -249,7 +249,8 @@ export function OrdersWorkspace({
   const [selectedCategoryId, setSelectedCategoryId] = useState<MenuCategoryId | null>(null);
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH' | 'EDIT'>('IDLE');
+  const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');
+  const [menuEditActive, setMenuEditActive] = useState(false);
   const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
   const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
@@ -322,6 +323,7 @@ export function OrdersWorkspace({
     let cancelled = false;
     setCategoryPreference(null);
     setCategoryMode('IDLE');
+    setMenuEditActive(false);
     setProductReorderCategoryId(null);
     setSearch('');
     setCategoryEditError(null);
@@ -350,17 +352,12 @@ export function OrdersWorkspace({
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        if (categoryMode === 'EDIT' || productReorderCategoryId !== null) return;
+        if (menuEditActive) return;
         event.preventDefault();
         setCategoryMode('SEARCH');
         return;
       }
-      if (
-        event.key === '/' &&
-        !targetIsEditor &&
-        categoryMode !== 'EDIT' &&
-        productReorderCategoryId === null
-      ) {
+      if (event.key === '/' && !targetIsEditor && !menuEditActive) {
         event.preventDefault();
         setCategoryMode('SEARCH');
         return;
@@ -377,7 +374,7 @@ export function OrdersWorkspace({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [categoryMode, productReorderCategoryId, search]);
+  }, [categoryMode, menuEditActive, search]);
 
   useEffect(
     () => () => {
@@ -535,7 +532,7 @@ export function OrdersWorkspace({
       ? null
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
-  function beginCategoryEdit(): void {
+  function beginMenuEdit(): void {
     setProductReorderCategoryId(null);
     setSearch('');
     setCategoryEditOrder(activeCategories.map((category) => category.id));
@@ -543,7 +540,7 @@ export function OrdersWorkspace({
     setCategoryEditError(null);
     setCategoryResetRequested(false);
     setDraggedCategoryId(null);
-    setCategoryMode('EDIT');
+    setMenuEditActive(true);
   }
 
   function moveCategory(categoryId: MenuCategoryId, direction: -1 | 1): void {
@@ -596,6 +593,7 @@ export function OrdersWorkspace({
         ),
       );
       setCategoryPreference(saved);
+      setMenuEditActive(false);
       setCategoryMode('IDLE');
     } catch {
       setCategoryEditError('Could not save category layout. Try again.');
@@ -860,10 +858,26 @@ export function OrdersWorkspace({
       <section className="menu-pane" aria-label="Menu">
         {productReorderCategory === null ? (
           <>
-            <div className={`menu-toolbar category-mode-${categoryMode.toLowerCase()}`}>
-              {categoryMode === 'EDIT' ? (
+            <div
+              className={
+                menuEditActive
+                  ? 'menu-toolbar category-mode-edit'
+                  : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
+              }
+            >
+              {menuEditActive ? (
                 <section className="category-editor" aria-label="Edit categories">
                   <div className="category-editor-toolbar">
+                    <button
+                      type="button"
+                      className="category-icon-action category-edit-active"
+                      aria-label="Edit menu"
+                      title="Edit menu"
+                      aria-pressed={menuEditActive}
+                      disabled
+                    >
+                      <EditPencilIcon />
+                    </button>
                     <div>
                       <strong>Category layout</strong>
                       <span>Drag categories or use the move controls.</span>
@@ -998,10 +1012,15 @@ export function OrdersWorkspace({
                       {categoryMode === 'IDLE' ? (
                         <button
                           type="button"
-                          className="category-icon-action"
-                          aria-label="Edit categories"
-                          title="Edit categories"
-                          onClick={beginCategoryEdit}
+                          className={
+                            menuEditActive
+                              ? 'category-icon-action category-edit-active'
+                              : 'category-icon-action'
+                          }
+                          aria-label="Edit menu"
+                          title="Edit menu"
+                          aria-pressed={menuEditActive}
+                          onClick={beginMenuEdit}
                         >
                           <EditPencilIcon />
                         </button>
