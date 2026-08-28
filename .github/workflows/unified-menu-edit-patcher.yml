@@ -30,8 +30,20 @@ jobs:
         run: |
           npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/styles/final-pos-corrections.css
           git diff --check
-      - name: Task 6 GREEN unit gate
-        run: npm run test
+      - name: Capture Task 6 GREEN diagnostic
+        run: |
+          set +e
+          npm run test > /tmp/task6-test.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/task6-test.log .github/task6-test-diagnostic.txt
+            git config user.name "tux-implementation-bot"
+            git config user.email "tux-implementation-bot@users.noreply.github.com"
+            git add .github/task6-test-diagnostic.txt
+            git commit -m "chore: capture task 6 test diagnostic"
+            git push origin HEAD:ui/unified-menu-edit-mode
+            exit "$status"
+          fi
       - name: Commit Task 6 production change
         run: |
           git config user.name "tux-implementation-bot"
