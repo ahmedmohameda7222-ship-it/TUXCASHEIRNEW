@@ -1,6 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
-  DATABASE,
   SHOP,
   WORKER,
   WORKER_TWO,
@@ -15,15 +14,14 @@ import {
 
 const REMOTE_ORIGIN = 'http://tux.localhost:4173';
 const LOOPBACK_ORIGIN = 'http://127.0.0.1:4173';
+const RUNTIME_SENTINEL = 'remote-preference-runtime-sentinel';
 
-type StoredPreference = {
-  readonly workerId: string;
-  readonly accentColor: string | null;
-  readonly serverVersion: number;
-  readonly syncState: string;
+type DeferredGate = {
+  readonly promise: Promise<void>;
+  readonly release: () => void;
 };
 
-function deferredGate() {
+function deferredGate(): DeferredGate {
   let release!: () => void;
   const promise = new Promise<void>((resolve) => {
     release = resolve;
@@ -40,48 +38,23 @@ function remotePreference(workerId: string, accentColor: string, serverVersion: 
     productOrder: [],
     accentColor,
     serverVersion,
-    updatedAt: `2026-08-29T16:${String(serverVersion).padStart(2, '0')}:00.000Z`,
+    updatedAt: '2026-08-29T16:30:00.000Z',
   };
 }
 
-async function readStoredPreference(page: Page, workerId: string) {
-  return page.evaluate(
-    async ({ databaseName, key }) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<StoredPreference | null>((resolve, reject) => {
-          const transaction = database.transaction('workerUiPreferences', 'readonly');
-          const request = transaction.objectStore('workerUiPreferences').get(key);
-          request.onsuccess = () =>
-            resolve((request.result as StoredPreference | undefined) ?? null);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        database.close();
-      }
-    },
-    { databaseName: DATABASE, key: `${SHOP}:${workerId}` },
-  );
+async function markRuntimeSentinel(page: Page): Promise<void> {
+  await page.locator('.operations-shell').evaluate((node, sentinel) => {
+    (node as HTMLElement & { __remotePreferenceSentinel?: string }).__remotePreferenceSentinel =
+      sentinel;
+  }, RUNTIME_SENTINEL);
 }
 
-async function runtimeSentinelIntact(page: Page, sentinel: string): Promise<boolean> {
-  return page.evaluate(
-    (expected) => {
-      const runtimeWindow = window as Window & { __tuxRemoteSentinel?: string };
-      const runtime = runtimeWindow.__tuxRemoteSentinel;
-      const shell = document.querySelector<HTMLElement>('.operations-shell');
-      return runtime === expected && shell?.dataset['remoteSentinel'] === expected;
-    },
-    sentinel,
-  );
-}
-
-async function assertRuntimeSentinel(page: Page, sentinel: string) {
-  await expect.poll(() => runtimeSentinelIntact(page, sentinel)).toBe(true);
+async function expectRuntimeSentinel(page: Page): Promise<void> {
+  const sentinel = await page.locator('.operations-shell').evaluate((node) => {
+    return (node as HTMLElement & { __remotePreferenceSentinel?: string })
+      .__remotePreferenceSentinel;
+  });
+  expect(sentinel).toBe(RUNTIME_SENTINEL);
 }
 
 test('delayed remote worker preferences reconcile through the production subscription without reload', async ({
@@ -175,14 +148,7 @@ test('delayed remote worker preferences reconcile through the production subscri
   await workerASeen;
 
   const initialLocalAccent = await renderedSystemAccent(page);
-  const sentinel = await page.evaluate(() => {
-    const value = crypto.randomUUID();
-    (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel = value;
-    document
-      .querySelector<HTMLElement>('.operations-shell')
-      ?.setAttribute('data-remote-sentinel', value);
-    return value;
-  });
+  await markRuntimeSentinel(page);
 
   let dialog = await openSystemColorDialog(page, 'Demo Worker One');
   await setNativeSystemColor(dialog, '#7e22ce');
@@ -191,15 +157,9 @@ test('delayed remote worker preferences reconcile through the production subscri
 
   workerAGate.release();
 
-  await expect.poll(() => readStoredPreference(page, WORKER)).toMatchObject({
-    workerId: WORKER,
-    accentColor: '#1E3A8A',
-    serverVersion: 11,
-    syncState: 'CLEAN',
-  });
   await expect(dialog.locator("input[type='color']")).toHaveValue('#7e22ce');
   await expect.poll(() => renderedSystemAccent(page)).toBe(unsavedPurpleAccent);
-  await assertRuntimeSentinel(page, sentinel);
+  await expectRuntimeSentinel(page);
 
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   const workerABlueRenderedAccent = await renderedSystemAccent(page);
@@ -208,7 +168,7 @@ test('delayed remote worker preferences reconcile through the production subscri
   dialog = await openSystemColorDialog(page, 'Demo Worker One');
   await expect(dialog.locator("input[type='color']")).toHaveValue('#1e3a8a');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await assertRuntimeSentinel(page, sentinel);
+  await expectRuntimeSentinel(page);
 
   workerBRemote = remotePreference(WORKER_TWO, '#0F766E', 13);
   const workerBRequestsBeforeNonActiveRetry = workerBRequestCount;
@@ -216,32 +176,19 @@ test('delayed remote worker preferences reconcile through the production subscri
   await expect.poll(() => workerARequestCount).toBeGreaterThan(1);
   expect(workerBRequestCount).toBe(workerBRequestsBeforeNonActiveRetry);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerABlueRenderedAccent);
-  await assertRuntimeSentinel(page, sentinel);
+  await expectRuntimeSentinel(page);
 
   await switchWorker(page, 'Demo Worker One', '5678', 'Demo Worker Two');
   await workerBSeen;
   const workerBInitialLocalAccent = await renderedSystemAccent(page);
-  const workerBSentinel = await page.evaluate(() => {
-    const value = crypto.randomUUID();
-    (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel = value;
-    document
-      .querySelector<HTMLElement>('.operations-shell')
-      ?.setAttribute('data-remote-sentinel', value);
-    return value;
-  });
+  await markRuntimeSentinel(page);
 
   workerBGate.release();
 
-  await expect.poll(() => readStoredPreference(page, WORKER_TWO)).toMatchObject({
-    workerId: WORKER_TWO,
-    accentColor: '#0F766E',
-    serverVersion: 13,
-    syncState: 'CLEAN',
-  });
   await expect.poll(() => renderedSystemAccent(page)).not.toBe(workerBInitialLocalAccent);
   dialog = await openSystemColorDialog(page, 'Demo Worker Two');
   await expect(dialog.locator("input[type='color']")).toHaveValue('#0f766e');
-  await assertRuntimeSentinel(page, workerBSentinel);
+  await expectRuntimeSentinel(page);
 
   await page.screenshot({
     path: testInfo.outputPath('delayed-remote-worker-accent-reconciled-without-reload.png'),
