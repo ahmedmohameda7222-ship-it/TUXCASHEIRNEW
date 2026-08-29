@@ -23,6 +23,10 @@ const MATRIX = [
   '#050505',
   '#FAFAFA',
 ] as const;
+const PANELS = {
+  light: parseSystemAccentColor('#FFFFFF'),
+  dark: parseSystemAccentColor('#141816'),
+} as const;
 const DESTRUCTIVE = {
   light: '#B42318',
   dark: '#F06B61',
@@ -43,6 +47,12 @@ describe('system accent accessibility corrections', () => {
             systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground)),
           ),
         ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(
+            systemAccentColorToRgb(palette.strong),
+            systemAccentColorToRgb(PANELS[theme]),
+          ),
+        ).toBeGreaterThanOrEqual(3);
       });
     }
 
@@ -66,6 +76,12 @@ describe('system accent accessibility corrections', () => {
     expect(featureCss).toMatch(
       /:root\[data-tux-custom-accent\] :focus-visible\s*{[^}]*outline-color:\s*var\(--tux-focus-ring\);/s,
     );
+  });
+
+  it('renders Place Order on the same strong solid action surface used by primary actions', () => {
+    const block = featureCss.match(/\.place-order-action\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(block).toContain('background: var(--tux-accent-strong);');
+    expect(block).toContain('color: var(--tux-action-foreground);');
   });
 
   it('uses accent-text for every selected label rendered directly on accent-soft', () => {
