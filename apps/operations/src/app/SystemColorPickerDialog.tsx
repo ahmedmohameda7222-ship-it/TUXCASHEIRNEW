@@ -179,7 +179,8 @@ export function SystemColorPickerDialog({
   }
 
   const hasValidationError = hexError !== null || rgbError !== null;
-  const previewLabel = draftAccentColor === null ? `TUX default · ${defaultPreviewColor}` : pickerColor;
+  const previewLabel =
+    draftAccentColor === null ? `TUX default · ${defaultPreviewColor}` : pickerColor;
 
   return (
     <div className="system-color-backdrop" role="presentation" onMouseDown={cancel}>
@@ -197,7 +198,10 @@ export function SystemColorPickerDialog({
         </header>
 
         <div className="system-color-editor">
-          <div className="system-color-preview" aria-label={`Current color ${previewLabel}`}>
+          <div
+            className="system-color-preview"
+            aria-label={`Current color ${previewLabel}`}
+          >
             <span
               className="system-color-preview-swatch"
               style={{ backgroundColor: pickerColor }}
@@ -243,7 +247,10 @@ export function SystemColorPickerDialog({
             </p>
           )}
 
-          <fieldset className="system-color-rgb" aria-describedby={rgbError === null ? undefined : 'system-color-rgb-error'}>
+          <fieldset
+            className="system-color-rgb"
+            aria-describedby={rgbError === null ? undefined : 'system-color-rgb-error'}
+          >
             <legend>RGB</legend>
             <label htmlFor="system-color-red">
               <span>Red</span>
@@ -300,7 +307,9 @@ export function SystemColorPickerDialog({
               className="quiet-action"
               disabled={saving || EyeDropper === null}
               aria-disabled={EyeDropper === null}
-              title={EyeDropper === null ? 'Screen color picking is not supported here.' : undefined}
+              title={
+                EyeDropper === null ? 'Screen color picking is not supported here.' : undefined
+              }
               onClick={() => void pickFromScreen()}
             >
               Pick from screen
@@ -323,7 +332,12 @@ export function SystemColorPickerDialog({
         )}
 
         <footer className="system-color-actions">
-          <button type="button" className="quiet-action" disabled={saving} onClick={cancel}>
+          <button
+            type="button"
+            className="quiet-action"
+            disabled={saving}
+            onClick={cancel}
+          >
             Cancel
           </button>
           <button
