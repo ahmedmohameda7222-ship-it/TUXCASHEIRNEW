@@ -275,6 +275,7 @@ function ActiveShell({
   const [accentHydrated, setAccentHydrated] = useState(false);
   const [systemColorOpen, setSystemColorOpen] = useState(false);
   const systemColorOpenRef = useRef(false);
+  const activeSystemColorWorkerRef = useRef(session.operator.id);
   const [systemColorSaving, setSystemColorSaving] = useState(false);
   const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);
 
@@ -298,6 +299,14 @@ function ActiveShell({
 
   const effectiveTheme: EffectiveTheme =
     theme === 'dark' || (theme === 'system' && systemDark) ? 'dark' : 'light';
+
+  useEffect(() => {
+    activeSystemColorWorkerRef.current = session.operator.id;
+    systemColorOpenRef.current = false;
+    setSystemColorOpen(false);
+    setSystemColorSaving(false);
+    setSystemColorSaveError(null);
+  }, [session.operator.id]);
 
   useLayoutEffect(() => {
     let cancelled = false;
@@ -354,18 +363,23 @@ function ActiveShell({
 
   async function saveSystemColor(accentColor: SystemAccentColor | null): Promise<void> {
     if (systemColorSaving) return;
+    const savingWorkerId = session.operator.id;
     setSystemColorSaving(true);
     setSystemColorSaveError(null);
     try {
       const saved = await preferencesClient.updateAccentColor(accentColor);
+      if (activeSystemColorWorkerRef.current !== savingWorkerId) return;
       setSavedAccentColor(saved.accentColor);
       setPreviewAccentColor(saved.accentColor);
       systemColorOpenRef.current = false;
       setSystemColorOpen(false);
     } catch {
+      if (activeSystemColorWorkerRef.current !== savingWorkerId) return;
       setSystemColorSaveError('Could not save system color. Try again.');
     } finally {
-      setSystemColorSaving(false);
+      if (activeSystemColorWorkerRef.current === savingWorkerId) {
+        setSystemColorSaving(false);
+      }
     }
   }
 
