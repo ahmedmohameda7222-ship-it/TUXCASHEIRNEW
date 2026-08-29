@@ -44,13 +44,11 @@ describe('system accent accessibility corrections', () => {
         const foreground = systemAccentColorToRgb(
           parseSystemAccentColor(palette.actionForeground),
         );
+        const panel = systemAccentColorToRgb(PANELS[theme]);
         for (const surface of [palette.hover, palette.pressed, palette.strong]) {
-          expect(
-            contrastRatio(systemAccentColorToRgb(surface), foreground),
-          ).toBeGreaterThanOrEqual(4.5);
-          expect(
-            contrastRatio(systemAccentColorToRgb(surface), systemAccentColorToRgb(PANELS[theme])),
-          ).toBeGreaterThanOrEqual(3);
+          const surfaceRgb = systemAccentColorToRgb(surface);
+          expect(contrastRatio(surfaceRgb, foreground)).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(surfaceRgb, panel)).toBeGreaterThanOrEqual(3);
         }
       });
     }
