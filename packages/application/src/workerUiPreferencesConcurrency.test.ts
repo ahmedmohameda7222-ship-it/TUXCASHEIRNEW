@@ -86,10 +86,7 @@ class MemoryRepository implements WorkerUiPreferencesRepository {
   }
 
   async delete(requestedShopId: ShopId, requestedWorkerId: WorkerId) {
-    if (
-      this.value?.shopId === requestedShopId &&
-      this.value.workerId === requestedWorkerId
-    ) {
+    if (this.value?.shopId === requestedShopId && this.value.workerId === requestedWorkerId) {
       this.value = null;
     }
   }
@@ -194,28 +191,25 @@ describe('WorkerUiPreferencesService concurrency safety', () => {
     },
   );
 
-  it(
-    'preserves a newer DIRTY local mutation when an older remote pull returns',
-    async () => {
-      const repository = new MemoryRepository(
-        preference({ accentColor: null, syncState: 'CLEAN', serverVersion: 3 }),
-      );
-      const gateway = new PausedGateway();
-      const service = new WorkerUiPreferencesService(repository, gateway, () =>
-        instant('2026-08-29T08:03:00.000Z'),
-      );
+  it('preserves a newer DIRTY local mutation when an older remote pull returns', async () => {
+    const repository = new MemoryRepository(
+      preference({ accentColor: null, syncState: 'CLEAN', serverVersion: 3 }),
+    );
+    const gateway = new PausedGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-29T08:03:00.000Z'),
+    );
 
-      const sync = service.syncOnce(shopId, workerId);
-      await gateway.getStarted.promise;
-      await service.updateAccentColor(shopId, workerId, accentB);
-      gateway.resolveGet(remote({ accentColor: accentA, serverVersion: 4 }));
-      await sync;
+    const sync = service.syncOnce(shopId, workerId);
+    await gateway.getStarted.promise;
+    await service.updateAccentColor(shopId, workerId, accentB);
+    gateway.resolveGet(remote({ accentColor: accentA, serverVersion: 4 }));
+    await sync;
 
-      expect(repository.value).toMatchObject({
-        accentColor: accentB,
-        syncState: 'DIRTY',
-        serverVersion: 3,
-      });
-    },
-  );
+    expect(repository.value).toMatchObject({
+      accentColor: accentB,
+      syncState: 'DIRTY',
+      serverVersion: 3,
+    });
+  });
 });
