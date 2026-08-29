@@ -39,20 +39,19 @@ const RED_COLLISION_MATRIX = {
 describe('system accent accessibility corrections', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const input of MATRIX) {
-      it(`derives ${theme} action foreground against the actual strong action surface for ${input}`, () => {
+      it(`derives ${theme} solid action states with one readable foreground for ${input}`, () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
-        expect(
-          contrastRatio(
-            systemAccentColorToRgb(palette.strong),
-            systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground)),
-          ),
-        ).toBeGreaterThanOrEqual(4.5);
-        expect(
-          contrastRatio(
-            systemAccentColorToRgb(palette.strong),
-            systemAccentColorToRgb(PANELS[theme]),
-          ),
-        ).toBeGreaterThanOrEqual(3);
+        const foreground = systemAccentColorToRgb(
+          parseSystemAccentColor(palette.actionForeground),
+        );
+        for (const surface of [palette.hover, palette.pressed, palette.strong]) {
+          expect(contrastRatio(systemAccentColorToRgb(surface), foreground)).toBeGreaterThanOrEqual(
+            4.5,
+          );
+          expect(
+            contrastRatio(systemAccentColorToRgb(surface), systemAccentColorToRgb(PANELS[theme])),
+          ).toBeGreaterThanOrEqual(3);
+        }
       });
     }
 
@@ -78,13 +77,22 @@ describe('system accent accessibility corrections', () => {
     );
   });
 
-  it('renders Place Order on the same strong solid action surface used by primary actions', () => {
-    const block = featureCss.match(/\.place-order-action\s*\{([^}]*)\}/s)?.[1] ?? '';
-    expect(block).toContain('background: var(--tux-accent-strong);');
-    expect(block).toContain('color: var(--tux-action-foreground);');
+  it('scopes custom action surfaces and foregrounds away from the canonical default path', () => {
+    expect(featureCss).toContain(
+      ':root[data-tux-custom-accent] .place-order-action:not(:hover):not(:active)',
+    );
+    expect(featureCss).toContain('background: var(--tux-accent-strong);');
+    expect(featureCss).toContain('color: var(--tux-action-foreground);');
+    expect(featureCss).toContain(':root[data-tux-custom-accent] .primary-action');
+    expect(featureCss).toContain(
+      ':root[data-tux-custom-accent] .place-order-action:not(:disabled):hover',
+    );
+    expect(featureCss).toContain(
+      ':root[data-tux-custom-accent] .place-order-action:not(:disabled):active',
+    );
   });
 
-  it('uses accent-text for every selected label rendered directly on accent-soft', () => {
+  it('uses accent-text for every custom selected label rendered directly on accent-soft', () => {
     const selectors = [
       '.operations-header .nav-item-active',
       '.operator-menu .appearance-option-active',
@@ -93,10 +101,14 @@ describe('system accent accessibility corrections', () => {
       '.order-type-section .segmented-control button.selected',
       '.payment-methods button.selected',
     ];
-    for (const selector of selectors) expect(featureCss).toContain(selector);
+    for (const selector of selectors) {
+      expect(featureCss).toContain(`:root[data-tux-custom-accent] ${selector}`);
+    }
 
     const block =
-      featureCss.match(/\.operations-header \.nav-item-active,[^{]+\{([^}]*)\}/s)?.[1] ?? '';
+      featureCss.match(
+        /:root\[data-tux-custom-accent\] \.operations-header \.nav-item-active,[^{]+\{([^}]*)\}/s,
+      )?.[1] ?? '';
     expect(block).toContain('background: var(--tux-accent-soft);');
     expect(block).toContain('color: var(--tux-accent-text);');
     expect(block).not.toContain('color: var(--tux-accent-strong);');
