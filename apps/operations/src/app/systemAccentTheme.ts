@@ -253,13 +253,20 @@ export function deriveSystemAccentPalette(
     strongCandidate,
   ]);
   const hoverRgb = ensureActionSurface(hoverCandidate, panel, actionForeground);
-  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground, null, [
-    hoverRgb,
-  ]);
-  const strongRgb = ensureActionSurface(strongCandidate, panel, actionForeground, destructive, [
-    hoverRgb,
-    pressedRgb,
-  ]);
+  const pressedRgb = ensureActionSurface(
+    pressedCandidate,
+    panel,
+    actionForeground,
+    null,
+    [hoverRgb],
+  );
+  const strongRgb = ensureActionSurface(
+    strongCandidate,
+    panel,
+    actionForeground,
+    destructive,
+    [hoverRgb, pressedRgb],
+  );
   const softRgb = blend(panel, accentRgb, theme === 'light' ? 0.12 : 0.24);
   const hoverSoftRgb = blend(panel, hoverCandidate, theme === 'light' ? 0.17 : 0.31);
   const textRgb = accessibleText(accentRgb, softRgb, direction);
