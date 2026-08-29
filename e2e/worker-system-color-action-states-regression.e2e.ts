@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { contrast, paint } from './worker-system-color-assertions';
+import { expect, test, type Locator } from '@playwright/test';
+import { contrast, paint, resolvedColor } from './worker-system-color-assertions';
 import {
   enterActiveOrders,
   openSystemColorDialog,
@@ -18,6 +18,16 @@ const COLOR_MATRIX = [
   '#fafafa',
 ] as const;
 
+async function settledPaint(locator: Locator, background: string, foreground: string) {
+  await expect
+    .poll(async () => {
+      const current = await paint(locator);
+      return [current.backgroundColor, current.color];
+    })
+    .toEqual([background, foreground]);
+  return paint(locator);
+}
+
 test('custom action foreground stays readable for normal hover and pressed matrix states', async ({
   page,
 }, testInfo) => {
@@ -33,15 +43,19 @@ test('custom action foreground stays readable for normal hover and pressed matri
       await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(dialog).toBeHidden();
 
+      const foreground = await resolvedColor(page, 'var(--tux-action-foreground)');
+      const strong = await resolvedColor(page, 'var(--tux-accent-strong)');
+      const hover = await resolvedColor(page, 'var(--tux-accent-hover)');
+      const pressed = await resolvedColor(page, 'var(--tux-accent-pressed)');
       const placeOrder = page.getByRole('button', { name: 'Place Order', exact: true });
-      const normal = await paint(placeOrder);
+      const normal = await settledPaint(placeOrder, strong, foreground);
       expect(
         contrast(normal.backgroundColor, normal.color),
         `${appearance} ${color} normal`,
       ).toBeGreaterThanOrEqual(4.5);
 
       await placeOrder.hover();
-      const hovered = await paint(placeOrder);
+      const hovered = await settledPaint(placeOrder, hover, foreground);
       expect(
         contrast(hovered.backgroundColor, hovered.color),
         `${appearance} ${color} hover`,
@@ -51,19 +65,20 @@ test('custom action foreground stays readable for normal hover and pressed matri
       expect(box).not.toBeNull();
       await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
       await page.mouse.down();
-      const pressed = await paint(placeOrder);
+      const active = await settledPaint(placeOrder, pressed, foreground);
       expect(
-        contrast(pressed.backgroundColor, pressed.color),
+        contrast(active.backgroundColor, active.color),
         `${appearance} ${color} pressed`,
       ).toBeGreaterThanOrEqual(4.5);
       expect(hovered.backgroundColor).not.toBe(normal.backgroundColor);
-      expect(pressed.backgroundColor).not.toBe(hovered.backgroundColor);
+      expect(active.backgroundColor).not.toBe(hovered.backgroundColor);
+      expect(active.backgroundColor).not.toBe(normal.backgroundColor);
       await page.mouse.move(1, 1);
       await page.mouse.up();
 
       await page.getByRole('button', { name: 'Edit menu' }).click();
       const primary = page.locator('.menu-edit-actions .primary-action');
-      const primaryPaint = await paint(primary);
+      const primaryPaint = await settledPaint(primary, strong, foreground);
       expect(
         contrast(primaryPaint.backgroundColor, primaryPaint.color),
         `${appearance} ${color} primary`,
