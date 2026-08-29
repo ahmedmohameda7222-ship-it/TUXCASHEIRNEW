@@ -186,6 +186,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           const identity = await activePreferenceIdentityFromSession();
           return preferencesRepository.get(identity.shopId, identity.workerId);
         },
+        subscribe: (listener) => preferencesService.subscribe(listener),
         updateMenuLayout: async (input) => {
           const identity = await activePreferenceIdentityFromSession();
           const updated = await preferencesService.updateMenuLayout(
@@ -355,6 +356,18 @@ export function createWorkerUiPreferencesClient(): OperationsWorkerUiPreferences
   if (desktop !== undefined) return desktop.workerUiPreferences;
   return {
     load: async () => (await browserRuntime()).workerUiPreferences.load(),
+    subscribe: (listener) => {
+      let active = true;
+      let unsubscribe = (): void => undefined;
+      void browserRuntime().then((runtime) => {
+        if (!active) return;
+        unsubscribe = runtime.workerUiPreferences.subscribe(listener);
+      });
+      return () => {
+        active = false;
+        unsubscribe();
+      };
+    },
     updateMenuLayout: async (input) =>
       (await browserRuntime()).workerUiPreferences.updateMenuLayout(input),
     updateAccentColor: async (accentColor) =>
