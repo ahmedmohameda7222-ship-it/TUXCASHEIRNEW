@@ -235,18 +235,18 @@
   outline-color: var(--tux-focus-ring);
 }
 
-.place-order-action {
+:root[data-tux-custom-accent] .place-order-action:not(:hover):not(:active) {
   border-color: var(--tux-accent-strong);
   background: var(--tux-accent-strong);
   color: var(--tux-action-foreground);
 }
 
-.operations-header .nav-item-active,
-.operator-menu .appearance-option-active,
-.menu-toolbar .category-rail button.selected,
-.product-family-filter button.selected,
-.order-type-section .segmented-control button.selected,
-.payment-methods button.selected {
+:root[data-tux-custom-accent] .operations-header .nav-item-active,
+:root[data-tux-custom-accent] .operator-menu .appearance-option-active,
+:root[data-tux-custom-accent] .menu-toolbar .category-rail button.selected,
+:root[data-tux-custom-accent] .product-family-filter button.selected,
+:root[data-tux-custom-accent] .order-type-section .segmented-control button.selected,
+:root[data-tux-custom-accent] .payment-methods button.selected {
   background: var(--tux-accent-soft);
   color: var(--tux-accent-text);
 }
