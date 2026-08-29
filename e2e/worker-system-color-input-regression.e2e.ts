@@ -24,7 +24,15 @@ test('HEX RGB native picker and EyeDropper synchronize without corrupting normal
   let dialog = await openSystemColorDialog(page, 'Demo Worker One');
   const hex = dialog.getByLabel('HEX');
   await hex.clear();
-  await hex.pressSequentially('#1E3A8A');
+  await hex.pressSequentially('#1E3');
+  await expect(hex).toHaveValue('#1E3');
+  await expect(dialog.getByLabel('Red')).toHaveValue('17');
+  await expect(dialog.getByLabel('Green')).toHaveValue('238');
+  await expect(dialog.getByLabel('Blue')).toHaveValue('51');
+  await expect(dialog.locator("input[type='color']")).toHaveValue('#11ee33');
+  await expect.poll(() => renderedSystemAccent(page)).not.toBe(originalAccent);
+
+  await hex.pressSequentially('A8A');
   await expect(hex).toHaveValue('#1E3A8A');
   await expect(dialog.getByLabel('Red')).toHaveValue('30');
   await expect(dialog.getByLabel('Green')).toHaveValue('58');
