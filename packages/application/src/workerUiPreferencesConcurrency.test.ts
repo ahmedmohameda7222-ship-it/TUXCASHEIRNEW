@@ -92,16 +92,14 @@ class MemoryRepository implements WorkerUiPreferencesRepository {
   }
 }
 
-class BarrierRepository extends MemoryRepository {
-  readonly #barrier = deferred<void>();
+class SlowFirstReadRepository extends MemoryRepository {
   #reads = 0;
 
   override async get(requestedShopId: ShopId, requestedWorkerId: WorkerId) {
     const snapshot = await super.get(requestedShopId, requestedWorkerId);
-    if (this.#reads < 2) {
-      this.#reads += 1;
-      if (this.#reads === 2) this.#barrier.resolve();
-      await this.#barrier.promise;
+    this.#reads += 1;
+    if (this.#reads === 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
     return snapshot;
   }
@@ -144,7 +142,7 @@ class NoopGateway implements WorkerUiPreferencesRemoteGateway {
 
 describe('WorkerUiPreferencesService concurrency safety', () => {
   it('serializes concurrent local menu-layout and accent mutations without losing either update', async () => {
-    const repository = new BarrierRepository(preference());
+    const repository = new SlowFirstReadRepository(preference());
     const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
       instant('2026-08-29T08:01:00.000Z'),
     );
