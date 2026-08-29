@@ -205,9 +205,7 @@ function ensureActionSurface(
   for (const endpoint of [BLACK, WHITE]) {
     for (let step = 1; step <= 255; step += 1) {
       const adjusted = blend(candidate, endpoint, step / 255);
-      if (
-        !actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)
-      ) {
+      if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)) {
         continue;
       }
       const distance = systemAccentColorDistance(candidate, adjusted);
@@ -255,7 +253,9 @@ export function deriveSystemAccentPalette(
     strongCandidate,
   ]);
   const hoverRgb = ensureActionSurface(hoverCandidate, panel, actionForeground);
-  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground, null, [hoverRgb]);
+  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground, null, [
+    hoverRgb,
+  ]);
   const strongRgb = ensureActionSurface(strongCandidate, panel, actionForeground, destructive, [
     hoverRgb,
     pressedRgb,
