@@ -33,4 +33,16 @@ describe('worker system color lifecycle', () => {
     expect(source).toContain('<SystemColorPickerDialog');
     expect(source).toContain('preferencesClient.updateAccentColor(accentColor)');
   });
+
+  it('closes and discards the previous worker color transaction on identity change', () => {
+    expect(source).toMatch(
+      /useEffect\(\(\) => \{[\s\S]*?systemColorOpenRef\.current = false;[\s\S]*?setSystemColorOpen\(false\);[\s\S]*?setSystemColorSaveError\(null\);[\s\S]*?\}, \[session\.operator\.id\]\);/,
+    );
+  });
+
+  it('ignores a stale color-save completion after the active worker changes', () => {
+    expect(source).toContain('activeSystemColorWorkerRef');
+    expect(source).toContain('const savingWorkerId = session.operator.id');
+    expect(source).toContain('activeSystemColorWorkerRef.current !== savingWorkerId');
+  });
 });
