@@ -163,8 +163,50 @@ function ensureDestructiveSeparation(
   return best;
 }
 
-function bestActionForeground(accent: RgbColor): '#000000' | '#FFFFFF' {
-  return contrastRatio(accent, BLACK) >= contrastRatio(accent, WHITE) ? '#000000' : '#FFFFFF';
+function bestActionForeground(surfaces: readonly RgbColor[]): '#000000' | '#FFFFFF' {
+  const blackMinimum = Math.min(...surfaces.map((surface) => contrastRatio(surface, BLACK)));
+  const whiteMinimum = Math.min(...surfaces.map((surface) => contrastRatio(surface, WHITE)));
+  return blackMinimum >= whiteMinimum ? '#000000' : '#FFFFFF';
+}
+
+function ensureActionSurface(
+  candidate: RgbColor,
+  panel: RgbColor,
+  foreground: '#000000' | '#FFFFFF',
+): RgbColor {
+  const foregroundRgb = foreground === '#000000' ? BLACK : WHITE;
+  if (contrastRatio(candidate, panel) >= 3 && contrastRatio(candidate, foregroundRgb) >= 4.5) {
+    return candidate;
+  }
+
+  let best: RgbColor | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const endpoint of [BLACK, WHITE]) {
+    for (let step = 1; step <= 255; step += 1) {
+      const adjusted = blend(candidate, endpoint, step / 255);
+      if (contrastRatio(adjusted, panel) < 3) continue;
+      if (contrastRatio(adjusted, foregroundRgb) < 4.5) continue;
+      const distance = systemAccentColorDistance(candidate, adjusted);
+      if (distance < bestDistance) {
+        best = adjusted;
+        bestDistance = distance;
+      }
+      break;
+    }
+  }
+  if (best !== null) return best;
+
+  for (let channel = 0; channel <= 255; channel += 1) {
+    const adjusted = { r: channel, g: channel, b: channel };
+    if (contrastRatio(adjusted, panel) < 3) continue;
+    if (contrastRatio(adjusted, foregroundRgb) < 4.5) continue;
+    const distance = systemAccentColorDistance(candidate, adjusted);
+    if (distance < bestDistance) {
+      best = adjusted;
+      bestDistance = distance;
+    }
+  }
+  return best ?? candidate;
 }
 
 export function deriveSystemAccentPalette(
@@ -176,13 +218,22 @@ export function deriveSystemAccentPalette(
   const direction = theme === 'light' ? BLACK : WHITE;
   const prepared = theme === 'dark' ? blend(raw, WHITE, 0.08) : raw;
   const accentRgb = ensureContrast(prepared, panel, 3, direction);
-  const hoverRgb = theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
-  const pressedRgb =
+  const hoverCandidate =
+    theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
+  const pressedCandidate =
     theme === 'light' ? blend(accentRgb, BLACK, 0.2) : blend(accentRgb, BLACK, 0.12);
-  const actionSurfaceRgb = ensureContrast(pressedRgb, panel, 3, direction);
-  const strongRgb = ensureDestructiveSeparation(actionSurfaceRgb, panel, theme);
+  const actionSurfaceRgb = ensureContrast(pressedCandidate, panel, 3, direction);
+  const strongCandidate = ensureDestructiveSeparation(actionSurfaceRgb, panel, theme);
+  const actionForeground = bestActionForeground([
+    hoverCandidate,
+    pressedCandidate,
+    strongCandidate,
+  ]);
+  const hoverRgb = ensureActionSurface(hoverCandidate, panel, actionForeground);
+  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground);
+  const strongRgb = ensureActionSurface(strongCandidate, panel, actionForeground);
   const softRgb = blend(panel, accentRgb, theme === 'light' ? 0.12 : 0.24);
-  const hoverSoftRgb = blend(panel, hoverRgb, theme === 'light' ? 0.17 : 0.31);
+  const hoverSoftRgb = blend(panel, hoverCandidate, theme === 'light' ? 0.17 : 0.31);
   const textRgb = accessibleText(accentRgb, softRgb, direction);
   const focusRgb = ensureContrast(accentRgb, panel, 3, direction);
 
@@ -195,7 +246,7 @@ export function deriveSystemAccentPalette(
     soft: rgbToSystemAccentColor(softRgb),
     hoverSoft: rgbToSystemAccentColor(hoverSoftRgb),
     focusRing: rgbToSystemAccentColor(focusRgb),
-    actionForeground: bestActionForeground(strongRgb),
+    actionForeground,
   };
 }
 
