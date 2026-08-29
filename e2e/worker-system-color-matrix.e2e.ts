@@ -283,7 +283,9 @@ async function semanticStatusColors(page: Page): Promise<{
   });
 }
 
-test('worker system color robustness matrix is accessible in light and dark', async ({ page }, testInfo) => {
+test('worker system color robustness matrix is accessible in light and dark', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await page.setViewportSize({ width: 1366, height: 768 });
   await enterActiveOrders(page);
