@@ -41,10 +41,10 @@ class MemoryRepository implements WorkerUiPreferencesRepository {
 
 class DelayedRemoteGateway implements WorkerUiPreferencesRemoteGateway {
   #release!: (value: RemoteWorkerUiPreferences) => void;
+  #requested!: () => void;
   readonly requested = new Promise<void>((resolve) => {
     this.#requested = resolve;
   });
-  #requested!: () => void;
   readonly #response = new Promise<RemoteWorkerUiPreferences>((resolve) => {
     this.#release = resolve;
   });
