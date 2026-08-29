@@ -35,6 +35,7 @@ const RED_COLLISION_MATRIX = {
   light: ['#B42318', '#B52319', '#DC2626'],
   dark: ['#F06B61', '#EF6A60', '#DC2626'],
 } as const;
+const ACTION_STATE_DISTANCE_MIN = 12;
 
 describe('system accent accessibility corrections', () => {
   for (const theme of ['light', 'dark'] as const) {
@@ -43,10 +44,19 @@ describe('system accent accessibility corrections', () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
         const foreground = systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground));
         const panel = systemAccentColorToRgb(PANELS[theme]);
-        for (const surface of [palette.hover, palette.pressed, palette.strong]) {
-          const surfaceRgb = systemAccentColorToRgb(surface);
-          expect(contrastRatio(surfaceRgb, foreground)).toBeGreaterThanOrEqual(4.5);
-          expect(contrastRatio(surfaceRgb, panel)).toBeGreaterThanOrEqual(3);
+        const surfaces = [palette.strong, palette.hover, palette.pressed].map((surface) =>
+          systemAccentColorToRgb(surface),
+        );
+        for (const surface of surfaces) {
+          expect(contrastRatio(surface, foreground)).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(surface, panel)).toBeGreaterThanOrEqual(3);
+        }
+        for (let left = 0; left < surfaces.length; left += 1) {
+          for (let right = left + 1; right < surfaces.length; right += 1) {
+            expect(systemAccentColorDistance(surfaces[left]!, surfaces[right]!)).toBeGreaterThanOrEqual(
+              ACTION_STATE_DISTANCE_MIN,
+            );
+          }
         }
       });
     }
