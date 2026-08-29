@@ -49,6 +49,22 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("'system-color-picker-mobile.png'");
   });
 
+  it('covers the required rendered robustness matrix in both Light and Dark', () => {
+    expect(source).toContain(
+      "test('worker system color robustness matrix is accessible in light and dark'",
+    );
+    expect(source).toContain("'#1f6b52'");
+    expect(source).toContain("'#1e3a8a'");
+    expect(source).toContain("'#7e22ce'");
+    expect(source).toContain("'#dc2626'");
+    expect(source).toContain("'#facc15'");
+    expect(source).toContain("'#050505'");
+    expect(source).toContain("'#fafafa'");
+    expect(source).toContain("for (const appearance of ['Light', 'Dark'] as const)");
+    expect(source).toContain('renderedPaletteContrast');
+    expect(source).toContain('semanticStatusColors');
+  });
+
   it('uses canonical surface tokens so the dialog remains opaque at compact widths', () => {
     expect(pickerCss).toContain('background: var(--tux-surface-panel);');
     expect(pickerCss).toContain('border: 1px solid var(--tux-border-subtle);');
