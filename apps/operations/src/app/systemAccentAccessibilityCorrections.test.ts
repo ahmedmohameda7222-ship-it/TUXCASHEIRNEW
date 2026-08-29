@@ -73,9 +73,9 @@ describe('system accent accessibility corrections', () => {
       '.operations-header .nav-item-active',
       '.operator-menu .appearance-option-active',
       '.menu-toolbar .category-rail button.selected',
-      '.menu-segmented button.selected',
-      '.order-type-toggle button.selected',
-      '.payment-options button.selected',
+      '.product-family-filter button.selected',
+      '.order-type-section .segmented-control button.selected',
+      '.payment-methods button.selected',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const block = featureCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 's'))?.[1] ?? '';
