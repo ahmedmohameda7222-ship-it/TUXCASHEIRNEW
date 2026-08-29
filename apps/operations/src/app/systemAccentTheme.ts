@@ -177,7 +177,8 @@ export function deriveSystemAccentPalette(
   const direction = theme === 'light' ? BLACK : WHITE;
   const prepared = theme === 'dark' ? blend(raw, WHITE, 0.08) : raw;
   const accentRgb = ensureContrast(prepared, panel, 3, direction);
-  const hoverRgb = theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
+  const hoverRgb =
+    theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
   const pressedRgb =
     theme === 'light' ? blend(accentRgb, BLACK, 0.2) : blend(accentRgb, BLACK, 0.12);
   const actionSurfaceRgb = ensureContrast(pressedRgb, panel, 3, direction);
