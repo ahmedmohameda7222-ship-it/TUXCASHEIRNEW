@@ -199,6 +199,20 @@
   outline-offset: 2px;
 }
 
+:root[data-tux-custom-accent] :focus-visible {
+  outline-color: var(--tux-focus-ring);
+}
+
+.operations-header .nav-item-active,
+.operator-menu .appearance-option-active,
+.menu-toolbar .category-rail button.selected,
+.menu-segmented button.selected,
+.order-type-toggle button.selected,
+.payment-options button.selected {
+  background: var(--tux-accent-soft);
+  color: var(--tux-accent-text);
+}
+
 .system-color-dialog > .form-error {
   margin: 14px 20px 0;
 }
