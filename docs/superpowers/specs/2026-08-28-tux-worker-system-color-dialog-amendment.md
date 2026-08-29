@@ -1,121 +1,71 @@
-# TUX Operations Worker System Color — Dialog Amendment
+# TUX Operations Worker System Color — Approved Dialog Amendment
 
-## Status and precedence
+**Status:** Approved follow-up authority
 
-Approved by direct user instruction on 2026-08-28 after the original System Color spec and implementation plan were written.
+This amendment records the later approved refinement to the System Color dialog and its rendered QA. It supersedes only conflicting picker-surface instructions in the earlier worker System Color design/implementation documents. All other architecture, persistence, security, lifecycle, accessibility, palette, semantic-color, and verification requirements remain unchanged.
 
-This amendment is the highest-precedence authority **only for the System Color dialog surface and the rendered-QA steps that drive that surface**. It supersedes conflicting dialog/UI-driving prose in:
+## Final approved System Color dialog
 
-- `docs/superpowers/specs/2026-08-28-tux-worker-system-color-design.md`
-- `docs/superpowers/plans/2026-08-28-tux-worker-system-color.md`
+The dialog is intentionally minimal and contains exactly two setting rows:
 
-All non-conflicting architecture, persistence, synchronization, palette, accessibility, semantic-color, worker-isolation, migration, and pre-merge requirements in those documents remain binding.
+1. **System Color** — one native square `<input type="color">`.
+2. **Default** — one checkbox.
 
-## Exact approved dialog
+The transaction actions are:
 
-The modal title remains:
+- **Save** — persist the draft accent for the active worker only.
+- **Cancel** — discard the draft and restore the previously saved preview.
 
-```text
-Choose system color
-```
+The final approved dialog must **not** expose:
 
-The dialog contains exactly two setting rows:
-
-1. `System Color` + one native square `input[type=color]`.
-2. `Default` + one checkbox.
-
-The footer contains:
-
-- `Cancel`
-- `Save`
-
-The dialog must not expose:
-
-- a raw HEX text input;
+- a raw HEX text field;
 - RGB numeric fields;
-- EyeDropper / `Pick from screen`;
-- a separate `Reset to TUX default` action.
+- EyeDropper / “Pick from screen” controls;
+- a separate “Reset to TUX default” button.
 
-`Default` is the only reset/default control and maps to the canonical persisted preference `accentColor: null`.
+The **Default** checkbox is the reset control. Checked means the persisted worker accent is `null`, which renders the exact canonical TUX default tokens. Unchecking restores the current native-picker draft without persisting until Save.
 
-## Transaction behavior
+The native color picker remains the only custom-color input surface. Its live `input` events may update the preview, while Save remains the only persistence boundary.
 
-- Opening the dialog initializes the draft from the active worker's saved `accentColor`.
-- If the saved accent is `null`, `Default` is checked and the native picker displays the current TUX default base color for visual continuity.
-- Selecting a native color normalizes it through the canonical accent parser, makes the draft custom, unchecks `Default`, and applies live preview.
-- Checking `Default` sets the draft to `null` and previews the exact existing TUX palette by clearing runtime accent overrides.
-- Unchecking `Default` uses the current native picker value as the custom draft.
-- `Cancel`, Escape, and permitted backdrop dismissal restore the exact previously saved worker accent and persist nothing.
-- `Save` persists only `accentColor` via the intent-specific accent mutation.
-- While Save is in flight, color-mutating controls and modal actions are disabled as required by the implementation transaction.
-- Save failure keeps the dialog open, preserves the draft preview, and shows an inline error.
+## Appearance remains separate
 
-## Appearance ownership
+`System | Light | Dark` remains unchanged and device-local. System Color personalization does not persist appearance mode and does not change the established appearance controls.
 
-The existing device-local selector remains unchanged:
+## Accessibility and transaction behavior
 
-```text
-System | Light | Dark
-```
+The existing approved accessibility requirements still apply:
 
-This amendment does not make Appearance worker-synced and does not alter its `localStorage` ownership.
-
-## Accessibility and responsive requirements
-
-- The modal remains labelled by `Choose system color`.
-- `System Color` and `Default` are programmatic labels for their controls.
-- The native picker is at least 44x44 CSS pixels.
-- The checkbox has an effective 44x44 interaction target.
-- Cancel and Save remain at least 44px high.
-- Focus enters the dialog on open and remains trapped inside the modal.
-- Escape cancels when not saving.
-- Save errors use an alert/live region.
-- The dialog remains inside the viewport with no horizontal clipping on configured desktop, tablet, and mobile projects.
-- Forced-colors behavior remains supported.
+- focus enters the dialog on open;
+- Tab/Shift+Tab stay trapped inside the modal;
+- Escape behaves like Cancel when not saving;
+- focus returns to the stable operator trigger after the modal closes;
+- controls remain at least 44px touch targets;
+- Save/Cancel and inputs are disabled while saving;
+- save failure remains inline and leaves the draft available for retry;
+- forced-colors behavior remains supported.
 
 ## Rendered QA amendment
 
-Feature-specific rendered QA lives in:
+Rendered QA for the System Color dialog must verify the approved two-row surface instead of older richer-picker controls.
 
-```text
-e2e/worker-system-color.e2e.ts
-```
+Required assertions include:
 
-The System Color rendered suite must verify:
-
-- exact two-row dialog structure;
-- one `input[type=color]`;
-- one `input[type=checkbox]`;
+- exactly two `.system-color-row` rows;
+- one `input[type="color"]`;
+- one `input[type="checkbox"]`;
 - zero text color inputs;
-- zero numeric RGB inputs;
-- no EyeDropper action;
-- no separate reset action;
-- live preview and Cancel rollback;
-- Save + reload persistence;
-- `Default` live preview, Cancel rollback, Save, and reload persistence;
-- menu-layout preservation across accent writes;
-- worker A / worker B isolation;
-- Light, Dark, and live System appearance behavior;
-- action foreground contrast at or above 4.5:1 for representative rendered custom colors;
-- exact desktop checks at 1366x768 and 1280x720;
-- tablet/mobile containment and no horizontal overflow;
-- evidence files including `system-color-light-blue-desktop.png`, `system-color-dark-blue-desktop.png`, `system-color-dialog-1280x720-light.png`, `system-color-picker-tablet.png`, and `system-color-picker-mobile.png`.
+- zero RGB numeric inputs;
+- no EyeDropper control;
+- no standalone reset button;
+- Save and Cancel remain visible and usable;
+- no horizontal overflow;
+- modal bounds remain inside each tested viewport;
+- canonical opaque surface/border/shadow/text tokens are used so the modal never becomes transparent;
+- worker-specific preview/save/cancel/default behavior remains isolated and persistent;
+- Light, Dark, and System appearance behavior remains correct;
+- action foreground contrast remains at least 4.5:1;
+- desktop, tablet, and mobile rendered evidence remains visually clean.
 
-The exhaustive green/blue/purple/red/yellow/near-black/near-white palette robustness matrix remains covered by the palette unit tests. Rendered QA must not reintroduce forbidden HEX/RGB/EyeDropper controls merely to drive those colors.
+## Precedence
 
-## Explicitly unchanged requirements
-
-This amendment does not change:
-
-- worker-scoped `accentColor` ownership;
-- `null` meaning exact TUX default;
-- canonical persisted uppercase `#RRGGBB`;
-- intent-specific `updateMenuLayout` and `updateAccentColor` writes;
-- IndexedDB, SQLite, browser, Electron, server, or Supabase boundaries;
-- repository-only/manual Supabase migration handling;
-- runtime Light/Dark palette derivation and contrast thresholds;
-- live `prefers-color-scheme` response under System appearance;
-- stale-response guarding and wrong-worker-flash prevention;
-- brand-accent token boundaries;
-- semantic positive/warning/destructive color independence;
-- the requirement to complete full CI, rendered QA, exact-diff review, and pre-merge review before merge.
+When older worker-System-Color documents conflict with this dialog amendment, this amendment is the authority **only for the dialog surface and its directly corresponding rendered-QA expectations**. It does not weaken or replace any other approved requirement.
