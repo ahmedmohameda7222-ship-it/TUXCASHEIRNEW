@@ -44,8 +44,7 @@ function parseRgbDraft(value: RgbDraft): RgbColor | null {
 
 function eyeDropperConstructor(): EyeDropperConstructor | null {
   if (typeof window === 'undefined') return null;
-  const candidate = (window as Window & { EyeDropper?: EyeDropperConstructor })
-    .EyeDropper;
+  const candidate = (window as Window & { EyeDropper?: EyeDropperConstructor }).EyeDropper;
   return typeof candidate === 'function' ? candidate : null;
 }
 
@@ -72,8 +71,7 @@ export function SystemColorPickerDialog({
   const EyeDropper = eyeDropperConstructor();
 
   useEffect(() => {
-    const returnFocusTarget =
-      document.querySelector<HTMLElement>('.operator-trigger');
+    const returnFocusTarget = document.querySelector<HTMLElement>('.operator-trigger');
     pickerRef.current?.focus();
     return () => returnFocusTarget?.focus();
   }, []);
@@ -91,9 +89,7 @@ export function SystemColorPickerDialog({
       const dialog = dialogRef.current;
       if (dialog === null) return;
       const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'input:not(:disabled), button:not(:disabled)',
-        ),
+        dialog.querySelectorAll<HTMLElement>('input:not(:disabled), button:not(:disabled)'),
       );
       if (focusable.length === 0) return;
       const first = focusable[0]!;
@@ -202,10 +198,7 @@ export function SystemColorPickerDialog({
         </header>
 
         <div className="system-color-editor">
-          <div
-            className="system-color-preview"
-            aria-label={`Current color ${previewLabel}`}
-          >
+          <div className="system-color-preview" aria-label={`Current color ${previewLabel}`}>
             <span
               className="system-color-preview-swatch"
               style={{ backgroundColor: pickerColor }}
@@ -312,9 +305,7 @@ export function SystemColorPickerDialog({
               disabled={saving || EyeDropper === null}
               aria-disabled={EyeDropper === null}
               title={
-                EyeDropper === null
-                  ? 'Screen color picking is not supported here.'
-                  : undefined
+                EyeDropper === null ? 'Screen color picking is not supported here.' : undefined
               }
               onClick={() => void pickFromScreen()}
             >
@@ -338,12 +329,7 @@ export function SystemColorPickerDialog({
         )}
 
         <footer className="system-color-actions">
-          <button
-            type="button"
-            className="quiet-action"
-            disabled={saving}
-            onClick={cancel}
-          >
+          <button type="button" className="quiet-action" disabled={saving} onClick={cancel}>
             Cancel
           </button>
           <button
