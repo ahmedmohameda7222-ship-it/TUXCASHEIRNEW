@@ -27,6 +27,8 @@ type EyeDropperConstructor = new () => {
   open(): Promise<{ readonly sRGBHex: string }>;
 };
 
+const HEX_ERROR = 'Enter a valid 3- or 6-digit HEX color.';
+
 function rgbDraft(color: SystemAccentColor): RgbDraft {
   const rgb = systemAccentColorToRgb(color);
   return { r: String(rgb.r), g: String(rgb.g), b: String(rgb.b) };
@@ -46,6 +48,14 @@ function eyeDropperConstructor(): EyeDropperConstructor | null {
   if (typeof window === 'undefined') return null;
   const candidate = (window as Window & { EyeDropper?: EyeDropperConstructor }).EyeDropper;
   return typeof candidate === 'function' ? candidate : null;
+}
+
+function isThreeDigitHex(value: string): boolean {
+  return /^#?[0-9a-f]{3}$/i.test(value.trim());
+}
+
+function isSixDigitHex(value: string): boolean {
+  return /^#?[0-9a-f]{6}$/i.test(value.trim());
 }
 
 export function SystemColorPickerDialog({
@@ -132,9 +142,19 @@ export function SystemColorPickerDialog({
   function chooseHex(value: string): void {
     if (saving) return;
     setHexInput(value);
-    const color = parseHexDraft(value);
+    if (isSixDigitHex(value)) {
+      const color = parseHexDraft(value);
+      if (color !== null) syncCustomColor(color);
+      return;
+    }
+    setHexError(isThreeDigitHex(value) ? null : HEX_ERROR);
+  }
+
+  function commitHex(): void {
+    if (saving) return;
+    const color = parseHexDraft(hexInput);
     if (color === null) {
-      setHexError('Enter a valid 3- or 6-digit HEX color.');
+      setHexError(HEX_ERROR);
       return;
     }
     syncCustomColor(color);
@@ -177,7 +197,13 @@ export function SystemColorPickerDialog({
   const invalidDraft = hexError !== null || rgbError !== null;
 
   return (
-    <div className="system-color-dialog-backdrop" role="presentation">
+    <div
+      className="system-color-dialog-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) cancel();
+      }}
+    >
       <section
         ref={dialogRef}
         className="system-color-dialog"
@@ -226,6 +252,12 @@ export function SystemColorPickerDialog({
               aria-invalid={hexError !== null}
               aria-describedby={hexError === null ? undefined : 'system-color-hex-error'}
               onChange={(event) => chooseHex(event.currentTarget.value)}
+              onBlur={commitHex}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                commitHex();
+              }}
             />
           </label>
 
