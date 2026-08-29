@@ -181,7 +181,8 @@ function actionSurfaceQualifies(
     contrastRatio(candidate, panel) >= 3 &&
     contrastRatio(candidate, foreground) >= 4.5 &&
     (destructive === null ||
-      systemAccentColorDistance(candidate, destructive) >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN) &&
+      systemAccentColorDistance(candidate, destructive) >=
+        SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN) &&
     separatedFrom.every(
       (surface) => systemAccentColorDistance(candidate, surface) >= ACTION_STATE_DISTANCE_MIN,
     )
