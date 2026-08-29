@@ -41,12 +41,13 @@ describe('system accent theme', () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
         const panel = theme === 'light' ? LIGHT_PANEL : DARK_PANEL;
         const accent = systemAccentColorToRgb(parseSystemAccentColor(palette.accent));
+        const strong = systemAccentColorToRgb(parseSystemAccentColor(palette.strong));
         const foreground = systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground));
         const soft = systemAccentColorToRgb(parseSystemAccentColor(palette.soft));
         const text = systemAccentColorToRgb(parseSystemAccentColor(palette.text));
         const focus = systemAccentColorToRgb(parseSystemAccentColor(palette.focusRing));
 
-        expect(contrastRatio(accent, foreground)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(strong, foreground)).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(accent, panel)).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(text, soft)).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(focus, panel)).toBeGreaterThanOrEqual(3);
@@ -62,11 +63,15 @@ describe('system accent theme', () => {
 
   it('removes only runtime accent token overrides when clearing the palette', () => {
     const removed: string[] = [];
+    const removedAttributes: string[] = [];
     const root = {
       style: {
         removeProperty(name: string) {
           removed.push(name);
         },
+      },
+      removeAttribute(name: string) {
+        removedAttributes.push(name);
       },
     } as unknown as HTMLElement;
 
@@ -85,5 +90,6 @@ describe('system accent theme', () => {
         '--tux-action-foreground',
       ].sort(),
     );
+    expect(removedAttributes).toEqual(['data-tux-custom-accent']);
   });
 });
