@@ -69,7 +69,9 @@ export function rgbToSystemAccentColor({ r, g, b }: RgbColor): SystemAccentColor
       throw new RangeError('RGB channels must be integers between 0 and 255.');
     }
   }
-  const hex = [r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('');
+  const hex = [r, g, b]
+    .map((channel) => channel.toString(16).padStart(2, '0'))
+    .join('');
   return parseSystemAccentColor(`#${hex}`);
 }
 
@@ -79,7 +81,9 @@ function linearChannel(channel: number): number {
 }
 
 function relativeLuminance({ r, g, b }: RgbColor): number {
-  return 0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b);
+  return (
+    0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b)
+  );
 }
 
 export function contrastRatio(a: RgbColor, b: RgbColor): number {
@@ -127,7 +131,11 @@ function ensureContrast(
   return best;
 }
 
-function accessibleText(accent: RgbColor, background: RgbColor, toward: RgbColor): RgbColor {
+function accessibleText(
+  accent: RgbColor,
+  background: RgbColor,
+  toward: RgbColor,
+): RgbColor {
   return ensureContrast(accent, background, 4.5, toward);
 }
 
@@ -150,8 +158,7 @@ function ensureDestructiveSeparation(
       const adjusted = blend(candidate, endpoint, step / 20);
       if (contrastRatio(adjusted, panel) < 3) continue;
       if (
-        systemAccentColorDistance(adjusted, destructive) <
-        SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
+        systemAccentColorDistance(adjusted, destructive) < SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
       ) {
         continue;
       }
