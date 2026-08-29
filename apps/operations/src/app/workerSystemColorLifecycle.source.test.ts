@@ -12,6 +12,14 @@ describe('worker system color lifecycle', () => {
     expect(source).toContain('clearSystemAccentPalette(document.documentElement)');
   });
 
+  it('subscribes to live worker preference changes without overwriting an open color draft', () => {
+    expect(source).toContain('preferencesClient.subscribe');
+    expect(source).toContain('preferences.workerId !== session.operator.id');
+    expect(source).toContain('setSavedAccentColor(preferences.accentColor)');
+    expect(source).toContain('if (!systemColorOpen)');
+    expect(source).toContain('setPreviewAccentColor(preferences.accentColor)');
+  });
+
   it('keeps Appearance device-local while resolving custom palettes for live light/dark mode', () => {
     expect(source).toContain("matchMedia('(prefers-color-scheme: dark)')");
     expect(source).toContain('deriveSystemAccentPalette');
