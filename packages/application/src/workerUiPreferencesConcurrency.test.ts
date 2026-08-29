@@ -44,9 +44,7 @@ function preference(overrides: Partial<WorkerUiPreferences> = {}): WorkerUiPrefe
   };
 }
 
-function remote(
-  overrides: Partial<RemoteWorkerUiPreferences> = {},
-): RemoteWorkerUiPreferences {
+function remote(overrides: Partial<RemoteWorkerUiPreferences> = {}): RemoteWorkerUiPreferences {
   return {
     shopId,
     workerId,
