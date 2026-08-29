@@ -28,10 +28,20 @@ test('null worker accent preserves canonical TUX computed styles in Light and Da
     );
 
     const placeOrder = page.getByRole('button', { name: 'Place Order', exact: true });
-    const placePaint = await paint(placeOrder);
-    expect(placePaint.backgroundColor).toBe(accentColor);
-    expect(placePaint.borderColor).toBe(accentColor);
-    expect(placePaint.color).toBe(actionForeground);
+    await expect
+      .poll(async () => {
+        const current = await paint(placeOrder);
+        return {
+          backgroundColor: current.backgroundColor,
+          borderColor: current.borderColor,
+          color: current.color,
+        };
+      })
+      .toEqual({
+        backgroundColor: accentColor,
+        borderColor: accentColor,
+        color: actionForeground,
+      });
 
     for (const locator of [
       page.locator('.operations-header .nav-item-active'),
