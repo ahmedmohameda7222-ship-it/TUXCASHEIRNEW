@@ -17,6 +17,7 @@ import {
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const blue = parseSystemAccentColor('#1E3A8A');
+const purple = parseSystemAccentColor('#7E22CE');
 
 class MemoryRepository implements WorkerUiPreferencesRepository {
   value: WorkerUiPreferences | null = null;
@@ -48,7 +49,7 @@ class RemoteGateway implements WorkerUiPreferencesRemoteGateway {
 }
 
 describe('WorkerUiPreferencesService observable changes', () => {
-  it('emits successful local mutations and remote reconciliation, then stops after unsubscribe', async () => {
+  it('emits local changes and a newer Device B remote accent, then stops after unsubscribe', async () => {
     const repository = new MemoryRepository();
     const gateway = new RemoteGateway();
     const service = new WorkerUiPreferencesService(repository, gateway, () =>
@@ -72,11 +73,13 @@ describe('WorkerUiPreferencesService observable changes', () => {
       categoryOrder: [],
       categoryAlignment: 'left',
       productOrder: [],
-      accentColor: blue,
+      accentColor: purple,
       updatedAt: instant('2026-08-29T08:11:00.000Z'),
       serverVersion: 2,
     };
     await service.syncOnce(shopId, workerId);
+    expect(observed.at(-1)?.workerId).toBe(workerId);
+    expect(observed.at(-1)?.accentColor).toBe(purple);
     expect(observed.at(-1)?.serverVersion).toBe(2);
     expect(observed.at(-1)?.syncState).toBe('CLEAN');
 
