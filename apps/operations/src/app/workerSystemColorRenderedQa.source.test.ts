@@ -16,7 +16,7 @@ const pickerCss = readFileSync(
 const source = `${e2e}\n${matrixE2e}`.replace(/\s+/g, ' ');
 
 describe('worker system color rendered QA contract', () => {
-  it('covers exact desktop viewports and the approved two-row native dialog', () => {
+  it('covers exact desktop viewports and the approved native dialog', () => {
     expect(source).toContain("test('worker system color is isolated, persistent, and responsive'");
     expect(source).toContain('width: 1366, height: 768');
     expect(source).toContain('width: 1280, height: 720');
@@ -24,11 +24,16 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("input[type='checkbox']");
     expect(source).toContain("input[type='text']");
     expect(source).toContain("input[type='number']");
-    expect(source).toContain("locator('.system-color-row')");
-    expect(source).toContain('toHaveCount(2)');
+    expect(source).toContain("getByText('Current color', { exact: true })");
+    expect(source).toContain("getByText('Visual picker', { exact: true })");
+    expect(source).toContain("name: 'Pick from screen', exact: true");
+    expect(source).toContain('toHaveCount(1)');
     expect(source).toContain('toHaveCount(0)');
-    expect(source).toContain("getByText('System Color', { exact: true })");
-    expect(source).toContain("getByText('Default', { exact: true })");
+    expect(source).toContain("name: 'Reset to TUX default', exact: true");
+    expect(source).toContain("name: 'Cancel', exact: true");
+    expect(source).toContain("name: 'Save', exact: true");
+    expect(source).toContain('toBeGreaterThanOrEqual(44)');
+    expect(source).toContain("keyboard.press('Shift+Tab')");
   });
 
   it('covers preview/cancel/default persistence, appearance modes, and two workers', () => {
@@ -42,8 +47,10 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("getPropertyValue('--tux-accent')");
   });
 
-  it('covers action contrast, tablet/mobile usability, and approval evidence', () => {
-    expect(source).toContain('renderedActionContrast');
+  it('covers actual action contrast, tablet/mobile usability, and approval evidence', () => {
+    expect(source).toContain('computedPaint');
+    expect(source).toContain('assertRenderedControls');
+    expect(source).toContain("'Place Order text'");
     expect(source).toContain('toBeGreaterThanOrEqual(4.5)');
     expect(source).toContain("test('worker system color picker is usable on tablet and mobile'");
     expect(source).toContain("test.skip(testInfo.project.name === 'desktop-browser-fallback')");
@@ -55,7 +62,7 @@ describe('worker system color rendered QA contract', () => {
 
   it('covers the required rendered robustness matrix in both Light and Dark', () => {
     expect(source).toContain(
-      "test('worker system color robustness matrix is accessible in light and dark'",
+      "test('worker system color robustness matrix verifies actual rendered controls in light and dark'",
     );
     expect(source).toContain("'#1f6b52'");
     expect(source).toContain("'#1e3a8a'");
@@ -65,8 +72,10 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("'#050505'");
     expect(source).toContain("'#fafafa'");
     expect(source).toContain("for (const appearance of ['Light', 'Dark'] as const)");
-    expect(source).toContain('renderedPaletteContrast');
+    expect(source).toContain('assertRenderedControls');
+    expect(source).toContain('assertFocusedPicker');
     expect(source).toContain('semanticStatusColors');
+    expect(source).toContain('MIN_DESTRUCTIVE_DISTANCE');
   });
 
   it('uses canonical surface tokens so the dialog remains opaque at compact widths', () => {
