@@ -224,6 +224,7 @@ export function SystemColorPickerDialog({
               value={hexInput}
               disabled={saving}
               aria-invalid={hexError !== null}
+              aria-describedby={hexError === null ? undefined : 'system-color-hex-error'}
               onChange={(event) => chooseHex(event.currentTarget.value)}
             />
           </label>
@@ -240,6 +241,7 @@ export function SystemColorPickerDialog({
                   step={1}
                   value={rgbInput[channel]}
                   aria-invalid={rgbError !== null}
+                  aria-describedby={rgbError === null ? undefined : 'system-color-rgb-error'}
                   onChange={(event) => chooseRgb(channel, event.currentTarget.value)}
                 />
               </label>
@@ -247,9 +249,21 @@ export function SystemColorPickerDialog({
           </fieldset>
         </div>
 
-        {hexError !== null ? <p className="system-color-validation">{hexError}</p> : null}
-        {rgbError !== null ? <p className="system-color-validation">{rgbError}</p> : null}
-        {saveError !== null ? <p className="system-color-validation">{saveError}</p> : null}
+        {hexError !== null ? (
+          <p className="system-color-validation" id="system-color-hex-error">
+            {hexError}
+          </p>
+        ) : null}
+        {rgbError !== null ? (
+          <p className="system-color-validation" id="system-color-rgb-error">
+            {rgbError}
+          </p>
+        ) : null}
+        {saveError !== null ? (
+          <p className="system-color-validation" role="alert" aria-live="polite">
+            {saveError}
+          </p>
+        ) : null}
 
         <div className="system-color-dialog-actions">
           <button type="button" disabled={saving || EyeDropper === null} onClick={pickFromScreen}>
