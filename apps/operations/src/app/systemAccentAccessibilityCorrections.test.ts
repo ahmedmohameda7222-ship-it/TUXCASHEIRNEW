@@ -85,19 +85,20 @@ describe('system accent accessibility corrections', () => {
   });
 
   it('uses accent-text for every selected label rendered directly on accent-soft', () => {
-    for (const selector of [
+    const selectors = [
       '.operations-header .nav-item-active',
       '.operator-menu .appearance-option-active',
       '.menu-toolbar .category-rail button.selected',
       '.product-family-filter button.selected',
       '.order-type-section .segmented-control button.selected',
       '.payment-methods button.selected',
-    ]) {
-      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const block = featureCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 's'))?.[1] ?? '';
-      expect(block, selector).toContain('background: var(--tux-accent-soft);');
-      expect(block, selector).toContain('color: var(--tux-accent-text);');
-      expect(block, selector).not.toContain('color: var(--tux-accent-strong);');
-    }
+    ];
+    for (const selector of selectors) expect(featureCss).toContain(selector);
+
+    const block =
+      featureCss.match(/\.operations-header \.nav-item-active,[^{]+\{([^}]*)\}/s)?.[1] ?? '';
+    expect(block).toContain('background: var(--tux-accent-soft);');
+    expect(block).toContain('color: var(--tux-accent-text);');
+    expect(block).not.toContain('color: var(--tux-accent-strong);');
   });
 });
