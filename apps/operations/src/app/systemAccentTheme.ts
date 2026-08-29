@@ -26,6 +26,7 @@ const BLACK: RgbColor = { r: 0, g: 0, b: 0 };
 const WHITE: RgbColor = { r: 255, g: 255, b: 255 };
 const LIGHT_DESTRUCTIVE: RgbColor = { r: 180, g: 35, b: 24 };
 const DARK_DESTRUCTIVE: RgbColor = { r: 240, g: 107, b: 97 };
+const ACTION_STATE_DISTANCE_MIN = 12;
 export const SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN = 72;
 
 const TOKEN_MAP = {
@@ -174,12 +175,16 @@ function actionSurfaceQualifies(
   panel: RgbColor,
   foreground: RgbColor,
   destructive: RgbColor | null,
+  separatedFrom: readonly RgbColor[] = [],
 ): boolean {
   return (
     contrastRatio(candidate, panel) >= 3 &&
     contrastRatio(candidate, foreground) >= 4.5 &&
     (destructive === null ||
-      systemAccentColorDistance(candidate, destructive) >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN)
+      systemAccentColorDistance(candidate, destructive) >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN) &&
+    separatedFrom.every(
+      (surface) => systemAccentColorDistance(candidate, surface) >= ACTION_STATE_DISTANCE_MIN,
+    )
   );
 }
 
@@ -188,16 +193,23 @@ function ensureActionSurface(
   panel: RgbColor,
   foreground: '#000000' | '#FFFFFF',
   destructive: RgbColor | null = null,
+  separatedFrom: readonly RgbColor[] = [],
 ): RgbColor {
   const foregroundRgb = foreground === '#000000' ? BLACK : WHITE;
-  if (actionSurfaceQualifies(candidate, panel, foregroundRgb, destructive)) return candidate;
+  if (actionSurfaceQualifies(candidate, panel, foregroundRgb, destructive, separatedFrom)) {
+    return candidate;
+  }
 
   let best: RgbColor | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const endpoint of [BLACK, WHITE]) {
     for (let step = 1; step <= 255; step += 1) {
       const adjusted = blend(candidate, endpoint, step / 255);
-      if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive)) continue;
+      if (
+        !actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)
+      ) {
+        continue;
+      }
       const distance = systemAccentColorDistance(candidate, adjusted);
       if (distance < bestDistance) {
         best = adjusted;
@@ -210,7 +222,9 @@ function ensureActionSurface(
 
   for (let channel = 0; channel <= 255; channel += 1) {
     const adjusted = { r: channel, g: channel, b: channel };
-    if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive)) continue;
+    if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)) {
+      continue;
+    }
     const distance = systemAccentColorDistance(candidate, adjusted);
     if (distance < bestDistance) {
       best = adjusted;
@@ -234,16 +248,18 @@ export function deriveSystemAccentPalette(
     theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
   const pressedCandidate =
     theme === 'light' ? blend(accentRgb, BLACK, 0.2) : blend(accentRgb, BLACK, 0.12);
-  const actionSurfaceRgb = ensureContrast(pressedCandidate, panel, 3, direction);
-  const strongCandidate = ensureDestructiveSeparation(actionSurfaceRgb, panel, theme);
+  const strongCandidate = ensureDestructiveSeparation(accentRgb, panel, theme);
   const actionForeground = bestActionForeground([
     hoverCandidate,
     pressedCandidate,
     strongCandidate,
   ]);
   const hoverRgb = ensureActionSurface(hoverCandidate, panel, actionForeground);
-  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground);
-  const strongRgb = ensureActionSurface(strongCandidate, panel, actionForeground, destructive);
+  const pressedRgb = ensureActionSurface(pressedCandidate, panel, actionForeground, null, [hoverRgb]);
+  const strongRgb = ensureActionSurface(strongCandidate, panel, actionForeground, destructive, [
+    hoverRgb,
+    pressedRgb,
+  ]);
   const softRgb = blend(panel, accentRgb, theme === 'light' ? 0.12 : 0.24);
   const hoverSoftRgb = blend(panel, hoverCandidate, theme === 'light' ? 0.17 : 0.31);
   const textRgb = accessibleText(accentRgb, softRgb, direction);
