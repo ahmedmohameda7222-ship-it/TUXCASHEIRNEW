@@ -53,9 +53,9 @@ describe('system accent accessibility corrections', () => {
         }
         for (let left = 0; left < surfaces.length; left += 1) {
           for (let right = left + 1; right < surfaces.length; right += 1) {
-            expect(systemAccentColorDistance(surfaces[left]!, surfaces[right]!)).toBeGreaterThanOrEqual(
-              ACTION_STATE_DISTANCE_MIN,
-            );
+            expect(
+              systemAccentColorDistance(surfaces[left]!, surfaces[right]!),
+            ).toBeGreaterThanOrEqual(ACTION_STATE_DISTANCE_MIN);
           }
         }
       });
