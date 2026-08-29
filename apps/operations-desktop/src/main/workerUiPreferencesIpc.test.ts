@@ -153,6 +153,36 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
+  it('exposes live preference subscription and stops after unsubscribe', async () => {
+    const repository = new MemoryRepository();
+    await repository.put(preference(workerA, [categoryA], 'left'));
+    const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
+      instant('2026-08-25T03:16:30.000Z'),
+    );
+    const runtime = new WorkerUiPreferencesIpcRuntime({
+      getSessionState: async () => active(workerA, 'Worker A'),
+      repository,
+      service,
+    });
+    const listener = vi.fn();
+
+    const unsubscribe = runtime.subscribe(listener);
+    await runtime.updateAccentColor(customAccent);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        workerId: workerA,
+        accentColor: customAccent,
+        syncState: 'DIRTY',
+      }),
+    );
+
+    unsubscribe();
+    await runtime.updateAccentColor(null);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects malformed or non-canonical accent input', async () => {
     const repository = new MemoryRepository();
     const service = new WorkerUiPreferencesService(repository, new NoopGateway());
