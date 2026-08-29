@@ -16,7 +16,7 @@ describe('worker system color lifecycle', () => {
     expect(source).toContain('preferencesClient.subscribe');
     expect(source).toContain('preferences.workerId !== session.operator.id');
     expect(source).toContain('setSavedAccentColor(preferences.accentColor)');
-    expect(source).toContain('if (!systemColorOpen)');
+    expect(source).toContain('if (!systemColorOpenRef.current)');
     expect(source).toContain('setPreviewAccentColor(preferences.accentColor)');
   });
 
