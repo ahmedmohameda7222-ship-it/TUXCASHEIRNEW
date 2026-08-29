@@ -257,10 +257,26 @@ export async function switchWorker(
   nextWorker: string,
   force = false,
 ): Promise<void> {
-  await page.getByRole('button', { name: new RegExp(currentWorker) }).click({ force });
-  await page.getByRole('menuitem', { name: 'Switch / Sign in worker' }).click({ force });
-  await page.getByLabel('Enter PIN to Sign In').fill(pin, { force });
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click({ force });
+  const operator = page.getByRole('button', { name: new RegExp(currentWorker) });
+  if (force) {
+    await operator.evaluate((node) => (node as HTMLButtonElement).click());
+    const switchItem = page.locator('.operator-menu [role="menuitem"]', {
+      hasText: 'Switch / Sign in worker',
+    });
+    await expect(switchItem).toBeAttached();
+    await switchItem.evaluate((node) => (node as HTMLButtonElement).click());
+    const switchDialog = page.locator('.switch-dialog');
+    await expect(switchDialog).toBeAttached();
+    await switchDialog.locator('input[name="worker-pin"]').fill(pin, { force: true });
+    await switchDialog
+      .locator('button.primary-action')
+      .evaluate((node) => (node as HTMLButtonElement).click());
+  } else {
+    await operator.click();
+    await page.getByRole('menuitem', { name: 'Switch / Sign in worker' }).click();
+    await page.getByLabel('Enter PIN to Sign In').fill(pin);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  }
   const nextOperator = page.getByRole('button', { name: new RegExp(nextWorker) });
   const nextGreeting = page.getByRole('heading', { name: new RegExp(nextWorker) });
   await expect
