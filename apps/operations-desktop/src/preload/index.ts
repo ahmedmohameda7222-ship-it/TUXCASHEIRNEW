@@ -27,6 +27,7 @@ const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
+const IPC_WORKER_UI_PREFERENCES_CHANGED = 'tux:worker-ui-preferences:changed';
 const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT = 'tux:worker-ui-preferences:update-menu-layout';
 const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
 const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT = 'tux:worker-ui-preferences:reset-menu-layout';
@@ -91,6 +92,13 @@ const api: TuxDesktopApi = Object.freeze({
     load: async () => {
       const value: unknown = await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_LOAD);
       return value === null ? null : parseWorkerUiPreferences(value);
+    },
+    subscribe: (listener: Parameters<TuxDesktopApi['workerUiPreferences']['subscribe']>[0]) => {
+      const wrapper = (_event: IpcRendererEvent, value: unknown): void => {
+        listener(parseWorkerUiPreferences(value));
+      };
+      ipcRenderer.on(IPC_WORKER_UI_PREFERENCES_CHANGED, wrapper);
+      return () => ipcRenderer.removeListener(IPC_WORKER_UI_PREFERENCES_CHANGED, wrapper);
     },
     updateMenuLayout: async (input: WorkerMenuLayoutInput) => {
       const value: unknown = await ipcRenderer.invoke(
