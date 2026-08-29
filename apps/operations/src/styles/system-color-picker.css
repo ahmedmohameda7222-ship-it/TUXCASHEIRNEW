@@ -203,6 +203,12 @@
   outline-color: var(--tux-focus-ring);
 }
 
+.place-order-action {
+  border-color: var(--tux-accent-strong);
+  background: var(--tux-accent-strong);
+  color: var(--tux-action-foreground);
+}
+
 .operations-header .nav-item-active,
 .operator-menu .appearance-option-active,
 .menu-toolbar .category-rail button.selected,
