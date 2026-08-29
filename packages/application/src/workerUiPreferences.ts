@@ -59,6 +59,28 @@ export interface WorkerUiPreferencesRetryOptions {
 
 const DEFAULT_WORKER_UI_PREFERENCES_RETRY_MS = 60_000;
 
+function sameIds<T>(left: readonly T[], right: readonly T[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function samePreferenceSnapshot(
+  left: WorkerUiPreferences | null,
+  right: WorkerUiPreferences | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return (
+    left.shopId === right.shopId &&
+    left.workerId === right.workerId &&
+    sameIds(left.categoryOrder, right.categoryOrder) &&
+    left.categoryAlignment === right.categoryAlignment &&
+    sameIds(left.productOrder, right.productOrder) &&
+    left.accentColor === right.accentColor &&
+    left.updatedAt === right.updatedAt &&
+    left.serverVersion === right.serverVersion &&
+    left.syncState === right.syncState
+  );
+}
+
 export class WorkerUiPreferencesRetryController {
   readonly #target: WorkerUiPreferencesSyncTarget;
   readonly #identity: () => WorkerUiPreferencesSyncIdentity | null;
@@ -111,6 +133,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
   readonly #repository: WorkerUiPreferencesRepository;
   readonly #gateway: WorkerUiPreferencesRemoteGateway;
   readonly #now: () => Instant;
+  readonly #mutationTails = new Map<string, Promise<void>>();
 
   constructor(
     repository: WorkerUiPreferencesRepository,
@@ -120,6 +143,30 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     this.#repository = repository;
     this.#gateway = gateway;
     this.#now = now;
+  }
+
+  async #serializeLocalMutation<T>(
+    shopId: ShopId,
+    workerId: WorkerId,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const key = `${shopId}:${workerId}`;
+    const previous = this.#mutationTails.get(key) ?? Promise.resolve();
+    const ready = previous.catch(() => undefined);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = ready.then(() => gate);
+    this.#mutationTails.set(key, tail);
+
+    await ready;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.#mutationTails.get(key) === tail) this.#mutationTails.delete(key);
+    }
   }
 
   async #currentOrDefault(shopId: ShopId, workerId: WorkerId): Promise<WorkerUiPreferences> {
@@ -143,17 +190,19 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     workerId: WorkerId,
     input: WorkerUiMenuLayoutUpdate,
   ): Promise<WorkerUiPreferences> {
-    const current = await this.#currentOrDefault(shopId, workerId);
-    const next = parseWorkerUiPreferences({
-      ...current,
-      categoryOrder: input.categoryOrder,
-      categoryAlignment: input.categoryAlignment,
-      productOrder: input.productOrder,
-      updatedAt: this.#now(),
-      syncState: 'DIRTY',
+    return this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#currentOrDefault(shopId, workerId);
+      const next = parseWorkerUiPreferences({
+        ...current,
+        categoryOrder: input.categoryOrder,
+        categoryAlignment: input.categoryAlignment,
+        productOrder: input.productOrder,
+        updatedAt: this.#now(),
+        syncState: 'DIRTY',
+      });
+      await this.#repository.put(next);
+      return next;
     });
-    await this.#repository.put(next);
-    return next;
   }
 
   async updateAccentColor(
@@ -161,15 +210,17 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     workerId: WorkerId,
     accentColor: SystemAccentColor | null,
   ): Promise<WorkerUiPreferences> {
-    const current = await this.#currentOrDefault(shopId, workerId);
-    const next = parseWorkerUiPreferences({
-      ...current,
-      accentColor,
-      updatedAt: this.#now(),
-      syncState: 'DIRTY',
+    return this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#currentOrDefault(shopId, workerId);
+      const next = parseWorkerUiPreferences({
+        ...current,
+        accentColor,
+        updatedAt: this.#now(),
+        syncState: 'DIRTY',
+      });
+      await this.#repository.put(next);
+      return next;
     });
-    await this.#repository.put(next);
-    return next;
   }
 
   async syncOnce(shopId: ShopId, workerId: WorkerId): Promise<void> {
@@ -183,23 +234,31 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         productOrder: local.productOrder,
         accentColor: local.accentColor,
       });
-      await this.#repository.put(
-        parseWorkerUiPreferences({
-          ...remote,
-          syncState: 'CLEAN',
-        }),
-      );
+      await this.#serializeLocalMutation(shopId, workerId, async () => {
+        const current = await this.#repository.get(shopId, workerId);
+        if (!samePreferenceSnapshot(current, local)) return;
+        await this.#repository.put(
+          parseWorkerUiPreferences({
+            ...remote,
+            syncState: 'CLEAN',
+          }),
+        );
+      });
       return;
     }
 
     const remote = await this.#gateway.getWorkerUiPreferences(shopId, workerId);
-    if (remote !== null && (local === null || remote.serverVersion > local.serverVersion)) {
+    if (remote === null || (local !== null && remote.serverVersion <= local.serverVersion)) return;
+
+    await this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#repository.get(shopId, workerId);
+      if (!samePreferenceSnapshot(current, local)) return;
       await this.#repository.put(
         parseWorkerUiPreferences({
           ...remote,
           syncState: 'CLEAN',
         }),
       );
-    }
+    });
   }
 }
