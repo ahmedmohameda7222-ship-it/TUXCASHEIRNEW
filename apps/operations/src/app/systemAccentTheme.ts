@@ -180,7 +180,8 @@ export function deriveSystemAccentPalette(
   const hoverRgb = theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
   const pressedRgb =
     theme === 'light' ? blend(accentRgb, BLACK, 0.2) : blend(accentRgb, BLACK, 0.12);
-  const strongRgb = ensureDestructiveSeparation(pressedRgb, panel, theme);
+  const actionSurfaceRgb = ensureContrast(pressedRgb, panel, 3, direction);
+  const strongRgb = ensureDestructiveSeparation(actionSurfaceRgb, panel, theme);
   const softRgb = blend(panel, accentRgb, theme === 'light' ? 0.12 : 0.24);
   const hoverSoftRgb = blend(panel, hoverRgb, theme === 'light' ? 0.17 : 0.31);
   const textRgb = accessibleText(accentRgb, softRgb, direction);
