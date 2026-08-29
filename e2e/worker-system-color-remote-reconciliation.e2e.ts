@@ -71,12 +71,14 @@ async function readStoredPreference(page: Page, workerId: string) {
 async function assertRuntimeSentinel(page: Page, sentinel: string) {
   await expect
     .poll(() =>
-      page.evaluate((expected) => {
-        const runtime = (window as Window & { __tuxRemoteSentinel?: string })
-          .__tuxRemoteSentinel;
-        const shell = document.querySelector<HTMLElement>('.operations-shell');
-        return runtime === expected && shell?.dataset['remoteSentinel'] === expected;
-      }, sentinel),
+      page.evaluate(
+        (expected) => {
+          const runtime = (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel;
+          const shell = document.querySelector<HTMLElement>('.operations-shell');
+          return runtime === expected && shell?.dataset['remoteSentinel'] === expected;
+        },
+        sentinel,
+      ),
     )
     .toBe(true);
 }
