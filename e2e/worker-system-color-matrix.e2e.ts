@@ -9,6 +9,7 @@ const ORDER_TYPE = '70000000-0000-4000-8000-000000000001';
 const PAYMENT = '80000000-0000-4000-8000-000000000001';
 const DATABASE = 'tux-operations-v2';
 const DRAFT_DATABASE = 'tux-operations-v2-drafts';
+const MIN_DESTRUCTIVE_DISTANCE = 72;
 
 const RENDERED_COLOR_MATRIX = [
   '#1f6b52',
@@ -19,6 +20,16 @@ const RENDERED_COLOR_MATRIX = [
   '#050505',
   '#fafafa',
 ] as const;
+
+type CssRgb = readonly [number, number, number];
+
+interface ComputedPaint {
+  readonly backgroundColor: string;
+  readonly color: string;
+  readonly outlineColor: string;
+  readonly outlineStyle: string;
+  readonly outlineWidth: string;
+}
 
 function pinHash(pin: string): string {
   const salt = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
@@ -78,6 +89,72 @@ function minimalConfiguration() {
     },
     inventoryItems: [],
   };
+}
+
+function parseComputedColor(value: string): CssRgb {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.startsWith('rgb(') || normalized.startsWith('rgba(')) {
+    const start = normalized.indexOf('(') + 1;
+    const end = normalized.lastIndexOf(')');
+    const channels = normalized
+      .slice(start, end)
+      .split(/[\s,/]+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map(Number);
+    if (channels.length === 3 && channels.every(Number.isFinite)) {
+      return [channels[0]!, channels[1]!, channels[2]!];
+    }
+  }
+  if (normalized.startsWith('color(srgb ')) {
+    const channels = normalized
+      .slice('color(srgb '.length, -1)
+      .split(/[\s/]+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((channel) => Number(channel) * 255);
+    if (channels.length === 3 && channels.every(Number.isFinite)) {
+      return [channels[0]!, channels[1]!, channels[2]!];
+    }
+  }
+  throw new Error(`Unsupported computed CSS color: ${value}`);
+}
+
+function linearChannel(channel: number): number {
+  const value = channel / 255;
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance([r, g, b]: CssRgb): number {
+  return 0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b);
+}
+
+function contrastRatio(left: string, right: string): number {
+  const leftLuminance = luminance(parseComputedColor(left));
+  const rightLuminance = luminance(parseComputedColor(right));
+  return (
+    (Math.max(leftLuminance, rightLuminance) + 0.05) /
+    (Math.min(leftLuminance, rightLuminance) + 0.05)
+  );
+}
+
+function colorDistance(left: string, right: string): number {
+  const [lr, lg, lb] = parseComputedColor(left);
+  const [rr, rg, rb] = parseComputedColor(right);
+  return Math.hypot(lr - rr, lg - rg, lb - rb);
+}
+
+async function computedPaint(locator: Locator): Promise<ComputedPaint> {
+  return locator.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color,
+      outlineColor: style.outlineColor,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+    };
+  });
 }
 
 async function seedBrowserFallback(page: Page): Promise<void> {
@@ -188,6 +265,14 @@ async function enterActiveOrders(page: Page): Promise<void> {
   });
 }
 
+async function prepareRenderedOrderControls(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Add one Single Smashed Patty' }).click();
+  await page.getByRole('button', { name: 'Take Away', exact: true }).click();
+  await page.getByRole('button', { name: 'Cash', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Place Order', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Clear', exact: true })).toBeEnabled();
+}
+
 async function setWorkerAppearance(
   page: Page,
   workerName: string,
@@ -224,58 +309,21 @@ async function setNativeSystemColor(dialog: Locator, color: string): Promise<voi
   await picker.focus();
 }
 
-async function renderedPaletteContrast(page: Page): Promise<{
-  action: number;
-  accentBoundary: number;
-  softText: number;
-  focus: number;
-  inlineAccent: string;
-}> {
-  return page.locator('html').evaluate((node) => {
-    const rootStyle = getComputedStyle(node);
-    const parseHex = (value: string): [number, number, number] => {
-      const compact = value.trim();
-      const shortMatch = /^#([0-9a-f]{3})$/i.exec(compact);
-      if (shortMatch !== null) {
-        const shortHex = shortMatch[1]!;
-        return [...shortHex].map((channel) => Number.parseInt(`${channel}${channel}`, 16)) as [
-          number,
-          number,
-          number,
-        ];
-      }
-      const longMatch = /^#([0-9a-f]{6})$/i.exec(compact);
-      if (longMatch === null) throw new Error(`Expected CSS HEX color, got ${value}`);
-      const hex = longMatch[1]!;
-      return [
-        Number.parseInt(hex.slice(0, 2), 16),
-        Number.parseInt(hex.slice(2, 4), 16),
-        Number.parseInt(hex.slice(4, 6), 16),
-      ];
-    };
-    const linearChannel = (channel: number): number => {
-      const value = channel / 255;
-      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-    };
-    const luminance = ([r, g, b]: [number, number, number]): number =>
-      0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b);
-    const contrast = (left: string, right: string): number => {
-      const leftLuminance = luminance(parseHex(left));
-      const rightLuminance = luminance(parseHex(right));
-      return (
-        (Math.max(leftLuminance, rightLuminance) + 0.05) /
-        (Math.min(leftLuminance, rightLuminance) + 0.05)
-      );
-    };
-    const read = (name: string): string => rootStyle.getPropertyValue(name).trim();
-    return {
-      action: contrast(read('--tux-accent'), read('--tux-action-foreground')),
-      accentBoundary: contrast(read('--tux-accent'), read('--tux-surface-panel')),
-      softText: contrast(read('--tux-accent-soft'), read('--tux-accent-text')),
-      focus: contrast(read('--tux-focus-ring'), read('--tux-surface-panel')),
-      inlineAccent: (node as HTMLElement).style.getPropertyValue('--tux-accent').trim(),
-    };
-  });
+async function assertSoftSelection(locator: Locator, label: string): Promise<void> {
+  await expect(locator, `${label} should be visible`).toBeVisible();
+  const paint = await computedPaint(locator);
+  expect(contrastRatio(paint.backgroundColor, paint.color), label).toBeGreaterThanOrEqual(4.5);
+}
+
+async function assertFocusedPicker(dialog: Locator): Promise<void> {
+  const picker = dialog.locator("input[type='color']");
+  await picker.focus();
+  await expect(picker).toBeFocused();
+  const pickerPaint = await computedPaint(picker);
+  const dialogPaint = await computedPaint(dialog);
+  expect(pickerPaint.outlineStyle).not.toBe('none');
+  expect(Number.parseFloat(pickerPaint.outlineWidth)).toBeGreaterThanOrEqual(3);
+  expect(contrastRatio(pickerPaint.outlineColor, dialogPaint.backgroundColor)).toBeGreaterThanOrEqual(3);
 }
 
 async function semanticStatusColors(page: Page): Promise<{
@@ -293,12 +341,51 @@ async function semanticStatusColors(page: Page): Promise<{
   });
 }
 
-test('worker system color robustness matrix is accessible in light and dark', async ({
+async function assertRenderedControls(page: Page, appearance: 'Light' | 'Dark'): Promise<void> {
+  const placeOrder = page.getByRole('button', { name: 'Place Order', exact: true });
+  const actionPaint = await computedPaint(placeOrder);
+  const totalsPaint = await computedPaint(page.locator('.cart-totals'));
+  expect(contrastRatio(actionPaint.backgroundColor, actionPaint.color), 'Place Order text').toBeGreaterThanOrEqual(4.5);
+  expect(
+    contrastRatio(actionPaint.backgroundColor, totalsPaint.backgroundColor),
+    'Place Order boundary',
+  ).toBeGreaterThanOrEqual(3);
+
+  await assertSoftSelection(page.locator('.operations-header .nav-item-active'), 'active navigation');
+  await assertSoftSelection(
+    page.locator('.menu-toolbar .category-rail button.selected'),
+    'selected category',
+  );
+  await assertSoftSelection(
+    page.locator('.order-type-section .segmented-control button.selected'),
+    'selected order type',
+  );
+  await assertSoftSelection(page.locator('.payment-methods button.selected'), 'selected payment');
+
+  const operator = page.getByRole('button', { name: /Demo Worker One/ });
+  await operator.click();
+  await assertSoftSelection(
+    page.locator('.operator-menu .appearance-option-active'),
+    `selected ${appearance} appearance`,
+  );
+  await operator.click();
+
+  const destructivePaint = await computedPaint(
+    page.getByRole('button', { name: 'Clear', exact: true }),
+  );
+  expect(
+    colorDistance(actionPaint.backgroundColor, destructivePaint.color),
+    'brand/destructive separation',
+  ).toBeGreaterThanOrEqual(MIN_DESTRUCTIVE_DISTANCE);
+}
+
+test('worker system color robustness matrix verifies actual rendered controls in light and dark', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await page.setViewportSize({ width: 1366, height: 768 });
   await enterActiveOrders(page);
+  await prepareRenderedOrderControls(page);
 
   for (const appearance of ['Light', 'Dark'] as const) {
     await setWorkerAppearance(page, 'Demo Worker One', appearance);
@@ -310,15 +397,32 @@ test('worker system color robustness matrix is accessible in light and dark', as
     for (const color of RENDERED_COLOR_MATRIX) {
       const dialog = await openSystemColorDialog(page, 'Demo Worker One');
       await setNativeSystemColor(dialog, color);
-      const contrast = await renderedPaletteContrast(page);
-      expect(contrast.inlineAccent).not.toBe('');
-      expect(contrast.action).toBeGreaterThanOrEqual(4.5);
-      expect(contrast.accentBoundary).toBeGreaterThanOrEqual(3);
-      expect(contrast.softText).toBeGreaterThanOrEqual(4.5);
-      expect(contrast.focus).toBeGreaterThanOrEqual(3);
-      expect(await semanticStatusColors(page)).toEqual(semanticBaseline);
-      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await assertFocusedPicker(dialog);
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(dialog).toBeHidden();
+      await expect(page.locator('html')).toHaveAttribute('data-tux-custom-accent', 'true');
+      await assertRenderedControls(page, appearance);
+      expect(await semanticStatusColors(page)).toEqual(semanticBaseline);
     }
   }
+});
+
+test('system color dialog remains usable without horizontal clipping at every supported viewport', async ({
+  page,
+}) => {
+  await enterActiveOrders(page);
+  const dialog = await openSystemColorDialog(page, 'Demo Worker One');
+  const viewport = page.viewportSize();
+  const box = await dialog.boundingBox();
+  expect(viewport).not.toBeNull();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width);
+  await expect(dialog.locator("input[type='color']")).toBeVisible();
+  await expect(dialog.getByLabel('HEX')).toBeVisible();
+  await expect(dialog.getByLabel('Red')).toBeVisible();
+  await expect(dialog.getByLabel('Green')).toBeVisible();
+  await expect(dialog.getByLabel('Blue')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 });
