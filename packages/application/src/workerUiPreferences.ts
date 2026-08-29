@@ -65,6 +65,13 @@ function sameIds<T>(left: readonly T[], right: readonly T[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function sameSyncIdentity(
+  left: WorkerUiPreferencesSyncIdentity,
+  right: WorkerUiPreferencesSyncIdentity,
+): boolean {
+  return left.shopId === right.shopId && left.workerId === right.workerId;
+}
+
 function samePreferenceSnapshot(
   left: WorkerUiPreferences | null,
   right: WorkerUiPreferences | null,
@@ -120,12 +127,24 @@ export class WorkerUiPreferencesRetryController {
     const identity = this.#identity();
     if (identity === null) return;
 
-    const sync = this.#target
-      .syncOnce(identity.shopId, identity.workerId)
-      .catch(() => undefined)
-      .finally(() => {
-        if (this.#syncInFlight === sync) this.#syncInFlight = null;
-      });
+    const run = async (): Promise<void> => {
+      let nextIdentity: WorkerUiPreferencesSyncIdentity | null = identity;
+      while (nextIdentity !== null) {
+        const currentIdentity: WorkerUiPreferencesSyncIdentity = nextIdentity;
+        await this.#target
+          .syncOnce(currentIdentity.shopId, currentIdentity.workerId)
+          .catch(() => undefined);
+        const activeIdentity = this.#identity();
+        nextIdentity =
+          activeIdentity !== null && !sameSyncIdentity(activeIdentity, currentIdentity)
+            ? activeIdentity
+            : null;
+      }
+    };
+
+    const sync = run().finally(() => {
+      if (this.#syncInFlight === sync) this.#syncInFlight = null;
+    });
     this.#syncInFlight = sync;
     return sync;
   }
