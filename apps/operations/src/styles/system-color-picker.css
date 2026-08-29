@@ -51,10 +51,10 @@
   width: min(440px, 100%);
   max-height: calc(100dvh - 48px);
   overflow: auto;
-  border: 1px solid var(--tux-border);
+  border: 1px solid var(--tux-border-subtle);
   border-radius: var(--tux-radius-lg);
-  background: var(--tux-panel);
-  box-shadow: var(--tux-shadow-lg);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-md);
 }
 
 .system-color-heading {
@@ -63,12 +63,12 @@
 
 .system-color-heading h2 {
   margin: 0;
-  color: var(--tux-text);
+  color: var(--tux-text-primary);
   font-size: 18px;
 }
 
 .system-color-rows {
-  border-block: 1px solid var(--tux-border);
+  border-block: 1px solid var(--tux-border-subtle);
 }
 
 .system-color-row {
@@ -78,12 +78,12 @@
   align-items: center;
   gap: 16px;
   padding: 8px 20px;
-  color: var(--tux-text);
+  color: var(--tux-text-primary);
   cursor: pointer;
 }
 
 .system-color-row + .system-color-row {
-  border-top: 1px solid var(--tux-border);
+  border-top: 1px solid var(--tux-border-subtle);
 }
 
 .system-color-native-picker {
