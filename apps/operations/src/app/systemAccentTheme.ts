@@ -24,6 +24,9 @@ const LIGHT_PANEL: RgbColor = { r: 255, g: 255, b: 255 };
 const DARK_PANEL: RgbColor = { r: 20, g: 24, b: 22 };
 const BLACK: RgbColor = { r: 0, g: 0, b: 0 };
 const WHITE: RgbColor = { r: 255, g: 255, b: 255 };
+const LIGHT_DESTRUCTIVE: RgbColor = { r: 180, g: 35, b: 24 };
+const DARK_DESTRUCTIVE: RgbColor = { r: 240, g: 107, b: 97 };
+export const SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN = 72;
 
 const TOKEN_MAP = {
   accent: '--tux-accent',
@@ -87,6 +90,10 @@ export function contrastRatio(a: RgbColor, b: RgbColor): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+export function systemAccentColorDistance(left: RgbColor, right: RgbColor): number {
+  return Math.hypot(left.r - right.r, left.g - right.g, left.b - right.b);
+}
+
 function blend(from: RgbColor, to: RgbColor, amount: number): RgbColor {
   const clamped = Math.min(1, Math.max(0, amount));
   return {
@@ -124,6 +131,41 @@ function accessibleText(accent: RgbColor, background: RgbColor, toward: RgbColor
   return ensureContrast(accent, background, 4.5, toward);
 }
 
+function ensureDestructiveSeparation(
+  candidate: RgbColor,
+  panel: RgbColor,
+  theme: EffectiveTheme,
+): RgbColor {
+  const destructive = theme === 'light' ? LIGHT_DESTRUCTIVE : DARK_DESTRUCTIVE;
+  if (
+    systemAccentColorDistance(candidate, destructive) >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
+  ) {
+    return candidate;
+  }
+
+  let best = candidate;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const endpoint of [BLACK, WHITE]) {
+    for (let step = 1; step <= 20; step += 1) {
+      const adjusted = blend(candidate, endpoint, step / 20);
+      if (contrastRatio(adjusted, panel) < 3) continue;
+      if (
+        systemAccentColorDistance(adjusted, destructive) <
+        SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
+      ) {
+        continue;
+      }
+      const distance = systemAccentColorDistance(candidate, adjusted);
+      if (distance < bestDistance) {
+        best = adjusted;
+        bestDistance = distance;
+      }
+      break;
+    }
+  }
+  return best;
+}
+
 function bestActionForeground(accent: RgbColor): '#000000' | '#FFFFFF' {
   return contrastRatio(accent, BLACK) >= contrastRatio(accent, WHITE) ? '#000000' : '#FFFFFF';
 }
@@ -137,9 +179,11 @@ export function deriveSystemAccentPalette(
   const direction = theme === 'light' ? BLACK : WHITE;
   const prepared = theme === 'dark' ? blend(raw, WHITE, 0.08) : raw;
   const accentRgb = ensureContrast(prepared, panel, 3, direction);
-  const hoverRgb = theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
+  const hoverRgb =
+    theme === 'light' ? blend(accentRgb, BLACK, 0.1) : blend(accentRgb, WHITE, 0.12);
   const pressedRgb =
     theme === 'light' ? blend(accentRgb, BLACK, 0.2) : blend(accentRgb, BLACK, 0.12);
+  const strongRgb = ensureDestructiveSeparation(pressedRgb, panel, theme);
   const softRgb = blend(panel, accentRgb, theme === 'light' ? 0.12 : 0.24);
   const hoverSoftRgb = blend(panel, hoverRgb, theme === 'light' ? 0.17 : 0.31);
   const textRgb = accessibleText(accentRgb, softRgb, direction);
@@ -149,12 +193,12 @@ export function deriveSystemAccentPalette(
     accent: rgbToSystemAccentColor(accentRgb),
     hover: rgbToSystemAccentColor(hoverRgb),
     pressed: rgbToSystemAccentColor(pressedRgb),
-    strong: rgbToSystemAccentColor(pressedRgb),
+    strong: rgbToSystemAccentColor(strongRgb),
     text: rgbToSystemAccentColor(textRgb),
     soft: rgbToSystemAccentColor(softRgb),
     hoverSoft: rgbToSystemAccentColor(hoverSoftRgb),
     focusRing: rgbToSystemAccentColor(focusRgb),
-    actionForeground: bestActionForeground(accentRgb),
+    actionForeground: bestActionForeground(strongRgb),
   };
 }
 
@@ -164,8 +208,10 @@ export function applySystemAccentPalette(root: HTMLElement, palette: SystemAccen
   >) {
     root.style.setProperty(token, palette[key]);
   }
+  root.setAttribute('data-tux-custom-accent', 'true');
 }
 
 export function clearSystemAccentPalette(root: HTMLElement): void {
   for (const token of Object.values(TOKEN_MAP)) root.style.removeProperty(token);
+  root.removeAttribute('data-tux-custom-accent');
 }
