@@ -50,14 +50,6 @@ function eyeDropperConstructor(): EyeDropperConstructor | null {
   return typeof candidate === 'function' ? candidate : null;
 }
 
-function isThreeDigitHex(value: string): boolean {
-  return /^#?[0-9a-f]{3}$/i.test(value.trim());
-}
-
-function isSixDigitHex(value: string): boolean {
-  return /^#?[0-9a-f]{6}$/i.test(value.trim());
-}
-
 export function SystemColorPickerDialog({
   savedAccentColor,
   defaultPreviewColor,
@@ -117,14 +109,18 @@ export function SystemColorPickerDialog({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onCancel, onPreview, savedAccentColor, saving]);
 
-  function syncCustomColor(color: SystemAccentColor): void {
+  function syncColorState(color: SystemAccentColor): void {
     setPickerColor(color);
     setDraftAccentColor(color);
-    setHexInput(color);
     setRgbInput(rgbDraft(color));
     setHexError(null);
     setRgbError(null);
     onPreview(color);
+  }
+
+  function syncCustomColor(color: SystemAccentColor): void {
+    syncColorState(color);
+    setHexInput(color);
   }
 
   function cancel(): void {
@@ -142,12 +138,12 @@ export function SystemColorPickerDialog({
   function chooseHex(value: string): void {
     if (saving) return;
     setHexInput(value);
-    if (isSixDigitHex(value)) {
-      const color = parseHexDraft(value);
-      if (color !== null) syncCustomColor(color);
+    const color = parseHexDraft(value);
+    if (color === null) {
+      setHexError(HEX_ERROR);
       return;
     }
-    setHexError(isThreeDigitHex(value) ? null : HEX_ERROR);
+    syncColorState(color);
   }
 
   function commitHex(): void {
