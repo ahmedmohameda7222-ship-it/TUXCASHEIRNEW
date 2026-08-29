@@ -13,6 +13,7 @@ import { ipcMain } from 'electron';
 import { assertTrustedIpcSender } from './security';
 
 export const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
+export const IPC_WORKER_UI_PREFERENCES_CHANGED = 'tux:worker-ui-preferences:changed';
 export const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT =
   'tux:worker-ui-preferences:update-menu-layout';
 export const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
@@ -79,6 +80,7 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
   readonly #repository: WorkerUiPreferencesRepository;
   readonly #service: WorkerUiPreferencesService;
   readonly #onChanged: (() => void) | undefined;
+  #unsubscribe: (() => void) | null = null;
 
   constructor(input: WorkerUiPreferencesIpcRuntimeInput) {
     this.#getSessionState = input.getSessionState;
@@ -101,6 +103,10 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
   async load() {
     const identity = await this.#activeIdentity();
     return this.#repository.get(identity.shopId, identity.workerId);
+  }
+
+  subscribe(): () => void {
+    throw new Error('Renderer subscriptions are registered through preload IPC.');
   }
 
   async updateMenuLayout(input: Parameters<TuxWorkerUiPreferencesApi['updateMenuLayout']>[0]) {
@@ -141,6 +147,12 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
     ]) {
       ipcMain.removeHandler(channel);
     }
+    this.#unsubscribe?.();
+    this.#unsubscribe = this.#service.subscribe((preferences) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send(IPC_WORKER_UI_PREFERENCES_CHANGED, preferences);
+      }
+    });
 
     ipcMain.handle(IPC_WORKER_UI_PREFERENCES_LOAD, async (event) => {
       assertTrustedIpcSender(event, window.webContents.id);
@@ -161,6 +173,8 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
   }
 
   close(): void {
+    this.#unsubscribe?.();
+    this.#unsubscribe = null;
     for (const channel of [
       IPC_WORKER_UI_PREFERENCES_LOAD,
       IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT,
