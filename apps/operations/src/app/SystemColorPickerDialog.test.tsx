@@ -46,7 +46,9 @@ describe('SystemColorPickerDialog', () => {
   it('disables every mutating control while saving and keeps Escape guarded in flight', () => {
     const markup = renderDialog(true);
 
-    expect(markup.match(/disabled=""/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
+    expect(markup.match(/disabled=""/g)?.length ?? 0).toBeGreaterThanOrEqual(7);
+    expect(markup).toContain('<fieldset class="system-color-rgb-fieldset" disabled="">');
+    expect(source).toContain('<fieldset className="system-color-rgb-fieldset" disabled={saving}>');
     expect(markup).toContain('Saving…');
     expect(source).toMatch(/if \(saving\) return;/);
     expect(source).toMatch(/event\.key === 'Escape'/);
