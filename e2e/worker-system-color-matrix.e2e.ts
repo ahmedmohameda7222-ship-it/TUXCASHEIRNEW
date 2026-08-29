@@ -234,9 +234,19 @@ async function renderedPaletteContrast(page: Page): Promise<{
   return page.locator('html').evaluate((node) => {
     const rootStyle = getComputedStyle(node);
     const parseHex = (value: string): [number, number, number] => {
-      const match = /^#([0-9a-f]{6})$/i.exec(value.trim());
-      if (match === null) throw new Error(`Expected canonical HEX color, got ${value}`);
-      const hex = match[1]!;
+      const compact = value.trim();
+      const shortMatch = /^#([0-9a-f]{3})$/i.exec(compact);
+      if (shortMatch !== null) {
+        const shortHex = shortMatch[1]!;
+        return [...shortHex].map((channel) => Number.parseInt(`${channel}${channel}`, 16)) as [
+          number,
+          number,
+          number,
+        ];
+      }
+      const longMatch = /^#([0-9a-f]{6})$/i.exec(compact);
+      if (longMatch === null) throw new Error(`Expected CSS HEX color, got ${value}`);
+      const hex = longMatch[1]!;
       return [
         Number.parseInt(hex.slice(0, 2), 16),
         Number.parseInt(hex.slice(2, 4), 16),
