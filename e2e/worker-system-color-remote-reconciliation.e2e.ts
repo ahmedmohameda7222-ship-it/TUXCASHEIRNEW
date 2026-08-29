@@ -12,7 +12,7 @@ import {
   switchWorker,
 } from './worker-system-color-test-helpers';
 
-const REMOTE_ORIGIN = 'http://tux.localhost:4173';
+const REMOTE_ORIGIN = 'https://tux.localhost:4173';
 const LOOPBACK_ORIGIN = 'http://127.0.0.1:4173';
 const RUNTIME_SENTINEL = 'remote-preference-runtime-sentinel';
 
