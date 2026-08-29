@@ -8,7 +8,7 @@ const migrationPath = resolve(
 );
 
 describe('worker UI preference accent-color migration', () => {
-  it('adds canonical nullable accent storage and upgrades the authorized RPC contract', () => {
+  it('adds canonical accent storage without dropping the deployed five-argument RPC', () => {
     expect(existsSync(migrationPath)).toBe(true);
     if (!existsSync(migrationPath)) return;
 
@@ -16,7 +16,7 @@ describe('worker UI preference accent-color migration', () => {
     expect(sql).toContain('add column if not exists accent_color text');
     expect(sql).toContain('worker_ui_preferences_accent_color_check');
     expect(sql).toContain("accent_color is null or accent_color ~ '^#[0-9A-F]{6}$'");
-    expect(sql).toContain(
+    expect(sql).not.toContain(
       'drop function if exists public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb)',
     );
     expect(sql).toContain('p_accent_color text');
@@ -25,6 +25,12 @@ describe('worker UI preference accent-color migration', () => {
     expect(sql).toContain('preferences.accent_color');
     expect(sql).toContain(
       'grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb, text)',
+    );
+    expect(sql).toMatch(
+      /create or replace function public\.put_worker_ui_preferences\([\s\S]*?p_product_order jsonb\n\)\nreturns table\([\s\S]*?server_version bigint,[\s\S]*?updated_at timestamptz[\s\S]*?select preferences\.accent_color[\s\S]*?public\.put_worker_ui_preferences\([\s\S]*?v_accent_color[\s\S]*?\);/,
+    );
+    expect(sql).toContain(
+      'grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb)',
     );
   });
 });
