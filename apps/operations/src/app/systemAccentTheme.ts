@@ -174,10 +174,13 @@ function actionStatesSeparated(
   candidate: RgbColor,
   separatedFrom: readonly RgbColor[],
 ): boolean {
-  return separatedFrom.every((surface) => {
+  for (const surface of separatedFrom) {
     const distance = systemAccentColorDistance(candidate, surface);
-    return distance >= ACTION_STATE_DISTANCE_MIN;
-  });
+    if (distance < ACTION_STATE_DISTANCE_MIN) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function actionSurfaceQualifies(
@@ -187,23 +190,19 @@ function actionSurfaceQualifies(
   destructive: RgbColor | null,
   separatedFrom: readonly RgbColor[] = [],
 ): boolean {
-  const panelContrast = contrastRatio(candidate, panel);
-  const foregroundContrast = contrastRatio(candidate, foreground);
-  const destructiveDistance =
-    destructive === null
-      ? null
-      : systemAccentColorDistance(candidate, destructive);
-  const destructiveSeparated =
-    destructiveDistance === null ||
-    destructiveDistance >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN;
-  const statesSeparated = actionStatesSeparated(candidate, separatedFrom);
-
-  return (
-    panelContrast >= 3 &&
-    foregroundContrast >= 4.5 &&
-    destructiveSeparated &&
-    statesSeparated
-  );
+  if (contrastRatio(candidate, panel) < 3) {
+    return false;
+  }
+  if (contrastRatio(candidate, foreground) < 4.5) {
+    return false;
+  }
+  if (destructive !== null) {
+    const distance = systemAccentColorDistance(candidate, destructive);
+    if (distance < SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN) {
+      return false;
+    }
+  }
+  return actionStatesSeparated(candidate, separatedFrom);
 }
 
 function ensureActionSurface(
