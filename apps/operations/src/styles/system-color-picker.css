@@ -36,7 +36,8 @@
   box-shadow: inset 0 0 0 2px var(--tux-surface-panel);
 }
 
-.system-color-backdrop {
+.system-color-backdrop,
+.system-color-dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -57,14 +58,21 @@
   box-shadow: var(--tux-shadow-md);
 }
 
-.system-color-heading {
+.system-color-heading,
+.system-color-dialog-header {
   padding: 18px 20px 14px;
 }
 
-.system-color-heading h2 {
+.system-color-heading h2,
+.system-color-dialog-header h2 {
   margin: 0;
   color: var(--tux-text-primary);
   font-size: 18px;
+}
+
+.system-color-dialog-header p {
+  margin: 6px 0 0;
+  color: var(--tux-text-secondary);
 }
 
 .system-color-editor {
@@ -74,11 +82,14 @@
   border-block: 1px solid var(--tux-border-subtle);
 }
 
-.system-color-preview {
+.system-color-preview,
+.system-color-current {
   min-height: 64px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
+  margin: 0 20px 18px;
   padding: 10px 12px;
   border: 1px solid var(--tux-border-subtle);
   border-radius: var(--tux-radius-md);
@@ -86,13 +97,15 @@
   color: var(--tux-text-primary);
 }
 
-.system-color-preview > span:last-child {
+.system-color-preview > span:last-child,
+.system-color-current-copy {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
-.system-color-preview-swatch {
+.system-color-preview-swatch,
+.system-color-current-swatch {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
@@ -101,13 +114,16 @@
   box-shadow: inset 0 0 0 2px var(--tux-surface-panel);
 }
 
-.system-color-preview-value {
+.system-color-preview-value,
+.system-color-current-copy > span:last-child {
   color: var(--tux-text-secondary);
   font-size: var(--tux-font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
-.system-color-field {
+.system-color-field,
+.system-color-native-field,
+.system-color-hex-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem);
   align-items: center;
@@ -116,12 +132,17 @@
 }
 
 .system-color-field > span,
-.system-color-rgb span {
+.system-color-rgb span,
+.system-color-native-field > span,
+.system-color-hex-field > span,
+.system-color-rgb-fieldset span {
   font-weight: 700;
 }
 
 .system-color-field input[type='text'],
-.system-color-rgb input {
+.system-color-rgb input,
+.system-color-hex-field input,
+.system-color-rgb-fieldset input {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--tux-border-subtle);
@@ -133,7 +154,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.system-color-native-picker {
+.system-color-native-picker,
+.system-color-native-field input[type='color'] {
   width: 100%;
   min-width: 9rem;
   height: 48px;
@@ -144,7 +166,8 @@
   cursor: pointer;
 }
 
-.system-color-rgb {
+.system-color-rgb,
+.system-color-rgb-fieldset {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -154,7 +177,8 @@
   border: 0;
 }
 
-.system-color-rgb legend {
+.system-color-rgb legend,
+.system-color-rgb-fieldset legend {
   width: 100%;
   margin-bottom: 8px;
   padding: 0;
@@ -162,19 +186,21 @@
   font-weight: 800;
 }
 
-.system-color-rgb label {
+.system-color-rgb label,
+.system-color-rgb-fieldset label {
   min-width: 0;
   display: grid;
   gap: 6px;
   color: var(--tux-text-primary);
 }
 
-.system-color-rgb label span {
+.system-color-rgb label span,
+.system-color-rgb-fieldset label span {
   font-size: var(--tux-font-size-xs);
 }
 
 .system-color-validation {
-  margin: -8px 0 0;
+  margin: 10px 20px 0;
   color: var(--tux-destructive);
   font-size: var(--tux-font-size-xs);
 }
@@ -186,15 +212,21 @@
 }
 
 .system-color-secondary-actions button,
-.system-color-actions button {
+.system-color-actions button,
+.system-color-dialog-actions button {
   min-height: 44px;
 }
 
 .system-color-native-picker:focus-visible,
+.system-color-native-field input[type='color']:focus,
+.system-color-native-field input[type='color']:focus-visible,
 .system-color-field input:focus-visible,
+.system-color-hex-field input:focus-visible,
 .system-color-rgb input:focus-visible,
+.system-color-rgb-fieldset input:focus-visible,
 .system-color-secondary-actions button:focus-visible,
-.system-color-actions button:focus-visible {
+.system-color-actions button:focus-visible,
+.system-color-dialog-actions button:focus-visible {
   outline: 3px solid var(--tux-focus-ring);
   outline-offset: 2px;
 }
@@ -223,15 +255,22 @@
   margin: 14px 20px 0;
 }
 
-.system-color-actions {
+.system-color-actions,
+.system-color-dialog-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   padding: 16px 20px 18px;
 }
 
+.system-color-action-spacer {
+  flex: 1 1 auto;
+}
+
 @media (max-width: 520px) {
-  .system-color-backdrop {
+  .system-color-backdrop,
+  .system-color-dialog-backdrop {
     align-items: start;
     padding: 12px;
   }
@@ -241,40 +280,58 @@
   }
 
   .system-color-heading,
+  .system-color-dialog-header,
   .system-color-editor,
-  .system-color-actions {
+  .system-color-actions,
+  .system-color-dialog-actions {
     padding-inline: 16px;
   }
 
-  .system-color-field {
+  .system-color-current {
+    margin-inline: 16px;
+  }
+
+  .system-color-field,
+  .system-color-native-field,
+  .system-color-hex-field {
     grid-template-columns: 1fr;
     gap: 6px;
   }
 
-  .system-color-native-picker {
+  .system-color-native-picker,
+  .system-color-native-field input[type='color'] {
     min-width: 0;
   }
 
   .system-color-secondary-actions,
-  .system-color-actions {
+  .system-color-actions,
+  .system-color-dialog-actions {
     grid-template-columns: 1fr;
   }
 
-  .system-color-actions {
+  .system-color-actions,
+  .system-color-dialog-actions {
     display: grid;
+  }
+
+  .system-color-action-spacer {
+    display: none;
   }
 }
 
 @media (max-width: 360px) {
-  .system-color-rgb {
+  .system-color-rgb,
+  .system-color-rgb-fieldset {
     grid-template-columns: 1fr;
   }
 }
 
 @media (forced-colors: active) {
   .system-color-native-picker,
+  .system-color-native-field input[type='color'],
   .system-color-profile-swatch,
-  .system-color-preview-swatch {
+  .system-color-preview-swatch,
+  .system-color-current-swatch {
     forced-color-adjust: auto;
   }
 }
