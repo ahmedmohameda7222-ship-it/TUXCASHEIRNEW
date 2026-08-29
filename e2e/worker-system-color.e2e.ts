@@ -344,15 +344,22 @@ async function switchWorker(
   if (outgoingAccent !== null) {
     await expect.poll(() => renderedSystemAccent(page)).not.toBe(outgoingAccent);
   }
-  await page.waitForFunction(
-    () =>
-      document.querySelector('.welcome-action') !== null ||
-      document.querySelector('[aria-label="Operations"]') !== null,
-  );
-  const welcomeAction = page.locator('.welcome-action');
-  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+  const nextOperator = page.getByRole('button', { name: new RegExp(nextWorker) });
+  const nextGreeting = page.getByRole('heading', { name: new RegExp(nextWorker) });
+  await expect
+    .poll(
+      async () =>
+        (await nextGreeting.isVisible().catch(() => false)) ||
+        (await nextOperator.isVisible().catch(() => false)),
+    )
+    .toBe(true);
+  if (await nextGreeting.isVisible().catch(() => false)) {
+    const welcomeAction = page.locator('.welcome-action');
+    await expect(welcomeAction).toBeVisible();
+    await welcomeAction.click();
+  }
   await waitForActiveShell(page);
-  await expect(page.getByRole('button', { name: new RegExp(nextWorker) })).toBeVisible();
+  await expect(nextOperator).toBeVisible();
 }
 
 test('worker system color is isolated, persistent, and responsive', async ({ page }, testInfo) => {
