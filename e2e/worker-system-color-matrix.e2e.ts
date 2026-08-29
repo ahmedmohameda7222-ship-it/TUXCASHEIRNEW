@@ -323,7 +323,9 @@ async function assertFocusedPicker(dialog: Locator): Promise<void> {
   const dialogPaint = await computedPaint(dialog);
   expect(pickerPaint.outlineStyle).not.toBe('none');
   expect(Number.parseFloat(pickerPaint.outlineWidth)).toBeGreaterThanOrEqual(3);
-  expect(contrastRatio(pickerPaint.outlineColor, dialogPaint.backgroundColor)).toBeGreaterThanOrEqual(3);
+  expect(
+    contrastRatio(pickerPaint.outlineColor, dialogPaint.backgroundColor),
+  ).toBeGreaterThanOrEqual(3);
 }
 
 async function semanticStatusColors(page: Page): Promise<{
@@ -345,13 +347,19 @@ async function assertRenderedControls(page: Page, appearance: 'Light' | 'Dark'):
   const placeOrder = page.getByRole('button', { name: 'Place Order', exact: true });
   const actionPaint = await computedPaint(placeOrder);
   const totalsPaint = await computedPaint(page.locator('.cart-totals'));
-  expect(contrastRatio(actionPaint.backgroundColor, actionPaint.color), 'Place Order text').toBeGreaterThanOrEqual(4.5);
+  expect(
+    contrastRatio(actionPaint.backgroundColor, actionPaint.color),
+    'Place Order text',
+  ).toBeGreaterThanOrEqual(4.5);
   expect(
     contrastRatio(actionPaint.backgroundColor, totalsPaint.backgroundColor),
     'Place Order boundary',
   ).toBeGreaterThanOrEqual(3);
 
-  await assertSoftSelection(page.locator('.operations-header .nav-item-active'), 'active navigation');
+  await assertSoftSelection(
+    page.locator('.operations-header .nav-item-active'),
+    'active navigation',
+  );
   await assertSoftSelection(
     page.locator('.menu-toolbar .category-rail button.selected'),
     'selected category',
