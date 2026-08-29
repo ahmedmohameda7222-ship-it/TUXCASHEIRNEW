@@ -148,8 +148,7 @@ function ensureDestructiveSeparation(
       const adjusted = blend(candidate, endpoint, step / 20);
       if (contrastRatio(adjusted, panel) < 3) continue;
       if (
-        systemAccentColorDistance(adjusted, destructive) <
-        SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
+        systemAccentColorDistance(adjusted, destructive) < SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN
       ) {
         continue;
       }
