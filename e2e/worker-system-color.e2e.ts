@@ -267,7 +267,9 @@ async function assertBindingDialog(page: Page, dialog: Locator): Promise<void> {
   await expect(dialog.locator("input[type='text']")).toHaveCount(1);
   await expect(dialog.locator("input[type='number']")).toHaveCount(3);
   await expect(dialog.locator("input[type='checkbox']")).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Pick from screen', exact: true })).toHaveCount(1);
+  await expect(dialog.getByRole('button', { name: 'Pick from screen', exact: true })).toHaveCount(
+    1,
+  );
   await expect(
     dialog.getByRole('button', { name: 'Reset to TUX default', exact: true }),
   ).toBeVisible();
