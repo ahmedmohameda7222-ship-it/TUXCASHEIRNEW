@@ -5,6 +5,7 @@ const e2e = readFileSync(
   new URL('../../../../e2e/worker-system-color.e2e.ts', import.meta.url),
   'utf8',
 );
+const pickerCss = readFileSync(new URL('../styles/system-color-picker.css', import.meta.url), 'utf8');
 const source = e2e.replace(/\s+/g, ' ');
 
 describe('worker system color rendered QA contract', () => {
@@ -43,5 +44,16 @@ describe('worker system color rendered QA contract', () => {
     expect(source).toContain("'system-color-dark-blue-desktop.png'");
     expect(source).toContain("'system-color-picker-tablet.png'");
     expect(source).toContain("'system-color-picker-mobile.png'");
+  });
+
+  it('uses canonical surface tokens so the dialog remains opaque at compact widths', () => {
+    expect(pickerCss).toContain('background: var(--tux-surface-panel);');
+    expect(pickerCss).toContain('border: 1px solid var(--tux-border-subtle);');
+    expect(pickerCss).toContain('box-shadow: var(--tux-shadow-md);');
+    expect(pickerCss).toContain('color: var(--tux-text-primary);');
+    expect(pickerCss).not.toContain('var(--tux-panel)');
+    expect(pickerCss).not.toContain('var(--tux-border)');
+    expect(pickerCss).not.toContain('var(--tux-shadow-lg)');
+    expect(pickerCss).not.toContain('var(--tux-text)');
   });
 });
