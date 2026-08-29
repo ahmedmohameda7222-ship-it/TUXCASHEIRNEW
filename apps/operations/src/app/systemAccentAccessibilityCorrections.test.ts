@@ -41,9 +41,7 @@ describe('system accent accessibility corrections', () => {
     for (const input of MATRIX) {
       it(`derives ${theme} solid action states with one readable foreground for ${input}`, () => {
         const palette = deriveSystemAccentPalette(parseSystemAccentColor(input), theme);
-        const foreground = systemAccentColorToRgb(
-          parseSystemAccentColor(palette.actionForeground),
-        );
+        const foreground = systemAccentColorToRgb(parseSystemAccentColor(palette.actionForeground));
         const panel = systemAccentColorToRgb(PANELS[theme]);
         for (const surface of [palette.hover, palette.pressed, palette.strong]) {
           const surfaceRgb = systemAccentColorToRgb(surface);
