@@ -274,6 +274,7 @@ function ActiveShell({
   const [previewAccentColor, setPreviewAccentColor] = useState<SystemAccentColor | null>(null);
   const [accentHydrated, setAccentHydrated] = useState(false);
   const [systemColorOpen, setSystemColorOpen] = useState(false);
+  const systemColorOpenRef = useRef(false);
   const [systemColorSaving, setSystemColorSaving] = useState(false);
   const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);
 
@@ -300,22 +301,33 @@ function ActiveShell({
 
   useLayoutEffect(() => {
     let cancelled = false;
+    let livePreferenceObserved = false;
     setAccentHydrated(false);
     setSavedAccentColor(null);
     setPreviewAccentColor(null);
     clearSystemAccentPalette(document.documentElement);
 
+    const unsubscribe = preferencesClient.subscribe((preferences) => {
+      if (preferences.workerId !== session.operator.id) return;
+      livePreferenceObserved = true;
+      setSavedAccentColor(preferences.accentColor);
+      setAccentHydrated(true);
+      if (!systemColorOpenRef.current) {
+        setPreviewAccentColor(preferences.accentColor);
+      }
+    });
+
     void preferencesClient
       .load()
       .then((preference) => {
-        if (cancelled) return;
+        if (cancelled || livePreferenceObserved) return;
         const accentColor = preference?.accentColor ?? null;
         setSavedAccentColor(accentColor);
         setPreviewAccentColor(accentColor);
         setAccentHydrated(true);
       })
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || livePreferenceObserved) return;
         setSavedAccentColor(null);
         setPreviewAccentColor(null);
         setAccentHydrated(true);
@@ -323,6 +335,7 @@ function ActiveShell({
 
     return () => {
       cancelled = true;
+      unsubscribe();
       clearSystemAccentPalette(document.documentElement);
     };
   }, [preferencesClient, session.operator.id]);
@@ -347,6 +360,7 @@ function ActiveShell({
       const saved = await preferencesClient.updateAccentColor(accentColor);
       setSavedAccentColor(saved.accentColor);
       setPreviewAccentColor(saved.accentColor);
+      systemColorOpenRef.current = false;
       setSystemColorOpen(false);
     } catch {
       setSystemColorSaveError('Could not save system color. Try again.');
@@ -450,6 +464,7 @@ function ActiveShell({
                       setSystemColorSaveError(null);
                       setPreviewAccentColor(savedAccentColor);
                       setMenuOpen(false);
+                      systemColorOpenRef.current = true;
                       setSystemColorOpen(true);
                     }}
                   >
@@ -541,7 +556,10 @@ function ActiveShell({
           saveError={systemColorSaveError}
           onPreview={setPreviewAccentColor}
           onSave={saveSystemColor}
-          onCancel={() => setSystemColorOpen(false)}
+          onCancel={() => {
+            systemColorOpenRef.current = false;
+            setSystemColorOpen(false);
+          }}
         />
       ) : null}
 
