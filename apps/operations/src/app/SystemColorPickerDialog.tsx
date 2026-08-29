@@ -44,7 +44,8 @@ function parseRgbDraft(value: RgbDraft): RgbColor | null {
 
 function eyeDropperConstructor(): EyeDropperConstructor | null {
   if (typeof window === 'undefined') return null;
-  const candidate = (window as Window & { EyeDropper?: EyeDropperConstructor }).EyeDropper;
+  const candidate = (window as Window & { EyeDropper?: EyeDropperConstructor })
+    .EyeDropper;
   return typeof candidate === 'function' ? candidate : null;
 }
 
@@ -71,7 +72,8 @@ export function SystemColorPickerDialog({
   const EyeDropper = eyeDropperConstructor();
 
   useEffect(() => {
-    const returnFocusTarget = document.querySelector<HTMLElement>('.operator-trigger');
+    const returnFocusTarget =
+      document.querySelector<HTMLElement>('.operator-trigger');
     pickerRef.current?.focus();
     return () => returnFocusTarget?.focus();
   }, []);
@@ -89,7 +91,9 @@ export function SystemColorPickerDialog({
       const dialog = dialogRef.current;
       if (dialog === null) return;
       const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>('input:not(:disabled), button:not(:disabled)'),
+        dialog.querySelectorAll<HTMLElement>(
+          'input:not(:disabled), button:not(:disabled)',
+        ),
       );
       if (focusable.length === 0) return;
       const first = focusable[0]!;
@@ -308,7 +312,9 @@ export function SystemColorPickerDialog({
               disabled={saving || EyeDropper === null}
               aria-disabled={EyeDropper === null}
               title={
-                EyeDropper === null ? 'Screen color picking is not supported here.' : undefined
+                EyeDropper === null
+                  ? 'Screen color picking is not supported here.'
+                  : undefined
               }
               onClick={() => void pickFromScreen()}
             >
