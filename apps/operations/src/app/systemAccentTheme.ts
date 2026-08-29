@@ -190,7 +190,9 @@ function actionSurfaceQualifies(
   const panelContrast = contrastRatio(candidate, panel);
   const foregroundContrast = contrastRatio(candidate, foreground);
   const destructiveDistance =
-    destructive === null ? null : systemAccentColorDistance(candidate, destructive);
+    destructive === null
+      ? null
+      : systemAccentColorDistance(candidate, destructive);
   const destructiveSeparated =
     destructiveDistance === null ||
     destructiveDistance >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN;
