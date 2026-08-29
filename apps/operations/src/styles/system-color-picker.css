@@ -235,9 +235,27 @@
   outline-color: var(--tux-focus-ring);
 }
 
+:root[data-tux-custom-accent] .primary-action {
+  color: var(--tux-action-foreground);
+}
+
 :root[data-tux-custom-accent] .place-order-action:not(:hover):not(:active) {
   border-color: var(--tux-accent-strong);
   background: var(--tux-accent-strong);
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .place-order-action:not(:disabled):hover,
+:root[data-tux-custom-accent] .primary-action:not(:disabled):hover {
+  border-color: var(--tux-accent-hover);
+  background: var(--tux-accent-hover);
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .place-order-action:not(:disabled):active,
+:root[data-tux-custom-accent] .primary-action:not(:disabled):active {
+  border-color: var(--tux-accent-pressed);
+  background: var(--tux-accent-pressed);
   color: var(--tux-action-foreground);
 }
 
