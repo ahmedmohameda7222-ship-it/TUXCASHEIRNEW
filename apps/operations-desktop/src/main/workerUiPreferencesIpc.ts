@@ -105,8 +105,8 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
     return this.#repository.get(identity.shopId, identity.workerId);
   }
 
-  subscribe(): () => void {
-    throw new Error('Renderer subscriptions are registered through preload IPC.');
+  subscribe(listener: Parameters<TuxWorkerUiPreferencesApi['subscribe']>[0]): () => void {
+    return this.#service.subscribe(listener);
   }
 
   async updateMenuLayout(input: Parameters<TuxWorkerUiPreferencesApi['updateMenuLayout']>[0]) {
