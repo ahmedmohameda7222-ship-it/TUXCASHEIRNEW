@@ -57,6 +57,10 @@ async function expectRuntimeSentinel(page: Page): Promise<void> {
   expect(sentinel).toBe(RUNTIME_SENTINEL);
 }
 
+async function triggerProductionPreferenceRetry(page: Page): Promise<void> {
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+}
+
 test('delayed remote worker preferences reconcile through the production subscription without reload', async ({
   page,
 }, testInfo) => {
@@ -145,6 +149,7 @@ test('delayed remote worker preferences reconcile through the production subscri
 
   await enterActiveOrders(page, REMOTE_ORIGIN);
   await setWorkerAppearance(page, 'Demo Worker One', 'Light');
+  await triggerProductionPreferenceRetry(page);
   await workerASeen;
 
   const initialLocalAccent = await renderedSystemAccent(page);
@@ -172,13 +177,14 @@ test('delayed remote worker preferences reconcile through the production subscri
 
   workerBRemote = remotePreference(WORKER_TWO, '#0F766E', 13);
   const workerBRequestsBeforeNonActiveRetry = workerBRequestCount;
-  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await triggerProductionPreferenceRetry(page);
   await expect.poll(() => workerARequestCount).toBeGreaterThan(1);
   expect(workerBRequestCount).toBe(workerBRequestsBeforeNonActiveRetry);
   await expect.poll(() => renderedSystemAccent(page)).toBe(workerABlueRenderedAccent);
   await expectRuntimeSentinel(page);
 
   await switchWorker(page, 'Demo Worker One', '5678', 'Demo Worker Two');
+  await triggerProductionPreferenceRetry(page);
   await workerBSeen;
   const workerBInitialLocalAccent = await renderedSystemAccent(page);
   await markRuntimeSentinel(page);
