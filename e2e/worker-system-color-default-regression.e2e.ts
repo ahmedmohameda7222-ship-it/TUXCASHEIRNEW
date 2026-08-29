@@ -51,7 +51,9 @@ test('null worker accent preserves canonical TUX computed styles in Light and Da
     expect(appearancePaint.color).toBe(strong);
     await operator.click();
 
+    await page.keyboard.press('Tab');
     await placeOrder.focus();
+    await expect(placeOrder).toBeFocused();
     const focused = await paint(placeOrder);
     expect(focused.outlineWidth).toBe('3px');
     expect(focused.outlineColor).toBe(canonicalFocus);
