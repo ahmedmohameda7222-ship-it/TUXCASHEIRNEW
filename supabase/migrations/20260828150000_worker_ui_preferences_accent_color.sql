@@ -1,6 +1,12 @@
 -- Extend worker-scoped UI preferences with the synced system accent color.
 -- This migration is committed for manual Supabase application by the operator.
 -- Do not apply this migration from the implementation workflow.
+--
+-- Rollout compatibility: deploy this schema migration before deploying clients that
+-- send p_accent_color. The deployed five-argument RPC remains available during the
+-- transition and preserves the row's existing accent_color when layout-only clients
+-- update preferences. After all deployed clients use the six-argument contract, the
+-- compatibility overload can be retired in a later migration.
 
 alter table public.worker_ui_preferences
   add column if not exists accent_color text;
@@ -11,8 +17,6 @@ alter table public.worker_ui_preferences
 alter table public.worker_ui_preferences
   add constraint worker_ui_preferences_accent_color_check
   check (accent_color is null or accent_color ~ '^#[0-9A-F]{6}$');
-
-drop function if exists public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb);
 
 create or replace function public.put_worker_ui_preferences(
   p_shop_id uuid,
@@ -105,4 +109,62 @@ $$;
 revoke all on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb, text)
   from public, anon;
 grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb, text)
+  to authenticated;
+
+create or replace function public.put_worker_ui_preferences(
+  p_shop_id uuid,
+  p_worker_id uuid,
+  p_category_order jsonb,
+  p_category_alignment text,
+  p_product_order jsonb
+)
+returns table(
+  shop_id uuid,
+  worker_id uuid,
+  category_order jsonb,
+  category_alignment text,
+  product_order jsonb,
+  server_version bigint,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_accent_color text;
+begin
+  if not (select private.is_active_operations_device(p_shop_id)) then
+    raise exception 'TUX_WORKER_UI_PREFERENCES_UNAUTHORIZED';
+  end if;
+
+  select preferences.accent_color
+    into v_accent_color
+  from public.worker_ui_preferences preferences
+  where preferences.shop_id = p_shop_id
+    and preferences.worker_id = p_worker_id;
+
+  return query
+  select
+    updated.shop_id,
+    updated.worker_id,
+    updated.category_order,
+    updated.category_alignment,
+    updated.product_order,
+    updated.server_version,
+    updated.updated_at
+  from public.put_worker_ui_preferences(
+    p_shop_id,
+    p_worker_id,
+    p_category_order,
+    p_category_alignment,
+    p_product_order,
+    v_accent_color
+  ) updated;
+end;
+$$;
+
+revoke all on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb)
+  from public, anon;
+grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb)
   to authenticated;
