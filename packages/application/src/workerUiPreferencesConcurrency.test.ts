@@ -141,55 +141,49 @@ class NoopGateway implements WorkerUiPreferencesRemoteGateway {
 }
 
 describe('WorkerUiPreferencesService concurrency safety', () => {
-  it(
-    'serializes concurrent local menu-layout and accent mutations without losing either update',
-    async () => {
-      const repository = new SlowFirstReadRepository(preference());
-      const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
-        instant('2026-08-29T08:01:00.000Z'),
-      );
+  it('serializes concurrent local menu-layout and accent mutations without losing either update', async () => {
+    const repository = new SlowFirstReadRepository(preference());
+    const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
+      instant('2026-08-29T08:01:00.000Z'),
+    );
 
-      await Promise.all([
-        service.updateMenuLayout(shopId, workerId, {
-          categoryOrder: [categoryB],
-          categoryAlignment: 'right',
-          productOrder: [productB],
-        }),
-        service.updateAccentColor(shopId, workerId, accentB),
-      ]);
-
-      expect(repository.value).toMatchObject({
+    await Promise.all([
+      service.updateMenuLayout(shopId, workerId, {
         categoryOrder: [categoryB],
         categoryAlignment: 'right',
         productOrder: [productB],
-        accentColor: accentB,
-        syncState: 'DIRTY',
-      });
-    },
-  );
+      }),
+      service.updateAccentColor(shopId, workerId, accentB),
+    ]);
 
-  it(
-    'preserves a newer DIRTY local mutation when an older DIRTY push response returns',
-    async () => {
-      const repository = new MemoryRepository(preference({ syncState: 'DIRTY' }));
-      const gateway = new PausedGateway();
-      const service = new WorkerUiPreferencesService(repository, gateway, () =>
-        instant('2026-08-29T08:02:00.000Z'),
-      );
+    expect(repository.value).toMatchObject({
+      categoryOrder: [categoryB],
+      categoryAlignment: 'right',
+      productOrder: [productB],
+      accentColor: accentB,
+      syncState: 'DIRTY',
+    });
+  });
 
-      const sync = service.syncOnce(shopId, workerId);
-      await gateway.putStarted.promise;
-      await service.updateAccentColor(shopId, workerId, accentB);
-      gateway.resolvePut(remote({ accentColor: accentA, serverVersion: 4 }));
-      await sync;
+  it('preserves a newer DIRTY local mutation when an older DIRTY push response returns', async () => {
+    const repository = new MemoryRepository(preference({ syncState: 'DIRTY' }));
+    const gateway = new PausedGateway();
+    const service = new WorkerUiPreferencesService(repository, gateway, () =>
+      instant('2026-08-29T08:02:00.000Z'),
+    );
 
-      expect(repository.value).toMatchObject({
-        accentColor: accentB,
-        syncState: 'DIRTY',
-        serverVersion: 3,
-      });
-    },
-  );
+    const sync = service.syncOnce(shopId, workerId);
+    await gateway.putStarted.promise;
+    await service.updateAccentColor(shopId, workerId, accentB);
+    gateway.resolvePut(remote({ accentColor: accentA, serverVersion: 4 }));
+    await sync;
+
+    expect(repository.value).toMatchObject({
+      accentColor: accentB,
+      syncState: 'DIRTY',
+      serverVersion: 3,
+    });
+  });
 
   it('preserves a newer DIRTY local mutation when an older remote pull returns', async () => {
     const repository = new MemoryRepository(
