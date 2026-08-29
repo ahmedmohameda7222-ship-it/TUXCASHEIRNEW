@@ -5,11 +5,15 @@ const e2e = readFileSync(
   new URL('../../../../e2e/worker-system-color.e2e.ts', import.meta.url),
   'utf8',
 );
+const matrixE2e = readFileSync(
+  new URL('../../../../e2e/worker-system-color-matrix.e2e.ts', import.meta.url),
+  'utf8',
+);
 const pickerCss = readFileSync(
   new URL('../styles/system-color-picker.css', import.meta.url),
   'utf8',
 );
-const source = e2e.replace(/\s+/g, ' ');
+const source = `${e2e}\n${matrixE2e}`.replace(/\s+/g, ' ');
 
 describe('worker system color rendered QA contract', () => {
   it('covers exact desktop viewports and the approved two-row native dialog', () => {
