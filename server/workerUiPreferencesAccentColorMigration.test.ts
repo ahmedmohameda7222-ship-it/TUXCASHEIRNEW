@@ -22,15 +22,15 @@ describe('worker UI preference accent-color migration', () => {
     expect(sql).toContain('p_accent_color text');
     expect(sql).toContain('TUX_WORKER_UI_PREFERENCES_ACCENT_INVALID');
     expect(sql).toContain('accent_color = excluded.accent_color');
-    expect(sql).toContain('preferences.accent_color');
+    expect(sql).toContain('select preferences.accent_color');
+    expect(sql).toContain('into v_accent_color');
+    expect(sql).toContain('v_accent_color\n  ) updated;');
     expect(sql).toContain(
       'grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb, text)',
-    );
-    expect(sql).toMatch(
-      /create or replace function public\.put_worker_ui_preferences\([\s\S]*?p_product_order jsonb\n\)\nreturns table\([\s\S]*?server_version bigint,[\s\S]*?updated_at timestamptz[\s\S]*?select preferences\.accent_color[\s\S]*?public\.put_worker_ui_preferences\([\s\S]*?v_accent_color[\s\S]*?\);/,
     );
     expect(sql).toContain(
       'grant execute on function public.put_worker_ui_preferences(uuid, uuid, jsonb, text, jsonb)',
     );
+    expect(sql).toContain('The deployed five-argument RPC remains available during the');
   });
 });
