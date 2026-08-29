@@ -6,13 +6,13 @@ import { SystemColorPickerDialog } from './SystemColorPickerDialog';
 
 const source = readFileSync(new URL('./SystemColorPickerDialog.tsx', import.meta.url), 'utf8');
 
-function renderDialog(saving = false) {
+function renderDialog(saving = false, saveError: string | null = null) {
   return renderToStaticMarkup(
     <SystemColorPickerDialog
       savedAccentColor={parseSystemAccentColor('#1E3A8A')}
       defaultPreviewColor={parseSystemAccentColor('#1F6B52')}
       saving={saving}
-      saveError={null}
+      saveError={saveError}
       onPreview={() => undefined}
       onSave={async () => undefined}
       onCancel={() => undefined}
@@ -52,6 +52,22 @@ describe('SystemColorPickerDialog', () => {
     expect(markup).toContain('Saving…');
     expect(source).toMatch(/if \(saving\) return;/);
     expect(source).toMatch(/event\.key === 'Escape'/);
+  });
+
+  it('connects validation errors to inputs and announces save failures', () => {
+    expect(source).toContain(
+      "aria-describedby={hexError === null ? undefined : 'system-color-hex-error'}",
+    );
+    expect(source).toContain(
+      "aria-describedby={rgbError === null ? undefined : 'system-color-rgb-error'}",
+    );
+    expect(source).toContain('id="system-color-hex-error"');
+    expect(source).toContain('id="system-color-rgb-error"');
+
+    const markup = renderDialog(false, 'Could not save system color. Try again.');
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('Could not save system color. Try again.');
   });
 
   it('uses one synchronized draft for native, HEX, RGB, reset, and eyedropper changes', () => {
