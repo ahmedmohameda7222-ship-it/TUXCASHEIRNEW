@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   DATABASE,
   SHOP,
@@ -44,7 +44,7 @@ function remotePreference(workerId: string, accentColor: string, serverVersion: 
   };
 }
 
-async function readStoredPreference(page: Parameters<typeof test>[0] extends never ? never : any, workerId: string) {
+async function readStoredPreference(page: Page, workerId: string) {
   return page.evaluate(
     async ({ databaseName, key }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -56,7 +56,8 @@ async function readStoredPreference(page: Parameters<typeof test>[0] extends nev
         return await new Promise<StoredPreference | null>((resolve, reject) => {
           const transaction = database.transaction('workerUiPreferences', 'readonly');
           const request = transaction.objectStore('workerUiPreferences').get(key);
-          request.onsuccess = () => resolve((request.result as StoredPreference | undefined) ?? null);
+          request.onsuccess = () =>
+            resolve((request.result as StoredPreference | undefined) ?? null);
           request.onerror = () => reject(request.error);
         });
       } finally {
@@ -67,7 +68,7 @@ async function readStoredPreference(page: Parameters<typeof test>[0] extends nev
   );
 }
 
-async function assertRuntimeSentinel(page: Parameters<typeof test>[0] extends never ? never : any, sentinel: string) {
+async function assertRuntimeSentinel(page: Page, sentinel: string) {
   await expect
     .poll(() =>
       page.evaluate((expected) => {
@@ -108,7 +109,10 @@ test('delayed remote worker preferences reconcile through the production subscri
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ shopId: SHOP, deviceId: '50000000-0000-4000-8000-000000000001' }),
+        body: JSON.stringify({
+          shopId: SHOP,
+          deviceId: '50000000-0000-4000-8000-000000000001',
+        }),
       });
       return;
     }
@@ -170,7 +174,9 @@ test('delayed remote worker preferences reconcile through the production subscri
   const sentinel = await page.evaluate(() => {
     const value = crypto.randomUUID();
     (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel = value;
-    document.querySelector<HTMLElement>('.operations-shell')?.setAttribute('data-remote-sentinel', value);
+    document
+      .querySelector<HTMLElement>('.operations-shell')
+      ?.setAttribute('data-remote-sentinel', value);
     return value;
   });
 
@@ -181,14 +187,12 @@ test('delayed remote worker preferences reconcile through the production subscri
 
   workerAGate.release();
 
-  await expect
-    .poll(() => readStoredPreference(page, WORKER))
-    .toMatchObject({
-      workerId: WORKER,
-      accentColor: '#1E3A8A',
-      serverVersion: 11,
-      syncState: 'CLEAN',
-    });
+  await expect.poll(() => readStoredPreference(page, WORKER)).toMatchObject({
+    workerId: WORKER,
+    accentColor: '#1E3A8A',
+    serverVersion: 11,
+    syncState: 'CLEAN',
+  });
   await expect(dialog.locator("input[type='color']")).toHaveValue('#7e22ce');
   await expect.poll(() => renderedSystemAccent(page)).toBe(unsavedPurpleAccent);
   await assertRuntimeSentinel(page, sentinel);
@@ -216,20 +220,20 @@ test('delayed remote worker preferences reconcile through the production subscri
   const workerBSentinel = await page.evaluate(() => {
     const value = crypto.randomUUID();
     (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel = value;
-    document.querySelector<HTMLElement>('.operations-shell')?.setAttribute('data-remote-sentinel', value);
+    document
+      .querySelector<HTMLElement>('.operations-shell')
+      ?.setAttribute('data-remote-sentinel', value);
     return value;
   });
 
   workerBGate.release();
 
-  await expect
-    .poll(() => readStoredPreference(page, WORKER_TWO))
-    .toMatchObject({
-      workerId: WORKER_TWO,
-      accentColor: '#0F766E',
-      serverVersion: 13,
-      syncState: 'CLEAN',
-    });
+  await expect.poll(() => readStoredPreference(page, WORKER_TWO)).toMatchObject({
+    workerId: WORKER_TWO,
+    accentColor: '#0F766E',
+    serverVersion: 13,
+    syncState: 'CLEAN',
+  });
   await expect.poll(() => renderedSystemAccent(page)).not.toBe(workerBInitialLocalAccent);
   dialog = await openSystemColorDialog(page, 'Demo Worker Two');
   await expect(dialog.locator("input[type='color']")).toHaveValue('#0f766e');
