@@ -5,7 +5,10 @@ const e2e = readFileSync(
   new URL('../../../../e2e/worker-system-color.e2e.ts', import.meta.url),
   'utf8',
 );
-const pickerCss = readFileSync(new URL('../styles/system-color-picker.css', import.meta.url), 'utf8');
+const pickerCss = readFileSync(
+  new URL('../styles/system-color-picker.css', import.meta.url),
+  'utf8',
+);
 const source = e2e.replace(/\s+/g, ' ');
 
 describe('worker system color rendered QA contract', () => {
