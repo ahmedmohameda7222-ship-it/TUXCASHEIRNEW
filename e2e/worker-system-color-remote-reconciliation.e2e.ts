@@ -68,19 +68,20 @@ async function readStoredPreference(page: Page, workerId: string) {
   );
 }
 
+async function runtimeSentinelIntact(page: Page, sentinel: string): Promise<boolean> {
+  return page.evaluate(
+    (expected) => {
+      const runtimeWindow = window as Window & { __tuxRemoteSentinel?: string };
+      const runtime = runtimeWindow.__tuxRemoteSentinel;
+      const shell = document.querySelector<HTMLElement>('.operations-shell');
+      return runtime === expected && shell?.dataset['remoteSentinel'] === expected;
+    },
+    sentinel,
+  );
+}
+
 async function assertRuntimeSentinel(page: Page, sentinel: string) {
-  await expect
-    .poll(() =>
-      page.evaluate(
-        (expected) => {
-          const runtime = (window as Window & { __tuxRemoteSentinel?: string }).__tuxRemoteSentinel;
-          const shell = document.querySelector<HTMLElement>('.operations-shell');
-          return runtime === expected && shell?.dataset['remoteSentinel'] === expected;
-        },
-        sentinel,
-      ),
-    )
-    .toBe(true);
+  await expect.poll(() => runtimeSentinelIntact(page, sentinel)).toBe(true);
 }
 
 test('delayed remote worker preferences reconcile through the production subscription without reload', async ({
