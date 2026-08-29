@@ -170,6 +170,16 @@ function bestActionForeground(surfaces: readonly RgbColor[]): '#000000' | '#FFFF
   return blackMinimum >= whiteMinimum ? '#000000' : '#FFFFFF';
 }
 
+function actionStatesSeparated(
+  candidate: RgbColor,
+  separatedFrom: readonly RgbColor[],
+): boolean {
+  return separatedFrom.every((surface) => {
+    const distance = systemAccentColorDistance(candidate, surface);
+    return distance >= ACTION_STATE_DISTANCE_MIN;
+  });
+}
+
 function actionSurfaceQualifies(
   candidate: RgbColor,
   panel: RgbColor,
@@ -177,15 +187,20 @@ function actionSurfaceQualifies(
   destructive: RgbColor | null,
   separatedFrom: readonly RgbColor[] = [],
 ): boolean {
+  const panelContrast = contrastRatio(candidate, panel);
+  const foregroundContrast = contrastRatio(candidate, foreground);
+  const destructiveDistance =
+    destructive === null ? null : systemAccentColorDistance(candidate, destructive);
+  const destructiveSeparated =
+    destructiveDistance === null ||
+    destructiveDistance >= SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN;
+  const statesSeparated = actionStatesSeparated(candidate, separatedFrom);
+
   return (
-    contrastRatio(candidate, panel) >= 3 &&
-    contrastRatio(candidate, foreground) >= 4.5 &&
-    (destructive === null ||
-      systemAccentColorDistance(candidate, destructive) >=
-        SYSTEM_ACCENT_DESTRUCTIVE_DISTANCE_MIN) &&
-    separatedFrom.every(
-      (surface) => systemAccentColorDistance(candidate, surface) >= ACTION_STATE_DISTANCE_MIN,
-    )
+    panelContrast >= 3 &&
+    foregroundContrast >= 4.5 &&
+    destructiveSeparated &&
+    statesSeparated
   );
 }
 
@@ -197,7 +212,18 @@ function ensureActionSurface(
   separatedFrom: readonly RgbColor[] = [],
 ): RgbColor {
   const foregroundRgb = foreground === '#000000' ? BLACK : WHITE;
-  if (actionSurfaceQualifies(candidate, panel, foregroundRgb, destructive, separatedFrom)) {
+
+  function qualifies(surface: RgbColor): boolean {
+    return actionSurfaceQualifies(
+      surface,
+      panel,
+      foregroundRgb,
+      destructive,
+      separatedFrom,
+    );
+  }
+
+  if (qualifies(candidate)) {
     return candidate;
   }
 
@@ -206,7 +232,7 @@ function ensureActionSurface(
   for (const endpoint of [BLACK, WHITE]) {
     for (let step = 1; step <= 255; step += 1) {
       const adjusted = blend(candidate, endpoint, step / 255);
-      if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)) {
+      if (!qualifies(adjusted)) {
         continue;
       }
       const distance = systemAccentColorDistance(candidate, adjusted);
@@ -221,7 +247,7 @@ function ensureActionSurface(
 
   for (let channel = 0; channel <= 255; channel += 1) {
     const adjusted = { r: channel, g: channel, b: channel };
-    if (!actionSurfaceQualifies(adjusted, panel, foregroundRgb, destructive, separatedFrom)) {
+    if (!qualifies(adjusted)) {
       continue;
     }
     const distance = systemAccentColorDistance(candidate, adjusted);
