@@ -57,6 +57,8 @@ export interface WorkerUiPreferencesRetryOptions {
   readonly intervalMs?: number;
 }
 
+export type WorkerUiPreferencesListener = (preferences: WorkerUiPreferences) => void;
+
 const DEFAULT_WORKER_UI_PREFERENCES_RETRY_MS = 60_000;
 
 function sameIds<T>(left: readonly T[], right: readonly T[]): boolean {
@@ -134,6 +136,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
   readonly #gateway: WorkerUiPreferencesRemoteGateway;
   readonly #now: () => Instant;
   readonly #mutationTails = new Map<string, Promise<void>>();
+  readonly #listeners = new Set<WorkerUiPreferencesListener>();
 
   constructor(
     repository: WorkerUiPreferencesRepository,
@@ -143,6 +146,15 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     this.#repository = repository;
     this.#gateway = gateway;
     this.#now = now;
+  }
+
+  subscribe(listener: WorkerUiPreferencesListener): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  #publish(preferences: WorkerUiPreferences): void {
+    for (const listener of this.#listeners) listener(preferences);
   }
 
   async #serializeLocalMutation<T>(
@@ -201,6 +213,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         syncState: 'DIRTY',
       });
       await this.#repository.put(next);
+      this.#publish(next);
       return next;
     });
   }
@@ -219,6 +232,7 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         syncState: 'DIRTY',
       });
       await this.#repository.put(next);
+      this.#publish(next);
       return next;
     });
   }
@@ -237,12 +251,12 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
       await this.#serializeLocalMutation(shopId, workerId, async () => {
         const current = await this.#repository.get(shopId, workerId);
         if (!samePreferenceSnapshot(current, local)) return;
-        await this.#repository.put(
-          parseWorkerUiPreferences({
-            ...remote,
-            syncState: 'CLEAN',
-          }),
-        );
+        const next = parseWorkerUiPreferences({
+          ...remote,
+          syncState: 'CLEAN',
+        });
+        await this.#repository.put(next);
+        this.#publish(next);
       });
       return;
     }
@@ -253,12 +267,12 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     await this.#serializeLocalMutation(shopId, workerId, async () => {
       const current = await this.#repository.get(shopId, workerId);
       if (!samePreferenceSnapshot(current, local)) return;
-      await this.#repository.put(
-        parseWorkerUiPreferences({
-          ...remote,
-          syncState: 'CLEAN',
-        }),
-      );
+      const next = parseWorkerUiPreferences({
+        ...remote,
+        syncState: 'CLEAN',
+      });
+      await this.#repository.put(next);
+      this.#publish(next);
     });
   }
 }
