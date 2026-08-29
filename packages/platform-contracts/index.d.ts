@@ -59,6 +59,7 @@ export interface TuxSyncApi {
 
 export interface TuxWorkerUiPreferencesApi {
   load(): Promise<WorkerUiPreferences | null>;
+  subscribe(listener: (preferences: WorkerUiPreferences) => void): () => void;
   updateMenuLayout(input: {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
