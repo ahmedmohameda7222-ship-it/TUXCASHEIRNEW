@@ -45,9 +45,9 @@ describe('system accent accessibility corrections', () => {
           parseSystemAccentColor(palette.actionForeground),
         );
         for (const surface of [palette.hover, palette.pressed, palette.strong]) {
-          expect(contrastRatio(systemAccentColorToRgb(surface), foreground)).toBeGreaterThanOrEqual(
-            4.5,
-          );
+          expect(
+            contrastRatio(systemAccentColorToRgb(surface), foreground),
+          ).toBeGreaterThanOrEqual(4.5);
           expect(
             contrastRatio(systemAccentColorToRgb(surface), systemAccentColorToRgb(PANELS[theme])),
           ).toBeGreaterThanOrEqual(3);
