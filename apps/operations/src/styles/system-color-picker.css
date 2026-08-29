@@ -48,7 +48,7 @@
 }
 
 .system-color-dialog {
-  width: min(440px, 100%);
+  width: min(520px, 100%);
   max-height: calc(100dvh - 48px);
   overflow: auto;
   border: 1px solid var(--tux-border-subtle);
@@ -67,27 +67,75 @@
   font-size: 18px;
 }
 
-.system-color-rows {
+.system-color-editor {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
   border-block: 1px solid var(--tux-border-subtle);
 }
 
-.system-color-row {
+.system-color-preview {
   min-height: 64px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 20px;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-subtle);
   color: var(--tux-text-primary);
-  cursor: pointer;
 }
 
-.system-color-row + .system-color-row {
-  border-top: 1px solid var(--tux-border-subtle);
+.system-color-preview > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.system-color-preview-swatch {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid var(--tux-border-strong);
+  border-radius: var(--tux-radius-sm);
+  box-shadow: inset 0 0 0 2px var(--tux-surface-panel);
+}
+
+.system-color-preview-value {
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.system-color-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem);
+  align-items: center;
+  gap: 14px;
+  color: var(--tux-text-primary);
+}
+
+.system-color-field > span,
+.system-color-rgb span {
+  font-weight: 700;
+}
+
+.system-color-field input[type='text'],
+.system-color-rgb input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  padding: 0 12px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .system-color-native-picker {
-  width: 48px;
+  width: 100%;
+  min-width: 9rem;
   height: 48px;
   padding: 3px;
   border: 1px solid var(--tux-border-strong);
@@ -96,23 +144,56 @@
   cursor: pointer;
 }
 
-.system-color-checkbox-hit {
-  width: 44px;
-  height: 44px;
+.system-color-rgb {
+  min-width: 0;
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.system-color-default-checkbox {
-  width: 24px;
-  height: 24px;
-  margin: 0;
-  accent-color: var(--tux-accent);
-  cursor: pointer;
+.system-color-rgb legend {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--tux-text-primary);
+  font-weight: 800;
+}
+
+.system-color-rgb label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--tux-text-primary);
+}
+
+.system-color-rgb label span {
+  font-size: var(--tux-font-size-xs);
+}
+
+.system-color-validation {
+  margin: -8px 0 0;
+  color: var(--tux-destructive);
+  font-size: var(--tux-font-size-xs);
+}
+
+.system-color-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.system-color-secondary-actions button,
+.system-color-actions button {
+  min-height: 44px;
 }
 
 .system-color-native-picker:focus-visible,
-.system-color-default-checkbox:focus-visible,
+.system-color-field input:focus-visible,
+.system-color-rgb input:focus-visible,
+.system-color-secondary-actions button:focus-visible,
 .system-color-actions button:focus-visible {
   outline: 3px solid var(--tux-focus-ring);
   outline-offset: 2px;
@@ -129,10 +210,6 @@
   padding: 16px 20px 18px;
 }
 
-.system-color-actions button {
-  min-height: 44px;
-}
-
 @media (max-width: 520px) {
   .system-color-backdrop {
     align-items: start;
@@ -143,25 +220,41 @@
     max-height: calc(100dvh - 24px);
   }
 
-  .system-color-heading {
+  .system-color-heading,
+  .system-color-editor,
+  .system-color-actions {
     padding-inline: 16px;
   }
 
-  .system-color-row {
-    padding-inline: 16px;
+  .system-color-field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .system-color-native-picker {
+    min-width: 0;
+  }
+
+  .system-color-secondary-actions,
+  .system-color-actions {
+    grid-template-columns: 1fr;
   }
 
   .system-color-actions {
     display: grid;
+  }
+}
+
+@media (max-width: 360px) {
+  .system-color-rgb {
     grid-template-columns: 1fr;
-    padding-inline: 16px;
   }
 }
 
 @media (forced-colors: active) {
   .system-color-native-picker,
-  .system-color-default-checkbox,
-  .system-color-profile-swatch {
+  .system-color-profile-swatch,
+  .system-color-preview-swatch {
     forced-color-adjust: auto;
   }
 }
