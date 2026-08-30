@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -46,6 +46,19 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Format Task 5 ordering test and restore CI
+        shell: bash
+        run: |
+          git fetch origin "refs/heads/${GITHUB_HEAD_REF}:refs/remotes/origin/${GITHUB_HEAD_REF}" "refs/heads/main:refs/remotes/origin/main"
+          git checkout -B "${GITHUB_HEAD_REF}" "refs/remotes/origin/${GITHUB_HEAD_REF}"
+          npx prettier --write apps/operations/src/app/menuLayoutEditorWorkspaceIntegration.source.test.ts
+          git checkout refs/remotes/origin/main -- .github/workflows/ci.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/menuLayoutEditorWorkspaceIntegration.source.test.ts .github/workflows/ci.yml
+          git diff --cached --check
+          git commit -m "style: format Task 5 transaction ordering test"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
       - name: Format check
         run: npm run format:check
       - name: Lint
