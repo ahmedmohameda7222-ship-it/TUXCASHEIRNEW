@@ -15,6 +15,7 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
   rectSortingStrategy,
+  sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -61,7 +62,6 @@ import {
   type MenuLayoutDraft,
   type WorkerMenuPreferenceLoadState,
 } from './menuLayoutEditorSession';
-import { menuLayoutKeyboardCoordinates } from './menuLayoutKeyboardCoordinates';
 import { MenuEditProductCard, menuEditProductSortableId } from './MenuEditProductCard';
 import { MenuProductCard } from './MenuProductCard';
 import { ProductCardPresentation } from './ProductCardPresentation';
@@ -405,10 +405,14 @@ export function OrdersWorkspace({
   const categoryEditOrder = menuEditSession.draft?.categoryOrder ?? [];
   const categoryEditAlignment = menuEditSession.draft?.categoryAlignment ?? 'left';
   const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
+  const categorySortingDisabled =
+    menuEditSaving || activeMenuDragId?.startsWith('product:') === true;
+  const productSortingDisabled =
+    menuEditSaving || activeMenuDragId?.startsWith('category:') === true;
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: menuLayoutKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const activeWorkerMenuPreferenceLoadState: WorkerMenuPreferenceLoadState =
@@ -1369,7 +1373,7 @@ export function OrdersWorkspace({
                             key={category.id}
                             category={category}
                             selected={selectedCategoryId === category.id}
-                            disabled={menuEditSaving}
+                            disabled={categorySortingDisabled}
                             onSelect={() => selectMenuEditCategory(category.id)}
                             onNodeRef={(node) => setCategoryTabRef(category.id, node)}
                           />
@@ -1545,7 +1549,7 @@ export function OrdersWorkspace({
                         position={index + 1}
                         total={menuEditProducts.length}
                         className="product-card menu-edit-product-card"
-                        disabled={menuEditSaving}
+                        disabled={productSortingDisabled}
                       />
                     ))}
                   </SortableContext>
