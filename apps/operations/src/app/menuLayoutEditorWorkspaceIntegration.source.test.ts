@@ -31,9 +31,24 @@ describe('OrdersWorkspace menu-layout transaction integration', () => {
     expect(ordersWorkspaceSource).toContain("type: 'DROP_CATEGORY_PICKUP'");
     expect(ordersWorkspaceSource).toContain("type: 'DROP_PRODUCT_PICKUP'");
     expect(ordersWorkspaceSource).toContain("type: 'CANCEL_PICKUP'");
-    expect(ordersWorkspaceSource).toMatch(
-      /dispatchMenuLayoutEditor\(\{ type: 'CATEGORY_CHANGE' \}\);\s*setSelectedCategoryId\(/,
+
+    const selectCategoryStart = ordersWorkspaceSource.indexOf(
+      'function selectMenuEditCategory(categoryId: MenuCategoryId): void',
     );
+    const selectCategoryEnd = ordersWorkspaceSource.indexOf(
+      '\n  function resetMenuEdit',
+      selectCategoryStart,
+    );
+    expect(selectCategoryStart).toBeGreaterThanOrEqual(0);
+    expect(selectCategoryEnd).toBeGreaterThan(selectCategoryStart);
+
+    const selectCategorySource = ordersWorkspaceSource.slice(selectCategoryStart, selectCategoryEnd);
+    const rollbackIndex = selectCategorySource.indexOf(
+      "dispatchMenuLayoutEditor({ type: 'CATEGORY_CHANGE' });",
+    );
+    const selectionIndex = selectCategorySource.indexOf('setSelectedCategoryId(categoryId);');
+    expect(rollbackIndex).toBeGreaterThanOrEqual(0);
+    expect(selectionIndex).toBeGreaterThan(rollbackIndex);
   });
 
   it('routes Reset and Cancel through whole-draft reducer events', () => {
