@@ -110,7 +110,9 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain(
       "const menuEditSaving = menuEditSession.lifecycle === 'SAVING';",
     );
-    expect(menuLayoutEditorSessionSource).toContain("if (state.lifecycle === 'SAVING') return state;");
+    expect(menuLayoutEditorSessionSource).toContain(
+      "if (state.lifecycle === 'SAVING') return state;",
+    );
     expect(
       ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(4);
