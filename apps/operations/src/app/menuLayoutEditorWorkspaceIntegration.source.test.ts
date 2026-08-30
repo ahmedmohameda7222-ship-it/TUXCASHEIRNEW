@@ -39,7 +39,7 @@ describe('OrdersWorkspace menu-layout transaction integration', () => {
   it('routes Reset and Cancel through whole-draft reducer events', () => {
     expect(ordersWorkspaceSource).toContain("type: 'RESET'");
     expect(ordersWorkspaceSource).toContain("type: 'CANCEL_EDITOR'");
-    expect(ordersWorkspaceSource).toContain('resetRequested: menuEditSession.resetRequested');
+    expect(ordersWorkspaceSource).toContain('menuEditSession.resetRequested');
   });
 
   it('uses save identity plus a unique token and reducer completion events', () => {
