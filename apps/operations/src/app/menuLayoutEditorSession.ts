@@ -135,16 +135,22 @@ interface IdentityInvalidatedEvent {
 
 type DraftEvent = SetCategoryOrderEvent | SetAlignmentEvent | SetProductOrderEvent;
 type PickupEvent =
-  BeginCategoryPickupEvent |
-  BeginProductPickupEvent |
-  DropCategoryPickupEvent |
-  DropProductPickupEvent |
-  CancelPickupEvent |
-  CategoryChangeEvent;
+  | BeginCategoryPickupEvent
+  | BeginProductPickupEvent
+  | DropCategoryPickupEvent
+  | DropProductPickupEvent
+  | CancelPickupEvent
+  | CategoryChangeEvent;
 type SaveEvent = BeginSaveEvent | SaveSuccessEvent | SaveFailureEvent;
 
 export type MenuLayoutEditorEvent =
-  OpenEvent | DraftEvent | PickupEvent | ResetEvent | CancelEditorEvent | SaveEvent | IdentityInvalidatedEvent;
+  | OpenEvent
+  | DraftEvent
+  | PickupEvent
+  | ResetEvent
+  | CancelEditorEvent
+  | SaveEvent
+  | IdentityInvalidatedEvent;
 
 export interface OpenMenuLayoutEditorInput {
   readonly shopId: ShopId;
