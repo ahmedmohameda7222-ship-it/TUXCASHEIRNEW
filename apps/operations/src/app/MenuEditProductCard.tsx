@@ -1,29 +1,46 @@
-import type { Product } from '@tux/domain';
-import type { ComponentPropsWithoutRef } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { Product, ProductId } from '@tux/domain';
 import { ProductCardPresentation } from './ProductCardPresentation';
 
-type EditCardArticleProps = Omit<ComponentPropsWithoutRef<'article'>, 'children' | 'className'>;
+export function menuEditProductSortableId(productId: ProductId): string {
+  return `product:${productId}`;
+}
 
 export function MenuEditProductCard({
   product,
   position,
   total,
   className,
-  articleProps,
+  disabled = false,
 }: {
   readonly product: Product;
   readonly position: number;
   readonly total: number;
   readonly className?: string;
-  readonly articleProps?: EditCardArticleProps;
+  readonly disabled?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: menuEditProductSortableId(product.id),
+    disabled,
+  });
+
   return (
     <article
-      {...articleProps}
-      className={className ?? 'product-card menu-edit-product-card'}
-      aria-label={
-        articleProps?.['aria-label'] ?? `${product.name}, position ${position} of ${total}`
-      }
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={[
+        className ?? 'product-card menu-edit-product-card',
+        isDragging ? 'menu-edit-product-card-dragging' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      aria-label={`${product.name}, position ${position} of ${total}`}
     >
       <div className="product-main">
         <ProductCardPresentation product={product} showDescription />
