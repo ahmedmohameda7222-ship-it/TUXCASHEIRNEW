@@ -5,6 +5,11 @@ export interface ProtectedTransitionState {
   readonly dirty: boolean;
 }
 
+export interface MenuLayoutExitController {
+  readonly state: ProtectedTransitionState;
+  discard(): void;
+}
+
 export type ProtectedTransitionDecision = 'RUN' | 'CONFIRM' | 'BLOCK';
 
 export function decideProtectedTransition(
