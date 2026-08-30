@@ -46,11 +46,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Diagnose Task 2 test formatting
-        run: |
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.test.ts apps/operations/src/app/menuLayoutEditorSession.test.ts
-          git diff -- apps/operations/src/app/OrdersWorkspace.test.ts apps/operations/src/app/menuLayoutEditorSession.test.ts
-          exit 1
       - name: Format check
         run: npm run format:check
       - name: Lint
