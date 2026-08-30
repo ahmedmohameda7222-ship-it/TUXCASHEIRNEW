@@ -1,0 +1,36 @@
+name: Menu Overlay Contract Formatter
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: >-
+      github.event.pull_request.number == 44 &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Format contract and self-remove
+        shell: bash
+        run: |
+          npx prettier apps/operations/src/app/unifiedMenuEditMode.source.test.ts --write
+          rm .github/workflows/menu-overlay-contract-formatter.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/operations/src/app/unifiedMenuEditMode.source.test.ts .github/workflows/menu-overlay-contract-formatter.yml
+          git diff --cached --check
+          git commit -m 'style(menu-editor): apply locked overlay contract formatting'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
