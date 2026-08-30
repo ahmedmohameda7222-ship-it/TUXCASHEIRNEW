@@ -52,16 +52,31 @@ export type MenuLayoutEditorEvent =
       readonly type: 'SET_CATEGORY_ORDER';
       readonly categoryOrder: readonly MenuCategoryId[];
     }
-  | { readonly type: 'SET_ALIGNMENT'; readonly categoryAlignment: CategoryAlignment }
-  | { readonly type: 'SET_PRODUCT_ORDER'; readonly productOrder: readonly ProductId[] }
-  | { readonly type: 'BEGIN_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
+  | {
+      readonly type: 'SET_ALIGNMENT';
+      readonly categoryAlignment: CategoryAlignment;
+    }
+  | {
+      readonly type: 'SET_PRODUCT_ORDER';
+      readonly productOrder: readonly ProductId[];
+    }
+  | {
+      readonly type: 'BEGIN_CATEGORY_PICKUP';
+      readonly categoryId: MenuCategoryId;
+    }
   | {
       readonly type: 'BEGIN_PRODUCT_PICKUP';
       readonly productId: ProductId;
       readonly categoryId: MenuCategoryId;
     }
-  | { readonly type: 'DROP_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
-  | { readonly type: 'DROP_PRODUCT_PICKUP'; readonly productId: ProductId }
+  | {
+      readonly type: 'DROP_CATEGORY_PICKUP';
+      readonly categoryId: MenuCategoryId;
+    }
+  | {
+      readonly type: 'DROP_PRODUCT_PICKUP';
+      readonly productId: ProductId;
+    }
   | { readonly type: 'CANCEL_PICKUP' }
   | { readonly type: 'CATEGORY_CHANGE' }
   | { readonly type: 'RESET'; readonly draft: MenuLayoutDraft }
