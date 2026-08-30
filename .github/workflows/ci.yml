@@ -46,6 +46,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Diagnose Task 2 GREEN formatting
+        run: |
+          npx prettier --write apps/operations/src/app/menuLayoutEditorSession.ts apps/operations/src/app/OrdersWorkspace.tsx
+          git diff -- apps/operations/src/app/menuLayoutEditorSession.ts apps/operations/src/app/OrdersWorkspace.tsx
+          exit 1
       - name: Format check
         run: npm run format:check
       - name: Lint
