@@ -14,7 +14,7 @@ jobs:
   correct-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -68,7 +68,7 @@ jobs:
           text = text.replace(ref_needle, ref_replacement, 1)
 
           sensors_needle = """  const menuEditSensors = useSensors(\n    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),\n    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),\n    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),\n  );\n"""
-          sensors_replacement = """  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(\n    (event, args) => {\n      const nextCoordinates = sortableKeyboardCoordinates(event, args);\n      if (nextCoordinates === undefined) return nextCoordinates;\n\n      const deltaX = nextCoordinates.x - args.currentCoordinates.x;\n      const deltaY = nextCoordinates.y - args.currentCoordinates.y;\n      const collisionRect = args.context.collisionRect;\n      const projectedCollisionRect = {\n        ...collisionRect,\n        left: collisionRect.left + deltaX,\n        right: collisionRect.right + deltaX,\n        top: collisionRect.top + deltaY,\n        bottom: collisionRect.bottom + deltaY,\n      };\n      const [projectedCollision] = closestCenter({\n        collisionRect: projectedCollisionRect,\n        droppableRects: args.context.droppableRects,\n        droppableContainers: args.context.droppableContainers.getEnabled(),\n        pointerCoordinates: null,\n      });\n      pendingKeyboardDragTargetRef.current =\n        projectedCollision === undefined ? null : String(projectedCollision.id);\n      return nextCoordinates;\n    },\n    [],\n  );\n  const menuEditSensors = useSensors(\n    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),\n    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),\n    useSensor(KeyboardSensor, { coordinateGetter: menuEditKeyboardCoordinateGetter }),\n  );\n"""
+          sensors_replacement = """  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(\n    (event, args) => {\n      const nextCoordinates = sortableKeyboardCoordinates(event, args);\n      if (nextCoordinates === undefined) {\n        pendingKeyboardDragTargetRef.current = null;\n        return nextCoordinates;\n      }\n\n      const collisionRect = args.context.collisionRect;\n      if (collisionRect === null) {\n        pendingKeyboardDragTargetRef.current = null;\n        return nextCoordinates;\n      }\n\n      const deltaX = nextCoordinates.x - args.currentCoordinates.x;\n      const deltaY = nextCoordinates.y - args.currentCoordinates.y;\n      const projectedCollisionRect = {\n        width: collisionRect.width,\n        height: collisionRect.height,\n        left: collisionRect.left + deltaX,\n        right: collisionRect.right + deltaX,\n        top: collisionRect.top + deltaY,\n        bottom: collisionRect.bottom + deltaY,\n      };\n      const [projectedCollision] = closestCenter({\n        collisionRect: projectedCollisionRect,\n        droppableRects: args.context.droppableRects,\n        droppableContainers: args.context.droppableContainers.getEnabled(),\n        pointerCoordinates: null,\n      });\n      pendingKeyboardDragTargetRef.current =\n        projectedCollision === undefined ? null : String(projectedCollision.id);\n      return nextCoordinates;\n    },\n    [],\n  );\n  const menuEditSensors = useSensors(\n    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),\n    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),\n    useSensor(KeyboardSensor, { coordinateGetter: menuEditKeyboardCoordinateGetter }),\n  );\n"""
           if sensors_needle not in text:
               raise SystemExit('menu edit sensor block missing')
           text = text.replace(sensors_needle, sensors_replacement, 1)
@@ -131,13 +131,51 @@ jobs:
         run: npx playwright test e2e/menu-layout-editor.e2e.ts --project=desktop-browser-fallback --grep "dirty shell exits keep or discard the exact editor transaction" --retries=0
       - name: Verify branch System Color matrix repeatedly without relaxed thresholds
         run: npx playwright test e2e/worker-system-color-matrix.e2e.ts --project=desktop-browser-fallback --grep "worker system color robustness matrix verifies actual rendered controls in light and dark" --repeat-each=3 --retries=0
+      - name: Final format
+        run: npm run format
+      - name: Final format check
+        run: npm run format:check
+      - name: Final lint
+        run: npm run lint
+      - name: Final unit and integration
+        run: npm test
+      - name: Final typecheck
+        run: npm run typecheck
+      - name: Final production build
+        run: npm run build
+      - name: Final migration-chain verification
+        run: npm run test:migrations
+      - name: Final full Playwright
+        run: npm run test:e2e
+      - name: Verify bounded working tree
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          allowed = {
+              'apps/operations/src/app/OrdersWorkspace.tsx',
+              'apps/operations/src/app/unifiedMenuEditMode.source.test.ts',
+              'apps/operations/src/styles/final-pos-corrections.css',
+              '.github/workflows/_temp_phase_a_interaction_fix.yml',
+          }
+          changed = {
+              line.strip()
+              for line in subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+              if line.strip()
+          }
+          unexpected = changed - allowed
+          if unexpected:
+              raise SystemExit(f'unexpected working-tree changes: {sorted(unexpected)}')
+          print('bounded changes:', sorted(changed))
+          PY
+          git diff --check
       - name: Commit verified correction and self-remove
         shell: bash
         run: |
           rm .github/workflows/_temp_phase_a_interaction_fix.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css apps/operations/src/app/unifiedMenuEditMode.source.test.ts .github/workflows/_temp_phase_a_interaction_fix.yml
+          git add -A
           git diff --cached --check
           git commit -m 'fix(menu-editor): stabilize spatial reorder interactions'
           git push origin HEAD:refactor/menu-layout-editor-long-term
