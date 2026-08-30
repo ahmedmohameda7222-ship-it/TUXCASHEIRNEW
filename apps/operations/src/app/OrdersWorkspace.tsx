@@ -6,6 +6,7 @@ import {
   PointerSensor,
   TouchSensor,
   closestCenter,
+  closestCorners,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -432,23 +433,31 @@ export function OrdersWorkspace({
         pendingKeyboardDragTargetRef.current = null;
         return nextCoordinates;
       }
-      const projectedCollisionRect = {
-        width: collisionRect.width,
-        height: collisionRect.height,
-        left: collisionRect.left + deltaX,
-        right: collisionRect.right + deltaX,
-        top: collisionRect.top + deltaY,
-        bottom: collisionRect.bottom + deltaY,
-      };
-      const [projectedCollision] = closestCenter({
+
+      const directionalDroppableContainers = args.context.droppableContainers
+        .getEnabled()
+        .filter((container) => {
+          if (container.id === active.id) return false;
+          const rect = args.context.droppableRects.get(container.id);
+          if (rect === undefined) return false;
+          if (event.code === 'ArrowDown') return collisionRect.top < rect.top;
+          if (event.code === 'ArrowUp') return collisionRect.top > rect.top;
+          if (event.code === 'ArrowLeft') return collisionRect.left > rect.left;
+          if (event.code === 'ArrowRight') return collisionRect.left < rect.left;
+          return false;
+        });
+      const projectedCollisions = closestCorners({
         active,
-        collisionRect: projectedCollisionRect,
+        collisionRect,
         droppableRects: args.context.droppableRects,
-        droppableContainers: args.context.droppableContainers
-          .getEnabled()
-          .filter((container) => container.id !== active.id),
+        droppableContainers: directionalDroppableContainers,
         pointerCoordinates: null,
       });
+      const currentOverId = args.context.over?.id;
+      const projectedCollision =
+        projectedCollisions[0]?.id === currentOverId && projectedCollisions.length > 1
+          ? projectedCollisions[1]
+          : projectedCollisions[0];
       pendingKeyboardDragTargetRef.current =
         projectedCollision === undefined ? null : String(projectedCollision.id);
       return nextCoordinates;
