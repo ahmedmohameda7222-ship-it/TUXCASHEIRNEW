@@ -48,7 +48,10 @@ export type MenuLayoutEditorEvent =
       readonly workerId: WorkerId;
       readonly base: MenuLayoutDraft;
     }
-  | { readonly type: 'SET_CATEGORY_ORDER'; readonly categoryOrder: readonly MenuCategoryId[] }
+  | {
+      readonly type: 'SET_CATEGORY_ORDER';
+      readonly categoryOrder: readonly MenuCategoryId[];
+    }
   | { readonly type: 'SET_ALIGNMENT'; readonly categoryAlignment: CategoryAlignment }
   | { readonly type: 'SET_PRODUCT_ORDER'; readonly productOrder: readonly ProductId[] }
   | { readonly type: 'BEGIN_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
@@ -98,7 +101,9 @@ function cloneDraft(draft: MenuLayoutDraft): MenuLayoutDraft {
 }
 
 function sameOrder<T>(left: readonly T[], right: readonly T[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+  return (
+    left.length === right.length && left.every((value, index) => value === right[index])
+  );
 }
 
 export function menuLayoutDraftsEqual(
