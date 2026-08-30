@@ -57,86 +57,21 @@ jobs:
 
           workspace_path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
           source = workspace_path.read_text()
-          source = source.replace(
-              "import { MenuProductCard } from './MenuProductCard';",
-              "import { MenuEditProductCard } from './MenuEditProductCard';\nimport { MenuProductCard } from './MenuProductCard';",
-              1,
-          )
-          old = '''                menuEditProducts.map((product) => (
-                  <article
-                    key={product.id}
-                    className={[
-                      'product-card',
-                      'menu-edit-product-card',
-                      draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',
-                      grabbedProductId === product.id ? 'menu-edit-product-card-grabbed' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}
-                    tabIndex={0}
-                    aria-label={`Reorder ${product.name}`}
-                    onDragStart={(event) => {
-                      if (menuEditSaving) return;
-                      setDraggedProductId(product.id);
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', product.id);
-                    }}
-                    onDragEnter={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId === null) return;
-                      event.preventDefault();
-                      moveDraggedProduct(product.id);
-                    }}
-                    onDragOver={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId !== null) event.preventDefault();
-                    }}
-                    onDragEnd={() => setDraggedProductId(null)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setDraggedProductId(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (menuEditSaving) return;
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggleProductPickup(product.id);
-                        return;
-                      }
-                      if (event.key === 'Escape' && grabbedProductId === product.id) {
-                        event.preventDefault();
-                        cancelProductPickup();
-                        return;
-                      }
-                      if (grabbedProductId !== product.id) return;
-                      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, -1);
-                      } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, 1);
-                      }
-                    }}
-                  >
-                    <div className="product-main">
-                      <div className="product-media">
-                        <ProductImage product={product} />
-                      </div>
-                      <div className="product-copy">
-                        <strong>{product.name}</strong>
-                        {product.description?.trim() ? <p>{product.description}</p> : null}
-                      </div>
-                      <strong className="product-price">
-                        {formatMoneyMinor(product.priceMinor)}
-                      </strong>
-                    </div>
-                    <div className="menu-edit-product-hint" aria-hidden="true">
-                      Drag to reorder
-                    </div>
-                  </article>
-                ))'''
-          new = '''                menuEditProducts.map((product, index) => (
+          old_import = "import { MenuProductCard } from './MenuProductCard';"
+          if "import { MenuEditProductCard } from './MenuEditProductCard';" not in source:
+              if old_import not in source:
+                  raise SystemExit('MenuProductCard import marker missing')
+              source = source.replace(
+                  old_import,
+                  "import { MenuEditProductCard } from './MenuEditProductCard';\n" + old_import,
+                  1,
+              )
+
+          start_marker = '                menuEditProducts.map((product) => (\n                  <article'
+          end_marker = '                  </article>\n                ))'
+          start = source.index(start_marker)
+          end = source.index(end_marker, start) + len(end_marker)
+          replacement = '''                menuEditProducts.map((product, index) => (
                   <MenuEditProductCard
                     key={product.id}
                     product={product}
@@ -200,14 +135,15 @@ jobs:
                     }}
                   />
                 ))'''
-          if old not in source:
-              raise SystemExit('OrdersWorkspace edit card block did not match expected Task 3 source')
-          workspace_path.write_text(source.replace(old, new, 1))
+          workspace_path.write_text(source[:start] + replacement + source[end:])
 
           css_path = Path('apps/operations/src/styles/final-pos-corrections.css')
           css = css_path.read_text()
-          start = css.index('/* Legacy ProductPositionEditor styles remain for its isolated component tests. */')
-          end = css.index('/* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */')
+          legacy_start = css.index(
+              '/* Legacy ProductPositionEditor styles remain for its isolated component tests. */'
+          )
+          unified_marker = '/* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */'
+          legacy_end = css.index(unified_marker, legacy_start)
           preserved = '''.sr-only {
             position: absolute;
             width: 1px;
@@ -226,7 +162,7 @@ jobs:
           }
 
           '''
-          css_path.write_text(css[:start] + preserved + css[end:])
+          css_path.write_text(css[:legacy_start] + preserved + css[legacy_end:])
           PY
           npx prettier --write \
             apps/operations/src/app/OrdersWorkspace.tsx \
