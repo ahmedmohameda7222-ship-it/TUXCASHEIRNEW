@@ -29,15 +29,17 @@ async function keyboardMove(locator: Locator, key: 'ArrowLeft' | 'ArrowRight' | 
   await locator.press('Space');
 }
 
-async function continuePastGreetingIfPresent(page: Parameters<typeof menuCategoryTabs>[0]) {
-  await page.waitForFunction(
-    () =>
-      document.querySelector('.welcome-action') !== null ||
-      document.querySelector('[aria-label="Operations"]') !== null,
-  );
+async function continuePastGreetingForWorker(
+  page: Parameters<typeof menuCategoryTabs>[0],
+  workerName: RegExp,
+) {
   const welcomeAction = page.locator('.welcome-action');
+  const targetWorker = page.getByRole('button', { name: workerName });
+  await expect
+    .poll(async () => (await welcomeAction.isVisible()) || (await targetWorker.isVisible()))
+    .toBe(true);
   if (await welcomeAction.isVisible()) await welcomeAction.click();
-  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
+  await expect(targetWorker).toBeVisible();
 }
 
 test('menu editor keeps selected category reachable and preserves Product Card geometry', async ({
@@ -177,7 +179,6 @@ test('desktop pointer and spatial keyboard reorder persist after save and re-ent
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(expected);
   await expectNoHorizontalOverflow(page);
 });
-
 test('dirty shell exits keep or discard the exact editor transaction', async ({
   page,
 }, testInfo) => {
@@ -220,8 +221,8 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({
   const switchDialog = page.getByRole('dialog', { name: 'Switch worker' });
   await switchDialog.getByLabel('Enter PIN to Sign In').fill('5678');
   await switchDialog.getByRole('button', { name: 'Sign In' }).click();
-  await continuePastGreetingIfPresent(page);
-  await expect(page.getByRole('button', { name: /Demo Worker Two/ })).toBeVisible();
+  await expect(switchDialog).toBeHidden();
+  await continuePastGreetingForWorker(page, /Demo Worker Two/);
 
   await page.getByRole('button', { name: 'Edit menu' }).click();
   await page.getByRole('button', { name: 'Right', exact: true }).click();
