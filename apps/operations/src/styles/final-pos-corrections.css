@@ -639,19 +639,24 @@
 .menu-edit-product-card {
   cursor: grab;
   user-select: none;
-  touch-action: manipulation;
-  transform-origin: center;
+  touch-action: none;
+  transform-origin: 50% 72%;
+  will-change: transform;
 }
 
 .category-tab-dragging,
-.category-tab-grabbed,
-.menu-edit-product-card-dragging,
-.menu-edit-product-card-grabbed {
+.menu-edit-product-card-dragging {
   animation-play-state: paused;
   border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
   background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
   box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
-  transform: translateY(-2px) scale(1.01);
+  rotate: 0deg;
+  translate: 0 -2px;
+  scale: 1.01;
+}
+
+.menu-edit-drag-overlay {
+  pointer-events: none;
 }
 
 .menu-edit-product-hint {
@@ -665,10 +670,12 @@
 @keyframes menu-edit-jiggle {
   0%,
   100% {
-    transform: rotate(-0.2deg) translateY(0);
+    rotate: -0.2deg;
+    translate: 0 0;
   }
   50% {
-    transform: rotate(0.2deg) translateY(-0.5px);
+    rotate: 0.2deg;
+    translate: 0 -0.5px;
   }
 }
 
@@ -702,13 +709,8 @@
   .category-tab-reordering,
   .menu-edit-product-card {
     animation: none;
-    transform: none;
-  }
-
-  .category-tab-dragging,
-  .category-tab-grabbed,
-  .menu-edit-product-card-dragging,
-  .menu-edit-product-card-grabbed {
-    transform: none;
+    rotate: none;
+    translate: none;
+    scale: none;
   }
 }
