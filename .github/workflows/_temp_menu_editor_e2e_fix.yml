@@ -6,6 +6,11 @@ on:
       - refactor/menu-layout-editor-long-term
     paths:
       - '.github/workflows/_temp_menu_editor_e2e_fix.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/_temp_menu_editor_e2e_fix.yml'
 
 permissions:
   contents: write
