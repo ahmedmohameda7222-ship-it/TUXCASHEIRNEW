@@ -46,6 +46,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Diagnose locked Prettier output
+        run: |
+          npx prettier --write apps/operations/src/app/menuLayoutEditorSession.ts
+          git diff -- apps/operations/src/app/menuLayoutEditorSession.ts
+          exit 1
       - name: Format check
         run: npm run format:check
       - name: Lint
