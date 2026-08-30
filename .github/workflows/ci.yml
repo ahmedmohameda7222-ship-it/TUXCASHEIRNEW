@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -46,34 +46,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Remove stale Task 4 save cleanup and restore CI
-        shell: bash
-        run: |
-          git fetch origin "refs/heads/${GITHUB_HEAD_REF}:refs/remotes/origin/${GITHUB_HEAD_REF}" "refs/heads/main:refs/remotes/origin/main"
-          git checkout -B "${GITHUB_HEAD_REF}" "refs/remotes/origin/${GITHUB_HEAD_REF}"
-          python <<'PY'
-          from pathlib import Path
-          path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
-          source = path.read_text()
-          old = '''      setDraggedCategoryId(null);
-                setDraggedProductId(null);
-                setGrabbedCategoryId(null);
-                setGrabbedProductId(null);
-                categoryPickupSnapshotRef.current = null;
-                productPickupSnapshotRef.current = null;
-          '''
-          if source.count(old) != 1:
-              raise SystemExit(f'expected one stale save cleanup block, found {source.count(old)}')
-          path.write_text(source.replace(old, '      setActiveMenuDragId(null);\n', 1))
-          PY
-          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx
-          git checkout refs/remotes/origin/main -- .github/workflows/ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/operations/src/app/OrdersWorkspace.tsx .github/workflows/ci.yml
-          git diff --cached --check
-          git commit -m "fix: clear dnd state after menu save"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
       - name: Format check
         run: npm run format:check
       - name: Lint

@@ -793,12 +793,7 @@ export function OrdersWorkspace({
       });
       setMenuEditActive(false);
       setMenuEditResetRequested(false);
-      setDraggedCategoryId(null);
-      setDraggedProductId(null);
-      setGrabbedCategoryId(null);
-      setGrabbedProductId(null);
-      categoryPickupSnapshotRef.current = null;
-      productPickupSnapshotRef.current = null;
+      setActiveMenuDragId(null);
       setMenuEditAnnouncement('');
       setSuccessMessage('Menu layout saved');
       window.setTimeout(() => setSuccessMessage(null), 4_500);
