@@ -36,10 +36,16 @@ jobs:
 
           contract = Path('apps/operations/src/app/unifiedMenuEditMode.source.test.ts')
           contract_text = contract.read_text()
-          contract_needle = 'strategy: MeasuringStrategy.Always'
-          if contract_needle not in contract_text:
-              raise SystemExit('measurement source contract insertion point missing')
-          contract.write_text(contract_text.replace(contract_needle, 'strategy: MeasuringStrategy.BeforeDragging', 1))
+          contract_text = contract_text.replace(
+              'strategy: MeasuringStrategy.Always',
+              'strategy: MeasuringStrategy.BeforeDragging',
+              1,
+          )
+          sensor_contract = "expect(ordersWorkspaceSource).toContain('coordinateGetter: sortableKeyboardCoordinates');"
+          sensor_replacement = "expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');\n    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');\n    expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');"
+          if sensor_contract not in contract_text:
+              raise SystemExit('keyboard coordinate source contract insertion point missing')
+          contract.write_text(contract_text.replace(sensor_contract, sensor_replacement, 1))
 
           workspace = Path('apps/operations/src/app/OrdersWorkspace.tsx')
           text = workspace.read_text()
@@ -55,11 +61,41 @@ jobs:
               raise SystemExit('menu edit measuring constant insertion point missing')
           text = text.replace(constant_needle, constant_replacement, 1)
 
+          ref_needle = "  const lastAppliedMenuDragTargetRef = useRef<string | null>(null);\n"
+          ref_replacement = ref_needle + "  const pendingKeyboardDragTargetRef = useRef<string | null>(null);\n"
+          if ref_needle not in text:
+              raise SystemExit('pending keyboard target ref insertion point missing')
+          text = text.replace(ref_needle, ref_replacement, 1)
+
+          sensors_needle = """  const menuEditSensors = useSensors(\n    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),\n    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),\n    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),\n  );\n"""
+          sensors_replacement = """  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(\n    (event, args) => {\n      const nextCoordinates = sortableKeyboardCoordinates(event, args);\n      if (nextCoordinates === undefined) return nextCoordinates;\n\n      const deltaX = nextCoordinates.x - args.currentCoordinates.x;\n      const deltaY = nextCoordinates.y - args.currentCoordinates.y;\n      const collisionRect = args.context.collisionRect;\n      const projectedCollisionRect = {\n        ...collisionRect,\n        left: collisionRect.left + deltaX,\n        right: collisionRect.right + deltaX,\n        top: collisionRect.top + deltaY,\n        bottom: collisionRect.bottom + deltaY,\n      };\n      const [projectedCollision] = closestCenter({\n        collisionRect: projectedCollisionRect,\n        droppableRects: args.context.droppableRects,\n        droppableContainers: args.context.droppableContainers.getEnabled(),\n        pointerCoordinates: null,\n      });\n      pendingKeyboardDragTargetRef.current =\n        projectedCollision === undefined ? null : String(projectedCollision.id);\n      return nextCoordinates;\n    },\n    [],\n  );\n  const menuEditSensors = useSensors(\n    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),\n    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),\n    useSensor(KeyboardSensor, { coordinateGetter: menuEditKeyboardCoordinateGetter }),\n  );\n"""
+          if sensors_needle not in text:
+              raise SystemExit('menu edit sensor block missing')
+          text = text.replace(sensors_needle, sensors_replacement, 1)
+
           pattern = re.compile(r'(?m)^(\s*)collisionDetection=\{closestCenter\}$')
           matches = list(pattern.finditer(text))
           if len(matches) != 2:
               raise SystemExit(f'expected 2 menu DndContext collision lines, found {len(matches)}')
           text = pattern.sub(lambda match: f"{match.group(1)}collisionDetection={{closestCenter}}\n{match.group(1)}measuring={{MENU_EDIT_MEASURING}}", text)
+
+          start_needle = "    lastAppliedMenuDragTargetRef.current = activeId;\n"
+          start_replacement = start_needle + "    pendingKeyboardDragTargetRef.current = null;\n"
+          if start_needle not in text:
+              raise SystemExit('drag start target insertion point missing')
+          text = text.replace(start_needle, start_replacement, 1)
+
+          cancel_needle = "    lastAppliedMenuDragTargetRef.current = null;\n  }\n\n  function applyMenuEditDragOver"
+          cancel_replacement = "    lastAppliedMenuDragTargetRef.current = null;\n    pendingKeyboardDragTargetRef.current = null;\n  }\n\n  function applyMenuEditDragOver"
+          if cancel_needle not in text:
+              raise SystemExit('drag cancel target insertion point missing')
+          text = text.replace(cancel_needle, cancel_replacement, 1)
+
+          end_needle = """    const activeId = String(event.active.id);\n    const overId = event.over === null ? null : String(event.over.id);\n    setActiveMenuDragId(null);\n\n    if (!menuEditActive || overId === null) {\n"""
+          end_replacement = """    const activeId = String(event.active.id);\n    const eventOverId = event.over === null ? null : String(event.over.id);\n    const projectedKeyboardTarget = pendingKeyboardDragTargetRef.current;\n    pendingKeyboardDragTargetRef.current = null;\n    const overId =\n      projectedKeyboardTarget !== null && (eventOverId === null || eventOverId === activeId)\n        ? projectedKeyboardTarget\n        : eventOverId;\n    setActiveMenuDragId(null);\n\n    if (!menuEditActive || overId === null) {\n"""
+          if end_needle not in text:
+              raise SystemExit('drag end projection insertion point missing')
+          text = text.replace(end_needle, end_replacement, 1)
           workspace.write_text(text)
 
           styles = Path('apps/operations/src/styles/final-pos-corrections.css')
@@ -73,6 +109,8 @@ jobs:
           git diff --check
       - name: Verify focused source and reducer contracts
         run: npx vitest run apps/operations/src/app/unifiedMenuEditMode.source.test.ts apps/operations/src/app/menuLayoutEditorSession.test.ts apps/operations/src/app/selectedCategoryVisibility.test.ts
+      - name: Verify typecheck before rendered tests
+        run: npm run typecheck
       - name: Install Playwright Chromium
         run: npx playwright install chromium
       - name: Verify desktop spatial keyboard and pointer reorder
