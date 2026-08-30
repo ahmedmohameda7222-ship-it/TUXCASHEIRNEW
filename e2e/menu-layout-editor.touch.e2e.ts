@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 import {
   attachMenuLayoutScreenshot,
   expectNoHorizontalOverflow,
-  menuCategoryTabs,
   menuEditProductCards,
   menuLayoutDraftSnapshot,
   startMenuLayoutActiveOrders,
   touchDrag,
 } from './menu-layout-editor-test-helpers';
+import type { menuCategoryTabs } from './menu-layout-editor-test-helpers';
 
 async function expectSelectedCategoryInsideRail(page: Parameters<typeof menuCategoryTabs>[0]) {
   const rail = page.getByLabel('Menu categories');
