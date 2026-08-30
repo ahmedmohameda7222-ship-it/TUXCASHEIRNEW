@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 import {
   attachMenuLayoutScreenshot,
   expectNoHorizontalOverflow,
+  holdPreferenceWriteTransaction,
   menuEditProductCards,
   menuLayoutDraftSnapshot,
+  releasePreferenceWriteTransaction,
   startMenuLayoutActiveOrders,
   touchDrag,
 } from './menu-layout-editor-test-helpers';
@@ -38,8 +40,15 @@ test('real touch reorder persists, cancel restores, and mobile editor stays reac
   await attachMenuLayoutScreenshot(page, testInfo, 'mobile-touch-drag');
   const persistedDraft = await menuLayoutDraftSnapshot(page);
 
+  await holdPreferenceWriteTransaction(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saving…' })).toBeVisible();
+  cards = menuEditProductCards(page);
+  await touchDrag(cards.nth(1), cards.nth(0), page);
+  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(persistedDraft);
+  await releasePreferenceWriteTransaction(page);
   await expect(page.getByRole('status').filter({ hasText: 'Menu layout saved' })).toBeVisible();
+
   await page.reload();
   await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
   await page.getByRole('button', { name: 'Edit menu' }).click();
