@@ -37,7 +37,9 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).not.toContain('<strong>Category layout</strong>');
     expect(ordersWorkspaceSource).not.toContain('className="category-editor"');
     expect(ordersWorkspaceSource).toContain('category-tab-reordering');
-    expect(ordersWorkspaceSource).toContain('draggable={menuEditActive');
+    expect(ordersWorkspaceSource).toMatch(
+      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedCategoryId\s*!==\s*category\.id\s*\}/,
+    );
     expect(ordersWorkspaceSource).toContain(
       'data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}',
     );
