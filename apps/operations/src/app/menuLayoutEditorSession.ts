@@ -32,7 +32,9 @@ interface ProductPickupInteraction {
 }
 
 export type MenuLayoutEditorInteraction =
-  NoMenuLayoutInteraction | CategoryPickupInteraction | ProductPickupInteraction;
+  | NoMenuLayoutInteraction
+  | CategoryPickupInteraction
+  | ProductPickupInteraction;
 
 export interface MenuLayoutEditorSession {
   readonly lifecycle: MenuLayoutEditorLifecycle;
