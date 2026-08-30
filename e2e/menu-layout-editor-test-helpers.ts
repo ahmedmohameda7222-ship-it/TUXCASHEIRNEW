@@ -271,7 +271,7 @@ export async function attachMenuLayoutScreenshot(
 }
 
 export function menuCategoryTabs(page: Page): Locator {
-  return page.getByLabel('Menu categories').locator('.category-tab');
+  return page.getByLabel('Menu categories').locator('.category-tab:not(.menu-edit-drag-overlay)');
 }
 
 export function menuEditProductCards(page: Page): Locator {

@@ -22,11 +22,22 @@ async function expectSelectedCategoryInsideRail(page: Parameters<typeof menuCate
   expect(selectedBox!.x + selectedBox!.width).toBeLessThanOrEqual(railBox!.x + railBox!.width + 1);
 }
 
-async function keyboardMove(locator: Locator, key: 'ArrowLeft' | 'ArrowRight' | 'ArrowDown') {
+async function keyboardMove(
+  page: Parameters<typeof menuCategoryTabs>[0],
+  locator: Locator,
+  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowDown',
+) {
   await locator.focus();
-  await locator.press('Space');
-  await locator.press(key);
-  await locator.press('Space');
+  await page.keyboard.press('Space');
+  await expect(page.locator('.category-tab-grabbed, .menu-edit-product-card-grabbed')).toHaveCount(
+    1,
+  );
+  await page.keyboard.press(key);
+  await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
+  await page.keyboard.press('Space');
+  await expect(page.locator('.category-tab-grabbed, .menu-edit-product-card-grabbed')).toHaveCount(
+    0,
+  );
 }
 
 async function continuePastGreetingForWorker(
@@ -106,7 +117,7 @@ test('menu editor keeps selected category reachable and preserves Product Card g
     expect(second).not.toBeNull();
     expect(Math.abs(first!.x - second!.x)).toBeLessThanOrEqual(1);
     expect(second!.y).toBeGreaterThan(first!.y + first!.height - 1);
-    await keyboardMove(cards.nth(1), 'ArrowDown');
+    await keyboardMove(page, cards.nth(1), 'ArrowDown');
     await expect(cards.nth(2)).toContainText('Double Smashed Patty');
   }
 
@@ -144,12 +155,12 @@ test('desktop pointer and spatial keyboard reorder persist after save and re-ent
   expect(Math.abs(firstBox!.y - secondBox!.y)).toBeLessThanOrEqual(2);
   expect(secondBox!.x).toBeGreaterThan(firstBox!.x);
 
-  await keyboardMove(cards.nth(1), 'ArrowLeft');
+  await keyboardMove(page, cards.nth(1), 'ArrowLeft');
   cards = menuEditProductCards(page);
   await expect(cards.nth(0)).toContainText('Double Smashed Patty');
 
   const categories = menuCategoryTabs(page);
-  await keyboardMove(categories.nth(0), 'ArrowRight');
+  await keyboardMove(page, categories.nth(0), 'ArrowRight');
   await expect(categories.nth(0)).toHaveText('Combo');
   await expect(categories.nth(1)).toHaveText('Burgers');
 
@@ -256,15 +267,17 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
   let cards = menuEditProductCards(page);
   const baseline = await menuLayoutDraftSnapshot(page);
   await cards.nth(1).focus();
-  await cards.nth(1).press('Space');
-  await cards.nth(1).press('ArrowLeft');
+  await page.keyboard.press('Space');
+  await expect(page.locator('.menu-edit-product-card-grabbed')).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
   await expect(cards.nth(0)).toContainText('Double Smashed Patty');
   await menuCategoryTabs(page).getByText('Fries', { exact: true }).click();
   await menuCategoryTabs(page).getByText('Burgers', { exact: true }).click();
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(baseline);
 
   cards = menuEditProductCards(page);
-  await keyboardMove(cards.nth(1), 'ArrowLeft');
+  await keyboardMove(page, cards.nth(1), 'ArrowLeft');
   const failedDraft = await menuLayoutDraftSnapshot(page);
   await installPreferenceSaveFailure(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
