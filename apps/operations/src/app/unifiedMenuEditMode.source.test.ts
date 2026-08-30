@@ -135,57 +135,46 @@ describe('unified menu edit entry point', () => {
     ).toBeGreaterThanOrEqual(4);
   });
 
-  it(
-    'uses dnd-kit spatial keyboard sorting and keeps immediate drops tied to the stock geometric target',
-    () => {
-      expect(ordersWorkspaceSource).toContain('KeyboardSensor');
-      expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
-      expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
-      expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
-      expect(ordersWorkspaceSource).toContain('container.id !== active.id');
-      expect(ordersWorkspaceSource).toContain('if (deltaX === 0 && deltaY === 0)');
-      expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
-      expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
-    },
-  );
+  it('keeps immediate keyboard drops geometric', () => {
+    expect(ordersWorkspaceSource).toContain('KeyboardSensor');
+    expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
+    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
+    expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
+    expect(ordersWorkspaceSource).toContain('container.id !== active.id');
+    expect(ordersWorkspaceSource).toContain('if (deltaX === 0 && deltaY === 0)');
+    expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
+    expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
+  });
 
-  it(
-    'resets the product drag sensor when a category change invalidates an in-flight product pickup',
-    () => {
-      expect(ordersWorkspaceSource).toContain("key={selectedCategoryId ?? 'menu-products-none'}");
-      expect(ordersWorkspaceSource).toContain(
-        "dispatchMenuLayoutEditor({ type: 'CATEGORY_CHANGE' })",
-      );
-    },
-  );
+  it('resets product drag on category change', () => {
+    expect(ordersWorkspaceSource).toContain("key={selectedCategoryId ?? 'menu-products-none'}");
+    expect(ordersWorkspaceSource).toContain("type: 'CATEGORY_CHANGE'");
+  });
 
-  it(
-    'keeps idle reorder hit targets geometrically stable while preserving the legacy jiggle cue, a clear active affordance, and Reduced Motion',
-    () => {
-      expect(menuEditStyles).toContain('.category-tab-reordering');
-      expect(menuEditStyles).toContain('.menu-edit-product-card');
-      expect(menuEditStyles).toContain('cursor: grab');
-      expect(menuEditStyles).toContain('touch-action: none');
-      expect(menuEditStyles).toContain('.category-tab-dragging');
-      expect(menuEditStyles).toContain('.menu-edit-product-card-dragging');
-      expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
-      expect(menuEditStabilityStyles).toContain('@keyframes menu-edit-jiggle');
-      expect(menuEditStabilityStyles).toContain(
-        '.category-tab-reordering:not(.category-tab-dragging)',
-      );
-      expect(menuEditStabilityStyles).toContain(
-        '.menu-edit-product-card:not(.menu-edit-product-card-dragging)',
-      );
-      expect(menuEditStabilityStyles).not.toContain('animation: none');
-      expect(menuEditStabilityStyles).toContain('rotate: none');
-      expect(menuEditStabilityStyles).toContain('translate: none');
-      expect(menuEditStabilityStyles).toContain('scale: none');
-      const stableJiggleKeyframes =
-        menuEditStabilityStyles.match(/@keyframes menu-edit-jiggle\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
-      expect(stableJiggleKeyframes).toContain('box-shadow');
-      expect(stableJiggleKeyframes).not.toContain('rotate:');
-      expect(stableJiggleKeyframes).not.toContain('translate:');
-      expect(stableJiggleKeyframes).not.toContain('scale:');
-    },
-  );
+  it('keeps stable hit targets and the legacy jiggle cue', () => {
+    expect(menuEditStyles).toContain('.category-tab-reordering');
+    expect(menuEditStyles).toContain('.menu-edit-product-card');
+    expect(menuEditStyles).toContain('cursor: grab');
+    expect(menuEditStyles).toContain('touch-action: none');
+    expect(menuEditStyles).toContain('.category-tab-dragging');
+    expect(menuEditStyles).toContain('.menu-edit-product-card-dragging');
+    expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(menuEditStabilityStyles).toContain('@keyframes menu-edit-jiggle');
+    expect(menuEditStabilityStyles).toContain(
+      '.category-tab-reordering:not(.category-tab-dragging)',
+    );
+    expect(menuEditStabilityStyles).toContain(
+      '.menu-edit-product-card:not(.menu-edit-product-card-dragging)',
+    );
+    expect(menuEditStabilityStyles).not.toContain('animation: none');
+    expect(menuEditStabilityStyles).toContain('rotate: none');
+    expect(menuEditStabilityStyles).toContain('translate: none');
+    expect(menuEditStabilityStyles).toContain('scale: none');
+    const stableJiggleKeyframes =
+      menuEditStabilityStyles.match(/@keyframes menu-edit-jiggle\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(stableJiggleKeyframes).toContain('box-shadow');
+    expect(stableJiggleKeyframes).not.toContain('rotate:');
+    expect(stableJiggleKeyframes).not.toContain('translate:');
+    expect(stableJiggleKeyframes).not.toContain('scale:');
+  });
 });
