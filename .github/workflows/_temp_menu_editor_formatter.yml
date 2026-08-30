@@ -1,0 +1,40 @@
+name: Temporary Menu Editor Formatter
+
+on:
+  push:
+    branches:
+      - refactor/menu-layout-editor-long-term
+    paths:
+      - '.github/workflows/_temp_menu_editor_formatter.yml'
+      - 'apps/operations/src/app/OrdersWorkspace.tsx'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/menu-layout-editor-long-term
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Apply locked Prettier
+        run: npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx
+      - name: Commit formatter output
+        shell: bash
+        run: |
+          if git diff --quiet -- apps/operations/src/app/OrdersWorkspace.tsx; then
+            echo 'OrdersWorkspace already formatted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/operations/src/app/OrdersWorkspace.tsx
+          git commit -m 'style(operations): apply locked prettier output'
+          git push origin HEAD:refactor/menu-layout-editor-long-term
