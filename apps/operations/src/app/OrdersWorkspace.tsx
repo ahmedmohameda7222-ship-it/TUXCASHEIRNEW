@@ -44,7 +44,7 @@ import {
   type ProductId,
   type WorkerUiPreferences,
 } from '@tux/domain';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   CART_WIDTH_MAX_PX,
   CART_WIDTH_MIN,
@@ -73,6 +73,7 @@ import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
+import type { MenuLayoutExitController } from './unsavedChangesGuard';
 import { menuEditPreferenceInput } from './workerUiPreferenceEditing';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
@@ -332,9 +333,11 @@ function MenuEditCategoryTab({
 export function OrdersWorkspace({
   session,
   client,
+  onMenuLayoutExitControllerChange,
 }: {
   readonly session: ActiveSession;
   readonly client: OperationsOrdersClient;
+  readonly onMenuLayoutExitControllerChange?: (controller: MenuLayoutExitController) => void;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
   const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
@@ -404,6 +407,48 @@ export function OrdersWorkspace({
     activeWorkerMenuPreferenceLoadState,
   );
   const categoryPreference = workerMenuPreferencePresentation.preference;
+  const discardMenuLayoutEditor = useCallback((): void => {
+    dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+    dispatchMenuLayoutEditor({ type: 'CANCEL_EDITOR' });
+    setActiveMenuDragId(null);
+    setMenuEditAnnouncement('');
+  }, []);
+
+  useEffect(() => {
+    if (onMenuLayoutExitControllerChange === undefined) return;
+    onMenuLayoutExitControllerChange({
+      state: {
+        lifecycle: menuEditSession.lifecycle,
+        dirty: menuEditSession.dirty,
+      },
+      discard: discardMenuLayoutEditor,
+    });
+  }, [
+    discardMenuLayoutEditor,
+    menuEditSession.dirty,
+    menuEditSession.lifecycle,
+    onMenuLayoutExitControllerChange,
+  ]);
+
+  useEffect(() => {
+    if (onMenuLayoutExitControllerChange === undefined) return;
+    return () => {
+      onMenuLayoutExitControllerChange({
+        state: { lifecycle: 'CLOSED', dirty: false },
+        discard: () => undefined,
+      });
+    };
+  }, [onMenuLayoutExitControllerChange]);
+
+  useEffect(() => {
+    if (!menuEditSession.dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [menuEditSession.dirty]);
 
   function commitCartWidth(nextWidth: number): void {
     const next = clampCartWidth(nextWidth, window.innerWidth);
@@ -779,9 +824,7 @@ export function OrdersWorkspace({
 
   function cancelMenuEdit(): void {
     if (menuEditSaving) return;
-    dispatchMenuLayoutEditor({ type: 'CANCEL_EDITOR' });
-    setActiveMenuDragId(null);
-    setMenuEditAnnouncement('');
+    discardMenuLayoutEditor();
   }
 
   async function saveMenuEdit(): Promise<void> {
