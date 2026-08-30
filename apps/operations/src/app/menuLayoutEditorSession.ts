@@ -6,8 +6,7 @@ import type {
   WorkerId,
 } from '@tux/domain';
 
-export type MenuLayoutEditorLifecycle =
-  'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
+export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -49,31 +48,16 @@ export type MenuLayoutEditorEvent =
       readonly workerId: WorkerId;
       readonly base: MenuLayoutDraft;
     }
-  | {
-      readonly type: 'SET_CATEGORY_ORDER';
-      readonly categoryOrder: readonly MenuCategoryId[];
-    }
-  | {
-      readonly type: 'SET_ALIGNMENT';
-      readonly categoryAlignment: CategoryAlignment;
-    }
-  | {
-      readonly type: 'SET_PRODUCT_ORDER';
-      readonly productOrder: readonly ProductId[];
-    }
-  | {
-      readonly type: 'BEGIN_CATEGORY_PICKUP';
-      readonly categoryId: MenuCategoryId;
-    }
+  | { readonly type: 'SET_CATEGORY_ORDER'; readonly categoryOrder: readonly MenuCategoryId[] }
+  | { readonly type: 'SET_ALIGNMENT'; readonly categoryAlignment: CategoryAlignment }
+  | { readonly type: 'SET_PRODUCT_ORDER'; readonly productOrder: readonly ProductId[] }
+  | { readonly type: 'BEGIN_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
   | {
       readonly type: 'BEGIN_PRODUCT_PICKUP';
       readonly productId: ProductId;
       readonly categoryId: MenuCategoryId;
     }
-  | {
-      readonly type: 'DROP_CATEGORY_PICKUP';
-      readonly categoryId: MenuCategoryId;
-    }
+  | { readonly type: 'DROP_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
   | { readonly type: 'DROP_PRODUCT_PICKUP'; readonly productId: ProductId }
   | { readonly type: 'CANCEL_PICKUP' }
   | { readonly type: 'CATEGORY_CHANGE' }
@@ -93,11 +77,7 @@ export type MenuLayoutEditorEvent =
       readonly saveToken: string;
       readonly message: string;
     }
-  | {
-      readonly type: 'IDENTITY_INVALIDATED';
-      readonly shopId: ShopId;
-      readonly workerId: WorkerId;
-    };
+  | { readonly type: 'IDENTITY_INVALIDATED'; readonly shopId: ShopId; readonly workerId: WorkerId };
 
 export interface OpenMenuLayoutEditorInput {
   readonly shopId: ShopId;
@@ -182,9 +162,7 @@ function withDraft(
   };
 }
 
-function rollbackPickup(
-  state: MenuLayoutEditorSession,
-): MenuLayoutEditorSession {
+function rollbackPickup(state: MenuLayoutEditorSession): MenuLayoutEditorSession {
   if (state.interaction.type === 'NONE') return state;
   if (state.base === null) return state;
   const draft = cloneDraft(state.interaction.snapshot);
@@ -226,10 +204,7 @@ export function menuLayoutEditorReducer(
 ): MenuLayoutEditorSession {
   if (event.type === 'IDENTITY_INVALIDATED') {
     if (state.lifecycle === 'CLOSED') return state;
-    if (
-      state.openingShopId === event.shopId &&
-      state.openingWorkerId === event.workerId
-    ) {
+    if (state.openingShopId === event.shopId && state.openingWorkerId === event.workerId) {
       return state;
     }
     return createClosedMenuLayoutEditorSession();
@@ -258,24 +233,15 @@ export function menuLayoutEditorReducer(
 
     case 'SET_CATEGORY_ORDER':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, {
-        ...state.draft,
-        categoryOrder: [...event.categoryOrder],
-      });
+      return withDraft(state, { ...state.draft, categoryOrder: [...event.categoryOrder] });
 
     case 'SET_ALIGNMENT':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, {
-        ...state.draft,
-        categoryAlignment: event.categoryAlignment,
-      });
+      return withDraft(state, { ...state.draft, categoryAlignment: event.categoryAlignment });
 
     case 'SET_PRODUCT_ORDER':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, {
-        ...state.draft,
-        productOrder: [...event.productOrder],
-      });
+      return withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
 
     case 'BEGIN_CATEGORY_PICKUP': {
       if (!canMutateDraft(state)) return state;
@@ -330,9 +296,7 @@ export function menuLayoutEditorReducer(
 
     case 'RESET': {
       if (!canMutateDraft(state)) return state;
-      const reset = withDraft(rollbackPickup(state), event.draft, {
-        resetRequested: true,
-      });
+      const reset = withDraft(rollbackPickup(state), event.draft, { resetRequested: true });
       return { ...reset, interaction: { type: 'NONE' } };
     }
 
