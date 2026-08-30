@@ -1,6 +1,53 @@
-import type { CategoryAlignment, MenuCategoryId, ProductId, ShopId, WorkerId } from '@tux/domain';
+import type {
+  CategoryAlignment,
+  MenuCategoryId,
+  ProductId,
+  ShopId,
+  WorkerId,
+  WorkerUiPreferences,
+} from '@tux/domain';
 
 export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
+
+export type WorkerMenuPreferenceLoadState =
+  | { readonly status: 'LOADING' }
+  | { readonly status: 'READY'; readonly preference: WorkerUiPreferences | null }
+  | { readonly status: 'ERROR'; readonly message: string };
+
+export interface WorkerMenuPreferenceLoadSession {
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly generation: number;
+  readonly state: WorkerMenuPreferenceLoadState;
+}
+
+interface WorkerMenuPreferenceLoadEvent {
+  readonly type: 'LOAD';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly generation: number;
+}
+
+interface WorkerMenuPreferenceReadyEvent {
+  readonly type: 'READY';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly generation: number;
+  readonly preference: WorkerUiPreferences | null;
+}
+
+interface WorkerMenuPreferenceErrorEvent {
+  readonly type: 'ERROR';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly generation: number;
+  readonly message: string;
+}
+
+export type WorkerMenuPreferenceEvent =
+  | WorkerMenuPreferenceLoadEvent
+  | WorkerMenuPreferenceReadyEvent
+  | WorkerMenuPreferenceErrorEvent;
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -150,6 +197,53 @@ export interface OpenMenuLayoutEditorInput {
   readonly shopId: ShopId;
   readonly workerId: WorkerId;
   readonly base: MenuLayoutDraft;
+}
+
+export function createWorkerMenuPreferenceLoadSession(
+  shopId: ShopId,
+  workerId: WorkerId,
+  generation: number,
+): WorkerMenuPreferenceLoadSession {
+  return {
+    shopId,
+    workerId,
+    generation,
+    state: { status: 'LOADING' },
+  };
+}
+
+function workerMenuPreferenceResultMatches(
+  session: WorkerMenuPreferenceLoadSession,
+  event: WorkerMenuPreferenceReadyEvent | WorkerMenuPreferenceErrorEvent,
+): boolean {
+  return (
+    session.shopId === event.shopId &&
+    session.workerId === event.workerId &&
+    session.generation === event.generation
+  );
+}
+
+export function workerMenuPreferenceLoadReducer(
+  session: WorkerMenuPreferenceLoadSession,
+  event: WorkerMenuPreferenceEvent,
+): WorkerMenuPreferenceLoadSession {
+  if (event.type === 'LOAD') {
+    return createWorkerMenuPreferenceLoadSession(event.shopId, event.workerId, event.generation);
+  }
+
+  if (!workerMenuPreferenceResultMatches(session, event)) return session;
+
+  if (event.type === 'READY') {
+    return {
+      ...session,
+      state: { status: 'READY', preference: event.preference },
+    };
+  }
+
+  return {
+    ...session,
+    state: { status: 'ERROR', message: event.message },
+  };
 }
 
 function cloneDraft(draft: MenuLayoutDraft): MenuLayoutDraft {
