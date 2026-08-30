@@ -280,6 +280,34 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
     page.getByRole('group', { name: 'Category alignment' }).getByRole('button').first(),
   ).toBeDisabled();
   await expect(menuCategoryTabs(page).first()).toBeDisabled();
+
+  const savingDraft = await menuLayoutDraftSnapshot(page);
+  cards = menuEditProductCards(page);
+  await cards.nth(1).focus();
+  await cards.nth(1).press('Space');
+  await cards.nth(1).press('ArrowLeft');
+  await cards.nth(1).press('Space');
+  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(savingDraft);
+
+  const [savingSourceBox, savingTargetBox] = await Promise.all([
+    cards.nth(1).boundingBox(),
+    cards.nth(0).boundingBox(),
+  ]);
+  expect(savingSourceBox).not.toBeNull();
+  expect(savingTargetBox).not.toBeNull();
+  await page.mouse.move(
+    savingSourceBox!.x + savingSourceBox!.width / 2,
+    savingSourceBox!.y + savingSourceBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    savingTargetBox!.x + savingTargetBox!.width / 2,
+    savingTargetBox!.y + savingTargetBox!.height / 2,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(savingDraft);
+
   await page.getByRole('button', { name: 'Orders Board', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Discard menu changes?' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Orders Board' })).toHaveCount(0);
