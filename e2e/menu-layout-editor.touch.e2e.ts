@@ -76,6 +76,9 @@ test('real touch reorder persists, cancel restores, and mobile editor stays reac
   await expect(guard).toBeVisible();
   await attachMenuLayoutScreenshot(page, testInfo, 'mobile-menu-guard');
   await guard.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expectNoHorizontalOverflow(page);
 });
