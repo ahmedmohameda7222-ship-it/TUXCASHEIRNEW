@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { parseEntityId, type MenuCategoryId, type Product, type ProductId, type ShopId } from '@tux/domain';
+import {
+  parseEntityId,
+  type MenuCategoryId,
+  type Product,
+  type ProductId,
+  type ShopId,
+} from '@tux/domain';
 import { MenuEditProductCard } from './MenuEditProductCard';
 import { MenuProductCard } from './MenuProductCard';
 
@@ -40,7 +46,7 @@ describe('shared Product Card presentation', () => {
       expect(markup).toContain('data-product-presentation="true"');
       expect(markup).toContain('data-product-media="true"');
       expect(markup).toContain('Double Smashed Patty');
-      expect(markup).toContain('E£180.00');
+      expect(markup).toContain('EGP 180.00');
     }
   });
 
