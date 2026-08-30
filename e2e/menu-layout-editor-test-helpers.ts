@@ -137,7 +137,15 @@ export async function seedMenuLayoutBrowserFallback(page: Page): Promise<void> {
   });
   await page.goto('/__tux_menu_layout_seed__');
   await page.evaluate(
-    async ({ databaseName, draftDatabaseName, shopId, workerId, workerTwoId, hashes, snapshot }) => {
+    async ({
+      databaseName,
+      draftDatabaseName,
+      shopId,
+      workerId,
+      workerTwoId,
+      hashes,
+      snapshot,
+    }) => {
       const deleteDatabase = (name: string) =>
         new Promise<void>((resolve, reject) => {
           const request = indexedDB.deleteDatabase(name);
@@ -186,7 +194,10 @@ export async function seedMenuLayoutBrowserFallback(page: Page): Promise<void> {
       });
 
       await new Promise<void>((resolve, reject) => {
-        const tx = database.transaction(['shops', 'workers', 'configurationSnapshots'], 'readwrite');
+        const tx = database.transaction(
+          ['shops', 'workers', 'configurationSnapshots'],
+          'readwrite',
+        );
         tx.objectStore('shops').put({ id: shopId, name: 'TUX E2E Shop', active: true });
         tx.objectStore('workers').put({
           id: workerId,
@@ -282,7 +293,8 @@ export async function menuLayoutDraftSnapshot(page: Page): Promise<{
       .getByRole('button')
       .evaluateAll(
         (buttons) =>
-          buttons.find((button) => button.getAttribute('aria-pressed') === 'true')?.textContent ?? '',
+          buttons.find((button) => button.getAttribute('aria-pressed') === 'true')?.textContent ??
+          '',
       )) ?? '';
   return { categories, products, alignment };
 }
