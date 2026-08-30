@@ -5,6 +5,10 @@ const ordersWorkspaceSource = readFileSync(
   new URL('./OrdersWorkspace.tsx', import.meta.url),
   'utf8',
 );
+const menuLayoutEditorSessionSource = readFileSync(
+  new URL('./menuLayoutEditorSession.ts', import.meta.url),
+  'utf8',
+);
 const menuEditProductCardSource = readFileSync(
   new URL('./MenuEditProductCard.tsx', import.meta.url),
   'utf8',
@@ -24,9 +28,10 @@ describe('unified menu edit entry point', () => {
   });
 
   // Edit mode consumes app-search shortcuts instead of handing them to the browser.
-  it('uses Pencil to activate one pressed menu edit session and suppresses search shortcuts during it', () => {
+  it('uses Pencil to activate one reducer-owned menu edit session and suppresses search shortcuts during it', () => {
     expect(ordersWorkspaceSource).toContain('menuEditActive');
-    expect(ordersWorkspaceSource).toContain('setMenuEditActive(true)');
+    expect(ordersWorkspaceSource).toContain('dispatchMenuLayoutEditor({');
+    expect(ordersWorkspaceSource).toContain("type: 'OPEN'");
     expect(ordersWorkspaceSource).toContain('aria-pressed={menuEditActive}');
     expect(ordersWorkspaceSource).toMatch(
       /if \(\(event\.ctrlKey \|\| event\.metaKey\) && event\.key\.toLowerCase\(\) === 'k'\) \{\s*event\.preventDefault\(\);\s*if \(menuEditActive\) return;/,
@@ -102,7 +107,10 @@ describe('unified menu edit entry point', () => {
     expect(
       ordersWorkspaceSource.match(/disabled=\{menuEditSaving\}/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(2);
-    expect(ordersWorkspaceSource).toContain('if (!menuEditActive || menuEditSaving) return;');
+    expect(ordersWorkspaceSource).toContain(
+      "const menuEditSaving = menuEditSession.lifecycle === 'SAVING';",
+    );
+    expect(menuLayoutEditorSessionSource).toContain("if (state.lifecycle === 'SAVING') return state;");
     expect(
       ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(4);
