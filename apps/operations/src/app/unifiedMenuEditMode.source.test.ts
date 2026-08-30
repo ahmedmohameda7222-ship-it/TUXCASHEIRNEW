@@ -17,6 +17,10 @@ const menuEditStyles = readFileSync(
   new URL('../styles/final-pos-corrections.css', import.meta.url),
   'utf8',
 );
+const menuEditStabilityStyles = readFileSync(
+  new URL('../styles/menu-edit-stability.css', import.meta.url),
+  'utf8',
+);
 
 // Unified edit evidence uses the same single-session contract exercised here.
 describe('unified menu edit entry point', () => {
@@ -147,10 +151,18 @@ describe('unified menu edit entry point', () => {
     expect(menuEditStyles).toContain('.menu-edit-product-card');
     expect(menuEditStyles).toContain('cursor: grab');
     expect(menuEditStyles).toContain('touch-action: none');
-    expect(menuEditStyles).not.toContain('@keyframes menu-edit-jiggle');
-    expect(menuEditStyles).not.toContain('animation: menu-edit-jiggle');
     expect(menuEditStyles).toContain('.category-tab-dragging');
     expect(menuEditStyles).toContain('.menu-edit-product-card-dragging');
     expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(menuEditStabilityStyles).toContain(
+      '.category-tab-reordering:not(.category-tab-dragging)',
+    );
+    expect(menuEditStabilityStyles).toContain(
+      '.menu-edit-product-card:not(.menu-edit-product-card-dragging)',
+    );
+    expect(menuEditStabilityStyles).toContain('animation: none');
+    expect(menuEditStabilityStyles).toContain('rotate: none');
+    expect(menuEditStabilityStyles).toContain('translate: none');
+    expect(menuEditStabilityStyles).toContain('scale: none');
   });
 });
