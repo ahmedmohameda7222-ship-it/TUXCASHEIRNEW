@@ -1528,11 +1528,7 @@ export function OrdersWorkspace({
               {workerMenuPreferencePresentation.errorMessage}
             </span>
             {workerMenuPreferencePresentation.retryVisible ? (
-              <button
-                type="button"
-                className="text-action"
-                onClick={retryWorkerMenuPreferenceLoad}
-              >
+              <button type="button" className="text-action" onClick={retryWorkerMenuPreferenceLoad}>
                 Retry
               </button>
             ) : null}
