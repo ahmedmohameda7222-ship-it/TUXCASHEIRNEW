@@ -1,10 +1,4 @@
-import type {
-  CategoryAlignment,
-  MenuCategoryId,
-  ProductId,
-  ShopId,
-  WorkerId,
-} from '@tux/domain';
+import type { CategoryAlignment, MenuCategoryId, ProductId, ShopId, WorkerId } from '@tux/domain';
 
 export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
@@ -32,9 +26,7 @@ interface ProductPickupInteraction {
 }
 
 export type MenuLayoutEditorInteraction =
-  | NoMenuLayoutInteraction
-  | CategoryPickupInteraction
-  | ProductPickupInteraction;
+  NoMenuLayoutInteraction | CategoryPickupInteraction | ProductPickupInteraction;
 
 export interface MenuLayoutEditorSession {
   readonly lifecycle: MenuLayoutEditorLifecycle;
