@@ -1,0 +1,139 @@
+name: Temporary Menu Editor E2E Fix
+
+on:
+  push:
+    branches:
+      - refactor/menu-layout-editor-long-term
+    paths:
+      - '.github/workflows/_temp_menu_editor_e2e_fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/menu-layout-editor-long-term
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded RED-driven patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          orders = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          text = orders.read_text()
+          old = '''                    <DragOverlay>
+                      {activeDraggedCategory === null ? null : (
+                        <button
+                          type="button"
+                          className="category-tab category-tab-dragging menu-edit-drag-overlay"
+                        >
+                          {activeDraggedCategory.name}
+                        </button>
+                      )}
+                    </DragOverlay>'''
+          new = '''                    <DragOverlay>
+                      {activeDraggedCategory === null ? null : (
+                        <div
+                          aria-hidden="true"
+                          className="category-tab category-tab-dragging menu-edit-drag-overlay"
+                        >
+                          {activeDraggedCategory.name}
+                        </div>
+                      )}
+                    </DragOverlay>'''
+          assert text.count(old) == 1, 'category overlay source changed'
+          orders.write_text(text.replace(old, new))
+
+          helpers = Path('e2e/menu-layout-editor-test-helpers.ts')
+          text = helpers.read_text()
+          old = "  return page.getByLabel('Menu categories').locator('.category-tab');"
+          new = "  return page.getByLabel('Menu categories').locator('.category-tab:not(.menu-edit-drag-overlay)');"
+          assert text.count(old) == 1, 'category helper source changed'
+          helpers.write_text(text.replace(old, new))
+
+          spec = Path('e2e/menu-layout-editor.e2e.ts')
+          text = spec.read_text()
+          old = '''async function keyboardMove(locator: Locator, key: 'ArrowLeft' | 'ArrowRight' | 'ArrowDown') {
+  await locator.focus();
+  await locator.press('Space');
+  await locator.press(key);
+  await locator.press('Space');
+}'''
+          new = '''async function keyboardMove(
+  page: Parameters<typeof menuCategoryTabs>[0],
+  locator: Locator,
+  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowDown',
+) {
+  await locator.focus();
+  await page.keyboard.press('Space');
+  const activeSortable = page.locator(
+    '.category-tab-grabbed, .menu-edit-product-card-grabbed',
+  );
+  await expect(activeSortable).toHaveCount(1);
+  await expect(
+    page.locator('.menu-pane .sr-only').filter({ hasText: 'picked up' }),
+  ).toBeVisible();
+  await page.keyboard.press(key);
+  await expect(
+    page.locator('.menu-pane .sr-only').filter({ hasText: 'moved to position' }),
+  ).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(activeSortable).toHaveCount(0);
+}'''
+          assert text.count(old) == 1, 'keyboard helper source changed'
+          text = text.replace(old, new)
+          assert text.count("await keyboardMove(cards.nth(1), 'ArrowDown');") == 1
+          text = text.replace(
+              "await keyboardMove(cards.nth(1), 'ArrowDown');",
+              "await keyboardMove(page, cards.nth(1), 'ArrowDown');",
+          )
+          assert text.count("await keyboardMove(cards.nth(1), 'ArrowLeft');") == 2
+          text = text.replace(
+              "await keyboardMove(cards.nth(1), 'ArrowLeft');",
+              "await keyboardMove(page, cards.nth(1), 'ArrowLeft');",
+          )
+          assert text.count("await keyboardMove(categories.nth(0), 'ArrowRight');") == 1
+          text = text.replace(
+              "await keyboardMove(categories.nth(0), 'ArrowRight');",
+              "await keyboardMove(page, categories.nth(0), 'ArrowRight');",
+          )
+          old = '''  await cards.nth(1).focus();
+  await cards.nth(1).press('Space');
+  await cards.nth(1).press('ArrowLeft');
+  await expect(cards.nth(0)).toContainText('Double Smashed Patty');'''
+          new = '''  await cards.nth(1).focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('.menu-edit-product-card-grabbed')).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await expect(
+    page.locator('.menu-pane .sr-only').filter({ hasText: 'moved to position' }),
+  ).toBeVisible();
+  await expect(cards.nth(0)).toContainText('Double Smashed Patty');'''
+          assert text.count(old) == 1, 'pickup rollback source changed'
+          spec.write_text(text.replace(old, new))
+          PY
+          npx prettier --write \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            e2e/menu-layout-editor-test-helpers.ts \
+            e2e/menu-layout-editor.e2e.ts
+          rm .github/workflows/_temp_menu_editor_e2e_fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            apps/operations/src/app/OrdersWorkspace.tsx \
+            e2e/menu-layout-editor-test-helpers.ts \
+            e2e/menu-layout-editor.e2e.ts \
+            .github/workflows/_temp_menu_editor_e2e_fix.yml
+          git diff --cached --check
+          git commit -m 'test(menu-editor): synchronize keyboard drag acceptance'
+          git push origin HEAD:refactor/menu-layout-editor-long-term
