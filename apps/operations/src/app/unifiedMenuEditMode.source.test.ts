@@ -78,14 +78,14 @@ describe('unified menu edit entry point', () => {
     expect(menuEditProductCardSource).not.toContain('onDecrement');
   });
 
-  it('removes native HTML5 menu sorting while allowing reducer-owned dnd-kit drag-over updates', () => {
+  it('removes native HTML5 menu sorting while allowing reducer-owned dnd-kit drag-move updates', () => {
     expect(ordersWorkspaceSource).not.toContain('draggable={');
     expect(ordersWorkspaceSource).not.toContain('draggable:');
     expect(ordersWorkspaceSource).not.toContain('dataTransfer');
     expect(ordersWorkspaceSource).not.toContain('onDragEnter');
     expect(ordersWorkspaceSource).not.toContain('onDrop');
     expect(ordersWorkspaceSource).toContain('onDragStart={handleMenuEditDragStart}');
-    expect(ordersWorkspaceSource).toContain('onDragOver={handleMenuEditDragOver}');
+    expect(ordersWorkspaceSource).toContain('onDragMove={handleMenuEditDragMove}');
     expect(ordersWorkspaceSource).toContain('onDragEnd={handleMenuEditDragEnd}');
   });
 

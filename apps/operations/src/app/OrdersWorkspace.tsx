@@ -8,7 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
+  type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import {
@@ -355,6 +355,7 @@ export function OrdersWorkspace({
   const searchRef = useRef<HTMLInputElement>(null);
   const categoryRailRef = useRef<HTMLDivElement>(null);
   const categoryTabRefs = useRef<Map<MenuCategoryId, HTMLButtonElement>>(new Map());
+  const lastAppliedMenuDragTargetRef = useRef<string | null>(null);
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
@@ -934,6 +935,7 @@ export function OrdersWorkspace({
     if (menuEditSaving) return;
     if (!menuEditActive) return;
     const activeId = String(event.active.id);
+    lastAppliedMenuDragTargetRef.current = activeId;
     const activeCategory = categoryEditorCategories.find(
       (category) => menuEditCategorySortableId(category.id) === activeId,
     );
@@ -963,6 +965,7 @@ export function OrdersWorkspace({
     if (menuEditSaving) return;
     dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
     setActiveMenuDragId(null);
+    lastAppliedMenuDragTargetRef.current = null;
   }
 
   function applyMenuEditDragOver(activeId: string, overId: string): boolean {
@@ -1028,9 +1031,14 @@ export function OrdersWorkspace({
     return true;
   }
 
-  function handleMenuEditDragOver(event: DragOverEvent): void {
+  function handleMenuEditDragMove(event: DragMoveEvent): void {
     if (menuEditSaving || !menuEditActive || event.over === null) return;
-    applyMenuEditDragOver(String(event.active.id), String(event.over.id));
+    const activeId = String(event.active.id);
+    const overId = String(event.over.id);
+    if (activeId === overId || lastAppliedMenuDragTargetRef.current === overId) return;
+    if (applyMenuEditDragOver(activeId, overId)) {
+      lastAppliedMenuDragTargetRef.current = overId;
+    }
   }
 
   function handleMenuEditDragEnd(event: DragEndEvent): void {
@@ -1041,8 +1049,14 @@ export function OrdersWorkspace({
 
     if (!menuEditActive || overId === null) {
       dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+      lastAppliedMenuDragTargetRef.current = null;
       return;
     }
+
+    if (activeId !== overId && lastAppliedMenuDragTargetRef.current !== overId) {
+      applyMenuEditDragOver(activeId, overId);
+    }
+    lastAppliedMenuDragTargetRef.current = null;
 
     const activeCategory = categoryEditorCategories.find(
       (category) => menuEditCategorySortableId(category.id) === activeId,
@@ -1355,7 +1369,7 @@ export function OrdersWorkspace({
                     sensors={menuEditSensors}
                     collisionDetection={closestCenter}
                     onDragStart={handleMenuEditDragStart}
-                    onDragOver={handleMenuEditDragOver}
+                    onDragMove={handleMenuEditDragMove}
                     onDragCancel={handleMenuEditDragCancel}
                     onDragEnd={handleMenuEditDragEnd}
                   >
@@ -1376,12 +1390,12 @@ export function OrdersWorkspace({
                     </SortableContext>
                     <DragOverlay>
                       {activeDraggedCategory === null ? null : (
-                        <button
-                          type="button"
+                        <div
+                          aria-hidden="true"
                           className="category-tab category-tab-dragging menu-edit-drag-overlay"
                         >
                           {activeDraggedCategory.name}
-                        </button>
+                        </div>
                       )}
                     </DragOverlay>
                   </DndContext>
@@ -1547,7 +1561,7 @@ export function OrdersWorkspace({
                 sensors={menuEditSensors}
                 collisionDetection={closestCenter}
                 onDragStart={handleMenuEditDragStart}
-                onDragOver={handleMenuEditDragOver}
+                onDragMove={handleMenuEditDragMove}
                 onDragCancel={handleMenuEditDragCancel}
                 onDragEnd={handleMenuEditDragEnd}
               >
@@ -1565,7 +1579,10 @@ export function OrdersWorkspace({
                 </SortableContext>
                 <DragOverlay>
                   {activeDraggedProduct === null ? null : (
-                    <article className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay">
+                    <article
+                      aria-hidden="true"
+                      className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay"
+                    >
                       <div className="product-main">
                         <ProductCardPresentation product={activeDraggedProduct} showDescription />
                       </div>
