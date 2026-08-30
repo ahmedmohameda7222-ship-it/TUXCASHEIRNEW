@@ -92,6 +92,10 @@ test('menu editor keeps selected category reachable and preserves Product Card g
   expect(editMediaBox!.width).toBeCloseTo(normalMediaBox!.width, 0);
   expect(editMediaBox!.height).toBeCloseTo(normalMediaBox!.height, 0);
 
+  if (testInfo.project.name === 'desktop-browser-fallback') {
+    await attachMenuLayoutScreenshot(page, testInfo, 'desktop-menu-edit');
+  }
+
   if (testInfo.project.name === 'mobile-browser-fallback') {
     const cards = menuEditProductCards(page);
     const [first, second] = await Promise.all([
