@@ -33,7 +33,6 @@ import {
   productQuantityInDraft,
   replaceDraftLineCustomization,
   validateOrderDraft,
-  type CategoryAlignment,
   type DraftLineCustomization,
   type DraftLineId,
   type MenuCategory,
@@ -55,8 +54,11 @@ import {
 } from './cartWidthPreference';
 import { EditPencilIcon, SearchIcon } from './icons';
 import {
+  createClosedMenuLayoutEditorSession,
   createWorkerMenuPreferenceLoadSession,
+  menuLayoutEditorReducer,
   workerMenuPreferenceLoadReducer,
+  type MenuLayoutDraft,
   type WorkerMenuPreferenceLoadState,
 } from './menuLayoutEditorSession';
 import { MenuEditProductCard, menuEditProductSortableId } from './MenuEditProductCard';
@@ -343,6 +345,8 @@ export function OrdersWorkspace({
   const undoTimerRef = useRef<number | null>(null);
   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const preferenceLoadGenerationRef = useRef(0);
+  const menuEditIdentityRef = useRef({ shopId: session.shopId, workerId: session.operator.id });
+  menuEditIdentityRef.current = { shopId: session.shopId, workerId: session.operator.id };
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -357,19 +361,16 @@ export function OrdersWorkspace({
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');
-  const [menuEditActive, setMenuEditActive] = useState(false);
   const [workerMenuPreferenceLoadSession, dispatchWorkerMenuPreferenceLoad] = useReducer(
     workerMenuPreferenceLoadReducer,
     createWorkerMenuPreferenceLoadSession(session.shopId, session.operator.id, 0),
   );
-  const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
-  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
-  const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
+  const [menuEditSession, dispatchMenuLayoutEditor] = useReducer(
+    menuLayoutEditorReducer,
+    createClosedMenuLayoutEditorSession(),
+  );
   const [activeMenuDragId, setActiveMenuDragId] = useState<string | null>(null);
   const [menuEditAnnouncement, setMenuEditAnnouncement] = useState('');
-  const [menuEditSaving, setMenuEditSaving] = useState(false);
-  const [menuEditError, setMenuEditError] = useState<string | null>(null);
-  const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -382,6 +383,12 @@ export function OrdersWorkspace({
       ? CART_WIDTH_MIN
       : readCartWidth(window.localStorage, window.innerWidth),
   );
+  const menuEditActive = menuEditSession.lifecycle !== 'CLOSED';
+  const menuEditSaving = menuEditSession.lifecycle === 'SAVING';
+  const menuEditError = menuEditSession.saveError;
+  const categoryEditOrder = menuEditSession.draft?.categoryOrder ?? [];
+  const categoryEditAlignment = menuEditSession.draft?.categoryAlignment ?? 'left';
+  const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -449,10 +456,10 @@ export function OrdersWorkspace({
     const generation = preferenceLoadGenerationRef.current + 1;
     preferenceLoadGenerationRef.current = generation;
     dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
+    dispatchMenuLayoutEditor({ type: 'IDENTITY_INVALIDATED', shopId, workerId });
     setCategoryMode('IDLE');
-    setMenuEditActive(false);
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
+    setActiveMenuDragId(null);
+    setMenuEditAnnouncement('');
     setSearch('');
     void preferencesClient.load().then(
       (preference) => {
@@ -726,64 +733,82 @@ export function OrdersWorkspace({
 
   function beginMenuEdit(): void {
     if (!workerMenuPreferencePresentation.menuEditEnabled) return;
+    const base: MenuLayoutDraft = {
+      categoryOrder: activeCategories.map((category) => category.id),
+      categoryAlignment,
+      productOrder: reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
+        (product) => product.id,
+      ),
+    };
+    dispatchMenuLayoutEditor({
+      type: 'OPEN',
+      shopId: session.shopId,
+      workerId: session.operator.id,
+      base,
+    });
     setCategoryMode('IDLE');
     setSearch('');
     setSelectedFamily(null);
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
-    setCategoryEditOrder(activeCategories.map((category) => category.id));
-    setCategoryEditAlignment(categoryAlignment);
-    setMenuEditProductOrder(
-      reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
-        (product) => product.id,
-      ),
-    );
     setActiveMenuDragId(null);
     setMenuEditAnnouncement(
       'Menu edit mode. Drag categories or products to reorder. Keyboard users can pick up an item with Space and move it with the arrow keys.',
     );
-    setMenuEditActive(true);
+  }
+
+  function selectMenuEditCategory(categoryId: MenuCategoryId): void {
+    if (menuEditSaving) return;
+    dispatchMenuLayoutEditor({ type: 'CATEGORY_CHANGE' });
+    setSelectedCategoryId(categoryId);
+    setSelectedFamily(null);
+    setSearch('');
   }
 
   function resetMenuEdit(): void {
     if (menuEditSaving) return;
-    setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
-    setCategoryEditAlignment('left');
-    setMenuEditProductOrder(
-      reconcileProductOrder(configuration?.products ?? [], null).map((product) => product.id),
-    );
+    const draft: MenuLayoutDraft = {
+      categoryOrder: configuredActiveCategories.map((category) => category.id),
+      categoryAlignment: 'left',
+      productOrder: reconcileProductOrder(configuration?.products ?? [], null).map(
+        (product) => product.id,
+      ),
+    };
+    dispatchMenuLayoutEditor({ type: 'RESET', draft });
     setActiveMenuDragId(null);
     setMenuEditAnnouncement('Menu layout reset to defaults. Save to keep the reset.');
-    setMenuEditError(null);
-    setMenuEditResetRequested(true);
   }
 
   function cancelMenuEdit(): void {
     if (menuEditSaving) return;
-    setMenuEditActive(false);
+    dispatchMenuLayoutEditor({ type: 'CANCEL_EDITOR' });
     setActiveMenuDragId(null);
     setMenuEditAnnouncement('');
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
   }
 
   async function saveMenuEdit(): Promise<void> {
     if (menuEditSaving) return;
-    const saveShopId = workerMenuPreferenceLoadSession.shopId;
-    const saveWorkerId = workerMenuPreferenceLoadSession.workerId;
+    const saveDraft = menuEditSession.draft;
+    const saveShopId = menuEditSession.openingShopId;
+    const saveWorkerId = menuEditSession.openingWorkerId;
+    if (saveDraft === null || saveShopId === null || saveWorkerId === null) return;
     const saveGeneration = workerMenuPreferenceLoadSession.generation;
-    setMenuEditSaving(true);
+    const saveToken = crypto.randomUUID();
+    dispatchMenuLayoutEditor({ type: 'BEGIN_SAVE', saveToken });
     setActiveMenuDragId(null);
-    setMenuEditError(null);
     try {
       const saved = await preferencesClient.updateMenuLayout(
         menuEditPreferenceInput(
-          categoryEditOrder,
-          categoryEditAlignment,
-          menuEditProductOrder,
-          menuEditResetRequested,
+          saveDraft.categoryOrder,
+          saveDraft.categoryAlignment,
+          saveDraft.productOrder,
+          menuEditSession.resetRequested,
         ),
       );
+      if (
+        menuEditIdentityRef.current.shopId !== saveShopId ||
+        menuEditIdentityRef.current.workerId !== saveWorkerId
+      ) {
+        return;
+      }
       dispatchWorkerMenuPreferenceLoad({
         type: 'READY',
         shopId: saveShopId,
@@ -791,37 +816,76 @@ export function OrdersWorkspace({
         generation: saveGeneration,
         preference: saved,
       });
-      setMenuEditActive(false);
-      setMenuEditResetRequested(false);
+      dispatchMenuLayoutEditor({
+        type: 'SAVE_SUCCESS',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        saveToken,
+      });
       setActiveMenuDragId(null);
       setMenuEditAnnouncement('');
       setSuccessMessage('Menu layout saved');
       window.setTimeout(() => setSuccessMessage(null), 4_500);
     } catch {
-      setMenuEditError('Could not save menu layout. Try again.');
-    } finally {
-      setMenuEditSaving(false);
+      if (
+        menuEditIdentityRef.current.shopId !== saveShopId ||
+        menuEditIdentityRef.current.workerId !== saveWorkerId
+      ) {
+        return;
+      }
+      dispatchMenuLayoutEditor({
+        type: 'SAVE_FAILURE',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        saveToken,
+        message: 'Could not save menu layout. Try again.',
+      });
     }
   }
 
   function handleMenuEditDragStart(event: DragStartEvent): void {
     if (menuEditSaving) return;
     if (!menuEditActive) return;
-    setActiveMenuDragId(String(event.active.id));
+    const activeId = String(event.active.id);
+    const activeCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === activeId,
+    );
+    if (activeCategory !== undefined) {
+      dispatchMenuLayoutEditor({
+        type: 'BEGIN_CATEGORY_PICKUP',
+        categoryId: activeCategory.id,
+      });
+      setActiveMenuDragId(activeId);
+      return;
+    }
+    const activeProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === activeId,
+    );
+    if (activeProduct === undefined || selectedCategoryId === null) return;
+    dispatchMenuLayoutEditor({
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: activeProduct.id,
+      categoryId: selectedCategoryId,
+    });
+    setActiveMenuDragId(activeId);
   }
 
   function handleMenuEditDragCancel(): void {
     if (menuEditSaving) return;
+    dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
     setActiveMenuDragId(null);
   }
 
   function handleMenuEditDragEnd(event: DragEndEvent): void {
+    if (menuEditSaving) return;
     const activeId = String(event.active.id);
     const overId = event.over === null ? null : String(event.over.id);
     setActiveMenuDragId(null);
 
-    if (!menuEditActive || menuEditSaving) return;
-    if (overId === null || activeId === overId) return;
+    if (!menuEditActive || overId === null) {
+      dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+      return;
+    }
 
     const activeCategory = categoryEditorCategories.find(
       (category) => menuEditCategorySortableId(category.id) === activeId,
@@ -830,19 +894,28 @@ export function OrdersWorkspace({
       (category) => menuEditCategorySortableId(category.id) === overId,
     );
     if (activeCategory !== undefined && overCategory !== undefined) {
-      setMenuEditResetRequested(false);
-      setCategoryEditOrder((current) => {
-        const sourceIndex = current.indexOf(activeCategory.id);
-        const targetIndex = current.indexOf(overCategory.id);
-        if (sourceIndex < 0 || targetIndex < 0) return current;
-        const next = [...current];
+      if (activeCategory.id !== overCategory.id) {
+        const sourceIndex = categoryEditOrder.indexOf(activeCategory.id);
+        const targetIndex = categoryEditOrder.indexOf(overCategory.id);
+        if (sourceIndex < 0 || targetIndex < 0) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
+        const next = [...categoryEditOrder];
         const [moved] = next.splice(sourceIndex, 1);
-        if (moved === undefined) return current;
+        if (moved === undefined) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
         next.splice(targetIndex, 0, moved);
+        dispatchMenuLayoutEditor({ type: 'SET_CATEGORY_ORDER', categoryOrder: next });
         setMenuEditAnnouncement(
           `${activeCategory.name} moved to position ${targetIndex + 1} of ${next.length}.`,
         );
-        return next;
+      }
+      dispatchMenuLayoutEditor({
+        type: 'DROP_CATEGORY_PICKUP',
+        categoryId: activeCategory.id,
       });
       return;
     }
@@ -860,24 +933,25 @@ export function OrdersWorkspace({
       activeProduct.categoryId !== selectedCategoryId ||
       overProduct.categoryId !== selectedCategoryId
     ) {
+      dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
       return;
     }
 
-    setMenuEditResetRequested(false);
-    const productCategoryById = new Map(
-      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
-    );
-    setMenuEditProductOrder((current) => {
-      const categoryProductIds = current.filter(
+    if (activeProduct.id !== overProduct.id) {
+      const productCategoryById = new Map(
+        (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+      );
+      const categoryProductIds = menuEditProductOrder.filter(
         (productId) => productCategoryById.get(productId) === selectedCategoryId,
       );
       const next = moveProductWithinCategory(
-        current,
+        menuEditProductOrder,
         categoryProductIds,
         activeProduct.id,
         overProduct.id,
       );
-      if (next !== current) {
+      if (next !== menuEditProductOrder) {
+        dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
         const categoryOnly = next.filter(
           (productId) => productCategoryById.get(productId) === selectedCategoryId,
         );
@@ -885,7 +959,10 @@ export function OrdersWorkspace({
           `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
         );
       }
-      return next;
+    }
+    dispatchMenuLayoutEditor({
+      type: 'DROP_PRODUCT_PICKUP',
+      productId: activeProduct.id,
     });
   }
 
@@ -1176,11 +1253,7 @@ export function OrdersWorkspace({
                             category={category}
                             selected={selectedCategoryId === category.id}
                             disabled={menuEditSaving}
-                            onSelect={() => {
-                              setSelectedCategoryId(category.id);
-                              setSelectedFamily(null);
-                              setSearch('');
-                            }}
+                            onSelect={() => selectMenuEditCategory(category.id)}
                           />
                         ))}
                       </SortableContext>
@@ -1220,8 +1293,11 @@ export function OrdersWorkspace({
                             disabled={menuEditSaving}
                             aria-pressed={categoryEditAlignment === alignment}
                             onClick={() => {
-                              setCategoryEditAlignment(alignment);
-                              setMenuEditResetRequested(false);
+                              if (menuEditSaving) return;
+                              dispatchMenuLayoutEditor({
+                                type: 'SET_ALIGNMENT',
+                                categoryAlignment: alignment,
+                              });
                             }}
                           >
                             {alignment === 'left'
