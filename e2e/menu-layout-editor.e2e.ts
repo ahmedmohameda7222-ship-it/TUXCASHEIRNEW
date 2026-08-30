@@ -37,7 +37,10 @@ test('menu editor keeps selected category reachable and preserves Product Card g
   await expect(page.getByRole('button', { name: 'Manage order' })).toHaveCount(0);
   await expect(page.locator('.product-position-editor')).toHaveCount(0);
 
-  const normalSingle = page.locator('.product-card').filter({ hasText: 'Single Smashed Patty' }).first();
+  const normalSingle = page
+    .locator('.product-card')
+    .filter({ hasText: 'Single Smashed Patty' })
+    .first();
   const normalMediaBox = await normalSingle.locator('.product-media').boundingBox();
   expect(normalMediaBox).not.toBeNull();
   await attachMenuLayoutScreenshot(page, testInfo, `${testInfo.project.name}-menu-normal`);
@@ -48,7 +51,10 @@ test('menu editor keeps selected category reachable and preserves Product Card g
     node.scrollLeft = 0;
   });
   await page.getByRole('button', { name: 'Edit menu' }).click();
-  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expectSelectedCategoryInsideRail(page);
   await attachMenuLayoutScreenshot(page, testInfo, `${testInfo.project.name}-selected-category`);
 
@@ -57,13 +63,17 @@ test('menu editor keeps selected category reachable and preserves Product Card g
   if (testInfo.project.name !== 'desktop-browser-fallback') {
     const actionBox = await actionBar.boundingBox();
     expect(actionBox).not.toBeNull();
-    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(testInfo.project.use.viewport!.height + 1);
+    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(
+      testInfo.project.use.viewport!.height + 1,
+    );
   }
 
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await rail.getByRole('button', { name: 'Burgers', exact: true }).click();
   await page.getByRole('button', { name: 'Edit menu' }).click();
-  const editSingle = page.locator('.menu-edit-product-card').filter({ hasText: 'Single Smashed Patty' });
+  const editSingle = page
+    .locator('.menu-edit-product-card')
+    .filter({ hasText: 'Single Smashed Patty' });
   const editMediaBox = await editSingle.locator('.product-media').boundingBox();
   expect(editMediaBox).not.toBeNull();
   expect(editMediaBox!.width).toBeCloseTo(normalMediaBox!.width, 0);
@@ -71,7 +81,10 @@ test('menu editor keeps selected category reachable and preserves Product Card g
 
   if (testInfo.project.name === 'mobile-browser-fallback') {
     const cards = menuEditProductCards(page);
-    const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+    const [first, second] = await Promise.all([
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     expect(Math.abs(first!.x - second!.x)).toBeLessThanOrEqual(1);
@@ -105,7 +118,10 @@ test('desktop pointer and spatial keyboard reorder persist after save and re-ent
   await page.getByRole('button', { name: 'Edit menu' }).click();
 
   let cards = menuEditProductCards(page);
-  const [firstBox, secondBox] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+  const [firstBox, secondBox] = await Promise.all([
+    cards.nth(0).boundingBox(),
+    cards.nth(1).boundingBox(),
+  ]);
   expect(firstBox).not.toBeNull();
   expect(secondBox).not.toBeNull();
   expect(Math.abs(firstBox!.y - secondBox!.y)).toBeLessThanOrEqual(2);
@@ -151,7 +167,9 @@ test('desktop pointer and spatial keyboard reorder persist after save and re-ent
   await expectNoHorizontalOverflow(page);
 });
 
-test('dirty shell exits keep or discard the exact editor transaction', async ({ page }, testInfo) => {
+test('dirty shell exits keep or discard the exact editor transaction', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback', 'desktop shell guard acceptance');
   await startMenuLayoutActiveOrders(page);
   await page.getByRole('button', { name: 'Edit menu' }).click();
@@ -179,7 +197,10 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({ 
   await page.getByRole('menuitem', { name: 'Switch / Sign in worker' }).click();
   guard = page.getByRole('dialog', { name: 'Discard menu changes?' });
   await guard.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 
   await page.getByRole('button', { name: /Demo Worker One/ }).click();
   await page.getByRole('menuitem', { name: 'Switch / Sign in worker' }).click();
@@ -198,7 +219,10 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({ 
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   guard = page.getByRole('dialog', { name: 'Discard menu changes?' });
   await guard.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Edit menu' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 
   await page.getByRole('button', { name: /Demo Worker Two/ }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
@@ -229,7 +253,9 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
   const failedDraft = await menuLayoutDraftSnapshot(page);
   await installPreferenceSaveFailure(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Could not save menu layout' })).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Could not save menu layout' }),
+  ).toBeVisible();
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(failedDraft);
   await attachMenuLayoutScreenshot(page, testInfo, 'desktop-menu-save-error');
   await restorePreferenceSave(page);
@@ -240,7 +266,9 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
   await expect(savingButton).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
-  await expect(page.getByRole('group', { name: 'Category alignment' }).getByRole('button').first()).toBeDisabled();
+  await expect(
+    page.getByRole('group', { name: 'Category alignment' }).getByRole('button').first(),
+  ).toBeDisabled();
   await expect(menuCategoryTabs(page).first()).toBeDisabled();
   await page.getByRole('button', { name: 'Orders Board', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Discard menu changes?' })).toHaveCount(0);
