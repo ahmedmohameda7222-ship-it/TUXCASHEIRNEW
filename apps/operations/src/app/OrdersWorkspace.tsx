@@ -415,21 +415,9 @@ export function OrdersWorkspace({
   const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(
     (event, args) => {
       const nextCoordinates = sortableKeyboardCoordinates(event, args);
-      if (nextCoordinates === undefined) {
-        pendingKeyboardDragTargetRef.current = null;
-        return nextCoordinates;
-      }
-
       const active = args.context.active;
       const collisionRect = args.context.collisionRect;
       if (active === null || collisionRect === null) {
-        pendingKeyboardDragTargetRef.current = null;
-        return nextCoordinates;
-      }
-
-      const deltaX = nextCoordinates.x - args.currentCoordinates.x;
-      const deltaY = nextCoordinates.y - args.currentCoordinates.y;
-      if (deltaX === 0 && deltaY === 0) {
         pendingKeyboardDragTargetRef.current = null;
         return nextCoordinates;
       }
@@ -597,7 +585,6 @@ export function OrdersWorkspace({
       cancelled = true;
     };
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
-
   useEffect(() => {
     const shopId = session.shopId;
     const workerId = session.operator.id;
@@ -1397,7 +1384,7 @@ export function OrdersWorkspace({
   if (workspace === null || draft === null || configuration === null) {
     return (
       <main className="orders-unavailable">
-        <h1>Orders unavailable</h1>
+        <h1 id="orders-unavailable-title">Orders unavailable</h1>
         <p>{globalError ?? 'The local Orders workspace could not be loaded.'}</p>
       </main>
     );
