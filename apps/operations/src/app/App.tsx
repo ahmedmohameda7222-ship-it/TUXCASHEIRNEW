@@ -442,7 +442,7 @@ function ActiveShell({
           <button
             type="button"
             className={area === 'ORDERS' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => requestProtectedTransition(() => setArea('ORDERS'))}
+            onClick={() => setArea('ORDERS')}
           >
             Orders
           </button>
