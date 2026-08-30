@@ -30,10 +30,7 @@ import {
   deriveSystemAccentPalette,
   type EffectiveTheme,
 } from './systemAccentTheme';
-import {
-  decideProtectedTransition,
-  type MenuLayoutExitController,
-} from './unsavedChangesGuard';
+import { decideProtectedTransition, type MenuLayoutExitController } from './unsavedChangesGuard';
 import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
 type ScreenState =
