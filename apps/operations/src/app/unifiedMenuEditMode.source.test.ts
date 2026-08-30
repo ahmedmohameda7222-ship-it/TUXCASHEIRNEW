@@ -70,7 +70,7 @@ describe('unified menu edit entry point', () => {
       /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedCategoryId\s*!==\s*category\.id\s*\}/,
     );
     expect(ordersWorkspaceSource).toMatch(
-      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedProductId\s*!==\s*product\.id\s*\}/,
+      /draggable:\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedProductId\s*!==\s*product\.id/,
     );
     expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
     expect(
