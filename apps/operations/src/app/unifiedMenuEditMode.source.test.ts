@@ -147,7 +147,9 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowLeft')");
     expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowRight')");
     expect(ordersWorkspaceSource).toContain('const projectedCollisions = closestCorners({');
-    expect(ordersWorkspaceSource).toContain('if (deltaX === 0 && deltaY === 0)');
+    expect(ordersWorkspaceSource).not.toContain('if (nextCoordinates === undefined)');
+    expect(ordersWorkspaceSource).not.toContain('if (deltaX === 0 && deltaY === 0)');
+    expect(ordersWorkspaceSource).toContain('return nextCoordinates;');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
