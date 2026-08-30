@@ -1555,7 +1555,10 @@ export function OrdersWorkspace({
                 onDragCancel={handleMenuEditDragCancel}
                 onDragEnd={handleMenuEditDragEnd}
               >
-                <SortableContext items={productSortableIds} strategy={rectSortingStrategy}>
+                <SortableContext
+                  items={productSortableIds}
+                  strategy={rectSortingStrategy}
+                >
                   {menuEditProducts.map((product, index) => (
                     <MenuEditProductCard
                       key={product.id}
@@ -1569,9 +1572,14 @@ export function OrdersWorkspace({
                 </SortableContext>
                 <DragOverlay>
                   {activeDraggedProduct === null ? null : (
-                    <article className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay">
+                    <article
+                      className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay"
+                    >
                       <div className="product-main">
-                        <ProductCardPresentation product={activeDraggedProduct} showDescription />
+                        <ProductCardPresentation
+                          product={activeDraggedProduct}
+                          showDescription
+                        />
                       </div>
                     </article>
                   )}
