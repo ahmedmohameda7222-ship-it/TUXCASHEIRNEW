@@ -39,6 +39,7 @@ import {
   workerMenuPreferenceLoadReducer,
   type WorkerMenuPreferenceLoadState,
 } from './menuLayoutEditorSession';
+import { MenuEditProductCard } from './MenuEditProductCard';
 import { MenuProductCard } from './MenuProductCard';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
@@ -1350,9 +1351,12 @@ export function OrdersWorkspace({
                   <span>This category has no active products.</span>
                 </div>
               ) : (
-                menuEditProducts.map((product) => (
-                  <article
+                menuEditProducts.map((product, index) => (
+                  <MenuEditProductCard
                     key={product.id}
+                    product={product}
+                    position={index + 1}
+                    total={menuEditProducts.length}
                     className={[
                       'product-card',
                       'menu-edit-product-card',
@@ -1361,68 +1365,55 @@ export function OrdersWorkspace({
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}
-                    tabIndex={0}
-                    aria-label={`Reorder ${product.name}`}
-                    onDragStart={(event) => {
-                      if (menuEditSaving) return;
-                      setDraggedProductId(product.id);
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', product.id);
-                    }}
-                    onDragEnter={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId === null) return;
-                      event.preventDefault();
-                      moveDraggedProduct(product.id);
-                    }}
-                    onDragOver={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId !== null) event.preventDefault();
-                    }}
-                    onDragEnd={() => setDraggedProductId(null)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setDraggedProductId(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (menuEditSaving) return;
-                      if (event.key === 'Enter' || event.key === ' ') {
+                    articleProps={{
+                      draggable:
+                        menuEditActive && !menuEditSaving && draggedProductId !== product.id,
+                      tabIndex: 0,
+                      'aria-label': `Reorder ${product.name}`,
+                      onDragStart: (event) => {
+                        if (menuEditSaving) return;
+                        setDraggedProductId(product.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', product.id);
+                      },
+                      onDragEnter: (event) => {
+                        if (menuEditSaving) return;
+                        if (draggedProductId === null) return;
                         event.preventDefault();
-                        toggleProductPickup(product.id);
-                        return;
-                      }
-                      if (event.key === 'Escape' && grabbedProductId === product.id) {
+                        moveDraggedProduct(product.id);
+                      },
+                      onDragOver: (event) => {
+                        if (menuEditSaving) return;
+                        if (draggedProductId !== null) event.preventDefault();
+                      },
+                      onDragEnd: () => setDraggedProductId(null),
+                      onDrop: (event) => {
                         event.preventDefault();
-                        cancelProductPickup();
-                        return;
-                      }
-                      if (grabbedProductId !== product.id) return;
-                      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, -1);
-                      } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, 1);
-                      }
+                        setDraggedProductId(null);
+                      },
+                      onKeyDown: (event) => {
+                        if (menuEditSaving) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          toggleProductPickup(product.id);
+                          return;
+                        }
+                        if (event.key === 'Escape' && grabbedProductId === product.id) {
+                          event.preventDefault();
+                          cancelProductPickup();
+                          return;
+                        }
+                        if (grabbedProductId !== product.id) return;
+                        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          moveProductByOffset(product.id, -1);
+                        } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                          event.preventDefault();
+                          moveProductByOffset(product.id, 1);
+                        }
+                      },
                     }}
-                  >
-                    <div className="product-main">
-                      <div className="product-media">
-                        <ProductImage product={product} />
-                      </div>
-                      <div className="product-copy">
-                        <strong>{product.name}</strong>
-                        {product.description?.trim() ? <p>{product.description}</p> : null}
-                      </div>
-                      <strong className="product-price">
-                        {formatMoneyMinor(product.priceMinor)}
-                      </strong>
-                    </div>
-                    <div className="menu-edit-product-hint" aria-hidden="true">
-                      Drag to reorder
-                    </div>
-                  </article>
+                  />
                 ))
               )
             ) : products.length === 0 ? (

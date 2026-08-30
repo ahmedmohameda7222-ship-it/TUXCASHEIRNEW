@@ -21,7 +21,9 @@ export function MenuEditProductCard({
     <article
       {...articleProps}
       className={className ?? 'product-card menu-edit-product-card'}
-      aria-label={articleProps?.['aria-label'] ?? `${product.name}, position ${position} of ${total}`}
+      aria-label={
+        articleProps?.['aria-label'] ?? `${product.name}, position ${position} of ${total}`
+      }
     >
       <div className="product-main">
         <ProductCardPresentation product={product} showDescription />
