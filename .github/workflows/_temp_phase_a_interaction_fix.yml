@@ -34,9 +34,15 @@ jobs:
           from pathlib import Path
           import re
 
+          contract = Path('apps/operations/src/app/unifiedMenuEditMode.source.test.ts')
+          contract_text = contract.read_text()
+          contract_needle = 'strategy: MeasuringStrategy.Always'
+          if contract_needle not in contract_text:
+              raise SystemExit('measurement source contract insertion point missing')
+          contract.write_text(contract_text.replace(contract_needle, 'strategy: MeasuringStrategy.BeforeDragging', 1))
+
           workspace = Path('apps/operations/src/app/OrdersWorkspace.tsx')
           text = workspace.read_text()
-
           import_needle = "  KeyboardSensor,\n  PointerSensor,"
           import_replacement = "  KeyboardSensor,\n  MeasuringStrategy,\n  PointerSensor,"
           if import_needle not in text:
@@ -44,7 +50,7 @@ jobs:
           text = text.replace(import_needle, import_replacement, 1)
 
           constant_needle = "const CART_RESIZE_KEYBOARD_STEP = 24;\n"
-          constant_replacement = constant_needle + "const MENU_EDIT_MEASURING = {\n  droppable: { strategy: MeasuringStrategy.Always },\n};\n"
+          constant_replacement = constant_needle + "const MENU_EDIT_MEASURING = {\n  droppable: { strategy: MeasuringStrategy.BeforeDragging },\n};\n"
           if constant_needle not in text:
               raise SystemExit('menu edit measuring constant insertion point missing')
           text = text.replace(constant_needle, constant_replacement, 1)
@@ -61,8 +67,7 @@ jobs:
           idle_motion = '''\n@keyframes menu-edit-jiggle {\n  0%,\n  100% {\n    rotate: -0.2deg;\n    translate: 0 0;\n  }\n  50% {\n    rotate: 0.2deg;\n    translate: 0 -0.5px;\n  }\n}\n\n@media (prefers-reduced-motion: no-preference) {\n  .category-tab-reordering {\n    animation: menu-edit-jiggle 1.8s ease-in-out infinite;\n  }\n\n  .menu-edit-product-card {\n    animation: menu-edit-jiggle 1.95s ease-in-out infinite;\n  }\n\n  .category-tab-reordering:nth-child(2n),\n  .menu-edit-product-card:nth-child(2n) {\n    animation-delay: -0.45s;\n  }\n\n  .category-tab-reordering:nth-child(3n),\n  .menu-edit-product-card:nth-child(3n) {\n    animation-delay: -0.9s;\n  }\n}\n'''
           if idle_motion not in css:
               raise SystemExit('idle jiggle block missing')
-          css = css.replace(idle_motion, '\n', 1)
-          styles.write_text(css)
+          styles.write_text(css.replace(idle_motion, '\n', 1))
           PY
           npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/styles/final-pos-corrections.css apps/operations/src/app/unifiedMenuEditMode.source.test.ts
           git diff --check
