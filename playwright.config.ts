@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+const menuLayoutTouchSpec = /menu-layout-editor\.touch\.e2e\.ts/;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.e2e\.ts/,
@@ -23,15 +25,27 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-browser-fallback',
+      testIgnore: menuLayoutTouchSpec,
       use: { browserName: 'chromium', viewport: { width: 1440, height: 960 } },
     },
     {
       name: 'mobile-tablet-browser-fallback',
+      testIgnore: menuLayoutTouchSpec,
       use: { browserName: 'chromium', viewport: { width: 768, height: 1024 } },
     },
     {
       name: 'mobile-browser-fallback',
+      testIgnore: menuLayoutTouchSpec,
       use: { browserName: 'chromium', viewport: { width: 375, height: 812 } },
+    },
+    {
+      name: 'touch-mobile-browser-fallback',
+      testMatch: menuLayoutTouchSpec,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 375, height: 812 },
+        hasTouch: true,
+      },
     },
   ],
   webServer: {
