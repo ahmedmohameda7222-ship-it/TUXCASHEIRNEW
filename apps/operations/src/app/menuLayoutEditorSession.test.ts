@@ -254,6 +254,7 @@ describe('worker menu preference loading', () => {
     expect(ready.state).toEqual({ status: 'READY', preference: savedPreference });
   });
 
+  // Identity and generation jointly fence stale async completions from a previous worker.
   it('ignores Worker A load completion after Worker B becomes active', () => {
     const workerALoading = createWorkerMenuPreferenceLoadSession(shopId, workerA, 1);
     const workerBLoading = workerMenuPreferenceLoadReducer(workerALoading, {
