@@ -45,9 +45,7 @@ interface WorkerMenuPreferenceErrorEvent {
 }
 
 export type WorkerMenuPreferenceEvent =
-  | WorkerMenuPreferenceLoadEvent
-  | WorkerMenuPreferenceReadyEvent
-  | WorkerMenuPreferenceErrorEvent;
+  WorkerMenuPreferenceLoadEvent | WorkerMenuPreferenceReadyEvent | WorkerMenuPreferenceErrorEvent;
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
