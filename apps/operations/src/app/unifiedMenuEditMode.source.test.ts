@@ -55,7 +55,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates');
     expect(ordersWorkspaceSource).toContain('horizontalListSortingStrategy');
     expect(ordersWorkspaceSource).toContain('rectSortingStrategy');
-    expect(ordersWorkspaceSource).toContain('strategy: MeasuringStrategy.Always');
+    expect(ordersWorkspaceSource).toContain('strategy: MeasuringStrategy.BeforeDragging');
     expect(ordersWorkspaceSource.match(/measuring=\{MENU_EDIT_MEASURING\}/g)).toHaveLength(2);
   });
 
@@ -133,7 +133,11 @@ describe('unified menu edit entry point', () => {
 
   it('uses dnd-kit spatial keyboard sorting for categories and Product Cards', () => {
     expect(ordersWorkspaceSource).toContain('KeyboardSensor');
-    expect(ordersWorkspaceSource).toContain('coordinateGetter: sortableKeyboardCoordinates');
+    expect(ordersWorkspaceSource).toContain(
+      'coordinateGetter: menuEditKeyboardCoordinateGetter',
+    );
+    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
+    expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
