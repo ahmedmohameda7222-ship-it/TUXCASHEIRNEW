@@ -274,9 +274,8 @@ function ActiveShell({
   const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
-  const [menuLayoutExitController, setMenuLayoutExitController] = useState<MenuLayoutExitController>(
-    CLOSED_MENU_LAYOUT_EXIT_CONTROLLER,
-  );
+  const [menuLayoutExitController, setMenuLayoutExitController] =
+    useState<MenuLayoutExitController>(CLOSED_MENU_LAYOUT_EXIT_CONTROLLER);
   const [discardMenuChangesOpen, setDiscardMenuChangesOpen] = useState(false);
   const pendingProtectedActionRef = useRef<(() => void) | null>(null);
   const keepEditingRef = useRef<HTMLButtonElement>(null);
