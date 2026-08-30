@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decideProtectedTransition } from './unsavedChangesGuard';
+
+const appSource = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8');
 
 describe('decideProtectedTransition', () => {
   it('runs immediately when the menu editor is closed', () => {
@@ -18,5 +21,12 @@ describe('decideProtectedTransition', () => {
   it('blocks protected transitions while a menu layout save is in flight', () => {
     expect(decideProtectedTransition({ lifecycle: 'SAVING', dirty: true })).toBe('BLOCK');
     expect(decideProtectedTransition({ lifecycle: 'SAVING', dirty: false })).toBe('BLOCK');
+  });
+});
+
+describe('ActiveShell protected transition scope', () => {
+  it('does not guard the already-active Orders destination', () => {
+    expect(appSource).toContain("onClick={() => setArea('ORDERS')}");
+    expect(appSource).not.toContain("requestProtectedTransition(() => setArea('ORDERS'))");
   });
 });
