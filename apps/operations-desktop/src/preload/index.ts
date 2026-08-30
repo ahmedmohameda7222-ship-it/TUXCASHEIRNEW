@@ -27,8 +27,10 @@ const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
-const IPC_WORKER_UI_PREFERENCES_UPDATE = 'tux:worker-ui-preferences:update';
-const IPC_WORKER_UI_PREFERENCES_RESET = 'tux:worker-ui-preferences:reset';
+const IPC_WORKER_UI_PREFERENCES_CHANGED = 'tux:worker-ui-preferences:changed';
+const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT = 'tux:worker-ui-preferences:update-menu-layout';
+const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
+const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT = 'tux:worker-ui-preferences:reset-menu-layout';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
@@ -51,6 +53,11 @@ const IPC_END_DAY_BEGIN = 'tux:end-day:begin';
 const IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';
 const IPC_END_DAY_PREVIEW = 'tux:end-day:preview';
 const IPC_END_DAY_CLOSE = 'tux:end-day:close';
+
+type WorkerMenuLayoutInput = Parameters<
+  TuxDesktopApi['workerUiPreferences']['updateMenuLayout']
+>[0];
+type WorkerAccentInput = Parameters<TuxDesktopApi['workerUiPreferences']['updateAccentColor']>[0];
 
 const api: TuxDesktopApi = Object.freeze({
   app: Object.freeze({
@@ -86,12 +93,29 @@ const api: TuxDesktopApi = Object.freeze({
       const value: unknown = await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_LOAD);
       return value === null ? null : parseWorkerUiPreferences(value);
     },
-    update: async (input: Parameters<TuxDesktopApi['workerUiPreferences']['update']>[0]) =>
-      parseWorkerUiPreferences(
-        (await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_UPDATE, input)) as unknown,
-      ),
-    reset: async () => {
-      await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_RESET);
+    subscribe: (listener: Parameters<TuxDesktopApi['workerUiPreferences']['subscribe']>[0]) => {
+      const wrapper = (_event: IpcRendererEvent, value: unknown): void => {
+        listener(parseWorkerUiPreferences(value));
+      };
+      ipcRenderer.on(IPC_WORKER_UI_PREFERENCES_CHANGED, wrapper);
+      return () => ipcRenderer.removeListener(IPC_WORKER_UI_PREFERENCES_CHANGED, wrapper);
+    },
+    updateMenuLayout: async (input: WorkerMenuLayoutInput) => {
+      const value: unknown = await ipcRenderer.invoke(
+        IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT,
+        input,
+      );
+      return parseWorkerUiPreferences(value);
+    },
+    updateAccentColor: async (accentColor: WorkerAccentInput) => {
+      const value: unknown = await ipcRenderer.invoke(
+        IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT,
+        accentColor,
+      );
+      return parseWorkerUiPreferences(value);
+    },
+    resetMenuLayout: async () => {
+      await ipcRenderer.invoke(IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT);
     },
   }),
   orders: Object.freeze({

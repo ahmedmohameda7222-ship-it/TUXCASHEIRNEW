@@ -1,11 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import {
   createOpenBusinessDay,
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type BusinessDayId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
@@ -16,6 +18,8 @@ import {
   type WorkerId,
 } from '@tux/domain';
 import { SqliteOperationsDatabase } from './SqliteOperationsDatabase';
+import { createSqliteWorkerUiPreferencesRepository } from './SqliteWorkerUiPreferencesStore';
+import { SQLITE_MIGRATIONS } from './migrations';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -26,6 +30,7 @@ const productAId = parseEntityId<ProductId>('24222222-2222-4222-8222-22222222222
 const productBId = parseEntityId<ProductId>('24222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const outboxId = parseEntityId<OutboxEventId>('44444444-4444-4444-8444-444444444444');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 async function seedFoundation(database: SqliteOperationsDatabase): Promise<void> {
   await database.transaction(async (transaction) => {
@@ -72,6 +77,7 @@ function preference(worker: WorkerId, serverVersion = 0) {
     categoryOrder: [categoryBId, categoryAId],
     categoryAlignment: 'center' as const,
     productOrder: worker === secondWorkerId ? [productAId, productBId] : [productBId, productAId],
+    accentColor: null,
     updatedAt: instant('2026-08-25T02:00:00.000Z'),
     serverVersion,
     syncState: 'DIRTY' as const,
@@ -144,6 +150,49 @@ describe('SqliteOperationsDatabase', () => {
     rmSync(directory, { recursive: true, force: true });
   });
 
+  it('migrates version 7 worker preferences to nullable accent color at version 8', async () => {
+    const database = new DatabaseSync(':memory:');
+    try {
+      for (const migration of SQLITE_MIGRATIONS.filter(({ version }) => version <= 7)) {
+        database.exec(migration.sql);
+      }
+      database
+        .prepare(
+          `INSERT INTO worker_ui_preferences(
+             shop_id, worker_id, category_order_json, category_alignment, product_order_json,
+             updated_at, server_version, sync_state
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          shopId,
+          workerId,
+          JSON.stringify([categoryAId]),
+          'right',
+          JSON.stringify([productAId]),
+          instant('2026-08-25T02:00:00.000Z'),
+          3,
+          'CLEAN',
+        );
+
+      const migration = SQLITE_MIGRATIONS.find(({ version }) => version === 8);
+      expect(migration?.name).toBe('worker_ui_accent_color');
+      database.exec(migration?.sql ?? '');
+
+      const columns = database
+        .prepare('PRAGMA table_info(worker_ui_preferences)')
+        .all()
+        .map((row) => String(row['name']));
+      expect(columns).toContain('accent_color');
+      await expect(
+        createSqliteWorkerUiPreferencesRepository(database).get(shopId, workerId),
+      ).resolves.toMatchObject({
+        accentColor: null,
+      });
+    } finally {
+      database.close();
+    }
+  });
+
   it('round-trips, upserts, isolates, and deletes worker UI preferences', async () => {
     const database = new SqliteOperationsDatabase(':memory:');
     await database.initialize();
@@ -164,6 +213,7 @@ describe('SqliteOperationsDatabase', () => {
       categoryOrder: [categoryAId],
       categoryAlignment: 'right' as const,
       productOrder: [productAId, productBId],
+      accentColor: customAccent,
       syncState: 'CLEAN' as const,
     };
     await database.transaction(async (transaction) => {

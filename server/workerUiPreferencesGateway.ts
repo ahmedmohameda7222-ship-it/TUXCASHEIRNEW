@@ -9,6 +9,7 @@ import {
 } from './supabaseGateway';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ACCENT_PATTERN = /^#[0-9A-F]{6}$/;
 const ALIGNMENTS = new Set(['left', 'center', 'right']);
 
 interface WorkerUiPreferenceInput {
@@ -17,6 +18,7 @@ interface WorkerUiPreferenceInput {
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: 'left' | 'center' | 'right';
   readonly productOrder: readonly string[];
+  readonly accentColor: string | null;
 }
 
 interface RemoteWorkerUiPreference {
@@ -25,6 +27,7 @@ interface RemoteWorkerUiPreference {
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: 'left' | 'center' | 'right';
   readonly productOrder: readonly string[];
+  readonly accentColor: string | null;
   readonly serverVersion: number;
   readonly updatedAt: string;
 }
@@ -44,17 +47,24 @@ function parseIdOrder(value: unknown): readonly string[] | null {
   return parsed;
 }
 
+function parseAccentColor(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === 'string' && ACCENT_PATTERN.test(value) ? value : undefined;
+}
+
 function parseInput(value: Readonly<Record<string, unknown>>): WorkerUiPreferenceInput | null {
   const shopId = requiredUuid(value['shopId']);
   const workerId = requiredUuid(value['workerId']);
   const categoryOrder = parseIdOrder(value['categoryOrder']);
   const categoryAlignment = value['categoryAlignment'];
   const productOrder = parseIdOrder(value['productOrder']);
+  const accentColor = parseAccentColor(value['accentColor']);
   if (
     shopId === null ||
     workerId === null ||
     categoryOrder === null ||
     productOrder === null ||
+    accentColor === undefined ||
     typeof categoryAlignment !== 'string' ||
     !ALIGNMENTS.has(categoryAlignment)
   ) {
@@ -66,6 +76,7 @@ function parseInput(value: Readonly<Record<string, unknown>>): WorkerUiPreferenc
     categoryOrder,
     categoryAlignment: categoryAlignment as WorkerUiPreferenceInput['categoryAlignment'],
     productOrder,
+    accentColor,
   };
 }
 
@@ -77,6 +88,7 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
   const categoryOrder = parseIdOrder(row['category_order']);
   const categoryAlignment = row['category_alignment'];
   const productOrder = parseIdOrder(row['product_order']);
+  const accentColor = parseAccentColor(row['accent_color']);
   const serverVersion = row['server_version'];
   const updatedAt = row['updated_at'];
   if (
@@ -84,6 +96,7 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
     workerId === null ||
     categoryOrder === null ||
     productOrder === null ||
+    accentColor === undefined ||
     typeof categoryAlignment !== 'string' ||
     !ALIGNMENTS.has(categoryAlignment) ||
     typeof serverVersion !== 'number' ||
@@ -100,6 +113,7 @@ function parseRemoteRow(value: unknown): RemoteWorkerUiPreference | null {
     categoryOrder,
     categoryAlignment: categoryAlignment as RemoteWorkerUiPreference['categoryAlignment'],
     productOrder,
+    accentColor,
     serverVersion,
     updatedAt,
   };
@@ -159,6 +173,7 @@ export async function handleWorkerUiPreferences(
         categoryOrder: [],
         categoryAlignment: 'center',
         productOrder: [],
+        accentColor: null,
       };
     }
   } else {
@@ -186,7 +201,7 @@ export async function handleWorkerUiPreferences(
       target.searchParams.set('worker_id', `eq.${input.workerId}`);
       target.searchParams.set(
         'select',
-        'shop_id,worker_id,category_order,category_alignment,product_order,server_version,updated_at',
+        'shop_id,worker_id,category_order,category_alignment,product_order,accent_color,server_version,updated_at',
       );
       target.searchParams.set('limit', '1');
       upstream = await fetch(target, {
@@ -213,6 +228,7 @@ export async function handleWorkerUiPreferences(
           p_category_order: input.categoryOrder,
           p_category_alignment: input.categoryAlignment,
           p_product_order: input.productOrder,
+          p_accent_color: input.accentColor,
         }),
         signal: AbortSignal.timeout(10_000),
       });
@@ -253,6 +269,7 @@ export async function handleWorkerUiPreferences(
     categoryOrder: preference.categoryOrder,
     categoryAlignment: preference.categoryAlignment,
     productOrder: preference.productOrder,
+    accentColor: preference.accentColor,
     serverVersion: preference.serverVersion,
     updatedAt: preference.updatedAt,
   });

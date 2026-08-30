@@ -8,6 +8,7 @@ import {
 import { instant, type Instant } from './time';
 
 export type CategoryAlignment = 'left' | 'center' | 'right';
+export type SystemAccentColor = `#${string}`;
 export type WorkerUiPreferencesSyncState = 'CLEAN' | 'DIRTY';
 
 export interface WorkerUiPreferences {
@@ -16,9 +17,19 @@ export interface WorkerUiPreferences {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
+  readonly accentColor: SystemAccentColor | null;
   readonly updatedAt: Instant;
   readonly serverVersion: number;
   readonly syncState: WorkerUiPreferencesSyncState;
+}
+
+const SYSTEM_ACCENT_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+export function parseSystemAccentColor(value: unknown): SystemAccentColor {
+  if (typeof value !== 'string' || !SYSTEM_ACCENT_COLOR_PATTERN.test(value)) {
+    throw new TypeError('WorkerUiPreferences.accentColor must be a six-digit HEX color.');
+  }
+  return value.toUpperCase() as SystemAccentColor;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -40,6 +51,10 @@ function categoryAlignment(value: unknown): CategoryAlignment {
     throw new TypeError('WorkerUiPreferences.categoryAlignment is invalid.');
   }
   return value;
+}
+
+function accentColor(value: unknown): SystemAccentColor | null {
+  return value === undefined || value === null ? null : parseSystemAccentColor(value);
 }
 
 function syncState(value: unknown): WorkerUiPreferencesSyncState {
@@ -104,6 +119,7 @@ export function parseWorkerUiPreferences(value: unknown): WorkerUiPreferences {
       categoryOrder: categoryOrder(preferences['categoryOrder']),
       categoryAlignment: categoryAlignment(preferences['categoryAlignment']),
       productOrder: productOrder(preferences['productOrder']),
+      accentColor: accentColor(preferences['accentColor']),
       updatedAt: instant(text(preferences['updatedAt'], 'updatedAt')),
       serverVersion,
       syncState: syncState(preferences['syncState']),

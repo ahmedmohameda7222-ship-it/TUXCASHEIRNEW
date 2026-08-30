@@ -212,6 +212,133 @@ function assertProductDescriptionMigration() {
   );
 }
 
+function assertWorkerPreferenceRpcCompatibility() {
+  psql(
+    [
+      '-c',
+      `insert into auth.users(id) values
+         ('91000000-0000-4000-8000-000000000001'),
+         ('91000000-0000-4000-8000-000000000002');
+
+       insert into public.shops(id, name, active)
+       values ('12000000-0000-4000-8000-000000000001', 'Preference RPC Shop', true);
+
+       insert into public.workers(id, shop_id, display_name, pin_hash, active)
+       values (
+         '22000000-0000-4000-8000-000000000001',
+         '12000000-0000-4000-8000-000000000001',
+         'Preference Worker',
+         'migration-smoke-pin-hash',
+         true
+       );
+
+       insert into public.shop_memberships(id, shop_id, auth_user_id, role, active)
+       values (
+         '92000000-0000-4000-8000-000000000001',
+         '12000000-0000-4000-8000-000000000001',
+         '91000000-0000-4000-8000-000000000001',
+         'OPERATIONS_DEVICE',
+         true
+       );
+
+       insert into public.devices(id, shop_id, label, active, auth_user_id)
+       values (
+         '93000000-0000-4000-8000-000000000001',
+         '12000000-0000-4000-8000-000000000001',
+         'Preference RPC Device',
+         true,
+         '91000000-0000-4000-8000-000000000001'
+       );
+
+       set request.jwt.claim.sub = '91000000-0000-4000-8000-000000000001';
+       set role authenticated;
+
+       do $$
+       declare
+         v_result record;
+       begin
+         select * into v_result
+         from public.put_worker_ui_preferences(
+           '12000000-0000-4000-8000-000000000001',
+           '22000000-0000-4000-8000-000000000001',
+           '["30000000-0000-4000-8000-000000000001"]'::jsonb,
+           'left',
+           '["40000000-0000-4000-8000-000000000001"]'::jsonb,
+           '#1E3A8A'
+         );
+         if v_result.server_version <> 1 then
+           raise exception 'six-argument RPC did not initialize server_version to 1';
+         end if;
+         if v_result.accent_color is distinct from '#1E3A8A' then
+           raise exception 'six-argument RPC did not return the saved accent';
+         end if;
+
+         select * into v_result
+         from public.put_worker_ui_preferences(
+           '12000000-0000-4000-8000-000000000001',
+           '22000000-0000-4000-8000-000000000001',
+           '["30000000-0000-4000-8000-000000000002"]'::jsonb,
+           'right',
+           '["40000000-0000-4000-8000-000000000002"]'::jsonb
+         );
+         if v_result.server_version <> 2 then
+           raise exception 'five-argument RPC did not increment server_version exactly once';
+         end if;
+       end $$;
+
+       reset role;
+
+       do $$
+       declare
+         v_accent text;
+         v_version bigint;
+       begin
+         select accent_color, server_version
+           into v_accent, v_version
+         from public.worker_ui_preferences
+         where shop_id = '12000000-0000-4000-8000-000000000001'
+           and worker_id = '22000000-0000-4000-8000-000000000001';
+         if v_accent is distinct from '#1E3A8A' then
+           raise exception 'legacy layout update erased the saved accent';
+         end if;
+         if v_version <> 2 then
+           raise exception 'legacy layout update changed server_version more than once';
+         end if;
+       end $$;
+
+       set request.jwt.claim.sub = '91000000-0000-4000-8000-000000000002';
+       set role authenticated;
+
+       do $$
+       begin
+         begin
+           perform *
+           from public.put_worker_ui_preferences(
+             '12000000-0000-4000-8000-000000000001',
+             '22000000-0000-4000-8000-000000000001',
+             '[]'::jsonb,
+             'left',
+             '[]'::jsonb
+           );
+           raise exception 'unauthorized five-argument RPC unexpectedly succeeded';
+         exception
+           when others then
+             if sqlerrm = 'unauthorized five-argument RPC unexpectedly succeeded' then
+               raise;
+             end if;
+             if position('TUX_WORKER_UI_PREFERENCES_UNAUTHORIZED' in sqlerrm) = 0 then
+               raise exception 'unexpected unauthorized RPC error: %', sqlerrm;
+             end if;
+         end;
+       end $$;
+
+       reset role;
+       reset request.jwt.claim.sub;`,
+    ],
+    'Worker UI preference RPC rollout compatibility assertions',
+  );
+}
+
 psql(
   [
     '-c',
@@ -225,8 +352,11 @@ psql(
        if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated noinherit; end if;
        if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role noinherit; end if;
      end $$;
+     grant usage on schema public to anon, authenticated, service_role;
      create table auth.users(id uuid primary key);
-     create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;`,
+     create function auth.uid() returns uuid language sql stable as $$
+       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+     $$;`,
   ],
   'Fresh database reset and Supabase auth compatibility stub',
 );
@@ -243,6 +373,7 @@ psql(
   `${productDescriptionMigration} idempotency replay`,
 );
 assertProductDescriptionMigration();
+assertWorkerPreferenceRpcCompatibility();
 
 psql(
   [
@@ -288,6 +419,12 @@ psql(
        end if;
        if to_regprocedure('public.publish_tux_operations_configuration(uuid,integer,jsonb,uuid)') is null then
          raise exception 'configuration publish RPC missing';
+       end if;
+       if to_regprocedure('public.put_worker_ui_preferences(uuid,uuid,jsonb,text,jsonb)') is null then
+         raise exception 'legacy worker UI preference RPC missing';
+       end if;
+       if to_regprocedure('public.put_worker_ui_preferences(uuid,uuid,jsonb,text,jsonb,text)') is null then
+         raise exception 'accent worker UI preference RPC missing';
        end if;
        if not exists (
          select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace

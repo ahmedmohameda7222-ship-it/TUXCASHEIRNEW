@@ -1,5 +1,11 @@
 import type { OperationsSessionResult, WorkerUiPreferencesService } from '@tux/application';
-import { parseEntityId, type MenuCategoryId, type ProductId } from '@tux/domain';
+import {
+  parseEntityId,
+  parseSystemAccentColor,
+  type MenuCategoryId,
+  type ProductId,
+  type SystemAccentColor,
+} from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import type { TuxWorkerUiPreferencesApi } from '@tux/platform-contracts';
 import type { BrowserWindow } from 'electron';
@@ -7,8 +13,12 @@ import { ipcMain } from 'electron';
 import { assertTrustedIpcSender } from './security';
 
 export const IPC_WORKER_UI_PREFERENCES_LOAD = 'tux:worker-ui-preferences:load';
-export const IPC_WORKER_UI_PREFERENCES_UPDATE = 'tux:worker-ui-preferences:update';
-export const IPC_WORKER_UI_PREFERENCES_RESET = 'tux:worker-ui-preferences:reset';
+export const IPC_WORKER_UI_PREFERENCES_CHANGED = 'tux:worker-ui-preferences:changed';
+export const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT =
+  'tux:worker-ui-preferences:update-menu-layout';
+export const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
+export const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT =
+  'tux:worker-ui-preferences:reset-menu-layout';
 
 interface WorkerUiPreferencesIpcRuntimeInput {
   readonly getSessionState: () => Promise<OperationsSessionResult>;
@@ -23,7 +33,9 @@ function assertObjectPayload(value: unknown): asserts value is Record<string, un
   }
 }
 
-function parseUpdateInput(value: unknown): Parameters<TuxWorkerUiPreferencesApi['update']>[0] {
+function parseMenuLayoutInput(
+  value: unknown,
+): Parameters<TuxWorkerUiPreferencesApi['updateMenuLayout']>[0] {
   assertObjectPayload(value);
   const categoryOrder = value['categoryOrder'];
   const categoryAlignment = value['categoryAlignment'];
@@ -54,11 +66,21 @@ function parseUpdateInput(value: unknown): Parameters<TuxWorkerUiPreferencesApi[
   };
 }
 
+function parseAccentInput(value: unknown): SystemAccentColor | null {
+  if (value === null) return null;
+  const parsed = parseSystemAccentColor(value);
+  if (parsed !== value) {
+    throw new TypeError('Worker UI preference accent must use canonical uppercase HEX.');
+  }
+  return parsed;
+}
+
 export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi {
   readonly #getSessionState: () => Promise<OperationsSessionResult>;
   readonly #repository: WorkerUiPreferencesRepository;
   readonly #service: WorkerUiPreferencesService;
   readonly #onChanged: (() => void) | undefined;
+  #unsubscribe: (() => void) | null = null;
 
   constructor(input: WorkerUiPreferencesIpcRuntimeInput) {
     this.#getSessionState = input.getSessionState;
@@ -83,45 +105,81 @@ export class WorkerUiPreferencesIpcRuntime implements TuxWorkerUiPreferencesApi 
     return this.#repository.get(identity.shopId, identity.workerId);
   }
 
-  async update(input: Parameters<TuxWorkerUiPreferencesApi['update']>[0]) {
+  subscribe(listener: Parameters<TuxWorkerUiPreferencesApi['subscribe']>[0]): () => void {
+    return this.#service.subscribe(listener);
+  }
+
+  async updateMenuLayout(input: Parameters<TuxWorkerUiPreferencesApi['updateMenuLayout']>[0]) {
     const identity = await this.#activeIdentity();
-    const updated = await this.#service.update(identity.shopId, identity.workerId, input);
+    const updated = await this.#service.updateMenuLayout(identity.shopId, identity.workerId, input);
     this.#onChanged?.();
     return updated;
   }
 
-  async reset(): Promise<void> {
-    await this.update({ categoryOrder: [], categoryAlignment: 'left', productOrder: [] });
+  async updateAccentColor(accentColor: unknown) {
+    const parsedAccent = parseAccentInput(accentColor);
+    const identity = await this.#activeIdentity();
+    const updated = await this.#service.updateAccentColor(
+      identity.shopId,
+      identity.workerId,
+      parsedAccent,
+    );
+    this.#onChanged?.();
+    return updated;
+  }
+
+  async resetMenuLayout(): Promise<void> {
+    const identity = await this.#activeIdentity();
+    await this.#service.updateMenuLayout(identity.shopId, identity.workerId, {
+      categoryOrder: [],
+      categoryAlignment: 'left',
+      productOrder: [],
+    });
+    this.#onChanged?.();
   }
 
   register(window: BrowserWindow): void {
     for (const channel of [
       IPC_WORKER_UI_PREFERENCES_LOAD,
-      IPC_WORKER_UI_PREFERENCES_UPDATE,
-      IPC_WORKER_UI_PREFERENCES_RESET,
+      IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT,
+      IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT,
+      IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT,
     ]) {
       ipcMain.removeHandler(channel);
     }
+    this.#unsubscribe?.();
+    this.#unsubscribe = this.#service.subscribe((preferences) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send(IPC_WORKER_UI_PREFERENCES_CHANGED, preferences);
+      }
+    });
 
     ipcMain.handle(IPC_WORKER_UI_PREFERENCES_LOAD, async (event) => {
       assertTrustedIpcSender(event, window.webContents.id);
       return this.load();
     });
-    ipcMain.handle(IPC_WORKER_UI_PREFERENCES_UPDATE, async (event, input: unknown) => {
+    ipcMain.handle(IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT, async (event, input: unknown) => {
       assertTrustedIpcSender(event, window.webContents.id);
-      return this.update(parseUpdateInput(input));
+      return this.updateMenuLayout(parseMenuLayoutInput(input));
     });
-    ipcMain.handle(IPC_WORKER_UI_PREFERENCES_RESET, async (event) => {
+    ipcMain.handle(IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT, async (event, accentColor: unknown) => {
       assertTrustedIpcSender(event, window.webContents.id);
-      await this.reset();
+      return this.updateAccentColor(accentColor);
+    });
+    ipcMain.handle(IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT, async (event) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      await this.resetMenuLayout();
     });
   }
 
   close(): void {
+    this.#unsubscribe?.();
+    this.#unsubscribe = null;
     for (const channel of [
       IPC_WORKER_UI_PREFERENCES_LOAD,
-      IPC_WORKER_UI_PREFERENCES_UPDATE,
-      IPC_WORKER_UI_PREFERENCES_RESET,
+      IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT,
+      IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT,
+      IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT,
     ]) {
       ipcMain.removeHandler(channel);
     }

@@ -8,10 +8,12 @@ import {
 import {
   instant,
   parseEntityId,
+  parseSystemAccentColor,
   type BusinessDayId,
   type CategoryAlignment,
   type MenuCategoryId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
   type WorkerUiPreferences,
 } from '@tux/domain';
@@ -25,6 +27,7 @@ const workerB = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const categoryA = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333331');
 const categoryB = parseEntityId<MenuCategoryId>('33333333-3333-4333-8333-333333333332');
 const businessDayId = parseEntityId<BusinessDayId>('44444444-4444-4444-8444-444444444444');
+const customAccent = parseSystemAccentColor('#1E3A8A');
 
 function active(workerId: WorkerId, displayName: string): OperationsSessionResult {
   return ok({
@@ -40,6 +43,7 @@ function preference(
   workerId: WorkerId,
   categoryOrder: readonly MenuCategoryId[],
   categoryAlignment: CategoryAlignment,
+  accentColor: SystemAccentColor | null = null,
 ): WorkerUiPreferences {
   return {
     shopId,
@@ -47,6 +51,7 @@ function preference(
     categoryOrder,
     categoryAlignment,
     productOrder: [],
+    accentColor,
     updatedAt: instant('2026-08-25T03:00:00.000Z'),
     serverVersion: 2,
     syncState: 'CLEAN',
@@ -80,10 +85,10 @@ class NoopGateway implements WorkerUiPreferencesRemoteGateway {
 }
 
 describe('WorkerUiPreferencesIpcRuntime', () => {
-  it('loads and updates only the currently active worker preference', async () => {
+  it('updates menu layout for only the active worker and preserves its accent', async () => {
     const repository = new MemoryRepository();
     await repository.put(preference(workerA, [categoryA], 'left'));
-    await repository.put(preference(workerB, [categoryB], 'right'));
+    await repository.put(preference(workerB, [categoryB], 'right', customAccent));
     const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
       instant('2026-08-25T03:15:00.000Z'),
     );
@@ -99,41 +104,105 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
     await expect(runtime.load()).resolves.toMatchObject({
       workerId: workerA,
       categoryOrder: [categoryA],
-      categoryAlignment: 'left',
+      accentColor: null,
     });
 
     session = active(workerB, 'Worker B');
-    await expect(runtime.load()).resolves.toMatchObject({
-      workerId: workerB,
-      categoryOrder: [categoryB],
-      categoryAlignment: 'right',
-    });
-
-    const updated = await runtime.update({
+    const updated = await runtime.updateMenuLayout({
       categoryOrder: [categoryA, categoryB],
       categoryAlignment: 'center',
       productOrder: [],
     });
-    expect(updated.workerId).toBe(workerB);
-    expect(updated.syncState).toBe('DIRTY');
-    expect(changed).toHaveBeenCalledTimes(1);
 
-    expect(await repository.get(shopId, workerA)).toEqual(preference(workerA, [categoryA], 'left'));
-    expect(await repository.get(shopId, workerB)).toMatchObject({
+    expect(updated).toMatchObject({
       workerId: workerB,
       categoryOrder: [categoryA, categoryB],
       categoryAlignment: 'center',
-      productOrder: [],
+      accentColor: customAccent,
       syncState: 'DIRTY',
     });
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(await repository.get(shopId, workerA)).toEqual(preference(workerA, [categoryA], 'left'));
   });
 
-  it('resets only the active worker to config-order/default-alignment semantics', async () => {
+  it('updates accent for only the active worker and preserves its menu layout', async () => {
     const repository = new MemoryRepository();
     await repository.put(preference(workerA, [categoryB, categoryA], 'right'));
     await repository.put(preference(workerB, [categoryB], 'left'));
     const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
       instant('2026-08-25T03:16:00.000Z'),
+    );
+    const changed = vi.fn();
+    const runtime = new WorkerUiPreferencesIpcRuntime({
+      getSessionState: async () => active(workerA, 'Worker A'),
+      repository,
+      service,
+      onChanged: changed,
+    });
+
+    const updated = await runtime.updateAccentColor(customAccent);
+    expect(updated).toMatchObject({
+      workerId: workerA,
+      categoryOrder: [categoryB, categoryA],
+      categoryAlignment: 'right',
+      productOrder: [],
+      accentColor: customAccent,
+      syncState: 'DIRTY',
+    });
+    expect(await repository.get(shopId, workerB)).toEqual(preference(workerB, [categoryB], 'left'));
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes live preference subscription and stops after unsubscribe', async () => {
+    const repository = new MemoryRepository();
+    await repository.put(preference(workerA, [categoryA], 'left'));
+    const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
+      instant('2026-08-25T03:16:30.000Z'),
+    );
+    const runtime = new WorkerUiPreferencesIpcRuntime({
+      getSessionState: async () => active(workerA, 'Worker A'),
+      repository,
+      service,
+    });
+    const listener = vi.fn();
+
+    const unsubscribe = runtime.subscribe(listener);
+    await runtime.updateAccentColor(customAccent);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        workerId: workerA,
+        accentColor: customAccent,
+        syncState: 'DIRTY',
+      }),
+    );
+
+    unsubscribe();
+    await runtime.updateAccentColor(null);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed or non-canonical accent input', async () => {
+    const repository = new MemoryRepository();
+    const service = new WorkerUiPreferencesService(repository, new NoopGateway());
+    const runtime = new WorkerUiPreferencesIpcRuntime({
+      getSessionState: async () => active(workerA, 'Worker A'),
+      repository,
+      service,
+    });
+
+    await expect(runtime.updateAccentColor('#12345')).rejects.toThrow(TypeError);
+    await expect(runtime.updateAccentColor('#1e3a8a')).rejects.toThrow(TypeError);
+    expect(repository.values.size).toBe(0);
+  });
+
+  it('resets only the active worker menu layout and preserves accent', async () => {
+    const repository = new MemoryRepository();
+    await repository.put(preference(workerA, [categoryB, categoryA], 'right', customAccent));
+    await repository.put(preference(workerB, [categoryB], 'left'));
+    const service = new WorkerUiPreferencesService(repository, new NoopGateway(), () =>
+      instant('2026-08-25T03:17:00.000Z'),
     );
     const runtime = new WorkerUiPreferencesIpcRuntime({
       getSessionState: async () => active(workerA, 'Worker A'),
@@ -141,17 +210,18 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
       service,
     });
 
-    await expect(runtime.reset()).resolves.toBeUndefined();
+    await expect(runtime.resetMenuLayout()).resolves.toBeUndefined();
     expect(await repository.get(shopId, workerA)).toMatchObject({
       categoryOrder: [],
       categoryAlignment: 'left',
       productOrder: [],
+      accentColor: customAccent,
       syncState: 'DIRTY',
     });
     expect(await repository.get(shopId, workerB)).toEqual(preference(workerB, [categoryB], 'left'));
   });
 
-  it('rejects access when there is no active worker session', async () => {
+  it('rejects every preference action when there is no active worker session', async () => {
     const repository = new MemoryRepository();
     const service = new WorkerUiPreferencesService(repository, new NoopGateway());
     const signedOut: OperationsSessionResult = ok({
@@ -166,13 +236,16 @@ describe('WorkerUiPreferencesIpcRuntime', () => {
 
     await expect(runtime.load()).rejects.toThrow('Active worker session required.');
     await expect(
-      runtime.update({
+      runtime.updateMenuLayout({
         categoryOrder: [categoryA],
         categoryAlignment: 'left',
         productOrder: [],
       }),
     ).rejects.toThrow('Active worker session required.');
-    await expect(runtime.reset()).rejects.toThrow('Active worker session required.');
+    await expect(runtime.updateAccentColor(customAccent)).rejects.toThrow(
+      'Active worker session required.',
+    );
+    await expect(runtime.resetMenuLayout()).rejects.toThrow('Active worker session required.');
     expect(repository.values.size).toBe(0);
   });
 });

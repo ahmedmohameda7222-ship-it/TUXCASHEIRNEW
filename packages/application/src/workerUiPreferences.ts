@@ -6,6 +6,7 @@ import {
   type MenuCategoryId,
   type ProductId,
   type ShopId,
+  type SystemAccentColor,
   type WorkerId,
   type WorkerUiPreferences,
 } from '@tux/domain';
@@ -17,6 +18,7 @@ export interface RemoteWorkerUiPreferences {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
+  readonly accentColor: SystemAccentColor | null;
   readonly serverVersion: number;
   readonly updatedAt: Instant;
 }
@@ -32,10 +34,11 @@ export interface WorkerUiPreferencesRemoteGateway {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
+    readonly accentColor: SystemAccentColor | null;
   }): Promise<RemoteWorkerUiPreferences>;
 }
 
-export interface WorkerUiPreferencesUpdate {
+export interface WorkerUiMenuLayoutUpdate {
   readonly categoryOrder: readonly MenuCategoryId[];
   readonly categoryAlignment: CategoryAlignment;
   readonly productOrder: readonly ProductId[];
@@ -54,7 +57,38 @@ export interface WorkerUiPreferencesRetryOptions {
   readonly intervalMs?: number;
 }
 
+export type WorkerUiPreferencesListener = (preferences: WorkerUiPreferences) => void;
+
 const DEFAULT_WORKER_UI_PREFERENCES_RETRY_MS = 60_000;
+
+function sameIds<T>(left: readonly T[], right: readonly T[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameSyncIdentity(
+  left: WorkerUiPreferencesSyncIdentity,
+  right: WorkerUiPreferencesSyncIdentity,
+): boolean {
+  return left.shopId === right.shopId && left.workerId === right.workerId;
+}
+
+function samePreferenceSnapshot(
+  left: WorkerUiPreferences | null,
+  right: WorkerUiPreferences | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return (
+    left.shopId === right.shopId &&
+    left.workerId === right.workerId &&
+    sameIds(left.categoryOrder, right.categoryOrder) &&
+    left.categoryAlignment === right.categoryAlignment &&
+    sameIds(left.productOrder, right.productOrder) &&
+    left.accentColor === right.accentColor &&
+    left.updatedAt === right.updatedAt &&
+    left.serverVersion === right.serverVersion &&
+    left.syncState === right.syncState
+  );
+}
 
 export class WorkerUiPreferencesRetryController {
   readonly #target: WorkerUiPreferencesSyncTarget;
@@ -93,12 +127,24 @@ export class WorkerUiPreferencesRetryController {
     const identity = this.#identity();
     if (identity === null) return;
 
-    const sync = this.#target
-      .syncOnce(identity.shopId, identity.workerId)
-      .catch(() => undefined)
-      .finally(() => {
-        if (this.#syncInFlight === sync) this.#syncInFlight = null;
-      });
+    const run = async (): Promise<void> => {
+      let nextIdentity: WorkerUiPreferencesSyncIdentity | null = identity;
+      while (nextIdentity !== null) {
+        const currentIdentity: WorkerUiPreferencesSyncIdentity = nextIdentity;
+        await this.#target
+          .syncOnce(currentIdentity.shopId, currentIdentity.workerId)
+          .catch(() => undefined);
+        const activeIdentity = this.#identity();
+        nextIdentity =
+          activeIdentity !== null && !sameSyncIdentity(activeIdentity, currentIdentity)
+            ? activeIdentity
+            : null;
+      }
+    };
+
+    const sync = run().finally(() => {
+      if (this.#syncInFlight === sync) this.#syncInFlight = null;
+    });
     this.#syncInFlight = sync;
     return sync;
   }
@@ -108,6 +154,8 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
   readonly #repository: WorkerUiPreferencesRepository;
   readonly #gateway: WorkerUiPreferencesRemoteGateway;
   readonly #now: () => Instant;
+  readonly #mutationTails = new Map<string, Promise<void>>();
+  readonly #listeners = new Set<WorkerUiPreferencesListener>();
 
   constructor(
     repository: WorkerUiPreferencesRepository,
@@ -119,24 +167,93 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
     this.#now = now;
   }
 
-  async update(
+  subscribe(listener: WorkerUiPreferencesListener): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  #publish(preferences: WorkerUiPreferences): void {
+    for (const listener of this.#listeners) listener(preferences);
+  }
+
+  async #serializeLocalMutation<T>(
     shopId: ShopId,
     workerId: WorkerId,
-    input: WorkerUiPreferencesUpdate,
-  ): Promise<WorkerUiPreferences> {
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const key = `${shopId}:${workerId}`;
+    const previous = this.#mutationTails.get(key) ?? Promise.resolve();
+    const ready = previous.catch(() => undefined);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = ready.then(() => gate);
+    this.#mutationTails.set(key, tail);
+
+    await ready;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.#mutationTails.get(key) === tail) this.#mutationTails.delete(key);
+    }
+  }
+
+  async #currentOrDefault(shopId: ShopId, workerId: WorkerId): Promise<WorkerUiPreferences> {
     const current = await this.#repository.get(shopId, workerId);
-    const next = parseWorkerUiPreferences({
+    if (current !== null) return current;
+    return parseWorkerUiPreferences({
       shopId,
       workerId,
-      categoryOrder: input.categoryOrder,
-      categoryAlignment: input.categoryAlignment,
-      productOrder: input.productOrder,
+      categoryOrder: [],
+      categoryAlignment: 'left',
+      productOrder: [],
+      accentColor: null,
       updatedAt: this.#now(),
-      serverVersion: current?.serverVersion ?? 0,
-      syncState: 'DIRTY',
+      serverVersion: 0,
+      syncState: 'CLEAN',
     });
-    await this.#repository.put(next);
-    return next;
+  }
+
+  async updateMenuLayout(
+    shopId: ShopId,
+    workerId: WorkerId,
+    input: WorkerUiMenuLayoutUpdate,
+  ): Promise<WorkerUiPreferences> {
+    return this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#currentOrDefault(shopId, workerId);
+      const next = parseWorkerUiPreferences({
+        ...current,
+        categoryOrder: input.categoryOrder,
+        categoryAlignment: input.categoryAlignment,
+        productOrder: input.productOrder,
+        updatedAt: this.#now(),
+        syncState: 'DIRTY',
+      });
+      await this.#repository.put(next);
+      this.#publish(next);
+      return next;
+    });
+  }
+
+  async updateAccentColor(
+    shopId: ShopId,
+    workerId: WorkerId,
+    accentColor: SystemAccentColor | null,
+  ): Promise<WorkerUiPreferences> {
+    return this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#currentOrDefault(shopId, workerId);
+      const next = parseWorkerUiPreferences({
+        ...current,
+        accentColor,
+        updatedAt: this.#now(),
+        syncState: 'DIRTY',
+      });
+      await this.#repository.put(next);
+      this.#publish(next);
+      return next;
+    });
   }
 
   async syncOnce(shopId: ShopId, workerId: WorkerId): Promise<void> {
@@ -148,26 +265,33 @@ export class WorkerUiPreferencesService implements WorkerUiPreferencesSyncTarget
         categoryOrder: local.categoryOrder,
         categoryAlignment: local.categoryAlignment,
         productOrder: local.productOrder,
+        accentColor: local.accentColor,
       });
-      await this.#repository.put(
-        parseWorkerUiPreferences({
-          ...local,
-          serverVersion: remote.serverVersion,
-          updatedAt: remote.updatedAt,
+      await this.#serializeLocalMutation(shopId, workerId, async () => {
+        const current = await this.#repository.get(shopId, workerId);
+        if (!samePreferenceSnapshot(current, local)) return;
+        const next = parseWorkerUiPreferences({
+          ...remote,
           syncState: 'CLEAN',
-        }),
-      );
+        });
+        await this.#repository.put(next);
+        this.#publish(next);
+      });
       return;
     }
 
     const remote = await this.#gateway.getWorkerUiPreferences(shopId, workerId);
-    if (remote !== null && (local === null || remote.serverVersion > local.serverVersion)) {
-      await this.#repository.put(
-        parseWorkerUiPreferences({
-          ...remote,
-          syncState: 'CLEAN',
-        }),
-      );
-    }
+    if (remote === null || (local !== null && remote.serverVersion <= local.serverVersion)) return;
+
+    await this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#repository.get(shopId, workerId);
+      if (!samePreferenceSnapshot(current, local)) return;
+      const next = parseWorkerUiPreferences({
+        ...remote,
+        syncState: 'CLEAN',
+      });
+      await this.#repository.put(next);
+      this.#publish(next);
+    });
   }
 }

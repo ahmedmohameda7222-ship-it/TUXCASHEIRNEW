@@ -25,6 +25,7 @@ function readPreferences(row: unknown): WorkerUiPreferences | null {
     categoryOrder: JSON.parse(record['category_order_json']) as unknown,
     categoryAlignment: record['category_alignment'],
     productOrder: JSON.parse(record['product_order_json']) as unknown,
+    accentColor: record['accent_color'] ?? null,
     updatedAt: record['updated_at'],
     serverVersion: Number(record['server_version']),
     syncState: record['sync_state'],
@@ -40,7 +41,7 @@ export function createSqliteWorkerUiPreferencesRepository(
         database
           .prepare(
             `SELECT shop_id, worker_id, category_order_json, category_alignment,
-                    product_order_json, updated_at, server_version, sync_state
+                    product_order_json, accent_color, updated_at, server_version, sync_state
              FROM worker_ui_preferences WHERE shop_id = ? AND worker_id = ?`,
           )
           .get(shopId, workerId),
@@ -52,12 +53,13 @@ export function createSqliteWorkerUiPreferencesRepository(
         .prepare(
           `INSERT INTO worker_ui_preferences(
              shop_id, worker_id, category_order_json, category_alignment, product_order_json,
-             updated_at, server_version, sync_state
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             accent_color, updated_at, server_version, sync_state
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(shop_id, worker_id) DO UPDATE SET
              category_order_json = excluded.category_order_json,
              category_alignment = excluded.category_alignment,
              product_order_json = excluded.product_order_json,
+             accent_color = excluded.accent_color,
              updated_at = excluded.updated_at,
              server_version = excluded.server_version,
              sync_state = excluded.sync_state`,
@@ -68,6 +70,7 @@ export function createSqliteWorkerUiPreferencesRepository(
           JSON.stringify(value.categoryOrder),
           value.categoryAlignment,
           JSON.stringify(value.productOrder),
+          value.accentColor,
           value.updatedAt,
           value.serverVersion,
           value.syncState,

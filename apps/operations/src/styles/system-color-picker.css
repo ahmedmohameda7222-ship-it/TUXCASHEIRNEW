@@ -1,0 +1,355 @@
+.operations-accent-loading {
+  min-height: 100dvh;
+  background: var(--tux-surface-canvas);
+}
+
+.system-color-profile-section {
+  display: grid;
+  gap: var(--tux-space-2);
+  padding: var(--tux-space-2) var(--tux-space-3) var(--tux-space-3);
+}
+
+.operator-menu .system-color-profile-action {
+  min-height: var(--tux-touch-target);
+  display: flex;
+  align-items: center;
+  gap: var(--tux-space-2);
+  width: 100%;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  padding: var(--tux-space-2);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-primary);
+  text-align: left;
+}
+
+.operator-menu .system-color-profile-action:hover {
+  background: var(--tux-accent-hover-soft);
+}
+
+.system-color-profile-swatch {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid var(--tux-border-strong);
+  border-radius: var(--tux-radius-sm);
+  box-shadow: inset 0 0 0 2px var(--tux-surface-panel);
+}
+
+.system-color-backdrop,
+.system-color-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: rgb(0 0 0 / 42%);
+}
+
+.system-color-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-lg);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-md);
+}
+
+.system-color-heading,
+.system-color-dialog-header {
+  padding: 18px 20px 14px;
+}
+
+.system-color-heading h2,
+.system-color-dialog-header h2 {
+  margin: 0;
+  color: var(--tux-text-primary);
+  font-size: 18px;
+}
+
+.system-color-dialog-header p {
+  margin: 6px 0 0;
+  color: var(--tux-text-secondary);
+}
+
+.system-color-editor {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+  border-block: 1px solid var(--tux-border-subtle);
+}
+
+.system-color-preview,
+.system-color-current {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 20px 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-subtle);
+  color: var(--tux-text-primary);
+}
+
+.system-color-preview > span:last-child,
+.system-color-current-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.system-color-preview-swatch,
+.system-color-current-swatch {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid var(--tux-border-strong);
+  border-radius: var(--tux-radius-sm);
+  box-shadow: inset 0 0 0 2px var(--tux-surface-panel);
+}
+
+.system-color-preview-value,
+.system-color-current-copy > span:last-child {
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.system-color-field,
+.system-color-native-field,
+.system-color-hex-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem);
+  align-items: center;
+  gap: 14px;
+  color: var(--tux-text-primary);
+}
+
+.system-color-field > span,
+.system-color-rgb span,
+.system-color-native-field > span,
+.system-color-hex-field > span,
+.system-color-rgb-fieldset span {
+  font-weight: 700;
+}
+
+.system-color-field input[type='text'],
+.system-color-rgb input,
+.system-color-hex-field input,
+.system-color-rgb-fieldset input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  padding: 0 12px;
+  background: var(--tux-surface-panel);
+  color: var(--tux-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.system-color-native-picker,
+.system-color-native-field input[type='color'] {
+  width: 100%;
+  min-width: 9rem;
+  height: 48px;
+  padding: 3px;
+  border: 1px solid var(--tux-border-strong);
+  border-radius: 10px;
+  background: var(--tux-surface-panel);
+  cursor: pointer;
+}
+
+.system-color-rgb,
+.system-color-rgb-fieldset {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.system-color-rgb legend,
+.system-color-rgb-fieldset legend {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--tux-text-primary);
+  font-weight: 800;
+}
+
+.system-color-rgb label,
+.system-color-rgb-fieldset label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--tux-text-primary);
+}
+
+.system-color-rgb label span,
+.system-color-rgb-fieldset label span {
+  font-size: var(--tux-font-size-xs);
+}
+
+.system-color-validation {
+  margin: 10px 20px 0;
+  color: var(--tux-destructive);
+  font-size: var(--tux-font-size-xs);
+}
+
+.system-color-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.system-color-secondary-actions button,
+.system-color-actions button,
+.system-color-dialog-actions button {
+  min-height: 44px;
+}
+
+.system-color-native-picker:focus-visible,
+.system-color-native-field input[type='color']:focus,
+.system-color-native-field input[type='color']:focus-visible,
+.system-color-field input:focus-visible,
+.system-color-hex-field input:focus-visible,
+.system-color-rgb input:focus-visible,
+.system-color-rgb-fieldset input:focus-visible,
+.system-color-secondary-actions button:focus-visible,
+.system-color-actions button:focus-visible,
+.system-color-dialog-actions button:focus-visible {
+  outline: 3px solid var(--tux-focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-tux-custom-accent] :focus-visible {
+  outline-color: var(--tux-focus-ring);
+}
+
+:root[data-tux-custom-accent] .primary-action {
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .place-order-action:not(:hover):not(:active) {
+  border-color: var(--tux-accent-strong);
+  background: var(--tux-accent-strong);
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .place-order-action:not(:disabled):hover,
+:root[data-tux-custom-accent] .primary-action:not(:disabled):hover {
+  border-color: var(--tux-accent-hover);
+  background: var(--tux-accent-hover);
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .place-order-action:not(:disabled):active,
+:root[data-tux-custom-accent] .primary-action:not(:disabled):active {
+  border-color: var(--tux-accent-pressed);
+  background: var(--tux-accent-pressed);
+  color: var(--tux-action-foreground);
+}
+
+:root[data-tux-custom-accent] .operations-header .nav-item-active,
+:root[data-tux-custom-accent] .operator-menu .appearance-option-active,
+:root[data-tux-custom-accent] .menu-toolbar .category-rail button.selected,
+:root[data-tux-custom-accent] .product-family-filter button.selected,
+:root[data-tux-custom-accent] .order-type-section .segmented-control button.selected,
+:root[data-tux-custom-accent] .payment-methods button.selected {
+  background: var(--tux-accent-soft);
+  color: var(--tux-accent-text);
+}
+
+.system-color-dialog > .form-error {
+  margin: 14px 20px 0;
+}
+
+.system-color-actions,
+.system-color-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 18px;
+}
+
+.system-color-action-spacer {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 520px) {
+  .system-color-backdrop,
+  .system-color-dialog-backdrop {
+    align-items: start;
+    padding: 12px;
+  }
+
+  .system-color-dialog {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .system-color-heading,
+  .system-color-dialog-header,
+  .system-color-editor,
+  .system-color-actions,
+  .system-color-dialog-actions {
+    padding-inline: 16px;
+  }
+
+  .system-color-current {
+    margin-inline: 16px;
+  }
+
+  .system-color-field,
+  .system-color-native-field,
+  .system-color-hex-field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .system-color-native-picker,
+  .system-color-native-field input[type='color'] {
+    min-width: 0;
+  }
+
+  .system-color-secondary-actions,
+  .system-color-actions,
+  .system-color-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .system-color-actions,
+  .system-color-dialog-actions {
+    display: grid;
+  }
+
+  .system-color-action-spacer {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .system-color-rgb,
+  .system-color-rgb-fieldset {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (forced-colors: active) {
+  .system-color-native-picker,
+  .system-color-native-field input[type='color'],
+  .system-color-profile-swatch,
+  .system-color-preview-swatch,
+  .system-color-current-swatch {
+    forced-color-adjust: auto;
+  }
+}

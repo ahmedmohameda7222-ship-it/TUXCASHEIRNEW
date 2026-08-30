@@ -261,6 +261,14 @@ ALTER TABLE worker_ui_preferences
 ADD COLUMN product_order_json TEXT NOT NULL DEFAULT '[]';
 `,
   },
+  {
+    version: 8,
+    name: 'worker_ui_accent_color',
+    sql: `
+ALTER TABLE worker_ui_preferences
+ADD COLUMN accent_color TEXT;
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

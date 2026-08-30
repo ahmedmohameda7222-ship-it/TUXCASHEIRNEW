@@ -177,27 +177,44 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           };
         };
 
+      const retryAfterMutation = (): void => {
+        if (preferenceRetryStarted) retryPreferences();
+      };
+
       const workerUiPreferences: TuxWorkerUiPreferencesApi = {
         load: async () => {
           const identity = await activePreferenceIdentityFromSession();
           return preferencesRepository.get(identity.shopId, identity.workerId);
         },
-        update: async (input) => {
+        subscribe: (listener) => preferencesService.subscribe(listener),
+        updateMenuLayout: async (input) => {
           const identity = await activePreferenceIdentityFromSession();
-          const updated = await preferencesService.update(
+          const updated = await preferencesService.updateMenuLayout(
             identity.shopId,
             identity.workerId,
             input,
           );
-          if (preferenceRetryStarted) retryPreferences();
+          retryAfterMutation();
           return updated;
         },
-        reset: async () => {
-          await workerUiPreferences.update({
+        updateAccentColor: async (accentColor) => {
+          const identity = await activePreferenceIdentityFromSession();
+          const updated = await preferencesService.updateAccentColor(
+            identity.shopId,
+            identity.workerId,
+            accentColor,
+          );
+          retryAfterMutation();
+          return updated;
+        },
+        resetMenuLayout: async () => {
+          const identity = await activePreferenceIdentityFromSession();
+          await preferencesService.updateMenuLayout(identity.shopId, identity.workerId, {
             categoryOrder: [],
             categoryAlignment: 'left',
             productOrder: [],
           });
+          retryAfterMutation();
         },
       };
 
@@ -339,8 +356,23 @@ export function createWorkerUiPreferencesClient(): OperationsWorkerUiPreferences
   if (desktop !== undefined) return desktop.workerUiPreferences;
   return {
     load: async () => (await browserRuntime()).workerUiPreferences.load(),
-    update: async (input) => (await browserRuntime()).workerUiPreferences.update(input),
-    reset: async () => (await browserRuntime()).workerUiPreferences.reset(),
+    subscribe: (listener) => {
+      let active = true;
+      let unsubscribe = (): void => undefined;
+      void browserRuntime().then((runtime) => {
+        if (!active) return;
+        unsubscribe = runtime.workerUiPreferences.subscribe(listener);
+      });
+      return () => {
+        active = false;
+        unsubscribe();
+      };
+    },
+    updateMenuLayout: async (input) =>
+      (await browserRuntime()).workerUiPreferences.updateMenuLayout(input),
+    updateAccentColor: async (accentColor) =>
+      (await browserRuntime()).workerUiPreferences.updateAccentColor(accentColor),
+    resetMenuLayout: async () => (await browserRuntime()).workerUiPreferences.resetMenuLayout(),
   };
 }
 

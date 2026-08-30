@@ -10,6 +10,7 @@ import type {
   CategoryAlignment,
   MenuCategoryId,
   ProductId,
+  SystemAccentColor,
   WorkerUiPreferences,
 } from '@tux/domain';
 
@@ -58,12 +59,14 @@ export interface TuxSyncApi {
 
 export interface TuxWorkerUiPreferencesApi {
   load(): Promise<WorkerUiPreferences | null>;
-  update(input: {
+  subscribe(listener: (preferences: WorkerUiPreferences) => void): () => void;
+  updateMenuLayout(input: {
     readonly categoryOrder: readonly MenuCategoryId[];
     readonly categoryAlignment: CategoryAlignment;
     readonly productOrder: readonly ProductId[];
   }): Promise<WorkerUiPreferences>;
-  reset(): Promise<void>;
+  updateAccentColor(accentColor: SystemAccentColor | null): Promise<WorkerUiPreferences>;
+  resetMenuLayout(): Promise<void>;
 }
 
 export type TuxOrdersApi = Pick<

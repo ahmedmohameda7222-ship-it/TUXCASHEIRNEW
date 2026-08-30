@@ -52,6 +52,7 @@ const preference: WorkerUiPreferences = {
   categoryOrder: [],
   categoryAlignment: 'left',
   productOrder: [products[1]!.id, products[0]!.id],
+  accentColor: null,
   updatedAt: instant(new Date('2026-08-28T06:00:00.000Z')),
   serverVersion: 1,
   syncState: 'CLEAN',

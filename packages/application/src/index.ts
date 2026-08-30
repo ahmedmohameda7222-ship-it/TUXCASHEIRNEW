@@ -81,9 +81,9 @@ export {
 } from './workerUiPreferences';
 export type {
   RemoteWorkerUiPreferences,
+  WorkerUiMenuLayoutUpdate,
   WorkerUiPreferencesRemoteGateway,
   WorkerUiPreferencesRetryOptions,
   WorkerUiPreferencesSyncIdentity,
   WorkerUiPreferencesSyncTarget,
-  WorkerUiPreferencesUpdate,
 } from './workerUiPreferences';

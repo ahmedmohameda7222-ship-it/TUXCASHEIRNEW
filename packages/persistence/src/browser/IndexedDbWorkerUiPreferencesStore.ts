@@ -13,6 +13,7 @@ interface StoredWorkerUiPreferences {
   readonly categoryOrder: readonly string[];
   readonly categoryAlignment: WorkerUiPreferences['categoryAlignment'];
   readonly productOrder: readonly string[];
+  readonly accentColor: WorkerUiPreferences['accentColor'];
   readonly updatedAt: string;
   readonly serverVersion: number;
   readonly syncState: WorkerUiPreferences['syncState'];
@@ -30,6 +31,7 @@ function stored(preferences: WorkerUiPreferences): StoredWorkerUiPreferences {
     categoryOrder: preferences.categoryOrder,
     categoryAlignment: preferences.categoryAlignment,
     productOrder: preferences.productOrder,
+    accentColor: preferences.accentColor,
     updatedAt: preferences.updatedAt,
     serverVersion: preferences.serverVersion,
     syncState: preferences.syncState,

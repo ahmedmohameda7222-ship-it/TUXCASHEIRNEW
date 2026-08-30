@@ -66,6 +66,7 @@ function preference(
     categoryOrder,
     categoryAlignment: 'right',
     productOrder,
+    accentColor: null,
     serverVersion: 4,
     updatedAt: instant(new Date('2026-08-25T04:00:00.000Z')),
     syncState: 'CLEAN',
