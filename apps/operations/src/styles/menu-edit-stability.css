@@ -1,0 +1,8 @@
+/* Keep sortable hit targets geometrically stable while idle. Active drag affordances stay in final-pos-corrections.css. */
+.category-tab-reordering:not(.category-tab-dragging),
+.menu-edit-product-card:not(.menu-edit-product-card-dragging) {
+  animation: none;
+  rotate: none;
+  translate: none;
+  scale: none;
+}
