@@ -89,6 +89,13 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('onDragEnd={handleMenuEditDragEnd}');
   });
 
+  it('keeps drag overlays visual-only so sortable controls stay unique in the accessibility tree', () => {
+    expect(ordersWorkspaceSource.match(/aria-hidden="true"/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(ordersWorkspaceSource).not.toMatch(
+      /<button[^>]*className="[^"]*menu-edit-drag-overlay[^"]*"/,
+    );
+  });
+
   it('persists category and product layout together through the menu-layout-only API', () => {
     expect(ordersWorkspaceSource).toContain('menuEditPreferenceInput');
     expect(ordersWorkspaceSource).toContain('function saveMenuEdit');
