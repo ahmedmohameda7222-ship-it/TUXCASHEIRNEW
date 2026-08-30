@@ -1853,7 +1853,7 @@ export function OrdersWorkspace({
             </button>
           </div>
         </div>
-      ) : null}
+      )}
       {globalError === null ? null : (
         <div className="global-error orders-error" role="alert">
           <span>{globalError}</span>
