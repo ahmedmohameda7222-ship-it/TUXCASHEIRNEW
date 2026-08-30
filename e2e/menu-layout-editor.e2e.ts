@@ -29,6 +29,17 @@ async function keyboardMove(locator: Locator, key: 'ArrowLeft' | 'ArrowRight' | 
   await locator.press('Space');
 }
 
+async function continuePastGreetingIfPresent(page: Parameters<typeof menuCategoryTabs>[0]) {
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
+  const welcomeAction = page.locator('.welcome-action');
+  if (await welcomeAction.isVisible()) await welcomeAction.click();
+  await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
+}
+
 test('menu editor keeps selected category reachable and preserves Product Card geometry', async ({
   page,
 }, testInfo) => {
@@ -209,8 +220,7 @@ test('dirty shell exits keep or discard the exact editor transaction', async ({
   const switchDialog = page.getByRole('dialog', { name: 'Switch worker' });
   await switchDialog.getByLabel('Enter PIN to Sign In').fill('5678');
   await switchDialog.getByRole('button', { name: 'Sign In' }).click();
-  const welcomeAction = page.locator('.welcome-action');
-  if (await welcomeAction.isVisible().catch(() => false)) await welcomeAction.click();
+  await continuePastGreetingIfPresent(page);
   await expect(page.getByRole('button', { name: /Demo Worker Two/ })).toBeVisible();
 
   await page.getByRole('button', { name: 'Edit menu' }).click();
