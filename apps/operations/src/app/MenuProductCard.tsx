@@ -1,32 +1,7 @@
 import type { Product } from '@tux/domain';
-import { useState, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { PlusCircleIcon } from './icons';
-import { formatMoneyMinor } from './ordersView';
-
-function ProductMedia({ product }: { readonly product: Product }) {
-  const [failed, setFailed] = useState(false);
-  if (product.imageKey === null || failed) {
-    return (
-      <div className="product-image-fallback" aria-hidden="true">
-        {product.name
-          .split(/\s+/)
-          .slice(0, 2)
-          .map((part) => part.slice(0, 1).toUpperCase())
-          .join('')}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      className="product-image"
-      src={product.imageKey}
-      alt=""
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  );
-}
+import { ProductCardPresentation } from './ProductCardPresentation';
 
 export function MenuProductCard({
   product,
@@ -66,19 +41,7 @@ export function MenuProductCard({
         onClick={onQuickInfo}
         aria-label={`Quick Info for ${product.name}`}
       >
-        <div className="product-media">
-          <ProductMedia product={product} />
-          {quantity > 0 ? (
-            <span className="product-quantity-badge" aria-label={`${quantity} in current order`}>
-              {quantity}
-            </span>
-          ) : null}
-        </div>
-        <div className="product-copy">
-          <strong>{product.name}</strong>
-          {product.soldOut ? <em>Sold Out</em> : null}
-        </div>
-        <strong className="product-price">{formatMoneyMinor(product.priceMinor)}</strong>
+        <ProductCardPresentation product={product} quantity={quantity} showDescription={false} />
       </button>
 
       <footer className="product-card-footer">
