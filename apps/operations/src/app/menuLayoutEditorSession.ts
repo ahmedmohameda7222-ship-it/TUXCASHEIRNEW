@@ -7,10 +7,7 @@ import type {
 } from '@tux/domain';
 
 export type MenuLayoutEditorLifecycle =
-  | 'CLOSED'
-  | 'EDITING'
-  | 'SAVING'
-  | 'ERROR';
+  'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -77,10 +74,7 @@ export type MenuLayoutEditorEvent =
       readonly type: 'DROP_CATEGORY_PICKUP';
       readonly categoryId: MenuCategoryId;
     }
-  | {
-      readonly type: 'DROP_PRODUCT_PICKUP';
-      readonly productId: ProductId;
-    }
+  | { readonly type: 'DROP_PRODUCT_PICKUP'; readonly productId: ProductId }
   | { readonly type: 'CANCEL_PICKUP' }
   | { readonly type: 'CATEGORY_CHANGE' }
   | { readonly type: 'RESET'; readonly draft: MenuLayoutDraft }
