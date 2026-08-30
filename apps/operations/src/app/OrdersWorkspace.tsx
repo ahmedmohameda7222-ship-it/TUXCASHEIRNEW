@@ -405,10 +405,6 @@ export function OrdersWorkspace({
   const categoryEditOrder = menuEditSession.draft?.categoryOrder ?? [];
   const categoryEditAlignment = menuEditSession.draft?.categoryAlignment ?? 'left';
   const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
-  const categorySortingDisabled =
-    menuEditSaving || activeMenuDragId?.startsWith('product:') === true;
-  const productSortingDisabled =
-    menuEditSaving || activeMenuDragId?.startsWith('category:') === true;
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -1339,313 +1335,323 @@ export function OrdersWorkspace({
       }
     >
       <section className="menu-pane" aria-label="Menu">
-        <DndContext
-          sensors={menuEditSensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleMenuEditDragStart}
-          onDragOver={handleMenuEditDragOver}
-          onDragCancel={handleMenuEditDragCancel}
-          onDragEnd={handleMenuEditDragEnd}
+        <div
+          className={
+            menuEditActive
+              ? 'menu-toolbar category-mode-edit'
+              : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
+          }
         >
-          <>
-            <div
-              className={
-                menuEditActive
-                  ? 'menu-toolbar category-mode-edit'
-                  : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
-              }
-            >
-              <div className="field-stack category-navigation-stack">
-                <div className="category-navigation">
-                  <div
-                    ref={categoryRailRef}
-                    className="category-rail"
-                    aria-label="Menu categories"
-                    data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
+          <div className="field-stack category-navigation-stack">
+            <div className="category-navigation">
+              <div
+                ref={categoryRailRef}
+                className="category-rail"
+                aria-label="Menu categories"
+                data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
+              >
+                {menuEditActive ? (
+                  <DndContext
+                    sensors={menuEditSensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleMenuEditDragStart}
+                    onDragOver={handleMenuEditDragOver}
+                    onDragCancel={handleMenuEditDragCancel}
+                    onDragEnd={handleMenuEditDragEnd}
                   >
-                    {menuEditActive ? (
-                      <SortableContext
-                        items={categorySortableIds}
-                        strategy={horizontalListSortingStrategy}
-                      >
-                        {categoryEditorCategories.map((category) => (
-                          <MenuEditCategoryTab
-                            key={category.id}
-                            category={category}
-                            selected={selectedCategoryId === category.id}
-                            disabled={categorySortingDisabled}
-                            onSelect={() => selectMenuEditCategory(category.id)}
-                            onNodeRef={(node) => setCategoryTabRef(category.id, node)}
-                          />
-                        ))}
-                      </SortableContext>
-                    ) : (
-                      activeCategories.map((category) => (
-                        <button
-                          type="button"
+                    <SortableContext
+                      items={categorySortableIds}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {categoryEditorCategories.map((category) => (
+                        <MenuEditCategoryTab
                           key={category.id}
-                          className={[
-                            'category-tab',
-                            selectedCategoryId === category.id ? 'selected' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          onClick={() => {
-                            setSelectedCategoryId(category.id);
-                            setSelectedFamily(null);
-                            setSearch('');
-                          }}
-                        >
-                          {category.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <div className="category-nav-actions">
-                    {menuEditActive ? (
-                      <div
-                        className="category-alignment category-alignment-inline"
-                        role="group"
-                        aria-label="Category alignment"
-                      >
-                        {(['left', 'center', 'right'] as const).map((alignment) => (
-                          <button
-                            type="button"
-                            key={alignment}
-                            disabled={menuEditSaving}
-                            aria-pressed={categoryEditAlignment === alignment}
-                            onClick={() => {
-                              if (menuEditSaving) return;
-                              dispatchMenuLayoutEditor({
-                                type: 'SET_ALIGNMENT',
-                                categoryAlignment: alignment,
-                              });
-                            }}
-                          >
-                            {alignment === 'left'
-                              ? 'Left'
-                              : alignment === 'center'
-                                ? 'Center'
-                                : 'Right'}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    {categoryMode === 'IDLE' ? (
-                      <button
-                        type="button"
-                        className={
-                          menuEditActive
-                            ? 'category-icon-action category-edit-active'
-                            : 'category-icon-action'
-                        }
-                        aria-label="Edit menu"
-                        title="Edit menu"
-                        aria-pressed={menuEditActive}
-                        disabled={!workerMenuPreferencePresentation.menuEditEnabled}
-                        onClick={() => {
-                          if (!menuEditActive) beginMenuEdit();
-                        }}
-                      >
-                        <EditPencilIcon />
-                      </button>
-                    ) : null}
-                    {!menuEditActive && categoryMode === 'SEARCH' ? (
-                      <div className="product-search category-search-inline">
-                        <SearchIcon className="category-search-glyph" />
-                        <input
-                          ref={searchRef}
-                          id="product-search"
-                          type="search"
-                          aria-label="Search menu"
-                          value={search}
-                          placeholder="Search products"
-                          autoComplete="off"
-                          onChange={(event) => setSearch(event.target.value)}
+                          category={category}
+                          selected={selectedCategoryId === category.id}
+                          disabled={menuEditSaving}
+                          onSelect={() => selectMenuEditCategory(category.id)}
+                          onNodeRef={(node) => setCategoryTabRef(category.id, node)}
                         />
+                      ))}
+                    </SortableContext>
+                    <DragOverlay>
+                      {activeDraggedCategory === null ? null : (
                         <button
                           type="button"
-                          className="category-search-clear"
-                          aria-label="Clear search"
-                          title="Clear search"
-                          onClick={() => {
-                            setSearch('');
-                            setCategoryMode('IDLE');
-                          }}
+                          className="category-tab category-tab-dragging menu-edit-drag-overlay"
                         >
-                          ×
+                          {activeDraggedCategory.name}
                         </button>
-                      </div>
-                    ) : !menuEditActive ? (
-                      <button
-                        type="button"
-                        className="category-icon-action"
-                        aria-label="Search menu"
-                        title="Search menu"
-                        onClick={() => setCategoryMode('SEARCH')}
-                      >
-                        <SearchIcon />
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {!menuEditActive && activeFamilies.length > 0 ? (
-                  <div
-                    className="segmented-control product-family-filter"
-                    aria-label="Product families"
-                  >
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                ) : (
+                  activeCategories.map((category) => (
                     <button
                       type="button"
-                      className={selectedFamily === null ? 'selected' : undefined}
-                      onClick={() => setSelectedFamily(null)}
+                      key={category.id}
+                      className={[
+                        'category-tab',
+                        selectedCategoryId === category.id ? 'selected' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => {
+                        setSelectedCategoryId(category.id);
+                        setSelectedFamily(null);
+                        setSearch('');
+                      }}
                     >
-                      All
+                      {category.name}
                     </button>
-                    {activeFamilies.map((family) => (
+                  ))
+                )}
+              </div>
+              <div className="category-nav-actions">
+                {menuEditActive ? (
+                  <div
+                    className="category-alignment category-alignment-inline"
+                    role="group"
+                    aria-label="Category alignment"
+                  >
+                    {(['left', 'center', 'right'] as const).map((alignment) => (
                       <button
                         type="button"
-                        key={family}
-                        className={selectedFamily === family ? 'selected' : undefined}
-                        onClick={() => setSelectedFamily(family)}
+                        key={alignment}
+                        disabled={menuEditSaving}
+                        aria-pressed={categoryEditAlignment === alignment}
+                        onClick={() => {
+                          if (menuEditSaving) return;
+                          dispatchMenuLayoutEditor({
+                            type: 'SET_ALIGNMENT',
+                            categoryAlignment: alignment,
+                          });
+                        }}
                       >
-                        {family}
+                        {alignment === 'left'
+                          ? 'Left'
+                          : alignment === 'center'
+                            ? 'Center'
+                            : 'Right'}
                       </button>
                     ))}
                   </div>
                 ) : null}
-              </div>
-            </div>
-
-            {workerMenuPreferencePresentation.errorMessage === null ? null : (
-              <div className="menu-edit-action-status" role="status">
-                <span className="category-editor-error" role="alert">
-                  {workerMenuPreferencePresentation.errorMessage}
-                </span>
-                {workerMenuPreferencePresentation.retryVisible ? (
+                {categoryMode === 'IDLE' ? (
                   <button
                     type="button"
-                    className="text-action"
-                    onClick={retryWorkerMenuPreferenceLoad}
+                    className={
+                      menuEditActive
+                        ? 'category-icon-action category-edit-active'
+                        : 'category-icon-action'
+                    }
+                    aria-label="Edit menu"
+                    title="Edit menu"
+                    aria-pressed={menuEditActive}
+                    disabled={!workerMenuPreferencePresentation.menuEditEnabled}
+                    onClick={() => {
+                      if (!menuEditActive) beginMenuEdit();
+                    }}
                   >
-                    Retry
+                    <EditPencilIcon />
+                  </button>
+                ) : null}
+                {!menuEditActive && categoryMode === 'SEARCH' ? (
+                  <div className="product-search category-search-inline">
+                    <SearchIcon className="category-search-glyph" />
+                    <input
+                      ref={searchRef}
+                      id="product-search"
+                      type="search"
+                      aria-label="Search menu"
+                      value={search}
+                      placeholder="Search products"
+                      autoComplete="off"
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="category-search-clear"
+                      aria-label="Clear search"
+                      title="Clear search"
+                      onClick={() => {
+                        setSearch('');
+                        setCategoryMode('IDLE');
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : !menuEditActive ? (
+                  <button
+                    type="button"
+                    className="category-icon-action"
+                    aria-label="Search menu"
+                    title="Search menu"
+                    onClick={() => setCategoryMode('SEARCH')}
+                  >
+                    <SearchIcon />
                   </button>
                 ) : null}
               </div>
-            )}
-
-            <div className="product-grid" aria-live="polite">
-              {menuEditActive ? (
-                menuEditProducts.length === 0 ? (
-                  <div className="menu-empty">
-                    <strong>No products found</strong>
-                    <span>This category has no active products.</span>
-                  </div>
-                ) : (
-                  <SortableContext items={productSortableIds} strategy={rectSortingStrategy}>
-                    {menuEditProducts.map((product, index) => (
-                      <MenuEditProductCard
-                        key={product.id}
-                        product={product}
-                        position={index + 1}
-                        total={menuEditProducts.length}
-                        className="product-card menu-edit-product-card"
-                        disabled={productSortingDisabled}
-                      />
-                    ))}
-                  </SortableContext>
-                )
-              ) : products.length === 0 ? (
-                <div className="menu-empty">
-                  <strong>No products found</strong>
-                  <span>
-                    {search.length > 0
-                      ? 'Try another search.'
-                      : 'This category has no active products.'}
-                  </span>
-                </div>
-              ) : (
-                products.map((product) => (
-                  <MenuProductCard
-                    key={product.id}
-                    product={product}
-                    quantity={productQuantityInDraft(draft, product.id)}
-                    busy={busy}
-                    onQuickInfo={() => setQuickInfoProductId(product.id)}
-                    onDecrement={() => decrementProduct(product)}
-                    onAdd={() => addProduct(product)}
-                    onExtras={() =>
-                      setCustomizer({
-                        kind: 'ADD',
-                        productId: product.id,
-                        focusSection: 'EXTRAS',
-                      })
-                    }
-                  />
-                ))
-              )}
             </div>
-
-            {menuEditActive ? (
-              <div className="sr-only" aria-live="polite" aria-atomic="true">
-                {menuEditAnnouncement}
+            {!menuEditActive && activeFamilies.length > 0 ? (
+              <div
+                className="segmented-control product-family-filter"
+                aria-label="Product families"
+              >
+                <button
+                  type="button"
+                  className={selectedFamily === null ? 'selected' : undefined}
+                  onClick={() => setSelectedFamily(null)}
+                >
+                  All
+                </button>
+                {activeFamilies.map((family) => (
+                  <button
+                    type="button"
+                    key={family}
+                    className={selectedFamily === family ? 'selected' : undefined}
+                    onClick={() => setSelectedFamily(family)}
+                  >
+                    {family}
+                  </button>
+                ))}
               </div>
             ) : null}
+          </div>
+        </div>
 
-            {menuEditActive ? (
-              <div className="menu-edit-actions" aria-label="Menu edit actions">
-                <div className="menu-edit-action-status">
-                  {menuEditError === null ? null : (
-                    <span className="category-editor-error" role="alert">
-                      {menuEditError}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="text-action"
-                    disabled={menuEditSaving}
-                    onClick={resetMenuEdit}
-                  >
-                    Reset
-                  </button>
-                </div>
-                <div className="menu-edit-actions-primary">
-                  <button
-                    type="button"
-                    className="secondary-action"
-                    disabled={menuEditSaving}
-                    onClick={cancelMenuEdit}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-action"
-                    disabled={menuEditSaving}
-                    onClick={() => void saveMenuEdit()}
-                  >
-                    {menuEditSaving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </>
-          <DragOverlay>
-            {activeDraggedProduct !== null ? (
-              <article className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay">
-                <div className="product-main">
-                  <ProductCardPresentation product={activeDraggedProduct} showDescription />
-                </div>
-              </article>
-            ) : activeDraggedCategory !== null ? (
+        {workerMenuPreferencePresentation.errorMessage === null ? null : (
+          <div className="menu-edit-action-status" role="status">
+            <span className="category-editor-error" role="alert">
+              {workerMenuPreferencePresentation.errorMessage}
+            </span>
+            {workerMenuPreferencePresentation.retryVisible ? (
               <button
                 type="button"
-                className="category-tab category-tab-dragging menu-edit-drag-overlay"
+                className="text-action"
+                onClick={retryWorkerMenuPreferenceLoad}
               >
-                {activeDraggedCategory.name}
+                Retry
               </button>
             ) : null}
-          </DragOverlay>
-        </DndContext>
+          </div>
+        )}
+
+        <div className="product-grid" aria-live="polite">
+          {menuEditActive ? (
+            menuEditProducts.length === 0 ? (
+              <div className="menu-empty">
+                <strong>No products found</strong>
+                <span>This category has no active products.</span>
+              </div>
+            ) : (
+              <DndContext
+                sensors={menuEditSensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleMenuEditDragStart}
+                onDragOver={handleMenuEditDragOver}
+                onDragCancel={handleMenuEditDragCancel}
+                onDragEnd={handleMenuEditDragEnd}
+              >
+                <SortableContext items={productSortableIds} strategy={rectSortingStrategy}>
+                  {menuEditProducts.map((product, index) => (
+                    <MenuEditProductCard
+                      key={product.id}
+                      product={product}
+                      position={index + 1}
+                      total={menuEditProducts.length}
+                      className="product-card menu-edit-product-card"
+                      disabled={menuEditSaving}
+                    />
+                  ))}
+                </SortableContext>
+                <DragOverlay>
+                  {activeDraggedProduct === null ? null : (
+                    <article className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay">
+                      <div className="product-main">
+                        <ProductCardPresentation product={activeDraggedProduct} showDescription />
+                      </div>
+                    </article>
+                  )}
+                </DragOverlay>
+              </DndContext>
+            )
+          ) : products.length === 0 ? (
+            <div className="menu-empty">
+              <strong>No products found</strong>
+              <span>
+                {search.length > 0
+                  ? 'Try another search.'
+                  : 'This category has no active products.'}
+              </span>
+            </div>
+          ) : (
+            products.map((product) => (
+              <MenuProductCard
+                key={product.id}
+                product={product}
+                quantity={productQuantityInDraft(draft, product.id)}
+                busy={busy}
+                onQuickInfo={() => setQuickInfoProductId(product.id)}
+                onDecrement={() => decrementProduct(product)}
+                onAdd={() => addProduct(product)}
+                onExtras={() =>
+                  setCustomizer({
+                    kind: 'ADD',
+                    productId: product.id,
+                    focusSection: 'EXTRAS',
+                  })
+                }
+              />
+            ))
+          )}
+        </div>
+
+        {menuEditActive ? (
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {menuEditAnnouncement}
+          </div>
+        ) : null}
+
+        {menuEditActive ? (
+          <div className="menu-edit-actions" aria-label="Menu edit actions">
+            <div className="menu-edit-action-status">
+              {menuEditError === null ? null : (
+                <span className="category-editor-error" role="alert">
+                  {menuEditError}
+                </span>
+              )}
+              <button
+                type="button"
+                className="text-action"
+                disabled={menuEditSaving}
+                onClick={resetMenuEdit}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="menu-edit-actions-primary">
+              <button
+                type="button"
+                className="secondary-action"
+                disabled={menuEditSaving}
+                onClick={cancelMenuEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-action"
+                disabled={menuEditSaving}
+                onClick={() => void saveMenuEdit()}
+              >
+                {menuEditSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {desktopCartResizable ? (
@@ -1847,7 +1853,7 @@ export function OrdersWorkspace({
             </button>
           </div>
         </div>
-      )}
+      ) : null}
       {globalError === null ? null : (
         <div className="global-error orders-error" role="alert">
           <span>{globalError}</span>
