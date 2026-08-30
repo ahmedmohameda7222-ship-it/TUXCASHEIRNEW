@@ -90,9 +90,9 @@ describe('unified menu edit entry point', () => {
   });
 
   it('keeps drag overlays visual-only so sortable controls stay unique in the accessibility tree', () => {
-    expect(
-      ordersWorkspaceSource.match(/aria-hidden="true"/g)?.length ?? 0,
-    ).toBeGreaterThanOrEqual(2);
+    expect(ordersWorkspaceSource.match(/aria-hidden="true"/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      2,
+    );
     expect(ordersWorkspaceSource).not.toMatch(
       /<button[^>]*className="[^"]*menu-edit-drag-overlay[^"]*"/,
     );
