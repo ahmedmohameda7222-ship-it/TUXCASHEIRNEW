@@ -14,19 +14,25 @@ export interface MenuLayoutDraft {
   readonly productOrder: readonly ProductId[];
 }
 
+interface NoMenuLayoutInteraction {
+  readonly type: 'NONE';
+}
+
+interface CategoryPickupInteraction {
+  readonly type: 'CATEGORY_PICKUP';
+  readonly categoryId: MenuCategoryId;
+  readonly snapshot: MenuLayoutDraft;
+}
+
+interface ProductPickupInteraction {
+  readonly type: 'PRODUCT_PICKUP';
+  readonly productId: ProductId;
+  readonly categoryId: MenuCategoryId;
+  readonly snapshot: MenuLayoutDraft;
+}
+
 export type MenuLayoutEditorInteraction =
-  | { readonly type: 'NONE' }
-  | {
-      readonly type: 'CATEGORY_PICKUP';
-      readonly categoryId: MenuCategoryId;
-      readonly snapshot: MenuLayoutDraft;
-    }
-  | {
-      readonly type: 'PRODUCT_PICKUP';
-      readonly productId: ProductId;
-      readonly categoryId: MenuCategoryId;
-      readonly snapshot: MenuLayoutDraft;
-    };
+  NoMenuLayoutInteraction | CategoryPickupInteraction | ProductPickupInteraction;
 
 export interface MenuLayoutEditorSession {
   readonly lifecycle: MenuLayoutEditorLifecycle;
@@ -41,43 +47,104 @@ export interface MenuLayoutEditorSession {
   readonly saveToken: string | null;
 }
 
+interface OpenEvent {
+  readonly type: 'OPEN';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly base: MenuLayoutDraft;
+}
+
+interface SetCategoryOrderEvent {
+  readonly type: 'SET_CATEGORY_ORDER';
+  readonly categoryOrder: readonly MenuCategoryId[];
+}
+
+interface SetAlignmentEvent {
+  readonly type: 'SET_ALIGNMENT';
+  readonly categoryAlignment: CategoryAlignment;
+}
+
+interface SetProductOrderEvent {
+  readonly type: 'SET_PRODUCT_ORDER';
+  readonly productOrder: readonly ProductId[];
+}
+
+interface BeginCategoryPickupEvent {
+  readonly type: 'BEGIN_CATEGORY_PICKUP';
+  readonly categoryId: MenuCategoryId;
+}
+
+interface BeginProductPickupEvent {
+  readonly type: 'BEGIN_PRODUCT_PICKUP';
+  readonly productId: ProductId;
+  readonly categoryId: MenuCategoryId;
+}
+
+interface DropCategoryPickupEvent {
+  readonly type: 'DROP_CATEGORY_PICKUP';
+  readonly categoryId: MenuCategoryId;
+}
+
+interface DropProductPickupEvent {
+  readonly type: 'DROP_PRODUCT_PICKUP';
+  readonly productId: ProductId;
+}
+
+interface CancelPickupEvent {
+  readonly type: 'CANCEL_PICKUP';
+}
+
+interface CategoryChangeEvent {
+  readonly type: 'CATEGORY_CHANGE';
+}
+
+interface ResetEvent {
+  readonly type: 'RESET';
+  readonly draft: MenuLayoutDraft;
+}
+
+interface CancelEditorEvent {
+  readonly type: 'CANCEL_EDITOR';
+}
+
+interface BeginSaveEvent {
+  readonly type: 'BEGIN_SAVE';
+  readonly saveToken: string;
+}
+
+interface SaveSuccessEvent {
+  readonly type: 'SAVE_SUCCESS';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly saveToken: string;
+}
+
+interface SaveFailureEvent {
+  readonly type: 'SAVE_FAILURE';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+  readonly saveToken: string;
+  readonly message: string;
+}
+
+interface IdentityInvalidatedEvent {
+  readonly type: 'IDENTITY_INVALIDATED';
+  readonly shopId: ShopId;
+  readonly workerId: WorkerId;
+}
+
+type DraftEvent = SetCategoryOrderEvent | SetAlignmentEvent | SetProductOrderEvent;
+type PickupEvent =
+  BeginCategoryPickupEvent |
+  BeginProductPickupEvent |
+  DropCategoryPickupEvent |
+  DropProductPickupEvent |
+  CancelPickupEvent |
+  CategoryChangeEvent;
+type SaveEvent = BeginSaveEvent | SaveSuccessEvent | SaveFailureEvent;
+
 export type MenuLayoutEditorEvent =
-  | {
-      readonly type: 'OPEN';
-      readonly shopId: ShopId;
-      readonly workerId: WorkerId;
-      readonly base: MenuLayoutDraft;
-    }
-  | { readonly type: 'SET_CATEGORY_ORDER'; readonly categoryOrder: readonly MenuCategoryId[] }
-  | { readonly type: 'SET_ALIGNMENT'; readonly categoryAlignment: CategoryAlignment }
-  | { readonly type: 'SET_PRODUCT_ORDER'; readonly productOrder: readonly ProductId[] }
-  | { readonly type: 'BEGIN_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
-  | {
-      readonly type: 'BEGIN_PRODUCT_PICKUP';
-      readonly productId: ProductId;
-      readonly categoryId: MenuCategoryId;
-    }
-  | { readonly type: 'DROP_CATEGORY_PICKUP'; readonly categoryId: MenuCategoryId }
-  | { readonly type: 'DROP_PRODUCT_PICKUP'; readonly productId: ProductId }
-  | { readonly type: 'CANCEL_PICKUP' }
-  | { readonly type: 'CATEGORY_CHANGE' }
-  | { readonly type: 'RESET'; readonly draft: MenuLayoutDraft }
-  | { readonly type: 'CANCEL_EDITOR' }
-  | { readonly type: 'BEGIN_SAVE'; readonly saveToken: string }
-  | {
-      readonly type: 'SAVE_SUCCESS';
-      readonly shopId: ShopId;
-      readonly workerId: WorkerId;
-      readonly saveToken: string;
-    }
-  | {
-      readonly type: 'SAVE_FAILURE';
-      readonly shopId: ShopId;
-      readonly workerId: WorkerId;
-      readonly saveToken: string;
-      readonly message: string;
-    }
-  | { readonly type: 'IDENTITY_INVALIDATED'; readonly shopId: ShopId; readonly workerId: WorkerId };
+  OpenEvent | DraftEvent | PickupEvent | ResetEvent | CancelEditorEvent | SaveEvent | IdentityInvalidatedEvent;
 
 export interface OpenMenuLayoutEditorInput {
   readonly shopId: ShopId;
@@ -184,11 +251,7 @@ function canMutateDraft(state: MenuLayoutEditorSession): boolean {
 
 function saveCompletionMatches(
   state: MenuLayoutEditorSession,
-  event: {
-    readonly shopId: ShopId;
-    readonly workerId: WorkerId;
-    readonly saveToken: string;
-  },
+  event: SaveSuccessEvent | SaveFailureEvent,
 ): boolean {
   return (
     state.lifecycle === 'SAVING' &&
