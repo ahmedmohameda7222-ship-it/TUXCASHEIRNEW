@@ -53,7 +53,9 @@ describe('OrdersWorkspace menu-layout transaction integration', () => {
   });
 
   it('freezes alignment Reset Cancel and dnd mutation from the reducer SAVING lifecycle', () => {
-    expect(ordersWorkspaceSource).toContain("const menuEditSaving = menuEditSession.lifecycle === 'SAVING'");
+    expect(ordersWorkspaceSource).toContain(
+      "const menuEditSaving = menuEditSession.lifecycle === 'SAVING'",
+    );
     expect(
       ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(4);
