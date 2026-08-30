@@ -6,7 +6,11 @@ import type {
   WorkerId,
 } from '@tux/domain';
 
-export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
+export type MenuLayoutEditorLifecycle =
+  | 'CLOSED'
+  | 'EDITING'
+  | 'SAVING'
+  | 'ERROR';
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -116,9 +120,8 @@ function cloneDraft(draft: MenuLayoutDraft): MenuLayoutDraft {
 }
 
 function sameOrder<T>(left: readonly T[], right: readonly T[]): boolean {
-  return (
-    left.length === right.length && left.every((value, index) => value === right[index])
-  );
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 }
 
 export function menuLayoutDraftsEqual(
@@ -227,13 +230,18 @@ export function menuLayoutEditorReducer(
 ): MenuLayoutEditorSession {
   if (event.type === 'IDENTITY_INVALIDATED') {
     if (state.lifecycle === 'CLOSED') return state;
-    return state.openingShopId === event.shopId && state.openingWorkerId === event.workerId
-      ? state
-      : createClosedMenuLayoutEditorSession();
+    if (
+      state.openingShopId === event.shopId &&
+      state.openingWorkerId === event.workerId
+    ) {
+      return state;
+    }
+    return createClosedMenuLayoutEditorSession();
   }
 
   if (event.type === 'SAVE_SUCCESS') {
-    return saveCompletionMatches(state, event) ? createClosedMenuLayoutEditorSession() : state;
+    if (!saveCompletionMatches(state, event)) return state;
+    return createClosedMenuLayoutEditorSession();
   }
 
   if (event.type === 'SAVE_FAILURE') {
@@ -254,15 +262,24 @@ export function menuLayoutEditorReducer(
 
     case 'SET_CATEGORY_ORDER':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, { ...state.draft, categoryOrder: [...event.categoryOrder] });
+      return withDraft(state, {
+        ...state.draft,
+        categoryOrder: [...event.categoryOrder],
+      });
 
     case 'SET_ALIGNMENT':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, { ...state.draft, categoryAlignment: event.categoryAlignment });
+      return withDraft(state, {
+        ...state.draft,
+        categoryAlignment: event.categoryAlignment,
+      });
 
     case 'SET_PRODUCT_ORDER':
       if (!canMutateDraft(state) || state.draft === null) return state;
-      return withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
+      return withDraft(state, {
+        ...state.draft,
+        productOrder: [...event.productOrder],
+      });
 
     case 'BEGIN_CATEGORY_PICKUP': {
       if (!canMutateDraft(state)) return state;
@@ -315,15 +332,17 @@ export function menuLayoutEditorReducer(
     case 'CATEGORY_CHANGE':
       return rollbackPickup(state);
 
-    case 'RESET':
+    case 'RESET': {
       if (!canMutateDraft(state)) return state;
-      return {
-        ...withDraft(rollbackPickup(state), event.draft, { resetRequested: true }),
-        interaction: { type: 'NONE' },
-      };
+      const reset = withDraft(rollbackPickup(state), event.draft, {
+        resetRequested: true,
+      });
+      return { ...reset, interaction: { type: 'NONE' } };
+    }
 
     case 'CANCEL_EDITOR':
-      return state.lifecycle === 'CLOSED' ? state : createClosedMenuLayoutEditorSession();
+      if (state.lifecycle === 'CLOSED') return state;
+      return createClosedMenuLayoutEditorSession();
 
     case 'BEGIN_SAVE': {
       if (!canMutateDraft(state)) return state;
