@@ -73,6 +73,7 @@ import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
+import { shouldEnsureSelectedCategoryVisible } from './selectedCategoryVisibility';
 import type { MenuLayoutExitController } from './unsavedChangesGuard';
 import { menuEditPreferenceInput } from './workerUiPreferenceEditing';
 
@@ -293,20 +294,29 @@ function MenuEditCategoryTab({
   selected,
   disabled,
   onSelect,
+  onNodeRef,
 }: {
   readonly category: MenuCategory;
   readonly selected: boolean;
   readonly disabled: boolean;
   readonly onSelect: () => void;
+  readonly onNodeRef: (node: HTMLButtonElement | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: menuEditCategorySortableId(category.id),
     disabled,
   });
+  const setCombinedNodeRef = useCallback(
+    (node: HTMLButtonElement | null): void => {
+      setNodeRef(node);
+      onNodeRef(node);
+    },
+    [onNodeRef, setNodeRef],
+  );
 
   return (
     <button
-      ref={setNodeRef}
+      ref={setCombinedNodeRef}
       type="button"
       disabled={disabled}
       className={[
@@ -342,6 +352,8 @@ export function OrdersWorkspace({
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
   const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
   const searchRef = useRef<HTMLInputElement>(null);
+  const categoryRailRef = useRef<HTMLDivElement>(null);
+  const categoryTabRefs = useRef<Map<MenuCategoryId, HTMLButtonElement>>(new Map());
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
@@ -413,6 +425,23 @@ export function OrdersWorkspace({
     setActiveMenuDragId(null);
     setMenuEditAnnouncement('');
   }, []);
+  const setCategoryTabRef = useCallback(
+    (categoryId: MenuCategoryId, node: HTMLButtonElement | null): void => {
+      if (node === null) categoryTabRefs.current.delete(categoryId);
+      else categoryTabRefs.current.set(categoryId, node);
+    },
+    [],
+  );
+  const ensureSelectedCategoryVisible = useCallback((): void => {
+    if (selectedCategoryId === null) return;
+    const rail = categoryRailRef.current;
+    const selectedTab = categoryTabRefs.current.get(selectedCategoryId);
+    if (rail === null || selectedTab === undefined) return;
+    const railBounds = rail.getBoundingClientRect();
+    const selectedTabBounds = selectedTab.getBoundingClientRect();
+    if (!shouldEnsureSelectedCategoryVisible(railBounds, selectedTabBounds)) return;
+    selectedTab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selectedCategoryId]);
 
   useEffect(() => {
     if (onMenuLayoutExitControllerChange === undefined) return;
@@ -449,6 +478,20 @@ export function OrdersWorkspace({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [menuEditSession.dirty]);
+
+  useEffect(() => {
+    if (!menuEditActive) return;
+    ensureSelectedCategoryVisible();
+  }, [ensureSelectedCategoryVisible, menuEditActive]);
+
+  useEffect(() => {
+    if (!menuEditActive || typeof ResizeObserver === 'undefined') return;
+    const rail = categoryRailRef.current;
+    if (rail === null) return;
+    const observer = new ResizeObserver(() => ensureSelectedCategoryVisible());
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [ensureSelectedCategoryVisible, menuEditActive]);
 
   function commitCartWidth(nextWidth: number): void {
     const next = clampCartWidth(nextWidth, window.innerWidth);
@@ -1281,6 +1324,7 @@ export function OrdersWorkspace({
               <div className="field-stack category-navigation-stack">
                 <div className="category-navigation">
                   <div
+                    ref={categoryRailRef}
                     className="category-rail"
                     aria-label="Menu categories"
                     data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
@@ -1297,6 +1341,7 @@ export function OrdersWorkspace({
                             selected={selectedCategoryId === category.id}
                             disabled={menuEditSaving}
                             onSelect={() => selectMenuEditCategory(category.id)}
+                            onNodeRef={(node) => setCategoryTabRef(category.id, node)}
                           />
                         ))}
                       </SortableContext>
@@ -1768,7 +1813,7 @@ export function OrdersWorkspace({
             </button>
           </div>
         </div>
-      )}
+      ) : null}
       {globalError === null ? null : (
         <div className="global-error orders-error" role="alert">
           <span>{globalError}</span>
