@@ -55,7 +55,7 @@ jobs:
           python scripts/task4_dnd_green.py
           npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/MenuEditProductCard.tsx apps/operations/src/styles/final-pos-corrections.css
           git checkout refs/remotes/origin/main -- .github/workflows/ci.yml
-          git rm scripts/task4_dnd_green.py
+          git rm -f scripts/task4_dnd_green.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/MenuEditProductCard.tsx apps/operations/src/styles/final-pos-corrections.css .github/workflows/ci.yml
