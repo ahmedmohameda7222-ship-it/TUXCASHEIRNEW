@@ -585,6 +585,7 @@ export function OrdersWorkspace({
       cancelled = true;
     };
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
+
   useEffect(() => {
     const shopId = session.shopId;
     const workerId = session.operator.id;
@@ -1384,7 +1385,7 @@ export function OrdersWorkspace({
   if (workspace === null || draft === null || configuration === null) {
     return (
       <main className="orders-unavailable">
-        <h1 id="orders-unavailable-title">Orders unavailable</h1>
+        <h1>Orders unavailable</h1>
         <p>{globalError ?? 'The local Orders workspace could not be loaded.'}</p>
       </main>
     );
