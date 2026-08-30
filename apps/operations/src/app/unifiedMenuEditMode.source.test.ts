@@ -42,7 +42,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
 
-  it('uses dnd-kit sensors, sortable contexts, constrained spatial keyboard coordinates, and an overlay', () => {
+  it('uses dnd-kit sensors, sortable contexts, stock spatial keyboard coordinates, and an overlay', () => {
     expect(ordersWorkspaceSource).toContain('DndContext');
     expect(ordersWorkspaceSource).toContain('PointerSensor');
     expect(ordersWorkspaceSource).toContain('TouchSensor');
@@ -51,7 +51,7 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('useSensors');
     expect(ordersWorkspaceSource).toContain('DragOverlay');
     expect(ordersWorkspaceSource).toContain('SortableContext');
-    expect(ordersWorkspaceSource).toContain('menuLayoutKeyboardCoordinates');
+    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates');
     expect(ordersWorkspaceSource).toContain('horizontalListSortingStrategy');
     expect(ordersWorkspaceSource).toContain('rectSortingStrategy');
   });
@@ -118,9 +118,9 @@ describe('unified menu edit entry point', () => {
     ).toBeGreaterThanOrEqual(4);
   });
 
-  it('uses constrained dnd-kit spatial keyboard sorting for categories and Product Cards', () => {
+  it('uses dnd-kit spatial keyboard sorting for categories and Product Cards', () => {
     expect(ordersWorkspaceSource).toContain('KeyboardSensor');
-    expect(ordersWorkspaceSource).toContain('menuLayoutKeyboardCoordinates');
+    expect(ordersWorkspaceSource).toContain('coordinateGetter: sortableKeyboardCoordinates');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
