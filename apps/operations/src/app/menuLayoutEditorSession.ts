@@ -182,7 +182,9 @@ function withDraft(
   };
 }
 
-function rollbackPickup(state: MenuLayoutEditorSession): MenuLayoutEditorSession {
+function rollbackPickup(
+  state: MenuLayoutEditorSession,
+): MenuLayoutEditorSession {
   if (state.interaction.type === 'NONE') return state;
   if (state.base === null) return state;
   const draft = cloneDraft(state.interaction.snapshot);
