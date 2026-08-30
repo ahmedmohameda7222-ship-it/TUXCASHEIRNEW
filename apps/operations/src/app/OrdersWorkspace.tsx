@@ -8,7 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragMoveEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import {
@@ -1031,7 +1031,7 @@ export function OrdersWorkspace({
     return true;
   }
 
-  function handleMenuEditDragMove(event: DragMoveEvent): void {
+  function handleMenuEditDragOver(event: DragOverEvent): void {
     if (menuEditSaving || !menuEditActive || event.over === null) return;
     const activeId = String(event.active.id);
     const overId = String(event.over.id);
@@ -1369,7 +1369,7 @@ export function OrdersWorkspace({
                     sensors={menuEditSensors}
                     collisionDetection={closestCenter}
                     onDragStart={handleMenuEditDragStart}
-                    onDragMove={handleMenuEditDragMove}
+                    onDragOver={handleMenuEditDragOver}
                     onDragCancel={handleMenuEditDragCancel}
                     onDragEnd={handleMenuEditDragEnd}
                   >
@@ -1561,7 +1561,7 @@ export function OrdersWorkspace({
                 sensors={menuEditSensors}
                 collisionDetection={closestCenter}
                 onDragStart={handleMenuEditDragStart}
-                onDragMove={handleMenuEditDragMove}
+                onDragOver={handleMenuEditDragOver}
                 onDragCancel={handleMenuEditDragCancel}
                 onDragEnd={handleMenuEditDragEnd}
               >
