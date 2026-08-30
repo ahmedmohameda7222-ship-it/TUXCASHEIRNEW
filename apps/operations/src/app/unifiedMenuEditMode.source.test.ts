@@ -140,7 +140,13 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
     expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
     expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
-    expect(ordersWorkspaceSource).toContain('container.id !== active.id');
+    expect(ordersWorkspaceSource).toContain('directionalDroppableContainers');
+    expect(ordersWorkspaceSource).toContain('if (container.id === active.id) return false;');
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowDown')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowUp')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowLeft')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowRight')");
+    expect(ordersWorkspaceSource).toContain('const projectedCollisions = closestCorners({');
     expect(ordersWorkspaceSource).toContain('if (deltaX === 0 && deltaY === 0)');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
