@@ -46,6 +46,20 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Temporary Prettier diff diagnostic
+        shell: bash
+        run: |
+          for file in \
+            apps/operations/src/app/App.tsx \
+            e2e/menu-layout-editor-test-helpers.ts \
+            e2e/menu-layout-editor.e2e.ts \
+            e2e/menu-layout-editor.touch.e2e.ts; do
+            echo "===== $file ====="
+            formatted="$(mktemp)"
+            npx prettier "$file" > "$formatted"
+            diff -u "$file" "$formatted" || true
+            rm -f "$formatted"
+          done
       - name: Format check
         run: npm run format:check
       - name: Lint
