@@ -42,7 +42,10 @@ describe('OrdersWorkspace menu-layout transaction integration', () => {
     expect(selectCategoryStart).toBeGreaterThanOrEqual(0);
     expect(selectCategoryEnd).toBeGreaterThan(selectCategoryStart);
 
-    const selectCategorySource = ordersWorkspaceSource.slice(selectCategoryStart, selectCategoryEnd);
+    const selectCategorySource = ordersWorkspaceSource.slice(
+      selectCategoryStart,
+      selectCategoryEnd,
+    );
     const rollbackIndex = selectCategorySource.indexOf(
       "dispatchMenuLayoutEditor({ type: 'CATEGORY_CHANGE' });",
     );
