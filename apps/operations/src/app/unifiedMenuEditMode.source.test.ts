@@ -137,9 +137,7 @@ describe('unified menu edit entry point', () => {
 
   it('uses dnd-kit spatial keyboard sorting for categories and Product Cards', () => {
     expect(ordersWorkspaceSource).toContain('KeyboardSensor');
-    expect(ordersWorkspaceSource).toContain(
-      'coordinateGetter: menuEditKeyboardCoordinateGetter',
-    );
+    expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
     expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
     expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
