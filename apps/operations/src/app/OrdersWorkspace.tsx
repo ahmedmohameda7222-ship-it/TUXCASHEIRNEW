@@ -2,6 +2,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   closestCenter,
@@ -82,6 +83,9 @@ type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
 const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
 const CART_RESIZE_KEYBOARD_STEP = 24;
+const MENU_EDIT_MEASURING = {
+  droppable: { strategy: MeasuringStrategy.BeforeDragging },
+};
 
 function desktopCartResizeMatches(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
@@ -356,6 +360,7 @@ export function OrdersWorkspace({
   const categoryRailRef = useRef<HTMLDivElement>(null);
   const categoryTabRefs = useRef<Map<MenuCategoryId, HTMLButtonElement>>(new Map());
   const lastAppliedMenuDragTargetRef = useRef<string | null>(null);
+  const pendingKeyboardDragTargetRef = useRef<string | null>(null);
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
@@ -406,10 +411,48 @@ export function OrdersWorkspace({
   const categoryEditOrder = menuEditSession.draft?.categoryOrder ?? [];
   const categoryEditAlignment = menuEditSession.draft?.categoryAlignment ?? 'left';
   const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
+  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(
+    (event, args) => {
+      const nextCoordinates = sortableKeyboardCoordinates(event, args);
+      if (nextCoordinates === undefined) {
+        pendingKeyboardDragTargetRef.current = null;
+        return nextCoordinates;
+      }
+
+      const active = args.context.active;
+      const collisionRect = args.context.collisionRect;
+      if (active === null || collisionRect === null) {
+        pendingKeyboardDragTargetRef.current = null;
+        return nextCoordinates;
+      }
+
+      const deltaX = nextCoordinates.x - args.currentCoordinates.x;
+      const deltaY = nextCoordinates.y - args.currentCoordinates.y;
+      const projectedCollisionRect = {
+        width: collisionRect.width,
+        height: collisionRect.height,
+        left: collisionRect.left + deltaX,
+        right: collisionRect.right + deltaX,
+        top: collisionRect.top + deltaY,
+        bottom: collisionRect.bottom + deltaY,
+      };
+      const [projectedCollision] = closestCenter({
+        active,
+        collisionRect: projectedCollisionRect,
+        droppableRects: args.context.droppableRects,
+        droppableContainers: args.context.droppableContainers.getEnabled(),
+        pointerCoordinates: null,
+      });
+      pendingKeyboardDragTargetRef.current =
+        projectedCollision === undefined ? null : String(projectedCollision.id);
+      return nextCoordinates;
+    },
+    [],
+  );
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: menuEditKeyboardCoordinateGetter }),
   );
 
   const activeWorkerMenuPreferenceLoadState: WorkerMenuPreferenceLoadState =
@@ -936,6 +979,7 @@ export function OrdersWorkspace({
     if (!menuEditActive) return;
     const activeId = String(event.active.id);
     lastAppliedMenuDragTargetRef.current = activeId;
+    pendingKeyboardDragTargetRef.current = null;
     const activeCategory = categoryEditorCategories.find(
       (category) => menuEditCategorySortableId(category.id) === activeId,
     );
@@ -966,6 +1010,7 @@ export function OrdersWorkspace({
     dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
     setActiveMenuDragId(null);
     lastAppliedMenuDragTargetRef.current = null;
+    pendingKeyboardDragTargetRef.current = null;
   }
 
   function applyMenuEditDragOver(activeId: string, overId: string): boolean {
@@ -1044,7 +1089,13 @@ export function OrdersWorkspace({
   function handleMenuEditDragEnd(event: DragEndEvent): void {
     if (menuEditSaving) return;
     const activeId = String(event.active.id);
-    const overId = event.over === null ? null : String(event.over.id);
+    const eventOverId = event.over === null ? null : String(event.over.id);
+    const projectedKeyboardTarget = pendingKeyboardDragTargetRef.current;
+    pendingKeyboardDragTargetRef.current = null;
+    const overId =
+      projectedKeyboardTarget !== null && (eventOverId === null || eventOverId === activeId)
+        ? projectedKeyboardTarget
+        : eventOverId;
     setActiveMenuDragId(null);
 
     if (!menuEditActive || overId === null) {
@@ -1368,6 +1419,7 @@ export function OrdersWorkspace({
                   <DndContext
                     sensors={menuEditSensors}
                     collisionDetection={closestCenter}
+                    measuring={MENU_EDIT_MEASURING}
                     onDragStart={handleMenuEditDragStart}
                     onDragOver={handleMenuEditDragOver}
                     onDragCancel={handleMenuEditDragCancel}
@@ -1560,6 +1612,7 @@ export function OrdersWorkspace({
               <DndContext
                 sensors={menuEditSensors}
                 collisionDetection={closestCenter}
+                measuring={MENU_EDIT_MEASURING}
                 onDragStart={handleMenuEditDragStart}
                 onDragOver={handleMenuEditDragOver}
                 onDragCancel={handleMenuEditDragCancel}
