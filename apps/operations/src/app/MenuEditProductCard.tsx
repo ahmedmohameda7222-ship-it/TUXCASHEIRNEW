@@ -32,7 +32,7 @@ export function MenuEditProductCard({
       {...listeners}
       className={[
         className ?? 'product-card menu-edit-product-card',
-        isDragging ? 'menu-edit-product-card-dragging' : '',
+        isDragging ? 'menu-edit-product-card-dragging menu-edit-product-card-grabbed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
