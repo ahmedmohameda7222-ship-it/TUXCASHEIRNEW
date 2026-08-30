@@ -263,17 +263,15 @@ describe('worker menu preference presentation', () => {
   it('enables Menu Edit only after READY, including intentional READY(null)', () => {
     const saved = preference([drinks.id, burgers.id]);
 
-    expect(
-      resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: saved }),
-    ).toEqual({
-      preference: saved,
-      menuEditEnabled: true,
-      errorMessage: null,
-      retryVisible: false,
-    });
-    expect(
-      resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: null }),
-    ).toEqual({
+    expect(resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: saved })).toEqual(
+      {
+        preference: saved,
+        menuEditEnabled: true,
+        errorMessage: null,
+        retryVisible: false,
+      },
+    );
+    expect(resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: null })).toEqual({
       preference: null,
       menuEditEnabled: true,
       errorMessage: null,
