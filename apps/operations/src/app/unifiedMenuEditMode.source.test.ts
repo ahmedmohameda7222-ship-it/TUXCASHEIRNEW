@@ -42,11 +42,12 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
 
-  it('uses dnd-kit sensors, sortable contexts, stock spatial keyboard coordinates, and an overlay', () => {
+  it('uses dnd-kit sensors, sortable contexts, stock spatial keyboard coordinates, eager droppable measurement, and an overlay', () => {
     expect(ordersWorkspaceSource).toContain('DndContext');
     expect(ordersWorkspaceSource).toContain('PointerSensor');
     expect(ordersWorkspaceSource).toContain('TouchSensor');
     expect(ordersWorkspaceSource).toContain('KeyboardSensor');
+    expect(ordersWorkspaceSource).toContain('MeasuringStrategy');
     expect(ordersWorkspaceSource).toContain('useSensor');
     expect(ordersWorkspaceSource).toContain('useSensors');
     expect(ordersWorkspaceSource).toContain('DragOverlay');
@@ -54,6 +55,8 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates');
     expect(ordersWorkspaceSource).toContain('horizontalListSortingStrategy');
     expect(ordersWorkspaceSource).toContain('rectSortingStrategy');
+    expect(ordersWorkspaceSource).toContain('strategy: MeasuringStrategy.Always');
+    expect(ordersWorkspaceSource.match(/measuring=\{MENU_EDIT_MEASURING\}/g)).toHaveLength(2);
   });
 
   it('keeps category tabs in the header and makes those same tabs sortable in edit mode', () => {
@@ -135,14 +138,15 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
 
-  it('jiggles both reorder surfaces continuously with staggered timing and distinct active state while respecting Reduced Motion', () => {
-    expect(menuEditStyles).toContain('@keyframes menu-edit-jiggle');
+  it('keeps idle reorder hit targets geometrically stable while preserving a clear active affordance and Reduced Motion', () => {
     expect(menuEditStyles).toContain('.category-tab-reordering');
     expect(menuEditStyles).toContain('.menu-edit-product-card');
-    expect(menuEditStyles).toContain('animation: menu-edit-jiggle');
-    expect(menuEditStyles).toContain(':nth-child(2n)');
-    expect(menuEditStyles).toContain(':nth-child(3n)');
+    expect(menuEditStyles).toContain('cursor: grab');
+    expect(menuEditStyles).toContain('touch-action: none');
+    expect(menuEditStyles).not.toContain('@keyframes menu-edit-jiggle');
+    expect(menuEditStyles).not.toContain('animation: menu-edit-jiggle');
+    expect(menuEditStyles).toContain('.category-tab-dragging');
+    expect(menuEditStyles).toContain('.menu-edit-product-card-dragging');
     expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(menuEditStyles).toContain('animation: none');
   });
 });
