@@ -8,13 +8,13 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   horizontalListSortingStrategy,
   rectSortingStrategy,
-  sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -61,6 +61,7 @@ import {
   type MenuLayoutDraft,
   type WorkerMenuPreferenceLoadState,
 } from './menuLayoutEditorSession';
+import { menuLayoutKeyboardCoordinates } from './menuLayoutKeyboardCoordinates';
 import { MenuEditProductCard, menuEditProductSortableId } from './MenuEditProductCard';
 import { MenuProductCard } from './MenuProductCard';
 import { ProductCardPresentation } from './ProductCardPresentation';
@@ -323,7 +324,7 @@ function MenuEditCategoryTab({
         'category-tab',
         selected ? 'selected' : '',
         'category-tab-reordering',
-        isDragging ? 'category-tab-dragging' : '',
+        isDragging ? 'category-tab-dragging category-tab-grabbed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -407,7 +408,7 @@ export function OrdersWorkspace({
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: menuLayoutKeyboardCoordinates }),
   );
 
   const activeWorkerMenuPreferenceLoadState: WorkerMenuPreferenceLoadState =
@@ -942,6 +943,7 @@ export function OrdersWorkspace({
         categoryId: activeCategory.id,
       });
       setActiveMenuDragId(activeId);
+      setMenuEditAnnouncement(`${activeCategory.name} picked up.`);
       return;
     }
     const activeProduct = menuEditProducts.find(
@@ -954,12 +956,81 @@ export function OrdersWorkspace({
       categoryId: selectedCategoryId,
     });
     setActiveMenuDragId(activeId);
+    setMenuEditAnnouncement(`${activeProduct.name} picked up.`);
   }
 
   function handleMenuEditDragCancel(): void {
     if (menuEditSaving) return;
     dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
     setActiveMenuDragId(null);
+  }
+
+  function applyMenuEditDragOver(activeId: string, overId: string): boolean {
+    const activeCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === activeId,
+    );
+    const overCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === overId,
+    );
+    if (activeCategory !== undefined && overCategory !== undefined) {
+      if (activeCategory.id === overCategory.id) return true;
+      const sourceIndex = categoryEditOrder.indexOf(activeCategory.id);
+      const targetIndex = categoryEditOrder.indexOf(overCategory.id);
+      if (sourceIndex < 0 || targetIndex < 0) return false;
+      const next = [...categoryEditOrder];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (moved === undefined) return false;
+      next.splice(targetIndex, 0, moved);
+      dispatchMenuLayoutEditor({ type: 'SET_CATEGORY_ORDER', categoryOrder: next });
+      setMenuEditAnnouncement(
+        `${activeCategory.name} moved to position ${targetIndex + 1} of ${next.length}.`,
+      );
+      return true;
+    }
+
+    const activeProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === activeId,
+    );
+    const overProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === overId,
+    );
+    if (
+      activeProduct === undefined ||
+      overProduct === undefined ||
+      selectedCategoryId === null ||
+      activeProduct.categoryId !== selectedCategoryId ||
+      overProduct.categoryId !== selectedCategoryId
+    ) {
+      return false;
+    }
+    if (activeProduct.id === overProduct.id) return true;
+
+    const productCategoryById = new Map(
+      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+    );
+    const categoryProductIds = menuEditProductOrder.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
+    const next = moveProductWithinCategory(
+      menuEditProductOrder,
+      categoryProductIds,
+      activeProduct.id,
+      overProduct.id,
+    );
+    if (next === menuEditProductOrder) return true;
+    dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
+    const categoryOnly = next.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
+    setMenuEditAnnouncement(
+      `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
+    );
+    return true;
+  }
+
+  function handleMenuEditDragOver(event: DragOverEvent): void {
+    if (menuEditSaving || !menuEditActive || event.over === null) return;
+    applyMenuEditDragOver(String(event.active.id), String(event.over.id));
   }
 
   function handleMenuEditDragEnd(event: DragEndEvent): void {
@@ -980,25 +1051,6 @@ export function OrdersWorkspace({
       (category) => menuEditCategorySortableId(category.id) === overId,
     );
     if (activeCategory !== undefined && overCategory !== undefined) {
-      if (activeCategory.id !== overCategory.id) {
-        const sourceIndex = categoryEditOrder.indexOf(activeCategory.id);
-        const targetIndex = categoryEditOrder.indexOf(overCategory.id);
-        if (sourceIndex < 0 || targetIndex < 0) {
-          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
-          return;
-        }
-        const next = [...categoryEditOrder];
-        const [moved] = next.splice(sourceIndex, 1);
-        if (moved === undefined) {
-          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
-          return;
-        }
-        next.splice(targetIndex, 0, moved);
-        dispatchMenuLayoutEditor({ type: 'SET_CATEGORY_ORDER', categoryOrder: next });
-        setMenuEditAnnouncement(
-          `${activeCategory.name} moved to position ${targetIndex + 1} of ${next.length}.`,
-        );
-      }
       dispatchMenuLayoutEditor({
         type: 'DROP_CATEGORY_PICKUP',
         categoryId: activeCategory.id,
@@ -1023,29 +1075,6 @@ export function OrdersWorkspace({
       return;
     }
 
-    if (activeProduct.id !== overProduct.id) {
-      const productCategoryById = new Map(
-        (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
-      );
-      const categoryProductIds = menuEditProductOrder.filter(
-        (productId) => productCategoryById.get(productId) === selectedCategoryId,
-      );
-      const next = moveProductWithinCategory(
-        menuEditProductOrder,
-        categoryProductIds,
-        activeProduct.id,
-        overProduct.id,
-      );
-      if (next !== menuEditProductOrder) {
-        dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
-        const categoryOnly = next.filter(
-          (productId) => productCategoryById.get(productId) === selectedCategoryId,
-        );
-        setMenuEditAnnouncement(
-          `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
-        );
-      }
-    }
     dispatchMenuLayoutEditor({
       type: 'DROP_PRODUCT_PICKUP',
       productId: activeProduct.id,
@@ -1310,6 +1339,7 @@ export function OrdersWorkspace({
           sensors={menuEditSensors}
           collisionDetection={closestCenter}
           onDragStart={handleMenuEditDragStart}
+          onDragOver={handleMenuEditDragOver}
           onDragCancel={handleMenuEditDragCancel}
           onDragEnd={handleMenuEditDragEnd}
         >
