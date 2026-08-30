@@ -1569,9 +1569,7 @@ export function OrdersWorkspace({
                 </SortableContext>
                 <DragOverlay>
                   {activeDraggedProduct === null ? null : (
-                    <article
-                      className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay"
-                    >
+                    <article className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay">
                       <div className="product-main">
                         <ProductCardPresentation product={activeDraggedProduct} showDescription />
                       </div>
