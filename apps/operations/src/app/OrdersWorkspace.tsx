@@ -25,7 +25,7 @@ import {
   type ProductId,
   type WorkerUiPreferences,
 } from '@tux/domain';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   CART_WIDTH_MAX_PX,
   CART_WIDTH_MIN,
@@ -34,6 +34,11 @@ import {
   writeCartWidth,
 } from './cartWidthPreference';
 import { EditPencilIcon, SearchIcon } from './icons';
+import {
+  createWorkerMenuPreferenceLoadSession,
+  workerMenuPreferenceLoadReducer,
+  type WorkerMenuPreferenceLoadState,
+} from './menuLayoutEditorSession';
 import { MenuProductCard } from './MenuProductCard';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
@@ -132,6 +137,36 @@ export function filterProductsForMenu(
     )
     .slice()
     .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+export function resolveWorkerMenuPreferencePresentation(state: WorkerMenuPreferenceLoadState): {
+  readonly preference: WorkerUiPreferences | null;
+  readonly menuEditEnabled: boolean;
+  readonly errorMessage: string | null;
+  readonly retryVisible: boolean;
+} {
+  if (state.status === 'READY') {
+    return {
+      preference: state.preference,
+      menuEditEnabled: true,
+      errorMessage: null,
+      retryVisible: false,
+    };
+  }
+  if (state.status === 'ERROR') {
+    return {
+      preference: null,
+      menuEditEnabled: false,
+      errorMessage: state.message,
+      retryVisible: true,
+    };
+  }
+  return {
+    preference: null,
+    menuEditEnabled: false,
+    errorMessage: null,
+    retryVisible: false,
+  };
 }
 
 interface UndoState {
@@ -242,6 +277,7 @@ export function OrdersWorkspace({
   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const categoryPickupSnapshotRef = useRef<readonly MenuCategoryId[] | null>(null);
   const productPickupSnapshotRef = useRef<readonly ProductId[] | null>(null);
+  const preferenceLoadGenerationRef = useRef(0);
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -257,7 +293,10 @@ export function OrdersWorkspace({
   const [search, setSearch] = useState('');
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');
   const [menuEditActive, setMenuEditActive] = useState(false);
-  const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
+  const [workerMenuPreferenceLoadSession, dispatchWorkerMenuPreferenceLoad] = useReducer(
+    workerMenuPreferenceLoadReducer,
+    createWorkerMenuPreferenceLoadSession(session.shopId, session.operator.id, 0),
+  );
   const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
   const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
   const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
@@ -281,6 +320,16 @@ export function OrdersWorkspace({
       ? CART_WIDTH_MIN
       : readCartWidth(window.localStorage, window.innerWidth),
   );
+
+  const activeWorkerMenuPreferenceLoadState: WorkerMenuPreferenceLoadState =
+    workerMenuPreferenceLoadSession.shopId === session.shopId &&
+    workerMenuPreferenceLoadSession.workerId === session.operator.id
+      ? workerMenuPreferenceLoadSession.state
+      : { status: 'LOADING' };
+  const workerMenuPreferencePresentation = resolveWorkerMenuPreferencePresentation(
+    activeWorkerMenuPreferenceLoadState,
+  );
+  const categoryPreference = workerMenuPreferencePresentation.preference;
 
   function commitCartWidth(nextWidth: number): void {
     const next = clampCartWidth(nextWidth, window.innerWidth);
@@ -328,25 +377,37 @@ export function OrdersWorkspace({
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
 
   useEffect(() => {
-    let cancelled = false;
-    setCategoryPreference(null);
+    const shopId = session.shopId;
+    const workerId = session.operator.id;
+    const generation = preferenceLoadGenerationRef.current + 1;
+    preferenceLoadGenerationRef.current = generation;
+    dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
     setCategoryMode('IDLE');
     setMenuEditActive(false);
     setMenuEditError(null);
     setMenuEditResetRequested(false);
     setSearch('');
-    void preferencesClient
-      .load()
-      .then((preference) => {
-        if (!cancelled) setCategoryPreference(preference);
-      })
-      .catch(() => {
-        if (!cancelled) setCategoryPreference(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [preferencesClient, session.operator.id]);
+    void preferencesClient.load().then(
+      (preference) => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'READY',
+          shopId,
+          workerId,
+          generation,
+          preference,
+        });
+      },
+      () => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'ERROR',
+          shopId,
+          workerId,
+          generation,
+          message: 'Menu customization could not be loaded. Retry to enable Menu Edit.',
+        });
+      },
+    );
+  }, [preferencesClient, session.operator.id, session.shopId]);
 
   useEffect(() => {
     if (categoryMode === 'SEARCH') searchRef.current?.focus();
@@ -548,7 +609,36 @@ export function OrdersWorkspace({
       ? null
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
+  function retryWorkerMenuPreferenceLoad(): void {
+    const shopId = session.shopId;
+    const workerId = session.operator.id;
+    const generation = preferenceLoadGenerationRef.current + 1;
+    preferenceLoadGenerationRef.current = generation;
+    dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
+    void preferencesClient.load().then(
+      (preference) => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'READY',
+          shopId,
+          workerId,
+          generation,
+          preference,
+        });
+      },
+      () => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'ERROR',
+          shopId,
+          workerId,
+          generation,
+          message: 'Menu customization could not be loaded. Retry to enable Menu Edit.',
+        });
+      },
+    );
+  }
+
   function beginMenuEdit(): void {
+    if (!workerMenuPreferencePresentation.menuEditEnabled) return;
     setCategoryMode('IDLE');
     setSearch('');
     setSelectedFamily(null);
@@ -606,6 +696,9 @@ export function OrdersWorkspace({
 
   async function saveMenuEdit(): Promise<void> {
     if (menuEditSaving) return;
+    const saveShopId = workerMenuPreferenceLoadSession.shopId;
+    const saveWorkerId = workerMenuPreferenceLoadSession.workerId;
+    const saveGeneration = workerMenuPreferenceLoadSession.generation;
     setMenuEditSaving(true);
     setDraggedCategoryId(null);
     setDraggedProductId(null);
@@ -623,7 +716,13 @@ export function OrdersWorkspace({
           menuEditResetRequested,
         ),
       );
-      setCategoryPreference(saved);
+      dispatchWorkerMenuPreferenceLoad({
+        type: 'READY',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        generation: saveGeneration,
+        preference: saved,
+      });
       setMenuEditActive(false);
       setMenuEditResetRequested(false);
       setDraggedCategoryId(null);
@@ -1152,6 +1251,7 @@ export function OrdersWorkspace({
                       aria-label="Edit menu"
                       title="Edit menu"
                       aria-pressed={menuEditActive}
+                      disabled={!workerMenuPreferencePresentation.menuEditEnabled}
                       onClick={() => {
                         if (!menuEditActive) beginMenuEdit();
                       }}
@@ -1224,6 +1324,19 @@ export function OrdersWorkspace({
               ) : null}
             </div>
           </div>
+
+          {workerMenuPreferencePresentation.errorMessage === null ? null : (
+            <div className="menu-edit-action-status" role="status">
+              <span className="category-editor-error" role="alert">
+                {workerMenuPreferencePresentation.errorMessage}
+              </span>
+              {workerMenuPreferencePresentation.retryVisible ? (
+                <button type="button" className="text-action" onClick={retryWorkerMenuPreferenceLoad}>
+                  Retry
+                </button>
+              ) : null}
+            </div>
+          )}
 
           <div className="product-grid" aria-live="polite">
             {menuEditActive ? (
