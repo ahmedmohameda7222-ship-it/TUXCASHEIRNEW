@@ -10,6 +10,7 @@ import './styles/end-day.css';
 import './styles/premium.css';
 import './styles/brand.css';
 import './styles/responsive-safe-area.css';
+import './styles/menu-layout-editor.css';
 import './styles/final-pos-corrections.css';
 import './styles/system-color-picker.css';
 import { BrowserBootstrapGate } from './app/BrowserBootstrapGate';
