@@ -428,6 +428,10 @@ export function OrdersWorkspace({
 
       const deltaX = nextCoordinates.x - args.currentCoordinates.x;
       const deltaY = nextCoordinates.y - args.currentCoordinates.y;
+      if (deltaX === 0 && deltaY === 0) {
+        pendingKeyboardDragTargetRef.current = null;
+        return nextCoordinates;
+      }
       const projectedCollisionRect = {
         width: collisionRect.width,
         height: collisionRect.height,
@@ -440,7 +444,9 @@ export function OrdersWorkspace({
         active,
         collisionRect: projectedCollisionRect,
         droppableRects: args.context.droppableRects,
-        droppableContainers: args.context.droppableContainers.getEnabled(),
+        droppableContainers: args.context.droppableContainers
+          .getEnabled()
+          .filter((container) => container.id !== active.id),
         pointerCoordinates: null,
       });
       pendingKeyboardDragTargetRef.current =
@@ -1610,6 +1616,7 @@ export function OrdersWorkspace({
               </div>
             ) : (
               <DndContext
+                key={selectedCategoryId ?? 'menu-products-none'}
                 sensors={menuEditSensors}
                 collisionDetection={closestCenter}
                 measuring={MENU_EDIT_MEASURING}
@@ -1919,7 +1926,7 @@ export function OrdersWorkspace({
             </button>
           </div>
         </div>
-      )}
+      ) : null}
       {globalError === null ? null : (
         <div className="global-error orders-error" role="alert">
           <span>{globalError}</span>
