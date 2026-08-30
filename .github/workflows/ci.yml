@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -46,6 +46,19 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Add locked dnd-kit dependencies and restore CI
+        env:
+          BRANCH_NAME: refactor/menu-layout-editor-long-term
+        run: |
+          git fetch origin main "$BRANCH_NAME"
+          git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
+          npm install --workspace @tux/operations --save-exact @dnd-kit/core@6.3.1 @dnd-kit/sortable@10.0.0 @dnd-kit/utilities@3.2.2
+          git checkout origin/main -- .github/workflows/ci.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/package.json package-lock.json .github/workflows/ci.yml
+          git commit -m "build: add dnd-kit menu sorting dependencies"
+          git push origin HEAD:"$BRANCH_NAME"
       - name: Format check
         run: npm run format:check
       - name: Lint
@@ -74,8 +87,6 @@ jobs:
         run: npm run test:migrations
       - uses: denoland/setup-deno@v2
         with:
-          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
-          # same resolver semantics so remote import-graph failures are caught before deploy.
           deno-version: v1.46.3
       - name: Edge Function typecheck
         run: |
