@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  instant,
   parseEntityId,
   type MenuCategoryId,
   type ProductId,
   type ShopId,
   type WorkerId,
+  type WorkerUiPreferences,
 } from '@tux/domain';
 import {
   createClosedMenuLayoutEditorSession,
+  createWorkerMenuPreferenceLoadSession,
   menuLayoutEditorReducer,
   openMenuLayoutEditorSession,
+  workerMenuPreferenceLoadReducer,
   type MenuLayoutDraft,
 } from './menuLayoutEditorSession';
 
@@ -26,6 +30,18 @@ const base: MenuLayoutDraft = {
   categoryOrder: [categoryA, categoryB],
   categoryAlignment: 'left',
   productOrder: [productA, productB, productC],
+};
+
+const savedPreference: WorkerUiPreferences = {
+  shopId,
+  workerId: workerA,
+  categoryOrder: [categoryB, categoryA],
+  categoryAlignment: 'right',
+  productOrder: [productC, productA, productB],
+  accentColor: null,
+  serverVersion: 2,
+  updatedAt: instant(new Date('2026-08-30T04:00:00.000Z')),
+  syncState: 'CLEAN',
 };
 
 function opened() {
@@ -203,5 +219,72 @@ describe('menuLayoutEditorSession', () => {
     expect(mutated).toEqual(saving);
     expect(reset).toEqual(saving);
     expect(cancelled).toEqual(saving);
+  });
+});
+
+describe('worker menu preference loading', () => {
+  it('moves LOADING to ERROR, then retry back through LOADING to READY', () => {
+    const loading = createWorkerMenuPreferenceLoadSession(shopId, workerA, 1);
+    expect(loading.state).toEqual({ status: 'LOADING' });
+
+    const errored = workerMenuPreferenceLoadReducer(loading, {
+      type: 'ERROR',
+      shopId,
+      workerId: workerA,
+      generation: 1,
+      message: 'Preference load failed.',
+    });
+    expect(errored.state).toEqual({ status: 'ERROR', message: 'Preference load failed.' });
+
+    const retrying = workerMenuPreferenceLoadReducer(errored, {
+      type: 'LOAD',
+      shopId,
+      workerId: workerA,
+      generation: 2,
+    });
+    expect(retrying.state).toEqual({ status: 'LOADING' });
+
+    const ready = workerMenuPreferenceLoadReducer(retrying, {
+      type: 'READY',
+      shopId,
+      workerId: workerA,
+      generation: 2,
+      preference: savedPreference,
+    });
+    expect(ready.state).toEqual({ status: 'READY', preference: savedPreference });
+  });
+
+  it('ignores Worker A load completion after Worker B becomes active', () => {
+    const workerALoading = createWorkerMenuPreferenceLoadSession(shopId, workerA, 1);
+    const workerBLoading = workerMenuPreferenceLoadReducer(workerALoading, {
+      type: 'LOAD',
+      shopId,
+      workerId: workerB,
+      generation: 2,
+    });
+
+    const stale = workerMenuPreferenceLoadReducer(workerBLoading, {
+      type: 'READY',
+      shopId,
+      workerId: workerA,
+      generation: 1,
+      preference: savedPreference,
+    });
+
+    expect(stale).toEqual(workerBLoading);
+    expect(stale.state).toEqual({ status: 'LOADING' });
+  });
+
+  it('treats READY(null) as the intentional default preference state', () => {
+    const loading = createWorkerMenuPreferenceLoadSession(shopId, workerA, 1);
+    const ready = workerMenuPreferenceLoadReducer(loading, {
+      type: 'READY',
+      shopId,
+      workerId: workerA,
+      generation: 1,
+      preference: null,
+    });
+
+    expect(ready.state).toEqual({ status: 'READY', preference: null });
   });
 });
