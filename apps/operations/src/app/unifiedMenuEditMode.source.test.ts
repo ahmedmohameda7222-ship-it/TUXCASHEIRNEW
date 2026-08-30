@@ -76,11 +76,12 @@ describe('unified menu edit entry point', () => {
   it('removes native HTML5 menu sorting instead of mutating order on drag hover', () => {
     expect(ordersWorkspaceSource).not.toContain('draggable={');
     expect(ordersWorkspaceSource).not.toContain('draggable:');
-    expect(ordersWorkspaceSource).not.toContain('onDragStart');
+    expect(ordersWorkspaceSource).not.toContain('dataTransfer');
     expect(ordersWorkspaceSource).not.toContain('onDragEnter');
     expect(ordersWorkspaceSource).not.toContain('onDragOver');
     expect(ordersWorkspaceSource).not.toContain('onDrop');
-    expect(ordersWorkspaceSource).toContain('onDragEnd');
+    expect(ordersWorkspaceSource).toContain('onDragStart={handleMenuEditDragStart}');
+    expect(ordersWorkspaceSource).toContain('onDragEnd={handleMenuEditDragEnd}');
   });
 
   it('persists category and product layout together through the menu-layout-only API', () => {
@@ -98,8 +99,10 @@ describe('unified menu edit entry point', () => {
 
   // Saving freezes every persisted menu-layout control after the payload is captured.
   it('freezes every edit interaction while the final preference save is in flight', () => {
-    expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
-    expect(ordersWorkspaceSource).toContain('disabled: menuEditSaving');
+    expect(
+      ordersWorkspaceSource.match(/disabled=\{menuEditSaving\}/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(2);
+    expect(ordersWorkspaceSource).toContain('if (!menuEditActive || menuEditSaving) return;');
     expect(
       ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(4);
