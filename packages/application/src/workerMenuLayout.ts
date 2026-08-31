@@ -67,7 +67,10 @@ export type WorkerMenuLayoutListener = (layout: WorkerMenuLayout) => void;
 
 const DEFAULT_WORKER_MENU_LAYOUT_RETRY_MS = 60_000;
 
-function sameIdentity(left: WorkerMenuLayoutSyncIdentity, right: WorkerMenuLayoutSyncIdentity): boolean {
+function sameIdentity(
+  left: WorkerMenuLayoutSyncIdentity,
+  right: WorkerMenuLayoutSyncIdentity,
+): boolean {
   return left.shopId === right.shopId && left.workerId === right.workerId;
 }
 
@@ -111,8 +114,10 @@ export class WorkerMenuLayoutRetryController {
     const run = async (): Promise<void> => {
       let nextIdentity: WorkerMenuLayoutSyncIdentity | null = identity;
       while (nextIdentity !== null) {
-        const currentIdentity = nextIdentity;
-        await this.#target.syncOnce(currentIdentity.shopId, currentIdentity.workerId).catch(() => undefined);
+        const currentIdentity: WorkerMenuLayoutSyncIdentity = nextIdentity;
+        await this.#target
+          .syncOnce(currentIdentity.shopId, currentIdentity.workerId)
+          .catch(() => undefined);
         const activeIdentity = this.#identity();
         nextIdentity =
           activeIdentity !== null && !sameIdentity(activeIdentity, currentIdentity)
@@ -335,7 +340,9 @@ export function workerMenuLayoutUpdateFromFlatProductOrder(input: {
   readonly catalog: WorkerMenuLayoutCatalog;
 }): WorkerMenuLayoutUpdate {
   const productsById = new Map(
-    input.catalog.products.filter((product) => product.active).map((product) => [product.id, product]),
+    input.catalog.products
+      .filter((product) => product.active)
+      .map((product) => [product.id, product]),
   );
   const productOrderByCategory: Partial<Record<MenuCategoryId, ProductId[]>> = {};
   for (const productId of input.productOrder) {
