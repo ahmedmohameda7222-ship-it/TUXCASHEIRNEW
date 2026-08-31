@@ -1,0 +1,40 @@
+name: Phase B one-shot test fixture patch
+
+on:
+  push:
+    branches:
+      - feat/menu-layout-persistence-phase-b
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/menu-layout-persistence-phase-b
+      - name: Retarget stale inline Menu Layout failure injector
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('e2e/operations.e2e.ts')
+          text = path.read_text()
+          old = "if (this.name === 'workerUiPreferences') {\n        throw new DOMException('Forced preference write failure', 'AbortError');"
+          new = "if (this.name === 'workerMenuLayouts') {\n        throw new DOMException('Forced preference write failure', 'AbortError');"
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one stale inline injector, found {count}')
+          path.write_text(text.replace(old, new))
+          PY
+          rm .github/workflows/phase-b-one-shot-test-fixture-patch.yml
+          git diff --check
+          git diff -- e2e/operations.e2e.ts .github/workflows/phase-b-one-shot-test-fixture-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add e2e/operations.e2e.ts .github/workflows/phase-b-one-shot-test-fixture-patch.yml
+          git commit -m 'test: retarget operations menu layout failure fixture'
+          git push origin HEAD:feat/menu-layout-persistence-phase-b
