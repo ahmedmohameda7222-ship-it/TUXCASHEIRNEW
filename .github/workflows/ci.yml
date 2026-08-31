@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -40,8 +40,6 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -50,19 +48,6 @@ jobs:
         run: npm ci
       - name: Format check
         run: npm run format:check
-      - name: Apply exact Prettier output to PR branch
-        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          npm run format >/dev/null
-          git checkout -- .github/workflows/ci.yml
-          mapfile -t files < <(git diff --name-only)
-          test "${#files[@]}" -gt 0
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- "${files[@]}"
-          git commit -m 'style: format Phase B implementation'
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
