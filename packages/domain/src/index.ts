@@ -122,6 +122,18 @@ export {
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
 export {
+  flattenWorkerMenuLayoutProductOrder,
+  normalizeWorkerMenuLayoutUpdate,
+  parseWorkerMenuLayout,
+  reconcileWorkerMenuLayout,
+  sameWorkerMenuLayoutSnapshot,
+  type ProductOrderByCategory,
+  type WorkerMenuLayout,
+  type WorkerMenuLayoutCatalog,
+  type WorkerMenuLayoutSyncState,
+  type WorkerMenuLayoutUpdate,
+} from './workerMenuLayout';
+export {
   parseSystemAccentColor,
   parseWorkerUiPreferences,
   type CategoryAlignment,
