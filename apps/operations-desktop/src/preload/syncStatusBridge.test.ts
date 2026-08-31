@@ -1,5 +1,5 @@
 import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const harness = vi.hoisted(() => ({
   exposed: null as unknown,
@@ -31,8 +31,13 @@ const synced: TuxSyncHealthSnapshot = {
 beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
+  vi.stubGlobal('window', { addEventListener: vi.fn() });
   harness.exposed = null;
   await import('./index');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 type SyncApi = {
