@@ -297,5 +297,13 @@ export async function handleWorkerMenuLayout(
     return;
   }
 
-  sendJson(response, 200, layout);
+  sendJson(response, 200, {
+    shopId: layout.shopId,
+    workerId: layout.workerId,
+    categoryOrder: layout.categoryOrder,
+    categoryAlignment: layout.categoryAlignment,
+    productOrderByCategory: layout.productOrderByCategory,
+    layoutVersion: layout.layoutVersion,
+    updatedAt: layout.updatedAt,
+  });
 }
