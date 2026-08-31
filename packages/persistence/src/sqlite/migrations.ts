@@ -269,6 +269,94 @@ ALTER TABLE worker_ui_preferences
 ADD COLUMN accent_color TEXT;
 `,
   },
+  {
+    version: 9,
+    name: 'worker_menu_layouts',
+    sql: `
+CREATE TABLE worker_menu_layouts (
+  shop_id TEXT NOT NULL,
+  worker_id TEXT NOT NULL,
+  category_order_json TEXT NOT NULL,
+  category_alignment TEXT NOT NULL CHECK (category_alignment IN ('left','center','right')),
+  product_order_by_category_json TEXT NOT NULL,
+  layout_version INTEGER NOT NULL CHECK (layout_version >= 0),
+  updated_at TEXT NOT NULL,
+  sync_state TEXT NOT NULL CHECK (sync_state IN ('CLEAN','DIRTY')),
+  PRIMARY KEY (shop_id, worker_id)
+);
+
+WITH category_rows AS (
+  SELECT
+    pref.shop_id,
+    pref.worker_id,
+    CAST(category_order.key AS INTEGER) AS ord,
+    category_order.value AS category_id
+  FROM worker_ui_preferences pref
+  JOIN configuration_snapshots config ON config.shop_id = pref.shop_id
+  JOIN json_each(pref.category_order_json) category_order
+  JOIN json_each(json_extract(config.payload_json, '$.categories')) category
+    ON json_extract(category.value, '$.id') = category_order.value
+   AND json_extract(category.value, '$.shopId') = pref.shop_id
+   AND json_extract(category.value, '$.active') = 1
+),
+category_json AS (
+  SELECT shop_id, worker_id, json_group_array(category_id) AS category_order_json
+  FROM (SELECT * FROM category_rows ORDER BY shop_id, worker_id, ord)
+  GROUP BY shop_id, worker_id
+),
+product_rows AS (
+  SELECT
+    pref.shop_id,
+    pref.worker_id,
+    CAST(product_order.key AS INTEGER) AS ord,
+    product_order.value AS product_id,
+    json_extract(product.value, '$.categoryId') AS category_id
+  FROM worker_ui_preferences pref
+  JOIN configuration_snapshots config ON config.shop_id = pref.shop_id
+  JOIN json_each(pref.product_order_json) product_order
+  JOIN json_each(json_extract(config.payload_json, '$.products')) product
+    ON json_extract(product.value, '$.id') = product_order.value
+   AND json_extract(product.value, '$.shopId') = pref.shop_id
+   AND json_extract(product.value, '$.active') = 1
+  JOIN json_each(json_extract(config.payload_json, '$.categories')) category
+    ON json_extract(category.value, '$.id') = json_extract(product.value, '$.categoryId')
+   AND json_extract(category.value, '$.shopId') = pref.shop_id
+   AND json_extract(category.value, '$.active') = 1
+),
+per_category AS (
+  SELECT shop_id, worker_id, category_id, json_group_array(product_id) AS products_json
+  FROM (SELECT * FROM product_rows ORDER BY shop_id, worker_id, category_id, ord)
+  GROUP BY shop_id, worker_id, category_id
+),
+product_json AS (
+  SELECT shop_id, worker_id, json_group_object(category_id, json(products_json)) AS mapping
+  FROM per_category
+  GROUP BY shop_id, worker_id
+)
+INSERT INTO worker_menu_layouts(
+  shop_id,
+  worker_id,
+  category_order_json,
+  category_alignment,
+  product_order_by_category_json,
+  layout_version,
+  updated_at,
+  sync_state
+)
+SELECT
+  pref.shop_id,
+  pref.worker_id,
+  COALESCE(category_json.category_order_json, '[]'),
+  pref.category_alignment,
+  COALESCE(product_json.mapping, '{}'),
+  pref.server_version,
+  pref.updated_at,
+  pref.sync_state
+FROM worker_ui_preferences pref
+LEFT JOIN category_json USING (shop_id, worker_id)
+LEFT JOIN product_json USING (shop_id, worker_id);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

@@ -4,4 +4,5 @@ export { SqliteExpenseLedgerStore } from './SqliteExpenseLedgerStore';
 export { SqliteOperationsDatabase } from './SafeSqliteOperationsDatabase';
 export { SqliteOperatorSessionReadModel } from './SqliteOperatorSessionReadModel';
 export { SqliteOrderDraftStore } from './SqliteOrderDraftStore';
+export { SqliteWorkerMenuLayoutStore } from './SqliteWorkerMenuLayoutStore';
 export { SqliteWorkerUiPreferencesStore } from './SqliteWorkerUiPreferencesStore';
