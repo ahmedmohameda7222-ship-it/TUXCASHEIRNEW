@@ -1,3 +1,26 @@
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MeasuringStrategy,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  closestCorners,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type {
   OperationsSessionState,
   OrdersWorkspace as OrdersWorkspaceData,
@@ -13,7 +36,6 @@ import {
   productQuantityInDraft,
   replaceDraftLineCustomization,
   validateOrderDraft,
-  type CategoryAlignment,
   type DraftLineCustomization,
   type DraftLineId,
   type MenuCategory,
@@ -25,7 +47,7 @@ import {
   type ProductId,
   type WorkerUiPreferences,
 } from '@tux/domain';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   CART_WIDTH_MAX_PX,
   CART_WIDTH_MIN,
@@ -34,23 +56,37 @@ import {
   writeCartWidth,
 } from './cartWidthPreference';
 import { EditPencilIcon, SearchIcon } from './icons';
+import {
+  createClosedMenuLayoutEditorSession,
+  createWorkerMenuPreferenceLoadSession,
+  menuLayoutEditorReducer,
+  workerMenuPreferenceLoadReducer,
+  type MenuLayoutDraft,
+  type WorkerMenuPreferenceLoadState,
+} from './menuLayoutEditorSession';
+import { MenuEditProductCard, menuEditProductSortableId } from './MenuEditProductCard';
 import { MenuProductCard } from './MenuProductCard';
+import { ProductCardPresentation } from './ProductCardPresentation';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
   moveProductWithinCategory,
-  moveProductWithinCategoryByOffset,
   reconcileProductOrder,
 } from './menuProductOrder';
 import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
+import { shouldEnsureSelectedCategoryVisible } from './selectedCategoryVisibility';
+import type { MenuLayoutExitController } from './unsavedChangesGuard';
 import { menuEditPreferenceInput } from './workerUiPreferenceEditing';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
 const DESKTOP_CART_RESIZE_QUERY = '(min-width: 54.0625rem)';
 const CART_RESIZE_KEYBOARD_STEP = 24;
+const MENU_EDIT_MEASURING = {
+  droppable: { strategy: MeasuringStrategy.BeforeDragging },
+};
 
 function desktopCartResizeMatches(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(DESKTOP_CART_RESIZE_QUERY).matches;
@@ -132,6 +168,36 @@ export function filterProductsForMenu(
     )
     .slice()
     .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+export function resolveWorkerMenuPreferencePresentation(state: WorkerMenuPreferenceLoadState): {
+  readonly preference: WorkerUiPreferences | null;
+  readonly menuEditEnabled: boolean;
+  readonly errorMessage: string | null;
+  readonly retryVisible: boolean;
+} {
+  if (state.status === 'READY') {
+    return {
+      preference: state.preference,
+      menuEditEnabled: true,
+      errorMessage: null,
+      retryVisible: false,
+    };
+  }
+  if (state.status === 'ERROR') {
+    return {
+      preference: null,
+      menuEditEnabled: false,
+      errorMessage: state.message,
+      retryVisible: true,
+    };
+  }
+  return {
+    preference: null,
+    menuEditEnabled: false,
+    errorMessage: null,
+    retryVisible: false,
+  };
 }
 
 interface UndoState {
@@ -225,23 +291,85 @@ function QuickInfo({
   );
 }
 
+function menuEditCategorySortableId(categoryId: MenuCategoryId): string {
+  return `category:${categoryId}`;
+}
+
+function MenuEditCategoryTab({
+  category,
+  selected,
+  disabled,
+  onSelect,
+  onNodeRef,
+}: {
+  readonly category: MenuCategory;
+  readonly selected: boolean;
+  readonly disabled: boolean;
+  readonly onSelect: () => void;
+  readonly onNodeRef: (node: HTMLButtonElement | null) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: menuEditCategorySortableId(category.id),
+    disabled,
+  });
+  const setCombinedNodeRef = useCallback(
+    (node: HTMLButtonElement | null): void => {
+      setNodeRef(node);
+      onNodeRef(node);
+    },
+    [onNodeRef, setNodeRef],
+  );
+
+  return (
+    <button
+      ref={setCombinedNodeRef}
+      type="button"
+      disabled={disabled}
+      className={[
+        'category-tab',
+        selected ? 'selected' : '',
+        'category-tab-reordering',
+        isDragging ? 'category-tab-dragging category-tab-grabbed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      onClick={onSelect}
+      {...attributes}
+      {...listeners}
+    >
+      {category.name}
+    </button>
+  );
+}
+
 export function OrdersWorkspace({
   session,
   client,
+  onMenuLayoutExitControllerChange,
 }: {
   readonly session: ActiveSession;
   readonly client: OperationsOrdersClient;
+  readonly onMenuLayoutExitControllerChange?: (controller: MenuLayoutExitController) => void;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
   const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
   const searchRef = useRef<HTMLInputElement>(null);
+  const categoryRailRef = useRef<HTMLDivElement>(null);
+  const categoryTabRefs = useRef<Map<MenuCategoryId, HTMLButtonElement>>(new Map());
+  const lastAppliedMenuDragTargetRef = useRef<string | null>(null);
+  const pendingKeyboardDragTargetRef = useRef<string | null>(null);
   const draftRef = useRef<OrderDraft | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
   const undoTimerRef = useRef<number | null>(null);
   const cartResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const categoryPickupSnapshotRef = useRef<readonly MenuCategoryId[] | null>(null);
-  const productPickupSnapshotRef = useRef<readonly ProductId[] | null>(null);
+  const preferenceLoadGenerationRef = useRef(0);
+  const menuEditIdentityRef = useRef({ shopId: session.shopId, workerId: session.operator.id });
+  menuEditIdentityRef.current = { shopId: session.shopId, workerId: session.operator.id };
 
   const [workspace, setWorkspace] = useState<OrdersWorkspaceData | null>(null);
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -256,19 +384,16 @@ export function OrdersWorkspace({
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryMode, setCategoryMode] = useState<'IDLE' | 'SEARCH'>('IDLE');
-  const [menuEditActive, setMenuEditActive] = useState(false);
-  const [categoryPreference, setCategoryPreference] = useState<WorkerUiPreferences | null>(null);
-  const [categoryEditOrder, setCategoryEditOrder] = useState<readonly MenuCategoryId[]>([]);
-  const [categoryEditAlignment, setCategoryEditAlignment] = useState<CategoryAlignment>('left');
-  const [draggedCategoryId, setDraggedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [menuEditProductOrder, setMenuEditProductOrder] = useState<readonly ProductId[]>([]);
-  const [draggedProductId, setDraggedProductId] = useState<ProductId | null>(null);
-  const [grabbedCategoryId, setGrabbedCategoryId] = useState<MenuCategoryId | null>(null);
-  const [grabbedProductId, setGrabbedProductId] = useState<ProductId | null>(null);
+  const [workerMenuPreferenceLoadSession, dispatchWorkerMenuPreferenceLoad] = useReducer(
+    workerMenuPreferenceLoadReducer,
+    createWorkerMenuPreferenceLoadSession(session.shopId, session.operator.id, 0),
+  );
+  const [menuEditSession, dispatchMenuLayoutEditor] = useReducer(
+    menuLayoutEditorReducer,
+    createClosedMenuLayoutEditorSession(),
+  );
+  const [activeMenuDragId, setActiveMenuDragId] = useState<string | null>(null);
   const [menuEditAnnouncement, setMenuEditAnnouncement] = useState('');
-  const [menuEditSaving, setMenuEditSaving] = useState(false);
-  const [menuEditError, setMenuEditError] = useState<string | null>(null);
-  const [menuEditResetRequested, setMenuEditResetRequested] = useState(false);
   const [customizer, setCustomizer] = useState<ProductCustomizerTarget | null>(null);
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -281,6 +406,140 @@ export function OrdersWorkspace({
       ? CART_WIDTH_MIN
       : readCartWidth(window.localStorage, window.innerWidth),
   );
+  const menuEditActive = menuEditSession.lifecycle !== 'CLOSED';
+  const menuEditSaving = menuEditSession.lifecycle === 'SAVING';
+  const menuEditError = menuEditSession.saveError;
+  const categoryEditOrder = menuEditSession.draft?.categoryOrder ?? [];
+  const categoryEditAlignment = menuEditSession.draft?.categoryAlignment ?? 'left';
+  const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
+  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(
+    (event, args) => {
+      const nextCoordinates = sortableKeyboardCoordinates(event, args);
+      const active = args.context.active;
+      const collisionRect = args.context.collisionRect;
+      if (active === null || collisionRect === null) {
+        pendingKeyboardDragTargetRef.current = null;
+        return nextCoordinates;
+      }
+
+      const directionalDroppableContainers = args.context.droppableContainers
+        .getEnabled()
+        .filter((container) => {
+          if (container.id === active.id) return false;
+          const rect = args.context.droppableRects.get(container.id);
+          if (rect === undefined) return false;
+          if (event.code === 'ArrowDown') return collisionRect.top < rect.top;
+          if (event.code === 'ArrowUp') return collisionRect.top > rect.top;
+          if (event.code === 'ArrowLeft') return collisionRect.left > rect.left;
+          if (event.code === 'ArrowRight') return collisionRect.left < rect.left;
+          return false;
+        });
+      const projectedCollisions = closestCorners({
+        active,
+        collisionRect,
+        droppableRects: args.context.droppableRects,
+        droppableContainers: directionalDroppableContainers,
+        pointerCoordinates: null,
+      });
+      const currentOverId = args.context.over?.id;
+      const projectedCollision =
+        projectedCollisions[0]?.id === currentOverId && projectedCollisions.length > 1
+          ? projectedCollisions[1]
+          : projectedCollisions[0];
+      pendingKeyboardDragTargetRef.current =
+        projectedCollision === undefined ? null : String(projectedCollision.id);
+      return nextCoordinates;
+    },
+    [],
+  );
+  const menuEditSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: menuEditKeyboardCoordinateGetter }),
+  );
+
+  const activeWorkerMenuPreferenceLoadState: WorkerMenuPreferenceLoadState =
+    workerMenuPreferenceLoadSession.shopId === session.shopId &&
+    workerMenuPreferenceLoadSession.workerId === session.operator.id
+      ? workerMenuPreferenceLoadSession.state
+      : { status: 'LOADING' };
+  const workerMenuPreferencePresentation = resolveWorkerMenuPreferencePresentation(
+    activeWorkerMenuPreferenceLoadState,
+  );
+  const categoryPreference = workerMenuPreferencePresentation.preference;
+  const discardMenuLayoutEditor = useCallback((): void => {
+    dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+    dispatchMenuLayoutEditor({ type: 'CANCEL_EDITOR' });
+    setActiveMenuDragId(null);
+    setMenuEditAnnouncement('');
+  }, []);
+  const setCategoryTabRef = useCallback(
+    (categoryId: MenuCategoryId, node: HTMLButtonElement | null): void => {
+      if (node === null) categoryTabRefs.current.delete(categoryId);
+      else categoryTabRefs.current.set(categoryId, node);
+    },
+    [],
+  );
+  const ensureSelectedCategoryVisible = useCallback((): void => {
+    if (selectedCategoryId === null) return;
+    const rail = categoryRailRef.current;
+    const selectedTab = categoryTabRefs.current.get(selectedCategoryId);
+    if (rail === null || selectedTab === undefined) return;
+    const railBounds = rail.getBoundingClientRect();
+    const selectedTabBounds = selectedTab.getBoundingClientRect();
+    if (!shouldEnsureSelectedCategoryVisible(railBounds, selectedTabBounds)) return;
+    selectedTab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
+    if (onMenuLayoutExitControllerChange === undefined) return;
+    onMenuLayoutExitControllerChange({
+      state: {
+        lifecycle: menuEditSession.lifecycle,
+        dirty: menuEditSession.dirty,
+      },
+      discard: discardMenuLayoutEditor,
+    });
+  }, [
+    discardMenuLayoutEditor,
+    menuEditSession.dirty,
+    menuEditSession.lifecycle,
+    onMenuLayoutExitControllerChange,
+  ]);
+
+  useEffect(() => {
+    if (onMenuLayoutExitControllerChange === undefined) return;
+    return () => {
+      onMenuLayoutExitControllerChange({
+        state: { lifecycle: 'CLOSED', dirty: false },
+        discard: () => undefined,
+      });
+    };
+  }, [onMenuLayoutExitControllerChange]);
+
+  useEffect(() => {
+    if (!menuEditSession.dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [menuEditSession.dirty]);
+
+  useEffect(() => {
+    if (!menuEditActive) return;
+    ensureSelectedCategoryVisible();
+  }, [ensureSelectedCategoryVisible, menuEditActive]);
+
+  useEffect(() => {
+    if (!menuEditActive || typeof ResizeObserver === 'undefined') return;
+    const rail = categoryRailRef.current;
+    if (rail === null) return;
+    const observer = new ResizeObserver(() => ensureSelectedCategoryVisible());
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [ensureSelectedCategoryVisible, menuEditActive]);
 
   function commitCartWidth(nextWidth: number): void {
     const next = clampCartWidth(nextWidth, window.innerWidth);
@@ -328,25 +587,37 @@ export function OrdersWorkspace({
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
 
   useEffect(() => {
-    let cancelled = false;
-    setCategoryPreference(null);
+    const shopId = session.shopId;
+    const workerId = session.operator.id;
+    const generation = preferenceLoadGenerationRef.current + 1;
+    preferenceLoadGenerationRef.current = generation;
+    dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
+    dispatchMenuLayoutEditor({ type: 'IDENTITY_INVALIDATED', shopId, workerId });
     setCategoryMode('IDLE');
-    setMenuEditActive(false);
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
+    setActiveMenuDragId(null);
+    setMenuEditAnnouncement('');
     setSearch('');
-    void preferencesClient
-      .load()
-      .then((preference) => {
-        if (!cancelled) setCategoryPreference(preference);
-      })
-      .catch(() => {
-        if (!cancelled) setCategoryPreference(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [preferencesClient, session.operator.id]);
+    void preferencesClient.load().then(
+      (preference) => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'READY',
+          shopId,
+          workerId,
+          generation,
+          preference,
+        });
+      },
+      () => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'ERROR',
+          shopId,
+          workerId,
+          generation,
+          message: 'Menu customization could not be loaded. Retry to enable Menu Edit.',
+        });
+      },
+    );
+  }, [preferencesClient, session.operator.id, session.shopId]);
 
   useEffect(() => {
     if (categoryMode === 'SEARCH') searchRef.current?.focus();
@@ -534,6 +805,26 @@ export function OrdersWorkspace({
       return product !== undefined && product.categoryId === selectedCategoryId ? [product] : [];
     });
   }, [configuration, menuEditProductOrder, selectedCategoryId]);
+  const categorySortableIds = useMemo(
+    () => categoryEditorCategories.map((category) => menuEditCategorySortableId(category.id)),
+    [categoryEditorCategories],
+  );
+  const productSortableIds = useMemo(
+    () => menuEditProducts.map((product) => menuEditProductSortableId(product.id)),
+    [menuEditProducts],
+  );
+  const activeDraggedCategory =
+    activeMenuDragId === null
+      ? null
+      : (categoryEditorCategories.find(
+          (category) => menuEditCategorySortableId(category.id) === activeMenuDragId,
+        ) ?? null);
+  const activeDraggedProduct =
+    activeMenuDragId === null
+      ? null
+      : (menuEditProducts.find(
+          (product) => menuEditProductSortableId(product.id) === activeMenuDragId,
+        ) ?? null);
 
   const validation = useMemo(() => {
     if (draft === null || configuration === null) return null;
@@ -548,229 +839,362 @@ export function OrdersWorkspace({
       ? null
       : (configuration?.products.find((product) => product.id === quickInfoProductId) ?? null);
 
+  function retryWorkerMenuPreferenceLoad(): void {
+    const shopId = session.shopId;
+    const workerId = session.operator.id;
+    const generation = preferenceLoadGenerationRef.current + 1;
+    preferenceLoadGenerationRef.current = generation;
+    dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
+    void preferencesClient.load().then(
+      (preference) => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'READY',
+          shopId,
+          workerId,
+          generation,
+          preference,
+        });
+      },
+      () => {
+        dispatchWorkerMenuPreferenceLoad({
+          type: 'ERROR',
+          shopId,
+          workerId,
+          generation,
+          message: 'Menu customization could not be loaded. Retry to enable Menu Edit.',
+        });
+      },
+    );
+  }
+
   function beginMenuEdit(): void {
+    if (!workerMenuPreferencePresentation.menuEditEnabled) return;
+    const base: MenuLayoutDraft = {
+      categoryOrder: activeCategories.map((category) => category.id),
+      categoryAlignment,
+      productOrder: reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
+        (product) => product.id,
+      ),
+    };
+    dispatchMenuLayoutEditor({
+      type: 'OPEN',
+      shopId: session.shopId,
+      workerId: session.operator.id,
+      base,
+    });
     setCategoryMode('IDLE');
     setSearch('');
     setSelectedFamily(null);
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
-    setCategoryEditOrder(activeCategories.map((category) => category.id));
-    setCategoryEditAlignment(categoryAlignment);
-    setMenuEditProductOrder(
-      reconcileProductOrder(configuration?.products ?? [], categoryPreference).map(
-        (product) => product.id,
-      ),
-    );
-    setDraggedCategoryId(null);
-    setDraggedProductId(null);
-    setGrabbedCategoryId(null);
-    setGrabbedProductId(null);
-    categoryPickupSnapshotRef.current = null;
-    productPickupSnapshotRef.current = null;
+    setActiveMenuDragId(null);
     setMenuEditAnnouncement(
-      'Menu edit mode. Pick up a category or product with Enter or Space, move it with arrow keys, and press Escape to cancel a pickup.',
+      'Menu edit mode. Drag categories or products to reorder. Keyboard users can pick up an item with Space and move it with the arrow keys.',
     );
-    setMenuEditActive(true);
+  }
+
+  function selectMenuEditCategory(categoryId: MenuCategoryId): void {
+    if (menuEditSaving) return;
+    dispatchMenuLayoutEditor({ type: 'CATEGORY_CHANGE' });
+    setSelectedCategoryId(categoryId);
+    setSelectedFamily(null);
+    setSearch('');
   }
 
   function resetMenuEdit(): void {
-    setCategoryEditOrder(configuredActiveCategories.map((category) => category.id));
-    setCategoryEditAlignment('left');
-    setMenuEditProductOrder(
-      reconcileProductOrder(configuration?.products ?? [], null).map((product) => product.id),
-    );
-    setDraggedCategoryId(null);
-    setDraggedProductId(null);
-    setGrabbedCategoryId(null);
-    setGrabbedProductId(null);
-    categoryPickupSnapshotRef.current = null;
-    productPickupSnapshotRef.current = null;
+    if (menuEditSaving) return;
+    const draft: MenuLayoutDraft = {
+      categoryOrder: configuredActiveCategories.map((category) => category.id),
+      categoryAlignment: 'left',
+      productOrder: reconcileProductOrder(configuration?.products ?? [], null).map(
+        (product) => product.id,
+      ),
+    };
+    dispatchMenuLayoutEditor({ type: 'RESET', draft });
+    setActiveMenuDragId(null);
     setMenuEditAnnouncement('Menu layout reset to defaults. Save to keep the reset.');
-    setMenuEditError(null);
-    setMenuEditResetRequested(true);
   }
 
   function cancelMenuEdit(): void {
     if (menuEditSaving) return;
-    setMenuEditActive(false);
-    setDraggedCategoryId(null);
-    setDraggedProductId(null);
-    setGrabbedCategoryId(null);
-    setGrabbedProductId(null);
-    categoryPickupSnapshotRef.current = null;
-    productPickupSnapshotRef.current = null;
-    setMenuEditAnnouncement('');
-    setMenuEditError(null);
-    setMenuEditResetRequested(false);
+    discardMenuLayoutEditor();
   }
 
   async function saveMenuEdit(): Promise<void> {
     if (menuEditSaving) return;
-    setMenuEditSaving(true);
-    setDraggedCategoryId(null);
-    setDraggedProductId(null);
-    setGrabbedCategoryId(null);
-    setGrabbedProductId(null);
-    categoryPickupSnapshotRef.current = null;
-    productPickupSnapshotRef.current = null;
-    setMenuEditError(null);
+    const saveDraft = menuEditSession.draft;
+    const saveShopId = menuEditSession.openingShopId;
+    const saveWorkerId = menuEditSession.openingWorkerId;
+    if (saveDraft === null || saveShopId === null || saveWorkerId === null) return;
+    const saveGeneration = workerMenuPreferenceLoadSession.generation;
+    const saveToken = crypto.randomUUID();
+    dispatchMenuLayoutEditor({ type: 'BEGIN_SAVE', saveToken });
+    setActiveMenuDragId(null);
     try {
       const saved = await preferencesClient.updateMenuLayout(
         menuEditPreferenceInput(
-          categoryEditOrder,
-          categoryEditAlignment,
-          menuEditProductOrder,
-          menuEditResetRequested,
+          saveDraft.categoryOrder,
+          saveDraft.categoryAlignment,
+          saveDraft.productOrder,
+          menuEditSession.resetRequested,
         ),
       );
-      setCategoryPreference(saved);
-      setMenuEditActive(false);
-      setMenuEditResetRequested(false);
-      setDraggedCategoryId(null);
-      setDraggedProductId(null);
-      setGrabbedCategoryId(null);
-      setGrabbedProductId(null);
-      categoryPickupSnapshotRef.current = null;
-      productPickupSnapshotRef.current = null;
+      if (
+        menuEditIdentityRef.current.shopId !== saveShopId ||
+        menuEditIdentityRef.current.workerId !== saveWorkerId
+      ) {
+        return;
+      }
+      dispatchWorkerMenuPreferenceLoad({
+        type: 'READY',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        generation: saveGeneration,
+        preference: saved,
+      });
+      dispatchMenuLayoutEditor({
+        type: 'SAVE_SUCCESS',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        saveToken,
+      });
+      setActiveMenuDragId(null);
       setMenuEditAnnouncement('');
       setSuccessMessage('Menu layout saved');
       window.setTimeout(() => setSuccessMessage(null), 4_500);
     } catch {
-      setMenuEditError('Could not save menu layout. Try again.');
-    } finally {
-      setMenuEditSaving(false);
-    }
-  }
-
-  function moveCategoryByOffset(categoryId: MenuCategoryId, offset: -1 | 1): void {
-    setMenuEditResetRequested(false);
-    setCategoryEditOrder((current) => {
-      const sourceIndex = current.indexOf(categoryId);
-      const targetIndex = sourceIndex + offset;
-      if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      [next[sourceIndex], next[targetIndex]] = [next[targetIndex]!, next[sourceIndex]!];
-      const category = configuredActiveCategories.find((candidate) => candidate.id === categoryId);
-      setMenuEditAnnouncement(
-        `${category?.name ?? 'Category'} moved to position ${targetIndex + 1} of ${next.length}.`,
-      );
-      return next;
-    });
-  }
-
-  function toggleCategoryPickup(categoryId: MenuCategoryId): void {
-    const category = configuredActiveCategories.find((candidate) => candidate.id === categoryId);
-    if (grabbedCategoryId === categoryId) {
-      setGrabbedCategoryId(null);
-      categoryPickupSnapshotRef.current = null;
-      setMenuEditAnnouncement(`${category?.name ?? 'Category'} dropped.`);
-      return;
-    }
-    categoryPickupSnapshotRef.current = categoryEditOrder;
-    setGrabbedProductId(null);
-    productPickupSnapshotRef.current = null;
-    setGrabbedCategoryId(categoryId);
-    setMenuEditAnnouncement(
-      `${category?.name ?? 'Category'} picked up. Use Left or Right Arrow to move, Enter or Space to drop, or Escape to cancel.`,
-    );
-  }
-
-  function cancelCategoryPickup(): void {
-    if (grabbedCategoryId === null) return;
-    const category = configuredActiveCategories.find(
-      (candidate) => candidate.id === grabbedCategoryId,
-    );
-    const snapshot = categoryPickupSnapshotRef.current;
-    if (snapshot !== null) setCategoryEditOrder(snapshot);
-    setGrabbedCategoryId(null);
-    categoryPickupSnapshotRef.current = null;
-    setMenuEditAnnouncement(`${category?.name ?? 'Category'} movement cancelled.`);
-  }
-
-  function moveProductByOffset(productId: ProductId, offset: -1 | 1): void {
-    if (selectedCategoryId === null) return;
-    setMenuEditResetRequested(false);
-    const productCategoryById = new Map(
-      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
-    );
-    setMenuEditProductOrder((current) => {
-      const categoryProductIds = current.filter(
-        (candidateId) => productCategoryById.get(candidateId) === selectedCategoryId,
-      );
-      const next = moveProductWithinCategoryByOffset(
-        current,
-        categoryProductIds,
-        productId,
-        offset,
-      );
-      if (next !== current) {
-        const categoryOnly = next.filter(
-          (candidateId) => productCategoryById.get(candidateId) === selectedCategoryId,
-        );
-        const product = configuration?.products.find((candidate) => candidate.id === productId);
-        setMenuEditAnnouncement(
-          `${product?.name ?? 'Product'} moved to position ${categoryOnly.indexOf(productId) + 1} of ${categoryOnly.length}.`,
-        );
+      if (
+        menuEditIdentityRef.current.shopId !== saveShopId ||
+        menuEditIdentityRef.current.workerId !== saveWorkerId
+      ) {
+        return;
       }
-      return next;
-    });
+      dispatchMenuLayoutEditor({
+        type: 'SAVE_FAILURE',
+        shopId: saveShopId,
+        workerId: saveWorkerId,
+        saveToken,
+        message: 'Could not save menu layout. Try again.',
+      });
+    }
   }
 
-  function toggleProductPickup(productId: ProductId): void {
-    const product = configuration?.products.find((candidate) => candidate.id === productId);
-    if (grabbedProductId === productId) {
-      setGrabbedProductId(null);
-      productPickupSnapshotRef.current = null;
-      setMenuEditAnnouncement(`${product?.name ?? 'Product'} dropped.`);
+  function handleMenuEditDragStart(event: DragStartEvent): void {
+    if (menuEditSaving) return;
+    if (!menuEditActive) return;
+    const activeId = String(event.active.id);
+    lastAppliedMenuDragTargetRef.current = activeId;
+    pendingKeyboardDragTargetRef.current = null;
+    const activeCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === activeId,
+    );
+    if (activeCategory !== undefined) {
+      dispatchMenuLayoutEditor({
+        type: 'BEGIN_CATEGORY_PICKUP',
+        categoryId: activeCategory.id,
+      });
+      setActiveMenuDragId(activeId);
+      setMenuEditAnnouncement(`${activeCategory.name} picked up.`);
       return;
     }
-    productPickupSnapshotRef.current = menuEditProductOrder;
-    setGrabbedCategoryId(null);
-    categoryPickupSnapshotRef.current = null;
-    setGrabbedProductId(productId);
-    setMenuEditAnnouncement(
-      `${product?.name ?? 'Product'} picked up. Use arrow keys to move, Enter or Space to drop, or Escape to cancel.`,
+    const activeProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === activeId,
     );
-  }
-
-  function cancelProductPickup(): void {
-    if (grabbedProductId === null) return;
-    const product = configuration?.products.find((candidate) => candidate.id === grabbedProductId);
-    const snapshot = productPickupSnapshotRef.current;
-    if (snapshot !== null) setMenuEditProductOrder(snapshot);
-    setGrabbedProductId(null);
-    productPickupSnapshotRef.current = null;
-    setMenuEditAnnouncement(`${product?.name ?? 'Product'} movement cancelled.`);
-  }
-
-  function moveDraggedCategory(targetId: MenuCategoryId): void {
-    const sourceId = draggedCategoryId;
-    if (sourceId === null || sourceId === targetId) return;
-    setMenuEditResetRequested(false);
-    setCategoryEditOrder((current) => {
-      const sourceIndex = current.indexOf(sourceId);
-      const targetIndex = current.indexOf(targetId);
-      if (sourceIndex < 0 || targetIndex < 0) return current;
-      const next = [...current];
-      const [moved] = next.splice(sourceIndex, 1);
-      if (moved === undefined) return current;
-      next.splice(targetIndex, 0, moved);
-      return next;
+    if (activeProduct === undefined || selectedCategoryId === null) return;
+    dispatchMenuLayoutEditor({
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: activeProduct.id,
+      categoryId: selectedCategoryId,
     });
+    setActiveMenuDragId(activeId);
+    setMenuEditAnnouncement(`${activeProduct.name} picked up.`);
   }
 
-  function moveDraggedProduct(targetId: ProductId): void {
-    const sourceId = draggedProductId;
-    if (sourceId === null || sourceId === targetId || selectedCategoryId === null) return;
-    setMenuEditResetRequested(false);
+  function handleMenuEditDragCancel(): void {
+    if (menuEditSaving) return;
+    dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+    setActiveMenuDragId(null);
+    lastAppliedMenuDragTargetRef.current = null;
+    pendingKeyboardDragTargetRef.current = null;
+  }
+
+  function applyMenuEditDragOver(activeId: string, overId: string): boolean {
+    const activeCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === activeId,
+    );
+    const overCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === overId,
+    );
+    if (activeCategory !== undefined && overCategory !== undefined) {
+      if (activeCategory.id === overCategory.id) return true;
+      const sourceIndex = categoryEditOrder.indexOf(activeCategory.id);
+      const targetIndex = categoryEditOrder.indexOf(overCategory.id);
+      if (sourceIndex < 0 || targetIndex < 0) return false;
+      const next = [...categoryEditOrder];
+      const [moved] = next.splice(sourceIndex, 1);
+      if (moved === undefined) return false;
+      next.splice(targetIndex, 0, moved);
+      dispatchMenuLayoutEditor({ type: 'SET_CATEGORY_ORDER', categoryOrder: next });
+      setMenuEditAnnouncement(
+        `${activeCategory.name} moved to position ${targetIndex + 1} of ${next.length}.`,
+      );
+      return true;
+    }
+
+    const activeProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === activeId,
+    );
+    const overProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === overId,
+    );
+    if (
+      activeProduct === undefined ||
+      overProduct === undefined ||
+      selectedCategoryId === null ||
+      activeProduct.categoryId !== selectedCategoryId ||
+      overProduct.categoryId !== selectedCategoryId
+    ) {
+      return false;
+    }
+    if (activeProduct.id === overProduct.id) return true;
+
     const productCategoryById = new Map(
       (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
     );
-    setMenuEditProductOrder((current) => {
-      const categoryProductIds = current.filter(
+    const categoryProductIds = menuEditProductOrder.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
+    const next = moveProductWithinCategory(
+      menuEditProductOrder,
+      categoryProductIds,
+      activeProduct.id,
+      overProduct.id,
+    );
+    if (next === menuEditProductOrder) return true;
+    dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
+    const categoryOnly = next.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
+    setMenuEditAnnouncement(
+      `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
+    );
+    return true;
+  }
+
+  function handleMenuEditDragOver(event: DragOverEvent): void {
+    if (menuEditSaving || !menuEditActive || event.over === null) return;
+    const activeId = String(event.active.id);
+    const overId = String(event.over.id);
+    if (activeId === overId || lastAppliedMenuDragTargetRef.current === overId) return;
+    if (applyMenuEditDragOver(activeId, overId)) {
+      lastAppliedMenuDragTargetRef.current = overId;
+    }
+  }
+
+  function handleMenuEditDragEnd(event: DragEndEvent): void {
+    if (menuEditSaving) return;
+    const activeId = String(event.active.id);
+    const eventOverId = event.over === null ? null : String(event.over.id);
+    const projectedKeyboardTarget = pendingKeyboardDragTargetRef.current;
+    pendingKeyboardDragTargetRef.current = null;
+    const overId =
+      projectedKeyboardTarget !== null && (eventOverId === null || eventOverId === activeId)
+        ? projectedKeyboardTarget
+        : eventOverId;
+    setActiveMenuDragId(null);
+
+    if (!menuEditActive || overId === null) {
+      dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+      lastAppliedMenuDragTargetRef.current = null;
+      return;
+    }
+
+    if (activeId !== overId && lastAppliedMenuDragTargetRef.current !== overId) {
+      applyMenuEditDragOver(activeId, overId);
+    }
+    lastAppliedMenuDragTargetRef.current = null;
+
+    const activeCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === activeId,
+    );
+    const overCategory = categoryEditorCategories.find(
+      (category) => menuEditCategorySortableId(category.id) === overId,
+    );
+    if (activeCategory !== undefined && overCategory !== undefined) {
+      if (
+        menuEditSession.interaction.type !== 'CATEGORY_PICKUP' ||
+        menuEditSession.interaction.categoryId !== activeCategory.id
+      ) {
+        dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+        return;
+      }
+      let categoryOrder = menuEditSession.interaction.snapshot.categoryOrder;
+      if (activeCategory.id === overCategory.id && menuEditSession.draft !== null) {
+        categoryOrder = menuEditSession.draft.categoryOrder;
+      } else if (activeCategory.id !== overCategory.id) {
+        const sourceIndex = categoryOrder.indexOf(activeCategory.id);
+        const targetIndex = categoryOrder.indexOf(overCategory.id);
+        if (sourceIndex < 0 || targetIndex < 0) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
+        const next = [...categoryOrder];
+        const [moved] = next.splice(sourceIndex, 1);
+        if (moved === undefined) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
+        next.splice(targetIndex, 0, moved);
+        categoryOrder = next;
+      }
+      dispatchMenuLayoutEditor({
+        type: 'DROP_CATEGORY_PICKUP',
+        categoryId: activeCategory.id,
+        categoryOrder,
+      });
+      return;
+    }
+
+    const activeProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === activeId,
+    );
+    const overProduct = menuEditProducts.find(
+      (product) => menuEditProductSortableId(product.id) === overId,
+    );
+    if (
+      activeProduct === undefined ||
+      overProduct === undefined ||
+      selectedCategoryId === null ||
+      activeProduct.categoryId !== selectedCategoryId ||
+      overProduct.categoryId !== selectedCategoryId ||
+      menuEditSession.interaction.type !== 'PRODUCT_PICKUP' ||
+      menuEditSession.interaction.productId !== activeProduct.id ||
+      menuEditSession.interaction.categoryId !== selectedCategoryId
+    ) {
+      dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+      return;
+    }
+
+    const snapshotProductOrder = menuEditSession.interaction.snapshot.productOrder;
+    let productOrder = snapshotProductOrder;
+    if (activeProduct.id === overProduct.id && menuEditSession.draft !== null) {
+      productOrder = menuEditSession.draft.productOrder;
+    } else if (activeProduct.id !== overProduct.id) {
+      const productCategoryById = new Map(
+        (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+      );
+      const categoryProductIds = snapshotProductOrder.filter(
         (productId) => productCategoryById.get(productId) === selectedCategoryId,
       );
-      return moveProductWithinCategory(current, categoryProductIds, sourceId, targetId);
+      productOrder = moveProductWithinCategory(
+        snapshotProductOrder,
+        categoryProductIds,
+        activeProduct.id,
+        overProduct.id,
+      );
+    }
+    dispatchMenuLayoutEditor({
+      type: 'DROP_PRODUCT_PICKUP',
+      productId: activeProduct.id,
+      productOrder,
     });
   }
 
@@ -1028,357 +1452,325 @@ export function OrdersWorkspace({
       }
     >
       <section className="menu-pane" aria-label="Menu">
-        <>
-          <div
-            className={
-              menuEditActive
-                ? 'menu-toolbar category-mode-edit'
-                : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
-            }
-          >
-            <div className="field-stack category-navigation-stack">
-              <div className="category-navigation">
-                <div
-                  className="category-rail"
-                  aria-label="Menu categories"
-                  data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
-                >
-                  {(menuEditActive ? categoryEditorCategories : activeCategories).map(
-                    (category) => (
-                      <button
-                        type="button"
-                        key={category.id}
-                        className={[
-                          'category-tab',
-                          selectedCategoryId === category.id ? 'selected' : '',
-                          menuEditActive ? 'category-tab-reordering' : '',
-                          draggedCategoryId === category.id ? 'category-tab-dragging' : '',
-                          grabbedCategoryId === category.id ? 'category-tab-grabbed' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                        draggable={
-                          menuEditActive && !menuEditSaving && draggedCategoryId !== category.id
-                        }
-                        onDragStart={(event) => {
-                          if (menuEditSaving) return;
-                          if (!menuEditActive) return;
-                          setDraggedCategoryId(category.id);
-                          event.dataTransfer.effectAllowed = 'move';
-                          event.dataTransfer.setData('text/plain', category.id);
-                        }}
-                        onDragEnter={(event) => {
-                          if (menuEditSaving) return;
-                          if (!menuEditActive || draggedCategoryId === null) return;
-                          event.preventDefault();
-                          moveDraggedCategory(category.id);
-                        }}
-                        onDragOver={(event) => {
-                          if (menuEditSaving) return;
-                          if (menuEditActive && draggedCategoryId !== null) event.preventDefault();
-                        }}
-                        onDragEnd={() => setDraggedCategoryId(null)}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          setDraggedCategoryId(null);
-                        }}
-                        onKeyDown={(event) => {
-                          if (!menuEditActive || menuEditSaving) return;
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            toggleCategoryPickup(category.id);
-                            return;
-                          }
-                          if (event.key === 'Escape' && grabbedCategoryId === category.id) {
-                            event.preventDefault();
-                            cancelCategoryPickup();
-                            return;
-                          }
-                          if (grabbedCategoryId !== category.id) return;
-                          if (event.key === 'ArrowLeft') {
-                            event.preventDefault();
-                            moveCategoryByOffset(category.id, -1);
-                          } else if (event.key === 'ArrowRight') {
-                            event.preventDefault();
-                            moveCategoryByOffset(category.id, 1);
-                          }
-                        }}
-                        onClick={() => {
-                          setSelectedCategoryId(category.id);
-                          setSelectedFamily(null);
-                          setSearch('');
-                        }}
-                      >
-                        {category.name}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <div className="category-nav-actions">
-                  {menuEditActive ? (
-                    <div
-                      className="category-alignment category-alignment-inline"
-                      role="group"
-                      aria-label="Category alignment"
+        <div
+          className={
+            menuEditActive
+              ? 'menu-toolbar category-mode-edit'
+              : `menu-toolbar category-mode-${categoryMode.toLowerCase()}`
+          }
+        >
+          <div className="field-stack category-navigation-stack">
+            <div className="category-navigation">
+              <div
+                ref={categoryRailRef}
+                className="category-rail"
+                aria-label="Menu categories"
+                data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}
+              >
+                {menuEditActive ? (
+                  <DndContext
+                    sensors={menuEditSensors}
+                    collisionDetection={closestCenter}
+                    measuring={MENU_EDIT_MEASURING}
+                    onDragStart={handleMenuEditDragStart}
+                    onDragOver={handleMenuEditDragOver}
+                    onDragCancel={handleMenuEditDragCancel}
+                    onDragEnd={handleMenuEditDragEnd}
+                  >
+                    <SortableContext
+                      items={categorySortableIds}
+                      strategy={horizontalListSortingStrategy}
                     >
-                      {(['left', 'center', 'right'] as const).map((alignment) => (
-                        <button
-                          type="button"
-                          key={alignment}
+                      {categoryEditorCategories.map((category) => (
+                        <MenuEditCategoryTab
+                          key={category.id}
+                          category={category}
+                          selected={selectedCategoryId === category.id}
                           disabled={menuEditSaving}
-                          aria-pressed={categoryEditAlignment === alignment}
-                          onClick={() => {
-                            setCategoryEditAlignment(alignment);
-                            setMenuEditResetRequested(false);
-                          }}
-                        >
-                          {alignment === 'left'
-                            ? 'Left'
-                            : alignment === 'center'
-                              ? 'Center'
-                              : 'Right'}
-                        </button>
+                          onSelect={() => selectMenuEditCategory(category.id)}
+                          onNodeRef={(node) => setCategoryTabRef(category.id, node)}
+                        />
                       ))}
-                    </div>
-                  ) : null}
-                  {categoryMode === 'IDLE' ? (
+                    </SortableContext>
+                    <DragOverlay>
+                      {activeDraggedCategory === null ? null : (
+                        <div
+                          aria-hidden="true"
+                          className="category-tab category-tab-dragging menu-edit-drag-overlay"
+                        >
+                          {activeDraggedCategory.name}
+                        </div>
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                ) : (
+                  activeCategories.map((category) => (
                     <button
                       type="button"
-                      className={
-                        menuEditActive
-                          ? 'category-icon-action category-edit-active'
-                          : 'category-icon-action'
-                      }
-                      aria-label="Edit menu"
-                      title="Edit menu"
-                      aria-pressed={menuEditActive}
+                      key={category.id}
+                      className={[
+                        'category-tab',
+                        selectedCategoryId === category.id ? 'selected' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       onClick={() => {
-                        if (!menuEditActive) beginMenuEdit();
+                        setSelectedCategoryId(category.id);
+                        setSelectedFamily(null);
+                        setSearch('');
                       }}
                     >
-                      <EditPencilIcon />
+                      {category.name}
                     </button>
-                  ) : null}
-                  {!menuEditActive && categoryMode === 'SEARCH' ? (
-                    <div className="product-search category-search-inline">
-                      <SearchIcon className="category-search-glyph" />
-                      <input
-                        ref={searchRef}
-                        id="product-search"
-                        type="search"
-                        aria-label="Search menu"
-                        value={search}
-                        placeholder="Search products"
-                        autoComplete="off"
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
+                  ))
+                )}
+              </div>
+              <div className="category-nav-actions">
+                {menuEditActive ? (
+                  <div
+                    className="category-alignment category-alignment-inline"
+                    role="group"
+                    aria-label="Category alignment"
+                  >
+                    {(['left', 'center', 'right'] as const).map((alignment) => (
                       <button
                         type="button"
-                        className="category-search-clear"
-                        aria-label="Clear search"
-                        title="Clear search"
+                        key={alignment}
+                        disabled={menuEditSaving}
+                        aria-pressed={categoryEditAlignment === alignment}
                         onClick={() => {
-                          setSearch('');
-                          setCategoryMode('IDLE');
+                          if (menuEditSaving) return;
+                          dispatchMenuLayoutEditor({
+                            type: 'SET_ALIGNMENT',
+                            categoryAlignment: alignment,
+                          });
                         }}
                       >
-                        ×
+                        {alignment === 'left'
+                          ? 'Left'
+                          : alignment === 'center'
+                            ? 'Center'
+                            : 'Right'}
                       </button>
-                    </div>
-                  ) : !menuEditActive ? (
-                    <button
-                      type="button"
-                      className="category-icon-action"
-                      aria-label="Search menu"
-                      title="Search menu"
-                      onClick={() => setCategoryMode('SEARCH')}
-                    >
-                      <SearchIcon />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              {!menuEditActive && activeFamilies.length > 0 ? (
-                <div
-                  className="segmented-control product-family-filter"
-                  aria-label="Product families"
-                >
+                    ))}
+                  </div>
+                ) : null}
+                {categoryMode === 'IDLE' ? (
                   <button
                     type="button"
-                    className={selectedFamily === null ? 'selected' : undefined}
-                    onClick={() => setSelectedFamily(null)}
+                    className={
+                      menuEditActive
+                        ? 'category-icon-action category-edit-active'
+                        : 'category-icon-action'
+                    }
+                    aria-label="Edit menu"
+                    title="Edit menu"
+                    aria-pressed={menuEditActive}
+                    disabled={!workerMenuPreferencePresentation.menuEditEnabled}
+                    onClick={() => {
+                      if (!menuEditActive) beginMenuEdit();
+                    }}
                   >
-                    All
+                    <EditPencilIcon />
                   </button>
-                  {activeFamilies.map((family) => (
+                ) : null}
+                {!menuEditActive && categoryMode === 'SEARCH' ? (
+                  <div className="product-search category-search-inline">
+                    <SearchIcon className="category-search-glyph" />
+                    <input
+                      ref={searchRef}
+                      id="product-search"
+                      type="search"
+                      aria-label="Search menu"
+                      value={search}
+                      placeholder="Search products"
+                      autoComplete="off"
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
                     <button
                       type="button"
-                      key={family}
-                      className={selectedFamily === family ? 'selected' : undefined}
-                      onClick={() => setSelectedFamily(family)}
+                      className="category-search-clear"
+                      aria-label="Clear search"
+                      title="Clear search"
+                      onClick={() => {
+                        setSearch('');
+                        setCategoryMode('IDLE');
+                      }}
                     >
-                      {family}
+                      ×
                     </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="product-grid" aria-live="polite">
-            {menuEditActive ? (
-              menuEditProducts.length === 0 ? (
-                <div className="menu-empty">
-                  <strong>No products found</strong>
-                  <span>This category has no active products.</span>
-                </div>
-              ) : (
-                menuEditProducts.map((product) => (
-                  <article
-                    key={product.id}
-                    className={[
-                      'product-card',
-                      'menu-edit-product-card',
-                      draggedProductId === product.id ? 'menu-edit-product-card-dragging' : '',
-                      grabbedProductId === product.id ? 'menu-edit-product-card-grabbed' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    draggable={menuEditActive && !menuEditSaving && draggedProductId !== product.id}
-                    tabIndex={0}
-                    aria-label={`Reorder ${product.name}`}
-                    onDragStart={(event) => {
-                      if (menuEditSaving) return;
-                      setDraggedProductId(product.id);
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', product.id);
-                    }}
-                    onDragEnter={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId === null) return;
-                      event.preventDefault();
-                      moveDraggedProduct(product.id);
-                    }}
-                    onDragOver={(event) => {
-                      if (menuEditSaving) return;
-                      if (draggedProductId !== null) event.preventDefault();
-                    }}
-                    onDragEnd={() => setDraggedProductId(null)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setDraggedProductId(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (menuEditSaving) return;
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggleProductPickup(product.id);
-                        return;
-                      }
-                      if (event.key === 'Escape' && grabbedProductId === product.id) {
-                        event.preventDefault();
-                        cancelProductPickup();
-                        return;
-                      }
-                      if (grabbedProductId !== product.id) return;
-                      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, -1);
-                      } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        moveProductByOffset(product.id, 1);
-                      }
-                    }}
+                  </div>
+                ) : !menuEditActive ? (
+                  <button
+                    type="button"
+                    className="category-icon-action"
+                    aria-label="Search menu"
+                    title="Search menu"
+                    onClick={() => setCategoryMode('SEARCH')}
                   >
-                    <div className="product-main">
-                      <div className="product-media">
-                        <ProductImage product={product} />
-                      </div>
-                      <div className="product-copy">
-                        <strong>{product.name}</strong>
-                        {product.description?.trim() ? <p>{product.description}</p> : null}
-                      </div>
-                      <strong className="product-price">
-                        {formatMoneyMinor(product.priceMinor)}
-                      </strong>
-                    </div>
-                    <div className="menu-edit-product-hint" aria-hidden="true">
-                      Drag to reorder
-                    </div>
-                  </article>
-                ))
-              )
-            ) : products.length === 0 ? (
+                    <SearchIcon />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {!menuEditActive && activeFamilies.length > 0 ? (
+              <div
+                className="segmented-control product-family-filter"
+                aria-label="Product families"
+              >
+                <button
+                  type="button"
+                  className={selectedFamily === null ? 'selected' : undefined}
+                  onClick={() => setSelectedFamily(null)}
+                >
+                  All
+                </button>
+                {activeFamilies.map((family) => (
+                  <button
+                    type="button"
+                    key={family}
+                    className={selectedFamily === family ? 'selected' : undefined}
+                    onClick={() => setSelectedFamily(family)}
+                  >
+                    {family}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {workerMenuPreferencePresentation.errorMessage === null ? null : (
+          <div className="menu-edit-action-status" role="status">
+            <span className="category-editor-error" role="alert">
+              {workerMenuPreferencePresentation.errorMessage}
+            </span>
+            {workerMenuPreferencePresentation.retryVisible ? (
+              <button type="button" className="text-action" onClick={retryWorkerMenuPreferenceLoad}>
+                Retry
+              </button>
+            ) : null}
+          </div>
+        )}
+
+        <div className="product-grid" aria-live="polite">
+          {menuEditActive ? (
+            menuEditProducts.length === 0 ? (
               <div className="menu-empty">
                 <strong>No products found</strong>
-                <span>
-                  {search.length > 0
-                    ? 'Try another search.'
-                    : 'This category has no active products.'}
-                </span>
+                <span>This category has no active products.</span>
               </div>
             ) : (
-              products.map((product) => (
-                <MenuProductCard
-                  key={product.id}
-                  product={product}
-                  quantity={productQuantityInDraft(draft, product.id)}
-                  busy={busy}
-                  onQuickInfo={() => setQuickInfoProductId(product.id)}
-                  onDecrement={() => decrementProduct(product)}
-                  onAdd={() => addProduct(product)}
-                  onExtras={() =>
-                    setCustomizer({ kind: 'ADD', productId: product.id, focusSection: 'EXTRAS' })
-                  }
-                />
-              ))
-            )}
+              <DndContext
+                key={selectedCategoryId ?? 'menu-products-none'}
+                sensors={menuEditSensors}
+                collisionDetection={closestCenter}
+                measuring={MENU_EDIT_MEASURING}
+                onDragStart={handleMenuEditDragStart}
+                onDragOver={handleMenuEditDragOver}
+                onDragCancel={handleMenuEditDragCancel}
+                onDragEnd={handleMenuEditDragEnd}
+              >
+                <SortableContext items={productSortableIds} strategy={rectSortingStrategy}>
+                  {menuEditProducts.map((product, index) => (
+                    <MenuEditProductCard
+                      key={product.id}
+                      product={product}
+                      position={index + 1}
+                      total={menuEditProducts.length}
+                      className="product-card menu-edit-product-card"
+                      disabled={menuEditSaving}
+                    />
+                  ))}
+                </SortableContext>
+                <DragOverlay>
+                  {activeDraggedProduct === null ? null : (
+                    <article
+                      aria-hidden="true"
+                      className="product-card menu-edit-product-card-dragging menu-edit-drag-overlay"
+                    >
+                      <div className="product-main">
+                        <ProductCardPresentation product={activeDraggedProduct} showDescription />
+                      </div>
+                    </article>
+                  )}
+                </DragOverlay>
+              </DndContext>
+            )
+          ) : products.length === 0 ? (
+            <div className="menu-empty">
+              <strong>No products found</strong>
+              <span>
+                {search.length > 0
+                  ? 'Try another search.'
+                  : 'This category has no active products.'}
+              </span>
+            </div>
+          ) : (
+            products.map((product) => (
+              <MenuProductCard
+                key={product.id}
+                product={product}
+                quantity={productQuantityInDraft(draft, product.id)}
+                busy={busy}
+                onQuickInfo={() => setQuickInfoProductId(product.id)}
+                onDecrement={() => decrementProduct(product)}
+                onAdd={() => addProduct(product)}
+                onExtras={() =>
+                  setCustomizer({
+                    kind: 'ADD',
+                    productId: product.id,
+                    focusSection: 'EXTRAS',
+                  })
+                }
+              />
+            ))
+          )}
+        </div>
+
+        {menuEditActive ? (
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {menuEditAnnouncement}
           </div>
+        ) : null}
 
-          {menuEditActive ? (
-            <div className="sr-only" aria-live="polite" aria-atomic="true">
-              {menuEditAnnouncement}
+        {menuEditActive ? (
+          <div className="menu-edit-actions" aria-label="Menu edit actions">
+            <div className="menu-edit-action-status">
+              {menuEditError === null ? null : (
+                <span className="category-editor-error" role="alert">
+                  {menuEditError}
+                </span>
+              )}
+              <button
+                type="button"
+                className="text-action"
+                disabled={menuEditSaving}
+                onClick={resetMenuEdit}
+              >
+                Reset
+              </button>
             </div>
-          ) : null}
-
-          {menuEditActive ? (
-            <div className="menu-edit-actions" aria-label="Menu edit actions">
-              <div className="menu-edit-action-status">
-                {menuEditError === null ? null : (
-                  <span className="category-editor-error" role="alert">
-                    {menuEditError}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="text-action"
-                  disabled={menuEditSaving}
-                  onClick={resetMenuEdit}
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="menu-edit-actions-primary">
-                <button
-                  type="button"
-                  className="secondary-action"
-                  disabled={menuEditSaving}
-                  onClick={cancelMenuEdit}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="primary-action"
-                  disabled={menuEditSaving}
-                  onClick={() => void saveMenuEdit()}
-                >
-                  {menuEditSaving ? 'Saving…' : 'Save'}
-                </button>
-              </div>
+            <div className="menu-edit-actions-primary">
+              <button
+                type="button"
+                className="secondary-action"
+                disabled={menuEditSaving}
+                onClick={cancelMenuEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-action"
+                disabled={menuEditSaving}
+                onClick={() => void saveMenuEdit()}
+              >
+                {menuEditSaving ? 'Saving…' : 'Save'}
+              </button>
             </div>
-          ) : null}
-        </>
+          </div>
+        ) : null}
       </section>
 
       {desktopCartResizable ? (

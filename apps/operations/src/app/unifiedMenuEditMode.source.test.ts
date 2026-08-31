@@ -5,8 +5,20 @@ const ordersWorkspaceSource = readFileSync(
   new URL('./OrdersWorkspace.tsx', import.meta.url),
   'utf8',
 );
+const menuLayoutEditorSessionSource = readFileSync(
+  new URL('./menuLayoutEditorSession.ts', import.meta.url),
+  'utf8',
+);
+const menuEditProductCardSource = readFileSync(
+  new URL('./MenuEditProductCard.tsx', import.meta.url),
+  'utf8',
+);
 const menuEditStyles = readFileSync(
   new URL('../styles/final-pos-corrections.css', import.meta.url),
+  'utf8',
+);
+const menuEditStabilityStyles = readFileSync(
+  new URL('../styles/menu-edit-stability.css', import.meta.url),
   'utf8',
 );
 
@@ -20,9 +32,10 @@ describe('unified menu edit entry point', () => {
   });
 
   // Edit mode consumes app-search shortcuts instead of handing them to the browser.
-  it('uses Pencil to activate one pressed menu edit session and suppresses search shortcuts during it', () => {
+  it('uses Pencil to activate one reducer-owned menu edit session and suppresses search shortcuts during it', () => {
     expect(ordersWorkspaceSource).toContain('menuEditActive');
-    expect(ordersWorkspaceSource).toContain('setMenuEditActive(true)');
+    expect(ordersWorkspaceSource).toContain('dispatchMenuLayoutEditor({');
+    expect(ordersWorkspaceSource).toContain("type: 'OPEN'");
     expect(ordersWorkspaceSource).toContain('aria-pressed={menuEditActive}');
     expect(ordersWorkspaceSource).toMatch(
       /if \(\(event\.ctrlKey \|\| event\.metaKey\) && event\.key\.toLowerCase\(\) === 'k'\) \{\s*event\.preventDefault\(\);\s*if \(menuEditActive\) return;/,
@@ -33,22 +46,64 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).not.toContain("categoryMode === 'EDIT'");
   });
 
-  it('keeps category tabs in the header and makes those same tabs reorderable in edit mode', () => {
+  it('uses dnd-kit sensors, sortable contexts, stock spatial keyboard coordinates, eager droppable measurement, and an overlay', () => {
+    expect(ordersWorkspaceSource).toContain('DndContext');
+    expect(ordersWorkspaceSource).toContain('PointerSensor');
+    expect(ordersWorkspaceSource).toContain('TouchSensor');
+    expect(ordersWorkspaceSource).toContain('KeyboardSensor');
+    expect(ordersWorkspaceSource).toContain('MeasuringStrategy');
+    expect(ordersWorkspaceSource).toContain('useSensor');
+    expect(ordersWorkspaceSource).toContain('useSensors');
+    expect(ordersWorkspaceSource).toContain('DragOverlay');
+    expect(ordersWorkspaceSource).toContain('SortableContext');
+    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates');
+    expect(ordersWorkspaceSource).toContain('horizontalListSortingStrategy');
+    expect(ordersWorkspaceSource).toContain('rectSortingStrategy');
+    expect(ordersWorkspaceSource).toContain('strategy: MeasuringStrategy.BeforeDragging');
+    expect(ordersWorkspaceSource.match(/measuring=\{MENU_EDIT_MEASURING\}/g)).toHaveLength(2);
+  });
+
+  it('keeps category tabs in the header and makes those same tabs sortable in edit mode', () => {
     expect(ordersWorkspaceSource).not.toContain('<strong>Category layout</strong>');
     expect(ordersWorkspaceSource).not.toContain('className="category-editor"');
     expect(ordersWorkspaceSource).toContain('category-tab-reordering');
-    expect(ordersWorkspaceSource).toContain('draggable={menuEditActive');
+    expect(ordersWorkspaceSource).toContain('categorySortableIds');
     expect(ordersWorkspaceSource).toContain(
       'data-alignment={menuEditActive ? categoryEditAlignment : categoryAlignment}',
     );
   });
 
-  it('keeps Product Cards in the menu grid and reorders them from the same unified draft', () => {
+  it('keeps Product Cards in the menu grid and gives the edit wrapper sortable semantics only', () => {
     expect(ordersWorkspaceSource).not.toContain('<ProductPositionEditor');
     expect(ordersWorkspaceSource).not.toContain('productReorderCategoryId');
     expect(ordersWorkspaceSource).toContain('menuEditProductOrder');
     expect(ordersWorkspaceSource).toContain('menu-edit-product-card');
-    expect(ordersWorkspaceSource).toContain('moveProductWithinCategory');
+    expect(menuEditProductCardSource).toContain('useSortable');
+    expect(menuEditProductCardSource).not.toContain('Quick Info');
+    expect(menuEditProductCardSource).not.toContain('onExtras');
+    expect(menuEditProductCardSource).not.toContain('onAdd');
+    expect(menuEditProductCardSource).not.toContain('onDecrement');
+  });
+
+  it('removes native HTML5 menu sorting while allowing reducer-owned dnd-kit drag-over updates', () => {
+    expect(ordersWorkspaceSource).not.toContain('draggable={');
+    expect(ordersWorkspaceSource).not.toContain('draggable:');
+    expect(ordersWorkspaceSource).not.toContain('dataTransfer');
+    expect(ordersWorkspaceSource).not.toContain('onDragEnter');
+    expect(ordersWorkspaceSource).not.toContain('onDrop');
+    expect(ordersWorkspaceSource).toContain('onDragStart={handleMenuEditDragStart}');
+    expect(ordersWorkspaceSource).toContain('onDragOver={handleMenuEditDragOver}');
+    expect(ordersWorkspaceSource).not.toContain('onDragMove={handleMenuEditDragMove}');
+    expect(ordersWorkspaceSource).toContain('onDragEnd={handleMenuEditDragEnd}');
+  });
+
+  it('keeps drag overlays visual-only so sortable controls stay unique in the accessibility tree', () => {
+    expect(ordersWorkspaceSource.match(/aria-hidden="true"/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(ordersWorkspaceSource).not.toMatch(
+      /<button[^>]*className="[^"]*menu-edit-drag-overlay[^"]*"/,
+    );
   });
 
   it('persists category and product layout together through the menu-layout-only API', () => {
@@ -66,49 +121,68 @@ describe('unified menu edit entry point', () => {
 
   // Saving freezes every persisted menu-layout control after the payload is captured.
   it('freezes every edit interaction while the final preference save is in flight', () => {
-    expect(ordersWorkspaceSource).toMatch(
-      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedCategoryId\s*!==\s*category\.id\s*\}/,
+    expect(
+      ordersWorkspaceSource.match(/disabled=\{menuEditSaving\}/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(2);
+    expect(ordersWorkspaceSource).toContain(
+      "const menuEditSaving = menuEditSession.lifecycle === 'SAVING';",
     );
-    expect(ordersWorkspaceSource).toMatch(
-      /draggable=\{\s*menuEditActive\s*&&\s*!menuEditSaving\s*&&\s*draggedProductId\s*!==\s*product\.id\s*\}/,
+    expect(menuLayoutEditorSessionSource).toContain(
+      "if (state.lifecycle === 'SAVING') return state;",
     );
-    expect(ordersWorkspaceSource).toContain('disabled={menuEditSaving}');
     expect(
       ordersWorkspaceSource.match(/if \(menuEditSaving\) return;/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(4);
   });
 
-  it('supports keyboard pickup drop move and cancel for categories and Product Cards', () => {
-    expect(ordersWorkspaceSource).toContain('grabbedCategoryId');
-    expect(ordersWorkspaceSource).toContain('grabbedProductId');
-    expect(ordersWorkspaceSource).toContain('categoryPickupSnapshotRef');
-    expect(ordersWorkspaceSource).toContain('productPickupSnapshotRef');
+  it('keeps immediate keyboard drops geometric', () => {
+    expect(ordersWorkspaceSource).toContain('KeyboardSensor');
+    expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
+    expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
+    expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
+    expect(ordersWorkspaceSource).toContain('directionalDroppableContainers');
+    expect(ordersWorkspaceSource).toContain('if (container.id === active.id) return false;');
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowDown')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowUp')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowLeft')");
+    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowRight')");
+    expect(ordersWorkspaceSource).toContain('const projectedCollisions = closestCorners({');
+    expect(ordersWorkspaceSource).not.toContain('if (nextCoordinates === undefined)');
+    expect(ordersWorkspaceSource).not.toContain('if (deltaX === 0 && deltaY === 0)');
+    expect(ordersWorkspaceSource).toContain('return nextCoordinates;');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
-    expect(ordersWorkspaceSource).toContain('function toggleCategoryPickup');
-    expect(ordersWorkspaceSource).toContain('function cancelCategoryPickup');
-    expect(ordersWorkspaceSource).toContain('function toggleProductPickup');
-    expect(ordersWorkspaceSource).toContain('function cancelProductPickup');
-    expect(ordersWorkspaceSource).toContain('category-tab-grabbed');
-    expect(ordersWorkspaceSource).toContain('menu-edit-product-card-grabbed');
-    expect(ordersWorkspaceSource).toContain("event.key === 'Enter' || event.key === ' '");
-    expect(ordersWorkspaceSource).toContain("event.key === 'Escape'");
-    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowLeft'");
-    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowRight'");
-    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowUp'");
-    expect(ordersWorkspaceSource).toContain("event.key === 'ArrowDown'");
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
 
-  it('jiggles both reorder surfaces continuously with staggered timing and distinct grabbed state while respecting Reduced Motion', () => {
-    expect(menuEditStyles).toContain('@keyframes menu-edit-jiggle');
+  it('resets product drag on category change', () => {
+    expect(ordersWorkspaceSource).toContain("key={selectedCategoryId ?? 'menu-products-none'}");
+    expect(ordersWorkspaceSource).toContain("type: 'CATEGORY_CHANGE'");
+  });
+
+  it('keeps stable hit targets and the legacy jiggle cue', () => {
     expect(menuEditStyles).toContain('.category-tab-reordering');
     expect(menuEditStyles).toContain('.menu-edit-product-card');
-    expect(menuEditStyles).toContain('animation: menu-edit-jiggle');
-    expect(menuEditStyles).toContain(':nth-child(2n)');
-    expect(menuEditStyles).toContain(':nth-child(3n)');
-    expect(menuEditStyles).toContain('.category-tab-grabbed');
-    expect(menuEditStyles).toContain('.menu-edit-product-card-grabbed');
+    expect(menuEditStyles).toContain('cursor: grab');
+    expect(menuEditStyles).toContain('touch-action: none');
+    expect(menuEditStyles).toContain('.category-tab-dragging');
+    expect(menuEditStyles).toContain('.menu-edit-product-card-dragging');
     expect(menuEditStyles).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(menuEditStyles).toContain('animation: none');
+    expect(menuEditStabilityStyles).toContain('@keyframes menu-edit-jiggle');
+    expect(menuEditStabilityStyles).toContain(
+      '.category-tab-reordering:not(.category-tab-dragging)',
+    );
+    expect(menuEditStabilityStyles).toContain(
+      '.menu-edit-product-card:not(.menu-edit-product-card-dragging)',
+    );
+    expect(menuEditStabilityStyles).not.toContain('animation: none');
+    expect(menuEditStabilityStyles).toContain('rotate: none');
+    expect(menuEditStabilityStyles).toContain('translate: none');
+    expect(menuEditStabilityStyles).toContain('scale: none');
+    const stableJiggleKeyframes =
+      menuEditStabilityStyles.match(/@keyframes menu-edit-jiggle\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(stableJiggleKeyframes).toContain('box-shadow');
+    expect(stableJiggleKeyframes).not.toContain('rotate:');
+    expect(stableJiggleKeyframes).not.toContain('translate:');
+    expect(stableJiggleKeyframes).not.toContain('scale:');
   });
 });

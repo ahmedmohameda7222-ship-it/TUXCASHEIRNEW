@@ -30,6 +30,7 @@ import {
   deriveSystemAccentPalette,
   type EffectiveTheme,
 } from './systemAccentTheme';
+import { decideProtectedTransition, type MenuLayoutExitController } from './unsavedChangesGuard';
 import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
 type ScreenState =
@@ -45,6 +46,10 @@ type ThemePreference = 'system' | 'light' | 'dark';
 type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES' | 'BULK_STOCK';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 const DEFAULT_SYSTEM_ACCENT = parseSystemAccentColor('#1F6B52');
+const CLOSED_MENU_LAYOUT_EXIT_CONTROLLER: MenuLayoutExitController = {
+  state: { lifecycle: 'CLOSED', dirty: false },
+  discard: () => undefined,
+};
 
 function initialTheme(): ThemePreference {
   try {
@@ -266,6 +271,11 @@ function ActiveShell({
   const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
+  const [menuLayoutExitController, setMenuLayoutExitController] =
+    useState<MenuLayoutExitController>(CLOSED_MENU_LAYOUT_EXIT_CONTROLLER);
+  const [discardMenuChangesOpen, setDiscardMenuChangesOpen] = useState(false);
+  const pendingProtectedActionRef = useRef<(() => void) | null>(null);
+  const keepEditingRef = useRef<HTMLButtonElement>(null);
   const preferencesClient = useMemo(() => createWorkerUiPreferencesClient(), []);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches,
@@ -296,6 +306,10 @@ function ActiveShell({
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    if (discardMenuChangesOpen) keepEditingRef.current?.focus();
+  }, [discardMenuChangesOpen]);
 
   const effectiveTheme: EffectiveTheme =
     theme === 'dark' || (theme === 'system' && systemDark) ? 'dark' : 'light';
@@ -383,6 +397,31 @@ function ActiveShell({
     }
   }
 
+  function requestProtectedTransition(action: () => void): void {
+    const decision = decideProtectedTransition(menuLayoutExitController.state);
+    if (decision === 'RUN') {
+      action();
+      return;
+    }
+    if (decision === 'BLOCK') return;
+    pendingProtectedActionRef.current = action;
+    setMenuOpen(false);
+    setDiscardMenuChangesOpen(true);
+  }
+
+  function keepEditing(): void {
+    pendingProtectedActionRef.current = null;
+    setDiscardMenuChangesOpen(false);
+  }
+
+  function discardMenuChangesAndContinue(): void {
+    const action = pendingProtectedActionRef.current;
+    pendingProtectedActionRef.current = null;
+    menuLayoutExitController.discard();
+    setDiscardMenuChangesOpen(false);
+    action?.();
+  }
+
   if (!accentHydrated) {
     return (
       <main
@@ -410,21 +449,21 @@ function ActiveShell({
           <button
             type="button"
             className={area === 'ORDERS_BOARD' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('ORDERS_BOARD')}
+            onClick={() => requestProtectedTransition(() => setArea('ORDERS_BOARD'))}
           >
             Orders Board
           </button>
           <button
             type="button"
             className={area === 'EXPENSES' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('EXPENSES')}
+            onClick={() => requestProtectedTransition(() => setArea('EXPENSES'))}
           >
             Expenses
           </button>
           <button
             type="button"
             className={area === 'BULK_STOCK' ? 'nav-item nav-item-active' : 'nav-item'}
-            onClick={() => setArea('BULK_STOCK')}
+            onClick={() => requestProtectedTransition(() => setArea('BULK_STOCK'))}
           >
             Bulk Stock
           </button>
@@ -494,10 +533,12 @@ function ActiveShell({
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => {
-                    setSwitchOpen(true);
-                    setMenuOpen(false);
-                  }}
+                  onClick={() =>
+                    requestProtectedTransition(() => {
+                      setSwitchOpen(true);
+                      setMenuOpen(false);
+                    })
+                  }
                 >
                   Switch / Sign in worker
                 </button>
@@ -505,7 +546,7 @@ function ActiveShell({
                   type="button"
                   role="menuitem"
                   disabled={busy}
-                  onClick={() => void onSignOut()}
+                  onClick={() => requestProtectedTransition(() => void onSignOut())}
                 >
                   Sign out
                 </button>
@@ -514,10 +555,12 @@ function ActiveShell({
                   type="button"
                   role="menuitem"
                   disabled={busy}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setEndDayOpen(true);
-                  }}
+                  onClick={() =>
+                    requestProtectedTransition(() => {
+                      setMenuOpen(false);
+                      setEndDayOpen(true);
+                    })
+                  }
                 >
                   End Day
                 </button>
@@ -528,7 +571,11 @@ function ActiveShell({
       </header>
 
       {area === 'ORDERS' ? (
-        <OrdersWorkspace session={session} client={ordersClient} />
+        <OrdersWorkspace
+          session={session}
+          client={ordersClient}
+          onMenuLayoutExitControllerChange={setMenuLayoutExitController}
+        />
       ) : area === 'ORDERS_BOARD' ? (
         <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
       ) : area === 'EXPENSES' ? (
@@ -603,6 +650,47 @@ function ActiveShell({
                 if (switched) setSwitchOpen(false);
               }}
             />
+          </section>
+        </div>
+      ) : null}
+
+      {discardMenuChangesOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="switch-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discard-menu-changes-title"
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return;
+              event.preventDefault();
+              keepEditing();
+            }}
+          >
+            <div className="dialog-heading">
+              <div>
+                <p className="eyebrow">Menu Edit</p>
+                <h2 id="discard-menu-changes-title">Discard menu changes?</h2>
+              </div>
+            </div>
+            <p>Your unsaved menu layout changes will be lost.</p>
+            <div className="drawer-footer">
+              <button
+                ref={keepEditingRef}
+                type="button"
+                className="secondary-action"
+                onClick={keepEditing}
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                className="primary-action"
+                onClick={discardMenuChangesAndContinue}
+              >
+                Discard changes
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

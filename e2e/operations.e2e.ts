@@ -516,6 +516,15 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
     .toBe(true);
 }
 
+async function waitForDndKeyboardSensor(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      }),
+  );
+}
+
 async function waitForActiveShell(page: Page): Promise<void> {
   await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible({
     timeout: 15_000,
@@ -847,6 +856,7 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(
     page.locator('.menu-pane .sr-only').filter({ hasText: 'Burgers picked up' }),
   ).toContainText('Burgers picked up');
+  await waitForDndKeyboardSensor(page);
   await page.keyboard.press('ArrowRight');
   await expect(categories.nth(0)).toHaveText('Combo');
   await page.keyboard.press('Escape');
@@ -854,6 +864,8 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
 
   await burgers.focus();
   await page.keyboard.press('Space');
+  await expect(burgers).toHaveClass(/category-tab-grabbed/);
+  await waitForDndKeyboardSensor(page);
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Space');
   await expect(categories.nth(0)).toHaveText('Combo');
@@ -869,11 +881,16 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(reorderCards).toHaveCount(9);
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
+  const moveProductBeforeKey =
+    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowUp' : 'ArrowLeft';
+  const moveProductAfterKey =
+    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowDown' : 'ArrowRight';
 
   await reorderCards.nth(1).focus();
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
-  await page.keyboard.press('ArrowLeft');
+  await waitForDndKeyboardSensor(page);
+  await page.keyboard.press(moveProductBeforeKey);
   await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
   await page.keyboard.press('Escape');
   reorderCards = page.locator('.menu-edit-product-card');
@@ -881,7 +898,9 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
 
   await reorderCards.nth(1).focus();
   await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowLeft');
+  await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await waitForDndKeyboardSensor(page);
+  await page.keyboard.press(moveProductBeforeKey);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
 
@@ -931,7 +950,9 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   reorderCards = page.locator('.menu-edit-product-card');
   await reorderCards.nth(0).focus();
   await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowRight');
+  await expect(reorderCards.nth(0)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await waitForDndKeyboardSensor(page);
+  await page.keyboard.press(moveProductAfterKey);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();

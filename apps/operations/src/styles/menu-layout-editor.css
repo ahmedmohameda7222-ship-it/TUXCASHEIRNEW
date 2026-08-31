@@ -1,0 +1,31 @@
+/* Phase A menu-layout editor reachability. Final POS corrections remain authoritative. */
+.menu-toolbar.category-mode-edit .category-rail {
+  scroll-padding-inline: 8px;
+  overscroll-behavior-inline: contain;
+}
+
+@media (max-width: 54rem) {
+  .menu-toolbar.category-mode-edit .category-navigation {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: stretch;
+  }
+
+  .menu-toolbar.category-mode-edit .category-nav-actions {
+    min-width: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .menu-toolbar.category-mode-edit .category-nav-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu-toolbar.category-mode-edit .category-alignment-inline,
+  .menu-toolbar.category-mode-edit .category-nav-actions > button {
+    flex: 0 0 auto;
+  }
+}

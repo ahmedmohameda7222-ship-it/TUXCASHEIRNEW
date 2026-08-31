@@ -10,8 +10,13 @@ import {
   type WorkerUiPreferences,
 } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
-import { productFamiliesForCategory, reconcileCategoryOrder } from './OrdersWorkspace';
+import {
+  productFamiliesForCategory,
+  reconcileCategoryOrder,
+  resolveWorkerMenuPreferencePresentation,
+} from './OrdersWorkspace';
 import { filterProductsForMenu } from './menuProductOrder';
+import type { WorkerMenuPreferenceLoadState } from './menuLayoutEditorSession';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -226,5 +231,51 @@ describe('filterProductsForMenu', () => {
         search: '',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('worker menu preference presentation', () => {
+  it('keeps the cashier fallback usable while loading and disables Menu Edit', () => {
+    const state: WorkerMenuPreferenceLoadState = { status: 'LOADING' };
+
+    expect(resolveWorkerMenuPreferencePresentation(state)).toEqual({
+      preference: null,
+      menuEditEnabled: false,
+      errorMessage: null,
+      retryVisible: false,
+    });
+  });
+
+  it('shows a non-blocking load error with Retry and keeps Menu Edit disabled', () => {
+    const state: WorkerMenuPreferenceLoadState = {
+      status: 'ERROR',
+      message: 'Menu customization could not be loaded.',
+    };
+
+    expect(resolveWorkerMenuPreferencePresentation(state)).toEqual({
+      preference: null,
+      menuEditEnabled: false,
+      errorMessage: 'Menu customization could not be loaded.',
+      retryVisible: true,
+    });
+  });
+
+  it('enables Menu Edit only after READY, including intentional READY(null)', () => {
+    const saved = preference([drinks.id, burgers.id]);
+
+    expect(resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: saved })).toEqual(
+      {
+        preference: saved,
+        menuEditEnabled: true,
+        errorMessage: null,
+        retryVisible: false,
+      },
+    );
+    expect(resolveWorkerMenuPreferencePresentation({ status: 'READY', preference: null })).toEqual({
+      preference: null,
+      menuEditEnabled: true,
+      errorMessage: null,
+      retryVisible: false,
+    });
   });
 });

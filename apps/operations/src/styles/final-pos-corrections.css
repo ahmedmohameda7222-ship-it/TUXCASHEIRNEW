@@ -577,191 +577,6 @@
   color: var(--tux-action-foreground);
 }
 
-/* Legacy ProductPositionEditor styles remain for its isolated component tests. */
-
-.product-position-editor {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-}
-
-.product-reorder-cue {
-  margin: 0 var(--tux-space-4) var(--tux-space-2);
-  padding: var(--tux-space-3) var(--tux-space-4);
-  border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-lg);
-  background: var(--tux-surface-panel);
-}
-
-.product-reorder-cue h2,
-.product-reorder-cue p {
-  margin: 0;
-}
-
-.product-reorder-cue h2 {
-  margin-top: 2px;
-  font-size: 16px;
-  line-height: 21px;
-  font-weight: 700;
-}
-
-.product-reorder-cue p {
-  margin-top: 4px;
-  color: var(--tux-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.product-reorder-kicker,
-.product-reorder-position {
-  color: var(--tux-text-secondary);
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 600;
-}
-
-.product-reorder-error {
-  margin: 0 var(--tux-space-4) var(--tux-space-2);
-  border: 1px solid color-mix(in srgb, var(--tux-destructive) 36%, var(--tux-border-subtle));
-  border-radius: var(--tux-radius-sm);
-  background: color-mix(in srgb, var(--tux-destructive) 6%, var(--tux-surface-panel));
-  color: var(--tux-destructive);
-  padding: var(--tux-space-2) var(--tux-space-3);
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.product-reorder-grid {
-  min-height: 0;
-  padding-top: 0;
-  padding-bottom: calc(var(--tux-space-4) + 72px);
-}
-
-.product-card-reordering {
-  cursor: grab;
-  user-select: none;
-  touch-action: manipulation;
-  transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease,
-    background-color 140ms ease;
-}
-
-.product-card-reordering:active {
-  cursor: grabbing;
-}
-
-.product-card-dragging,
-.product-card-grabbed {
-  border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
-  background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
-  transform: translateY(-2px) scale(1.01);
-}
-
-.product-reorder-main {
-  min-height: 0;
-}
-
-.product-reorder-main .product-copy {
-  min-width: 0;
-}
-
-.product-name-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--tux-space-2);
-}
-
-.product-reorder-handle {
-  color: var(--tux-text-secondary);
-  font-size: 18px;
-  line-height: 18px;
-  letter-spacing: -0.15em;
-}
-
-.product-reorder-footer {
-  display: flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 4px 8px;
-  border-top: 1px solid var(--tux-border-subtle);
-}
-
-.product-reorder-move {
-  min-width: 44px;
-  min-height: 44px;
-  border: 1px solid var(--tux-border-subtle);
-  border-radius: var(--tux-radius-sm);
-  background: var(--tux-surface-raised);
-  color: var(--tux-text-primary);
-  padding: 0;
-  font-size: 18px;
-  line-height: 1;
-  font-weight: 650;
-}
-
-.product-reorder-move:hover:not(:disabled) {
-  background: var(--tux-accent-hover-soft);
-}
-
-.product-reorder-move:disabled {
-  opacity: 0.36;
-}
-
-.product-reorder-actions {
-  position: sticky;
-  z-index: 2;
-  bottom: 0;
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tux-space-3);
-  padding: 8px var(--tux-space-4) max(8px, env(safe-area-inset-bottom));
-  border-top: 1px solid var(--tux-border-subtle);
-  background: color-mix(in srgb, var(--tux-surface-panel) 94%, transparent);
-  box-shadow: 0 -10px 24px color-mix(in srgb, var(--tux-text-primary) 5%, transparent);
-  backdrop-filter: blur(14px) saturate(112%);
-  -webkit-backdrop-filter: blur(14px) saturate(112%);
-}
-
-.product-reorder-actions > .text-action {
-  min-height: 44px;
-  border: 0;
-  border-radius: var(--tux-radius-sm);
-  background: transparent;
-  color: var(--tux-text-secondary);
-  padding: 0 12px;
-  font-size: 14px;
-  line-height: 18px;
-  font-weight: 600;
-}
-
-.product-reorder-actions > .text-action:hover:not(:disabled) {
-  background: var(--tux-accent-hover-soft);
-  color: var(--tux-text-primary);
-}
-
-.product-reorder-actions-primary > button {
-  min-height: 44px;
-}
-
-.product-reorder-actions-primary {
-  display: flex;
-  gap: 8px;
-}
-
-.product-reorder-actions-primary > button {
-  min-width: 92px;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -774,30 +589,9 @@
   padding: 0;
 }
 
-@media (max-width: 54rem) {
-  .product-reorder-cue {
-    margin-inline: 8px;
-    padding-inline: 12px;
-  }
-
-  .product-reorder-grid {
-    padding-inline: 8px;
-  }
-
-  .product-reorder-actions {
-    padding-inline: 8px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .product-card-reordering {
-    transition: none;
-  }
-
-  .product-card-dragging,
-  .product-card-grabbed {
-    transform: none;
-  }
+/* Shared Product Card presentation keeps the approved product-main grid geometry. */
+.product-card-presentation {
+  display: contents;
 }
 
 /* Unified Menu Edit Mode: one in-place worker-specific reorder surface. */
@@ -845,19 +639,24 @@
 .menu-edit-product-card {
   cursor: grab;
   user-select: none;
-  touch-action: manipulation;
-  transform-origin: center;
+  touch-action: none;
+  transform-origin: 50% 72%;
+  will-change: transform;
 }
 
 .category-tab-dragging,
-.category-tab-grabbed,
-.menu-edit-product-card-dragging,
-.menu-edit-product-card-grabbed {
+.menu-edit-product-card-dragging {
   animation-play-state: paused;
   border-color: color-mix(in srgb, var(--tux-accent) 58%, var(--tux-border-subtle));
   background: color-mix(in srgb, var(--tux-accent-soft) 28%, var(--tux-surface-panel));
   box-shadow: 0 10px 24px color-mix(in srgb, var(--tux-text-primary) 11%, transparent);
-  transform: translateY(-2px) scale(1.01);
+  rotate: 0deg;
+  translate: 0 -2px;
+  scale: 1.01;
+}
+
+.menu-edit-drag-overlay {
+  pointer-events: none;
 }
 
 .menu-edit-product-hint {
@@ -871,10 +670,12 @@
 @keyframes menu-edit-jiggle {
   0%,
   100% {
-    transform: rotate(-0.2deg) translateY(0);
+    rotate: -0.2deg;
+    translate: 0 0;
   }
   50% {
-    transform: rotate(0.2deg) translateY(-0.5px);
+    rotate: 0.2deg;
+    translate: 0 -0.5px;
   }
 }
 
@@ -908,13 +709,8 @@
   .category-tab-reordering,
   .menu-edit-product-card {
     animation: none;
-    transform: none;
-  }
-
-  .category-tab-dragging,
-  .category-tab-grabbed,
-  .menu-edit-product-card-dragging,
-  .menu-edit-product-card-grabbed {
-    transform: none;
+    rotate: none;
+    translate: none;
+    scale: none;
   }
 }

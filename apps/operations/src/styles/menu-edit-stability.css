@@ -1,0 +1,18 @@
+/* Keep the legacy edit cue without moving sortable hit targets. */
+@keyframes menu-edit-jiggle {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tux-accent) 0%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tux-accent) 14%, transparent);
+  }
+}
+
+.category-tab-reordering:not(.category-tab-dragging),
+.menu-edit-product-card:not(.menu-edit-product-card-dragging) {
+  rotate: none;
+  translate: none;
+  scale: none;
+}
