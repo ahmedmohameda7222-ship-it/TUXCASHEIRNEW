@@ -272,12 +272,7 @@ export async function handleWorkerMenuLayout(
   }
 
   if (!upstream.ok) {
-    let detail = '';
-    try {
-      detail = await upstream.text();
-    } catch {
-      detail = '';
-    }
+    const detail = await upstream.text().catch(() => '');
     sendUpstreamError(response, upstream.status, detail);
     return;
   }
