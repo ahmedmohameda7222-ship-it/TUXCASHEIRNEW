@@ -10,7 +10,9 @@ import type {
   CategoryAlignment,
   MenuCategoryId,
   ProductId,
+  ProductOrderByCategory,
   SystemAccentColor,
+  WorkerMenuLayout,
   WorkerUiPreferences,
 } from '@tux/domain';
 
@@ -57,6 +59,19 @@ export interface TuxSyncApi {
   readonly subscribe: (listener: (snapshot: TuxSyncHealthSnapshot) => void) => () => void;
 }
 
+export interface TuxWorkerMenuLayoutApi {
+  load(): Promise<WorkerMenuLayout | null>;
+  subscribe(listener: (layout: WorkerMenuLayout) => void): () => void;
+  updateMenuLayout(input: {
+    readonly categoryOrder: readonly MenuCategoryId[];
+    readonly categoryAlignment: CategoryAlignment;
+    readonly productOrderByCategory: ProductOrderByCategory;
+  }): Promise<WorkerMenuLayout>;
+  resetMenuLayout(): Promise<void>;
+}
+
+// Compatibility surface retained for System Color and rollback safety. New Menu Layout
+// consumers should use TuxWorkerMenuLayoutApi; legacy menu methods remain callable.
 export interface TuxWorkerUiPreferencesApi {
   load(): Promise<WorkerUiPreferences | null>;
   subscribe(listener: (preferences: WorkerUiPreferences) => void): () => void;
@@ -104,6 +119,7 @@ export interface TuxDesktopApi {
     readonly signOut: () => Promise<OperationsSessionResult>;
   };
   readonly sync: TuxSyncApi;
+  readonly workerMenuLayout: TuxWorkerMenuLayoutApi;
   readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
   readonly orders: TuxOrdersApi;
   readonly ordersBoard: TuxOrdersBoardApi;
