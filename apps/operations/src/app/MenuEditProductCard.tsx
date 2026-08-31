@@ -30,6 +30,22 @@ export function MenuEditProductCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      onKeyDownCapture={(event) => {
+        if (!isDragging || (event.code !== 'Space' && event.code !== 'Enter')) return;
+        const ownerDocument = event.currentTarget.ownerDocument;
+        const KeyboardEventConstructor = ownerDocument.defaultView?.KeyboardEvent;
+        if (KeyboardEventConstructor === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        ownerDocument.dispatchEvent(
+          new KeyboardEventConstructor('keydown', {
+            key: event.key,
+            code: event.code,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }}
       className={[
         className ?? 'product-card menu-edit-product-card',
         isDragging ? 'menu-edit-product-card-dragging menu-edit-product-card-grabbed' : '',
