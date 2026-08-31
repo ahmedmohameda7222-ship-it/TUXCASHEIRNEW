@@ -70,6 +70,39 @@ describe('menuLayoutEditorSession', () => {
     expect(changed.dirty).toBe(false);
   });
 
+  it('commits the intended category order atomically on an immediate keyboard drop', () => {
+    const picked = menuLayoutEditorReducer(opened(), {
+      type: 'BEGIN_CATEGORY_PICKUP',
+      categoryId: categoryA,
+    });
+    const dropped = menuLayoutEditorReducer(picked, {
+      type: 'DROP_CATEGORY_PICKUP',
+      categoryId: categoryA,
+      categoryOrder: [categoryB, categoryA],
+    });
+
+    expect(dropped.draft?.categoryOrder).toEqual([categoryB, categoryA]);
+    expect(dropped.interaction).toEqual({ type: 'NONE' });
+    expect(dropped.dirty).toBe(true);
+  });
+
+  it('commits the intended product order atomically on an immediate keyboard drop', () => {
+    const picked = menuLayoutEditorReducer(opened(), {
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: productA,
+      categoryId: categoryA,
+    });
+    const dropped = menuLayoutEditorReducer(picked, {
+      type: 'DROP_PRODUCT_PICKUP',
+      productId: productA,
+      productOrder: [productB, productA, productC],
+    });
+
+    expect(dropped.draft?.productOrder).toEqual([productB, productA, productC]);
+    expect(dropped.interaction).toEqual({ type: 'NONE' });
+    expect(dropped.dirty).toBe(true);
+  });
+
   it('rolls product pickup back before category pickup begins', () => {
     const pickedProduct = menuLayoutEditorReducer(opened(), {
       type: 'BEGIN_PRODUCT_PICKUP',
