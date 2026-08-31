@@ -157,6 +157,33 @@ async function computedPaint(locator: Locator): Promise<ComputedPaint> {
   });
 }
 
+async function resolvedColor(page: Page, expression: string): Promise<string> {
+  return page.evaluate((value) => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    probe.style.position = 'fixed';
+    probe.style.pointerEvents = 'none';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, expression);
+}
+
+async function settledActionPaint(page: Page, locator: Locator): Promise<ComputedPaint> {
+  const [expectedBackground, expectedForeground] = await Promise.all([
+    resolvedColor(page, 'var(--tux-accent-strong)'),
+    resolvedColor(page, 'var(--tux-action-foreground)'),
+  ]);
+  await expect
+    .poll(async () => {
+      const paint = await computedPaint(locator);
+      return [paint.backgroundColor, paint.color];
+    })
+    .toEqual([expectedBackground, expectedForeground]);
+  return computedPaint(locator);
+}
+
 async function seedBrowserFallback(page: Page): Promise<void> {
   const bundle = minimalConfiguration();
   await page.route('**/__tux_system_color_matrix_seed__', async (route) => {
@@ -345,7 +372,7 @@ async function semanticStatusColors(page: Page): Promise<{
 
 async function assertRenderedControls(page: Page, appearance: 'Light' | 'Dark'): Promise<void> {
   const placeOrder = page.getByRole('button', { name: 'Place Order', exact: true });
-  const actionPaint = await computedPaint(placeOrder);
+  const actionPaint = await settledActionPaint(page, placeOrder);
   const totalsPaint = await computedPaint(page.locator('.cart-totals'));
   expect(
     contrastRatio(actionPaint.backgroundColor, actionPaint.color),

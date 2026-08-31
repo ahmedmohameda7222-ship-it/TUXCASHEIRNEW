@@ -881,12 +881,16 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(reorderCards).toHaveCount(9);
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
+  const moveProductBeforeKey =
+    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowUp' : 'ArrowLeft';
+  const moveProductAfterKey =
+    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowDown' : 'ArrowRight';
 
   await reorderCards.nth(1).focus();
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press(moveProductBeforeKey);
   await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
   await page.keyboard.press('Escape');
   reorderCards = page.locator('.menu-edit-product-card');
@@ -896,7 +900,7 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press(moveProductBeforeKey);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
 
@@ -948,7 +952,7 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(0)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press(moveProductAfterKey);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
