@@ -54,13 +54,20 @@ jobs:
         run: |
           npm run format >/dev/null
           mapfile -t files < <(git diff --name-only -- . ':(exclude).github/workflows/ci.yml')
+          rm -rf .tmp/prettier-formatted
+          mkdir -p .tmp/prettier-formatted
+          cp --parents "${files[@]}" .tmp/prettier-formatted/
           printf 'PRETTIER_FILES_BEGIN\n'
           printf '%s\n' "${files[@]}"
           printf 'PRETTIER_FILES_END\n'
-          tar -czf /tmp/prettier-formatted.tgz "${files[@]}"
-          printf 'PRETTIER_TAR_BASE64_BEGIN\n'
-          base64 -w0 /tmp/prettier-formatted.tgz
-          printf '\nPRETTIER_TAR_BASE64_END\n'
+      - name: Upload exact Prettier diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-formatted-source
+          path: .tmp/prettier-formatted
+          if-no-files-found: error
+          retention-days: 1
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
