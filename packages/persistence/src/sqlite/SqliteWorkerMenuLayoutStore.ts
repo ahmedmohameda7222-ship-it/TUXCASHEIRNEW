@@ -36,7 +36,9 @@ export class SqliteWorkerMenuLayoutStore implements WorkerMenuLayoutRepository {
   }
 
   #requiredDatabase(): DatabaseSync {
-    if (this.#database === null) throw new Error('Worker Menu Layout SQLite store is not initialized.');
+    if (this.#database === null) {
+      throw new Error('Worker Menu Layout SQLite store is not initialized.');
+    }
     return this.#database;
   }
 
