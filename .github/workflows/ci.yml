@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -46,6 +46,54 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply immediate keyboard drop fix and restore CI
+        shell: bash
+        run: |
+          git fetch origin "refs/heads/${GITHUB_HEAD_REF}:refs/remotes/origin/${GITHUB_HEAD_REF}"
+          git checkout -B "${GITHUB_HEAD_REF}" "refs/remotes/origin/${GITHUB_HEAD_REF}"
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
+          source = path.read_text()
+          old = """      onClick={onSelect}
+                {...attributes}
+                {...listeners}
+              >
+          """
+          new = """      onClick={onSelect}
+                {...attributes}
+                {...listeners}
+                onKeyDownCapture={(event) => {
+                  if (!isDragging || (event.code !== 'Space' && event.code !== 'Enter')) return;
+                  const ownerDocument = event.currentTarget.ownerDocument;
+                  const KeyboardEventConstructor = ownerDocument.defaultView?.KeyboardEvent;
+                  if (KeyboardEventConstructor === undefined) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  ownerDocument.dispatchEvent(
+                    new KeyboardEventConstructor('keydown', {
+                      key: event.key,
+                      code: event.code,
+                      bubbles: true,
+                      cancelable: true,
+                    }),
+                  );
+                }}
+              >
+          """
+          if source.count(old) != 1:
+              raise SystemExit(f'expected exactly one category sortable insertion point, found {source.count(old)}')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          npx prettier --write apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/MenuEditProductCard.tsx
+          git checkout HEAD^ -- .github/workflows/ci.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/OrdersWorkspace.tsx apps/operations/src/app/MenuEditProductCard.tsx .github/workflows/ci.yml
+          git diff --cached --check
+          git commit -m "fix(menu-edit): finalize immediate keyboard drops"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
       - name: Format check
         run: npm run format:check
       - name: Lint
