@@ -140,7 +140,10 @@ function browserDeviceId(): string {
 }
 
 export class VercelBrowserRemoteGateway
-  implements InboundConfigurationProvider, WorkerUiPreferencesRemoteGateway, WorkerMenuLayoutRemoteGateway
+  implements
+    InboundConfigurationProvider,
+    WorkerUiPreferencesRemoteGateway,
+    WorkerMenuLayoutRemoteGateway
 {
   async currentSession(): Promise<BrowserRemoteSession | null> {
     if (isLoopbackHost()) return null;
@@ -258,7 +261,8 @@ export class VercelBrowserRemoteGateway
     readonly productOrderByCategory: ProductOrderByCategory;
     readonly expectedLayoutVersion: number | null;
   }): Promise<RemoteWorkerMenuLayout> {
-    if (isLoopbackHost()) throw new Error('Remote Worker Menu Layout sync is unavailable on localhost.');
+    if (isLoopbackHost())
+      throw new Error('Remote Worker Menu Layout sync is unavailable on localhost.');
     const response = await fetch('/api/worker-menu-layout', {
       method: 'PUT',
       credentials: 'same-origin',

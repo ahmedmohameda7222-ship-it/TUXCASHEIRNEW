@@ -33,7 +33,9 @@ function legacyWorkerMenuLayout(
 ): Record<string, unknown> {
   const shopId = typeof preference['shopId'] === 'string' ? preference['shopId'] : '';
   const workerId = typeof preference['workerId'] === 'string' ? preference['workerId'] : '';
-  const rawCategories = Array.isArray(configuration?.['categories']) ? configuration['categories'] : [];
+  const rawCategories = Array.isArray(configuration?.['categories'])
+    ? configuration['categories']
+    : [];
   const rawProducts = Array.isArray(configuration?.['products']) ? configuration['products'] : [];
   const validCategories = new Set<string>();
   for (const value of rawCategories) {
@@ -63,13 +65,17 @@ function legacyWorkerMenuLayout(
     }
   }
 
-  const categoryOrder = (Array.isArray(preference['categoryOrder']) ? preference['categoryOrder'] : [])
+  const categoryOrder = (
+    Array.isArray(preference['categoryOrder']) ? preference['categoryOrder'] : []
+  )
     .filter((value): value is string => typeof value === 'string')
     .filter((value, index, values) => values.indexOf(value) === index)
     .filter((value) => validCategories.size === 0 || validCategories.has(value));
 
   const productOrderByCategory: Record<string, string[]> = {};
-  for (const productId of Array.isArray(preference['productOrder']) ? preference['productOrder'] : []) {
+  for (const productId of Array.isArray(preference['productOrder'])
+    ? preference['productOrder']
+    : []) {
     if (typeof productId !== 'string') continue;
     const categoryId = productCategory.get(productId);
     if (categoryId === undefined) continue;
@@ -193,7 +199,11 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
       cursorRequest.addEventListener('success', () => {
         const cursor = cursorRequest.result;
         if (cursor === null) return;
-        if (typeof cursor.value !== 'object' || cursor.value === null || Array.isArray(cursor.value)) {
+        if (
+          typeof cursor.value !== 'object' ||
+          cursor.value === null ||
+          Array.isArray(cursor.value)
+        ) {
           cursor.continue();
           return;
         }

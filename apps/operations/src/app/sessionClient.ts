@@ -245,7 +245,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           categoryAlignment: layout?.categoryAlignment ?? legacy?.categoryAlignment ?? 'left',
           productOrder:
             layout === null || layout === undefined
-              ? legacy?.productOrder ?? []
+              ? (legacy?.productOrder ?? [])
               : flattenWorkerMenuLayoutProductOrder(layout),
           accentColor: legacy?.accentColor ?? null,
           updatedAt: layout?.updatedAt ?? legacy?.updatedAt ?? runtime.now(),

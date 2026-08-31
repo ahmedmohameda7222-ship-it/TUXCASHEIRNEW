@@ -105,7 +105,8 @@ function oneWorkerUiPreferenceRow(value: unknown): RemoteWorkerUiPreferences {
 
 function oneWorkerMenuLayoutRow(value: unknown): RemoteWorkerMenuLayout {
   if (Array.isArray(value)) {
-    if (value.length !== 1) throw new TypeError('Worker Menu Layout response must contain one row.');
+    if (value.length !== 1)
+      throw new TypeError('Worker Menu Layout response must contain one row.');
     return parseRemoteWorkerMenuLayout(value[0]);
   }
   return parseRemoteWorkerMenuLayout(value);

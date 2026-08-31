@@ -104,12 +104,17 @@ class FakeGateway implements WorkerMenuLayoutRemoteGateway {
   failPut = false;
   conflict = false;
 
-  async getWorkerMenuLayout(shop: ShopId, worker: WorkerId): Promise<RemoteWorkerMenuLayout | null> {
+  async getWorkerMenuLayout(
+    shop: ShopId,
+    worker: WorkerId,
+  ): Promise<RemoteWorkerMenuLayout | null> {
     if (this.failGet) throw new Error('offline');
     return this.remote.get(key(shop, worker)) ?? null;
   }
 
-  async putWorkerMenuLayout(input: Parameters<WorkerMenuLayoutRemoteGateway['putWorkerMenuLayout']>[0]) {
+  async putWorkerMenuLayout(
+    input: Parameters<WorkerMenuLayoutRemoteGateway['putWorkerMenuLayout']>[0],
+  ) {
     if (this.conflict) throw new WorkerMenuLayoutConflictError();
     if (this.failPut) throw new Error('offline');
     const current = this.remote.get(key(input.shopId, input.workerId));
@@ -129,12 +134,14 @@ class FakeGateway implements WorkerMenuLayoutRemoteGateway {
   }
 }
 
-function localLayout(input: {
-  workerId?: WorkerId;
-  layoutVersion?: number;
-  syncState?: WorkerMenuLayout['syncState'];
-  order?: readonly ProductId[];
-} = {}): WorkerMenuLayout {
+function localLayout(
+  input: {
+    workerId?: WorkerId;
+    layoutVersion?: number;
+    syncState?: WorkerMenuLayout['syncState'];
+    order?: readonly ProductId[];
+  } = {},
+): WorkerMenuLayout {
   return parseWorkerMenuLayout({
     shopId,
     workerId: input.workerId ?? workerAId,
@@ -227,7 +234,10 @@ describe('WorkerMenuLayoutService', () => {
   it('never replaces a local DIRTY layout with a newer remote snapshot during load', async () => {
     const repository = new MemoryRepository();
     const gateway = new FakeGateway();
-    const dirty = parseWorkerMenuLayout({ ...localLayout({ layoutVersion: 3 }), syncState: 'DIRTY' });
+    const dirty = parseWorkerMenuLayout({
+      ...localLayout({ layoutVersion: 3 }),
+      syncState: 'DIRTY',
+    });
     await repository.put(dirty);
     gateway.remote.set(key(shopId, workerAId), remoteLayout(9));
     gateway.conflict = true;

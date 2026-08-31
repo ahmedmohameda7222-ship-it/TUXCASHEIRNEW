@@ -111,13 +111,13 @@ describe('WorkerMenuLayout', () => {
     expect(reconciled.productOrderByCategory[categoryB]).toEqual([productB1]);
     expect(reconciled.productOrderByCategory[categoryRemoved]).toBeUndefined();
 
-    const withNewProduct = reconcileWorkerMenuLayout(
-      reconciled,
-      {
-        ...catalog,
-        products: [...catalog.products, product(parseEntityId<ProductId>('40000000-0000-4000-8000-000000000005'), categoryA, 2)],
-      },
-    );
+    const withNewProduct = reconcileWorkerMenuLayout(reconciled, {
+      ...catalog,
+      products: [
+        ...catalog.products,
+        product(parseEntityId<ProductId>('40000000-0000-4000-8000-000000000005'), categoryA, 2),
+      ],
+    });
     expect(withNewProduct.productOrderByCategory[categoryA]?.slice(0, 2)).toEqual([
       productA2,
       productA1,

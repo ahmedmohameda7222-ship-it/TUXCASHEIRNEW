@@ -257,10 +257,7 @@ describe('IndexedDB migration registry', () => {
   it('backfills legacy flat worker product order into per-category Menu Layout order', async () => {
     const name = `tux-indexeddb-menu-layout-backfill-${crypto.randomUUID()}`;
     const v3 = await openAtVersion(name, 3);
-    const write = v3.transaction(
-      ['configurationSnapshots', 'workerUiPreferences'],
-      'readwrite',
-    );
+    const write = v3.transaction(['configurationSnapshots', 'workerUiPreferences'], 'readwrite');
     write.objectStore('configurationSnapshots').put({
       shopId: preferenceShopId,
       version: 1,

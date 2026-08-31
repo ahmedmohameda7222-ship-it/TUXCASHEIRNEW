@@ -29,7 +29,14 @@ describe('SQLite Worker Menu Layout migration', () => {
         .prepare(
           'INSERT INTO workers(id, shop_id, display_name, pin_hash, active, payload_json) VALUES (?, ?, ?, ?, ?, ?)',
         )
-        .run(workerId, shopId, 'Layout Worker', 'hash', 1, JSON.stringify({ id: workerId, shopId }));
+        .run(
+          workerId,
+          shopId,
+          'Layout Worker',
+          'hash',
+          1,
+          JSON.stringify({ id: workerId, shopId }),
+        );
 
       const configuration = {
         shopId,

@@ -204,11 +204,7 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
     return this.#serialize(this.#mutationTails, shopId, workerId, operation);
   }
 
-  #serializeSync<T>(
-    shopId: ShopId,
-    workerId: WorkerId,
-    operation: () => Promise<T>,
-  ): Promise<T> {
+  #serializeSync<T>(shopId: ShopId, workerId: WorkerId, operation: () => Promise<T>): Promise<T> {
     return this.#serialize(this.#syncTails, shopId, workerId, operation);
   }
 

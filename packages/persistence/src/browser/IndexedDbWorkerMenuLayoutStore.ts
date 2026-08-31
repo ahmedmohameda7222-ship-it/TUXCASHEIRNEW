@@ -30,17 +30,13 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
     transaction.addEventListener(
       'abort',
       () =>
-        reject(
-          transaction.error ?? new Error('IndexedDB Worker Menu Layout transaction aborted.'),
-        ),
+        reject(transaction.error ?? new Error('IndexedDB Worker Menu Layout transaction aborted.')),
       { once: true },
     );
     transaction.addEventListener(
       'error',
       () =>
-        reject(
-          transaction.error ?? new Error('IndexedDB Worker Menu Layout transaction failed.'),
-        ),
+        reject(transaction.error ?? new Error('IndexedDB Worker Menu Layout transaction failed.')),
       { once: true },
     );
   });
@@ -126,12 +122,11 @@ export class IndexedDbWorkerMenuLayoutStore implements WorkerMenuLayoutRepositor
   }
 
   async getCatalog(shopId: ShopId): Promise<WorkerMenuLayoutCatalog> {
-    const transaction = this.#requiredDatabase().transaction(
-      'configurationSnapshots',
-      'readonly',
-    );
+    const transaction = this.#requiredDatabase().transaction('configurationSnapshots', 'readonly');
     const completion = transactionDone(transaction);
-    const value = await requestResult(transaction.objectStore('configurationSnapshots').get(shopId));
+    const value = await requestResult(
+      transaction.objectStore('configurationSnapshots').get(shopId),
+    );
     await completion;
     if (value === undefined) return { categories: [], products: [] };
     const snapshot = value as OperationsConfigurationSnapshot;

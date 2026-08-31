@@ -105,10 +105,7 @@ function parseProductOrderByCategory(value: unknown): ProductOrderByCategory {
       let productId: ProductId;
       try {
         productId = parseEntityId<ProductId>(
-          text(
-            rawProductId,
-            `WorkerMenuLayout.productOrderByCategory.${rawCategoryId}[${index}]`,
-          ),
+          text(rawProductId, `WorkerMenuLayout.productOrderByCategory.${rawCategoryId}[${index}]`),
         );
       } catch (cause) {
         throw new TypeError(
@@ -230,7 +227,11 @@ export function reconcileWorkerMenuLayout(
     const seenProducts = new Set<ProductId>();
     for (const productId of layout.productOrderByCategory[categoryId] ?? []) {
       const product = productsById.get(productId);
-      if (product === undefined || product.categoryId !== categoryId || seenProducts.has(productId)) {
+      if (
+        product === undefined ||
+        product.categoryId !== categoryId ||
+        seenProducts.has(productId)
+      ) {
         continue;
       }
       ordered.push(productId);

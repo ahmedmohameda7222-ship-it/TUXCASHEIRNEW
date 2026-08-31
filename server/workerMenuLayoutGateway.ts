@@ -77,9 +77,7 @@ function parseProductOrderByCategory(
 
 function parseExpectedVersion(value: unknown): number | null | undefined {
   if (value === null) return null;
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
-    ? value
-    : undefined;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 ? value : undefined;
 }
 
 function parseInput(value: Readonly<Record<string, unknown>>): WorkerMenuLayoutInput | null {
@@ -296,7 +294,9 @@ export async function handleWorkerMenuLayout(
     return;
   }
   const layout =
-    Array.isArray(parsed) && parsed.length === 1 ? parseRemoteRow(parsed[0]) : parseRemoteRow(parsed);
+    Array.isArray(parsed) && parsed.length === 1
+      ? parseRemoteRow(parsed[0])
+      : parseRemoteRow(parsed);
   if (layout === null) {
     sendJson(response, 502, { error: 'invalid_remote_response' });
     return;
