@@ -45,7 +45,9 @@ interface WorkerMenuPreferenceErrorEvent {
 }
 
 export type WorkerMenuPreferenceEvent =
-  WorkerMenuPreferenceLoadEvent | WorkerMenuPreferenceReadyEvent | WorkerMenuPreferenceErrorEvent;
+  | WorkerMenuPreferenceLoadEvent
+  | WorkerMenuPreferenceReadyEvent
+  | WorkerMenuPreferenceErrorEvent;
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -71,7 +73,9 @@ interface ProductPickupInteraction {
 }
 
 export type MenuLayoutEditorInteraction =
-  NoMenuLayoutInteraction | CategoryPickupInteraction | ProductPickupInteraction;
+  | NoMenuLayoutInteraction
+  | CategoryPickupInteraction
+  | ProductPickupInteraction;
 
 export interface MenuLayoutEditorSession {
   readonly lifecycle: MenuLayoutEditorLifecycle;
@@ -122,11 +126,13 @@ interface BeginProductPickupEvent {
 interface DropCategoryPickupEvent {
   readonly type: 'DROP_CATEGORY_PICKUP';
   readonly categoryId: MenuCategoryId;
+  readonly categoryOrder?: readonly MenuCategoryId[];
 }
 
 interface DropProductPickupEvent {
   readonly type: 'DROP_PRODUCT_PICKUP';
   readonly productId: ProductId;
+  readonly productOrder?: readonly ProductId[];
 }
 
 interface CancelPickupEvent {
@@ -427,23 +433,33 @@ export function menuLayoutEditorReducer(
       };
     }
 
-    case 'DROP_CATEGORY_PICKUP':
+    case 'DROP_CATEGORY_PICKUP': {
       if (
         state.interaction.type !== 'CATEGORY_PICKUP' ||
         state.interaction.categoryId !== event.categoryId
       ) {
         return state;
       }
-      return { ...state, interaction: { type: 'NONE' } };
+      const dropped =
+        event.categoryOrder === undefined || state.draft === null
+          ? state
+          : withDraft(state, { ...state.draft, categoryOrder: [...event.categoryOrder] });
+      return { ...dropped, interaction: { type: 'NONE' } };
+    }
 
-    case 'DROP_PRODUCT_PICKUP':
+    case 'DROP_PRODUCT_PICKUP': {
       if (
         state.interaction.type !== 'PRODUCT_PICKUP' ||
         state.interaction.productId !== event.productId
       ) {
         return state;
       }
-      return { ...state, interaction: { type: 'NONE' } };
+      const dropped =
+        event.productOrder === undefined || state.draft === null
+          ? state
+          : withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
+      return { ...dropped, interaction: { type: 'NONE' } };
+    }
 
     case 'CANCEL_PICKUP':
     case 'CATEGORY_CHANGE':
