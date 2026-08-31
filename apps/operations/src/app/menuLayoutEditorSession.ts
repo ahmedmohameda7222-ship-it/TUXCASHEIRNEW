@@ -45,9 +45,7 @@ interface WorkerMenuPreferenceErrorEvent {
 }
 
 export type WorkerMenuPreferenceEvent =
-  | WorkerMenuPreferenceLoadEvent
-  | WorkerMenuPreferenceReadyEvent
-  | WorkerMenuPreferenceErrorEvent;
+  WorkerMenuPreferenceLoadEvent | WorkerMenuPreferenceReadyEvent | WorkerMenuPreferenceErrorEvent;
 
 export interface MenuLayoutDraft {
   readonly categoryOrder: readonly MenuCategoryId[];
@@ -73,9 +71,7 @@ interface ProductPickupInteraction {
 }
 
 export type MenuLayoutEditorInteraction =
-  | NoMenuLayoutInteraction
-  | CategoryPickupInteraction
-  | ProductPickupInteraction;
+  NoMenuLayoutInteraction | CategoryPickupInteraction | ProductPickupInteraction;
 
 export interface MenuLayoutEditorSession {
   readonly lifecycle: MenuLayoutEditorLifecycle;
