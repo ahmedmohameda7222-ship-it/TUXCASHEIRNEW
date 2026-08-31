@@ -14,7 +14,7 @@ on:
       - 'ui/tux-pos-refinement'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -40,6 +40,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -48,26 +50,19 @@ jobs:
         run: npm ci
       - name: Format check
         run: npm run format:check
-      - name: Capture exact Prettier diagnostic
-        if: failure()
+      - name: Apply exact Prettier output to PR branch
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         shell: bash
         run: |
           npm run format >/dev/null
-          mapfile -t files < <(git diff --name-only -- . ':(exclude).github/workflows/ci.yml')
-          rm -rf .tmp/prettier-formatted
-          mkdir -p .tmp/prettier-formatted
-          cp --parents "${files[@]}" .tmp/prettier-formatted/
-          printf 'PRETTIER_FILES_BEGIN\n'
-          printf '%s\n' "${files[@]}"
-          printf 'PRETTIER_FILES_END\n'
-      - name: Upload exact Prettier diagnostic
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prettier-formatted-source
-          path: .tmp/prettier-formatted
-          if-no-files-found: error
-          retention-days: 1
+          git checkout -- .github/workflows/ci.yml
+          mapfile -t files < <(git diff --name-only)
+          test "${#files[@]}" -gt 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "${files[@]}"
+          git commit -m 'style: format Phase B implementation'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
