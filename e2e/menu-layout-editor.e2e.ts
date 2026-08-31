@@ -22,6 +22,15 @@ async function expectSelectedCategoryInsideRail(page: Parameters<typeof menuCate
   expect(selectedBox!.x + selectedBox!.width).toBeLessThanOrEqual(railBox!.x + railBox!.width + 1);
 }
 
+async function waitForDndKeyboardSensor(page: Parameters<typeof menuCategoryTabs>[0]) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      }),
+  );
+}
+
 async function keyboardMove(
   page: Parameters<typeof menuCategoryTabs>[0],
   locator: Locator,
@@ -32,6 +41,7 @@ async function keyboardMove(
   await expect(page.locator('.category-tab-grabbed, .menu-edit-product-card-grabbed')).toHaveCount(
     1,
   );
+  await waitForDndKeyboardSensor(page);
   await page.keyboard.press(key);
   await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
   await page.keyboard.press('Space');
@@ -269,6 +279,7 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
   await cards.nth(1).focus();
   await page.keyboard.press('Space');
   await expect(page.locator('.menu-edit-product-card-grabbed')).toHaveCount(1);
+  await waitForDndKeyboardSensor(page);
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
   await expect(cards.nth(0)).toContainText('Double Smashed Patty');
