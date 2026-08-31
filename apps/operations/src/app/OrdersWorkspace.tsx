@@ -340,22 +340,6 @@ function MenuEditCategoryTab({
       onClick={onSelect}
       {...attributes}
       {...listeners}
-      onKeyDownCapture={(event) => {
-        if (!isDragging || (event.code !== 'Space' && event.code !== 'Enter')) return;
-        const ownerDocument = event.currentTarget.ownerDocument;
-        const KeyboardEventConstructor = ownerDocument.defaultView?.KeyboardEvent;
-        if (KeyboardEventConstructor === undefined) return;
-        event.preventDefault();
-        event.stopPropagation();
-        ownerDocument.dispatchEvent(
-          new KeyboardEventConstructor('keydown', {
-            key: event.key,
-            code: event.code,
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-      }}
     >
       {category.name}
     </button>
@@ -1135,9 +1119,36 @@ export function OrdersWorkspace({
       (category) => menuEditCategorySortableId(category.id) === overId,
     );
     if (activeCategory !== undefined && overCategory !== undefined) {
+      if (
+        menuEditSession.interaction.type !== 'CATEGORY_PICKUP' ||
+        menuEditSession.interaction.categoryId !== activeCategory.id
+      ) {
+        dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+        return;
+      }
+      let categoryOrder = menuEditSession.interaction.snapshot.categoryOrder;
+      if (activeCategory.id === overCategory.id && menuEditSession.draft !== null) {
+        categoryOrder = menuEditSession.draft.categoryOrder;
+      } else if (activeCategory.id !== overCategory.id) {
+        const sourceIndex = categoryOrder.indexOf(activeCategory.id);
+        const targetIndex = categoryOrder.indexOf(overCategory.id);
+        if (sourceIndex < 0 || targetIndex < 0) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
+        const next = [...categoryOrder];
+        const [moved] = next.splice(sourceIndex, 1);
+        if (moved === undefined) {
+          dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
+          return;
+        }
+        next.splice(targetIndex, 0, moved);
+        categoryOrder = next;
+      }
       dispatchMenuLayoutEditor({
         type: 'DROP_CATEGORY_PICKUP',
         categoryId: activeCategory.id,
+        categoryOrder,
       });
       return;
     }
@@ -1153,15 +1164,37 @@ export function OrdersWorkspace({
       overProduct === undefined ||
       selectedCategoryId === null ||
       activeProduct.categoryId !== selectedCategoryId ||
-      overProduct.categoryId !== selectedCategoryId
+      overProduct.categoryId !== selectedCategoryId ||
+      menuEditSession.interaction.type !== 'PRODUCT_PICKUP' ||
+      menuEditSession.interaction.productId !== activeProduct.id ||
+      menuEditSession.interaction.categoryId !== selectedCategoryId
     ) {
       dispatchMenuLayoutEditor({ type: 'CANCEL_PICKUP' });
       return;
     }
 
+    const snapshotProductOrder = menuEditSession.interaction.snapshot.productOrder;
+    let productOrder = snapshotProductOrder;
+    if (activeProduct.id === overProduct.id && menuEditSession.draft !== null) {
+      productOrder = menuEditSession.draft.productOrder;
+    } else if (activeProduct.id !== overProduct.id) {
+      const productCategoryById = new Map(
+        (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+      );
+      const categoryProductIds = snapshotProductOrder.filter(
+        (productId) => productCategoryById.get(productId) === selectedCategoryId,
+      );
+      productOrder = moveProductWithinCategory(
+        snapshotProductOrder,
+        categoryProductIds,
+        activeProduct.id,
+        overProduct.id,
+      );
+    }
     dispatchMenuLayoutEditor({
       type: 'DROP_PRODUCT_PICKUP',
       productId: activeProduct.id,
+      productOrder,
     });
   }
 
