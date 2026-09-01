@@ -9,14 +9,18 @@ const sessionClientSource = readFileSync(
 function functionBody(name: string, nextName: string): string {
   const start = sessionClientSource.indexOf(`const ${name} =`);
   const end = sessionClientSource.indexOf(`const ${nextName} =`, start + 1);
-  if (start < 0 || end < 0) throw new Error(`Could not locate ${name} source boundary.`);
+  if (start < 0 || end < 0) {
+    throw new Error(`Could not locate ${name} source boundary.`);
+  }
   return sessionClientSource.slice(start, end);
 }
 
 describe('Operations browser security session flow', () => {
   it('does not persist first-use identity until configuration installation succeeds', () => {
     const bootstrap = functionBody('bootstrapWithPin', 'submitPin');
-    const configurationSync = bootstrap.indexOf('configurationService.sync(bootstrap.shopId)');
+    const configurationSync = bootstrap.indexOf(
+      'configurationService.sync(bootstrap.shopId)',
+    );
     const persistShop = bootstrap.indexOf('transaction.shops.put(bootstrap.shop)');
     const persistWorker = bootstrap.indexOf('transaction.workers.put(bootstrap.worker)');
 
