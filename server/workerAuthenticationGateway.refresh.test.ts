@@ -74,7 +74,10 @@ describe('browser device-session refresh classification', () => {
   it('returns explicit unavailability without clearing cookies when refresh transport is offline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network unreachable')));
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 60)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 60)),
+      captured.response,
+    );
     expect(captured.status()).toBe(503);
     expect(captured.json()).toEqual({ error: 'device_session_unavailable' });
     expect(captured.header('set-cookie')).toBeUndefined();
@@ -83,7 +86,10 @@ describe('browser device-session refresh classification', () => {
   it('returns explicit unavailability without clearing cookies when refresh times out', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('aborted', 'TimeoutError')));
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 60)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 60)),
+      captured.response,
+    );
     expect(captured.status()).toBe(503);
     expect(captured.json()).toEqual({ error: 'device_session_unavailable' });
     expect(captured.header('set-cookie')).toBeUndefined();
@@ -92,7 +98,10 @@ describe('browser device-session refresh classification', () => {
   it('clears cookies only when the refresh token is authoritatively rejected', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(400, { error: 'invalid_grant' })));
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 60)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 60)),
+      captured.response,
+    );
     expect(captured.status()).toBe(401);
     expect(captured.json()).toEqual({ error: 'device_session_invalid' });
     expect(captured.header('set-cookie')).toBeDefined();
@@ -101,7 +110,10 @@ describe('browser device-session refresh classification', () => {
   it('treats a malformed refresh response as protocol failure without destroying durable cookies', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(200, { access_token: 'partial' })));
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 60)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 60)),
+      captured.response,
+    );
     expect(captured.status()).toBe(502);
     expect(captured.json()).toEqual({ error: 'device_session_protocol_error' });
     expect(captured.header('set-cookie')).toBeUndefined();
@@ -110,15 +122,24 @@ describe('browser device-session refresh classification', () => {
   it('preserves actual authoritative invalid-worker-PIN semantics', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(401, { error: 'invalid_pin' })));
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 3_600)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 3_600)),
+      captured.response,
+    );
     expect(captured.status()).toBe(401);
     expect(captured.json()).toEqual({ error: 'invalid_pin' });
   });
 
   it('preserves device-not-authorized semantics from worker auth', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(403, { error: 'device_not_authorized' })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(json(403, { error: 'device_not_authorized' })),
+    );
     const captured = responseCapture();
-    await proxyWorkerAuthentication(request(jwt(Math.floor(Date.now() / 1000) + 3_600)), captured.response);
+    await proxyWorkerAuthentication(
+      request(jwt(Math.floor(Date.now() / 1000) + 3_600)),
+      captured.response,
+    );
     expect(captured.status()).toBe(403);
     expect(captured.json()).toEqual({ error: 'device_not_authorized' });
   });

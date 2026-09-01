@@ -132,7 +132,9 @@ describe('desktop worker authentication device-session classification', () => {
 
   it('does not permit offline fallback for a malformed refresh response', async () => {
     const store = new MemoryStore(expiringSession());
-    const refresh = vi.fn<typeof fetch>().mockResolvedValue(json(200, { access_token: 'only-one' }));
+    const refresh = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(json(200, { access_token: 'only-one' }));
     const result = await authenticator(manager(store, refresh)).authenticate('1234');
     expect(result.status).toBe('INVALID_RESPONSE');
   });

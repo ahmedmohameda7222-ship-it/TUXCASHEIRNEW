@@ -47,18 +47,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Format check
-        run: |
-          npx prettier --write \
-            server/workerAuthenticationGateway.refresh.test.ts \
-            apps/operations/src/app/browserWorkerAuthentication.sessionMapping.test.ts \
-            packages/application/src/workerAuthentication.identity.sqlite.test.ts \
-            packages/sync/src/supabaseWorkerAuthentication.sessionClassification.test.ts
-          git diff -- \
-            server/workerAuthenticationGateway.refresh.test.ts \
-            apps/operations/src/app/browserWorkerAuthentication.sessionMapping.test.ts \
-            packages/application/src/workerAuthentication.identity.sqlite.test.ts \
-            packages/sync/src/supabaseWorkerAuthentication.sessionClassification.test.ts
-          exit 1
+        run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests

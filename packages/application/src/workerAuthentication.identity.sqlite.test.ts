@@ -64,11 +64,7 @@ class InactivatingWorkerStore extends DatabaseWorkerStore {
   }
 }
 
-function authoritativeWorker(
-  id = WORKER_B,
-  shopId = SHOP_ID,
-  pinHash = 'fixture:1234',
-): Worker {
+function authoritativeWorker(id = WORKER_B, shopId = SHOP_ID, pinHash = 'fixture:1234'): Worker {
   return {
     id,
     shopId,
@@ -102,7 +98,11 @@ async function fixture(input: { readonly bothCachedMatch?: boolean } = {}) {
     });
     await transaction.workers.put(authoritativeWorker(WORKER_A, SHOP_ID, 'fixture:1234'));
     await transaction.workers.put(
-      authoritativeWorker(WORKER_B, SHOP_ID, input.bothCachedMatch ? 'fixture:1234' : 'fixture:9999'),
+      authoritativeWorker(
+        WORKER_B,
+        SHOP_ID,
+        input.bothCachedMatch ? 'fixture:1234' : 'fixture:9999',
+      ),
     );
   });
 
@@ -172,7 +172,9 @@ describe('authoritative worker identity transition', () => {
     expect(result.value.operator.id).toBe(WORKER_B);
     expect(audits.every((event) => event.workerId === WORKER_B)).toBe(true);
 
-    const day = await base.transaction((transaction) => transaction.businessDays.getOpenForShop(SHOP_ID));
+    const day = await base.transaction((transaction) =>
+      transaction.businessDays.getOpenForShop(SHOP_ID),
+    );
     expect(day?.status === 'OPEN' ? day.startedByWorkerId : null).toBe(WORKER_B);
   });
 
@@ -194,7 +196,9 @@ describe('authoritative worker identity transition', () => {
   it('records the exact previous and new worker when switching an open Business Day', async () => {
     const { base, recordingDatabase, session, audits } = await fixture({ bothCachedMatch: true });
     const initial = await session.submitPin('1234');
-    expect(initial.ok && initial.value.status === 'ACTIVE' && initial.value.operator.id).toBe(WORKER_A);
+    expect(initial.ok && initial.value.status === 'ACTIVE' && initial.value.operator.id).toBe(
+      WORKER_A,
+    );
     audits.length = 0;
 
     const result = await service(
@@ -215,8 +219,7 @@ describe('authoritative worker identity transition', () => {
     );
     const switchedOutbox = pending.find((event) => event.eventType === 'WORKER_SWITCHED');
     const payload = switchedOutbox?.payload as
-      | { session?: { workerId?: unknown }; previousSession?: { workerId?: unknown } }
-      | undefined;
+      { session?: { workerId?: unknown }; previousSession?: { workerId?: unknown } } | undefined;
     expect(payload?.session?.workerId).toBe(WORKER_B);
     expect(payload?.previousSession?.workerId).toBe(WORKER_A);
   });

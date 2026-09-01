@@ -27,11 +27,14 @@ describe('browser worker-auth semantic mapping', () => {
     [401, { error: 'device_session_invalid' }],
     [401, { error: 'device_authentication_required' }],
     [403, { error: 'device_not_authorized' }],
-  ] as const)('maps HTTP %s device/session rejection without fencing the worker PIN', async (status, body) => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(status, body)));
-    const result = await new VercelBrowserRemoteGateway().authenticateWorker('1234');
-    expect(result.status).toBe('DEVICE_SESSION_INVALID');
-  });
+  ] as const)(
+    'maps HTTP %s device/session rejection without fencing the worker PIN',
+    async (status, body) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(status, body)));
+      const result = await new VercelBrowserRemoteGateway().authenticateWorker('1234');
+      expect(result.status).toBe('DEVICE_SESSION_INVALID');
+    },
+  );
 
   it('maps device-session refresh transport outage to offline-eligible unavailability', async () => {
     vi.stubGlobal(
