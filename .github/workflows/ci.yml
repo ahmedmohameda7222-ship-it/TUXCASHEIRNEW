@@ -47,7 +47,22 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Format check
-        run: npm run format:check
+        run: |
+          npx prettier --write \
+            packages/application/src/session.ts \
+            packages/application/src/workerAuthentication.test.ts \
+            packages/application/src/workerAuthentication.ts \
+            packages/sync/src/supabaseDeviceSession.ts \
+            packages/sync/src/supabaseWorkerAuthentication.ts \
+            packages/sync/src/supabaseWorkerAuthentication.test.ts
+          git diff -- \
+            packages/application/src/session.ts \
+            packages/application/src/workerAuthentication.test.ts \
+            packages/application/src/workerAuthentication.ts \
+            packages/sync/src/supabaseDeviceSession.ts \
+            packages/sync/src/supabaseWorkerAuthentication.ts \
+            packages/sync/src/supabaseWorkerAuthentication.test.ts
+          exit 1
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
