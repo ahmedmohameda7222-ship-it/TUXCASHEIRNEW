@@ -24,6 +24,11 @@ jobs:
         run: npm ci
       - name: Apply bounded 2D live reorder correction
         run: python3 .github/scripts/apply_menu_edit_2d_reorder.py
+      - name: Correct Product overlay acceptance selector
+        run: >-
+          sed -i
+          's/\.menu-edit-product-card\.menu-edit-drag-overlay/\.menu-edit-product-card-dragging\.menu-edit-drag-overlay/g'
+          e2e/menu-layout-editor.e2e.ts
       - name: Format affected files
         run: >-
           npx prettier --write
