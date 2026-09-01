@@ -55,7 +55,7 @@ jobs:
           npm run typecheck -w @tux/operations
       - name: Commit verified fixes to existing branch
         run: |
-          git rm .github/workflows/phase-b-planner-fixes.yml .github/scripts/phase_b_planner_fixes.py
+          git rm -f .github/workflows/phase-b-planner-fixes.yml .github/scripts/phase_b_planner_fixes.py
           git add \
             packages/application/src/workerMenuLayout.ts \
             packages/application/src/workerMenuLayout.test.ts \
