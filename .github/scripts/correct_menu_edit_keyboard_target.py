@@ -2,6 +2,9 @@ from pathlib import Path
 
 path = Path('apps/operations/src/app/OrdersWorkspace.tsx')
 text = path.read_text()
+if text.count('  closestCorners,\n') != 1:
+    raise SystemExit('expected one closestCorners import')
+text = text.replace('  closestCorners,\n', '', 1)
 start = "  const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(\n"
 end = "  const menuEditSensors = useSensors(\n"
 start_index = text.find(start)
