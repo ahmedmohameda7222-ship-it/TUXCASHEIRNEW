@@ -8,6 +8,8 @@ import {
   type GatewayResponse,
 } from './supabaseGateway';
 
+export type { GatewayRequest, GatewayResponse } from './supabaseGateway';
+
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
