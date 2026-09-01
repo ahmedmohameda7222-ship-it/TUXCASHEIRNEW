@@ -23,7 +23,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply bounded 2D live reorder correction
-        run: python3 .github/scripts/apply_menu_edit_2d_reorder.py
+        run: |
+          python3 .github/scripts/apply_menu_edit_2d_reorder.py
+          python3 .github/scripts/correct_menu_edit_keyboard_target.py
       - name: Correct Product overlay acceptance selector
         run: >-
           sed -i
@@ -76,6 +78,7 @@ jobs:
             .github/workflows/menu-edit-2d-red.yml \
             .github/workflows/menu-edit-2d-green.yml \
             .github/scripts/apply_menu_edit_2d_reorder.py \
+            .github/scripts/correct_menu_edit_keyboard_target.py \
             .github/menu-edit-2d-green-trigger.txt
           git add \
             apps/operations/src/app/OrdersWorkspace.tsx \
