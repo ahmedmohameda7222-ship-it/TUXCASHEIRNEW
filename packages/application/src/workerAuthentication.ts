@@ -6,9 +6,11 @@ export type AuthoritativeWorkerAuthenticationResult =
   | { readonly status: 'AUTHENTICATED'; readonly worker: Worker }
   | { readonly status: 'REJECTED'; readonly message: string }
   | { readonly status: 'THROTTLED'; readonly message: string }
+  | { readonly status: 'DEVICE_SESSION_INVALID'; readonly message: string }
   | { readonly status: 'INVALID_REQUEST'; readonly message: string }
   | { readonly status: 'INVALID_RESPONSE'; readonly message: string }
   | { readonly status: 'SERVER_ERROR'; readonly message: string }
+  | { readonly status: 'LOCAL_PERSISTENCE_ERROR'; readonly message: string; readonly cause: unknown }
   | { readonly status: 'UNAVAILABLE'; readonly message: string };
 
 export interface AuthoritativeWorkerAuthenticator {
@@ -18,6 +20,7 @@ export interface AuthoritativeWorkerAuthenticator {
 export interface WorkerAuthenticationLocalSession {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
+  submitAuthenticatedWorker(worker: Worker): Promise<OperationsSessionResult>;
 }
 
 export interface WorkerCredentialStore {
@@ -57,6 +60,12 @@ export class OperationsWorkerAuthenticationService {
 
     switch (remote.status) {
       case 'AUTHENTICATED':
+        if (!remote.worker.active || remote.worker.shopId !== state.value.shopId) {
+          return err({
+            code: 'REMOTE_SYNC_ERROR',
+            message: 'The authoritative worker identity does not belong to this activated shop.',
+          });
+        }
         try {
           await this.#workerStore.put(remote.worker);
         } catch (cause) {
@@ -66,7 +75,7 @@ export class OperationsWorkerAuthenticationService {
             cause,
           });
         }
-        return this.#session.submitPin(pin);
+        return this.#session.submitAuthenticatedWorker(remote.worker);
       case 'REJECTED':
         try {
           await this.#workerStore.fenceMatchingPin(pin);
@@ -80,6 +89,13 @@ export class OperationsWorkerAuthenticationService {
         return err({ code: 'PIN_AUTH_ERROR', message: remote.message });
       case 'THROTTLED':
         return err({ code: 'PIN_AUTH_ERROR', message: remote.message });
+      case 'LOCAL_PERSISTENCE_ERROR':
+        return err({
+          code: 'LOCAL_PERSISTENCE_ERROR',
+          message: remote.message,
+          cause: remote.cause,
+        });
+      case 'DEVICE_SESSION_INVALID':
       case 'INVALID_REQUEST':
       case 'INVALID_RESPONSE':
       case 'SERVER_ERROR':
