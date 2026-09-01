@@ -62,11 +62,17 @@ class FakeAuthenticator implements AuthoritativeWorkerAuthenticator {
 
 class FakeStore implements WorkerCredentialStore {
   readonly workers: Worker[] = [];
+  readonly fencedPins: string[] = [];
   constructor(readonly fail = false) {}
 
   async put(value: Worker) {
     if (this.fail) throw new Error('persistence failed');
     this.workers.push(value);
+  }
+
+  async fenceMatchingPin(pin: string) {
+    if (this.fail) throw new Error('persistence failed');
+    this.fencedPins.push(pin);
   }
 }
 
@@ -87,13 +93,14 @@ function fixture(
 }
 
 describe('OperationsWorkerAuthenticationService', () => {
-  it('A rejects a stale cached PIN when the reachable backend rejects it', async () => {
-    const { service, session } = fixture({ status: 'REJECTED', message: 'Invalid PIN.' });
+  it('A rejects and fences a stale cached PIN when the reachable backend rejects it', async () => {
+    const { service, session, store } = fixture({ status: 'REJECTED', message: 'Invalid PIN.' });
     await expect(service.submitPin('1111')).resolves.toEqual({
       ok: false,
       error: { code: 'PIN_AUTH_ERROR', message: 'Invalid PIN.' },
     });
     expect(session.submittedPins).toEqual([]);
+    expect(store.fencedPins).toEqual(['1111']);
   });
 
   it('B accepts a rotated authoritative PIN only after refreshing the local worker credential', async () => {
