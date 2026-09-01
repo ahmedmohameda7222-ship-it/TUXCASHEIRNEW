@@ -1,10 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const sessionClientSource = readFileSync(
-  new URL('./sessionClient.ts', import.meta.url),
-  'utf8',
-);
+const sessionClientSource = readFileSync(new URL('./sessionClient.ts', import.meta.url), 'utf8');
 
 function functionBody(name: string, nextName: string): string {
   const start = sessionClientSource.indexOf(`const ${name} =`);
@@ -18,9 +15,7 @@ function functionBody(name: string, nextName: string): string {
 describe('Operations browser security session flow', () => {
   it('does not persist first-use identity until configuration installation succeeds', () => {
     const bootstrap = functionBody('bootstrapWithPin', 'submitPin');
-    const configurationSync = bootstrap.indexOf(
-      'configurationService.sync(bootstrap.shopId)',
-    );
+    const configurationSync = bootstrap.indexOf('configurationService.sync(bootstrap.shopId)');
     const persistShop = bootstrap.indexOf('transaction.shops.put(bootstrap.shop)');
     const persistWorker = bootstrap.indexOf('transaction.workers.put(bootstrap.worker)');
 
