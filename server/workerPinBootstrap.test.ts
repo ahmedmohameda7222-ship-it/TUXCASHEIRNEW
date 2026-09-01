@@ -57,12 +57,14 @@ function upstreamRateLimitKeys(fetchMock: ReturnType<typeof vi.fn>): string[] {
 beforeEach(() => {
   process.env['TUX_SUPABASE_URL'] = 'https://project.supabase.co';
   process.env['TUX_SUPABASE_PUBLISHABLE_KEY'] = 'publishable-key';
+  process.env['TUX_BOOTSTRAP_HMAC_SECRET'] = 'test-bootstrap-hmac-secret-with-more-than-32-bytes';
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env['TUX_SUPABASE_URL'];
   delete process.env['TUX_SUPABASE_PUBLISHABLE_KEY'];
+  delete process.env['TUX_BOOTSTRAP_HMAC_SECRET'];
 });
 
 describe('worker PIN bootstrap rate-limit identity', () => {
@@ -106,5 +108,20 @@ describe('worker PIN bootstrap rate-limit identity', () => {
     const keys = upstreamRateLimitKeys(upstream);
     expect(keys).toHaveLength(2);
     expect(keys[1]).toBe(keys[0]);
+  });
+
+  it('signs the normalized abuse identity and bootstrap payload for the Edge boundary', async () => {
+    const upstream = vi.fn().mockResolvedValue(new Response('', { status: 401 }));
+    vi.stubGlobal('fetch', upstream);
+
+    await bootstrapDeviceWithWorkerPin(request({ deviceId: deviceA }), responseCapture());
+
+    const init = upstream.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get('x-tux-bootstrap-timestamp')).toMatch(/^\d+$/);
+    expect(headers.get('x-tux-bootstrap-nonce')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(headers.get('x-tux-bootstrap-signature')).toMatch(/^[0-9a-f]{64}$/);
   });
 });
