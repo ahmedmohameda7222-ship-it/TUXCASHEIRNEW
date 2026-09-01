@@ -75,6 +75,13 @@ export type {
   PinVerifier,
   SessionRuntime,
 } from './session';
+export { OperationsWorkerAuthenticationService } from './workerAuthentication';
+export type {
+  AuthoritativeWorkerAuthenticationResult,
+  AuthoritativeWorkerAuthenticator,
+  WorkerAuthenticationLocalSession,
+  WorkerCredentialStore,
+} from './workerAuthentication';
 export {
   WorkerMenuLayoutConflictError,
   WorkerMenuLayoutRetryController,
