@@ -39,6 +39,7 @@ function state(status: 'NO_ACTIVE_DAY' | 'CONFIGURATION_REQUIRED' = 'NO_ACTIVE_D
 
 class FakeSession implements WorkerAuthenticationLocalSession {
   readonly submittedPins: string[] = [];
+  readonly submittedWorkers: Worker[] = [];
   constructor(
     readonly initial: OperationsSessionState,
     readonly submitted: Result<OperationsSessionState, never> = ok({
@@ -53,6 +54,11 @@ class FakeSession implements WorkerAuthenticationLocalSession {
 
   async submitPin(pin: string) {
     this.submittedPins.push(pin);
+    return this.submitted;
+  }
+
+  async submitAuthenticatedWorker(value: Worker) {
+    this.submittedWorkers.push(value);
     return this.submitted;
   }
 }
@@ -107,15 +113,17 @@ describe('OperationsWorkerAuthenticationService', () => {
       error: { code: 'PIN_AUTH_ERROR', message: 'Invalid PIN.' },
     });
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([]);
     expect(store.fencedPins).toEqual(['1111']);
   });
 
-  it('B accepts a rotated authoritative PIN only after refreshing the local worker credential', async () => {
+  it('B accepts a rotated authoritative PIN only after refreshing and selecting the exact worker', async () => {
     const current = worker(WORKER_A, 'pbkdf2:rotated');
     const { service, store, session } = fixture({ status: 'AUTHENTICATED', worker: current });
     await service.submitPin('2222');
     expect(store.workers).toEqual([current]);
-    expect(session.submittedPins).toEqual(['2222']);
+    expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([current]);
   });
 
   it('C rejects a deactivated worker response without cached fallback', async () => {
@@ -136,15 +144,16 @@ describe('OperationsWorkerAuthenticationService', () => {
     expect(session.submittedPins).toEqual([]);
   });
 
-  it.each(['INVALID_REQUEST', 'INVALID_RESPONSE', 'SERVER_ERROR'] as const)(
+  it.each(['DEVICE_SESSION_INVALID', 'INVALID_REQUEST', 'INVALID_RESPONSE', 'SERVER_ERROR'] as const)(
     'E treats %s as authoritative remote failure rather than offline fallback',
     async (status) => {
-      const { service, session } = fixture({ status, message: `remote ${status}` });
+      const { service, session, store } = fixture({ status, message: `remote ${status}` });
       const result = await service.submitPin('1234');
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error('Expected remote failure.');
       expect(result.error.code).toBe('REMOTE_SYNC_ERROR');
       expect(session.submittedPins).toEqual([]);
+      expect(store.fencedPins).toEqual([]);
     },
   );
 
@@ -153,6 +162,7 @@ describe('OperationsWorkerAuthenticationService', () => {
     const result = await service.submitPin('1234');
     expect(result.ok).toBe(true);
     expect(session.submittedPins).toEqual(['1234']);
+    expect(session.submittedWorkers).toEqual([]);
   });
 
   it('G never attempts remote or cached PIN authentication for a fresh unactivated installation', async () => {
@@ -163,9 +173,10 @@ describe('OperationsWorkerAuthenticationService', () => {
     await expect(service.submitPin('1234')).resolves.toEqual(ok(state('CONFIGURATION_REQUIRED')));
     expect(authenticator.pins).toEqual([]);
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([]);
   });
 
-  it('H preserves worker switching by persisting the newly authenticated worker before the local session transition', async () => {
+  it('H preserves worker switching by persisting and selecting the exact authoritative worker', async () => {
     const switchedState = ok({
       status: 'ACTIVE' as const,
       shopId: SHOP_ID,
@@ -182,7 +193,8 @@ describe('OperationsWorkerAuthenticationService', () => {
     const result = await service.submitPin('5678');
     expect(result).toEqual(switchedState);
     expect(store.workers).toEqual([current]);
-    expect(session.submittedPins).toEqual(['5678']);
+    expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([current]);
   });
 
   it('does not downgrade a local credential persistence failure into offline fallback', async () => {
@@ -197,5 +209,21 @@ describe('OperationsWorkerAuthenticationService', () => {
     if (result.ok) throw new Error('Expected persistence failure.');
     expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([]);
+  });
+
+  it('surfaces device-session local persistence failures without offline fallback', async () => {
+    const cause = new Error('session store failed');
+    const { service, session } = fixture({
+      status: 'LOCAL_PERSISTENCE_ERROR',
+      message: 'Could not persist refreshed device session.',
+      cause,
+    });
+    const result = await service.submitPin('1234');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected local persistence failure.');
+    expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
+    expect(session.submittedPins).toEqual([]);
+    expect(session.submittedWorkers).toEqual([]);
   });
 });
