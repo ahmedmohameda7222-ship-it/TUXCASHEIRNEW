@@ -24,13 +24,25 @@ export interface WorkerCredentialStore {
 }
 
 export class OperationsWorkerAuthenticationService {
-  constructor(
-    _session: WorkerAuthenticationLocalSession,
-    _authenticator: AuthoritativeWorkerAuthenticator,
-    _workerStore: WorkerCredentialStore,
-  ) {}
+  readonly #session: WorkerAuthenticationLocalSession;
+  readonly #authenticator: AuthoritativeWorkerAuthenticator;
+  readonly #workerStore: WorkerCredentialStore;
 
-  async submitPin(_pin: string): Promise<OperationsSessionResult> {
+  constructor(
+    session: WorkerAuthenticationLocalSession,
+    authenticator: AuthoritativeWorkerAuthenticator,
+    workerStore: WorkerCredentialStore,
+  ) {
+    this.#session = session;
+    this.#authenticator = authenticator;
+    this.#workerStore = workerStore;
+  }
+
+  async submitPin(pin: string): Promise<OperationsSessionResult> {
+    void pin;
+    void this.#session;
+    void this.#authenticator;
+    void this.#workerStore;
     throw new Error('worker authentication policy not implemented');
   }
 }
