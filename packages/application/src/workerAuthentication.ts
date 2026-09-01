@@ -10,7 +10,11 @@ export type AuthoritativeWorkerAuthenticationResult =
   | { readonly status: 'INVALID_REQUEST'; readonly message: string }
   | { readonly status: 'INVALID_RESPONSE'; readonly message: string }
   | { readonly status: 'SERVER_ERROR'; readonly message: string }
-  | { readonly status: 'LOCAL_PERSISTENCE_ERROR'; readonly message: string; readonly cause: unknown }
+  | {
+      readonly status: 'LOCAL_PERSISTENCE_ERROR';
+      readonly message: string;
+      readonly cause: unknown;
+    }
   | { readonly status: 'UNAVAILABLE'; readonly message: string };
 
 export interface AuthoritativeWorkerAuthenticator {
