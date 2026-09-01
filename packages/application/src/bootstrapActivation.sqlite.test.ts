@@ -5,10 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { instant, parseEntityId, type ShopId, type WorkerId } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
-import {
-  SqliteOperationsDatabase,
-  SqliteOperatorSessionReadModel,
-} from '@tux/persistence/sqlite';
+import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import {
   OperationsConfigurationSyncService,
