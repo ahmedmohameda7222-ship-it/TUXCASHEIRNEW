@@ -24,7 +24,7 @@ export interface AuthoritativeWorkerAuthenticator {
 export interface WorkerAuthenticationLocalSession {
   getState(): Promise<OperationsSessionResult>;
   submitPin(pin: string): Promise<OperationsSessionResult>;
-  submitAuthenticatedWorker(worker: Worker): Promise<OperationsSessionResult>;
+  submitAuthenticatedWorker(pin: string, worker: Worker): Promise<OperationsSessionResult>;
 }
 
 export interface WorkerCredentialStore {
@@ -70,16 +70,7 @@ export class OperationsWorkerAuthenticationService {
             message: 'The authoritative worker identity does not belong to this activated shop.',
           });
         }
-        try {
-          await this.#workerStore.put(remote.worker);
-        } catch (cause) {
-          return err({
-            code: 'LOCAL_PERSISTENCE_ERROR',
-            message: 'Could not persist the authoritative worker credential locally.',
-            cause,
-          });
-        }
-        return this.#session.submitAuthenticatedWorker(remote.worker);
+        return this.#session.submitAuthenticatedWorker(pin, remote.worker);
       case 'REJECTED':
         try {
           await this.#workerStore.fenceMatchingPin(pin);

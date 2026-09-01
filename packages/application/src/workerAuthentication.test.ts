@@ -7,8 +7,8 @@ import {
   type Worker,
   type WorkerId,
 } from '@tux/domain';
-import { ok, type Result } from './result';
-import type { OperationsSessionState } from './session';
+import { err, ok } from './result';
+import type { OperationsSessionResult, OperationsSessionState } from './session';
 import {
   OperationsWorkerAuthenticationService,
   type AuthoritativeWorkerAuthenticationResult,
@@ -39,10 +39,11 @@ function state(status: 'NO_ACTIVE_DAY' | 'CONFIGURATION_REQUIRED' = 'NO_ACTIVE_D
 
 class FakeSession implements WorkerAuthenticationLocalSession {
   readonly submittedPins: string[] = [];
+  readonly submittedAuthenticatedPins: string[] = [];
   readonly submittedWorkers: Worker[] = [];
   constructor(
     readonly initial: OperationsSessionState,
-    readonly submitted: Result<OperationsSessionState, never> = ok({
+    readonly submitted: OperationsSessionResult = ok({
       status: 'NO_ACTIVE_DAY',
       shopId: SHOP_ID,
     }),
@@ -57,7 +58,8 @@ class FakeSession implements WorkerAuthenticationLocalSession {
     return this.submitted;
   }
 
-  async submitAuthenticatedWorker(value: Worker) {
+  async submitAuthenticatedWorker(pin: string, value: Worker) {
+    this.submittedAuthenticatedPins.push(pin);
     this.submittedWorkers.push(value);
     return this.submitted;
   }
@@ -92,7 +94,7 @@ class FakeStore implements WorkerCredentialStore {
 function fixture(
   remote: AuthoritativeWorkerAuthenticationResult,
   localState: OperationsSessionState = state(),
-  submitted?: Result<OperationsSessionState, never>,
+  submitted?: OperationsSessionResult,
   store = new FakeStore(),
 ) {
   const session = new FakeSession(localState, submitted);
@@ -113,16 +115,18 @@ describe('OperationsWorkerAuthenticationService', () => {
       error: { code: 'PIN_AUTH_ERROR', message: 'Invalid PIN.' },
     });
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
     expect(session.submittedWorkers).toEqual([]);
     expect(store.fencedPins).toEqual(['1111']);
   });
 
-  it('B accepts a rotated authoritative PIN only after refreshing and selecting the exact worker', async () => {
+  it('B accepts a rotated authoritative PIN only through the exact-worker local transition', async () => {
     const current = worker(WORKER_A, 'pbkdf2:rotated');
     const { service, store, session } = fixture({ status: 'AUTHENTICATED', worker: current });
     await service.submitPin('2222');
-    expect(store.workers).toEqual([current]);
+    expect(store.workers).toEqual([]);
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual(['2222']);
     expect(session.submittedWorkers).toEqual([current]);
   });
 
@@ -133,6 +137,7 @@ describe('OperationsWorkerAuthenticationService', () => {
     if (result.ok) throw new Error('Expected rejection.');
     expect(result.error.code).toBe('PIN_AUTH_ERROR');
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
   });
 
   it('D never treats throttling as offline unavailability', async () => {
@@ -142,6 +147,7 @@ describe('OperationsWorkerAuthenticationService', () => {
     if (result.ok) throw new Error('Expected throttle rejection.');
     expect(result.error).toEqual({ code: 'PIN_AUTH_ERROR', message: 'Too many attempts.' });
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
   });
 
   it.each([
@@ -158,6 +164,7 @@ describe('OperationsWorkerAuthenticationService', () => {
       if (result.ok) throw new Error('Expected remote failure.');
       expect(result.error.code).toBe('REMOTE_SYNC_ERROR');
       expect(session.submittedPins).toEqual([]);
+      expect(session.submittedAuthenticatedPins).toEqual([]);
       expect(store.fencedPins).toEqual([]);
     },
   );
@@ -167,6 +174,7 @@ describe('OperationsWorkerAuthenticationService', () => {
     const result = await service.submitPin('1234');
     expect(result.ok).toBe(true);
     expect(session.submittedPins).toEqual(['1234']);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
     expect(session.submittedWorkers).toEqual([]);
   });
 
@@ -178,10 +186,11 @@ describe('OperationsWorkerAuthenticationService', () => {
     await expect(service.submitPin('1234')).resolves.toEqual(ok(state('CONFIGURATION_REQUIRED')));
     expect(authenticator.pins).toEqual([]);
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
     expect(session.submittedWorkers).toEqual([]);
   });
 
-  it('H preserves worker switching by persisting and selecting the exact authoritative worker', async () => {
+  it('H preserves worker switching by selecting the exact authoritative worker', async () => {
     const switchedState = ok({
       status: 'ACTIVE' as const,
       shopId: SHOP_ID,
@@ -197,24 +206,29 @@ describe('OperationsWorkerAuthenticationService', () => {
     );
     const result = await service.submitPin('5678');
     expect(result).toEqual(switchedState);
-    expect(store.workers).toEqual([current]);
+    expect(store.workers).toEqual([]);
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual(['5678']);
     expect(session.submittedWorkers).toEqual([current]);
   });
 
-  it('does not downgrade a local credential persistence failure into offline fallback', async () => {
+  it('does not downgrade an authoritative local transition persistence failure into offline fallback', async () => {
+    const cause = new Error('persistence failed');
+    const localFailure = err({
+      code: 'LOCAL_PERSISTENCE_ERROR' as const,
+      message: 'Could not activate the authoritative local operator session.',
+      cause,
+    });
     const { service, session } = fixture(
       { status: 'AUTHENTICATED', worker: worker() },
       state(),
-      undefined,
-      new FakeStore(true),
+      localFailure,
     );
     const result = await service.submitPin('1234');
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected persistence failure.');
-    expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
+    expect(result).toEqual(localFailure);
     expect(session.submittedPins).toEqual([]);
-    expect(session.submittedWorkers).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual(['1234']);
+    expect(session.submittedWorkers).toEqual([worker()]);
   });
 
   it('surfaces device-session local persistence failures without offline fallback', async () => {
@@ -229,6 +243,7 @@ describe('OperationsWorkerAuthenticationService', () => {
     if (result.ok) throw new Error('Expected local persistence failure.');
     expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
     expect(session.submittedPins).toEqual([]);
+    expect(session.submittedAuthenticatedPins).toEqual([]);
     expect(session.submittedWorkers).toEqual([]);
   });
 });

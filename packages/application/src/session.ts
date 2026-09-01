@@ -128,8 +128,11 @@ export class OperationsSessionService {
     });
   }
 
-  async submitAuthenticatedWorker(worker: Worker): Promise<OperationsSessionResult> {
+  async submitAuthenticatedWorker(pin: string, worker: Worker): Promise<OperationsSessionResult> {
     return this.#exclusive(async () => {
+      if (pin.length === 0 || !/^\d+$/.test(pin)) {
+        return err({ code: 'VALIDATION_ERROR', message: 'Enter a valid PIN.' });
+      }
       if (!worker.active) {
         return err({ code: 'VALIDATION_ERROR', message: 'Authoritative worker is not active.' });
       }
@@ -151,7 +154,15 @@ export class OperationsSessionService {
           });
         }
 
-        return ok(await this.#transitionToWorker(shop, worker));
+        const activeWorkers = await this.#readModel.listActiveWorkers(shop.id);
+        const matchingWorkers: Worker[] = [];
+        for (const cachedWorker of activeWorkers) {
+          if (await this.#pinVerifier.verify(pin, cachedWorker.pinHash)) {
+            matchingWorkers.push(cachedWorker);
+          }
+        }
+
+        return ok(await this.#transitionToWorker(shop, worker, matchingWorkers));
       } catch (cause) {
         return err(
           localPersistenceError(
@@ -225,6 +236,7 @@ export class OperationsSessionService {
   async #transitionToWorker(
     shop: Shop,
     authoritativeWorker: Worker,
+    authoritativePinMatches: readonly Worker[] | null = null,
   ): Promise<OperationsSessionState> {
     const initialDay = await this.#database.transaction((transaction) =>
       transaction.businessDays.getOpenForShop(shop.id),
@@ -236,6 +248,22 @@ export class OperationsSessionService {
 
     const now = this.#runtime.now();
     return this.#database.transaction(async (transaction) => {
+      if (authoritativePinMatches !== null) {
+        for (const matchedWorker of authoritativePinMatches) {
+          if (matchedWorker.id === authoritativeWorker.id) continue;
+          const current = await transaction.workers.getById(matchedWorker.id);
+          if (
+            current !== null &&
+            current.active &&
+            current.shopId === shop.id &&
+            current.pinHash === matchedWorker.pinHash
+          ) {
+            await transaction.workers.put({ ...current, active: false });
+          }
+        }
+        await transaction.workers.put(authoritativeWorker);
+      }
+
       const worker = await transaction.workers.getById(authoritativeWorker.id);
       if (worker === null || !worker.active || worker.shopId !== shop.id) {
         throw new Error('Authenticated worker is no longer active for this shop.');

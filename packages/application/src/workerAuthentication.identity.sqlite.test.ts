@@ -64,15 +64,6 @@ class DatabaseWorkerStore implements WorkerCredentialStore {
   }
 }
 
-class InactivatingWorkerStore extends DatabaseWorkerStore {
-  override async put(worker: Worker) {
-    await super.put(worker);
-    await this.database.transaction((transaction) =>
-      transaction.workers.put({ ...worker, active: false }),
-    );
-  }
-}
-
 function authoritativeWorker(id = WORKER_B, shopId = SHOP_ID, pinHash = 'fixture:1234'): Worker {
   return {
     id,
@@ -141,7 +132,7 @@ async function fixture(input: { readonly bothCachedMatch?: boolean } = {}) {
     },
   );
   resources.push({ database: base, readModel, directory });
-  return { base, recordingDatabase, session, audits };
+  return { base, recordingDatabase, readModel, session, audits };
 }
 
 afterEach(async () => {
@@ -260,16 +251,48 @@ describe('authoritative worker identity transition', () => {
     expect(payload?.previousSession?.workerId).toBe(WORKER_A);
   });
 
-  it('fails safely if the authoritative worker is inactive before the local session transaction', async () => {
-    const { recordingDatabase, session } = await fixture();
-    const store = new InactivatingWorkerStore(recordingDatabase);
+  it('rolls back competing credential fencing when authoritative session persistence fails', async () => {
+    const { base, recordingDatabase, readModel } = await fixture({ bothCachedMatch: true });
+    const failingDatabase: OperationsDatabase = {
+      transaction: (work) =>
+        recordingDatabase.transaction((transaction) =>
+          work({
+            ...transaction,
+            workerSessions: {
+              async put() {
+                throw new Error('fixture worker session persistence failed');
+              },
+            },
+          }),
+        ),
+    };
+    const failingSession = new OperationsSessionService(
+      failingDatabase,
+      readModel,
+      new FixturePinVerifier(),
+      {
+        now: () => instant('2026-09-01T12:00:00.000Z'),
+        createUuid: () => randomUUID(),
+      },
+    );
+
     const result = await service(
-      session,
-      recordingDatabase,
+      failingSession,
+      failingDatabase,
       authoritativeWorker(WORKER_B),
-      store,
     ).submitPin('1234');
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected local persistence failure.');
+    expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
+
+    const cached = await base.transaction(async (transaction) => ({
+      workerA: await transaction.workers.getById(WORKER_A),
+      workerB: await transaction.workers.getById(WORKER_B),
+      day: await transaction.businessDays.getOpenForShop(SHOP_ID),
+    }));
+    expect(cached.workerA?.active).toBe(true);
+    expect(cached.workerB?.active).toBe(true);
+    expect(cached.day).toBeNull();
   });
 
   it('rejects a cross-shop authoritative worker instead of selecting a local PIN match', async () => {
