@@ -111,7 +111,7 @@ jobs:
       - name: Device bootstrap provenance behavioral tests
         run: >-
           deno test --allow-env --allow-net --allow-run --allow-read
-          supabase/functions/device-bootstrap/security.test.ts
+          supabase/functions/device-bootstrap/security.deno.ts
 
   windows-package:
     name: windows-package
