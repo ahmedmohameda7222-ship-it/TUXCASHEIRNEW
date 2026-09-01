@@ -94,7 +94,9 @@ describe('SupabaseWorkerAuthenticator', () => {
 
   it('does not classify an invalid device session as offline unavailability', async () => {
     const manager = sessionManager();
-    manager.requiredSession.mockRejectedValue(new Error('This TUX Operations device is not enrolled.'));
+    manager.requiredSession.mockRejectedValue(
+      new Error('This TUX Operations device is not enrolled.'),
+    );
     const authenticator = new SupabaseWorkerAuthenticator({
       projectUrl: 'https://project.supabase.co',
       sessionManager: manager,
