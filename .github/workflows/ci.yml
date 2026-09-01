@@ -47,10 +47,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Format check
-        run: |
-          npx prettier --write packages/application/src/workerAuthentication.identity.sqlite.test.ts
-          git diff -- packages/application/src/workerAuthentication.identity.sqlite.test.ts
-          false
+        run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
