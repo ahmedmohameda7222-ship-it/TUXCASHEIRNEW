@@ -7,6 +7,7 @@ import {
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  OperationsWorkerAuthenticationService,
   WorkerMenuLayoutRetryController,
   WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
@@ -14,6 +15,7 @@ import {
   err,
   workerMenuLayoutUpdateFromFlatProductOrder,
   type OperationsSessionResult,
+  type WorkerCredentialStore,
   type WorkerMenuLayoutSyncIdentity,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
@@ -205,13 +207,33 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         // Browser Operations stays usable from the last known-good local snapshot.
       }
 
+      const pinVerifier = new BrowserPbkdf2PinVerifier();
       const session = new CoordinatedOperationsSessionService(
         database,
         readModel,
-        new BrowserPbkdf2PinVerifier(),
+        pinVerifier,
         runtime,
         coordinator,
       );
+      const workerCredentialStore: WorkerCredentialStore = {
+        put: (worker) =>
+          database.transaction((transaction) => transaction.workers.put(worker)),
+        fenceMatchingPin: async (pin) => {
+          const state = await session.getState();
+          if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return;
+          const workers = await readModel.listActiveWorkers(state.value.shopId);
+          const matches = [];
+          for (const worker of workers) {
+            if (await pinVerifier.verify(pin, worker.pinHash)) matches.push(worker);
+          }
+          if (matches.length === 0) return;
+          await database.transaction(async (transaction) => {
+            for (const worker of matches) {
+              await transaction.workers.put({ ...worker, active: false });
+            }
+          });
+        },
+      };
 
       const activeIdentityFromSession = async (): Promise<WorkerMenuLayoutSyncIdentity> => {
         const result = await session.getState();
@@ -336,13 +358,11 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       const bootstrapWithPin = async (pin: string): Promise<OperationsSessionResult> => {
         try {
           const bootstrap = await remoteGateway.bootstrap(pin);
-          await database.transaction(async (transaction) => {
-            await transaction.shops.put(bootstrap.shop);
-            await transaction.workers.put(bootstrap.worker);
-          });
-
           const configuration = await configurationService.sync(bootstrap.shopId);
-          if (configuration.status === 'REMOTE_UNAVAILABLE') {
+          if (
+            configuration.status === 'REMOTE_UNAVAILABLE' ||
+            (configuration.status === 'UP_TO_DATE' && configuration.version === null)
+          ) {
             return err({
               code: 'REMOTE_SYNC_ERROR',
               message: 'PIN accepted, but the Operations configuration is unavailable.',
@@ -360,6 +380,10 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               message: 'Could not install the Operations configuration on this browser.',
             });
           }
+          await database.transaction(async (transaction) => {
+            await transaction.shops.put(bootstrap.shop);
+            await transaction.workers.put(bootstrap.worker);
+          });
           startRemoteRuntime(bootstrap.shopId);
           return session.submitPin(pin);
         } catch (cause) {
@@ -373,27 +397,23 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       };
 
       const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
-        const local = await session.submitPin(pin);
-        if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') {
-          trackWorkerIdentity(local);
-          return local;
+        const state = await session.getState();
+        if (!state.ok) {
+          trackWorkerIdentity(state);
+          return state;
+        }
+        if (state.value.status === 'CONFIGURATION_REQUIRED') {
+          const result = await bootstrapWithPin(pin);
+          trackWorkerIdentity(result);
+          return result;
         }
 
-        const needsRemoteBootstrap =
-          (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
-          (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
-        if (!needsRemoteBootstrap) {
-          trackWorkerIdentity(local);
-          return local;
-        }
-
-        const remote = await bootstrapWithPin(pin);
-        const result =
-          !remote.ok && remote.error.code === 'REMOTE_SYNC_ERROR' && !local.ok
-            ? local.error.code === 'PIN_AUTH_ERROR' && remote.error.message === 'Invalid PIN.'
-              ? local
-              : remote
-            : remote;
+        const workerAuthentication = new OperationsWorkerAuthenticationService(
+          session,
+          { authenticate: () => remoteGateway.authenticateWorker(pin) },
+          workerCredentialStore,
+        );
+        const result = await workerAuthentication.submitPin(pin);
         trackWorkerIdentity(result);
         return result;
       };
