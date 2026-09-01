@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 .github/scripts/apply_menu_edit_2d_reorder.py
           python3 .github/scripts/correct_menu_edit_keyboard_target.py
+          python3 .github/scripts/stabilize_menu_edit_pointer_test.py
       - name: Correct Product overlay acceptance selector
         run: >-
           sed -i
@@ -79,6 +80,7 @@ jobs:
             .github/workflows/menu-edit-2d-green.yml \
             .github/scripts/apply_menu_edit_2d_reorder.py \
             .github/scripts/correct_menu_edit_keyboard_target.py \
+            .github/scripts/stabilize_menu_edit_pointer_test.py \
             .github/menu-edit-2d-green-trigger.txt
           git add \
             apps/operations/src/app/OrdersWorkspace.tsx \
