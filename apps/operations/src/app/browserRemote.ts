@@ -248,7 +248,10 @@ export class VercelBrowserRemoteGateway
     }
 
     const remoteError = typeof body['error'] === 'string' ? body['error'] : '';
-    if (response.status === 503 && remoteError === 'remote_backend_unavailable') {
+    if (
+      response.status === 503 &&
+      (remoteError === 'remote_backend_unavailable' || remoteError === 'device_session_unavailable')
+    ) {
       return {
         status: 'UNAVAILABLE',
         message: 'Worker authentication backend is unavailable.',
@@ -257,13 +260,28 @@ export class VercelBrowserRemoteGateway
     if (response.status === 400) {
       return { status: 'INVALID_REQUEST', message: 'Worker authentication request was rejected.' };
     }
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401 && remoteError === 'invalid_pin') {
       return { status: 'REJECTED', message: 'Invalid PIN.' };
+    }
+    if (
+      (response.status === 401 &&
+        (remoteError === 'device_session_invalid' ||
+          remoteError === 'device_authentication_required' ||
+          remoteError === 'invalid_access_token')) ||
+      (response.status === 403 && remoteError === 'device_not_authorized')
+    ) {
+      return {
+        status: 'DEVICE_SESSION_INVALID',
+        message: 'This device session is not authorized for worker authentication.',
+      };
     }
     if (response.status === 429) {
       return { status: 'THROTTLED', message: 'Too many PIN attempts. Try again later.' };
     }
-    if (response.status === 502 && remoteError === 'invalid_remote_response') {
+    if (
+      response.status === 502 &&
+      (remoteError === 'invalid_remote_response' || remoteError === 'device_session_protocol_error')
+    ) {
       return {
         status: 'INVALID_RESPONSE',
         message: 'Worker authentication returned an invalid response.',
