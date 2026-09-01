@@ -12,14 +12,16 @@ export type SupabaseWorkerAuthenticationResult =
   | { readonly status: 'INVALID_REQUEST'; readonly message: string }
   | { readonly status: 'INVALID_RESPONSE'; readonly message: string }
   | { readonly status: 'SERVER_ERROR'; readonly message: string }
-  | { readonly status: 'LOCAL_PERSISTENCE_ERROR'; readonly message: string; readonly cause: unknown }
+  | {
+      readonly status: 'LOCAL_PERSISTENCE_ERROR';
+      readonly message: string;
+      readonly cause: unknown;
+    }
   | { readonly status: 'UNAVAILABLE'; readonly message: string };
 
 interface WorkerAuthenticationSessionManager {
   resolveSession(): Promise<SupabaseDeviceSessionResolution>;
-  authorizationHeadersFor(
-    session: SupabaseDeviceSessionRecord,
-  ): Readonly<Record<string, string>>;
+  authorizationHeadersFor(session: SupabaseDeviceSessionRecord): Readonly<Record<string, string>>;
 }
 
 export interface SupabaseWorkerAuthenticatorOptions {
@@ -187,7 +189,8 @@ export class SupabaseWorkerAuthenticator {
     }
     if (
       (response.status === 401 &&
-        (remoteError === 'invalid_access_token' || remoteError === 'device_authentication_required')) ||
+        (remoteError === 'invalid_access_token' ||
+          remoteError === 'device_authentication_required')) ||
       (response.status === 403 && remoteError === 'device_not_authorized')
     ) {
       return {
