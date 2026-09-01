@@ -106,7 +106,9 @@ export class OperationsSessionService {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
         if (!(await this.#hasActivatedConfiguration(shop.id))) {
-          return ok(configurationState('This device does not have an activated Operations configuration.'));
+          return ok(
+            configurationState('This device does not have an activated Operations configuration.'),
+          );
         }
 
         const workers = await this.#readModel.listActiveWorkers(shop.id);
@@ -233,7 +235,9 @@ export class OperationsSessionService {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
         if (!(await this.#hasActivatedConfiguration(shop.id))) {
-          return ok(configurationState('This device does not have an activated Operations configuration.'));
+          return ok(
+            configurationState('This device does not have an activated Operations configuration.'),
+          );
         }
         const day = await this.#database.transaction((transaction) =>
           transaction.businessDays.getOpenForShop(shop.id),
@@ -289,7 +293,9 @@ export class OperationsSessionService {
         return ok(configurationState('This device is not assigned to exactly one active shop.'));
       }
       if (!(await this.#hasActivatedConfiguration(shop.id))) {
-        return ok(configurationState('This device does not have an activated Operations configuration.'));
+        return ok(
+          configurationState('This device does not have an activated Operations configuration.'),
+        );
       }
       const day = await this.#database.transaction((transaction) =>
         transaction.businessDays.getOpenForShop(shop.id),
