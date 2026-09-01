@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseEntityId, type ShopId, type Worker, type WorkerId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type BusinessDayId,
+  type ShopId,
+  type Worker,
+  type WorkerId,
+} from '@tux/domain';
 import { ok, type Result } from './result';
 import type { OperationsSessionState } from './session';
 import {
@@ -162,8 +169,8 @@ describe('OperationsWorkerAuthenticationService', () => {
     const switchedState = ok({
       status: 'ACTIVE' as const,
       shopId: SHOP_ID,
-      businessDayId: parseEntityId('30000000-0000-4000-8000-000000000001'),
-      businessDayStartedAt: '2026-09-01T10:00:00.000Z' as never,
+      businessDayId: parseEntityId<BusinessDayId>('30000000-0000-4000-8000-000000000001'),
+      businessDayStartedAt: instant(new Date('2026-09-01T10:00:00.000Z')),
       operator: { id: WORKER_B, displayName: 'Maya' },
     });
     const current = worker(WORKER_B, 'pbkdf2:maya');

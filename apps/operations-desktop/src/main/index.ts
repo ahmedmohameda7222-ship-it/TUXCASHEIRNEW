@@ -210,7 +210,7 @@ async function initializeOperationsServices(): Promise<void> {
       const state = await sessionService!.getState();
       if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return;
       const workers = await operatorReadModel!.listActiveWorkers(state.value.shopId);
-      const matches = [];
+      const matches: Array<(typeof workers)[number]> = [];
       for (const worker of workers) {
         if (await pinVerifier.verify(pin, worker.pinHash)) matches.push(worker);
       }

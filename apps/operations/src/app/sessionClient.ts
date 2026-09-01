@@ -221,7 +221,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           const state = await session.getState();
           if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return;
           const workers = await readModel.listActiveWorkers(state.value.shopId);
-          const matches = [];
+          const matches: Array<(typeof workers)[number]> = [];
           for (const worker of workers) {
             if (await pinVerifier.verify(pin, worker.pinHash)) matches.push(worker);
           }
