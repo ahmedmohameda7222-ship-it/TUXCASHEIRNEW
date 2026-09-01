@@ -65,9 +65,7 @@ function parseWorker(value: Record<string, unknown>, label: string): Worker {
   if (workerSource['active'] !== true) throw new TypeError(`${label} worker is not active.`);
   return {
     id: parseEntityId<WorkerId>(requiredString(workerSource['id'], `${label} worker id`)),
-    shopId: parseEntityId<ShopId>(
-      requiredString(workerSource['shopId'], `${label} worker shopId`),
-    ),
+    shopId: parseEntityId<ShopId>(requiredString(workerSource['shopId'], `${label} worker shopId`)),
     displayName: requiredString(workerSource['displayName'], `${label} worker name`),
     pinHash: requiredString(workerSource['pinHash'], `${label} worker PIN hash`),
     active: true,
