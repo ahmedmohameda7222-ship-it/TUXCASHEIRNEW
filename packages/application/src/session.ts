@@ -105,6 +105,9 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
+        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+          return ok(configurationState('This device does not have an activated Operations configuration.'));
+        }
 
         const workers = await this.#readModel.listActiveWorkers(shop.id);
         let authenticatedWorker: Worker | null = null;
@@ -229,6 +232,9 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
+        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+          return ok(configurationState('This device does not have an activated Operations configuration.'));
+        }
         const day = await this.#database.transaction((transaction) =>
           transaction.businessDays.getOpenForShop(shop.id),
         );
@@ -282,6 +288,9 @@ export class OperationsSessionService {
       if (shop === null) {
         return ok(configurationState('This device is not assigned to exactly one active shop.'));
       }
+      if (!(await this.#hasActivatedConfiguration(shop.id))) {
+        return ok(configurationState('This device does not have an activated Operations configuration.'));
+      }
       const day = await this.#database.transaction((transaction) =>
         transaction.businessDays.getOpenForShop(shop.id),
       );
@@ -312,6 +321,13 @@ export class OperationsSessionService {
   async #resolveShop(): Promise<Shop | null> {
     const shops = await this.#readModel.listActiveShops();
     return shops.length === 1 ? (shops[0] ?? null) : null;
+  }
+
+  async #hasActivatedConfiguration(shopId: ShopId): Promise<boolean> {
+    const snapshot = await this.#database.transaction((transaction) =>
+      transaction.configuration.getForShop(shopId),
+    );
+    return snapshot !== null && snapshot.shopId === shopId && snapshot.version > 0;
   }
 
   #activeState(shop: Shop, day: OpenBusinessDay, worker: Worker): OperationsSessionState {
