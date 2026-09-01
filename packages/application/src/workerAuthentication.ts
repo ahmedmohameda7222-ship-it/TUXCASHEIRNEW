@@ -22,6 +22,7 @@ export interface WorkerAuthenticationLocalSession {
 
 export interface WorkerCredentialStore {
   put(worker: Worker): Promise<void>;
+  fenceMatchingPin(pin: string): Promise<void>;
 }
 
 export class OperationsWorkerAuthenticationService {
@@ -67,6 +68,16 @@ export class OperationsWorkerAuthenticationService {
         }
         return this.#session.submitPin(pin);
       case 'REJECTED':
+        try {
+          await this.#workerStore.fenceMatchingPin(pin);
+        } catch (cause) {
+          return err({
+            code: 'LOCAL_PERSISTENCE_ERROR',
+            message: 'Could not fence the rejected cached worker credential.',
+            cause,
+          });
+        }
+        return err({ code: 'PIN_AUTH_ERROR', message: remote.message });
       case 'THROTTLED':
         return err({ code: 'PIN_AUTH_ERROR', message: remote.message });
       case 'INVALID_REQUEST':
