@@ -50,7 +50,7 @@ describe('VercelBrowserRemoteGateway worker authentication', () => {
   it.each([
     [400, { error: 'invalid_worker_auth_request' }, 'INVALID_REQUEST'],
     [401, { error: 'invalid_pin' }, 'REJECTED'],
-    [403, { error: 'device_not_authorized' }, 'REJECTED'],
+    [403, { error: 'device_not_authorized' }, 'DEVICE_SESSION_INVALID'],
     [429, { error: 'too_many_pin_attempts' }, 'THROTTLED'],
     [500, { error: 'worker_lookup_failed' }, 'SERVER_ERROR'],
     [503, { error: 'worker_lookup_failed' }, 'SERVER_ERROR'],
