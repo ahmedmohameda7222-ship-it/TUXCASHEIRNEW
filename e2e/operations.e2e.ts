@@ -846,13 +846,12 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(categories.nth(0)).toHaveText('Burgers');
   await expect(categories.nth(1)).toHaveText('Combo');
 
-  const burgers = page.getByLabel('Menu categories').getByRole('button', {
-    name: 'Burgers',
-    exact: true,
-  });
+  const burgers = categories.filter({ hasText: 'Burgers' }).first();
   await burgers.focus();
   await page.keyboard.press('Space');
   await expect(burgers).toHaveClass(/category-tab-grabbed/);
+  await expect(burgers).toHaveCSS('visibility', 'hidden');
+  await expect(page.locator('.category-tab.menu-edit-drag-overlay')).toHaveCount(1);
   await expect(
     page.locator('.menu-pane .sr-only').filter({ hasText: 'Burgers picked up' }),
   ).toContainText('Burgers picked up');
@@ -881,6 +880,8 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(reorderCards).toHaveCount(9);
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
+  const sourceProductIndex = 0;
+  const targetProductIndex = 1;
   const productNamesBefore = await reorderCards.evaluateAll((nodes) =>
     nodes.map((node) =>
       (node.getAttribute('aria-label') ?? '').replace(/, position \d+ of \d+$/, ''),
@@ -889,34 +890,21 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   const productBoxes = await reorderCards.evaluateAll((nodes) =>
     nodes.map((node) => {
       const rect = node.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width };
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }),
   );
-  const sourceProductIndex = 0;
-  const sourceProductBox = productBoxes[sourceProductIndex];
-  expect(sourceProductBox).toBeDefined();
-  const sourceProductCenterX = sourceProductBox!.x + sourceProductBox!.width / 2;
-  const targetProductIndex = productBoxes.reduce((bestIndex, box, index) => {
-    if (index === sourceProductIndex || box.y <= sourceProductBox!.y + 1) return bestIndex;
-    const targetCenterX = box.x + box.width / 2;
-    const sameColumnTolerance = Math.max(1, Math.min(sourceProductBox!.width, box.width) / 4);
-    if (Math.abs(targetCenterX - sourceProductCenterX) > sameColumnTolerance) {
-      return bestIndex;
-    }
-    if (bestIndex < 0) return index;
-    return box.y < productBoxes[bestIndex]!.y ? index : bestIndex;
-  }, -1);
-  expect(targetProductIndex).toBeGreaterThan(sourceProductIndex);
   const sourceProductName = productNamesBefore[sourceProductIndex]!;
   const targetProductName = productNamesBefore[targetProductIndex]!;
+  const sameRow = Math.abs(productBoxes[0]!.y - productBoxes[1]!.y) <= 2;
+  const productMoveKey: 'ArrowRight' | 'ArrowDown' = sameRow ? 'ArrowRight' : 'ArrowDown';
 
   await reorderCards.nth(sourceProductIndex).focus();
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowDown');
-  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
-  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
+  await page.keyboard.press(productMoveKey);
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
   await page.keyboard.press('Escape');
   reorderCards = page.locator('.menu-edit-product-card');
   await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
@@ -926,9 +914,9 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowDown');
-  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
-  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
+  await page.keyboard.press(productMoveKey);
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
   await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
@@ -981,9 +969,9 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press('ArrowDown');
-  await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
-  await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
+  await page.keyboard.press(productMoveKey);
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
   await page.keyboard.press('Space');
   await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
   await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
