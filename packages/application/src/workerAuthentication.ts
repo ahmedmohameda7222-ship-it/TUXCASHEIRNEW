@@ -1,4 +1,5 @@
 import type { Worker } from '@tux/domain';
+import { err } from './result';
 import type { OperationsSessionResult } from './session';
 
 export type AuthoritativeWorkerAuthenticationResult =
@@ -39,10 +40,41 @@ export class OperationsWorkerAuthenticationService {
   }
 
   async submitPin(pin: string): Promise<OperationsSessionResult> {
-    void pin;
-    void this.#session;
-    void this.#authenticator;
-    void this.#workerStore;
-    throw new Error('worker authentication policy not implemented');
+    const state = await this.#session.getState();
+    if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return state;
+
+    let remote: AuthoritativeWorkerAuthenticationResult;
+    try {
+      remote = await this.#authenticator.authenticate(pin);
+    } catch (cause) {
+      return err({
+        code: 'REMOTE_SYNC_ERROR',
+        message: 'Could not authenticate the worker with the remote authority.',
+        cause,
+      });
+    }
+
+    switch (remote.status) {
+      case 'AUTHENTICATED':
+        try {
+          await this.#workerStore.put(remote.worker);
+        } catch (cause) {
+          return err({
+            code: 'LOCAL_PERSISTENCE_ERROR',
+            message: 'Could not persist the authoritative worker credential locally.',
+            cause,
+          });
+        }
+        return this.#session.submitPin(pin);
+      case 'REJECTED':
+      case 'THROTTLED':
+        return err({ code: 'PIN_AUTH_ERROR', message: remote.message });
+      case 'INVALID_REQUEST':
+      case 'INVALID_RESPONSE':
+      case 'SERVER_ERROR':
+        return err({ code: 'REMOTE_SYNC_ERROR', message: remote.message });
+      case 'UNAVAILABLE':
+        return this.#session.submitPin(pin);
+    }
   }
 }
