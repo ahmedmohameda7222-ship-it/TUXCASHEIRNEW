@@ -60,11 +60,11 @@ Remote current state may advance but stale events may not regress it:
 - **Customer contacts:** older `last_order_at` learning cannot replace newer name/address/zone learning.
 - **Worker sessions / Business Day:** terminal/closed state is monotonic and stale writes cannot reopen it.
 
-The real authenticated Supabase receiver is a future phase; repository policy functions and mutation guards are already deterministic/tested so the adapter has an explicit contract to implement.
+The authenticated Operations device/session transport is present in the repository. Remote materialization policy remains separately guarded by the deterministic parsing and mutation rules above.
 
-## Inbound configuration foundation
+## Inbound configuration and activation
 
-`OperationsConfigurationSyncService` is the application boundary for future Admin/backend configuration delivery:
+`OperationsConfigurationSyncService` is the application boundary for backend configuration delivery:
 
 ```text
 discover version
@@ -74,7 +74,37 @@ discover version
 → atomically install snapshot + inventory configuration
 ```
 
-Remote unavailability leaves local Operations fully usable. Invalid bundles preserve the last-known-good snapshot. Omitted old inventory definitions are retained inactive rather than destructively deleted, preserving historical references. Initial device provisioning uses the same install path.
+Remote unavailability preserves an already installed last-known-good configuration. Invalid bundles preserve the last-known-good snapshot. Omitted old inventory definitions are retained inactive rather than destructively deleted, preserving historical references. Initial device provisioning uses the same install path.
+
+A fresh installation is not trusted merely because a shop/worker identity was cached. Operations becomes activated only when exactly one active local shop and a validated durable configuration snapshot for that shop coexist. Therefore a crash or remote/configuration failure after identity persistence but before configuration installation cannot turn a half-provisioned browser/Desktop installation into an offline-authenticated worker session after restart.
+
+## Worker authentication: online authority versus offline fallback
+
+Worker PIN entry has one narrow offline exception rather than a generic “try local when anything remote fails” rule.
+
+When remote authority is available, its authenticated worker identity is authoritative. On success, Operations persists the returned active worker and transitions by that exact worker ID. It never chooses the operator by scanning cached matching PIN hashes after an online success. This prevents PIN reassignment or duplicate cached hashes from attributing Business Day/session/audit/outbox state to the wrong worker.
+
+Local cached PIN verification is used only when the remote/device-session boundary reports genuine transport unavailability **and** the installation is already activated. The following are explicitly not offline-fallback signals:
+
+- invalid/deactivated worker PIN;
+- invalid, expired/revoked or unauthorized device session;
+- throttling;
+- malformed/protocol-invalid remote response;
+- ordinary server errors that are not classified as transport unavailability;
+- local credential/session persistence failure;
+- fresh or partially provisioned installation.
+
+For browser device-session refresh, transport loss returns an explicit unavailable outcome without destroying durable cookies. An authoritative refresh-token rejection clears the device cookies and rejects authentication. A malformed refresh response is a protocol failure. Only an actual worker `invalid_pin` response may fence a matching stale cached worker credential.
+
+Desktop uses the same application semantics through typed device-session resolution: transport unavailable, authoritative invalid, protocol error, local persistence error and not-enrolled are distinct outcomes rather than exception-message guesses.
+
+## Bootstrap brute-force and provenance boundary
+
+First-use browser bootstrap is an exceptional unauthenticated PIN path and therefore has stricter abuse controls. The Vercel server derives the rate-limit identity from deployment-trusted `x-vercel-forwarded-for`; caller-controlled device IDs, labels, User-Agent and spoofable request inputs cannot rotate the bucket. Missing trusted source information collapses into one conservative unresolved bucket.
+
+The Edge Function does not trust a body `rateLimitKey` merely because the caller knows the Supabase publishable key. Vercel signs the normalized bootstrap request with HMAC-SHA256 using the server-only `TUX_BOOTSTRAP_HMAC_SECRET`. The signature binds timestamp, nonce, rate-limit key, device identity/label and PIN. The Edge function verifies signature/freshness before any Supabase access, atomically claims the nonce, and only then consumes the PIN rate-limit bucket. A replay is rejected before it can consume or rotate another rate-limit attempt.
+
+The same high-entropy `TUX_BOOTSTRAP_HMAC_SECRET` (minimum 32 UTF-8 bytes) must be configured at the Vercel server and `device-bootstrap` Edge Function. The value is deployment secret material and is never browser-visible or committed to source control.
 
 ## Browser fallback
 
@@ -82,7 +112,9 @@ IndexedDB is a first-class local fallback. The database has an explicit ordered 
 
 ## Remote status
 
-No new TUX V2 Supabase project exists in this repository state. No remote migration has been applied, no service-role credential is present, and RLS remains deny-by-default pending the later reviewed auth/device-enrollment phase.
+This repository contains the reviewed Supabase schema, device enrollment/authentication/configuration/sync Edge Functions, worker PIN rate-limit policy, and append-only bootstrap replay-protection migration. Repository CI applies the complete migration chain only to an ephemeral loopback PostgreSQL instance and exercises the relevant security behavior.
+
+No remote migration, Edge Function deployment, Vercel deployment or secret mutation is performed by this security-closeout work. Deployment operators must provision required environment secrets separately and apply repository migrations through the normal reviewed release process.
 
 ## Delivery after End Day
 
