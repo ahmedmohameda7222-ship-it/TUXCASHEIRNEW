@@ -6,7 +6,6 @@ import {
   PointerSensor,
   TouchSensor,
   closestCenter,
-  closestCorners,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -70,8 +69,8 @@ import { MenuProductCard } from './MenuProductCard';
 import { ProductCardPresentation } from './ProductCardPresentation';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
+  moveProductWithinCategory,
   reconcileProductOrder,
-  swapProductWithinCategory,
 } from './menuProductOrder';
 import { createWorkerMenuLayoutClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
@@ -414,73 +413,81 @@ export function OrdersWorkspace({
   const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
   const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(
     (event, args) => {
-      const active = args.context.active;
-      const collisionRect = args.context.collisionRect;
-      if (active === null || collisionRect === null) {
+      const direction = event.code;
+      if (
+        direction !== 'ArrowLeft' &&
+        direction !== 'ArrowRight' &&
+        direction !== 'ArrowUp' &&
+        direction !== 'ArrowDown'
+      ) {
         pendingKeyboardDragTargetRef.current = null;
         return sortableKeyboardCoordinates(event, args);
       }
 
-      const productDrag = String(active.id).startsWith('product:');
-      if (productDrag && (event.code === 'ArrowLeft' || event.code === 'ArrowRight')) {
+      event.preventDefault();
+      const active = args.context.active;
+      const collisionRect = args.context.collisionRect;
+      if (active === null || collisionRect === null) {
         pendingKeyboardDragTargetRef.current = null;
-        return undefined;
+        return args.currentCoordinates;
       }
 
-      const nextCoordinates = sortableKeyboardCoordinates(event, args);
-      const activeRect = productDrag ? args.context.droppableRects.get(active.id) : undefined;
-      const directionalDroppableContainers = args.context.droppableContainers
+      const activeRect = args.context.droppableRects.get(active.id) ?? collisionRect;
+      const activeCenterX = activeRect.left + activeRect.width / 2;
+      const activeCenterY = activeRect.top + activeRect.height / 2;
+      const horizontal = direction === 'ArrowLeft' || direction === 'ArrowRight';
+      const candidates = args.context.droppableContainers
         .getEnabled()
-        .filter((container) => {
-          if (container.id === active.id) return false;
+        .flatMap((container) => {
+          if (container.id === active.id) return [];
           const rect = args.context.droppableRects.get(container.id);
-          if (rect === undefined) return false;
-          if (productDrag && activeRect !== undefined) {
-            const activeCenterX = activeRect.left + activeRect.width / 2;
-            const targetCenterX = rect.left + rect.width / 2;
-            const sameColumnTolerance = Math.max(1, Math.min(activeRect.width, rect.width) / 4);
-            if (Math.abs(targetCenterX - activeCenterX) > sameColumnTolerance) return false;
+          if (rect === undefined) return [];
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+
+          if (horizontal) {
+            const rowTolerance = Math.max(activeRect.height, rect.height) / 2;
+            if (Math.abs(centerY - activeCenterY) > rowTolerance) return [];
+            if (direction === 'ArrowLeft' && centerX >= activeCenterX - 1) return [];
+            if (direction === 'ArrowRight' && centerX <= activeCenterX + 1) return [];
+            return [
+              {
+                container,
+                rect,
+                primaryDistance: Math.abs(centerX - activeCenterX),
+                crossDistance: Math.abs(centerY - activeCenterY),
+              },
+            ];
           }
-          if (event.code === 'ArrowDown') return collisionRect.top < rect.top;
-          if (event.code === 'ArrowUp') return collisionRect.top > rect.top;
-          if (event.code === 'ArrowLeft') return collisionRect.left > rect.left;
-          if (event.code === 'ArrowRight') return collisionRect.left < rect.left;
-          return false;
-        });
-      const projectedCollisions = closestCorners({
-        active,
-        collisionRect,
-        droppableRects: args.context.droppableRects,
-        droppableContainers: directionalDroppableContainers,
-        pointerCoordinates: null,
-      });
-      const currentOverId = args.context.over?.id;
-      const projectedCollision =
-        projectedCollisions[0]?.id === currentOverId && projectedCollisions.length > 1
-          ? projectedCollisions[1]
-          : projectedCollisions[0];
-      pendingKeyboardDragTargetRef.current =
-        projectedCollision === undefined ? null : String(projectedCollision.id);
-      return nextCoordinates;
+
+          if (direction === 'ArrowUp' && centerY >= activeCenterY - 1) return [];
+          if (direction === 'ArrowDown' && centerY <= activeCenterY + 1) return [];
+          return [
+            {
+              container,
+              rect,
+              primaryDistance: Math.abs(centerY - activeCenterY),
+              crossDistance: Math.abs(centerX - activeCenterX),
+            },
+          ];
+        })
+        .sort(
+          (left, right) =>
+            left.primaryDistance - right.primaryDistance ||
+            left.crossDistance - right.crossDistance,
+        );
+      const target = candidates[0];
+      if (target === undefined) {
+        pendingKeyboardDragTargetRef.current = null;
+        return args.currentCoordinates;
+      }
+
+      pendingKeyboardDragTargetRef.current = String(target.container.id);
+      target.container.node.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return { x: target.rect.left, y: target.rect.top };
     },
     [],
   );
-  const menuEditProductCollisionDetection = useCallback<typeof closestCenter>((args) => {
-    const activeRect = args.droppableRects.get(args.active.id);
-    if (activeRect === undefined) return closestCenter(args);
-    const activeCenterX = activeRect.left + activeRect.width / 2;
-    const sameColumnDroppableContainers = args.droppableContainers.filter((container) => {
-      const rect = args.droppableRects.get(container.id);
-      if (rect === undefined) return false;
-      const targetCenterX = rect.left + rect.width / 2;
-      const sameColumnTolerance = Math.max(1, Math.min(activeRect.width, rect.width) / 4);
-      return Math.abs(targetCenterX - activeCenterX) <= sameColumnTolerance;
-    });
-    return closestCenter({
-      ...args,
-      droppableContainers: sameColumnDroppableContainers,
-    });
-  }, []);
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -1111,10 +1118,25 @@ export function OrdersWorkspace({
     }
     if (activeProduct.id === overProduct.id) return true;
 
-    const targetIndex = menuEditProducts.findIndex((product) => product.id === overProduct.id);
-    if (targetIndex < 0) return false;
+    const productCategoryById = new Map(
+      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
+    );
+    const categoryProductIds = menuEditProductOrder.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
+    const next = moveProductWithinCategory(
+      menuEditProductOrder,
+      categoryProductIds,
+      activeProduct.id,
+      overProduct.id,
+    );
+    if (next === menuEditProductOrder) return true;
+    dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
+    const categoryOnly = next.filter(
+      (productId) => productCategoryById.get(productId) === selectedCategoryId,
+    );
     setMenuEditAnnouncement(
-      `${activeProduct.name} targeting position ${targetIndex + 1} of ${menuEditProducts.length}.`,
+      `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
     );
     return true;
   }
@@ -1222,7 +1244,7 @@ export function OrdersWorkspace({
       const categoryProductIds = snapshotProductOrder.filter(
         (productId) => productCategoryById.get(productId) === selectedCategoryId,
       );
-      productOrder = swapProductWithinCategory(
+      productOrder = moveProductWithinCategory(
         snapshotProductOrder,
         categoryProductIds,
         activeProduct.id,
@@ -1702,7 +1724,7 @@ export function OrdersWorkspace({
               <DndContext
                 key={selectedCategoryId ?? 'menu-products-none'}
                 sensors={menuEditSensors}
-                collisionDetection={menuEditProductCollisionDetection}
+                collisionDetection={closestCenter}
                 measuring={MENU_EDIT_MEASURING}
                 onDragStart={handleMenuEditDragStart}
                 onDragOver={handleMenuEditDragOver}
@@ -1721,7 +1743,7 @@ export function OrdersWorkspace({
                     />
                   ))}
                 </SortableContext>
-                <DragOverlay modifiers={[({ transform }) => ({ ...transform, x: 0 })]}>
+                <DragOverlay>
                   {activeDraggedProduct === null ? null : (
                     <article
                       aria-hidden="true"

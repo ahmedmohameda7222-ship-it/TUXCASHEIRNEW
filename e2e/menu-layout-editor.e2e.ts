@@ -34,7 +34,7 @@ async function waitForDndKeyboardSensor(page: Parameters<typeof menuCategoryTabs
 async function keyboardMove(
   page: Parameters<typeof menuCategoryTabs>[0],
   locator: Locator,
-  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowDown',
+  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
 ) {
   await locator.focus();
   await page.keyboard.press('Space');
@@ -83,35 +83,11 @@ async function productCardNames(cards: Locator): Promise<string[]> {
   );
 }
 
-function nearestSameColumnBelow(boxes: readonly ProductCardBox[], sourceIndex: number): number {
-  const source = boxes[sourceIndex];
-  if (source === undefined) throw new Error(`Missing Product Card ${sourceIndex}`);
-  const sourceCenterX = source.x + source.width / 2;
-  let targetIndex = -1;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  boxes.forEach((box, index) => {
-    if (index === sourceIndex || box.y <= source.y + 1) return;
-    const targetCenterX = box.x + box.width / 2;
-    const tolerance = Math.max(1, Math.min(source.width, box.width) / 4);
-    if (Math.abs(targetCenterX - sourceCenterX) > tolerance) return;
-    const distance = box.y - source.y;
-    if (distance >= nearestDistance) return;
-    nearestDistance = distance;
-    targetIndex = index;
-  });
-
-  if (targetIndex < 0) throw new Error(`No same-column Product Card below ${sourceIndex}`);
-  return targetIndex;
-}
-
-function swapNames(values: readonly string[], leftIndex: number, rightIndex: number): string[] {
+function moveName(values: readonly string[], sourceIndex: number, targetIndex: number): string[] {
   const next = [...values];
-  const left = next[leftIndex];
-  const right = next[rightIndex];
-  if (left === undefined || right === undefined) throw new Error('Invalid Product Card swap');
-  next[leftIndex] = right;
-  next[rightIndex] = left;
+  const [moved] = next.splice(sourceIndex, 1);
+  if (moved === undefined) throw new Error('Invalid Product Card move');
+  next.splice(targetIndex, 0, moved);
   return next;
 }
 
@@ -213,109 +189,98 @@ test('menu editor keeps selected category reachable and preserves Product Card g
   await expectNoHorizontalOverflow(page);
 });
 
-test('desktop fixed-slot Product drag swaps only same-column slots and persists after save', async ({
+test('desktop Apple-style Menu Edit reflows categories and Product Cards live in 2D', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback', 'desktop acceptance');
   await startMenuLayoutActiveOrders(page);
   await page.getByRole('button', { name: 'Edit menu' }).click();
 
-  let cards = menuEditProductCards(page);
-  let boxes = await productCardBoxes(cards);
-  const horizontalBefore = await menuLayoutDraftSnapshot(page);
-  await cards.nth(0).focus();
+  const categories = menuCategoryTabs(page);
+  const burgers = categories.getByText('Burgers', { exact: true });
+  await burgers.focus();
   await page.keyboard.press('Space');
-  await expect(page.locator('.menu-edit-product-card-grabbed')).toHaveCount(1);
+  await expect(page.locator('.category-tab.menu-edit-drag-overlay')).toHaveCount(1);
+  await expect(burgers).toHaveCSS('visibility', 'hidden');
   await waitForDndKeyboardSensor(page);
   await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('Space');
-  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(horizontalBefore);
-
-  const keyboardSourceIndex = 0;
-  const keyboardTargetIndex = nearestSameColumnBelow(boxes, keyboardSourceIndex);
-  const beforeKeyboardNames = await productCardNames(cards);
-  await keyboardMove(page, cards.nth(keyboardSourceIndex), 'ArrowDown');
-  cards = menuEditProductCards(page);
-  await expect
-    .poll(() => productCardNames(cards))
-    .toEqual(swapNames(beforeKeyboardNames, keyboardSourceIndex, keyboardTargetIndex));
-
-  const categories = menuCategoryTabs(page);
-  await keyboardMove(page, categories.nth(0), 'ArrowRight');
   await expect(categories.nth(0)).toHaveText('Combo');
   await expect(categories.nth(1)).toHaveText('Burgers');
+  await page.keyboard.press('Escape');
+  await expect(categories.nth(0)).toHaveText('Burgers');
+  await expect(categories.nth(1)).toHaveText('Combo');
 
-  await categories.getByText('Burgers', { exact: true }).click();
-  cards = menuEditProductCards(page);
-  const pointerSourceIndex = 0;
-  const beforePointerNames = await productCardNames(cards);
-  boxes = await productCardBoxes(cards);
-  const pointerTargetIndex = nearestSameColumnBelow(boxes, pointerSourceIndex);
-  const sourceBox = boxes[pointerSourceIndex];
-  const targetBox = boxes[pointerTargetIndex];
-  expect(sourceBox).toBeDefined();
-  expect(targetBox).toBeDefined();
-  const sourceX = sourceBox!.x + sourceBox!.width / 2;
-  const sourceY = sourceBox!.y + sourceBox!.height / 2;
-  const targetX = targetBox!.x + targetBox!.width / 2;
-  const targetY = targetBox!.y + targetBox!.height / 2;
-  const crossColumnIndex = boxes.findIndex(
-    (box, index) =>
-      index !== pointerSourceIndex &&
-      Math.abs(box.y - sourceBox!.y) <= 2 &&
-      Math.abs(box.x - sourceBox!.x) > sourceBox!.width / 2,
+  let cards = menuEditProductCards(page);
+  const beforeKeyboard = await productCardNames(cards);
+  let boxes = await productCardBoxes(cards);
+  expect(boxes.length).toBeGreaterThan(4);
+  expect(Math.abs(boxes[0]!.y - boxes[1]!.y)).toBeLessThanOrEqual(2);
+  expect(boxes[1]!.x).toBeGreaterThan(boxes[0]!.x);
+
+  await cards.nth(0).focus();
+  await page.keyboard.press('Space');
+  await expect(cards.nth(0)).toHaveCSS('visibility', 'hidden');
+  await expect(page.locator('.menu-edit-product-card-dragging.menu-edit-drag-overlay')).toHaveCount(
+    1,
   );
-
-  await page.mouse.move(sourceX, sourceY);
-  await page.mouse.down();
-  await page.mouse.move(sourceX + 8, sourceY + 4, { steps: 2 });
-  await expect(page.locator('.menu-edit-drag-overlay')).toHaveCount(1);
-  await expect(cards.nth(pointerSourceIndex)).toHaveCSS('visibility', 'hidden');
-
-  const activatedBoxes = await productCardBoxes(cards);
-  for (let index = 0; index < boxes.length; index += 1) {
-    if (index === pointerSourceIndex) continue;
-    expect(activatedBoxes[index]?.x).toBeCloseTo(boxes[index]!.x, 1);
-    expect(activatedBoxes[index]?.y).toBeCloseTo(boxes[index]!.y, 1);
-    expect(activatedBoxes[index]?.width).toBeCloseTo(boxes[index]!.width, 1);
-    expect(activatedBoxes[index]?.height).toBeCloseTo(boxes[index]!.height, 1);
-  }
-
-  if (crossColumnIndex >= 0) {
-    const crossBox = boxes[crossColumnIndex]!;
-    await page.mouse.move(crossBox.x + crossBox.width / 2, crossBox.y + crossBox.height / 2, {
-      steps: 4,
-    });
-    const overlayBox = await page.locator('.menu-edit-drag-overlay').boundingBox();
-    expect(overlayBox).not.toBeNull();
-    expect(overlayBox!.x + overlayBox!.width / 2).toBeCloseTo(
-      sourceBox!.x + sourceBox!.width / 2,
-      0,
-    );
-    await expect.poll(() => productCardNames(cards)).toEqual(beforePointerNames);
-  }
-
-  await page.mouse.move(targetX, targetY, { steps: 6 });
-  await expect(page.locator('.menu-pane .sr-only')).toContainText('targeting position');
-  await expect.poll(() => productCardNames(cards)).toEqual(beforePointerNames);
-  await attachMenuLayoutScreenshot(page, testInfo, 'desktop-menu-drag-fixed-slots');
-  await page.mouse.up();
+  await waitForDndKeyboardSensor(page);
+  await page.keyboard.press('ArrowRight');
+  const afterHorizontal = moveName(beforeKeyboard, 0, 1);
+  await expect.poll(() => productCardNames(menuEditProductCards(page))).toEqual(afterHorizontal);
+  await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
+  await page.keyboard.press('Space');
+  await expect.poll(() => productCardNames(menuEditProductCards(page))).toEqual(afterHorizontal);
+  await expect
+    .poll(() =>
+      menuEditProductCards(page).evaluateAll((nodes) =>
+        nodes.every((node) => getComputedStyle(node).transform === 'none'),
+      ),
+    )
+    .toBe(true);
 
   cards = menuEditProductCards(page);
-  await expect
-    .poll(() => productCardNames(cards))
-    .toEqual(swapNames(beforePointerNames, pointerSourceIndex, pointerTargetIndex));
+  const beforePointer = await productCardNames(cards);
+  boxes = await productCardBoxes(cards);
+  const pointerSourceIndex = 0;
+  const sourceBox = boxes[pointerSourceIndex];
+  expect(sourceBox).toBeDefined();
+  const pointerTargetIndex = boxes.findIndex(
+    (box, index) => index > pointerSourceIndex && box.y > sourceBox!.y + 2,
+  );
+  expect(pointerTargetIndex).toBeGreaterThan(1);
+  const targetBox = boxes[pointerTargetIndex];
+  expect(targetBox).toBeDefined();
+  const expectedPointer = moveName(beforePointer, pointerSourceIndex, pointerTargetIndex);
 
-  const expected = await menuLayoutDraftSnapshot(page);
+  await page.mouse.move(sourceBox!.x + sourceBox!.width / 2, sourceBox!.y + sourceBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    sourceBox!.x + sourceBox!.width / 2 + 8,
+    sourceBox!.y + sourceBox!.height / 2 + 4,
+    { steps: 2 },
+  );
+  await expect(page.locator('.menu-edit-product-card-dragging.menu-edit-drag-overlay')).toHaveCount(
+    1,
+  );
+  await expect(cards.nth(pointerSourceIndex)).toHaveCSS('visibility', 'hidden');
+  await page.mouse.move(targetBox!.x + targetBox!.width / 2, targetBox!.y + targetBox!.height / 2, {
+    steps: 8,
+  });
+  await expect.poll(() => productCardNames(menuEditProductCards(page))).toEqual(expectedPointer);
+  await attachMenuLayoutScreenshot(page, testInfo, 'desktop-menu-drag-live-2d');
+  await page.mouse.up();
+  await expect.poll(() => productCardNames(menuEditProductCards(page))).toEqual(expectedPointer);
+
+  const expectedDraft = await menuLayoutDraftSnapshot(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Menu layout saved' })).toBeVisible();
-
   await page.reload();
   await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible();
   await page.getByRole('button', { name: 'Edit menu' }).click();
-  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(expected);
+  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(expectedDraft);
   await expectNoHorizontalOverflow(page);
 });
+
 test('dirty shell exits keep or discard the exact editor transaction', async ({
   page,
 }, testInfo) => {
@@ -393,8 +358,8 @@ test('pickup rollback, save failure, and save-in-flight freeze preserve transact
   await expect(page.locator('.menu-edit-product-card-grabbed')).toHaveCount(1);
   await waitForDndKeyboardSensor(page);
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.menu-pane .sr-only')).toContainText('targeting position');
-  await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(baseline);
+  await expect(page.locator('.menu-pane .sr-only')).toContainText('moved to position');
+  await expect.poll(() => menuLayoutDraftSnapshot(page)).not.toEqual(baseline);
   await menuCategoryTabs(page).getByText('Fries', { exact: true }).click();
   await menuCategoryTabs(page).getByText('Burgers', { exact: true }).click();
   await expect.poll(() => menuLayoutDraftSnapshot(page)).toEqual(baseline);
