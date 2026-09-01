@@ -25,7 +25,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Apply bounded Phase B planner fixes
-        run: python3 .github/scripts/phase_b_planner_fixes.py
+        run: |
+          sed -i "s/'preferencesClient', 'menuLayoutClient', 5/'preferencesClient', 'menuLayoutClient', 4/" .github/scripts/phase_b_planner_fixes.py
+          python3 .github/scripts/phase_b_planner_fixes.py
       - name: Format affected files
         run: >-
           npx prettier --write
