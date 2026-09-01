@@ -138,6 +138,46 @@ function remoteAsClean(remote: RemoteWorkerMenuLayout): WorkerMenuLayout {
   return parseWorkerMenuLayout({ ...remote, syncState: 'CLEAN' });
 }
 
+interface WorkerMenuLayoutBusinessPayload {
+  readonly categoryOrder: readonly MenuCategoryId[];
+  readonly categoryAlignment: CategoryAlignment;
+  readonly productOrderByCategory: ProductOrderByCategory;
+}
+
+function sameOrderedValues<T extends string>(left: readonly T[], right: readonly T[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameProductOrderByCategory(
+  left: ProductOrderByCategory,
+  right: ProductOrderByCategory,
+): boolean {
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (!sameOrderedValues(leftKeys, rightKeys)) return false;
+  return leftKeys.every((categoryId) => {
+    const key = categoryId as MenuCategoryId;
+    const leftOrder = left[key];
+    const rightOrder = right[key];
+    return (
+      leftOrder !== undefined &&
+      rightOrder !== undefined &&
+      sameOrderedValues(leftOrder, rightOrder)
+    );
+  });
+}
+
+function sameWorkerMenuLayoutBusinessPayload(
+  left: WorkerMenuLayoutBusinessPayload,
+  right: WorkerMenuLayoutBusinessPayload,
+): boolean {
+  return (
+    left.categoryAlignment === right.categoryAlignment &&
+    sameOrderedValues(left.categoryOrder, right.categoryOrder) &&
+    sameProductOrderByCategory(left.productOrderByCategory, right.productOrderByCategory)
+  );
+}
+
 function mutationKey(shopId: ShopId, workerId: WorkerId): string {
   return `${shopId}:${workerId}`;
 }
@@ -170,6 +210,36 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
 
   #publish(layout: WorkerMenuLayout): void {
     for (const listener of this.#listeners) listener(layout);
+  }
+
+  async #adoptRemoteForAttempt(
+    shopId: ShopId,
+    workerId: WorkerId,
+    attempted: WorkerMenuLayout,
+    remote: RemoteWorkerMenuLayout,
+  ): Promise<void> {
+    const cleanRemote = remoteAsClean(remote);
+    await this.#serializeLocalMutation(shopId, workerId, async () => {
+      const current = await this.#repository.get(shopId, workerId);
+      if (sameWorkerMenuLayoutSnapshot(current, attempted)) {
+        await this.#repository.put(cleanRemote);
+        this.#publish(cleanRemote);
+        return;
+      }
+      if (
+        current !== null &&
+        current.syncState === 'DIRTY' &&
+        current.layoutVersion === attempted.layoutVersion &&
+        cleanRemote.layoutVersion > attempted.layoutVersion
+      ) {
+        const advancedDirty = parseWorkerMenuLayout({
+          ...current,
+          layoutVersion: cleanRemote.layoutVersion,
+        });
+        await this.#repository.put(advancedDirty);
+        this.#publish(advancedDirty);
+      }
+    });
   }
 
   async #serialize<T>(
@@ -291,35 +361,31 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
           if (!persisted) return;
         }
 
-        const remote = await this.#gateway.putWorkerMenuLayout({
-          shopId,
-          workerId,
-          categoryOrder: reconciled.categoryOrder,
-          categoryAlignment: reconciled.categoryAlignment,
-          productOrderByCategory: reconciled.productOrderByCategory,
-          expectedLayoutVersion: reconciled.layoutVersion === 0 ? null : reconciled.layoutVersion,
-        });
-        const cleanRemote = remoteAsClean(remote);
-        await this.#serializeLocalMutation(shopId, workerId, async () => {
-          const current = await this.#repository.get(shopId, workerId);
-          if (sameWorkerMenuLayoutSnapshot(current, reconciled)) {
-            await this.#repository.put(cleanRemote);
-            this.#publish(cleanRemote);
-            return;
-          }
+        let remote: RemoteWorkerMenuLayout;
+        try {
+          remote = await this.#gateway.putWorkerMenuLayout({
+            shopId,
+            workerId,
+            categoryOrder: reconciled.categoryOrder,
+            categoryAlignment: reconciled.categoryAlignment,
+            productOrderByCategory: reconciled.productOrderByCategory,
+            expectedLayoutVersion: reconciled.layoutVersion === 0 ? null : reconciled.layoutVersion,
+          });
+        } catch (error) {
+          if (!(error instanceof WorkerMenuLayoutConflictError)) throw error;
+          const recoveredRemote = await this.#gateway.getWorkerMenuLayout(shopId, workerId);
           if (
-            current !== null &&
-            current.syncState === 'DIRTY' &&
-            current.layoutVersion === reconciled.layoutVersion
+            recoveredRemote === null ||
+            recoveredRemote.layoutVersion <= reconciled.layoutVersion ||
+            !sameWorkerMenuLayoutBusinessPayload(recoveredRemote, reconciled)
           ) {
-            const advancedDirty = parseWorkerMenuLayout({
-              ...current,
-              layoutVersion: cleanRemote.layoutVersion,
-            });
-            await this.#repository.put(advancedDirty);
-            this.#publish(advancedDirty);
+            throw error;
           }
-        });
+          await this.#adoptRemoteForAttempt(shopId, workerId, reconciled, recoveredRemote);
+          return;
+        }
+
+        await this.#adoptRemoteForAttempt(shopId, workerId, reconciled, remote);
         return;
       }
 
