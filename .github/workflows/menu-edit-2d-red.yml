@@ -1,0 +1,78 @@
+name: Menu Edit 2D live reorder RED
+
+on:
+  push:
+    branches:
+      - feat/menu-edit-2d-live-reorder
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add focused failing acceptance tests
+        run: |
+          cat >> e2e/menu-layout-editor.e2e.ts <<'EOF'
+
+          test('Apple-style Product keyboard reorder previews horizontally before drop', async ({
+            page,
+          }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback', 'desktop acceptance');
+            await startMenuLayoutActiveOrders(page);
+            await page.getByRole('button', { name: 'Edit menu' }).click();
+
+            const cards = menuEditProductCards(page);
+            const before = await productCardNames(cards);
+            const boxes = await productCardBoxes(cards);
+            expect(boxes.length).toBeGreaterThan(1);
+            expect(Math.abs(boxes[0]!.y - boxes[1]!.y)).toBeLessThanOrEqual(2);
+            expect(boxes[1]!.x).toBeGreaterThan(boxes[0]!.x);
+
+            const expected = [...before];
+            const [moved] = expected.splice(0, 1);
+            expect(moved).toBeDefined();
+            expected.splice(1, 0, moved!);
+
+            await cards.nth(0).focus();
+            await page.keyboard.press('Space');
+            await waitForDndKeyboardSensor(page);
+            await page.keyboard.press('ArrowRight');
+
+            await expect.poll(() => productCardNames(menuEditProductCards(page))).toEqual(expected);
+          });
+
+          test('Apple-style Category drag uses one overlay with a hidden source placeholder', async ({
+            page,
+          }, testInfo) => {
+            test.skip(testInfo.project.name !== 'desktop-browser-fallback', 'desktop acceptance');
+            await startMenuLayoutActiveOrders(page);
+            await page.getByRole('button', { name: 'Edit menu' }).click();
+
+            const burgers = menuCategoryTabs(page).getByText('Burgers', { exact: true });
+            await burgers.focus();
+            await page.keyboard.press('Space');
+            await expect(page.locator('.category-tab.menu-edit-drag-overlay')).toHaveCount(1);
+            await expect(burgers).toHaveCSS('visibility', 'hidden');
+          });
+          EOF
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: RED - new acceptance must fail on current production behavior
+        shell: bash
+        run: |
+          set +e
+          npx playwright test e2e/menu-layout-editor.e2e.ts \
+            --project=desktop-browser-fallback \
+            --grep='Apple-style'
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo 'Expected new 2D live reorder acceptance to fail before implementation.' >&2
+            exit 1
+          fi
+          echo 'RED confirmed: current behavior does not satisfy approved 2D live reorder acceptance.'
