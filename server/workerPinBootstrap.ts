@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
 import { readJsonBody, requireSameOrigin, requireServerConfig, sendJson } from './supabaseGateway';
 
@@ -8,6 +8,15 @@ const COOKIE_REFRESH = 'tux_ops_refresh';
 const COOKIE_SHOP = 'tux_ops_shop';
 const COOKIE_DEVICE = 'tux_ops_device';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v1';
+const MIN_BOOTSTRAP_HMAC_SECRET_BYTES = 32;
+
+interface TrustedBootstrapBody {
+  readonly pin: string;
+  readonly deviceId: string;
+  readonly deviceLabel: string;
+  readonly rateLimitKey: string;
+}
 
 function firstHeader(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
@@ -61,6 +70,38 @@ function rateLimitKey(request: GatewayRequest): string {
     .digest('hex');
 }
 
+function bootstrapHmacSecret(): string | null {
+  const secret = process.env['TUX_BOOTSTRAP_HMAC_SECRET']?.trim() ?? '';
+  return Buffer.byteLength(secret, 'utf8') >= MIN_BOOTSTRAP_HMAC_SECRET_BYTES ? secret : null;
+}
+
+function canonicalBootstrapRequest(
+  body: TrustedBootstrapBody,
+  timestamp: number,
+  nonce: string,
+): string {
+  return JSON.stringify([
+    BOOTSTRAP_PROVENANCE_VERSION,
+    timestamp,
+    nonce,
+    body.rateLimitKey.toLowerCase(),
+    body.deviceId.toLowerCase(),
+    body.deviceLabel,
+    body.pin,
+  ]);
+}
+
+function bootstrapSignature(
+  secret: string,
+  body: TrustedBootstrapBody,
+  timestamp: number,
+  nonce: string,
+): string {
+  return createHmac('sha256', secret)
+    .update(canonicalBootstrapRequest(body, timestamp, nonce))
+    .digest('hex');
+}
+
 function safeObject(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -73,6 +114,12 @@ export async function bootstrapDeviceWithWorkerPin(
 ): Promise<void> {
   const config = requireServerConfig(response);
   if (config === null || !requireSameOrigin(request, response)) return;
+
+  const hmacSecret = bootstrapHmacSecret();
+  if (hmacSecret === null) {
+    sendJson(response, 503, { error: 'bootstrap_provenance_not_configured' });
+    return;
+  }
 
   let body: Readonly<Record<string, unknown>>;
   try {
@@ -96,6 +143,16 @@ export async function bootstrapDeviceWithWorkerPin(
     return;
   }
 
+  const trustedBody: TrustedBootstrapBody = {
+    pin,
+    deviceId,
+    deviceLabel,
+    rateLimitKey: rateLimitKey(request),
+  };
+  const timestamp = Math.floor(Date.now() / 1000);
+  const nonce = randomUUID();
+  const signature = bootstrapSignature(hmacSecret, trustedBody, timestamp, nonce);
+
   let upstream: Response;
   try {
     upstream = await fetch(`${config.projectUrl}/functions/v1/device-bootstrap`, {
@@ -103,13 +160,11 @@ export async function bootstrapDeviceWithWorkerPin(
       headers: {
         apikey: config.publishableKey,
         'content-type': 'application/json',
+        'x-tux-bootstrap-timestamp': String(timestamp),
+        'x-tux-bootstrap-nonce': nonce,
+        'x-tux-bootstrap-signature': signature,
       },
-      body: JSON.stringify({
-        pin,
-        deviceId,
-        deviceLabel,
-        rateLimitKey: rateLimitKey(request),
-      }),
+      body: JSON.stringify(trustedBody),
       signal: AbortSignal.timeout(12_000),
     });
   } catch {
