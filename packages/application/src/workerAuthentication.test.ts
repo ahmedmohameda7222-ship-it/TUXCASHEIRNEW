@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseEntityId,
-  type ShopId,
-  type Worker,
-  type WorkerId,
-} from '@tux/domain';
+import { parseEntityId, type ShopId, type Worker, type WorkerId } from '@tux/domain';
 import { ok, type Result } from './result';
 import type { OperationsSessionState } from './session';
 import {
