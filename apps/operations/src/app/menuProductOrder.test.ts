@@ -47,6 +47,46 @@ describe('moveProductWithinCategory', () => {
   });
 });
 
+describe('swapProductWithinCategory', () => {
+  it('swaps two selected-category slots without shifting intervening products', () => {
+    expect('swapProductWithinCategory' in menuProductOrder).toBe(true);
+    if (!('swapProductWithinCategory' in menuProductOrder)) return;
+    const swapProductWithinCategory = menuProductOrder.swapProductWithinCategory;
+    expect(swapProductWithinCategory).toBeTypeOf('function');
+    if (typeof swapProductWithinCategory !== 'function') return;
+
+    const burgerA = product(1);
+    const friesA = product(2);
+    const burgerB = product(3);
+    const drinksA = product(4);
+    const burgerC = product(5);
+
+    expect(
+      swapProductWithinCategory(
+        [burgerA, friesA, burgerB, drinksA, burgerC],
+        [burgerA, burgerB, burgerC],
+        burgerA,
+        burgerC,
+      ),
+    ).toEqual([burgerC, friesA, burgerB, drinksA, burgerA]);
+  });
+
+  it('leaves the order unchanged when either swap target is outside the selected category', () => {
+    expect('swapProductWithinCategory' in menuProductOrder).toBe(true);
+    if (!('swapProductWithinCategory' in menuProductOrder)) return;
+    const swapProductWithinCategory = menuProductOrder.swapProductWithinCategory;
+    expect(swapProductWithinCategory).toBeTypeOf('function');
+    if (typeof swapProductWithinCategory !== 'function') return;
+
+    const burgerA = product(1);
+    const friesA = product(2);
+    const burgerB = product(3);
+    const order = [burgerA, friesA, burgerB] as const;
+
+    expect(swapProductWithinCategory(order, [burgerA, burgerB], burgerA, friesA)).toBe(order);
+  });
+});
+
 describe('resetProductCategoryOrder', () => {
   it('restores canonical category slots without disturbing products from other categories', () => {
     expect('resetProductCategoryOrder' in menuProductOrder).toBe(true);

@@ -881,28 +881,57 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(reorderCards).toHaveCount(9);
   await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
   await expect(reorderCards.nth(1)).toContainText('Double Smashed Patty');
-  const moveProductBeforeKey =
-    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowUp' : 'ArrowLeft';
-  const moveProductAfterKey =
-    testInfo.project.name === 'mobile-browser-fallback' ? 'ArrowDown' : 'ArrowRight';
+  const productNamesBefore = await reorderCards.evaluateAll((nodes) =>
+    nodes.map((node) =>
+      (node.getAttribute('aria-label') ?? '').replace(/, position \d+ of \d+$/, ''),
+    ),
+  );
+  const productBoxes = await reorderCards.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width };
+    }),
+  );
+  const sourceProductIndex = 0;
+  const sourceProductBox = productBoxes[sourceProductIndex];
+  expect(sourceProductBox).toBeDefined();
+  const sourceProductCenterX = sourceProductBox!.x + sourceProductBox!.width / 2;
+  const targetProductIndex = productBoxes.reduce((bestIndex, box, index) => {
+    if (index === sourceProductIndex || box.y <= sourceProductBox!.y + 1) return bestIndex;
+    const targetCenterX = box.x + box.width / 2;
+    const sameColumnTolerance = Math.max(1, Math.min(sourceProductBox!.width, box.width) / 4);
+    if (Math.abs(targetCenterX - sourceProductCenterX) > sameColumnTolerance) {
+      return bestIndex;
+    }
+    if (bestIndex < 0) return index;
+    return box.y < productBoxes[bestIndex]!.y ? index : bestIndex;
+  }, -1);
+  expect(targetProductIndex).toBeGreaterThan(sourceProductIndex);
+  const sourceProductName = productNamesBefore[sourceProductIndex]!;
+  const targetProductName = productNamesBefore[targetProductIndex]!;
 
-  await reorderCards.nth(1).focus();
+  await reorderCards.nth(sourceProductIndex).focus();
   await page.keyboard.press('Space');
-  await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press(moveProductBeforeKey);
-  await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
+  await page.keyboard.press('ArrowDown');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
   await page.keyboard.press('Escape');
   reorderCards = page.locator('.menu-edit-product-card');
-  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
 
-  await reorderCards.nth(1).focus();
+  await reorderCards.nth(sourceProductIndex).focus();
   await page.keyboard.press('Space');
-  await expect(reorderCards.nth(1)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press(moveProductBeforeKey);
+  await page.keyboard.press('ArrowDown');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
   await page.keyboard.press('Space');
-  await expect(reorderCards.nth(0)).toContainText('Double Smashed Patty');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
 
   expect(
     await categories.nth(0).evaluate((node) => getComputedStyle(node).animationName),
@@ -935,7 +964,7 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(persistedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
   let menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
+  await expect(menuCards.nth(sourceProductIndex)).toContainText(targetProductName);
 
   await page.reload();
   await waitForActiveShell(page);
@@ -944,20 +973,23 @@ test('unified menu edit persists one combined worker layout with keyboard and ro
   await expect(persistedCategories.nth(1)).toHaveText('Burgers');
   await expect(page.getByLabel('Menu categories')).toHaveAttribute('data-alignment', 'right');
   menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
+  await expect(menuCards.nth(sourceProductIndex)).toContainText(targetProductName);
 
   await page.getByRole('button', { name: 'Edit menu' }).click();
   reorderCards = page.locator('.menu-edit-product-card');
-  await reorderCards.nth(0).focus();
+  await reorderCards.nth(sourceProductIndex).focus();
   await page.keyboard.press('Space');
-  await expect(reorderCards.nth(0)).toHaveClass(/menu-edit-product-card-grabbed/);
+  await expect(reorderCards.nth(sourceProductIndex)).toHaveClass(/menu-edit-product-card-grabbed/);
   await waitForDndKeyboardSensor(page);
-  await page.keyboard.press(moveProductAfterKey);
+  await page.keyboard.press('ArrowDown');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(targetProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(sourceProductName);
   await page.keyboard.press('Space');
-  await expect(reorderCards.nth(0)).toContainText('Single Smashed Patty');
+  await expect(reorderCards.nth(sourceProductIndex)).toContainText(sourceProductName);
+  await expect(reorderCards.nth(targetProductIndex)).toContainText(targetProductName);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   menuCards = page.locator('.product-grid .product-card');
-  await expect(menuCards.nth(0)).toContainText('Double Smashed Patty');
+  await expect(menuCards.nth(sourceProductIndex)).toContainText(targetProductName);
 
   await page.getByRole('button', { name: 'Edit menu' }).click();
   await page.getByRole('button', { name: 'Reset', exact: true }).click();

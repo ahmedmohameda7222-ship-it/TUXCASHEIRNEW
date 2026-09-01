@@ -1,5 +1,4 @@
 import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { Product, ProductId } from '@tux/domain';
 import { ProductCardPresentation } from './ProductCardPresentation';
 
@@ -20,7 +19,7 @@ export function MenuEditProductCard({
   readonly className?: string;
   readonly disabled?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: menuEditProductSortableId(product.id),
     disabled,
   });
@@ -36,10 +35,6 @@ export function MenuEditProductCard({
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
       aria-label={`${product.name}, position ${position} of ${total}`}
     >
       <div className="product-main">
