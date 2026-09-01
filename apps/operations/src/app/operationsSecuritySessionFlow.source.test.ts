@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const sessionClientSource = readFileSync(new URL('./sessionClient.ts', import.meta.url), 'utf8');
+const sessionClientSource = readFileSync(
+  new URL('./sessionClient.ts', import.meta.url),
+  'utf8',
+);
 
 function functionBody(name: string, nextName: string): string {
   const start = sessionClientSource.indexOf(`const ${name} =`);
@@ -24,7 +27,9 @@ describe('Operations browser security session flow', () => {
 
   it('does not accept a cached local PIN before reachable backend authority can evaluate it', () => {
     const submitPin = functionBody('submitPin', 'getState');
-    expect(submitPin).not.toMatch(/const local = await session\.submitPin\(pin\);[\s\S]*return local;/);
+    expect(submitPin).not.toMatch(
+      /const local = await session\.submitPin\(pin\);[\s\S]*return local;/,
+    );
     expect(submitPin).toContain('remoteGateway.authenticateWorker(pin)');
   });
 });
