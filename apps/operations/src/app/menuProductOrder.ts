@@ -1,20 +1,28 @@
-import type { MenuCategoryId, Product, ProductId, WorkerUiPreferences } from '@tux/domain';
+import {
+  flattenWorkerMenuLayoutProductOrder,
+  type MenuCategoryId,
+  type Product,
+  type ProductId,
+  type WorkerMenuLayout,
+} from '@tux/domain';
 
 export function reconcileProductOrder(
   products: readonly Product[],
-  preference: WorkerUiPreferences | null,
+  layout: WorkerMenuLayout | null,
 ): readonly Product[] {
   const canonical = products
     .filter((product) => product.active)
     .slice()
     .sort((left, right) => left.sortOrder - right.sortOrder);
-  if (preference === null || preference.productOrder.length === 0) return canonical;
+  if (layout === null) return canonical;
+  const productOrder = flattenWorkerMenuLayoutProductOrder(layout);
+  if (productOrder.length === 0) return canonical;
 
   const byId = new Map(canonical.map((product) => [product.id, product]));
   const reconciled: Product[] = [];
   const seen = new Set<ProductId>();
 
-  for (const productId of preference.productOrder) {
+  for (const productId of productOrder) {
     const product = byId.get(productId);
     if (product === undefined || seen.has(productId)) continue;
     reconciled.push(product);
@@ -100,9 +108,9 @@ export function filterProductsForMenu(
     readonly selectedFamily: string | null;
     readonly search: string;
   },
-  preference: WorkerUiPreferences | null = null,
+  layout: WorkerMenuLayout | null = null,
 ): readonly Product[] {
-  const ordered = reconcileProductOrder(products, preference);
+  const ordered = reconcileProductOrder(products, layout);
   const query = options.search.trim().toLocaleLowerCase();
 
   if (query.length > 0) {

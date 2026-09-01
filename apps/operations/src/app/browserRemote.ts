@@ -1,14 +1,19 @@
 import type {
   InboundConfigurationProvider,
+  RemoteWorkerMenuLayout,
   RemoteWorkerUiPreferences,
+  WorkerMenuLayoutRemoteGateway,
   WorkerUiPreferencesRemoteGateway,
 } from '@tux/application';
+import { WorkerMenuLayoutConflictError } from '@tux/application';
 import {
   parseEntityId,
+  parseWorkerMenuLayout,
   parseWorkerUiPreferences,
   type CategoryAlignment,
   type MenuCategoryId,
   type ProductId,
+  type ProductOrderByCategory,
   type Shop,
   type ShopId,
   type SystemAccentColor,
@@ -100,6 +105,19 @@ function parseRemoteWorkerUiPreferences(value: Record<string, unknown>): RemoteW
   };
 }
 
+function parseRemoteWorkerMenuLayout(value: Record<string, unknown>): RemoteWorkerMenuLayout {
+  const parsed = parseWorkerMenuLayout({ ...value, syncState: 'CLEAN' });
+  return {
+    shopId: parsed.shopId,
+    workerId: parsed.workerId,
+    categoryOrder: parsed.categoryOrder,
+    categoryAlignment: parsed.categoryAlignment,
+    productOrderByCategory: parsed.productOrderByCategory,
+    layoutVersion: parsed.layoutVersion,
+    updatedAt: parsed.updatedAt,
+  };
+}
+
 function isLoopbackHost(): boolean {
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
@@ -122,7 +140,10 @@ function browserDeviceId(): string {
 }
 
 export class VercelBrowserRemoteGateway
-  implements InboundConfigurationProvider, WorkerUiPreferencesRemoteGateway
+  implements
+    InboundConfigurationProvider,
+    WorkerUiPreferencesRemoteGateway,
+    WorkerMenuLayoutRemoteGateway
 {
   async currentSession(): Promise<BrowserRemoteSession | null> {
     if (isLoopbackHost()) return null;
@@ -209,6 +230,54 @@ export class VercelBrowserRemoteGateway
       throw new TypeError('Remote configuration version mismatch.');
     }
     return body['bundle'];
+  }
+
+  async getWorkerMenuLayout(
+    shopId: ShopId,
+    workerId: WorkerId,
+  ): Promise<RemoteWorkerMenuLayout | null> {
+    if (isLoopbackHost()) return null;
+    const url = new URL('/api/worker-menu-layout', window.location.origin);
+    url.searchParams.set('shopId', shopId);
+    url.searchParams.set('workerId', workerId);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Worker Menu Layout request failed with HTTP ${response.status}.`);
+    }
+    return parseRemoteWorkerMenuLayout(await jsonObject(response, 'Worker Menu Layout'));
+  }
+
+  async putWorkerMenuLayout(input: {
+    readonly shopId: ShopId;
+    readonly workerId: WorkerId;
+    readonly categoryOrder: readonly MenuCategoryId[];
+    readonly categoryAlignment: CategoryAlignment;
+    readonly productOrderByCategory: ProductOrderByCategory;
+    readonly expectedLayoutVersion: number | null;
+  }): Promise<RemoteWorkerMenuLayout> {
+    if (isLoopbackHost())
+      throw new Error('Remote Worker Menu Layout sync is unavailable on localhost.');
+    const response = await fetch('/api/worker-menu-layout', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+    if (response.status === 409) throw new WorkerMenuLayoutConflictError();
+    if (!response.ok) {
+      throw new Error(`Worker Menu Layout update failed with HTTP ${response.status}.`);
+    }
+    return parseRemoteWorkerMenuLayout(await jsonObject(response, 'Worker Menu Layout update'));
   }
 
   async getWorkerUiPreferences(

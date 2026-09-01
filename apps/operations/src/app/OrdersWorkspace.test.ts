@@ -7,7 +7,7 @@ import {
   type ProductId,
   type ShopId,
   type WorkerId,
-  type WorkerUiPreferences,
+  type WorkerMenuLayout,
 } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
 import {
@@ -63,16 +63,15 @@ const drinks = category(3, 'Drinks');
 
 function preference(
   categoryOrder: readonly MenuCategoryId[],
-  productOrder: readonly ProductId[] = [],
-): WorkerUiPreferences {
+  productOrderByCategory: WorkerMenuLayout['productOrderByCategory'] = {},
+): WorkerMenuLayout {
   return {
     shopId,
     workerId,
     categoryOrder,
     categoryAlignment: 'right',
-    productOrder,
-    accentColor: null,
-    serverVersion: 4,
+    productOrderByCategory,
+    layoutVersion: 4,
     updatedAt: instant(new Date('2026-08-25T04:00:00.000Z')),
     syncState: 'CLEAN',
   };
@@ -172,7 +171,9 @@ describe('filterProductsForMenu', () => {
 
   it('uses the worker product order, drops stale IDs, and appends new products canonically', () => {
     const staleId = parseEntityId<ProductId>('44444444-4444-4444-8444-999999999999');
-    const workerPreference = preference([], [products[2]!.id, staleId, products[0]!.id]);
+    const workerPreference = preference([], {
+      [burgers.id]: [products[2]!.id, staleId, products[0]!.id],
+    });
 
     expect(
       filterProductsForMenu(
@@ -188,7 +189,9 @@ describe('filterProductsForMenu', () => {
   });
 
   it('preserves the worker product order through global search', () => {
-    const workerPreference = preference([], [products[1]!.id, products[0]!.id, products[2]!.id]);
+    const workerPreference = preference([], {
+      [burgers.id]: [products[1]!.id, products[0]!.id, products[2]!.id],
+    });
 
     expect(
       filterProductsForMenu(

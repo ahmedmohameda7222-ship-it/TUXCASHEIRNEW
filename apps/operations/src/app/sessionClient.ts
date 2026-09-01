@@ -7,13 +7,24 @@ import {
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  WorkerMenuLayoutRetryController,
+  WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   err,
+  workerMenuLayoutUpdateFromFlatProductOrder,
   type OperationsSessionResult,
+  type WorkerMenuLayoutSyncIdentity,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
-import { instant, type ShopId } from '@tux/domain';
+import {
+  flattenWorkerMenuLayoutProductOrder,
+  instant,
+  parseWorkerUiPreferences,
+  type ShopId,
+  type WorkerMenuLayout,
+  type WorkerUiPreferences,
+} from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   IndexedDbBulkStockStore,
@@ -21,6 +32,7 @@ import {
   IndexedDbOperationsDatabase,
   IndexedDbOperatorSessionReadModel,
   IndexedDbOrderDraftStore,
+  IndexedDbWorkerMenuLayoutStore,
 } from '@tux/persistence/browser';
 import type {
   TuxBulkStockApi,
@@ -28,6 +40,7 @@ import type {
   TuxExpensesApi,
   TuxOrdersApi,
   TuxOrdersBoardApi,
+  TuxWorkerMenuLayoutApi,
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
@@ -42,6 +55,7 @@ export interface OperationsSessionClient {
   enrollDevice?(pin: string): Promise<OperationsSessionResult>;
 }
 
+export type OperationsWorkerMenuLayoutClient = TuxWorkerMenuLayoutApi;
 export type OperationsWorkerUiPreferencesClient = TuxWorkerUiPreferencesApi;
 export type OperationsOrdersClient = TuxOrdersApi;
 export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
@@ -51,6 +65,7 @@ export type OperationsEndDayClient = TuxEndDayApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
+  readonly workerMenuLayout: TuxWorkerMenuLayoutApi;
   readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
   readonly orders: OperationsOrdersService;
   readonly ordersBoard: OperationsOrdersBoardService;
@@ -69,6 +84,8 @@ async function browserRuntime(): Promise<BrowserRuntime> {
     browserRuntimePromise = (async () => {
       const database = new IndexedDbOperationsDatabase();
       await database.initialize();
+      const menuLayoutStore = new IndexedDbWorkerMenuLayoutStore();
+      await menuLayoutStore.initialize();
       const readModel = new IndexedDbOperatorSessionReadModel();
       await readModel.initialize();
       const draftStore = new IndexedDbOrderDraftStore();
@@ -106,17 +123,37 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         remoteGateway,
         runtime.now,
       );
+      const menuLayoutService = new WorkerMenuLayoutService(
+        menuLayoutStore,
+        remoteGateway,
+        { getWorkerMenuLayoutCatalog: (shopId) => menuLayoutStore.getCatalog(shopId) },
+        runtime.now,
+      );
+
       let activePreferenceIdentity: WorkerUiPreferencesSyncIdentity | null = null;
+      let activeMenuLayoutIdentity: WorkerMenuLayoutSyncIdentity | null = null;
       const preferencesRetry = new WorkerUiPreferencesRetryController(
         preferencesService,
         () => activePreferenceIdentity,
       );
+      const menuLayoutRetry = new WorkerMenuLayoutRetryController(
+        menuLayoutService,
+        () => activeMenuLayoutIdentity,
+      );
       let automaticSyncStarted = false;
       let configurationTimerStarted = false;
       let preferenceRetryStarted = false;
+      let menuLayoutRetryStarted = false;
 
       const retryPreferences = (): void => {
         void preferencesRetry.syncActive();
+      };
+      const retryMenuLayout = (): void => {
+        void menuLayoutRetry.syncActive();
+      };
+      const retryWorkerState = (): void => {
+        retryPreferences();
+        retryMenuLayout();
       };
 
       const startRemoteRuntime = (shopId: ShopId): void => {
@@ -130,21 +167,32 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         }
         if (!preferenceRetryStarted) {
           preferencesRetry.start();
-          window.addEventListener('online', retryPreferences);
           preferenceRetryStarted = true;
+        }
+        if (!menuLayoutRetryStarted) {
+          menuLayoutRetry.start();
+          menuLayoutRetryStarted = true;
+        }
+        if (preferenceRetryStarted && menuLayoutRetryStarted) {
+          window.removeEventListener('online', retryWorkerState);
+          window.addEventListener('online', retryWorkerState);
         }
       };
 
-      const trackPreferenceIdentity = (result: OperationsSessionResult): void => {
-        if (!result.ok || result.value.status !== 'ACTIVE' || !preferenceRetryStarted) {
+      const trackWorkerIdentity = (result: OperationsSessionResult): void => {
+        if (!result.ok || result.value.status !== 'ACTIVE') {
           activePreferenceIdentity = null;
+          activeMenuLayoutIdentity = null;
           return;
         }
-        activePreferenceIdentity = {
+        const identity = {
           shopId: result.value.shopId,
           workerId: result.value.operator.id,
         };
-        retryPreferences();
+        activePreferenceIdentity = identity;
+        activeMenuLayoutIdentity = identity;
+        if (preferenceRetryStarted) retryPreferences();
+        if (menuLayoutRetryStarted) retryMenuLayout();
       };
 
       try {
@@ -165,56 +213,123 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
       );
 
-      const activePreferenceIdentityFromSession =
-        async (): Promise<WorkerUiPreferencesSyncIdentity> => {
-          const result = await session.getState();
-          if (!result.ok || result.value.status !== 'ACTIVE') {
-            throw new Error('Active worker session required.');
-          }
-          return {
-            shopId: result.value.shopId,
-            workerId: result.value.operator.id,
-          };
+      const activeIdentityFromSession = async (): Promise<WorkerMenuLayoutSyncIdentity> => {
+        const result = await session.getState();
+        if (!result.ok || result.value.status !== 'ACTIVE') {
+          throw new Error('Active worker session required.');
+        }
+        return {
+          shopId: result.value.shopId,
+          workerId: result.value.operator.id,
         };
+      };
 
-      const retryAfterMutation = (): void => {
-        if (preferenceRetryStarted) retryPreferences();
+      const compatiblePreferences = async (
+        identity: WorkerMenuLayoutSyncIdentity,
+        menuLayout?: WorkerMenuLayout | null,
+        legacyPreferences?: WorkerUiPreferences | null,
+      ): Promise<WorkerUiPreferences | null> => {
+        const legacy =
+          legacyPreferences === undefined
+            ? await preferencesRepository.get(identity.shopId, identity.workerId)
+            : legacyPreferences;
+        const layout =
+          menuLayout === undefined
+            ? await menuLayoutStore.get(identity.shopId, identity.workerId)
+            : menuLayout;
+        if (legacy === null && layout === null) return null;
+        return parseWorkerUiPreferences({
+          shopId: identity.shopId,
+          workerId: identity.workerId,
+          categoryOrder: layout?.categoryOrder ?? legacy?.categoryOrder ?? [],
+          categoryAlignment: layout?.categoryAlignment ?? legacy?.categoryAlignment ?? 'left',
+          productOrder:
+            layout === null || layout === undefined
+              ? (legacy?.productOrder ?? [])
+              : flattenWorkerMenuLayoutProductOrder(layout),
+          accentColor: legacy?.accentColor ?? null,
+          updatedAt: layout?.updatedAt ?? legacy?.updatedAt ?? runtime.now(),
+          serverVersion: legacy?.serverVersion ?? 0,
+          syncState: layout?.syncState ?? legacy?.syncState ?? 'CLEAN',
+        });
+      };
+
+      const workerMenuLayout: TuxWorkerMenuLayoutApi = {
+        load: async () => {
+          const identity = await activeIdentityFromSession();
+          return menuLayoutService.load(identity.shopId, identity.workerId);
+        },
+        subscribe: (listener) => menuLayoutService.subscribe(listener),
+        updateMenuLayout: async (input) => {
+          const identity = await activeIdentityFromSession();
+          return menuLayoutService.updateMenuLayout(identity.shopId, identity.workerId, input);
+        },
+        resetMenuLayout: async () => {
+          const identity = await activeIdentityFromSession();
+          await menuLayoutService.resetMenuLayout(identity.shopId, identity.workerId);
+        },
       };
 
       const workerUiPreferences: TuxWorkerUiPreferencesApi = {
         load: async () => {
-          const identity = await activePreferenceIdentityFromSession();
-          return preferencesRepository.get(identity.shopId, identity.workerId);
+          const identity = await activeIdentityFromSession();
+          const layout = await menuLayoutService
+            .load(identity.shopId, identity.workerId)
+            .catch(() => menuLayoutStore.get(identity.shopId, identity.workerId));
+          return compatiblePreferences(identity, layout);
         },
-        subscribe: (listener) => preferencesService.subscribe(listener),
+        subscribe: (listener) => {
+          let active = true;
+          const publishCurrent = async (): Promise<void> => {
+            try {
+              const identity = await activeIdentityFromSession();
+              const preferences = await compatiblePreferences(identity);
+              if (active && preferences !== null) listener(preferences);
+            } catch {
+              // Worker/session transitions intentionally fence stale preference notifications.
+            }
+          };
+          const unsubscribePreferences = preferencesService.subscribe(() => void publishCurrent());
+          const unsubscribeLayout = menuLayoutService.subscribe(() => void publishCurrent());
+          return () => {
+            active = false;
+            unsubscribePreferences();
+            unsubscribeLayout();
+          };
+        },
         updateMenuLayout: async (input) => {
-          const identity = await activePreferenceIdentityFromSession();
-          const updated = await preferencesService.updateMenuLayout(
-            identity.shopId,
-            identity.workerId,
-            input,
-          );
-          retryAfterMutation();
-          return updated;
+          const identity = await activeIdentityFromSession();
+          const isReset =
+            input.categoryOrder.length === 0 &&
+            input.productOrder.length === 0 &&
+            input.categoryAlignment === 'left';
+          const layout = isReset
+            ? await menuLayoutService.resetMenuLayout(identity.shopId, identity.workerId)
+            : await menuLayoutService.updateMenuLayout(
+                identity.shopId,
+                identity.workerId,
+                workerMenuLayoutUpdateFromFlatProductOrder({
+                  categoryOrder: input.categoryOrder,
+                  categoryAlignment: input.categoryAlignment,
+                  productOrder: input.productOrder,
+                  catalog: await menuLayoutStore.getCatalog(identity.shopId),
+                }),
+              );
+          return (await compatiblePreferences(identity, layout))!;
         },
         updateAccentColor: async (accentColor) => {
-          const identity = await activePreferenceIdentityFromSession();
+          const identity = await activeIdentityFromSession();
           const updated = await preferencesService.updateAccentColor(
             identity.shopId,
             identity.workerId,
             accentColor,
           );
-          retryAfterMutation();
-          return updated;
+          if (preferenceRetryStarted) retryPreferences();
+          return (await compatiblePreferences(identity, undefined, updated))!;
         },
         resetMenuLayout: async () => {
-          const identity = await activePreferenceIdentityFromSession();
-          await preferencesService.updateMenuLayout(identity.shopId, identity.workerId, {
-            categoryOrder: [],
-            categoryAlignment: 'left',
-            productOrder: [],
-          });
-          retryAfterMutation();
+          const identity = await activeIdentityFromSession();
+          await menuLayoutService.resetMenuLayout(identity.shopId, identity.workerId);
         },
       };
 
@@ -260,7 +375,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       const submitPin = async (pin: string): Promise<OperationsSessionResult> => {
         const local = await session.submitPin(pin);
         if (local.ok && local.value.status !== 'CONFIGURATION_REQUIRED') {
-          trackPreferenceIdentity(local);
+          trackWorkerIdentity(local);
           return local;
         }
 
@@ -268,7 +383,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           (local.ok && local.value.status === 'CONFIGURATION_REQUIRED') ||
           (!local.ok && local.error.code === 'PIN_AUTH_ERROR');
         if (!needsRemoteBootstrap) {
-          trackPreferenceIdentity(local);
+          trackWorkerIdentity(local);
           return local;
         }
 
@@ -279,26 +394,29 @@ async function browserRuntime(): Promise<BrowserRuntime> {
               ? local
               : remote
             : remote;
-        trackPreferenceIdentity(result);
+        trackWorkerIdentity(result);
         return result;
       };
 
       const getState = async (): Promise<OperationsSessionResult> => {
         const result = await session.getState();
-        trackPreferenceIdentity(result);
+        trackWorkerIdentity(result);
         return result;
       };
 
       const signOut = async (): Promise<OperationsSessionResult> => {
         const result = await session.signOut();
-        trackPreferenceIdentity(result);
+        trackWorkerIdentity(result);
         return result;
       };
 
-      if (preferenceRetryStarted) trackPreferenceIdentity(await session.getState());
+      if (preferenceRetryStarted || menuLayoutRetryStarted) {
+        trackWorkerIdentity(await session.getState());
+      }
 
       return {
         session,
+        workerMenuLayout,
         workerUiPreferences,
         orders: new OperationsOrdersService(
           database,
@@ -348,6 +466,29 @@ export function createOperationsSessionClient(): OperationsSessionClient {
     submitPin: async (pin: string) => (await browserRuntime()).submitPin(pin),
     signOut: async () => (await browserRuntime()).signOut(),
     enrollDevice: async (pin: string) => (await browserRuntime()).submitPin(pin),
+  };
+}
+
+export function createWorkerMenuLayoutClient(): OperationsWorkerMenuLayoutClient {
+  const desktop = window.tuxDesktop;
+  if (desktop !== undefined) return desktop.workerMenuLayout;
+  return {
+    load: async () => (await browserRuntime()).workerMenuLayout.load(),
+    subscribe: (listener) => {
+      let active = true;
+      let unsubscribe = (): void => undefined;
+      void browserRuntime().then((runtime) => {
+        if (!active) return;
+        unsubscribe = runtime.workerMenuLayout.subscribe(listener);
+      });
+      return () => {
+        active = false;
+        unsubscribe();
+      };
+    },
+    updateMenuLayout: async (input) =>
+      (await browserRuntime()).workerMenuLayout.updateMenuLayout(input),
+    resetMenuLayout: async () => (await browserRuntime()).workerMenuLayout.resetMenuLayout(),
   };
 }
 

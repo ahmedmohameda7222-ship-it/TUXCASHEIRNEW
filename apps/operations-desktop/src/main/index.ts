@@ -6,9 +6,13 @@ import {
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  WorkerMenuLayoutRetryController,
+  WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type OperationsSessionResult,
+  type WorkerMenuLayoutRemoteGateway,
+  type WorkerMenuLayoutSyncIdentity,
   type WorkerUiPreferencesRemoteGateway,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
@@ -18,6 +22,7 @@ import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
+  SqliteWorkerMenuLayoutStore,
 } from '@tux/persistence/sqlite';
 import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
 import {
@@ -31,6 +36,7 @@ import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
   startDesktopAutomaticSync,
+  SupabaseDesktopWorkerMenuLayoutGateway,
   SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
@@ -43,6 +49,7 @@ import {
   createSecureWebPreferences,
   parseLoopbackDevelopmentUrl,
 } from './security';
+import { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';
 import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
@@ -65,15 +72,19 @@ const IPC_BOARD_RETURN = 'tux:orders-board:return';
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
 let orderDraftStore: SqliteOrderDraftStore | null = null;
+let workerMenuLayoutStore: SqliteWorkerMenuLayoutStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
 let ordersService: OperationsOrdersService | null = null;
 let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let workerMenuLayoutIpcRuntime: WorkerMenuLayoutIpcRuntime | null = null;
 let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
+let workerMenuLayoutRetry: WorkerMenuLayoutRetryController | null = null;
 let workerUiPreferencesRetry: WorkerUiPreferencesRetryController | null = null;
+let activeWorkerMenuLayoutIdentity: WorkerMenuLayoutSyncIdentity | null = null;
 let activeWorkerUiPreferencesIdentity: WorkerUiPreferencesSyncIdentity | null = null;
 let configurationSyncTimer: ReturnType<typeof setInterval> | null = null;
 let syncHealthSnapshot = buildSyncHealth({ remoteConfigured: false }) as TuxSyncHealthSnapshot;
@@ -96,16 +107,30 @@ function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
   }
 }
 
-function trackWorkerUiPreferencesIdentity(result: OperationsSessionResult): void {
+function trackWorkerPersistenceIdentity(result: OperationsSessionResult): void {
   if (!result.ok || result.value.status !== 'ACTIVE') {
+    activeWorkerMenuLayoutIdentity = null;
     activeWorkerUiPreferencesIdentity = null;
     return;
   }
-  activeWorkerUiPreferencesIdentity = {
+  const identity = {
     shopId: result.value.shopId,
     workerId: result.value.operator.id,
   };
+  activeWorkerMenuLayoutIdentity = identity;
+  activeWorkerUiPreferencesIdentity = identity;
+  void workerMenuLayoutRetry?.syncActive();
   void workerUiPreferencesRetry?.syncActive();
+}
+
+function unavailableWorkerMenuLayoutGateway(): WorkerMenuLayoutRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new Error('Remote Worker Menu Layout sync is not configured.');
+  };
+  return {
+    getWorkerMenuLayout: unavailable,
+    putWorkerMenuLayout: unavailable,
+  };
 }
 
 function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGateway {
@@ -125,6 +150,8 @@ async function initializeOperationsServices(): Promise<void> {
 
   orderDraftStore = new SqliteOrderDraftStore(databasePath);
   await orderDraftStore.initialize();
+  workerMenuLayoutStore = new SqliteWorkerMenuLayoutStore(databasePath);
+  await workerMenuLayoutStore.initialize();
   operatorReadModel = new SqliteOperatorSessionReadModel(databasePath);
 
   const runtime = {
@@ -205,13 +232,37 @@ async function initializeOperationsServices(): Promise<void> {
     onChanged: () => void workerUiPreferencesRetry?.syncActive(),
   });
 
+  const menuLayoutGateway =
+    remoteSessionManager !== null && supabaseUrl
+      ? new SupabaseDesktopWorkerMenuLayoutGateway({
+          projectUrl: supabaseUrl,
+          sessionManager: remoteSessionManager,
+        })
+      : unavailableWorkerMenuLayoutGateway();
+  const menuLayoutService = new WorkerMenuLayoutService(
+    workerMenuLayoutStore,
+    menuLayoutGateway,
+    { getWorkerMenuLayoutCatalog: (shopId) => workerMenuLayoutStore!.getCatalog(shopId) },
+    runtime.now,
+  );
+  workerMenuLayoutIpcRuntime = new WorkerMenuLayoutIpcRuntime({
+    getSessionState: () => sessionService!.getState(),
+    service: menuLayoutService,
+    onChanged: () => void workerMenuLayoutRetry?.syncActive(),
+  });
+
   if (remoteSessionManager !== null && supabaseUrl) {
+    workerMenuLayoutRetry = new WorkerMenuLayoutRetryController(
+      menuLayoutService,
+      () => activeWorkerMenuLayoutIdentity,
+    );
     workerUiPreferencesRetry = new WorkerUiPreferencesRetryController(
       preferencesService,
       () => activeWorkerUiPreferencesIdentity,
     );
+    workerMenuLayoutRetry.start();
     workerUiPreferencesRetry.start();
-    trackWorkerUiPreferencesIdentity(await sessionService.getState());
+    trackWorkerPersistenceIdentity(await sessionService.getState());
   }
 
   ordersService = new OperationsOrdersService(
@@ -279,14 +330,16 @@ async function initializeOperationsServices(): Promise<void> {
 }
 
 function currentSessionService(): CoordinatedOperationsSessionService {
-  if (sessionService === null)
+  if (sessionService === null) {
     throw new Error('Operations session service has not been initialized.');
+  }
   return sessionService;
 }
 
 function currentOrdersService(): OperationsOrdersService {
-  if (ordersService === null)
+  if (ordersService === null) {
     throw new Error('Operations Orders service has not been initialized.');
+  }
   return ordersService;
 }
 
@@ -329,20 +382,20 @@ function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_SESSION_GET_STATE, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
     const result = await currentSessionService().getState();
-    trackWorkerUiPreferencesIdentity(result);
+    trackWorkerPersistenceIdentity(result);
     return result;
   });
   ipcMain.handle(IPC_SESSION_SUBMIT_PIN, async (event, pin: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     if (typeof pin !== 'string') throw new TypeError('PIN IPC payload must be a string.');
     const result = await currentSessionService().submitPin(pin);
-    trackWorkerUiPreferencesIdentity(result);
+    trackWorkerPersistenceIdentity(result);
     return result;
   });
   ipcMain.handle(IPC_SESSION_SIGN_OUT, async (event) => {
     assertTrustedIpcSender(event, window.webContents.id);
     const result = await currentSessionService().signOut();
-    trackWorkerUiPreferencesIdentity(result);
+    trackWorkerPersistenceIdentity(result);
     return result;
   });
   ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
@@ -422,6 +475,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     });
   });
 
+  if (workerMenuLayoutIpcRuntime === null) {
+    throw new Error('Worker Menu Layout IPC runtime has not been initialized.');
+  }
   if (workerUiPreferencesIpcRuntime === null) {
     throw new Error('Worker UI Preferences IPC runtime has not been initialized.');
   }
@@ -434,6 +490,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  workerMenuLayoutIpcRuntime.register(window);
   workerUiPreferencesIpcRuntime.register(window);
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
@@ -478,9 +535,14 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
   configurationSyncTimer = null;
+  workerMenuLayoutRetry?.stop();
+  workerMenuLayoutRetry = null;
   workerUiPreferencesRetry?.stop();
   workerUiPreferencesRetry = null;
+  activeWorkerMenuLayoutIdentity = null;
   activeWorkerUiPreferencesIdentity = null;
+  workerMenuLayoutIpcRuntime?.close();
+  workerMenuLayoutIpcRuntime = null;
   workerUiPreferencesIpcRuntime?.close();
   workerUiPreferencesIpcRuntime = null;
   automaticSyncScheduler?.stop();
@@ -489,6 +551,7 @@ app.on('before-quit', () => {
   void expensesIpcRuntime?.close();
   void operatorReadModel?.close();
   void orderDraftStore?.close();
+  void workerMenuLayoutStore?.close();
   void operationsDatabase?.close();
   automaticSyncScheduler = null;
   endDayIpcRuntime = null;
@@ -496,6 +559,7 @@ app.on('before-quit', () => {
   expensesIpcRuntime = null;
   operatorReadModel = null;
   orderDraftStore = null;
+  workerMenuLayoutStore = null;
   operationsDatabase = null;
   sessionService = null;
   ordersService = null;

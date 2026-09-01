@@ -26,6 +26,7 @@ const preferenceCategoryAId = parseEntityId<MenuCategoryId>('83333333-3333-4333-
 const preferenceCategoryBId = parseEntityId<MenuCategoryId>('83333333-3333-4333-8333-333333333332');
 const preferenceProductAId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444441');
 const preferenceProductBId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444442');
+const preferenceProductCId = parseEntityId<ProductId>('84444444-4444-4444-8444-444444444443');
 const customAccent = parseSystemAccentColor('#1E3A8A');
 
 function preference(workerId: WorkerId, serverVersion = 0) {
@@ -105,9 +106,7 @@ async function deleteDatabase(name: string): Promise<void> {
     request.addEventListener(
       'blocked',
       () => reject(new Error(`IndexedDB delete blocked: ${name}`)),
-      {
-        once: true,
-      },
+      { once: true },
     );
     request.addEventListener(
       'error',
@@ -125,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3]);
-    expect(INDEXED_DB_VERSION).toBe(3);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4]);
+    expect(INDEXED_DB_VERSION).toBe(4);
   });
 
   it('creates every production store and operational index on a fresh install', async () => {
@@ -137,6 +136,7 @@ describe('IndexedDB migration registry', () => {
         expect.arrayContaining([...INDEXED_DB_STORES]),
       );
       expect([...database.objectStoreNames]).toContain('workerUiPreferences');
+      expect([...database.objectStoreNames]).toContain('workerMenuLayouts');
       const transaction = database.transaction(
         ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
         'readonly',
@@ -224,6 +224,7 @@ describe('IndexedDB migration registry', () => {
     try {
       expect(latest.version).toBe(INDEXED_DB_VERSION);
       expect([...latest.objectStoreNames]).toContain('workerUiPreferences');
+      expect([...latest.objectStoreNames]).toContain('workerMenuLayouts');
       const read = latest.transaction(
         ['shops', 'orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents'],
         'readonly',
@@ -248,6 +249,91 @@ describe('IndexedDB migration registry', () => {
       await expect(
         requestResult(read.objectStore('outboxEvents').index('aggregateStream').getAll()),
       ).resolves.toHaveLength(1);
+    } finally {
+      latest.close();
+    }
+  });
+
+  it('backfills legacy flat worker product order into per-category Menu Layout order', async () => {
+    const name = `tux-indexeddb-menu-layout-backfill-${crypto.randomUUID()}`;
+    const v3 = await openAtVersion(name, 3);
+    const write = v3.transaction(['configurationSnapshots', 'workerUiPreferences'], 'readwrite');
+    write.objectStore('configurationSnapshots').put({
+      shopId: preferenceShopId,
+      version: 1,
+      updatedAt: '2026-08-25T01:00:00.000Z',
+      categories: [
+        { id: preferenceCategoryAId, shopId: preferenceShopId, active: true, sortOrder: 0 },
+        { id: preferenceCategoryBId, shopId: preferenceShopId, active: true, sortOrder: 1 },
+      ],
+      products: [
+        {
+          id: preferenceProductAId,
+          shopId: preferenceShopId,
+          categoryId: preferenceCategoryAId,
+          active: true,
+          sortOrder: 0,
+        },
+        {
+          id: preferenceProductBId,
+          shopId: preferenceShopId,
+          categoryId: preferenceCategoryBId,
+          active: true,
+          sortOrder: 0,
+        },
+        {
+          id: preferenceProductCId,
+          shopId: preferenceShopId,
+          categoryId: preferenceCategoryAId,
+          active: true,
+          sortOrder: 1,
+        },
+      ],
+    });
+    write.objectStore('workerUiPreferences').put({
+      id: `${preferenceShopId}:${preferenceWorkerAId}`,
+      shopId: preferenceShopId,
+      workerId: preferenceWorkerAId,
+      categoryOrder: [preferenceCategoryBId, preferenceCategoryAId],
+      categoryAlignment: 'right',
+      productOrder: [
+        preferenceProductCId,
+        preferenceProductBId,
+        preferenceProductAId,
+        'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      ],
+      accentColor: customAccent,
+      updatedAt: '2026-08-25T02:00:00.000Z',
+      serverVersion: 7,
+      syncState: 'CLEAN',
+    });
+    await transactionDone(write);
+    v3.close();
+
+    const latest = await openAtVersion(name, INDEXED_DB_VERSION);
+    try {
+      const read = latest.transaction(['workerMenuLayouts', 'workerUiPreferences'], 'readonly');
+      await expect(
+        requestResult(
+          read.objectStore('workerMenuLayouts').get(`${preferenceShopId}:${preferenceWorkerAId}`),
+        ),
+      ).resolves.toMatchObject({
+        shopId: preferenceShopId,
+        workerId: preferenceWorkerAId,
+        categoryOrder: [preferenceCategoryBId, preferenceCategoryAId],
+        categoryAlignment: 'right',
+        productOrderByCategory: {
+          [preferenceCategoryAId]: [preferenceProductCId, preferenceProductAId],
+          [preferenceCategoryBId]: [preferenceProductBId],
+        },
+        layoutVersion: 7,
+        syncState: 'CLEAN',
+      });
+      await expect(
+        requestResult(
+          read.objectStore('workerUiPreferences').get(`${preferenceShopId}:${preferenceWorkerAId}`),
+        ),
+      ).resolves.toMatchObject({ accentColor: customAccent });
     } finally {
       latest.close();
     }
@@ -324,6 +410,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v4 is missing');
+    ).toThrow('IndexedDB migration v5 is missing');
   });
 });

@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 3;
+export const INDEXED_DB_VERSION = 4;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -6,6 +6,7 @@ export const INDEXED_DB_STORES = [
   'workers',
   'workerSessions',
   'workerUiPreferences',
+  'workerMenuLayouts',
   'configurationSnapshots',
   'customerContacts',
   'businessDays',
@@ -24,6 +25,84 @@ interface IndexedDbMigration {
   readonly version: number;
   readonly name: string;
   apply(database: IDBDatabase, transaction: IDBTransaction): void;
+}
+
+function legacyWorkerMenuLayout(
+  preference: Record<string, unknown>,
+  configuration: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const shopId = typeof preference['shopId'] === 'string' ? preference['shopId'] : '';
+  const workerId = typeof preference['workerId'] === 'string' ? preference['workerId'] : '';
+  const rawCategories = Array.isArray(configuration?.['categories'])
+    ? configuration['categories']
+    : [];
+  const rawProducts = Array.isArray(configuration?.['products']) ? configuration['products'] : [];
+  const validCategories = new Set<string>();
+  for (const value of rawCategories) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+    const category = value as Record<string, unknown>;
+    if (
+      category['shopId'] === shopId &&
+      category['active'] === true &&
+      typeof category['id'] === 'string'
+    ) {
+      validCategories.add(category['id']);
+    }
+  }
+
+  const productCategory = new Map<string, string>();
+  for (const value of rawProducts) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+    const product = value as Record<string, unknown>;
+    if (
+      product['shopId'] === shopId &&
+      product['active'] === true &&
+      typeof product['id'] === 'string' &&
+      typeof product['categoryId'] === 'string' &&
+      validCategories.has(product['categoryId'])
+    ) {
+      productCategory.set(product['id'], product['categoryId']);
+    }
+  }
+
+  const categoryOrder = (
+    Array.isArray(preference['categoryOrder']) ? preference['categoryOrder'] : []
+  )
+    .filter((value): value is string => typeof value === 'string')
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .filter((value) => validCategories.size === 0 || validCategories.has(value));
+
+  const productOrderByCategory: Record<string, string[]> = {};
+  for (const productId of Array.isArray(preference['productOrder'])
+    ? preference['productOrder']
+    : []) {
+    if (typeof productId !== 'string') continue;
+    const categoryId = productCategory.get(productId);
+    if (categoryId === undefined) continue;
+    (productOrderByCategory[categoryId] ??= []).push(productId);
+  }
+
+  const serverVersion = preference['serverVersion'];
+  return {
+    id: `${shopId}:${workerId}`,
+    shopId,
+    workerId,
+    categoryOrder,
+    categoryAlignment:
+      preference['categoryAlignment'] === 'center' || preference['categoryAlignment'] === 'right'
+        ? preference['categoryAlignment']
+        : 'left',
+    productOrderByCategory,
+    layoutVersion:
+      typeof serverVersion === 'number' && Number.isSafeInteger(serverVersion) && serverVersion >= 0
+        ? serverVersion
+        : 0,
+    updatedAt:
+      typeof preference['updatedAt'] === 'string'
+        ? preference['updatedAt']
+        : new Date(0).toISOString(),
+    syncState: preference['syncState'] === 'DIRTY' ? 'DIRTY' : 'CLEAN',
+  };
 }
 
 const MIGRATIONS: readonly IndexedDbMigration[] = [
@@ -107,6 +186,49 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
     name: 'worker_ui_preferences',
     apply(database) {
       database.createObjectStore('workerUiPreferences', { keyPath: 'id' });
+    },
+  },
+  {
+    version: 4,
+    name: 'worker_menu_layouts',
+    apply(database, transaction) {
+      const layouts = database.createObjectStore('workerMenuLayouts', { keyPath: 'id' });
+      const preferences = transaction.objectStore('workerUiPreferences');
+      const configurations = transaction.objectStore('configurationSnapshots');
+      const cursorRequest = preferences.openCursor();
+      cursorRequest.addEventListener('success', () => {
+        const cursor = cursorRequest.result;
+        if (cursor === null) return;
+        if (
+          typeof cursor.value !== 'object' ||
+          cursor.value === null ||
+          Array.isArray(cursor.value)
+        ) {
+          cursor.continue();
+          return;
+        }
+        const preference = cursor.value as Record<string, unknown>;
+        const shopId = preference['shopId'];
+        if (typeof shopId !== 'string') {
+          cursor.continue();
+          return;
+        }
+        const configurationRequest = configurations.get(shopId);
+        configurationRequest.addEventListener(
+          'success',
+          () => {
+            const configuration =
+              typeof configurationRequest.result === 'object' &&
+              configurationRequest.result !== null &&
+              !Array.isArray(configurationRequest.result)
+                ? (configurationRequest.result as Record<string, unknown>)
+                : null;
+            layouts.put(legacyWorkerMenuLayout(preference, configuration));
+          },
+          { once: true },
+        );
+        cursor.continue();
+      });
     },
   },
 ];

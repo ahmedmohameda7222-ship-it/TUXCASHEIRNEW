@@ -76,6 +76,20 @@ export type {
   SessionRuntime,
 } from './session';
 export {
+  WorkerMenuLayoutConflictError,
+  WorkerMenuLayoutRetryController,
+  WorkerMenuLayoutService,
+  workerMenuLayoutUpdateFromFlatProductOrder,
+} from './workerMenuLayout';
+export type {
+  RemoteWorkerMenuLayout,
+  WorkerMenuLayoutCatalogProvider,
+  WorkerMenuLayoutRemoteGateway,
+  WorkerMenuLayoutRetryOptions,
+  WorkerMenuLayoutSyncIdentity,
+  WorkerMenuLayoutSyncTarget,
+} from './workerMenuLayout';
+export {
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
 } from './workerUiPreferences';

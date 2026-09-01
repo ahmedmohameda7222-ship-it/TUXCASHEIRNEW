@@ -990,7 +990,7 @@ test('unified menu edit persistence failure keeps the draft and order intact', a
       value: unknown,
       key?: IDBValidKey,
     ) {
-      if (this.name === 'workerUiPreferences') {
+      if (this.name === 'workerMenuLayouts') {
         throw new DOMException('Forced preference write failure', 'AbortError');
       }
       return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);

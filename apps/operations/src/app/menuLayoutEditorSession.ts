@@ -4,14 +4,14 @@ import type {
   ProductId,
   ShopId,
   WorkerId,
-  WorkerUiPreferences,
+  WorkerMenuLayout,
 } from '@tux/domain';
 
 export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
 export type WorkerMenuPreferenceLoadState =
   | { readonly status: 'LOADING' }
-  | { readonly status: 'READY'; readonly preference: WorkerUiPreferences | null }
+  | { readonly status: 'READY'; readonly preference: WorkerMenuLayout | null }
   | { readonly status: 'ERROR'; readonly message: string };
 
 export interface WorkerMenuPreferenceLoadSession {
@@ -33,7 +33,7 @@ interface WorkerMenuPreferenceReadyEvent {
   readonly shopId: ShopId;
   readonly workerId: WorkerId;
   readonly generation: number;
-  readonly preference: WorkerUiPreferences | null;
+  readonly preference: WorkerMenuLayout | null;
 }
 
 interface WorkerMenuPreferenceErrorEvent {

@@ -358,7 +358,7 @@ export async function installPreferenceSaveFailure(page: Page): Promise<void> {
     const original = IDBObjectStore.prototype.put;
     scope.__tuxMenuLayoutOriginalPut = original;
     IDBObjectStore.prototype.put = function put(value: unknown, key?: IDBValidKey): IDBRequest {
-      if (this.name === 'workerUiPreferences') throw new Error('Forced menu layout save failure');
+      if (this.name === 'workerMenuLayouts') throw new Error('Forced menu layout save failure');
       return key === undefined ? original.call(this, value) : original.call(this, value, key);
     };
   });
@@ -384,8 +384,8 @@ export async function holdPreferenceWriteTransaction(page: Page): Promise<void> 
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const transaction = database.transaction('workerUiPreferences', 'readwrite');
-    const store = transaction.objectStore('workerUiPreferences');
+    const transaction = database.transaction('workerMenuLayouts', 'readwrite');
+    const store = transaction.objectStore('workerMenuLayouts');
     const keepAlive = (): void => {
       if (scope.__tuxMenuLayoutReleaseWrite) {
         database.close();
