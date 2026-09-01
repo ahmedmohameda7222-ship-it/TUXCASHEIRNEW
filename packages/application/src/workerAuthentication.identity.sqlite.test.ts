@@ -212,7 +212,8 @@ describe('authoritative worker identity transition', () => {
 
     const switchedAudit = audits.find((event) => event.eventType === 'WORKER_SWITCHED');
     expect(switchedAudit?.workerId).toBe(WORKER_B);
-    expect(switchedAudit?.details['previousWorkerId']).toBe(WORKER_A);
+    const switchedDetails = switchedAudit?.details as { previousWorkerId?: unknown } | null | undefined;
+    expect(switchedDetails?.previousWorkerId).toBe(WORKER_A);
 
     const pending = await base.transaction((transaction) =>
       transaction.outbox.listPending(instant('2026-09-01T13:00:00.000Z'), 100),
