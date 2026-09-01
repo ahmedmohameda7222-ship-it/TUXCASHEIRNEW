@@ -52,7 +52,16 @@ class DatabaseWorkerStore implements WorkerCredentialStore {
     await this.database.transaction((transaction) => transaction.workers.put(worker));
   }
 
-  async fenceMatchingPin() {}
+  async fenceMatchingPin(pin: string) {
+    await this.database.transaction(async (transaction) => {
+      for (const workerId of [WORKER_A, WORKER_B]) {
+        const worker = await transaction.workers.getById(workerId);
+        if (worker?.active && worker.pinHash === `fixture:${pin}`) {
+          await transaction.workers.put({ ...worker, active: false });
+        }
+      }
+    });
+  }
 }
 
 class InactivatingWorkerStore extends DatabaseWorkerStore {
@@ -191,6 +200,29 @@ describe('authoritative worker identity transition', () => {
       throw new Error('Expected active authoritative worker session.');
     }
     expect(result.value.operator.id).toBe(WORKER_B);
+  });
+
+  it('keeps the authoritative reassignment as the sole offline PIN match after an outage', async () => {
+    const { recordingDatabase, session } = await fixture({ bothCachedMatch: true });
+    const store = new DatabaseWorkerStore(recordingDatabase);
+    const online = await service(
+      session,
+      recordingDatabase,
+      authoritativeWorker(WORKER_B),
+      store,
+    ).submitPin('1234');
+    expect(online.ok && online.value.status === 'ACTIVE' && online.value.operator.id).toBe(WORKER_B);
+
+    const offline = await new OperationsWorkerAuthenticationService(
+      session,
+      new FixedAuthenticator({ status: 'UNAVAILABLE', message: 'offline' }),
+      store,
+    ).submitPin('1234');
+    expect(offline.ok).toBe(true);
+    if (!offline.ok || offline.value.status !== 'ACTIVE') {
+      throw new Error('Expected offline cached worker authentication.');
+    }
+    expect(offline.value.operator.id).toBe(WORKER_B);
   });
 
   it('records the exact previous and new worker when switching an open Business Day', async () => {
