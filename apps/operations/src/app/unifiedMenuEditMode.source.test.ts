@@ -144,16 +144,32 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('coordinateGetter: menuEditKeyboardCoordinateGetter');
     expect(ordersWorkspaceSource).toContain('sortableKeyboardCoordinates(event, args)');
     expect(ordersWorkspaceSource).toContain('pendingKeyboardDragTargetRef');
-    expect(ordersWorkspaceSource).toContain('directionalDroppableContainers');
-    expect(ordersWorkspaceSource).toContain('if (container.id === active.id) return false;');
-    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowDown')");
-    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowUp')");
-    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowLeft')");
-    expect(ordersWorkspaceSource).toContain("if (event.code === 'ArrowRight')");
-    expect(ordersWorkspaceSource).toContain('const projectedCollisions = closestCorners({');
+    expect(ordersWorkspaceSource).toContain(
+      'const activeRect = args.context.droppableRects.get(active.id) ?? collisionRect;',
+    );
+    expect(ordersWorkspaceSource).toContain('const activeCenterX = activeRect.left + activeRect.width / 2;');
+    expect(ordersWorkspaceSource).toContain('const activeCenterY = activeRect.top + activeRect.height / 2;');
+    expect(ordersWorkspaceSource).toContain(
+      "const horizontal = direction === 'ArrowLeft' || direction === 'ArrowRight';",
+    );
+    expect(ordersWorkspaceSource).toContain('const candidates = args.context.droppableContainers');
+    expect(ordersWorkspaceSource).toContain('const rowTolerance = Math.max(activeRect.height, rect.height) / 2;');
+    expect(ordersWorkspaceSource).toContain('primaryDistance: Math.abs(centerX - activeCenterX)');
+    expect(ordersWorkspaceSource).toContain('primaryDistance: Math.abs(centerY - activeCenterY)');
+    expect(ordersWorkspaceSource).toContain('crossDistance: Math.abs(centerX - activeCenterX)');
+    expect(ordersWorkspaceSource).toContain('left.primaryDistance - right.primaryDistance');
+    expect(ordersWorkspaceSource).toContain('left.crossDistance - right.crossDistance');
+    expect(ordersWorkspaceSource).toContain(
+      'pendingKeyboardDragTargetRef.current = String(target.container.id);',
+    );
+    expect(ordersWorkspaceSource).toContain(
+      "target.container.node.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });",
+    );
+    expect(ordersWorkspaceSource).toContain('return { x: target.rect.left, y: target.rect.top };');
+    expect(ordersWorkspaceSource).not.toContain('directionalDroppableContainers');
+    expect(ordersWorkspaceSource).not.toContain('const projectedCollisions = closestCorners({');
     expect(ordersWorkspaceSource).not.toContain('if (nextCoordinates === undefined)');
     expect(ordersWorkspaceSource).not.toContain('if (deltaX === 0 && deltaY === 0)');
-    expect(ordersWorkspaceSource).toContain('return nextCoordinates;');
     expect(ordersWorkspaceSource).toContain('menuEditAnnouncement');
     expect(ordersWorkspaceSource).toContain('aria-live="polite" aria-atomic="true"');
   });
