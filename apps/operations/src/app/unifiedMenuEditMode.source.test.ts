@@ -147,13 +147,19 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain(
       'const activeRect = args.context.droppableRects.get(active.id) ?? collisionRect;',
     );
-    expect(ordersWorkspaceSource).toContain('const activeCenterX = activeRect.left + activeRect.width / 2;');
-    expect(ordersWorkspaceSource).toContain('const activeCenterY = activeRect.top + activeRect.height / 2;');
+    expect(ordersWorkspaceSource).toContain(
+      'const activeCenterX = activeRect.left + activeRect.width / 2;',
+    );
+    expect(ordersWorkspaceSource).toContain(
+      'const activeCenterY = activeRect.top + activeRect.height / 2;',
+    );
     expect(ordersWorkspaceSource).toContain(
       "const horizontal = direction === 'ArrowLeft' || direction === 'ArrowRight';",
     );
     expect(ordersWorkspaceSource).toContain('const candidates = args.context.droppableContainers');
-    expect(ordersWorkspaceSource).toContain('const rowTolerance = Math.max(activeRect.height, rect.height) / 2;');
+    expect(ordersWorkspaceSource).toContain(
+      'const rowTolerance = Math.max(activeRect.height, rect.height) / 2;',
+    );
     expect(ordersWorkspaceSource).toContain('primaryDistance: Math.abs(centerX - activeCenterX)');
     expect(ordersWorkspaceSource).toContain('primaryDistance: Math.abs(centerY - activeCenterY)');
     expect(ordersWorkspaceSource).toContain('crossDistance: Math.abs(centerX - activeCenterX)');
