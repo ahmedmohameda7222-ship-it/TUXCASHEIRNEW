@@ -154,7 +154,10 @@ export class OperationsSessionService {
         return ok(await this.#transitionToWorker(shop, worker));
       } catch (cause) {
         return err(
-          localPersistenceError('Could not activate the authoritative local operator session.', cause),
+          localPersistenceError(
+            'Could not activate the authoritative local operator session.',
+            cause,
+          ),
         );
       }
     });
@@ -219,7 +222,10 @@ export class OperationsSessionService {
     });
   }
 
-  async #transitionToWorker(shop: Shop, authoritativeWorker: Worker): Promise<OperationsSessionState> {
+  async #transitionToWorker(
+    shop: Shop,
+    authoritativeWorker: Worker,
+  ): Promise<OperationsSessionState> {
     const initialDay = await this.#database.transaction((transaction) =>
       transaction.businessDays.getOpenForShop(shop.id),
     );
