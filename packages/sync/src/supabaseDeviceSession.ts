@@ -18,7 +18,11 @@ export type SupabaseDeviceSessionResolution =
   | { readonly status: 'TRANSPORT_UNAVAILABLE'; readonly message: string }
   | { readonly status: 'AUTHORITATIVELY_INVALID'; readonly message: string }
   | { readonly status: 'PROTOCOL_ERROR'; readonly message: string }
-  | { readonly status: 'LOCAL_PERSISTENCE_ERROR'; readonly message: string; readonly cause: unknown }
+  | {
+      readonly status: 'LOCAL_PERSISTENCE_ERROR';
+      readonly message: string;
+      readonly cause: unknown;
+    }
   | { readonly status: 'NOT_ENROLLED'; readonly message: string };
 
 export class SupabaseDeviceSessionError extends Error {
@@ -219,9 +223,7 @@ export class SupabaseDeviceSessionManager {
     });
   }
 
-  authorizationHeadersFor(
-    session: SupabaseDeviceSessionRecord,
-  ): Readonly<Record<string, string>> {
+  authorizationHeadersFor(session: SupabaseDeviceSessionRecord): Readonly<Record<string, string>> {
     return {
       apikey: this.#publishableKey,
       authorization: `Bearer ${session.accessToken}`,
