@@ -144,7 +144,12 @@ describe('OperationsWorkerAuthenticationService', () => {
     expect(session.submittedPins).toEqual([]);
   });
 
-  it.each(['DEVICE_SESSION_INVALID', 'INVALID_REQUEST', 'INVALID_RESPONSE', 'SERVER_ERROR'] as const)(
+  it.each([
+    'DEVICE_SESSION_INVALID',
+    'INVALID_REQUEST',
+    'INVALID_RESPONSE',
+    'SERVER_ERROR',
+  ] as const)(
     'E treats %s as authoritative remote failure rather than offline fallback',
     async (status) => {
       const { service, session, store } = fixture({ status, message: `remote ${status}` });
