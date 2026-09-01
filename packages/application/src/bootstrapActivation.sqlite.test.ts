@@ -3,14 +3,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  instant,
-  parseEntityId,
-  type ShopId,
-  type WorkerId,
-} from '@tux/domain';
+import { instant, parseEntityId, type ShopId, type WorkerId } from '@tux/domain';
 import type { OperationsDatabase } from '@tux/persistence';
-import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
+import {
+  SqliteOperationsDatabase,
+  SqliteOperatorSessionReadModel,
+} from '@tux/persistence/sqlite';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import {
   OperationsConfigurationSyncService,
@@ -151,7 +149,7 @@ describe('durable Operations bootstrap activation boundary', () => {
           work({
             ...transaction,
             configuration: {
-              ...transaction.configuration,
+              getForShop: (shopId) => transaction.configuration.getForShop(shopId),
               async put() {
                 throw new Error('injected configuration persistence failure');
               },
@@ -181,11 +179,8 @@ describe('durable Operations bootstrap activation boundary', () => {
   it('recovers safely across the meaningful durable bootstrap boundaries', async () => {
     const empty = await fixture(false);
     const emptySession = await freshSession(empty.database, empty.databasePath);
-    expect((await emptySession.service.getState()).ok).toBe(true);
-    expect(
-      (await emptySession.service.getState()).ok &&
-        (await emptySession.service.getState()).value.status,
-    ).toBe('CONFIGURATION_REQUIRED');
+    const emptyState = await emptySession.service.getState();
+    expect(emptyState.ok && emptyState.value.status).toBe('CONFIGURATION_REQUIRED');
     await emptySession.readModel.close();
     await empty.database.close();
 
