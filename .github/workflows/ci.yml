@@ -99,6 +99,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  edge-security:
+    name: edge-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Device bootstrap provenance behavioral tests
+        run: >-
+          deno test --allow-env --allow-net --allow-run --allow-read
+          supabase/functions/device-bootstrap/security.test.ts
+
   windows-package:
     name: windows-package
     runs-on: windows-latest
@@ -128,13 +142,16 @@ jobs:
     if: always()
     needs:
       - quality
+      - edge-security
       - windows-package
     runs-on: ubuntu-latest
     steps:
       - name: Require every permanent gate
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
+          test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
