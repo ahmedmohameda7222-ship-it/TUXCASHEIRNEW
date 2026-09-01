@@ -16,7 +16,7 @@
     "lint": "eslint \"{api,server,apps,packages,e2e}/**/*.{ts,tsx}\" playwright.config.ts --max-warnings 0",
     "test": "vitest run",
     "format": "prettier --write \"api/**/*.{ts,tsx}\" \"server/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
-    "format:check": "prettier --write packages/application/src/workerAuthentication.test.ts && git diff -- packages/application/src/workerAuthentication.test.ts && false",
+    "format:check": "prettier --check \"api/**/*.{ts,tsx}\" \"server/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
     "dev:provision": "npm run dev:provision -w @tux/operations-desktop --",
     "test:migrations": "node scripts/test-migrations.mjs && node scripts/test-worker-pin-rate-limit.mjs && node scripts/test-worker-menu-layout-migration.mjs",
     "package:win": "npm run build && electron-builder --win nsis --x64",
