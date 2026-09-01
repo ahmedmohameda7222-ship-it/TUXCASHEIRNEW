@@ -44,14 +44,21 @@ function persistSession(
   ]);
 }
 
-function rateLimitKey(request: GatewayRequest, deviceId: string): string {
-  const forwarded = firstHeader(request.headers['x-forwarded-for']).split(',')[0]?.trim() ?? '';
-  const realIp = firstHeader(request.headers['x-real-ip']).trim();
-  const vercelForwarded =
-    firstHeader(request.headers['x-vercel-forwarded-for']).split(',')[0]?.trim() ?? '';
-  const clientAddress = vercelForwarded || forwarded || realIp || 'unknown';
-  const userAgent = firstHeader(request.headers['user-agent']).slice(0, 256);
-  return createHash('sha256').update(`${clientAddress}\n${deviceId}\n${userAgent}`).digest('hex');
+function trustedClientAddress(request: GatewayRequest): string {
+  // Vercel injects x-vercel-forwarded-for at the deployment boundary. Unlike request-body IDs,
+  // User-Agent, or arbitrary client headers, this value represents the public request source at
+  // the trusted proxy. If the deployment header is unexpectedly absent, deliberately collapse
+  // traffic into one conservative bucket rather than accepting a spoofable fallback identity.
+  return (
+    firstHeader(request.headers['x-vercel-forwarded-for']).split(',')[0]?.trim() ||
+    'unresolved-vercel-client'
+  );
+}
+
+function rateLimitKey(request: GatewayRequest): string {
+  return createHash('sha256')
+    .update(`tux-worker-pin-bootstrap:v2\n${trustedClientAddress(request)}`)
+    .digest('hex');
 }
 
 function safeObject(value: unknown): Record<string, unknown> | null {
@@ -101,7 +108,7 @@ export async function bootstrapDeviceWithWorkerPin(
         pin,
         deviceId,
         deviceLabel,
-        rateLimitKey: rateLimitKey(request, deviceId),
+        rateLimitKey: rateLimitKey(request),
       }),
       signal: AbortSignal.timeout(12_000),
     });
