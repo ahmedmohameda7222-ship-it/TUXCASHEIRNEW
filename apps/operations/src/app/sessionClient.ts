@@ -216,8 +216,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         coordinator,
       );
       const workerCredentialStore: WorkerCredentialStore = {
-        put: (worker) =>
-          database.transaction((transaction) => transaction.workers.put(worker)),
+        put: (worker) => database.transaction((transaction) => transaction.workers.put(worker)),
         fenceMatchingPin: async (pin) => {
           const state = await session.getState();
           if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return;
