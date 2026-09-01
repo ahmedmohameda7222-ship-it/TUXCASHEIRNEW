@@ -1,18 +1,25 @@
 import { parseEntityId, type ShopId, type Worker, type WorkerId } from '@tux/domain';
-import type { SupabaseDeviceSessionRecord } from './supabaseDeviceSession';
+import type {
+  SupabaseDeviceSessionRecord,
+  SupabaseDeviceSessionResolution,
+} from './supabaseDeviceSession';
 
 export type SupabaseWorkerAuthenticationResult =
   | { readonly status: 'AUTHENTICATED'; readonly worker: Worker }
   | { readonly status: 'REJECTED'; readonly message: string }
   | { readonly status: 'THROTTLED'; readonly message: string }
+  | { readonly status: 'DEVICE_SESSION_INVALID'; readonly message: string }
   | { readonly status: 'INVALID_REQUEST'; readonly message: string }
   | { readonly status: 'INVALID_RESPONSE'; readonly message: string }
   | { readonly status: 'SERVER_ERROR'; readonly message: string }
+  | { readonly status: 'LOCAL_PERSISTENCE_ERROR'; readonly message: string; readonly cause: unknown }
   | { readonly status: 'UNAVAILABLE'; readonly message: string };
 
 interface WorkerAuthenticationSessionManager {
-  requiredSession(): Promise<SupabaseDeviceSessionRecord>;
-  authorizationHeaders(): Promise<Readonly<Record<string, string>>>;
+  resolveSession(): Promise<SupabaseDeviceSessionResolution>;
+  authorizationHeadersFor(
+    session: SupabaseDeviceSessionRecord,
+  ): Readonly<Record<string, string>>;
 }
 
 export interface SupabaseWorkerAuthenticatorOptions {
@@ -73,7 +80,6 @@ function parseWorker(value: unknown, expectedShopId: ShopId): Worker | null {
 
 function messageForStatus(status: number): string {
   if (status === 400) return 'Worker authentication request was rejected.';
-  if (status === 401 || status === 403) return 'Invalid PIN.';
   if (status === 429) return 'Too many PIN attempts. Try again later.';
   return 'Worker authentication failed on the server.';
 }
@@ -97,17 +103,35 @@ export class SupabaseWorkerAuthenticator {
       return { status: 'INVALID_REQUEST', message: 'Enter a valid worker PIN.' };
     }
 
-    let session: SupabaseDeviceSessionRecord;
-    let headers: Readonly<Record<string, string>>;
+    let resolution: SupabaseDeviceSessionResolution;
     try {
-      session = await this.#sessionManager.requiredSession();
-      headers = await this.#sessionManager.authorizationHeaders();
-    } catch {
+      resolution = await this.#sessionManager.resolveSession();
+    } catch (cause) {
       return {
-        status: 'SERVER_ERROR',
-        message: 'The enrolled device session could not be validated.',
+        status: 'LOCAL_PERSISTENCE_ERROR',
+        message: 'The enrolled device session could not be loaded locally.',
+        cause,
       };
     }
+
+    if (resolution.status === 'TRANSPORT_UNAVAILABLE') {
+      return { status: 'UNAVAILABLE', message: resolution.message };
+    }
+    if (resolution.status === 'AUTHORITATIVELY_INVALID' || resolution.status === 'NOT_ENROLLED') {
+      return { status: 'DEVICE_SESSION_INVALID', message: resolution.message };
+    }
+    if (resolution.status === 'PROTOCOL_ERROR') {
+      return { status: 'INVALID_RESPONSE', message: resolution.message };
+    }
+    if (resolution.status === 'LOCAL_PERSISTENCE_ERROR') {
+      return {
+        status: 'LOCAL_PERSISTENCE_ERROR',
+        message: resolution.message,
+        cause: resolution.cause,
+      };
+    }
+    const session = resolution.session;
+    const headers = this.#sessionManager.authorizationHeadersFor(session);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
@@ -153,11 +177,23 @@ export class SupabaseWorkerAuthenticator {
           }
         : { status: 'AUTHENTICATED', worker };
     }
+
+    const remoteError = typeof body['error'] === 'string' ? body['error'] : '';
     if (response.status === 400) {
       return { status: 'INVALID_REQUEST', message: messageForStatus(response.status) };
     }
-    if (response.status === 401 || response.status === 403) {
-      return { status: 'REJECTED', message: messageForStatus(response.status) };
+    if (response.status === 401 && remoteError === 'invalid_pin') {
+      return { status: 'REJECTED', message: 'Invalid PIN.' };
+    }
+    if (
+      (response.status === 401 &&
+        (remoteError === 'invalid_access_token' || remoteError === 'device_authentication_required')) ||
+      (response.status === 403 && remoteError === 'device_not_authorized')
+    ) {
+      return {
+        status: 'DEVICE_SESSION_INVALID',
+        message: 'The enrolled device session is not authorized for worker authentication.',
+      };
     }
     if (response.status === 429) {
       return { status: 'THROTTLED', message: messageForStatus(response.status) };
