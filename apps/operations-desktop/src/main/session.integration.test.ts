@@ -54,6 +54,20 @@ async function fixture() {
       pinHash: 'fixture:5678',
       active: true,
     });
+    await transaction.configuration.put({
+      shopId: SHOP_ID,
+      version: 1,
+      updatedAt: instant('2026-08-17T12:00:00.000Z'),
+      categories: [],
+      products: [],
+      modifiers: [],
+      productModifierLinks: [],
+      comboBeverageOptions: [],
+      recipeLines: [],
+      orderTypes: [],
+      paymentMethods: [],
+      deliveryZones: [],
+    });
   });
   const readModel = new SqliteOperatorSessionReadModel(databasePath);
   let now = instant('2026-08-17T13:00:00.000Z');
