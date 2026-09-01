@@ -211,7 +211,9 @@ describe('authoritative worker identity transition', () => {
       authoritativeWorker(WORKER_B),
       store,
     ).submitPin('1234');
-    expect(online.ok && online.value.status === 'ACTIVE' && online.value.operator.id).toBe(WORKER_B);
+    expect(online.ok && online.value.status === 'ACTIVE' && online.value.operator.id).toBe(
+      WORKER_B,
+    );
 
     const offline = await new OperationsWorkerAuthenticationService(
       session,
