@@ -16,3 +16,8 @@
   translate: none;
   scale: none;
 }
+
+/* Product drag keeps the source slot reserved while one overlay follows the gesture. */
+.menu-edit-product-card-dragging:not(.menu-edit-drag-overlay) {
+  visibility: hidden;
+}

@@ -68,6 +68,24 @@ export function moveProductWithinCategory(
   });
 }
 
+export function swapProductWithinCategory(
+  order: readonly ProductId[],
+  categoryProductIds: readonly ProductId[],
+  sourceId: ProductId,
+  targetId: ProductId,
+): readonly ProductId[] {
+  if (sourceId === targetId) return order;
+
+  const categorySet = new Set(categoryProductIds);
+  if (!categorySet.has(sourceId) || !categorySet.has(targetId)) return order;
+
+  return order.map((productId) => {
+    if (productId === sourceId) return targetId;
+    if (productId === targetId) return sourceId;
+    return productId;
+  });
+}
+
 export function resetProductCategoryOrder(
   order: readonly ProductId[],
   canonicalCategoryProductIds: readonly ProductId[],

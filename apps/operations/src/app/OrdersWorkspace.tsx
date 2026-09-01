@@ -70,8 +70,8 @@ import { MenuProductCard } from './MenuProductCard';
 import { ProductCardPresentation } from './ProductCardPresentation';
 import {
   filterProductsForMenu as filterProductsForMenuWithPreference,
-  moveProductWithinCategory,
   reconcileProductOrder,
+  swapProductWithinCategory,
 } from './menuProductOrder';
 import { createWorkerMenuLayoutClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
@@ -414,20 +414,33 @@ export function OrdersWorkspace({
   const menuEditProductOrder = menuEditSession.draft?.productOrder ?? [];
   const menuEditKeyboardCoordinateGetter = useCallback<typeof sortableKeyboardCoordinates>(
     (event, args) => {
-      const nextCoordinates = sortableKeyboardCoordinates(event, args);
       const active = args.context.active;
       const collisionRect = args.context.collisionRect;
       if (active === null || collisionRect === null) {
         pendingKeyboardDragTargetRef.current = null;
-        return nextCoordinates;
+        return sortableKeyboardCoordinates(event, args);
       }
 
+      const productDrag = String(active.id).startsWith('product:');
+      if (productDrag && (event.code === 'ArrowLeft' || event.code === 'ArrowRight')) {
+        pendingKeyboardDragTargetRef.current = null;
+        return undefined;
+      }
+
+      const nextCoordinates = sortableKeyboardCoordinates(event, args);
+      const activeRect = productDrag ? args.context.droppableRects.get(active.id) : undefined;
       const directionalDroppableContainers = args.context.droppableContainers
         .getEnabled()
         .filter((container) => {
           if (container.id === active.id) return false;
           const rect = args.context.droppableRects.get(container.id);
           if (rect === undefined) return false;
+          if (productDrag && activeRect !== undefined) {
+            const activeCenterX = activeRect.left + activeRect.width / 2;
+            const targetCenterX = rect.left + rect.width / 2;
+            const sameColumnTolerance = Math.max(1, Math.min(activeRect.width, rect.width) / 4);
+            if (Math.abs(targetCenterX - activeCenterX) > sameColumnTolerance) return false;
+          }
           if (event.code === 'ArrowDown') return collisionRect.top < rect.top;
           if (event.code === 'ArrowUp') return collisionRect.top > rect.top;
           if (event.code === 'ArrowLeft') return collisionRect.left > rect.left;
@@ -452,6 +465,22 @@ export function OrdersWorkspace({
     },
     [],
   );
+  const menuEditProductCollisionDetection = useCallback<typeof closestCenter>((args) => {
+    const activeRect = args.droppableRects.get(args.active.id);
+    if (activeRect === undefined) return closestCenter(args);
+    const activeCenterX = activeRect.left + activeRect.width / 2;
+    const sameColumnDroppableContainers = args.droppableContainers.filter((container) => {
+      const rect = args.droppableRects.get(container.id);
+      if (rect === undefined) return false;
+      const targetCenterX = rect.left + rect.width / 2;
+      const sameColumnTolerance = Math.max(1, Math.min(activeRect.width, rect.width) / 4);
+      return Math.abs(targetCenterX - activeCenterX) <= sameColumnTolerance;
+    });
+    return closestCenter({
+      ...args,
+      droppableContainers: sameColumnDroppableContainers,
+    });
+  }, []);
   const menuEditSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
@@ -1082,25 +1111,10 @@ export function OrdersWorkspace({
     }
     if (activeProduct.id === overProduct.id) return true;
 
-    const productCategoryById = new Map(
-      (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
-    );
-    const categoryProductIds = menuEditProductOrder.filter(
-      (productId) => productCategoryById.get(productId) === selectedCategoryId,
-    );
-    const next = moveProductWithinCategory(
-      menuEditProductOrder,
-      categoryProductIds,
-      activeProduct.id,
-      overProduct.id,
-    );
-    if (next === menuEditProductOrder) return true;
-    dispatchMenuLayoutEditor({ type: 'SET_PRODUCT_ORDER', productOrder: next });
-    const categoryOnly = next.filter(
-      (productId) => productCategoryById.get(productId) === selectedCategoryId,
-    );
+    const targetIndex = menuEditProducts.findIndex((product) => product.id === overProduct.id);
+    if (targetIndex < 0) return false;
     setMenuEditAnnouncement(
-      `${activeProduct.name} moved to position ${categoryOnly.indexOf(activeProduct.id) + 1} of ${categoryOnly.length}.`,
+      `${activeProduct.name} targeting position ${targetIndex + 1} of ${menuEditProducts.length}.`,
     );
     return true;
   }
@@ -1201,16 +1215,14 @@ export function OrdersWorkspace({
 
     const snapshotProductOrder = menuEditSession.interaction.snapshot.productOrder;
     let productOrder = snapshotProductOrder;
-    if (activeProduct.id === overProduct.id && menuEditSession.draft !== null) {
-      productOrder = menuEditSession.draft.productOrder;
-    } else if (activeProduct.id !== overProduct.id) {
+    if (activeProduct.id !== overProduct.id) {
       const productCategoryById = new Map(
         (configuration?.products ?? []).map((product) => [product.id, product.categoryId]),
       );
       const categoryProductIds = snapshotProductOrder.filter(
         (productId) => productCategoryById.get(productId) === selectedCategoryId,
       );
-      productOrder = moveProductWithinCategory(
+      productOrder = swapProductWithinCategory(
         snapshotProductOrder,
         categoryProductIds,
         activeProduct.id,
@@ -1690,7 +1702,7 @@ export function OrdersWorkspace({
               <DndContext
                 key={selectedCategoryId ?? 'menu-products-none'}
                 sensors={menuEditSensors}
-                collisionDetection={closestCenter}
+                collisionDetection={menuEditProductCollisionDetection}
                 measuring={MENU_EDIT_MEASURING}
                 onDragStart={handleMenuEditDragStart}
                 onDragOver={handleMenuEditDragOver}
@@ -1709,7 +1721,7 @@ export function OrdersWorkspace({
                     />
                   ))}
                 </SortableContext>
-                <DragOverlay>
+                <DragOverlay modifiers={[({ transform }) => ({ ...transform, x: 0 })]}>
                   {activeDraggedProduct === null ? null : (
                     <article
                       aria-hidden="true"
