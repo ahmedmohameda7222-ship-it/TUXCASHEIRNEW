@@ -6,6 +6,8 @@
 
 **Starting authority:** current `main` at `bb133b3e339711e86d29cfb59b25430b0849a3fc` (2026-09-01). Work is isolated on `fix/operations-security-closeout`. No production deployment, remote Supabase mutation, or historical migration rewrite is permitted.
 
+**Execution-environment note:** the available local container could not resolve `github.com`, so a trustworthy local checkout/worktree could not be established in this session. Repository reads/writes are therefore performed through the connected GitHub API and executable verification through fresh GitHub Actions runs on exact branch/PR heads. This is an execution-capability deviation only; it must not be represented as a completed local worktree verification in the final handoff.
+
 **Architecture:** Keep the existing local-first Operations database and configuration snapshot as the durable runtime substrate. Treat a local installation as activated only when active local identity and a validated durable configuration snapshot coexist. Add an explicit worker-authentication authority boundary so reachable-server authentication is authoritative while genuine transport/backend unavailability can fall back only to an already activated local installation. Bootstrap rate limiting uses deployment-trusted request-source information rather than request-body/device/User-Agent identities. Browser and Electron use the same application security semantics while adapting their different authenticated transports.
 
 **Technology:** TypeScript, Vitest, IndexedDB/SQLite repositories, Vercel server routes, Supabase Edge Functions/PostgreSQL, Playwright, Electron packaging.
@@ -107,6 +109,17 @@
 2. Re-run focused P1-1/P1-2/P1-3 suites together.
 3. Independently inspect the diff for scope creep, historical migration edits, secret exposure, Admin work, and Delivery/End Day semantics changes.
 
+## Task 7A — independent review closeout corrections
+
+Independent review of the first PR implementation identified four additional P1 defects that must be treated as binding follow-on acceptance criteria with their own RED→GREEN evidence:
+
+1. **P1-A — Desktop refresh classification:** token-refresh network/timeout failures must be typed as genuine unavailability, while missing/revoked device sessions, malformed refresh responses, and local session persistence errors remain non-fallback outcomes.
+2. **P1-B — Browser refresh classification:** browser device-session refresh transport loss must preserve durable cookies and surface explicit unavailability; authoritative session rejection may clear cookies; only an actual worker `invalid_pin` result may become worker rejection/fencing.
+3. **P1-C — Exact authoritative worker identity:** online success must transition by the exact server-returned worker ID. It must not delegate to cached PIN scanning, including when a PIN moved between workers or multiple cached rows accidentally match.
+4. **P1-D — Edge bootstrap provenance:** the public Supabase credential and unsigned body `rateLimitKey` are not a trusted boundary. The Vercel→`device-bootstrap` call must carry cryptographic server provenance bound to the normalized request, with bounded freshness and replay protection verified before the rate limiter. Direct callers must not be able to rotate arbitrary buckets.
+
+P1-D may add an append-only private replay-nonce migration and permanent Deno process test. Required deployment secret material must be documented by name/contract only; no secret value may enter the repository.
+
 ## Task 8 — final repository verification and handoff
 
 From the exact final branch head run/obtain fresh evidence for:
@@ -123,4 +136,4 @@ npm run test:e2e
 npm run package:win -- --publish never
 ```
 
-Also run every focused security suite introduced above. Push the exact final branch, open a PR against current `main`, and verify the permanent `TUX V2 CI / Required quality gate` on that exact PR head. Do not merge. Hand off to Planner/Auditor with exact RED/GREEN evidence, commit SHAs, CI run ID, file list, migration status, and any remaining in-scope finding.
+Also run every focused security suite introduced above. Push the exact final branch, keep PR #49 against current `main`, and verify the permanent `TUX V2 CI / Required quality gate` on that exact PR head. Do not merge. Do not resolve binding review threads before exact-head permanent verification is green. Hand off to Planner/Auditor with exact RED/GREEN evidence, commit SHAs, CI run ID, file list, migration status, execution-environment deviation, and any remaining in-scope finding.
