@@ -21,9 +21,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type {
-  OperationsSessionState,
-  OrdersWorkspace as OrdersWorkspaceData,
+import {
+  workerMenuLayoutUpdateFromFlatProductOrder,
+  type OperationsSessionState,
+  type OrdersWorkspace as OrdersWorkspaceData,
 } from '@tux/application';
 import {
   ZERO_MONEY,
@@ -45,7 +46,7 @@ import {
   type OrderValidationIssue,
   type Product,
   type ProductId,
-  type WorkerUiPreferences,
+  type WorkerMenuLayout,
 } from '@tux/domain';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
@@ -72,13 +73,12 @@ import {
   moveProductWithinCategory,
   reconcileProductOrder,
 } from './menuProductOrder';
-import { createWorkerUiPreferencesClient, type OperationsOrdersClient } from './sessionClient';
+import { createWorkerMenuLayoutClient, type OperationsOrdersClient } from './sessionClient';
 import { OrdersCart, type DraftMutation } from './OrdersCart';
 import { ProductCustomizer, type ProductCustomizerTarget } from './ProductCustomizer';
 import { formatMoneyMinor, nextDraftAddedSequence, resolveOrdersDraftScopeId } from './ordersView';
 import { shouldEnsureSelectedCategoryVisible } from './selectedCategoryVisibility';
 import type { MenuLayoutExitController } from './unsavedChangesGuard';
-import { menuEditPreferenceInput } from './workerUiPreferenceEditing';
 
 type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 
@@ -94,7 +94,7 @@ function desktopCartResizeMatches(): boolean {
 
 export function reconcileCategoryOrder(
   activeCategories: readonly MenuCategory[],
-  preference: WorkerUiPreferences | null,
+  preference: WorkerMenuLayout | null,
 ): readonly MenuCategory[] {
   if (preference === null || preference.categoryOrder.length === 0) return activeCategories;
 
@@ -171,7 +171,7 @@ export function filterProductsForMenu(
 }
 
 export function resolveWorkerMenuPreferencePresentation(state: WorkerMenuPreferenceLoadState): {
-  readonly preference: WorkerUiPreferences | null;
+  readonly preference: WorkerMenuLayout | null;
   readonly menuEditEnabled: boolean;
   readonly errorMessage: string | null;
   readonly retryVisible: boolean;
@@ -356,7 +356,7 @@ export function OrdersWorkspace({
   readonly onMenuLayoutExitControllerChange?: (controller: MenuLayoutExitController) => void;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
-  const preferencesClient = useMemo(createWorkerUiPreferencesClient, []);
+  const menuLayoutClient = useMemo(createWorkerMenuLayoutClient, []);
   const searchRef = useRef<HTMLInputElement>(null);
   const categoryRailRef = useRef<HTMLDivElement>(null);
   const categoryTabRefs = useRef<Map<MenuCategoryId, HTMLButtonElement>>(new Map());
@@ -597,7 +597,7 @@ export function OrdersWorkspace({
     setActiveMenuDragId(null);
     setMenuEditAnnouncement('');
     setSearch('');
-    void preferencesClient.load().then(
+    void menuLayoutClient.load().then(
       (preference) => {
         dispatchWorkerMenuPreferenceLoad({
           type: 'READY',
@@ -617,7 +617,22 @@ export function OrdersWorkspace({
         });
       },
     );
-  }, [preferencesClient, session.operator.id, session.shopId]);
+  }, [menuLayoutClient, session.operator.id, session.shopId]);
+
+  useEffect(() => {
+    const shopId = session.shopId;
+    const workerId = session.operator.id;
+    return menuLayoutClient.subscribe((layout) => {
+      if (layout.shopId !== shopId || layout.workerId !== workerId) return;
+      dispatchWorkerMenuPreferenceLoad({
+        type: 'READY',
+        shopId,
+        workerId,
+        generation: preferenceLoadGenerationRef.current,
+        preference: layout,
+      });
+    });
+  }, [menuLayoutClient, session.operator.id, session.shopId]);
 
   useEffect(() => {
     if (categoryMode === 'SEARCH') searchRef.current?.focus();
@@ -845,7 +860,7 @@ export function OrdersWorkspace({
     const generation = preferenceLoadGenerationRef.current + 1;
     preferenceLoadGenerationRef.current = generation;
     dispatchWorkerMenuPreferenceLoad({ type: 'LOAD', shopId, workerId, generation });
-    void preferencesClient.load().then(
+    void menuLayoutClient.load().then(
       (preference) => {
         dispatchWorkerMenuPreferenceLoad({
           type: 'READY',
@@ -929,14 +944,25 @@ export function OrdersWorkspace({
     dispatchMenuLayoutEditor({ type: 'BEGIN_SAVE', saveToken });
     setActiveMenuDragId(null);
     try {
-      const saved = await preferencesClient.updateMenuLayout(
-        menuEditPreferenceInput(
-          saveDraft.categoryOrder,
-          saveDraft.categoryAlignment,
-          saveDraft.productOrder,
-          menuEditSession.resetRequested,
-        ),
-      );
+      let saved: WorkerMenuLayout | null;
+      if (menuEditSession.resetRequested) {
+        await menuLayoutClient.resetMenuLayout();
+        saved = await menuLayoutClient.load();
+        if (saved === null) throw new Error('Menu layout reset could not be reloaded.');
+      } else {
+        if (configuration === null) throw new Error('Menu configuration is unavailable.');
+        saved = await menuLayoutClient.updateMenuLayout(
+          workerMenuLayoutUpdateFromFlatProductOrder({
+            categoryOrder: saveDraft.categoryOrder,
+            categoryAlignment: saveDraft.categoryAlignment,
+            productOrder: saveDraft.productOrder,
+            catalog: {
+              categories: configuration.categories,
+              products: configuration.products,
+            },
+          }),
+        );
+      }
       if (
         menuEditIdentityRef.current.shopId !== saveShopId ||
         menuEditIdentityRef.current.workerId !== saveWorkerId

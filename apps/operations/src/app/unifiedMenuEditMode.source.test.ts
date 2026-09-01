@@ -107,7 +107,9 @@ describe('unified menu edit entry point', () => {
   });
 
   it('persists category and product layout together through the menu-layout-only API', () => {
-    expect(ordersWorkspaceSource).toContain('menuEditPreferenceInput');
+    expect(ordersWorkspaceSource).toContain('createWorkerMenuLayoutClient');
+    expect(ordersWorkspaceSource).toContain('workerMenuLayoutUpdateFromFlatProductOrder');
+    expect(ordersWorkspaceSource).toContain('menuLayoutClient.subscribe');
     expect(ordersWorkspaceSource).toContain('function saveMenuEdit');
     expect(ordersWorkspaceSource).toContain('function resetMenuEdit');
     expect(ordersWorkspaceSource).toContain('function cancelMenuEdit');
@@ -115,8 +117,10 @@ describe('unified menu edit entry point', () => {
     expect(ordersWorkspaceSource).toContain('onClick={resetMenuEdit}');
     expect(ordersWorkspaceSource).toContain('onClick={cancelMenuEdit}');
     expect(ordersWorkspaceSource).toContain("'Saving…' : 'Save'");
-    expect(ordersWorkspaceSource.match(/preferencesClient\.updateMenuLayout\(/g)).toHaveLength(1);
-    expect(ordersWorkspaceSource).not.toContain('preferencesClient.update(');
+    expect(ordersWorkspaceSource.match(/menuLayoutClient\.updateMenuLayout\(/g)).toHaveLength(1);
+    expect(ordersWorkspaceSource).toContain('menuLayoutClient.resetMenuLayout()');
+    expect(ordersWorkspaceSource).not.toContain('createWorkerUiPreferencesClient');
+    expect(ordersWorkspaceSource).not.toContain('preferencesClient.updateMenuLayout');
   });
 
   // Saving freezes every persisted menu-layout control after the payload is captured.

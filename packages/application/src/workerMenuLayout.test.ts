@@ -170,11 +170,15 @@ function remoteLayout(version: number, workerId: WorkerId = workerAId): RemoteWo
   };
 }
 
-function service(repository: MemoryRepository, gateway: FakeGateway) {
+function service(
+  repository: MemoryRepository,
+  gateway: FakeGateway,
+  currentCatalog: WorkerMenuLayoutCatalog = catalog,
+) {
   return new WorkerMenuLayoutService(
     repository,
     gateway,
-    { getWorkerMenuLayoutCatalog: async () => catalog },
+    { getWorkerMenuLayoutCatalog: async () => currentCatalog },
     () => instant('2026-08-31T11:00:00.000Z'),
   );
 }
@@ -229,6 +233,52 @@ describe('WorkerMenuLayoutService', () => {
     gateway.failPut = false;
     await target.syncOnce(shopId, workerAId);
     expect((await repository.get(shopId, workerAId))?.syncState).toBe('CLEAN');
+  });
+
+  it('reconciles a DIRTY snapshot against the current catalog before remote PUT and becomes CLEAN', async () => {
+    const repository = new MemoryRepository();
+    const gateway = new FakeGateway();
+    const dirty = localLayout({ layoutVersion: 2, syncState: 'DIRTY' });
+    await repository.put(dirty);
+    gateway.remote.set(key(shopId, workerAId), remoteLayout(2));
+    const reducedCatalog: WorkerMenuLayoutCatalog = {
+      categories: categories.map((category) =>
+        category.id === categoryBId ? { ...category, active: false } : category,
+      ),
+      products: products.map((product) =>
+        product.id === productA2Id ? { ...product, active: false } : product,
+      ),
+    };
+    const target = service(repository, gateway, reducedCatalog);
+
+    await target.syncOnce(shopId, workerAId);
+
+    const stored = await repository.get(shopId, workerAId);
+    expect(stored?.syncState).toBe('CLEAN');
+    expect(stored?.layoutVersion).toBe(3);
+    expect(stored?.categoryOrder).toEqual([categoryAId]);
+    expect(stored?.productOrderByCategory).toEqual({ [categoryAId]: [productA1Id] });
+    expect(gateway.remote.get(key(shopId, workerAId))?.categoryOrder).toEqual([categoryAId]);
+    expect(gateway.remote.get(key(shopId, workerAId))?.productOrderByCategory).toEqual({
+      [categoryAId]: [productA1Id],
+    });
+  });
+
+  it('treats explicit remote NOT_FOUND as an intentional default when no local layout exists', async () => {
+    const repository = new MemoryRepository();
+    const gateway = new FakeGateway();
+    const target = service(repository, gateway);
+
+    await expect(target.load(shopId, workerAId)).resolves.toBeNull();
+  });
+
+  it('propagates remote availability failures when no local layout exists', async () => {
+    const repository = new MemoryRepository();
+    const gateway = new FakeGateway();
+    gateway.failGet = true;
+    const target = service(repository, gateway);
+
+    await expect(target.load(shopId, workerAId)).rejects.toThrow('offline');
   });
 
   it('never replaces a local DIRTY layout with a newer remote snapshot during load', async () => {

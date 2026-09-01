@@ -217,19 +217,15 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
       return effective;
     }
 
-    try {
-      const remote = await this.#gateway.getWorkerMenuLayout(shopId, workerId);
-      if (remote === null) return null;
-      const restored = remoteAsClean(remote);
-      await this.#serializeLocalMutation(shopId, workerId, async () => {
-        if ((await this.#repository.get(shopId, workerId)) !== null) return;
-        await this.#repository.put(restored);
-        this.#publish(restored);
-      });
-      return reconcileWorkerMenuLayout(restored, catalog);
-    } catch {
-      return null;
-    }
+    const remote = await this.#gateway.getWorkerMenuLayout(shopId, workerId);
+    if (remote === null) return null;
+    const restored = remoteAsClean(remote);
+    await this.#serializeLocalMutation(shopId, workerId, async () => {
+      if ((await this.#repository.get(shopId, workerId)) !== null) return;
+      await this.#repository.put(restored);
+      this.#publish(restored);
+    });
+    return reconcileWorkerMenuLayout(restored, catalog);
   }
 
   async updateMenuLayout(
@@ -282,18 +278,31 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
     return this.#serializeSync(shopId, workerId, async () => {
       const local = await this.#repository.get(shopId, workerId);
       if (local?.syncState === 'DIRTY') {
+        const catalog = await this.#catalogProvider.getWorkerMenuLayoutCatalog(shopId);
+        const reconciled = reconcileWorkerMenuLayout(local, catalog);
+        if (!sameWorkerMenuLayoutSnapshot(reconciled, local)) {
+          const persisted = await this.#serializeLocalMutation(shopId, workerId, async () => {
+            const current = await this.#repository.get(shopId, workerId);
+            if (!sameWorkerMenuLayoutSnapshot(current, local)) return false;
+            await this.#repository.put(reconciled);
+            this.#publish(reconciled);
+            return true;
+          });
+          if (!persisted) return;
+        }
+
         const remote = await this.#gateway.putWorkerMenuLayout({
           shopId,
           workerId,
-          categoryOrder: local.categoryOrder,
-          categoryAlignment: local.categoryAlignment,
-          productOrderByCategory: local.productOrderByCategory,
-          expectedLayoutVersion: local.layoutVersion === 0 ? null : local.layoutVersion,
+          categoryOrder: reconciled.categoryOrder,
+          categoryAlignment: reconciled.categoryAlignment,
+          productOrderByCategory: reconciled.productOrderByCategory,
+          expectedLayoutVersion: reconciled.layoutVersion === 0 ? null : reconciled.layoutVersion,
         });
         const cleanRemote = remoteAsClean(remote);
         await this.#serializeLocalMutation(shopId, workerId, async () => {
           const current = await this.#repository.get(shopId, workerId);
-          if (sameWorkerMenuLayoutSnapshot(current, local)) {
+          if (sameWorkerMenuLayoutSnapshot(current, reconciled)) {
             await this.#repository.put(cleanRemote);
             this.#publish(cleanRemote);
             return;
@@ -301,7 +310,7 @@ export class WorkerMenuLayoutService implements WorkerMenuLayoutSyncTarget {
           if (
             current !== null &&
             current.syncState === 'DIRTY' &&
-            current.layoutVersion === local.layoutVersion
+            current.layoutVersion === reconciled.layoutVersion
           ) {
             const advancedDirty = parseWorkerMenuLayout({
               ...current,

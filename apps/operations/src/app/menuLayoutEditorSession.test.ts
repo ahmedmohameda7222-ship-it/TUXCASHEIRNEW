@@ -6,7 +6,7 @@ import {
   type ProductId,
   type ShopId,
   type WorkerId,
-  type WorkerUiPreferences,
+  type WorkerMenuLayout,
 } from '@tux/domain';
 import {
   createClosedMenuLayoutEditorSession,
@@ -32,14 +32,13 @@ const base: MenuLayoutDraft = {
   productOrder: [productA, productB, productC],
 };
 
-const savedPreference: WorkerUiPreferences = {
+const savedPreference: WorkerMenuLayout = {
   shopId,
   workerId: workerA,
   categoryOrder: [categoryB, categoryA],
   categoryAlignment: 'right',
-  productOrder: [productC, productA, productB],
-  accentColor: null,
-  serverVersion: 2,
+  productOrderByCategory: { [categoryA]: [productC, productA, productB] },
+  layoutVersion: 2,
   updatedAt: instant(new Date('2026-08-30T04:00:00.000Z')),
   syncState: 'CLEAN',
 };

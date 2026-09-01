@@ -273,7 +273,9 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       const workerUiPreferences: TuxWorkerUiPreferencesApi = {
         load: async () => {
           const identity = await activeIdentityFromSession();
-          const layout = await menuLayoutService.load(identity.shopId, identity.workerId);
+          const layout = await menuLayoutService
+            .load(identity.shopId, identity.workerId)
+            .catch(() => menuLayoutStore.get(identity.shopId, identity.workerId));
           return compatiblePreferences(identity, layout);
         },
         subscribe: (listener) => {
