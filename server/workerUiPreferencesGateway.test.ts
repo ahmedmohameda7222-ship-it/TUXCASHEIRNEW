@@ -40,11 +40,16 @@ function responseCapture(): ResponseCapture {
   };
 }
 
+function jwt(expiresAt = 4_000_000_000): string {
+  const payload = Buffer.from(JSON.stringify({ exp: expiresAt })).toString('base64url');
+  return `header.${payload}.signature`;
+}
+
 function sessionCookie(shopId = shopA): string {
   return [
     `tux_ops_shop=${shopId}`,
     `tux_ops_device=${deviceId}`,
-    'tux_ops_access=opaque-access-token',
+    `tux_ops_access=${jwt()}`,
     'tux_ops_refresh=opaque-refresh-token',
   ].join('; ');
 }
