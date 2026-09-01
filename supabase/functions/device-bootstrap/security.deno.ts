@@ -67,17 +67,20 @@ async function postBootstrap(
   body: BootstrapBody,
   headers: Record<string, string> = { 'content-type': 'application/json' },
 ): Promise<Response> {
-  return fetch(EDGE_ORIGIN, {
+  const response = await fetch(EDGE_ORIGIN, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
+  await response.body?.cancel();
+  return response;
 }
 
 async function waitForEdge(): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
-      await fetch(EDGE_ORIGIN);
+      const response = await fetch(EDGE_ORIGIN);
+      await response.body?.cancel();
       return;
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 50));
