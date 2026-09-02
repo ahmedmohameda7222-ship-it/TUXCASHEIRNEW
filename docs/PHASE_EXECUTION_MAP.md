@@ -22,7 +22,7 @@ This is the concise execution map for the approved build sequence. The canonical
 - One minimal bootstrap commit on `main` is allowed by the execution prompt; product implementation remains isolated from `main`.
 - All product implementation targets `integration/tux-operations-v2` through phase branches.
 - Legacy `Tuxcashier` is read-only reference. Its large `src/AppCore.js` monolith is specifically not a V2 architecture template.
-- No remote Supabase project is configured; remote migration application remains forbidden until explicitly authorized.
+- The earlier pre-deployment observation is superseded: Production Supabase is now configured, deployed, and reconciled. Production migration application remains an explicit operator-controlled boundary governed by `docs/MIGRATIONS.md` and `docs/deployment/SUPABASE_REMOTE_MIGRATION_LEDGER.md`; repository and CI commands do not mutate Production.
 - Phase 1 established the strict TypeScript workspace, shared React renderer, secure Electron boundary, design tokens, runtime-config validation, lockfile, tests, and permanent CI quality gate.
 - Phase 2 established the domain/local-first persistence foundation and was squash-merged through PR #4 into integration as `10f15a057f5371987a4e2f7fb119fedfdd901a9d`.
 - Phase 3 implements Business Day/operator behavior, narrow PIN/session runtime adapters, worker-session persistence, greeting transition, and SQLite worker-session uniqueness. Permanent CI run `32068544454` passed install, format, lint, strict typecheck, unit/integration tests, browser build, and Electron main/preload builds on the PR documentation head.
