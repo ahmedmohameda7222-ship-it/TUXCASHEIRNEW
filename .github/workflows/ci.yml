@@ -47,10 +47,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Format check
-        run: |
-          npx prettier --write server/workerAuthenticationGateway.refresh.test.ts
-          git diff -- server/workerAuthenticationGateway.refresh.test.ts
-          exit 1
+        run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
