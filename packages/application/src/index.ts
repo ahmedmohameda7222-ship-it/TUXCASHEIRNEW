@@ -82,6 +82,11 @@ export type {
   WorkerAuthenticationLocalSession,
   WorkerCredentialStore,
 } from './workerAuthentication';
+export type {
+  WhatsAppInboxOrderLink,
+  WhatsAppInboxSnapshot,
+  WhatsAppRemoteGateway,
+} from './whatsappRemote';
 export {
   WorkerMenuLayoutConflictError,
   WorkerMenuLayoutRetryController,
