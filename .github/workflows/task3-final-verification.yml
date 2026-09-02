@@ -1,0 +1,64 @@
+name: Task 3 Final Verification
+
+on:
+  push:
+    branches:
+      - 'feat/ops-whatsapp-task3-final-verify'
+
+permissions:
+  contents: read
+
+jobs:
+  task3-final:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Exact Task 3 focused verification
+        run: |
+          npm test -- \
+            packages/domain/src/phone.test.ts \
+            packages/domain/src/whatsapp.test.ts \
+            server/whatsappServerConfig.test.ts \
+            server/whatsappChannelResolver.test.ts \
+            server/whatsappProviderGateway.test.ts \
+            server/whatsappWebhook.test.ts
+      - name: Migration gate
+        run: npm run test:migrations
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Task 2 migration unchanged
+        run: |
+          test -z "$(git diff 9733cfd0a2f90030016f201b5b737a6d63b1056c..HEAD -- supabase/migrations/20260902220000_whatsapp_inbox.sql)"
+      - name: Obsolete WhatsApp routing variables absent
+        run: |
+          if git grep -n "TUX_WHATSAPP_SHOP_ID\|TUX_WHATSAPP_PHONE_NUMBER_ID" -- server api packages apps; then
+            echo 'Obsolete WhatsApp routing variable found.' >&2
+            exit 1
+          fi
