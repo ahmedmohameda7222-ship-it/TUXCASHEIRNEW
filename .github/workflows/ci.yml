@@ -51,9 +51,7 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
-        run: >-
-          npm test -- server/workerAuthenticationGateway.refresh.test.ts
-          -t "refreshes when the access cookie has naturally expired"
+        run: npm test -- server/workerAuthenticationGateway.refresh.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Production builds
