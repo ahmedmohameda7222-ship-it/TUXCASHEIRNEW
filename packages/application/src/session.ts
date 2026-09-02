@@ -105,6 +105,11 @@ export class OperationsSessionService {
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
         }
+        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+          return ok(
+            configurationState('This device does not have an activated Operations configuration.'),
+          );
+        }
 
         const workers = await this.#readModel.listActiveWorkers(shop.id);
         let authenticatedWorker: Worker | null = null;
@@ -116,108 +121,55 @@ export class OperationsSessionService {
           return err({ code: 'PIN_AUTH_ERROR', message: 'Invalid PIN.' });
         }
 
-        const initialDay = await this.#database.transaction((transaction) =>
-          transaction.businessDays.getOpenForShop(shop.id),
-        );
-        const existingSession =
-          initialDay?.status === 'OPEN'
-            ? await this.#readModel.getOpenWorkerSession(initialDay.id)
-            : null;
-
-        const now = this.#runtime.now();
-        const worker = authenticatedWorker;
-        const activeState = await this.#database.transaction(async (transaction) => {
-          const persistedWorker = await transaction.workers.getById(worker.id);
-          if (
-            persistedWorker === null ||
-            !persistedWorker.active ||
-            persistedWorker.shopId !== shop.id
-          ) {
-            throw new Error('Authenticated worker is no longer active for this shop.');
-          }
-
-          const currentDay = await transaction.businessDays.getOpenForShop(shop.id);
-          const day: OpenBusinessDay =
-            currentDay === null
-              ? createOpenBusinessDay({
-                  id: this.#id<BusinessDayId>(),
-                  shopId: shop.id,
-                  startedAt: now,
-                  startedByWorkerId: worker.id,
-                })
-              : currentDay.status === 'OPEN'
-                ? currentDay
-                : (() => {
-                    throw new Error('Closed Business Day returned from open-day query.');
-                  })();
-
-          if (currentDay === null) {
-            await transaction.businessDays.put(day);
-            await transaction.audit.append(
-              this.#audit(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, worker.id, now, {
-                startedByWorkerId: worker.id,
-              }),
-            );
-            await transaction.outbox.append(
-              this.#outbox(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, now, {
-                eventType: 'BUSINESS_DAY_STARTED',
-                version: 1,
-                businessDay: day,
-              }),
-            );
-          }
-
-          const openExistingSession =
-            existingSession !== null &&
-            existingSession.businessDayId === day.id &&
-            existingSession.endedAt === null
-              ? existingSession
-              : null;
-
-          if (openExistingSession?.workerId === worker.id) {
-            return this.#activeState(shop, day, worker);
-          }
-
-          const closedPreviousSession: WorkerSession | null =
-            openExistingSession === null ? null : { ...openExistingSession, endedAt: now };
-          if (closedPreviousSession !== null) {
-            await transaction.workerSessions.put(closedPreviousSession);
-          }
-
-          const newSession: WorkerSession = {
-            id: this.#id<WorkerSessionId>(),
-            shopId: shop.id,
-            businessDayId: day.id,
-            workerId: worker.id,
-            startedAt: now,
-            endedAt: null,
-          };
-          await transaction.workerSessions.put(newSession);
-
-          const switched =
-            openExistingSession !== null && openExistingSession.workerId !== worker.id;
-          const eventType = switched ? 'WORKER_SWITCHED' : 'WORKER_SIGNED_IN';
-          await transaction.audit.append(
-            this.#audit(shop.id, eventType, day.id, newSession.id, worker.id, now, {
-              workerId: worker.id,
-              previousWorkerId: switched ? openExistingSession.workerId : null,
-            }),
-          );
-          await transaction.outbox.append(
-            this.#outbox(shop.id, eventType, day.id, newSession.id, now, {
-              eventType,
-              version: 1,
-              session: newSession,
-              previousSession: closedPreviousSession,
-            }),
-          );
-
-          return this.#activeState(shop, day, worker);
-        });
-
-        return ok(activeState);
+        return ok(await this.#transitionToWorker(shop, authenticatedWorker));
       } catch (cause) {
         return err(localPersistenceError('Could not update the local operator session.', cause));
+      }
+    });
+  }
+
+  async submitAuthenticatedWorker(pin: string, worker: Worker): Promise<OperationsSessionResult> {
+    return this.#exclusive(async () => {
+      if (pin.length === 0 || !/^\d+$/.test(pin)) {
+        return err({ code: 'VALIDATION_ERROR', message: 'Enter a valid PIN.' });
+      }
+      if (!worker.active) {
+        return err({ code: 'VALIDATION_ERROR', message: 'Authoritative worker is not active.' });
+      }
+
+      try {
+        const shop = await this.#resolveShop();
+        if (shop === null) {
+          return ok(configurationState('This device is not assigned to exactly one active shop.'));
+        }
+        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+          return ok(
+            configurationState('This device does not have an activated Operations configuration.'),
+          );
+        }
+        if (worker.shopId !== shop.id) {
+          return err({
+            code: 'VALIDATION_ERROR',
+            message: 'Authoritative worker belongs to a different shop.',
+          });
+        }
+
+        const activeWorkers = await this.#readModel.listActiveWorkers(shop.id);
+        const matchingWorkers: Worker[] = [];
+        for (const cachedWorker of activeWorkers) {
+          if (await this.#pinVerifier.verify(pin, cachedWorker.pinHash)) {
+            matchingWorkers.push(cachedWorker);
+          }
+        }
+
+        return ok(await this.#transitionToWorker(shop, worker, matchingWorkers));
+      } catch (cause) {
+        return err(
+          localPersistenceError(
+            'Could not activate the authoritative local operator session.',
+            cause,
+          ),
+        );
       }
     });
   }
@@ -228,6 +180,11 @@ export class OperationsSessionService {
         const shop = await this.#resolveShop();
         if (shop === null) {
           return ok(configurationState('This device is not assigned to exactly one active shop.'));
+        }
+        if (!(await this.#hasActivatedConfiguration(shop.id))) {
+          return ok(
+            configurationState('This device does not have an activated Operations configuration.'),
+          );
         }
         const day = await this.#database.transaction((transaction) =>
           transaction.businessDays.getOpenForShop(shop.id),
@@ -276,11 +233,131 @@ export class OperationsSessionService {
     });
   }
 
+  async #transitionToWorker(
+    shop: Shop,
+    authoritativeWorker: Worker,
+    authoritativePinMatches: readonly Worker[] | null = null,
+  ): Promise<OperationsSessionState> {
+    const initialDay = await this.#database.transaction((transaction) =>
+      transaction.businessDays.getOpenForShop(shop.id),
+    );
+    const existingSession =
+      initialDay?.status === 'OPEN'
+        ? await this.#readModel.getOpenWorkerSession(initialDay.id)
+        : null;
+
+    const now = this.#runtime.now();
+    return this.#database.transaction(async (transaction) => {
+      if (authoritativePinMatches !== null) {
+        for (const matchedWorker of authoritativePinMatches) {
+          if (matchedWorker.id === authoritativeWorker.id) continue;
+          const current = await transaction.workers.getById(matchedWorker.id);
+          if (
+            current !== null &&
+            current.active &&
+            current.shopId === shop.id &&
+            current.pinHash === matchedWorker.pinHash
+          ) {
+            await transaction.workers.put({ ...current, active: false });
+          }
+        }
+        await transaction.workers.put(authoritativeWorker);
+      }
+
+      const worker = await transaction.workers.getById(authoritativeWorker.id);
+      if (worker === null || !worker.active || worker.shopId !== shop.id) {
+        throw new Error('Authenticated worker is no longer active for this shop.');
+      }
+
+      const currentDay = await transaction.businessDays.getOpenForShop(shop.id);
+      const day: OpenBusinessDay =
+        currentDay === null
+          ? createOpenBusinessDay({
+              id: this.#id<BusinessDayId>(),
+              shopId: shop.id,
+              startedAt: now,
+              startedByWorkerId: worker.id,
+            })
+          : currentDay.status === 'OPEN'
+            ? currentDay
+            : (() => {
+                throw new Error('Closed Business Day returned from open-day query.');
+              })();
+
+      if (currentDay === null) {
+        await transaction.businessDays.put(day);
+        await transaction.audit.append(
+          this.#audit(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, worker.id, now, {
+            startedByWorkerId: worker.id,
+          }),
+        );
+        await transaction.outbox.append(
+          this.#outbox(shop.id, 'BUSINESS_DAY_STARTED', day.id, day.id, now, {
+            eventType: 'BUSINESS_DAY_STARTED',
+            version: 1,
+            businessDay: day,
+          }),
+        );
+      }
+
+      const openExistingSession =
+        existingSession !== null &&
+        existingSession.businessDayId === day.id &&
+        existingSession.endedAt === null
+          ? existingSession
+          : null;
+
+      if (openExistingSession?.workerId === worker.id) {
+        return this.#activeState(shop, day, worker);
+      }
+
+      const closedPreviousSession: WorkerSession | null =
+        openExistingSession === null ? null : { ...openExistingSession, endedAt: now };
+      if (closedPreviousSession !== null) {
+        await transaction.workerSessions.put(closedPreviousSession);
+      }
+
+      const newSession: WorkerSession = {
+        id: this.#id<WorkerSessionId>(),
+        shopId: shop.id,
+        businessDayId: day.id,
+        workerId: worker.id,
+        startedAt: now,
+        endedAt: null,
+      };
+      await transaction.workerSessions.put(newSession);
+
+      const switched = openExistingSession !== null && openExistingSession.workerId !== worker.id;
+      const eventType = switched ? 'WORKER_SWITCHED' : 'WORKER_SIGNED_IN';
+      await transaction.audit.append(
+        this.#audit(shop.id, eventType, day.id, newSession.id, worker.id, now, {
+          workerId: worker.id,
+          previousWorkerId: switched ? openExistingSession.workerId : null,
+        }),
+      );
+      await transaction.outbox.append(
+        this.#outbox(shop.id, eventType, day.id, newSession.id, now, {
+          eventType,
+          version: 1,
+          session: newSession,
+          previousSession: closedPreviousSession,
+        }),
+      );
+
+      return this.#activeState(shop, day, worker);
+    });
+  }
+
   async #getStateUnlocked(): Promise<OperationsSessionResult> {
     try {
       const shop = await this.#resolveShop();
       if (shop === null) {
         return ok(configurationState('This device is not assigned to exactly one active shop.'));
+      }
+      if (!(await this.#hasActivatedConfiguration(shop.id))) {
+        return ok(
+          configurationState('This device does not have an activated Operations configuration.'),
+        );
       }
       const day = await this.#database.transaction((transaction) =>
         transaction.businessDays.getOpenForShop(shop.id),
@@ -312,6 +389,13 @@ export class OperationsSessionService {
   async #resolveShop(): Promise<Shop | null> {
     const shops = await this.#readModel.listActiveShops();
     return shops.length === 1 ? (shops[0] ?? null) : null;
+  }
+
+  async #hasActivatedConfiguration(shopId: ShopId): Promise<boolean> {
+    const snapshot = await this.#database.transaction((transaction) =>
+      transaction.configuration.getForShop(shopId),
+    );
+    return snapshot !== null && snapshot.shopId === shopId && snapshot.version > 0;
   }
 
   #activeState(shop: Shop, day: OpenBusinessDay, worker: Worker): OperationsSessionState {

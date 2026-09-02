@@ -1,4 +1,5 @@
 import type {
+  AuthoritativeWorkerAuthenticationResult,
   InboundConfigurationProvider,
   RemoteWorkerMenuLayout,
   RemoteWorkerUiPreferences,
@@ -59,18 +60,27 @@ function parseSession(value: Record<string, unknown>): BrowserRemoteSession {
   };
 }
 
+function parseWorker(value: Record<string, unknown>, label: string): Worker {
+  const workerSource = object(value['worker'], `${label} worker`);
+  if (workerSource['active'] !== true) throw new TypeError(`${label} worker is not active.`);
+  return {
+    id: parseEntityId<WorkerId>(requiredString(workerSource['id'], `${label} worker id`)),
+    shopId: parseEntityId<ShopId>(requiredString(workerSource['shopId'], `${label} worker shopId`)),
+    displayName: requiredString(workerSource['displayName'], `${label} worker name`),
+    pinHash: requiredString(workerSource['pinHash'], `${label} worker PIN hash`),
+    active: true,
+  };
+}
+
 function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult {
   const session = parseSession(value);
   const shopSource = object(value['shop'], 'Bootstrap shop');
-  const workerSource = object(value['worker'], 'Bootstrap worker');
+  const worker = parseWorker(value, 'Bootstrap');
   const shopId = parseEntityId<ShopId>(requiredString(shopSource['id'], 'Bootstrap shop id'));
   if (shopId !== session.shopId || shopSource['active'] !== true) {
     throw new TypeError('Bootstrap shop identity is invalid.');
   }
-  const workerShopId = parseEntityId<ShopId>(
-    requiredString(workerSource['shopId'], 'Bootstrap worker shopId'),
-  );
-  if (workerShopId !== session.shopId || workerSource['active'] !== true) {
+  if (worker.shopId !== session.shopId) {
     throw new TypeError('Bootstrap worker identity is invalid.');
   }
 
@@ -81,13 +91,7 @@ function parseBootstrap(value: Record<string, unknown>): BrowserBootstrapResult 
       name: requiredString(shopSource['name'], 'Bootstrap shop name'),
       active: true,
     },
-    worker: {
-      id: parseEntityId<WorkerId>(requiredString(workerSource['id'], 'Bootstrap worker id')),
-      shopId: workerShopId,
-      displayName: requiredString(workerSource['displayName'], 'Bootstrap worker name'),
-      pinHash: requiredString(workerSource['pinHash'], 'Bootstrap worker PIN hash'),
-      active: true,
-    },
+    worker,
   };
 }
 
@@ -189,6 +193,107 @@ export class VercelBrowserRemoteGateway
       throw new Error('Could not connect this TUX Operations browser.');
     }
     return parseBootstrap(await jsonObject(response, 'Worker sign-in'));
+  }
+
+  async authenticateWorker(pin: string): Promise<AuthoritativeWorkerAuthenticationResult> {
+    const normalizedPin = pin.trim();
+    if (!/^\d{4,12}$/.test(normalizedPin)) {
+      return { status: 'INVALID_REQUEST', message: 'Enter a valid worker PIN.' };
+    }
+    if (isLoopbackHost()) {
+      return {
+        status: 'UNAVAILABLE',
+        message: 'Worker authentication backend is unavailable.',
+      };
+    }
+
+    let response: Response;
+    try {
+      response = await fetch('/api/worker-auth', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ pin: normalizedPin }),
+      });
+    } catch {
+      return {
+        status: 'UNAVAILABLE',
+        message: 'Worker authentication backend is unavailable.',
+      };
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await jsonObject(response, 'Worker authentication');
+    } catch {
+      return {
+        status: 'INVALID_RESPONSE',
+        message: 'Worker authentication returned an invalid response.',
+      };
+    }
+
+    if (response.ok) {
+      try {
+        return { status: 'AUTHENTICATED', worker: parseWorker(body, 'Worker authentication') };
+      } catch {
+        return {
+          status: 'INVALID_RESPONSE',
+          message: 'Worker authentication returned an invalid response.',
+        };
+      }
+    }
+
+    const remoteError = typeof body['error'] === 'string' ? body['error'] : '';
+    if (
+      response.status === 503 &&
+      (remoteError === 'remote_backend_unavailable' || remoteError === 'device_session_unavailable')
+    ) {
+      return {
+        status: 'UNAVAILABLE',
+        message: 'Worker authentication backend is unavailable.',
+      };
+    }
+    if (response.status === 400) {
+      return { status: 'INVALID_REQUEST', message: 'Worker authentication request was rejected.' };
+    }
+    if (response.status === 401 && remoteError === 'invalid_pin') {
+      return { status: 'REJECTED', message: 'Invalid PIN.' };
+    }
+    if (
+      (response.status === 401 &&
+        (remoteError === 'device_session_invalid' ||
+          remoteError === 'device_authentication_required' ||
+          remoteError === 'invalid_access_token')) ||
+      (response.status === 403 && remoteError === 'device_not_authorized')
+    ) {
+      return {
+        status: 'DEVICE_SESSION_INVALID',
+        message: 'This device session is not authorized for worker authentication.',
+      };
+    }
+    if (response.status === 429) {
+      return { status: 'THROTTLED', message: 'Too many PIN attempts. Try again later.' };
+    }
+    if (
+      response.status === 502 &&
+      (remoteError === 'invalid_remote_response' || remoteError === 'device_session_protocol_error')
+    ) {
+      return {
+        status: 'INVALID_RESPONSE',
+        message: 'Worker authentication returned an invalid response.',
+      };
+    }
+    if (response.status >= 500) {
+      return { status: 'SERVER_ERROR', message: 'Worker authentication failed on the server.' };
+    }
+    return {
+      status: 'INVALID_RESPONSE',
+      message: `Worker authentication returned HTTP ${response.status}.`,
+    };
   }
 
   async discoverVersion(shopId: ShopId): Promise<number | null> {

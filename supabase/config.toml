@@ -1,0 +1,23 @@
+# Durable Supabase Edge Function platform-authentication contract.
+# Keep every current function explicit. Application-layer authentication remains
+# enforced inside functions even when the platform JWT check is disabled.
+
+# Custom server authentication: Vercel signs every bootstrap request with the
+# shared TUX_BOOTSTRAP_HMAC_SECRET. No user/device Authorization JWT is sent.
+[functions.device-bootstrap]
+verify_jwt = false
+
+# Public/bootstrap provisioning boundary: possession of a valid one-time device
+# enrollment code is verified by the function. The caller does not have a device JWT yet.
+[functions.device-enroll]
+verify_jwt = false
+
+# Enrolled Operations devices call these functions with their Supabase device session JWT.
+[functions.operations-config]
+verify_jwt = true
+
+[functions.operations-sync]
+verify_jwt = true
+
+[functions.worker-auth]
+verify_jwt = true

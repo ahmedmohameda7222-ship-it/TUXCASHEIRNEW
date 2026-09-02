@@ -68,7 +68,7 @@ Print failure remains a post-commit warning and never rolls back a saved Order.
 
 ## Configuration architecture
 
-Operations stores one complete validated versioned configuration snapshot per shop. `OperationsConfigurationSyncService` provides the future inbound Admin/backend boundary:
+Operations stores one complete validated versioned configuration snapshot per shop. `OperationsConfigurationSyncService` provides the inbound backend boundary:
 
 ```text
 remote version discovery
@@ -82,6 +82,26 @@ remote version discovery
 ```
 
 Invalid, cross-shop or stale bundles cannot damage/downgrade the local snapshot. Initial device provisioning uses the same validation/application path. Historical Orders are never rewritten when configuration changes.
+
+An Operations installation is considered activated only when exactly one active local shop identity and a validated durable configuration snapshot for that shop coexist. A partially persisted bootstrap identity without configuration does not become a trusted worker session after restart. A previously activated installation may continue from its last-known-good configuration when the remote configuration authority is later unavailable.
+
+## Device and worker authentication trust boundary
+
+Worker authentication distinguishes **remote authority**, **device-session authority**, and the explicitly allowed **offline fallback** path.
+
+For an activated installation with network authority available, the server-returned worker identity is authoritative. Successful online authentication persists that worker and transitions the local session by the exact authoritative worker ID; it does not rescan cached PIN hashes to choose an operator. The transaction re-reads that exact worker and validates that it remains active for the same shop before creating or switching Business Day/session/audit/outbox state.
+
+Cached local PIN verification is used only when the remote boundary reports genuine transport unavailability. Device/session rejection, invalid/malformed protocol state, throttling, local credential persistence failure, and other server errors are not offline signals and cannot silently fall through to cached authentication. Browser and Electron adapters map their transport-specific failures into the same application-level semantics.
+
+Browser device-session refresh has typed outcomes: transport failure preserves durable cookies and becomes an unavailable signal; authoritative refresh-token rejection clears the device cookies and becomes device-session invalid; malformed refresh responses are protocol errors. Only an actual worker `invalid_pin` response is treated as worker credential rejection/fencing.
+
+## Worker PIN bootstrap abuse boundary
+
+First-use browser PIN bootstrap is routed through the Vercel server boundary. The brute-force bucket is derived only from deployment-trusted `x-vercel-forwarded-for`; browser-generated device IDs, labels, User-Agent and other caller-controlled headers/body values do not create new buckets. If the trusted source header is absent, requests deliberately collapse into one conservative unresolved bucket instead of accepting a spoofable fallback identity.
+
+The Supabase `device-bootstrap` Edge Function does **not** trust the public/anon API credential or a caller-provided abuse key as proof that a request passed through Vercel. The server signs a canonical bootstrap request with HMAC-SHA256 using the server-only `TUX_BOOTSTRAP_HMAC_SECRET`. The signed material binds timestamp, one-time nonce, normalized abuse key, device identity/label and PIN. The Edge Function verifies signature and bounded timestamp in constant time before any Supabase access, then atomically claims the nonce before touching the PIN rate limiter. Replays are rejected and cannot create a second rate-limit attempt.
+
+`TUX_BOOTSTRAP_HMAC_SECRET` must be configured with the same high-entropy value at the Vercel server and the `device-bootstrap` Edge Function. It is deployment secret material, must contain at least 32 UTF-8 bytes, and must never be exposed to the browser, checked into the repository, or replaced by the Supabase publishable key.
 
 ## Persistence
 
@@ -102,13 +122,15 @@ Remote materialization plans are monotonic:
 - Customer contacts use monotonic `last_order_at` semantics.
 - Worker sessions and Business Days cannot be reopened/regressed by stale lifecycle writes.
 
-The actual remote Supabase receiver/auth layer is deliberately not connected yet.
+Device enrollment, authenticated Operations configuration/worker-auth routes, and the Operations Sync transport scaffolding are present in the repository. Their deployment is outside this repository-only closeout; no production Supabase/Vercel change is performed by the implementation task itself.
 
 ## Postgres/Supabase repository schema
 
-`supabase/migrations/*.sql` defines the normalized remote-compatible schema, tenant integrity, lifecycle/domain parity and sync receipt table. RLS remains enabled/deny-by-default until a later reviewed auth phase. CI applies the full chain from zero against ephemeral PostgreSQL with only a minimal test `auth.users` compatibility stub representing the Supabase-managed auth table.
+`supabase/migrations/*.sql` defines the normalized remote-compatible schema, tenant integrity, lifecycle/domain parity and sync receipt table. Authentication/device migrations also define the Operations device identity, worker PIN rate limiter, and private bootstrap replay nonce store. CI applies the full chain from zero against ephemeral PostgreSQL with only a minimal test `auth.users` compatibility stub representing the Supabase-managed auth table.
 
-No remote Supabase project, credential or migration deployment is part of this state.
+The bootstrap replay table is private and its nonce-claim RPC is executable only by `service_role`; public, anon and authenticated roles cannot claim or inspect replay state. Historical migrations are not rewritten—the provenance guard is append-only.
+
+No remote Supabase migration or Edge Function deployment is performed as part of this repository state.
 
 ## Windows desktop packaging
 

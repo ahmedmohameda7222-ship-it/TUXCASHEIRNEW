@@ -13,6 +13,29 @@ export interface SupabaseDeviceSessionStore {
   save(session: SupabaseDeviceSessionRecord): Promise<void>;
 }
 
+export type SupabaseDeviceSessionResolution =
+  | { readonly status: 'VALID'; readonly session: SupabaseDeviceSessionRecord }
+  | { readonly status: 'TRANSPORT_UNAVAILABLE'; readonly message: string }
+  | { readonly status: 'AUTHORITATIVELY_INVALID'; readonly message: string }
+  | { readonly status: 'PROTOCOL_ERROR'; readonly message: string }
+  | {
+      readonly status: 'LOCAL_PERSISTENCE_ERROR';
+      readonly message: string;
+      readonly cause: unknown;
+    }
+  | { readonly status: 'NOT_ENROLLED'; readonly message: string };
+
+export class SupabaseDeviceSessionError extends Error {
+  constructor(
+    readonly status: Exclude<SupabaseDeviceSessionResolution['status'], 'VALID' | 'NOT_ENROLLED'>,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'SupabaseDeviceSessionError';
+  }
+}
+
 export interface SupabaseDeviceSessionManagerOptions {
   readonly projectUrl: string;
   readonly publishableKey: string;
@@ -120,7 +143,7 @@ export class SupabaseDeviceSessionManager {
   readonly #fetcher: typeof fetch;
   readonly #nowEpochSeconds: () => number;
   readonly #timeoutMs: number;
-  #refreshInFlight: Promise<SupabaseDeviceSessionRecord> | null = null;
+  #refreshInFlight: Promise<SupabaseDeviceSessionResolution> | null = null;
 
   constructor(options: SupabaseDeviceSessionManagerOptions) {
     this.#projectUrl = projectUrl(options.projectUrl);
@@ -162,21 +185,45 @@ export class SupabaseDeviceSessionManager {
     return session;
   }
 
-  async currentSession(): Promise<SupabaseDeviceSessionRecord | null> {
-    const session = await this.#store.load();
-    if (session === null) return null;
-    if (session.expiresAt - this.#nowEpochSeconds() > 120) return session;
+  async resolveSession(): Promise<SupabaseDeviceSessionResolution> {
+    let session: SupabaseDeviceSessionRecord | null;
+    try {
+      session = await this.#store.load();
+    } catch (cause) {
+      return {
+        status: 'LOCAL_PERSISTENCE_ERROR',
+        message: 'The enrolled device session could not be loaded locally.',
+        cause,
+      };
+    }
+    if (session === null) {
+      return { status: 'NOT_ENROLLED', message: 'This TUX Operations device is not enrolled.' };
+    }
+    if (session.expiresAt - this.#nowEpochSeconds() > 120) {
+      return { status: 'VALID', session };
+    }
     return this.#refresh(session);
   }
 
-  async requiredSession(): Promise<SupabaseDeviceSessionRecord> {
-    const session = await this.currentSession();
-    if (session === null) throw new Error('This TUX Operations device is not enrolled.');
-    return session;
+  async currentSession(): Promise<SupabaseDeviceSessionRecord | null> {
+    const resolution = await this.resolveSession();
+    if (resolution.status === 'VALID') return resolution.session;
+    if (resolution.status === 'NOT_ENROLLED') return null;
+    throw new SupabaseDeviceSessionError(resolution.status, resolution.message, {
+      cause: resolution.status === 'LOCAL_PERSISTENCE_ERROR' ? resolution.cause : undefined,
+    });
   }
 
-  async authorizationHeaders(): Promise<Readonly<Record<string, string>>> {
-    const session = await this.requiredSession();
+  async requiredSession(): Promise<SupabaseDeviceSessionRecord> {
+    const resolution = await this.resolveSession();
+    if (resolution.status === 'VALID') return resolution.session;
+    if (resolution.status === 'NOT_ENROLLED') throw new Error(resolution.message);
+    throw new SupabaseDeviceSessionError(resolution.status, resolution.message, {
+      cause: resolution.status === 'LOCAL_PERSISTENCE_ERROR' ? resolution.cause : undefined,
+    });
+  }
+
+  authorizationHeadersFor(session: SupabaseDeviceSessionRecord): Readonly<Record<string, string>> {
     return {
       apikey: this.#publishableKey,
       authorization: `Bearer ${session.accessToken}`,
@@ -184,33 +231,69 @@ export class SupabaseDeviceSessionManager {
     };
   }
 
-  async #refresh(existing: SupabaseDeviceSessionRecord): Promise<SupabaseDeviceSessionRecord> {
+  async authorizationHeaders(): Promise<Readonly<Record<string, string>>> {
+    return this.authorizationHeadersFor(await this.requiredSession());
+  }
+
+  async #refresh(existing: SupabaseDeviceSessionRecord): Promise<SupabaseDeviceSessionResolution> {
     if (this.#refreshInFlight !== null) return this.#refreshInFlight;
     this.#refreshInFlight = (async () => {
-      const response = await fetchWithTimeout(
-        this.#fetcher,
-        `${this.#projectUrl}/auth/v1/token?grant_type=refresh_token`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: this.#publishableKey,
-            'content-type': 'application/json',
+      let response: Response;
+      try {
+        response = await fetchWithTimeout(
+          this.#fetcher,
+          `${this.#projectUrl}/auth/v1/token?grant_type=refresh_token`,
+          {
+            method: 'POST',
+            headers: {
+              apikey: this.#publishableKey,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ refresh_token: existing.refreshToken }),
           },
-          body: JSON.stringify({ refresh_token: existing.refreshToken }),
-        },
-        this.#timeoutMs,
-        'Supabase device session refresh',
-      );
-      if (!response.ok) {
-        throw new Error(`Supabase device session refresh failed with HTTP ${response.status}.`);
+          this.#timeoutMs,
+          'Supabase device session refresh',
+        );
+      } catch {
+        return {
+          status: 'TRANSPORT_UNAVAILABLE',
+          message: 'The device-session authority is temporarily unavailable.',
+        };
       }
-      const refreshed = parseRefreshResponse(
-        await response.json(),
-        existing,
-        this.#nowEpochSeconds,
-      );
-      await this.#store.save(refreshed);
-      return refreshed;
+
+      if (response.status === 400 || response.status === 401 || response.status === 403) {
+        return {
+          status: 'AUTHORITATIVELY_INVALID',
+          message: 'The enrolled device session is no longer valid.',
+        };
+      }
+      if (!response.ok) {
+        return {
+          status: 'PROTOCOL_ERROR',
+          message: `Device-session refresh failed with HTTP ${response.status}.`,
+        };
+      }
+
+      let refreshed: SupabaseDeviceSessionRecord;
+      try {
+        refreshed = parseRefreshResponse(await response.json(), existing, this.#nowEpochSeconds);
+      } catch {
+        return {
+          status: 'PROTOCOL_ERROR',
+          message: 'The device-session authority returned an invalid refresh response.',
+        };
+      }
+
+      try {
+        await this.#store.save(refreshed);
+      } catch (cause) {
+        return {
+          status: 'LOCAL_PERSISTENCE_ERROR',
+          message: 'The refreshed device session could not be persisted locally.',
+          cause,
+        };
+      }
+      return { status: 'VALID', session: refreshed };
     })();
     try {
       return await this.#refreshInFlight;
@@ -264,7 +347,7 @@ export class SupabaseInboundConfigurationProvider {
     const response = await fetchWithTimeout(
       this.#fetcher,
       url,
-      { headers: await this.#session.authorizationHeaders() },
+      { headers: this.#session.authorizationHeadersFor(session) },
       this.#timeoutMs,
       'Remote Operations configuration request',
     );

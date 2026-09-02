@@ -8,10 +8,17 @@ export interface DeviceSessionSummary {
   readonly deviceId: string;
 }
 
-interface DeviceSessionSecrets extends DeviceSessionSummary {
+export interface DeviceSessionSecrets extends DeviceSessionSummary {
   readonly accessToken: string;
   readonly refreshToken: string;
 }
+
+export type DeviceSessionResolution =
+  | { readonly status: 'VALID'; readonly session: DeviceSessionSecrets }
+  | { readonly status: 'NOT_ENROLLED' }
+  | { readonly status: 'TRANSPORT_UNAVAILABLE' }
+  | { readonly status: 'AUTHORITATIVELY_INVALID' }
+  | { readonly status: 'PROTOCOL_ERROR' };
 
 interface SupabaseServerConfig {
   readonly projectUrl: string;
@@ -190,10 +197,10 @@ async function refreshDeviceSession(
   config: SupabaseServerConfig,
   session: DeviceSessionSecrets,
   response: GatewayResponse,
-): Promise<DeviceSessionSecrets> {
-  const refreshResponse = await fetch(
-    `${config.projectUrl}/auth/v1/token?grant_type=refresh_token`,
-    {
+): Promise<DeviceSessionResolution> {
+  let refreshResponse: Response;
+  try {
+    refreshResponse = await fetch(`${config.projectUrl}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: {
         apikey: config.publishableKey,
@@ -201,20 +208,33 @@ async function refreshDeviceSession(
       },
       body: JSON.stringify({ refresh_token: session.refreshToken }),
       signal: AbortSignal.timeout(10_000),
-    },
-  );
-  if (!refreshResponse.ok) throw new Error('device_session_refresh_failed');
+    });
+  } catch {
+    return { status: 'TRANSPORT_UNAVAILABLE' };
+  }
 
-  const parsed: unknown = await refreshResponse.json();
+  if (
+    refreshResponse.status === 400 ||
+    refreshResponse.status === 401 ||
+    refreshResponse.status === 403
+  ) {
+    return { status: 'AUTHORITATIVELY_INVALID' };
+  }
+  if (!refreshResponse.ok) return { status: 'PROTOCOL_ERROR' };
+
+  let parsed: unknown;
+  try {
+    parsed = await refreshResponse.json();
+  } catch {
+    return { status: 'PROTOCOL_ERROR' };
+  }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('device_session_refresh_failed');
+    return { status: 'PROTOCOL_ERROR' };
   }
   const source = parsed as Record<string, unknown>;
   const accessToken = requiredString(source['access_token']);
   const refreshToken = requiredString(source['refresh_token']);
-  if (accessToken === null || refreshToken === null) {
-    throw new Error('device_session_refresh_failed');
-  }
+  if (accessToken === null || refreshToken === null) return { status: 'PROTOCOL_ERROR' };
 
   const rawExpiresAt = source['expires_at'];
   const rawExpiresIn = source['expires_in'];
@@ -224,10 +244,45 @@ async function refreshDeviceSession(
       : typeof rawExpiresIn === 'number' && Number.isSafeInteger(rawExpiresIn) && rawExpiresIn > 0
         ? Math.floor(Date.now() / 1000) + rawExpiresIn
         : jwtExpiry(accessToken);
+  if (expiresAt === null) return { status: 'PROTOCOL_ERROR' };
 
   const refreshed = { ...session, accessToken, refreshToken };
   persistSession(response, refreshed, expiresAt);
-  return refreshed;
+  return { status: 'VALID', session: refreshed };
+}
+
+export async function resolveDeviceSession(
+  request: GatewayRequest,
+  response: GatewayResponse,
+  config: SupabaseServerConfig,
+): Promise<DeviceSessionResolution> {
+  const session = readDeviceSession(request);
+  if (session === null) return { status: 'NOT_ENROLLED' };
+
+  const expiresAt = jwtExpiry(session.accessToken);
+  if (expiresAt === null) return { status: 'PROTOCOL_ERROR' };
+  if (expiresAt - Math.floor(Date.now() / 1000) > 120) return { status: 'VALID', session };
+  return refreshDeviceSession(config, session, response);
+}
+
+export function sendDeviceSessionResolutionError(
+  response: GatewayResponse,
+  resolution: Exclude<DeviceSessionResolution, { readonly status: 'VALID' }>,
+): void {
+  switch (resolution.status) {
+    case 'NOT_ENROLLED':
+      sendJson(response, 401, { error: 'device_authentication_required' });
+      return;
+    case 'TRANSPORT_UNAVAILABLE':
+      sendJson(response, 503, { error: 'device_session_unavailable' });
+      return;
+    case 'AUTHORITATIVELY_INVALID':
+      clearDeviceSession(response);
+      sendJson(response, 401, { error: 'device_session_invalid' });
+      return;
+    case 'PROTOCOL_ERROR':
+      sendJson(response, 502, { error: 'device_session_protocol_error' });
+  }
 }
 
 export async function requireDeviceSession(
@@ -235,22 +290,10 @@ export async function requireDeviceSession(
   response: GatewayResponse,
   config: SupabaseServerConfig,
 ): Promise<DeviceSessionSecrets | null> {
-  const session = readDeviceSession(request);
-  if (session === null) {
-    sendJson(response, 401, { error: 'device_authentication_required' });
-    return null;
-  }
-
-  const expiresAt = jwtExpiry(session.accessToken);
-  if (expiresAt === null || expiresAt - Math.floor(Date.now() / 1000) > 120) return session;
-
-  try {
-    return await refreshDeviceSession(config, session, response);
-  } catch {
-    clearDeviceSession(response);
-    sendJson(response, 401, { error: 'device_session_expired' });
-    return null;
-  }
+  const resolution = await resolveDeviceSession(request, response, config);
+  if (resolution.status === 'VALID') return resolution.session;
+  sendDeviceSessionResolutionError(response, resolution);
+  return null;
 }
 
 export async function readJsonBody(
@@ -426,13 +469,24 @@ export async function proxyAuthenticatedFunction(
   let upstream: Response;
   try {
     upstream = await callSupabaseFunction(config, session, functionName, request, body);
-    if (upstream.status === 401) {
-      session = await refreshDeviceSession(config, session, response);
-      upstream = await callSupabaseFunction(config, session, functionName, request, body);
-    }
   } catch {
     sendJson(response, 503, { error: 'remote_backend_unavailable' });
     return;
+  }
+
+  if (upstream.status === 401) {
+    const refreshed = await refreshDeviceSession(config, session, response);
+    if (refreshed.status !== 'VALID') {
+      sendDeviceSessionResolutionError(response, refreshed);
+      return;
+    }
+    session = refreshed.session;
+    try {
+      upstream = await callSupabaseFunction(config, session, functionName, request, body);
+    } catch {
+      sendJson(response, 503, { error: 'remote_backend_unavailable' });
+      return;
+    }
   }
 
   const payload = await upstream.text();
@@ -454,26 +508,18 @@ export async function getDeviceSession(
   const config = requireServerConfig(response);
   if (config === null) return;
 
-  const session = readDeviceSession(request);
-  if (session === null) {
+  const resolution = await resolveDeviceSession(request, response, config);
+  if (resolution.status === 'NOT_ENROLLED') {
     sendJson(response, 404, { status: 'NOT_ENROLLED' });
     return;
   }
-
-  const expiresAt = jwtExpiry(session.accessToken);
-  let current = session;
-  if (expiresAt !== null && expiresAt - Math.floor(Date.now() / 1000) <= 120) {
-    try {
-      current = await refreshDeviceSession(config, session, response);
-    } catch {
-      clearDeviceSession(response);
-      sendJson(response, 404, { status: 'NOT_ENROLLED' });
-      return;
-    }
+  if (resolution.status !== 'VALID') {
+    sendDeviceSessionResolutionError(response, resolution);
+    return;
   }
   sendJson(response, 200, {
     status: 'ENROLLED',
-    shopId: current.shopId,
-    deviceId: current.deviceId,
+    shopId: resolution.session.shopId,
+    deviceId: resolution.session.deviceId,
   });
 }

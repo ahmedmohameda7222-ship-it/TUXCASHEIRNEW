@@ -2,10 +2,21 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RATE_KEY_PATTERN = /^[0-9a-f]{64}$/i;
+const SIGNATURE_PATTERN = /^[0-9a-f]{64}$/i;
 const HASH_PREFIX = 'pbkdf2-sha256';
 const DERIVED_KEY_BYTES = 32;
 const MAX_ATTEMPTS = 8;
 const WINDOW_SECONDS = 15 * 60;
+const BOOTSTRAP_PROVENANCE_VERSION = 'tux-device-bootstrap:v1';
+const BOOTSTRAP_PROVENANCE_MAX_SKEW_SECONDS = 5 * 60;
+const MIN_BOOTSTRAP_HMAC_SECRET_BYTES = 32;
+
+interface TrustedBootstrapBody {
+  readonly pin: string;
+  readonly deviceId: string;
+  readonly deviceLabel: string;
+  readonly rateLimitKey: string;
+}
 
 function jsonResponse(status: number, body: unknown, retryAfter?: number): Response {
   const headers = new Headers({
@@ -40,6 +51,63 @@ function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
     difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
   }
   return difference === 0;
+}
+
+function canonicalBootstrapRequest(
+  body: TrustedBootstrapBody,
+  timestamp: number,
+  nonce: string,
+): string {
+  return JSON.stringify([
+    BOOTSTRAP_PROVENANCE_VERSION,
+    timestamp,
+    nonce,
+    body.rateLimitKey.toLowerCase(),
+    body.deviceId.toLowerCase(),
+    body.deviceLabel,
+    body.pin,
+  ]);
+}
+
+async function verifiedProvenanceNonce(
+  request: Request,
+  body: TrustedBootstrapBody,
+  secret: string,
+): Promise<string | null> {
+  const rawTimestamp = request.headers.get('x-tux-bootstrap-timestamp')?.trim() ?? '';
+  const rawNonce = request.headers.get('x-tux-bootstrap-nonce')?.trim() ?? '';
+  const rawSignature = request.headers.get('x-tux-bootstrap-signature')?.trim() ?? '';
+  const timestamp = Number(rawTimestamp);
+  if (
+    !Number.isSafeInteger(timestamp) ||
+    timestamp <= 0 ||
+    !UUID_PATTERN.test(rawNonce) ||
+    !SIGNATURE_PATTERN.test(rawSignature)
+  ) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - timestamp) > BOOTSTRAP_PROVENANCE_MAX_SKEW_SECONDS) return null;
+
+  const nonce = rawNonce.toLowerCase();
+  const supplied = hexToBytes(rawSignature);
+  if (supplied === null) return null;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const expected = new Uint8Array(
+    await crypto.subtle.sign(
+      'HMAC',
+      key,
+      new TextEncoder().encode(canonicalBootstrapRequest(body, timestamp, nonce)),
+    ),
+  );
+  return constantTimeEqual(supplied, expected) ? nonce : null;
 }
 
 async function verifyPin(pin: string, storedHash: string): Promise<boolean> {
@@ -110,7 +178,13 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
+  const hmacSecret = Deno.env.get('TUX_BOOTSTRAP_HMAC_SECRET')?.trim() ?? '';
+  if (
+    !supabaseUrl ||
+    !publishableKey ||
+    !serviceRoleKey ||
+    new TextEncoder().encode(hmacSecret).length < MIN_BOOTSTRAP_HMAC_SECRET_BYTES
+  ) {
     return jsonResponse(500, { error: 'bootstrap_not_configured' });
   }
 
@@ -136,13 +210,36 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { error: 'invalid_bootstrap_request' });
   }
 
+  const trustedBody: TrustedBootstrapBody = {
+    pin,
+    deviceId,
+    deviceLabel: requestedLabel,
+    rateLimitKey: rateKey.toLowerCase(),
+  };
+  const provenanceNonce = await verifiedProvenanceNonce(request, trustedBody, hmacSecret);
+  if (provenanceNonce === null) {
+    return jsonResponse(401, { error: 'invalid_bootstrap_provenance' });
+  }
+
   const service = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const { data: nonceClaimed, error: nonceError } = await service.rpc(
+    'claim_tux_bootstrap_request_nonce',
+    { p_nonce: provenanceNonce },
+  );
+  if (nonceError || typeof nonceClaimed !== 'boolean') {
+    console.error('worker PIN bootstrap nonce claim failed', nonceError);
+    return jsonResponse(503, { error: 'bootstrap_nonce_guard_unavailable' });
+  }
+  if (!nonceClaimed) {
+    return jsonResponse(409, { error: 'bootstrap_request_replayed' });
+  }
+
   const { data: attempts, error: rateError } = await service.rpc(
     'claim_tux_worker_pin_bootstrap_attempt',
     {
-      p_rate_key: rateKey.toLowerCase(),
+      p_rate_key: trustedBody.rateLimitKey,
       p_max_attempts: MAX_ATTEMPTS,
       p_window_seconds: WINDOW_SECONDS,
     },
@@ -203,7 +300,7 @@ Deno.serve(async (request) => {
   }
   if (matchedWorker === null) return jsonResponse(401, { error: 'invalid_pin' });
 
-  await clearRateLimit(service, rateKey.toLowerCase());
+  await clearRateLimit(service, trustedBody.rateLimitKey);
 
   const deviceLabel = requestedLabel || 'TUX Operations Web';
   const password = randomSecret(32);

@@ -6,11 +6,13 @@ import {
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  OperationsWorkerAuthenticationService,
   WorkerMenuLayoutRetryController,
   WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type OperationsSessionResult,
+  type WorkerCredentialStore,
   type WorkerMenuLayoutRemoteGateway,
   type WorkerMenuLayoutSyncIdentity,
   type WorkerUiPreferencesRemoteGateway,
@@ -28,6 +30,7 @@ import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
 import {
   buildSyncHealth,
   SupabaseInboundConfigurationProvider,
+  SupabaseWorkerAuthenticator,
   type AutomaticOutboxScheduler,
   type OutboxSyncSummary,
 } from '@tux/sync';
@@ -74,6 +77,7 @@ let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
 let orderDraftStore: SqliteOrderDraftStore | null = null;
 let workerMenuLayoutStore: SqliteWorkerMenuLayoutStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
+let workerAuthenticationService: OperationsWorkerAuthenticationService | null = null;
 let ordersService: OperationsOrdersService | null = null;
 let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
@@ -191,12 +195,49 @@ async function initializeOperationsServices(): Promise<void> {
     configurationSyncTimer = setInterval(() => void synchronizeConfiguration(), 5 * 60 * 1000);
   }
 
+  const pinVerifier = new NodePbkdf2PinVerifier();
   sessionService = new CoordinatedOperationsSessionService(
     operationsDatabase,
     operatorReadModel,
-    new NodePbkdf2PinVerifier(),
+    pinVerifier,
     runtime,
     coordinator,
+  );
+  const workerCredentialStore: WorkerCredentialStore = {
+    put: (worker) =>
+      operationsDatabase!.transaction((transaction) => transaction.workers.put(worker)),
+    fenceMatchingPin: async (pin) => {
+      const state = await sessionService!.getState();
+      if (!state.ok || state.value.status === 'CONFIGURATION_REQUIRED') return;
+      const workers = await operatorReadModel!.listActiveWorkers(state.value.shopId);
+      const matches: Array<(typeof workers)[number]> = [];
+      for (const worker of workers) {
+        if (await pinVerifier.verify(pin, worker.pinHash)) matches.push(worker);
+      }
+      if (matches.length === 0) return;
+      await operationsDatabase!.transaction(async (transaction) => {
+        for (const worker of matches) {
+          await transaction.workers.put({ ...worker, active: false });
+        }
+      });
+    },
+  };
+  const workerAuthenticator =
+    remoteSessionManager !== null && supabaseUrl
+      ? new SupabaseWorkerAuthenticator({
+          projectUrl: supabaseUrl,
+          sessionManager: remoteSessionManager,
+        })
+      : {
+          authenticate: async () => ({
+            status: 'SERVER_ERROR' as const,
+            message: 'Worker authentication backend is not configured.',
+          }),
+        };
+  workerAuthenticationService = new OperationsWorkerAuthenticationService(
+    sessionService,
+    workerAuthenticator,
+    workerCredentialStore,
   );
 
   const preferencesRepository: WorkerUiPreferencesRepository = {
@@ -336,6 +377,13 @@ function currentSessionService(): CoordinatedOperationsSessionService {
   return sessionService;
 }
 
+function currentWorkerAuthenticationService(): OperationsWorkerAuthenticationService {
+  if (workerAuthenticationService === null) {
+    throw new Error('Worker authentication service has not been initialized.');
+  }
+  return workerAuthenticationService;
+}
+
 function currentOrdersService(): OperationsOrdersService {
   if (ordersService === null) {
     throw new Error('Operations Orders service has not been initialized.');
@@ -388,7 +436,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(IPC_SESSION_SUBMIT_PIN, async (event, pin: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     if (typeof pin !== 'string') throw new TypeError('PIN IPC payload must be a string.');
-    const result = await currentSessionService().submitPin(pin);
+    const result = await currentWorkerAuthenticationService().submitPin(pin);
     trackWorkerPersistenceIdentity(result);
     return result;
   });
@@ -562,6 +610,7 @@ app.on('before-quit', () => {
   workerMenuLayoutStore = null;
   operationsDatabase = null;
   sessionService = null;
+  workerAuthenticationService = null;
   ordersService = null;
   ordersBoardService = null;
   syncHasRun = false;

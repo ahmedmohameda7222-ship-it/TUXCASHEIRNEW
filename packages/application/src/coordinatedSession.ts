@@ -1,3 +1,4 @@
+import type { Worker } from '@tux/domain';
 import type { OperationsDatabase, OperatorSessionReadModel } from '@tux/persistence';
 import type { ApplicationCommandCoordinator } from './commandCoordinator';
 import {
@@ -32,6 +33,13 @@ export class CoordinatedOperationsSessionService extends OperationsSessionServic
 
   override async submitPin(pin: string): Promise<OperationsSessionResult> {
     return this.#coordinator.runExclusive(() => super.submitPin(pin));
+  }
+
+  override async submitAuthenticatedWorker(
+    pin: string,
+    worker: Worker,
+  ): Promise<OperationsSessionResult> {
+    return this.#coordinator.runExclusive(() => super.submitAuthenticatedWorker(pin, worker));
   }
 
   override async signOut(): Promise<OperationsSessionResult> {

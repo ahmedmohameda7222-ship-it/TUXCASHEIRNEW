@@ -24,5 +24,10 @@ export {
   type SupabaseDeviceSessionRecord,
   type SupabaseDeviceSessionStore,
 } from './supabaseDeviceSession';
+export {
+  SupabaseWorkerAuthenticator,
+  type SupabaseWorkerAuthenticationResult,
+  type SupabaseWorkerAuthenticatorOptions,
+} from './supabaseWorkerAuthentication';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
 export { buildSyncHealth, type SyncHealthSnapshot, type SyncHealthState } from './syncHealth';

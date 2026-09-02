@@ -1,3 +1,4 @@
+import { pbkdf2Sync } from 'node:crypto';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   SHOP,
@@ -27,6 +28,12 @@ function deferredGate(): DeferredGate {
     release = resolve;
   });
   return { promise, release };
+}
+
+function workerPinHash(pin: string): string {
+  const salt = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+  const digest = pbkdf2Sync(pin, salt, 210_000, 32, 'sha256');
+  return `pbkdf2-sha256$210000$${salt.toString('hex')}$${digest.toString('hex')}`;
 }
 
 function remotePreference(workerId: string, accentColor: string, serverVersion: number) {
@@ -103,6 +110,35 @@ test('delayed remote worker preferences reconcile through the production subscri
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ version: 1, bundle: configuration }),
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/worker-auth' && request.method() === 'POST') {
+      const body = request.postDataJSON() as { pin?: unknown };
+      const pin = typeof body.pin === 'string' ? body.pin : '';
+      const worker =
+        pin === '1234'
+          ? {
+              id: WORKER,
+              shopId: SHOP,
+              displayName: 'Demo Worker One',
+              pinHash: workerPinHash(pin),
+              active: true,
+            }
+          : pin === '5678'
+            ? {
+                id: WORKER_TWO,
+                shopId: SHOP,
+                displayName: 'Demo Worker Two',
+                pinHash: workerPinHash(pin),
+                active: true,
+              }
+            : null;
+      await route.fulfill({
+        status: worker === null ? 401 : 200,
+        contentType: 'application/json',
+        body: JSON.stringify(worker === null ? { error: 'invalid_pin' } : { worker }),
       });
       return;
     }

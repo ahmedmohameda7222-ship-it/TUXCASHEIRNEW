@@ -77,12 +77,15 @@ jobs:
           # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
           # same resolver semantics so remote import-graph failures are caught before deploy.
           deno-version: v1.46.3
+      - name: Supabase function auth deployment contract
+        run: deno test --allow-read scripts/supabaseFunctionAuthConfig.deno.ts
       - name: Edge Function typecheck
         run: |
           deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
           deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
           deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
           deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
+          deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E
@@ -97,6 +100,20 @@ jobs:
             test-results
           if-no-files-found: warn
           retention-days: 14
+
+  edge-security:
+    name: edge-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Device bootstrap provenance behavioral tests
+        run: >-
+          deno test --allow-env --allow-net --allow-run --allow-read
+          supabase/functions/device-bootstrap/security.deno.ts
 
   windows-package:
     name: windows-package
@@ -127,13 +144,16 @@ jobs:
     if: always()
     needs:
       - quality
+      - edge-security
       - windows-package
     runs-on: ubuntu-latest
     steps:
       - name: Require every permanent gate
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
+          test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
