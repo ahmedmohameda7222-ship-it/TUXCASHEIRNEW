@@ -1,7 +1,9 @@
+import { type OperationsSessionState } from '@tux/application';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { App } from './App';
 import { createOperationsSessionClient } from './sessionClient';
 
+type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
 type GateState = 'LOADING' | 'PIN_REQUIRED' | 'READY';
 
 function Brand() {
@@ -13,6 +15,7 @@ export function BrowserBootstrapGate() {
   const [state, setState] = useState<GateState>(
     window.tuxDesktop === undefined ? 'LOADING' : 'READY',
   );
+  const [freshAuthenticatedSession, setFreshAuthenticatedSession] = useState<ActiveSession>();
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,10 +53,13 @@ export function BrowserBootstrapGate() {
       setPin('');
       return;
     }
+    if (result.value.status === 'ACTIVE') {
+      setFreshAuthenticatedSession(result.value);
+    }
     setState('READY');
   }
 
-  if (state === 'READY') return <App />;
+  if (state === 'READY') return <App initialAuthenticatedSession={freshAuthenticatedSession} />;
   if (state === 'LOADING') {
     return <main className="loading-shell" aria-label="Loading TUX Operations" />;
   }
