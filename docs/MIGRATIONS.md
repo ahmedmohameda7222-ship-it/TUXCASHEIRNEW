@@ -37,20 +37,24 @@ The browser physical schema need not mirror normalized PostgreSQL table-for-tabl
 
 ## Repository PostgreSQL/Supabase chain
 
-The repository carries, in filename order:
+The complete PostgreSQL/Supabase migration chain is the ordered set of SQL files currently committed under `supabase/migrations/`. The repository files, in filename order, are the schema source of truth; this document deliberately does not freeze another duplicate numbered list that can become stale as append-only migrations are added.
 
-1. `20260817195000_operations_foundation.sql`
-2. `20260817195500_tenant_integrity.sql`
-3. `20260820023000_operations_sync_domain_parity.sql`
+The current Production reconciliation for every repository migration is recorded in [`docs/deployment/SUPABASE_REMOTE_MIGRATION_LEDGER.md`](deployment/SUPABASE_REMOTE_MIGRATION_LEDGER.md).
 
-The third migration adds parity needed by the local-first sync protocol: Current Operator uniqueness, Expense lifecycle fields, Order operational lifecycle/configuration-version fields, parent-position identities for nested snapshots, order-status revision data, and the durable `operations_sync_event_receipts` idempotency receipt table.
+Repository migration truth and Supabase remote migration-history metadata are distinct records. A migration can have a verified Production schema/data effect even when `supabase_migrations.schema_migrations` has no corresponding row, for example when SQL was applied through an authorized Dashboard workflow. Missing history metadata is therefore a reconciliation signal, not an instruction to replay SQL or manually edit migration history.
+
+Historical migration SQL remains immutable in meaning. Any new schema evolution must be represented by a new append-only migration file.
 
 ## Migration-chain smoke gate
 
 `npm run test:migrations` requires `TUX_TEST_DATABASE_URL` and deliberately refuses non-loopback hosts. It resets only that local test database, creates the minimal `auth.users` compatibility table supplied by Supabase in production, applies every repository migration in filename order with `psql -v ON_ERROR_STOP=1`, then asserts critical tenant FKs, lifecycle constraints, Current Operator uniqueness, sync-receipt presence, and RLS enablement.
 
-GitHub Actions supplies a clean PostgreSQL service for this gate. This proves SQL compile/order/invariant integrity; it does **not** claim to emulate the complete Supabase Auth/runtime platform.
+GitHub Actions supplies a clean PostgreSQL service for this gate. This proves SQL compile/order/invariant integrity; it does **not** claim to emulate the complete Supabase Auth/runtime platform and it does **not** mutate Production.
 
 ## Production deployment boundary
 
-Real V2 Supabase project creation, credentials, RLS policy design for authenticated clients/service roles, backup/restore rehearsal, and production migration application are external deployment work. They remain unconfigured until explicitly authorized.
+A Production Supabase project is deployed and its repository migration effects have been reconciled. The detailed observed remote state, including aligned history entries, the historical timestamp alias, and effect-verified migrations whose history entries are absent, is maintained in the [Production remote migration ledger](deployment/SUPABASE_REMOTE_MIGRATION_LEDGER.md).
+
+Production migration application remains an explicit operator-controlled boundary. Repository commands and CI do not apply, replay, repair, or record migrations against Production. An approved Production migration is applied only through the authorized deployment workflow, its remote effects are independently verified, and the ledger is then updated with the evidence actually observed.
+
+Do not infer that a missing `supabase_migrations.schema_migrations` row means a migration has not taken effect. Do not casually or manually mutate that history table to force metadata alignment. Reconcile repository SQL, remote history metadata, and independently verified Production effects deliberately.
