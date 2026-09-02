@@ -74,3 +74,5 @@ jobs:
 
           test -z "$(git status --short)"
           echo "Historical migration, routing, renderer-secret, and clean-tree checks passed."
+
+# Explicit rerun after guarded Prettier repair.
