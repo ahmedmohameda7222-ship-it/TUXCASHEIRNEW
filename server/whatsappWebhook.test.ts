@@ -1,6 +1,9 @@
 import { createHmac } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
+import { Readable } from 'node:stream';
 import { parseEntityId, type ShopId } from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
+import { readRawBody } from '../api/whatsapp-webhook';
 import { handleWhatsAppWebhook } from './whatsappWebhook';
 
 const appSecret = 'test-app-secret';
@@ -131,6 +134,30 @@ describe('handleWhatsAppWebhook', () => {
     expect(result.status).toBe(401);
     expect(deps.channelResolver.resolveInboundChannel).not.toHaveBeenCalled();
     expect(deps.materializer.materializeInbound).not.toHaveBeenCalled();
+  });
+
+  it('verifies the exact raw POST bytes rather than reconstructed JSON', async () => {
+    const deps = dependencies();
+    const rawBody = Buffer.from(JSON.stringify(textPayload(), null, 2), 'utf8');
+
+    const result = await handleWhatsAppWebhook(
+      {
+        method: 'POST',
+        url: 'https://tux.example/api/whatsapp-webhook',
+        headers: { 'x-hub-signature-256': signatureFor(rawBody) },
+        rawBody,
+      },
+      {
+        appSecret,
+        webhookVerifyToken,
+        channelResolver: deps.channelResolver,
+        materializer: deps.materializer,
+        diagnosticSink: deps.diagnosticSink,
+      },
+    );
+
+    expect(result.status).toBe(200);
+    expect(deps.materializer.materializeInbound).toHaveBeenCalledTimes(1);
   });
 
   it('resolves metadata.phone_number_id before materializing with the resolved shop', async () => {
@@ -268,24 +295,27 @@ describe('handleWhatsAppWebhook', () => {
       'media-audio',
       { mimeType: 'audio/ogg', sha256: 'audio-sha', voice: true },
     ],
-  ])('translates verified %s metadata without downloading media', async (type, providerMedia, kind, mediaRef, mediaMetadata) => {
-    const deps = dependencies();
-    const payload = textPayload();
-    const entry = (payload['entry'] as Array<Record<string, unknown>>)[0]!;
-    const change = (entry['changes'] as Array<Record<string, unknown>>)[0]!;
-    const value = change['value'] as Record<string, unknown>;
-    const message = (value['messages'] as Array<Record<string, unknown>>)[0]!;
-    delete message['text'];
-    message['type'] = type;
-    message[type] = providerMedia;
+  ])(
+    'translates verified %s metadata without downloading media',
+    async (type, providerMedia, kind, mediaRef, mediaMetadata) => {
+      const deps = dependencies();
+      const payload = textPayload();
+      const entry = (payload['entry'] as Array<Record<string, unknown>>)[0]!;
+      const change = (entry['changes'] as Array<Record<string, unknown>>)[0]!;
+      const value = change['value'] as Record<string, unknown>;
+      const message = (value['messages'] as Array<Record<string, unknown>>)[0]!;
+      delete message['text'];
+      message['type'] = type;
+      message[type] = providerMedia;
 
-    const result = await post(payload, deps);
+      const result = await post(payload, deps);
 
-    expect(result.status).toBe(200);
-    expect(deps.materializer.materializeInbound).toHaveBeenCalledWith(
-      expect.objectContaining({ kind, mediaRef, mediaMetadata }),
-    );
-  });
+      expect(result.status).toBe(200);
+      expect(deps.materializer.materializeInbound).toHaveBeenCalledWith(
+        expect.objectContaining({ kind, mediaRef, mediaMetadata }),
+      );
+    },
+  );
 
   it('persists location as contextual metadata rather than delivery-address truth', async () => {
     const deps = dependencies();
@@ -318,5 +348,20 @@ describe('handleWhatsAppWebhook', () => {
         },
       }),
     );
+  });
+});
+
+describe('readRawBody', () => {
+  it('preserves exact bytes up to the 1 MiB Vercel webhook limit', async () => {
+    const bytes = Buffer.from(' { "raw": true }\n', 'utf8');
+    const request = Readable.from([bytes]) as unknown as IncomingMessage;
+
+    await expect(readRawBody(request)).resolves.toEqual(bytes);
+  });
+
+  it('rejects a POST body larger than 1 MiB', async () => {
+    const request = Readable.from([Buffer.alloc(1_048_577)]) as unknown as IncomingMessage;
+
+    await expect(readRawBody(request)).rejects.toThrow('WHATSAPP_WEBHOOK_BODY_TOO_LARGE');
   });
 });
