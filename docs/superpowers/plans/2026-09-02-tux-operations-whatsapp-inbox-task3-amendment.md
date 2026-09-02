@@ -17,7 +17,7 @@
 - Task 1 permanent commit: `4e92f421e8026ebfe7ea74c8d4fe101e0ac312ce`.
 - Task 2 permanent commit: `9733cfd0a2f90030016f201b5b737a6d63b1056c`.
 - Do not modify or redo either commit.
-- The implementer already recorded the valid provider-gateway RED:
+- The implementer already recorded a valid provider-gateway RED on its isolated diagnostic branch:
 
 ```text
 npm test -- server/whatsappProviderGateway.test.ts
@@ -25,12 +25,12 @@ FAIL: Cannot find module './whatsappProviderGateway'
 ERR_MODULE_NOT_FOUND
 ```
 
-That RED remains valid evidence. Do not manufacture a second initial RED for the same missing provider-gateway module.
+That RED remains valid evidence. The diagnostic test used the original Task 3 method name `sendMessage`; this amendment preserves that method name and `createWhatsAppProviderGateway` factory so downstream Task 4 does not inherit a needless interface rename.
 
 ## Global Constraints
 
 - Do not modify `supabase/migrations/20260902220000_whatsapp_inbox.sql`.
-- Add only append-only migration `supabase/migrations/20260902223000_whatsapp_channels.sql`.
+- Add only append-only migration `supabase/migrations/20260902223000_whatsapp_channels.sql` for channel ownership.
 - Inbound tenant authority is `META_CLOUD_API + metadata.phone_number_id -> active whatsapp_channels row -> shop_id`.
 - Customer/sender phone, conversation search, request body, first shop, only shop, or environment-supplied shop ID must never choose a tenant.
 - V1 permits exactly one active WhatsApp channel per shop.
@@ -39,9 +39,9 @@ That RED remains valid evidence. Do not manufacture a second initial RED for the
 - Verified webhook with unknown/inactive `phone_number_id` returns HTTP `200` and performs no tenant mutation.
 - Outbound routing begins from authenticated TUX `shop_id`; renderer/client code never chooses authoritative `shop_id` or `provider_phone_number_id`.
 - `TUX_WHATSAPP_PHONE_NUMBER_ID` is not a production routing input and must not be required by the provider gateway.
-- Provider/Meta secrets remain server-side only.
-- The trusted Supabase service credential is server-side only. Never print it, return it, log it, commit it, or ask the user to paste it into chat.
-- No production migration deployment is part of this task.
+- `TUX_WHATSAPP_SHOP_ID` must not exist as a routing shortcut.
+- Provider/Meta secrets and the trusted Supabase service credential remain server-side only. Never print, return, log, commit, or request their values in chat.
+- No production migration deployment, Meta webhook registration, or Vercel secret configuration is performed during this task.
 - No AI/chatbot/order-text parsing.
 - WhatsApp failure must remain isolated from Orders, Business Day, End Day, printing, Expenses, and Bulk Stock.
 
@@ -64,7 +64,7 @@ public.resolve_tux_whatsapp_outbound_channel_v1(uuid)
 
 ### Step 1: Write the migration contract test first
 
-Create `scripts/test-whatsapp-channel-migration.mjs` with this exact contract shape:
+Create `scripts/test-whatsapp-channel-migration.mjs`:
 
 ```js
 import assert from 'node:assert/strict';
@@ -114,9 +114,7 @@ assert.doesNotMatch(
 );
 ```
 
-### Step 2: Run the new migration RED
-
-Run:
+### Step 2: Run migration RED
 
 ```bash
 node scripts/test-whatsapp-channel-migration.mjs
@@ -128,7 +126,7 @@ Record this RED before creating the migration.
 
 ### Step 3: Create the append-only channel migration
 
-Create `supabase/migrations/20260902223000_whatsapp_channels.sql` using this schema contract:
+Create `supabase/migrations/20260902223000_whatsapp_channels.sql` with:
 
 ```sql
 create table public.whatsapp_channels (
@@ -154,11 +152,10 @@ create unique index whatsapp_channels_one_active_per_shop
   where active = true;
 
 alter table public.whatsapp_channels enable row level security;
-
 revoke all on table public.whatsapp_channels from public, anon, authenticated;
 ```
 
-Add the inbound resolver exactly as a server-only read boundary:
+Add the inbound resolver:
 
 ```sql
 create or replace function public.resolve_tux_whatsapp_inbound_channel_v1(
@@ -186,7 +183,7 @@ grant execute on function public.resolve_tux_whatsapp_inbound_channel_v1(text, t
   to service_role;
 ```
 
-Add the outbound resolver exactly as a shop-authoritative server-only read boundary:
+Add the outbound resolver:
 
 ```sql
 create or replace function public.resolve_tux_whatsapp_outbound_channel_v1(
@@ -216,11 +213,9 @@ grant execute on function public.resolve_tux_whatsapp_outbound_channel_v1(uuid)
   to service_role;
 ```
 
-Do not add a broad `SELECT`, `INSERT`, `UPDATE`, or `DELETE` grant for `anon` or `authenticated`.
+Do not add broad table grants for `anon` or `authenticated`.
 
 ### Step 4: Run migration GREEN
-
-Run:
 
 ```bash
 node scripts/test-whatsapp-channel-migration.mjs
@@ -228,19 +223,17 @@ node scripts/test-whatsapp-channel-migration.mjs
 
 Expected: PASS.
 
-### Step 5: Extend the permanent migration gate
+### Step 5: Extend the migration gate
 
-Modify root `package.json` so `test:migrations` includes the new test after the existing WhatsApp inbox migration test:
+Set root `test:migrations` to:
 
 ```json
 "test:migrations": "node scripts/test-migrations.mjs && node scripts/test-whatsapp-migration.mjs && node scripts/test-whatsapp-channel-migration.mjs && node scripts/test-worker-pin-rate-limit.mjs && node scripts/test-bootstrap-request-provenance.mjs && node scripts/test-worker-menu-layout-migration.mjs"
 ```
 
-Do not remove or reorder existing security/migration tests except for inserting this new contract check after `test-whatsapp-migration.mjs`.
+Do not remove or weaken any existing migration/security test.
 
-### Step 6: Run the repository migration gate
-
-Run:
+### Step 6: Run migration gate
 
 ```bash
 npm run test:migrations
@@ -248,7 +241,7 @@ npm run test:migrations
 
 Expected: PASS.
 
-If the isolated migration database reports a syntax/ownership/role error, fix the new migration only. Do not rewrite historical migrations.
+If the isolated migration database reports a syntax/role problem, fix the new migration only. Never rewrite historical migrations.
 
 ### Step 7: Commit Task 3A
 
@@ -261,11 +254,11 @@ git add \
 git commit -m "feat: add WhatsApp channel tenant resolution"
 ```
 
-Record the commit SHA.
+Record the SHA.
 
 ---
 
-## Amended Task 3B: Add trusted server configuration, channel resolver, and provider gateway
+## Amended Task 3B: Add trusted server config, channel resolver, and provider gateway
 
 **Files:**
 - Create: `server/whatsappServerConfig.ts`
@@ -273,7 +266,7 @@ Record the commit SHA.
 - Create: `server/whatsappChannelResolver.ts`
 - Create: `server/whatsappChannelResolver.test.ts`
 - Create: `server/whatsappProviderGateway.ts`
-- Create: `server/whatsappProviderGateway.test.ts`
+- Continue the already-created diagnostic contract in: `server/whatsappProviderGateway.test.ts`
 
 **Environment names consumed by production server code:**
 
@@ -286,9 +279,10 @@ TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN
 TUX_WHATSAPP_APP_SECRET
 ```
 
-Allowed Supabase fallback name for the service credential:
+Allowed server-only fallback names:
 
 ```text
+SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
@@ -299,35 +293,53 @@ TUX_WHATSAPP_PHONE_NUMBER_ID
 TUX_WHATSAPP_SHOP_ID
 ```
 
-Never ask the user to paste any secret value into chat. Later deployment instructions may name the environment variables and dashboard location only.
+Never ask the user to paste secret values into chat.
 
-### Step 1: Preserve the already-recorded provider RED
+### Step 1: Preserve and update the already-recorded provider RED contract
 
-The existing RED for `server/whatsappProviderGateway.test.ts` is accepted as the initial RED for the provider module. Do not recreate or invalidate it.
-
-Before implementing the provider gateway, add additional test cases to the same test file proving that `providerPhoneNumberId` is a required input and is used in the URL:
+The existing diagnostic test already proved the provider module is missing. Preserve its public method/factory names:
 
 ```ts
-expect(fetchMock).toHaveBeenCalledWith(
-  `https://graph.facebook.com/${graphVersion}/${providerPhoneNumberId}/messages`,
-  expect.objectContaining({
-    method: 'POST',
-    headers: expect.objectContaining({
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }),
-  }),
-);
+createWhatsAppProviderGateway(...)
+gateway.sendMessage(...)
+WhatsAppProviderError
 ```
 
-The test must instantiate the gateway without any `TUX_WHATSAPP_PHONE_NUMBER_ID` dependency.
+Before writing production code, update only the routing shape in that test from constructor-level `phoneNumberId` to per-send `providerPhoneNumberId`:
+
+```ts
+const gateway = createWhatsAppProviderGateway(
+  { graphVersion, accessToken },
+  fetchMock,
+);
+
+await gateway.sendMessage({
+  providerPhoneNumberId: phoneNumberId,
+  to: '01012345678',
+  kind: 'TEXT',
+  text: 'Order ready',
+});
+```
+
+Keep the existing assertion that the provider boundary converts the canonical Egyptian local phone to Meta recipient form `201012345678`.
+
+Keep the existing safe-error assertion for:
+
+```ts
+WhatsAppProviderError
+httpStatus
+providerCode
+safeMessage
+```
+
+The test must contain no dependency on `TUX_WHATSAPP_PHONE_NUMBER_ID`.
 
 ### Step 2: Write server-config RED tests
 
-Create `server/whatsappServerConfig.test.ts` proving:
+Create `server/whatsappServerConfig.test.ts`:
 
 ```ts
-it('loads server-only WhatsApp and Supabase admin configuration without a phone-number routing env', () => {
+it('loads server-only config without a phone-number routing env', () => {
   const config = loadWhatsAppServerConfig({
     TUX_SUPABASE_URL: 'https://example.supabase.co',
     TUX_SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
@@ -367,16 +379,7 @@ Expected: FAIL because `./whatsappServerConfig` does not exist.
 
 ### Step 3: Implement server-only config loading
 
-Create `server/whatsappServerConfig.ts` with a deterministic parser that:
-
-- requires HTTPS `TUX_SUPABASE_URL`/`SUPABASE_URL`;
-- requires `TUX_SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`;
-- requires all four approved Meta configuration values;
-- strips any leading/trailing whitespace;
-- returns no phone-number ID or shop ID routing value;
-- never logs secret values.
-
-Use this public shape:
+Create `server/whatsappServerConfig.ts`:
 
 ```ts
 export interface WhatsAppServerConfig {
@@ -393,11 +396,20 @@ export function loadWhatsAppServerConfig(
 ): WhatsAppServerConfig;
 ```
 
+The implementation must:
+
+- require HTTPS `TUX_SUPABASE_URL` or `SUPABASE_URL`;
+- require `TUX_SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`;
+- require all four Meta values shown above;
+- trim configured values;
+- return no shop ID or provider phone-number routing value;
+- never log secrets.
+
 ### Step 4: Write channel-resolver RED tests
 
-Create `server/whatsappChannelResolver.test.ts` around an injected `fetch` implementation.
+Create `server/whatsappChannelResolver.test.ts` with an injected `fetch`.
 
-Prove the inbound resolver uses only provider identity:
+Inbound known channel:
 
 ```ts
 const resolved = await resolver.resolveInboundChannel({
@@ -422,25 +434,12 @@ expect(resolved).toEqual({
 });
 ```
 
-Prove unknown/inactive channel response resolves to `null` when RPC returns `[]`.
+Also prove:
 
-Prove outbound routing accepts only `shopId`:
-
-```ts
-const resolved = await resolver.resolveOutboundChannel({
-  shopId: shopA,
-});
-
-expect(fetchMock).toHaveBeenCalledWith(
-  'https://example.supabase.co/rest/v1/rpc/resolve_tux_whatsapp_outbound_channel_v1',
-  expect.objectContaining({
-    method: 'POST',
-    body: JSON.stringify({ p_shop_id: shopA }),
-  }),
-);
-```
-
-Prove Shop B's resolver call cannot reuse Shop A's RPC input by asserting the exact serialized `p_shop_id` for each request.
+- successful `[]` inbound result -> `null`;
+- outbound resolver serializes only `p_shop_id`;
+- Shop A and Shop B produce distinct RPC bodies;
+- non-2xx or malformed successful payload throws a safe server error instead of falling back to another tenant.
 
 Run:
 
@@ -452,7 +451,7 @@ Expected: FAIL because `./whatsappChannelResolver` does not exist.
 
 ### Step 5: Implement the server-only channel resolver
 
-Create `server/whatsappChannelResolver.ts` with these interfaces:
+Create `server/whatsappChannelResolver.ts`:
 
 ```ts
 import type { ShopId } from '@tux/domain';
@@ -482,9 +481,9 @@ export interface WhatsAppChannelResolver {
 }
 ```
 
-Implement `SupabaseWhatsAppChannelResolver` using injected `fetch`, `projectUrl`, and `serviceRoleKey`.
+Implement `SupabaseWhatsAppChannelResolver` with injected `fetch`, `projectUrl`, and `serviceRoleKey`.
 
-Every RPC request must use:
+Every trusted RPC request uses:
 
 ```ts
 headers: {
@@ -494,51 +493,72 @@ headers: {
 }
 ```
 
-Do not include the service credential in thrown error messages.
+A successful empty array means `null`. No arbitrary first-shop or first-conversation fallback is permitted. Error text must never contain the service credential.
 
-Treat a successful empty RPC array as `null`. Treat malformed successful payloads or non-2xx responses as typed/server errors rather than selecting a fallback tenant.
+### Step 6: Implement provider gateway against the existing RED
 
-### Step 6: Implement provider gateway from the recorded RED
-
-Create `server/whatsappProviderGateway.ts` with a provider phone number supplied per call:
+Create `server/whatsappProviderGateway.ts` with the already-bound factory/method names:
 
 ```ts
-export interface SendWhatsAppTextInput {
-  readonly providerPhoneNumberId: string;
-  readonly recipient: string;
-  readonly text: string;
+export interface WhatsAppProviderGatewayConfig {
+  readonly graphVersion: string;
+  readonly accessToken: string;
 }
+
+export type SendWhatsAppMessageInput = {
+  readonly providerPhoneNumberId: string;
+  readonly to: string;
+  readonly kind: 'TEXT';
+  readonly text: string;
+};
 
 export interface WhatsAppProviderGateway {
-  sendText(input: SendWhatsAppTextInput): Promise<{ providerMessageId: string }>;
+  sendMessage(
+    input: SendWhatsAppMessageInput,
+  ): Promise<{ providerMessageId: string }>;
+}
+
+export function createWhatsAppProviderGateway(
+  config: WhatsAppProviderGatewayConfig,
+  fetchImpl: typeof fetch = fetch,
+): WhatsAppProviderGateway;
+```
+
+Keep/export the diagnostic-test error contract:
+
+```ts
+export class WhatsAppProviderError extends Error {
+  readonly httpStatus: number;
+  readonly providerCode: number | null;
+  readonly safeMessage: string;
 }
 ```
 
-The Meta URL must be:
+The Meta URL is:
 
 ```ts
-`https://graph.facebook.com/${graphVersion}/${input.providerPhoneNumberId}/messages`
+`https://graph.facebook.com/${config.graphVersion}/${input.providerPhoneNumberId}/messages`
 ```
 
-Text body:
+For `kind: 'TEXT'`, body is:
 
 ```ts
 {
   messaging_product: 'whatsapp',
   recipient_type: 'individual',
-  to: input.recipient,
+  to: providerRecipient,
   type: 'text',
   text: { body: input.text },
 }
 ```
 
-Never read `TUX_WHATSAPP_PHONE_NUMBER_ID` inside the gateway.
+Use the shared Egyptian phone normalization contract at this provider boundary and send the international digits without leading `+` (for example `01012345678 -> 201012345678`). Invalid phone input must fail before the provider call.
 
-Provider error translation may retain safe numeric HTTP/provider error codes but must never include the access token or Authorization header in logs/errors.
+Never read `TUX_WHATSAPP_PHONE_NUMBER_ID` inside this module.
+
+Provider failures may retain safe numeric status/code fields but must never expose the access token, Authorization header, or raw provider diagnostic if it contains secrets.
 
 ### Step 7: Run Task 3B GREEN
-
-Run:
 
 ```bash
 npm test -- \
@@ -549,7 +569,7 @@ npm test -- \
 
 Expected: PASS.
 
-Then run:
+Then:
 
 ```bash
 npm run typecheck
@@ -571,7 +591,7 @@ git add \
 git commit -m "feat: add WhatsApp channel and provider gateways"
 ```
 
-Record the commit SHA.
+Record the SHA.
 
 ---
 
@@ -590,23 +610,23 @@ normalizeEgyptianPhone(raw)
 public.materialize_tux_whatsapp_inbound_v1(...)
 ```
 
-**Interfaces produced:**
+**Interface produced:**
 
 ```ts
 handleWhatsAppWebhook(input, dependencies): Promise<WhatsAppWebhookResult>
 ```
 
-### Step 1: Write webhook RED tests before production webhook code
+### Step 1: Write webhook RED tests
 
-Create `server/whatsappWebhook.test.ts` with dependency injection for:
+Create `server/whatsappWebhook.test.ts` with injected:
 
 - `appSecret`;
 - `webhookVerifyToken`;
 - `channelResolver`;
 - `materializer`;
-- optional diagnostic sink.
+- safe diagnostic sink.
 
-Use exact raw bytes for HMAC tests:
+HMAC helper:
 
 ```ts
 import { createHmac } from 'node:crypto';
@@ -616,17 +636,17 @@ function signatureFor(rawBody: Buffer, appSecret: string): string {
 }
 ```
 
-Test these required cases:
+Required tests:
 
-1. `POST` with missing signature -> `401`; resolver not called; materializer not called.
-2. `POST` with invalid signature -> `401`; resolver not called; materializer not called.
-3. Valid signature + known `metadata.phone_number_id` -> resolver called before materializer; resolved `shopId` is passed to materializer.
-4. Valid signature + unknown/inactive channel -> `200`; materializer not called.
-5. Changing sender/customer phone while preserving the same provider channel cannot change resolver input. Resolver input must remain only `{ provider: 'META_CLOUD_API', providerPhoneNumberId }`.
-6. Duplicate provider message IDs may call the idempotent Task 2 RPC twice at the HTTP boundary, but persistence semantics must return/retain one message; webhook code must not invent a second local idempotency scheme that bypasses Task 2.
-7. Verification `GET` with matching `hub.verify_token` returns the `hub.challenge`; mismatched token returns `403`.
+1. POST missing signature -> `401`, resolver not called, materializer not called.
+2. POST invalid signature -> `401`, resolver not called, materializer not called.
+3. Valid signature + known `metadata.phone_number_id` -> resolver called before materializer and resolved `shopId` passed to materializer.
+4. Valid signature + unknown/inactive channel -> `200`, materializer not called.
+5. Changing sender/customer phone cannot change resolver input; resolver input remains only `{ provider: 'META_CLOUD_API', providerPhoneNumberId }`.
+6. Duplicate provider message delivery reuses Task 2 RPC idempotency; webhook code does not invent a cross-tenant/global message lookup.
+7. Verification GET with matching `hub.verify_token` returns `hub.challenge`; mismatched token returns `403`.
 
-Use a minimal valid text provider fixture:
+Use this minimal valid text fixture:
 
 ```ts
 const payload = {
@@ -671,29 +691,29 @@ Expected: FAIL because `./whatsappWebhook` does not exist.
 
 ### Step 2: Implement constant-time signature verification over raw bytes
 
-In `server/whatsappWebhook.ts`, verify the exact raw POST body before JSON parsing.
+Verify the exact POST bytes before JSON parsing.
 
-Use `createHmac` and `timingSafeEqual`. Do not compare HMAC strings with ordinary `===` after decoding.
+Use `createHmac` and `timingSafeEqual`.
 
 The verifier must:
 
-- require prefix `sha256=`;
-- compute the expected hex HMAC over the raw bytes;
-- reject length mismatch before `timingSafeEqual`;
-- return `false` without throwing secret-bearing diagnostics.
+- require `sha256=` prefix;
+- compute expected HMAC over the raw `Buffer`;
+- reject byte-length mismatch before `timingSafeEqual`;
+- return false without secret-bearing diagnostics.
 
 ### Step 3: Parse only verified provider payloads
 
 After signature success:
 
 - parse JSON;
-- require `metadata.phone_number_id` for a materializable inbound message;
-- derive sender identity from the message `from`/contact `wa_id` only after shop resolution;
-- call the shared `normalizeEgyptianPhone` contract;
-- if the sender phone is invalid, acknowledge safely without creating customer/message state and emit a safe diagnostic;
-- translate Meta text/image/document/audio/location payloads into Task 2 RPC fields without passing raw Meta object shapes into domain/application code.
+- require `metadata.phone_number_id` for materializable inbound messages;
+- resolve the provider channel before customer lookup/normalization-driven matching;
+- normalize sender identity with the shared `normalizeEgyptianPhone` contract after shop resolution;
+- invalid sender phone -> acknowledge safely, no customer/message state, safe diagnostic only;
+- translate Meta text/image/document/audio/location shapes into the existing Task 2 RPC fields.
 
-For text messages use:
+Text translation:
 
 ```ts
 {
@@ -704,13 +724,13 @@ For text messages use:
 }
 ```
 
-For image/document/audio messages, persist the provider media identifier as `mediaRef` and safe metadata only. Do not download media in Task 3.
+Image/document/audio: persist provider media identifier as `mediaRef` plus safe metadata only; do not download media in Task 3.
 
-For location messages persist structured latitude/longitude/name/address fields in `mediaMetadata`; do not treat location text as customer address truth.
+Location: persist structured latitude/longitude/name/address in `mediaMetadata`; never treat it as confirmed delivery-address truth.
 
-### Step 4: Bind tenant resolution before materialization
+### Step 4: Enforce tenant-resolution order
 
-The production order is mandatory:
+Mandatory order:
 
 ```text
 raw body
@@ -719,30 +739,28 @@ raw body
 -> metadata.phone_number_id
 -> channelResolver.resolveInboundChannel(...)
 -> resolved shopId
--> normalize sender/customer phone
+-> normalize sender phone
 -> materialize_tux_whatsapp_inbound_v1(shopId, ...)
 ```
 
-Never reorder customer lookup ahead of channel resolution.
-
-Unknown/inactive channel behavior is exactly:
+Unknown/inactive channel behavior:
 
 ```text
 HTTP 200
-no shop selected
+no tenant selected
 no Task 2 materialization call
-safe server diagnostic only
+safe configuration diagnostic only
 ```
 
-### Step 5: Add trusted inbound materializer adapter
+### Step 5: Add trusted Task 2 materializer adapter
 
-Inside `server/whatsappWebhook.ts` or a focused private helper in the same file, call:
+Call:
 
 ```text
 POST ${projectUrl}/rest/v1/rpc/materialize_tux_whatsapp_inbound_v1
 ```
 
-with server-only service credentials and body keys matching Task 2 exactly:
+using server-only service credentials and exact Task 2 body names:
 
 ```ts
 {
@@ -758,15 +776,15 @@ with server-only service credentials and body keys matching Task 2 exactly:
 }
 ```
 
-Do not grant or expose this RPC to browser/device roles.
+Do not expose this trusted RPC credential to browser/device code.
 
-### Step 6: Add the Vercel webhook route without JSON pre-processing
+### Step 6: Add thin Vercel webhook route with raw-body handling
 
-Create `api/whatsapp-webhook.ts` as a thin Node adapter.
+Create `api/whatsapp-webhook.ts`.
 
-For `POST`, read the incoming request stream into a `Buffer` with a hard maximum of 1 MiB before calling the webhook handler. Do not stringify `request.body` to recreate signature bytes.
+For POST, read the Node `IncomingMessage` stream into a `Buffer` with hard maximum 1 MiB. Never recreate signature bytes with `JSON.stringify(request.body)`.
 
-Use a helper equivalent to:
+Use:
 
 ```ts
 async function readRawBody(request: IncomingMessage): Promise<Buffer> {
@@ -782,13 +800,11 @@ async function readRawBody(request: IncomingMessage): Promise<Buffer> {
 }
 ```
 
-The route loads `WhatsAppServerConfig`, constructs the server-side resolver/provider dependencies, and writes only the result status/body. It must never echo secrets.
+The route loads `WhatsAppServerConfig`, constructs the server-side channel resolver/materializer dependencies, and writes only safe status/body output.
 
-`GET` verification does not require a POST signature; it validates the configured webhook verify token against query parameters.
+GET verification validates the configured verify token and does not require POST HMAC.
 
-### Step 7: Run webhook GREEN
-
-Run:
+### Step 7: Run Task 3C GREEN and related gates
 
 ```bash
 npm test -- server/whatsappWebhook.test.ts
@@ -796,7 +812,7 @@ npm test -- server/whatsappWebhook.test.ts
 
 Expected: PASS.
 
-Then run the complete amended Task 3 focused suite:
+Then:
 
 ```bash
 npm test -- \
@@ -804,19 +820,13 @@ npm test -- \
   server/whatsappChannelResolver.test.ts \
   server/whatsappProviderGateway.test.ts \
   server/whatsappWebhook.test.ts
-```
 
-Expected: PASS.
-
-Then run:
-
-```bash
 npm run typecheck
 npm run lint
 npm run test:migrations
 ```
 
-Expected: PASS for all three.
+Expected: PASS for all.
 
 ### Step 8: Commit Task 3C
 
@@ -829,13 +839,13 @@ git add \
 git commit -m "feat: add tenant-fenced WhatsApp webhook"
 ```
 
-Record the commit SHA.
+Record the SHA.
 
 ---
 
 ## Amended Task 3 Final Verification
 
-After Task 3A, 3B, and 3C are committed, run:
+Run:
 
 ```bash
 npm test -- \
@@ -853,16 +863,16 @@ npm run lint
 
 Expected: PASS.
 
-Also verify:
+Prove Task 2 migration stayed untouched:
 
 ```bash
 git diff 9733cfd0a2f90030016f201b5b737a6d63b1056c..HEAD -- \
   supabase/migrations/20260902220000_whatsapp_inbox.sql
 ```
 
-Expected: no output. Task 2 migration must remain byte-for-byte untouched.
+Expected: no output.
 
-Search production code to prove obsolete routing variables were not introduced:
+Prove obsolete routing shortcuts are absent from production code:
 
 ```bash
 git grep -n "TUX_WHATSAPP_SHOP_ID\|TUX_WHATSAPP_PHONE_NUMBER_ID" -- \
@@ -871,11 +881,11 @@ git grep -n "TUX_WHATSAPP_SHOP_ID\|TUX_WHATSAPP_PHONE_NUMBER_ID" -- \
 
 Expected: no production-code matches.
 
-No production Supabase migration, Meta webhook registration, or Vercel environment change is performed during this task.
+No production Supabase migration, Meta webhook registration, or Vercel environment update is performed during this task.
 
 ## Task 3 Completion Report
 
-Report exactly:
+Report:
 
 ```text
 TASK 3 COMPLETE
@@ -885,8 +895,7 @@ Task 2 base:
 UNCHANGED
 
 Task 3A migration RED:
-<command>
-<expected missing migration failure>
+<command + expected missing migration failure>
 
 Task 3A GREEN:
 <command/result>
@@ -897,6 +906,9 @@ Task 3A commit:
 Provider RED already recorded before amendment:
 npm test -- server/whatsappProviderGateway.test.ts
 FAIL ERR_MODULE_NOT_FOUND
+
+Provider public interface preserved:
+createWhatsAppProviderGateway + sendMessage + WhatsAppProviderError
 
 Task 3B GREEN:
 <commands/results>
@@ -959,11 +971,11 @@ Plan progress:
 Task 3 of 10 complete
 ```
 
-After this report, resume the original WhatsApp Inbox plan at **Task 4** unless a new repository/spec contradiction is discovered. If one is discovered, STOP with evidence instead of guessing.
+After this report, resume the original WhatsApp Inbox plan at **Task 4** unless another repository/spec contradiction appears. If one appears, STOP with evidence instead of guessing.
 
 ## Plan Self-Review Result
 
 - Spec coverage: provider-channel ownership, one-active-channel v1 rule, inbound tenant resolution, outbound symmetry, signature-before-resolution, unknown-channel `200` no-mutation behavior, invalid-signature `401`, Task 2 idempotency reuse, server-only secret boundary, and no production deployment are all assigned to concrete steps.
 - Placeholder scan: no implementation step depends on TBD/TODO behavior.
-- Type consistency: `WhatsAppChannelResolver` produces the exact channel identifiers consumed by webhook/provider routing; Task 2 `materialize_tux_whatsapp_inbound_v1` parameter names are preserved.
-- Scope: this amendment changes Task 3 only. It does not implement Operations UI, Task 4 authenticated worker API, TUX-MENU, Admin, or production onboarding.
+- Type consistency: the already-recorded provider RED's `createWhatsAppProviderGateway`, `sendMessage`, and `WhatsAppProviderError` contract is preserved; `WhatsAppChannelResolver` produces the exact routing identity consumed by provider/webhook paths; Task 2 RPC parameter names are preserved.
+- Scope: this amendment changes Task 3 only. It does not implement Task 4 authenticated worker API, Operations UI, TUX-MENU, Admin, or production onboarding.
