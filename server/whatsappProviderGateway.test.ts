@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  WhatsAppProviderError,
-  createWhatsAppProviderGateway,
-} from './whatsappProviderGateway';
+import { WhatsAppProviderError, createWhatsAppProviderGateway } from './whatsappProviderGateway';
 
 describe('WhatsAppProviderGateway', () => {
   it('builds the Meta text-message request using the resolved provider phone identity', async () => {
@@ -54,16 +51,17 @@ describe('WhatsAppProviderGateway', () => {
 
   it('returns a typed safe provider failure without leaking the access token', async () => {
     const accessToken = 'do-not-leak-this-token';
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          error: {
-            message: `provider diagnostic containing ${accessToken}`,
-            code: 131026,
-          },
-        }),
-        { status: 400, headers: { 'content-type': 'application/json' } },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              message: `provider diagnostic containing ${accessToken}`,
+              code: 131026,
+            },
+          }),
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        ),
     );
     const gateway = createWhatsAppProviderGateway(
       { graphVersion: 'v23.0', accessToken },

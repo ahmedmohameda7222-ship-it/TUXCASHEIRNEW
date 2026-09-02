@@ -4,13 +4,7 @@ import type { Instant } from './time';
 
 export type WhatsAppMessageStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
 export type WhatsAppMessageDirection = 'INBOUND' | 'OUTBOUND';
-export type WhatsAppMessageKind =
-  | 'TEXT'
-  | 'IMAGE'
-  | 'DOCUMENT'
-  | 'AUDIO'
-  | 'LOCATION'
-  | 'SYSTEM';
+export type WhatsAppMessageKind = 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'LOCATION' | 'SYSTEM';
 export type WhatsAppConversationContext = 'DIRECT' | 'WEB_REQUEST' | 'ORDER_LINKED';
 
 export interface WhatsAppConversation {
@@ -45,12 +39,7 @@ export interface WhatsAppMessage {
 }
 
 export type WhatsAppQuickReplyCategory =
-  | 'PREPARATION'
-  | 'DELIVERY'
-  | 'ADDRESS'
-  | 'PAYMENT'
-  | 'DELAY'
-  | 'THANKS';
+  'PREPARATION' | 'DELIVERY' | 'ADDRESS' | 'PAYMENT' | 'DELAY' | 'THANKS';
 
 export interface WhatsAppQuickReply {
   readonly id: string;
@@ -70,7 +59,9 @@ export function assertWhatsAppMessageInvariant(message: WhatsAppMessage): void {
       message.initiatedByDeviceId !== null ||
       message.initiatedAt !== null
     ) {
-      throw new DomainInvariantError('Inbound WhatsApp messages cannot carry outbound attribution.');
+      throw new DomainInvariantError(
+        'Inbound WhatsApp messages cannot carry outbound attribution.',
+      );
     }
     return;
   }

@@ -1,9 +1,4 @@
-import {
-  parseEntityId,
-  type BusinessDayId,
-  type OrderId,
-  type WorkerId,
-} from '@tux/domain';
+import { parseEntityId, type BusinessDayId, type OrderId, type WorkerId } from '@tux/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   VercelBrowserWhatsAppRemote,
@@ -155,9 +150,11 @@ describe('VercelBrowserWhatsAppRemote', () => {
   it('maps Current Operator mismatch to a typed safe error', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        json(409, { error: 'whatsapp_operator_not_synchronized', diagnostic: 'hidden' }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(
+          json(409, { error: 'whatsapp_operator_not_synchronized', diagnostic: 'hidden' }),
+        ),
     );
 
     await expect(

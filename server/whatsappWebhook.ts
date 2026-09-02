@@ -52,7 +52,10 @@ interface MaterializerConfig {
   readonly serviceRoleKey: string;
 }
 
-function jsonResult(status: number, body: Readonly<Record<string, unknown>>): WhatsAppWebhookResult {
+function jsonResult(
+  status: number,
+  body: Readonly<Record<string, unknown>>,
+): WhatsAppWebhookResult {
   return {
     status,
     body: JSON.stringify(body),
@@ -64,10 +67,7 @@ function plainResult(status: number, body: string): WhatsAppWebhookResult {
   return { status, body, contentType: 'text/plain; charset=utf-8' };
 }
 
-function firstHeader(
-  headers: WhatsAppWebhookInput['headers'],
-  name: string,
-): string | null {
+function firstHeader(headers: WhatsAppWebhookInput['headers'], name: string): string | null {
   const target = name.toLowerCase();
   for (const [key, value] of Object.entries(headers)) {
     if (key.toLowerCase() !== target || value === undefined) continue;
@@ -160,7 +160,9 @@ function mediaMetadata(
   return metadata;
 }
 
-function translateProviderMessage(message: Record<string, unknown>): TranslatedProviderMessage | null {
+function translateProviderMessage(
+  message: Record<string, unknown>,
+): TranslatedProviderMessage | null {
   const providerMessageId = nonEmptyString(message['id']);
   const senderPhone = nonEmptyString(message['from']);
   const type = nonEmptyString(message['type']);

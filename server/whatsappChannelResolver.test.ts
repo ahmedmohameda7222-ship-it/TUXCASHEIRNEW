@@ -6,24 +6,22 @@ const projectUrl = 'https://example.supabase.co';
 const serviceRoleKey = 'server-service-role-secret';
 
 function createResolver(fetchMock: typeof fetch) {
-  return new SupabaseWhatsAppChannelResolver(
-    { projectUrl, serviceRoleKey },
-    fetchMock,
-  );
+  return new SupabaseWhatsAppChannelResolver({ projectUrl, serviceRoleKey }, fetchMock);
 }
 
 describe('SupabaseWhatsAppChannelResolver', () => {
   it('resolves a known inbound provider phone identity to exactly one shop', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify([
-          {
-            channel_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-            shop_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          },
-        ]),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify([
+            {
+              channel_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              shop_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
     );
     const resolver = createResolver(fetchMock as unknown as typeof fetch);
 
@@ -49,8 +47,9 @@ describe('SupabaseWhatsAppChannelResolver', () => {
   });
 
   it('returns null for a successful empty inbound resolution', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
     );
     const resolver = createResolver(fetchMock as unknown as typeof fetch);
 
@@ -107,8 +106,9 @@ describe('SupabaseWhatsAppChannelResolver', () => {
   });
 
   it('fails safely on transport/protocol errors without exposing the service credential', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ error: `diagnostic ${serviceRoleKey}` }), { status: 500 }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: `diagnostic ${serviceRoleKey}` }), { status: 500 }),
     );
     const resolver = createResolver(fetchMock as unknown as typeof fetch);
 
@@ -119,11 +119,12 @@ describe('SupabaseWhatsAppChannelResolver', () => {
       }),
     ).rejects.not.toThrow(serviceRoleKey);
 
-    const malformedFetch = vi.fn(async () =>
-      new Response(JSON.stringify([{ channel_id: 'not-a-uuid', shop_id: 'not-a-uuid' }]), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const malformedFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ channel_id: 'not-a-uuid', shop_id: 'not-a-uuid' }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     );
     const malformedResolver = createResolver(malformedFetch as unknown as typeof fetch);
     await expect(

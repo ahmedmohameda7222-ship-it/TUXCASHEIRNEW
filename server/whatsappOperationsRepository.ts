@@ -165,7 +165,10 @@ function parseNullableInstant(value: unknown): ReturnType<typeof instant> | null
   return value === null ? null : parseInstant(value);
 }
 
-function parseMessage(value: unknown): { readonly message: WhatsAppMessage; readonly updatedAt: string } {
+function parseMessage(value: unknown): {
+  readonly message: WhatsAppMessage;
+  readonly updatedAt: string;
+} {
   const source = record(value);
   const message: WhatsAppMessage = {
     id: arbitraryUuid(source['id']),
@@ -191,9 +194,12 @@ function parseMessage(value: unknown): { readonly message: WhatsAppMessage; read
       'READ',
       'FAILED',
     ]),
-    sentByWorkerId: source['sent_by_worker_id'] === null ? null : id<WorkerId>(source['sent_by_worker_id']),
+    sentByWorkerId:
+      source['sent_by_worker_id'] === null ? null : id<WorkerId>(source['sent_by_worker_id']),
     initiatedByDeviceId:
-      source['initiated_by_device_id'] === null ? null : id<DeviceId>(source['initiated_by_device_id']),
+      source['initiated_by_device_id'] === null
+        ? null
+        : id<DeviceId>(source['initiated_by_device_id']),
     initiatedAt: parseNullableInstant(source['initiated_at']),
     createdAt: parseInstant(source['created_at']),
   };

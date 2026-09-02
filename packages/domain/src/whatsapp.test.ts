@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeEgyptianPhone } from './phone';
-import {
-  assertWhatsAppMessageInvariant,
-  type WhatsAppMessage,
-} from './whatsapp';
+import { assertWhatsAppMessageInvariant, type WhatsAppMessage } from './whatsapp';
 
 const validOutbound: WhatsAppMessage = {
   id: 'message-1',
@@ -55,20 +52,17 @@ describe('WhatsApp message invariants', () => {
 });
 
 describe('WhatsApp customer identity uses the shared Egyptian phone contract', () => {
-  it.each([
-    '01012345678',
-    '+201012345678',
-    '00201012345678',
-    '201012345678',
-    '1012345678',
-  ])('maps %s to the same TUX customer key', (raw) => {
-    const result = normalizeEgyptianPhone(raw);
-    expect(result).toEqual({
-      normalizedPhone: '01012345678',
-      displayPhone: '+201012345678',
-      valid: true,
-    });
-  });
+  it.each(['01012345678', '+201012345678', '00201012345678', '201012345678', '1012345678'])(
+    'maps %s to the same TUX customer key',
+    (raw) => {
+      const result = normalizeEgyptianPhone(raw);
+      expect(result).toEqual({
+        normalizedPhone: '01012345678',
+        displayPhone: '+201012345678',
+        valid: true,
+      });
+    },
+  );
 
   it('does not permit an unsupported international number to become a TUX customer key', () => {
     const result = normalizeEgyptianPhone('+491701234567');
