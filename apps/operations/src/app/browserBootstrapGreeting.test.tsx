@@ -39,9 +39,7 @@ afterAll(() => {
 
 describe('fresh browser bootstrap greeting handoff', () => {
   it('renders GreetingScreen when App receives a fresh authenticated ACTIVE transition', () => {
-    const html = renderToStaticMarkup(
-      <App initialAuthenticatedSession={activeSession} />,
-    );
+    const html = renderToStaticMarkup(<App initialAuthenticatedSession={activeSession} />);
 
     expect(html).toContain('greeting-shell');
     expect(html).toContain('Glad you made it in safely.');
