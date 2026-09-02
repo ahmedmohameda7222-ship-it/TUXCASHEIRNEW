@@ -1,4 +1,4 @@
-name: Task 4B WhatsApp Shared Contract GREEN
+name: Task 4B WhatsApp Data Config RED
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - feat/ops-whatsapp-task4b-compile-red
 
 jobs:
-  green:
+  red:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -17,7 +17,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 4B shared contract compile GREEN
-        run: npm run typecheck -w @tux/application
-      - name: Task 4B shared contract runtime GREEN
-        run: npm test -- packages/application/src/whatsappRemote.test.ts
+      - name: Task 4B data-plane config RED
+        run: npm test -- server/whatsappServerConfig.test.ts
