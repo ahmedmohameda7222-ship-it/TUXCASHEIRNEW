@@ -1,6 +1,9 @@
-export interface WhatsAppServerConfig {
+export interface WhatsAppDataServerConfig {
   readonly projectUrl: string;
   readonly serviceRoleKey: string;
+}
+
+export interface WhatsAppServerConfig extends WhatsAppDataServerConfig {
   readonly graphVersion: string;
   readonly accessToken: string;
   readonly webhookVerifyToken: string;
@@ -17,27 +20,16 @@ function firstConfigured(environment: Environment, names: readonly string[]): st
   return null;
 }
 
-export function loadWhatsAppServerConfig(
+export function loadWhatsAppDataServerConfig(
   environment: Environment = process.env,
-): WhatsAppServerConfig {
+): WhatsAppDataServerConfig {
   const rawProjectUrl = firstConfigured(environment, ['TUX_SUPABASE_URL', 'SUPABASE_URL']);
   const serviceRoleKey = firstConfigured(environment, [
     'TUX_SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
   ]);
-  const graphVersion = firstConfigured(environment, ['TUX_WHATSAPP_GRAPH_VERSION']);
-  const accessToken = firstConfigured(environment, ['TUX_WHATSAPP_ACCESS_TOKEN']);
-  const webhookVerifyToken = firstConfigured(environment, ['TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN']);
-  const appSecret = firstConfigured(environment, ['TUX_WHATSAPP_APP_SECRET']);
 
-  if (
-    rawProjectUrl === null ||
-    serviceRoleKey === null ||
-    graphVersion === null ||
-    accessToken === null ||
-    webhookVerifyToken === null ||
-    appSecret === null
-  ) {
+  if (rawProjectUrl === null || serviceRoleKey === null) {
     throw new Error('WhatsApp server configuration is incomplete.');
   }
 
@@ -52,9 +44,29 @@ export function loadWhatsAppServerConfig(
     throw new Error('WhatsApp server configuration is incomplete.');
   }
 
+  return { projectUrl, serviceRoleKey };
+}
+
+export function loadWhatsAppServerConfig(
+  environment: Environment = process.env,
+): WhatsAppServerConfig {
+  const dataConfig = loadWhatsAppDataServerConfig(environment);
+  const graphVersion = firstConfigured(environment, ['TUX_WHATSAPP_GRAPH_VERSION']);
+  const accessToken = firstConfigured(environment, ['TUX_WHATSAPP_ACCESS_TOKEN']);
+  const webhookVerifyToken = firstConfigured(environment, ['TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN']);
+  const appSecret = firstConfigured(environment, ['TUX_WHATSAPP_APP_SECRET']);
+
+  if (
+    graphVersion === null ||
+    accessToken === null ||
+    webhookVerifyToken === null ||
+    appSecret === null
+  ) {
+    throw new Error('WhatsApp server configuration is incomplete.');
+  }
+
   return {
-    projectUrl,
-    serviceRoleKey,
+    ...dataConfig,
     graphVersion,
     accessToken,
     webhookVerifyToken,
