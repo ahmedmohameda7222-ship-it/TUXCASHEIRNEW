@@ -8,10 +8,18 @@ export interface DeviceSessionSummary {
   readonly deviceId: string;
 }
 
-export interface DeviceSessionSecrets extends DeviceSessionSummary {
-  readonly accessToken: string;
+interface RefreshableDeviceSession extends DeviceSessionSummary {
   readonly refreshToken: string;
 }
+
+export interface DeviceSessionSecrets extends RefreshableDeviceSession {
+  readonly accessToken: string;
+}
+
+type StoredDeviceSession =
+  | { readonly status: 'USABLE'; readonly session: DeviceSessionSecrets }
+  | { readonly status: 'REFRESHABLE'; readonly session: RefreshableDeviceSession }
+  | { readonly status: 'NOT_ENROLLED' };
 
 export type DeviceSessionResolution =
   | { readonly status: 'VALID'; readonly session: DeviceSessionSecrets }
@@ -130,23 +138,26 @@ function clearCookie(name: string): string {
   return `${name}=; Path=/api; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
 }
 
-function readDeviceSession(request: GatewayRequest): DeviceSessionSecrets | null {
+function readDeviceSession(request: GatewayRequest): StoredDeviceSession {
   const cookies = parseCookies(request);
   const shopId = requiredString(cookies[COOKIE_SHOP]);
   const deviceId = requiredString(cookies[COOKIE_DEVICE]);
-  const accessToken = requiredString(cookies[COOKIE_ACCESS]);
   const refreshToken = requiredString(cookies[COOKIE_REFRESH]);
   if (
     shopId === null ||
     deviceId === null ||
-    accessToken === null ||
     refreshToken === null ||
     !UUID_PATTERN.test(shopId) ||
     !UUID_PATTERN.test(deviceId)
   ) {
-    return null;
+    return { status: 'NOT_ENROLLED' };
   }
-  return { shopId, deviceId, accessToken, refreshToken };
+
+  const accessToken = requiredString(cookies[COOKIE_ACCESS]);
+  if (accessToken === null) {
+    return { status: 'REFRESHABLE', session: { shopId, deviceId, refreshToken } };
+  }
+  return { status: 'USABLE', session: { shopId, deviceId, accessToken, refreshToken } };
 }
 
 function jwtExpiry(accessToken: string): number | null {
@@ -195,7 +206,7 @@ export function clearDeviceSession(response: GatewayResponse): void {
 
 async function refreshDeviceSession(
   config: SupabaseServerConfig,
-  session: DeviceSessionSecrets,
+  session: RefreshableDeviceSession,
   response: GatewayResponse,
 ): Promise<DeviceSessionResolution> {
   let refreshResponse: Response;
@@ -246,7 +257,12 @@ async function refreshDeviceSession(
         : jwtExpiry(accessToken);
   if (expiresAt === null) return { status: 'PROTOCOL_ERROR' };
 
-  const refreshed = { ...session, accessToken, refreshToken };
+  const refreshed: DeviceSessionSecrets = {
+    shopId: session.shopId,
+    deviceId: session.deviceId,
+    accessToken,
+    refreshToken,
+  };
   persistSession(response, refreshed, expiresAt);
   return { status: 'VALID', session: refreshed };
 }
@@ -256,9 +272,13 @@ export async function resolveDeviceSession(
   response: GatewayResponse,
   config: SupabaseServerConfig,
 ): Promise<DeviceSessionResolution> {
-  const session = readDeviceSession(request);
-  if (session === null) return { status: 'NOT_ENROLLED' };
+  const storedSession = readDeviceSession(request);
+  if (storedSession.status === 'NOT_ENROLLED') return { status: 'NOT_ENROLLED' };
+  if (storedSession.status === 'REFRESHABLE') {
+    return refreshDeviceSession(config, storedSession.session, response);
+  }
 
+  const session = storedSession.session;
   const expiresAt = jwtExpiry(session.accessToken);
   if (expiresAt === null) return { status: 'PROTOCOL_ERROR' };
   if (expiresAt - Math.floor(Date.now() / 1000) > 120) return { status: 'VALID', session };
