@@ -1,4 +1,4 @@
-name: Task 4A WhatsApp Current Worker RED
+name: Task 4A WhatsApp Current Worker GREEN
 
 on:
   push:
@@ -6,9 +6,44 @@ on:
       - feat/ops-whatsapp-task4a-red
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v7
-      - name: Task 4A migration RED
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Task 4A migration GREEN
         run: node scripts/test-whatsapp-current-worker-migration.mjs
+      - name: Full migration gate
+        run: npm run test:migrations
+      - name: Task 2 migration unchanged
+        run: test -z "$(git diff 9733cfd0a2f90030016f201b5b737a6d63b1056c..HEAD -- supabase/migrations/20260902220000_whatsapp_inbox.sql)"
+      - name: Task 3 channel migration unchanged
+        run: |
+          CHANNEL_MIGRATION_COMMIT="$(git log --format=%H --reverse -- supabase/migrations/20260902223000_whatsapp_channels.sql | head -n 1)"
+          test -n "$CHANNEL_MIGRATION_COMMIT"
+          test -z "$(git diff "${CHANNEL_MIGRATION_COMMIT}"..HEAD -- supabase/migrations/20260902223000_whatsapp_channels.sql)"
