@@ -61,7 +61,7 @@ export default async function handler(
     return;
   }
 
-  let rawBody = Buffer.alloc(0);
+  let rawBody: Buffer = Buffer.alloc(0);
   if (request.method === 'POST') {
     try {
       rawBody = await readRawBody(request);
