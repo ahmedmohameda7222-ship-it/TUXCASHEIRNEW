@@ -133,11 +133,11 @@ async function handleGet(
   shopId: ShopId,
   dependencies: WhatsAppOperationsDependencyFactory,
 ): Promise<void> {
-  let after: string | null = null;
+  let after: string | null;
   try {
     const requestUrl = new URL(request.url ?? '/api/whatsapp', 'https://tux.invalid');
-    after = requestUrl.searchParams.get('after');
-    if (after !== null && after.trim().length === 0) after = null;
+    const rawAfter = requestUrl.searchParams.get('after');
+    after = rawAfter !== null && rawAfter.trim().length === 0 ? null : rawAfter;
   } catch {
     invalidRequest(response);
     return;
