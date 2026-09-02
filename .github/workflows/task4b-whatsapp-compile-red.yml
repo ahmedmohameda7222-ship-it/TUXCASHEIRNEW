@@ -1,4 +1,4 @@
-name: Task 4B WhatsApp Gateway RED
+name: Task 4B WhatsApp Gateway GREEN
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - feat/ops-whatsapp-task4b-compile-red
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -17,5 +17,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 4B gateway RED
+      - name: Task 4B gateway GREEN
         run: npm test -- server/whatsappOperationsGateway.test.ts
+      - name: Task 4B gateway typecheck
+        run: npm run typecheck
