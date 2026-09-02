@@ -220,7 +220,7 @@ describe('VercelBrowserWhatsAppRemote', () => {
   });
 
   it('serializes conversation-state mutations with documented fields only', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(json(200, { status: 'OK' }));
+    const fetchMock = vi.fn().mockImplementation(async () => json(200, { status: 'OK' }));
     vi.stubGlobal('fetch', fetchMock);
     const remote = new VercelBrowserWhatsAppRemote();
 
