@@ -6,12 +6,14 @@ import {
 
 describe('WhatsAppProviderGateway', () => {
   it('builds the Meta text-message request using the resolved provider phone identity', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ messages: [{ id: 'wamid.outbound-1' }] }), {
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ messages: [{ id: 'wamid.outbound-1' }] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
-      }),
-    );
+      });
+    });
     const graphVersion = 'v23.0';
     const phoneNumberId = '123456789';
     const accessToken = 'super-secret-token';
@@ -40,8 +42,7 @@ describe('WhatsAppProviderGateway', () => {
       }),
     );
 
-    const [, init] = fetchMock.mock.calls[0] ?? [];
-    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    const body = JSON.parse(String(capturedInit?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
