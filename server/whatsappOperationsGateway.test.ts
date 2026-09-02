@@ -223,7 +223,7 @@ describe('handleWhatsAppOperations', () => {
 
   it('returns operator-not-synchronized when preflight authority is absent without resolving a channel', async () => {
     const deps = createDependencies();
-    deps.repository.resolveCurrentOperator.mockResolvedValueOnce(null);
+    deps.repository.resolveCurrentOperator.mockResolvedValueOnce(null as never);
     const result = await execute(request({ body: sendBody() }), deps.factory);
     expect(result.status()).toBe(409);
     expect(result.json()).toMatchObject({ error: 'whatsapp_operator_not_synchronized' });
@@ -234,7 +234,7 @@ describe('handleWhatsAppOperations', () => {
 
   it('returns channel-not-configured before durable claim or Meta when the authenticated shop has no channel', async () => {
     const deps = createDependencies();
-    deps.channelResolver.resolveOutboundChannel.mockResolvedValueOnce(null);
+    deps.channelResolver.resolveOutboundChannel.mockResolvedValueOnce(null as never);
     const result = await execute(request({ body: sendBody() }), deps.factory);
     expect(result.status()).toBe(503);
     expect(result.json()).toMatchObject({ error: 'whatsapp_channel_not_configured' });
