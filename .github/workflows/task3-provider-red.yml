@@ -1,0 +1,21 @@
+name: Task 3 Provider RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-inbox-ci
+
+jobs:
+  provider-red:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Provider gateway RED
+        run: npm test -- server/whatsappProviderGateway.test.ts
