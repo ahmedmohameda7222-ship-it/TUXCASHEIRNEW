@@ -1,4 +1,4 @@
-name: Task 4C WhatsApp Browser RED
+name: Task 4C WhatsApp Browser GREEN
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - feat/ops-whatsapp-task4c-red
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -17,5 +17,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 4C browser RED
+      - name: Task 4C browser GREEN
         run: npm test -- apps/operations/src/app/browserWhatsAppRemote.test.ts
+      - name: Task 4C operations typecheck
+        run: npm run typecheck -w @tux/operations
