@@ -33,14 +33,20 @@ import {
 import { decideProtectedTransition, type MenuLayoutExitController } from './unsavedChangesGuard';
 import { chooseWelcomeCopy, greetingForLocalHour, type WelcomeCopy } from './welcomeCopy';
 
+type ActiveSession = Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+
 type ScreenState =
   | { readonly kind: 'LOADING' }
   | { readonly kind: 'SESSION'; readonly session: OperationsSessionState }
   | {
       readonly kind: 'GREETING';
-      readonly session: Extract<OperationsSessionState, { status: 'ACTIVE' }>;
+      readonly session: ActiveSession;
       readonly copy: WelcomeCopy;
     };
+
+type AppProps = {
+  readonly initialAuthenticatedSession?: ActiveSession;
+};
 
 type ThemePreference = 'system' | 'light' | 'dark';
 type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES' | 'BULK_STOCK';
@@ -698,15 +704,20 @@ function ActiveShell({
   );
 }
 
-export function App() {
+export function App({ initialAuthenticatedSession }: AppProps = {}) {
   const client = useMemo(() => createOperationsSessionClient(), []);
   const ordersClient = useMemo(() => createOperationsOrdersClient(), []);
   const ordersBoardClient = useMemo(() => createOperationsOrdersBoardClient(), []);
   const expensesClient = useMemo(() => createOperationsExpensesClient(), []);
   const bulkStockClient = useMemo(() => createOperationsBulkStockClient(), []);
   const endDayClient = useMemo(() => createOperationsEndDayClient(), []);
-  const previousWelcomeCopy = useRef<WelcomeCopy | null>(null);
-  const [screen, setScreen] = useState<ScreenState>({ kind: 'LOADING' });
+  const initialGreeting = useMemo(() => {
+    if (initialAuthenticatedSession === undefined) return null;
+    const copy = chooseWelcomeCopy({ previousLine: null, previousButton: null });
+    return { kind: 'GREETING' as const, session: initialAuthenticatedSession, copy };
+  }, [initialAuthenticatedSession]);
+  const previousWelcomeCopy = useRef<WelcomeCopy | null>(initialGreeting?.copy ?? null);
+  const [screen, setScreen] = useState<ScreenState>(() => initialGreeting ?? { kind: 'LOADING' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -717,6 +728,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (initialAuthenticatedSession !== undefined) return;
     let cancelled = false;
     void client.getState().then((result) => {
       if (cancelled) return;
@@ -726,7 +738,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [client]);
+  }, [client, initialAuthenticatedSession]);
 
   async function applyPin(pin: string): Promise<boolean> {
     setBusy(true);
