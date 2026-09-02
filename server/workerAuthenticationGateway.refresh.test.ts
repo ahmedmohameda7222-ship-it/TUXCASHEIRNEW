@@ -5,6 +5,7 @@ import { proxyWorkerAuthentication } from './workerAuthenticationGateway';
 
 const SHOP_ID = '10000000-0000-4000-8000-000000000001';
 const DEVICE_ID = '30000000-0000-4000-8000-000000000001';
+const WORKER_ID = '40000000-0000-4000-8000-000000000001';
 
 function jwt(exp: number): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -17,6 +18,24 @@ function request(accessToken: string): GatewayRequest {
     origin: 'https://tux.test',
     cookie: [
       `tux_ops_access=${encodeURIComponent(accessToken)}`,
+      'tux_ops_refresh=refresh-token',
+      `tux_ops_shop=${SHOP_ID}`,
+      `tux_ops_device=${DEVICE_ID}`,
+    ].join('; '),
+  };
+  return {
+    method: 'POST',
+    url: '/api/worker-auth',
+    headers,
+    body: { pin: '1234' },
+  } as GatewayRequest;
+}
+
+function requestWithoutAccessCookie(): GatewayRequest {
+  const headers: IncomingHttpHeaders = {
+    host: 'tux.test',
+    origin: 'https://tux.test',
+    cookie: [
       'tux_ops_refresh=refresh-token',
       `tux_ops_shop=${SHOP_ID}`,
       `tux_ops_device=${DEVICE_ID}`,
@@ -71,6 +90,57 @@ afterEach(() => {
 });
 
 describe('browser device-session refresh classification', () => {
+  it('refreshes when the access cookie has naturally expired', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const refreshedAccessToken = jwt(now + 3_600);
+    const authenticatedWorker = {
+      id: WORKER_ID,
+      shopId: SHOP_ID,
+      displayName: 'Recovered Worker',
+      pinHash: 'pbkdf2-sha256$100000$00$00',
+      active: true,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json(200, {
+          access_token: refreshedAccessToken,
+          refresh_token: 'rotated-refresh-token',
+          expires_at: now + 3_600,
+        }),
+      )
+      .mockResolvedValueOnce(json(200, { worker: authenticatedWorker }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const captured = responseCapture();
+    await proxyWorkerAuthentication(requestWithoutAccessCookie(), captured.response);
+
+    expect(captured.status()).toBe(200);
+    expect(captured.json()).toEqual({ worker: authenticatedWorker });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const [refreshUrl, refreshInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(refreshUrl).toBe(
+      'https://project.supabase.co/auth/v1/token?grant_type=refresh_token',
+    );
+    expect(JSON.parse(String(refreshInit.body))).toEqual({ refresh_token: 'refresh-token' });
+
+    const setCookie = captured.header('set-cookie');
+    expect(setCookie).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(`tux_ops_access=${encodeURIComponent(refreshedAccessToken)}`),
+        expect.stringContaining('tux_ops_refresh=rotated-refresh-token'),
+      ]),
+    );
+
+    const [workerAuthUrl, workerAuthInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(workerAuthUrl).toBe('https://project.supabase.co/functions/v1/worker-auth');
+    expect(workerAuthInit.headers).toMatchObject({
+      authorization: `Bearer ${refreshedAccessToken}`,
+      'x-tux-device-id': DEVICE_ID,
+    });
+  });
+
   it('returns explicit unavailability without clearing cookies when refresh transport is offline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network unreachable')));
     const captured = responseCapture();
