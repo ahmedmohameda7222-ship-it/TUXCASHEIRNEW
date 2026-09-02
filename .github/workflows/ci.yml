@@ -51,7 +51,7 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
-        run: npm test -- server/workerAuthenticationGateway.refresh.test.ts
+        run: npm run test
       - name: Typecheck
         run: npm run typecheck
       - name: Production builds
