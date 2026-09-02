@@ -1,4 +1,4 @@
-name: Task 3A WhatsApp Channel Migration RED
+name: Task 3A WhatsApp Channel Migration Verification
 
 on:
   push:
@@ -9,12 +9,38 @@ permissions:
   contents: read
 
 jobs:
-  task3a-red:
+  task3a-green:
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: WhatsApp channel migration RED
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: WhatsApp channel migration contract GREEN
         run: node scripts/test-whatsapp-channel-migration.mjs
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Full migration gate
+        run: npm run test:migrations
