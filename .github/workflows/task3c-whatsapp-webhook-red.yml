@@ -1,0 +1,24 @@
+name: Task 3C WhatsApp Webhook RED
+
+on:
+  push:
+    branches:
+      - 'feat/ops-whatsapp-task3c-red'
+
+permissions:
+  contents: read
+
+jobs:
+  webhook-red:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Webhook RED
+        run: npm test -- server/whatsappWebhook.test.ts
