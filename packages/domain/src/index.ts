@@ -122,6 +122,17 @@ export {
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
 export {
+  assertWhatsAppMessageInvariant,
+  type WhatsAppConversation,
+  type WhatsAppConversationContext,
+  type WhatsAppMessage,
+  type WhatsAppMessageDirection,
+  type WhatsAppMessageKind,
+  type WhatsAppMessageStatus,
+  type WhatsAppQuickReply,
+  type WhatsAppQuickReplyCategory,
+} from './whatsapp';
+export {
   flattenWorkerMenuLayoutProductOrder,
   normalizeWorkerMenuLayoutUpdate,
   parseWorkerMenuLayout,
