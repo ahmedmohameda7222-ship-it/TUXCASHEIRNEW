@@ -1,18 +1,26 @@
+import {
+  parseEntityId,
+  type BusinessDayId,
+  type DeviceId,
+  type OrderId,
+  type ShopId,
+  type WorkerId,
+} from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
 import {
   SupabaseWhatsAppOperationsRepository,
   WhatsAppOperationsRepositoryError,
 } from './whatsappOperationsRepository';
 
-const shopId = '00000000-0000-4000-8000-000000000001' as const;
-const businessDayId = '00000000-0000-4000-8000-000000000002' as const;
-const workerId = '00000000-0000-4000-8000-000000000003' as const;
-const deviceId = '00000000-0000-4000-8000-000000000004' as const;
+const shopId = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000001');
+const businessDayId = parseEntityId<BusinessDayId>('00000000-0000-4000-8000-000000000002');
+const workerId = parseEntityId<WorkerId>('00000000-0000-4000-8000-000000000003');
+const deviceId = parseEntityId<DeviceId>('00000000-0000-4000-8000-000000000004');
 const conversationId = '00000000-0000-4000-8000-000000000005';
 const messageId = '00000000-0000-4000-8000-000000000006';
-const orderId = '00000000-0000-4000-8000-000000000007' as const;
+const orderId = parseEntityId<OrderId>('00000000-0000-4000-8000-000000000007');
 const quickReplyId = '00000000-0000-4000-8000-000000000008';
-const secondOrderId = '00000000-0000-4000-8000-000000000009' as const;
+const secondOrderId = parseEntityId<OrderId>('00000000-0000-4000-8000-000000000009');
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
