@@ -1,0 +1,56 @@
+name: Task 4 Format Repair
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task4-final-verify
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format and validate changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format
+
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+
+          git diff --name-only | sort > /tmp/actual-format-files.txt
+          cat > /tmp/expected-format-files.txt <<'EOF'
+          apps/operations/src/app/browserWhatsAppRemote.test.ts
+          apps/operations/src/app/browserWhatsAppRemote.ts
+          packages/domain/src/whatsapp.test.ts
+          packages/domain/src/whatsapp.ts
+          server/whatsappChannelResolver.test.ts
+          server/whatsappChannelResolver.ts
+          server/whatsappOperationsGateway.test.ts
+          server/whatsappOperationsGateway.ts
+          server/whatsappOperationsRepository.test.ts
+          server/whatsappOperationsRepository.ts
+          server/whatsappProviderGateway.test.ts
+          server/whatsappServerConfig.test.ts
+          server/whatsappWebhook.ts
+          EOF
+          diff -u /tmp/expected-format-files.txt /tmp/actual-format-files.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- $(cat /tmp/actual-format-files.txt)
+          git commit -m "style: format WhatsApp implementation"
+          git push origin HEAD:feat/ops-whatsapp-task4-final-verify
