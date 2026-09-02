@@ -77,11 +77,7 @@ function nonNegativeInteger(value: unknown, label: string): number {
   return value;
 }
 
-function enumValue<T extends string>(
-  value: unknown,
-  allowed: readonly T[],
-  label: string,
-): T {
+function enumValue<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
     throw new TypeError(`${label} is invalid.`);
   }
@@ -98,10 +94,7 @@ function parseMessage(value: unknown): WhatsAppMessage {
   const message: WhatsAppMessage = {
     id: requiredString(source['id'], 'WhatsApp message id'),
     shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp message shopId')),
-    conversationId: requiredString(
-      source['conversationId'],
-      'WhatsApp message conversationId',
-    ),
+    conversationId: requiredString(source['conversationId'], 'WhatsApp message conversationId'),
     providerMessageId: nullableString(
       source['providerMessageId'],
       'WhatsApp message providerMessageId',
@@ -137,10 +130,7 @@ function parseMessage(value: unknown): WhatsAppMessage {
       source['initiatedByDeviceId'] === null
         ? null
         : parseEntityId<DeviceId>(
-            requiredString(
-              source['initiatedByDeviceId'],
-              'WhatsApp message initiatedByDeviceId',
-            ),
+            requiredString(source['initiatedByDeviceId'], 'WhatsApp message initiatedByDeviceId'),
           ),
     initiatedAt: nullableInstant(source['initiatedAt'], 'WhatsApp message initiatedAt'),
     createdAt: instant(requiredString(source['createdAt'], 'WhatsApp message createdAt')),
@@ -153,9 +143,7 @@ function parseConversation(value: unknown): WhatsAppConversation {
   const source = object(value, 'WhatsApp conversation');
   return {
     id: requiredString(source['id'], 'WhatsApp conversation id'),
-    shopId: parseEntityId<ShopId>(
-      requiredString(source['shopId'], 'WhatsApp conversation shopId'),
-    ),
+    shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp conversation shopId')),
     normalizedPhone: requiredString(
       source['normalizedPhone'],
       'WhatsApp conversation normalizedPhone',
@@ -176,10 +164,7 @@ function parseConversation(value: unknown): WhatsAppConversation {
     unreadCount: nonNegativeInteger(source['unreadCount'], 'WhatsApp conversation unreadCount'),
     archived: requiredBoolean(source['archived'], 'WhatsApp conversation archived'),
     followUp: requiredBoolean(source['followUp'], 'WhatsApp conversation followUp'),
-    lastMessageAt: nullableInstant(
-      source['lastMessageAt'],
-      'WhatsApp conversation lastMessageAt',
-    ),
+    lastMessageAt: nullableInstant(source['lastMessageAt'], 'WhatsApp conversation lastMessageAt'),
   };
 }
 
@@ -193,7 +178,11 @@ function parseQuickReply(value: unknown): WhatsAppQuickReply {
       ['PREPARATION', 'DELIVERY', 'ADDRESS', 'PAYMENT', 'DELAY', 'THANKS'],
       'WhatsApp quick reply category',
     ),
-    language: enumValue(source['language'], ['ar-EG', 'en'] as const, 'WhatsApp quick reply language'),
+    language: enumValue(
+      source['language'],
+      ['ar-EG', 'en'] as const,
+      'WhatsApp quick reply language',
+    ),
     text: requiredString(source['text'], 'WhatsApp quick reply text'),
     usageCount: nonNegativeInteger(source['usageCount'], 'WhatsApp quick reply usageCount'),
     active: requiredBoolean(source['active'], 'WhatsApp quick reply active'),
@@ -204,7 +193,9 @@ function parseOrderLink(value: unknown): WhatsAppInboxOrderLink {
   const source = object(value, 'WhatsApp order link');
   return {
     conversationId: requiredString(source['conversationId'], 'WhatsApp order link conversationId'),
-    orderId: parseEntityId<OrderId>(requiredString(source['orderId'], 'WhatsApp order link orderId')),
+    orderId: parseEntityId<OrderId>(
+      requiredString(source['orderId'], 'WhatsApp order link orderId'),
+    ),
     linkedAt: instant(requiredString(source['linkedAt'], 'WhatsApp order link linkedAt')),
   };
 }
@@ -289,7 +280,9 @@ export class VercelBrowserWhatsAppRemote implements WhatsAppRemoteGateway {
     return parseSnapshot(await requestJson('GET', url));
   }
 
-  async sendText(input: Parameters<WhatsAppRemoteGateway['sendText']>[0]): Promise<WhatsAppMessage> {
+  async sendText(
+    input: Parameters<WhatsAppRemoteGateway['sendText']>[0],
+  ): Promise<WhatsAppMessage> {
     const payload = await requestJson('POST', '/api/whatsapp', {
       action: 'SEND_MESSAGE',
       businessDayId: input.businessDayId,

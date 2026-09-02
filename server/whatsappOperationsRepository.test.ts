@@ -78,7 +78,9 @@ function repository(fetchMock: ReturnType<typeof vi.fn>) {
 
 describe('SupabaseWhatsAppOperationsRepository', () => {
   it('calls the Current Operator resolver with tenant-fenced claims and parses one row', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse([{ business_day_id: businessDayId, worker_id: workerId }]));
+    const fetchMock = vi.fn(async () =>
+      jsonResponse([{ business_day_id: businessDayId, worker_id: workerId }]),
+    );
     const result = await repository(fetchMock).resolveCurrentOperator({
       shopId,
       businessDayId,
@@ -354,7 +356,10 @@ describe('SupabaseWhatsAppOperationsRepository', () => {
 
   it('maps only approved Postgres authority exceptions and never leaks remote bodies', async () => {
     const operatorFetch = vi.fn(async () =>
-      jsonResponse({ message: 'TUX_WHATSAPP_OPERATOR_NOT_SYNCHRONIZED', secret: 'do-not-leak' }, 400),
+      jsonResponse(
+        { message: 'TUX_WHATSAPP_OPERATOR_NOT_SYNCHRONIZED', secret: 'do-not-leak' },
+        400,
+      ),
     );
     await expect(
       repository(operatorFetch).claimOutboundTextIntent({
@@ -385,7 +390,9 @@ describe('SupabaseWhatsAppOperationsRepository', () => {
       }),
     ).rejects.toMatchObject({ code: 'OUTBOUND_INTENT_CONFLICT' });
 
-    const remoteFetch = vi.fn(async () => jsonResponse({ message: 'db detail', secret: 'do-not-leak' }, 500));
+    const remoteFetch = vi.fn(async () =>
+      jsonResponse({ message: 'db detail', secret: 'do-not-leak' }, 500),
+    );
     let caught: unknown;
     try {
       await repository(remoteFetch).resolveCurrentOperator({ shopId, businessDayId, workerId });

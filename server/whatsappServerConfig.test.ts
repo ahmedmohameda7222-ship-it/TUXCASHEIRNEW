@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  loadWhatsAppDataServerConfig,
-  loadWhatsAppServerConfig,
-} from './whatsappServerConfig';
+import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig';
 
 describe('loadWhatsAppServerConfig', () => {
   it('loads server-only config without a phone-number routing env', () => {

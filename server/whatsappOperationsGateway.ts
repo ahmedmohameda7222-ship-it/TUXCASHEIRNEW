@@ -30,10 +30,7 @@ import {
   WhatsAppProviderError,
   type WhatsAppProviderGateway,
 } from './whatsappProviderGateway';
-import {
-  loadWhatsAppDataServerConfig,
-  loadWhatsAppServerConfig,
-} from './whatsappServerConfig';
+import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig';
 
 export interface WhatsAppOperationsDependencyFactory {
   createRepository(): WhatsAppOperationsRepository;
@@ -370,14 +367,7 @@ async function handleLinkOrder(
   dependencies: WhatsAppOperationsDependencyFactory,
 ): Promise<void> {
   if (
-    !onlyKeys(body, [
-      'action',
-      'businessDayId',
-      'workerId',
-      'conversationId',
-      'orderId',
-      'linked',
-    ])
+    !onlyKeys(body, ['action', 'businessDayId', 'workerId', 'conversationId', 'orderId', 'linked'])
   ) {
     invalidRequest(response);
     return;

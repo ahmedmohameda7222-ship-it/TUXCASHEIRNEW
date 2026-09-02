@@ -41,13 +41,15 @@ function validCookie(): string {
   ].join('; ');
 }
 
-function request(input: {
-  method?: string;
-  body?: Readonly<Record<string, unknown>>;
-  url?: string;
-  origin?: string | null;
-  cookie?: string | null;
-} = {}): GatewayRequest {
+function request(
+  input: {
+    method?: string;
+    body?: Readonly<Record<string, unknown>>;
+    url?: string;
+    origin?: string | null;
+    cookie?: string | null;
+  } = {},
+): GatewayRequest {
   const headers: Record<string, string> = { host: 'ops.example' };
   const origin = input.origin === undefined ? 'https://ops.example' : input.origin;
   const cookie = input.cookie === undefined ? validCookie() : input.cookie;
@@ -192,7 +194,10 @@ describe('handleWhatsAppOperations', () => {
 
   it('rejects a disallowed POST Origin before any WhatsApp mutation', async () => {
     const deps = createDependencies();
-    const result = await execute(request({ body: sendBody(), origin: 'https://evil.example' }), deps.factory);
+    const result = await execute(
+      request({ body: sendBody(), origin: 'https://evil.example' }),
+      deps.factory,
+    );
     expect(result.status()).toBe(403);
     expect(result.json()).toMatchObject({ error: 'origin_not_allowed' });
     expect(deps.factory.createRepository).not.toHaveBeenCalled();
@@ -202,7 +207,10 @@ describe('handleWhatsAppOperations', () => {
     'rejects renderer authority field %s',
     async (field) => {
       const deps = createDependencies();
-      const result = await execute(request({ body: sendBody({ [field]: 'forbidden' }) }), deps.factory);
+      const result = await execute(
+        request({ body: sendBody({ [field]: 'forbidden' }) }),
+        deps.factory,
+      );
       expect(result.status()).toBe(400);
       expect(result.json()).toMatchObject({ error: 'invalid_whatsapp_request' });
       expect(deps.repository.resolveCurrentOperator).not.toHaveBeenCalled();
@@ -407,7 +415,11 @@ describe('handleWhatsAppOperations', () => {
   it('GET inbox constructs only data-plane repository dependencies and never the provider gateway', async () => {
     const deps = createDependencies();
     const result = await execute(
-      request({ method: 'GET', url: '/api/whatsapp?after=2026-09-02T20%3A00%3A00.000Z', origin: null }),
+      request({
+        method: 'GET',
+        url: '/api/whatsapp?after=2026-09-02T20%3A00%3A00.000Z',
+        origin: null,
+      }),
       deps.factory,
     );
     expect(result.status()).toBe(200);

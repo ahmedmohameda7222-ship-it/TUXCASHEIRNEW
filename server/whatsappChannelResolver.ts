@@ -38,7 +38,12 @@ function oneRow(value: unknown): Record<string, unknown> | null {
     throw new Error('WhatsApp channel resolver returned an invalid response.');
   }
   if (value.length === 0) return null;
-  if (value.length !== 1 || typeof value[0] !== 'object' || value[0] === null || Array.isArray(value[0])) {
+  if (
+    value.length !== 1 ||
+    typeof value[0] !== 'object' ||
+    value[0] === null ||
+    Array.isArray(value[0])
+  ) {
     throw new Error('WhatsApp channel resolver returned an invalid response.');
   }
   return value[0] as Record<string, unknown>;
@@ -117,11 +122,7 @@ export class SupabaseWhatsAppChannelResolver implements WhatsAppChannelResolver 
     const channelId = nonEmptyString(row['channel_id']);
     const provider = nonEmptyString(row['provider']);
     const providerPhoneNumberId = nonEmptyString(row['provider_phone_number_id']);
-    if (
-      channelId === null ||
-      provider !== 'META_CLOUD_API' ||
-      providerPhoneNumberId === null
-    ) {
+    if (channelId === null || provider !== 'META_CLOUD_API' || providerPhoneNumberId === null) {
       throw new Error('WhatsApp channel resolver returned an invalid response.');
     }
 
