@@ -1,0 +1,52 @@
+name: Task 3B WhatsApp Server RED
+
+on:
+  push:
+    branches:
+      - 'feat/ops-whatsapp-task3b-red'
+
+permissions:
+  contents: read
+
+jobs:
+  server-config-red:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Server config RED
+        run: npm test -- server/whatsappServerConfig.test.ts
+
+  channel-resolver-red:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Channel resolver RED
+        run: npm test -- server/whatsappChannelResolver.test.ts
+
+  provider-red:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Updated provider routing RED
+        run: npm test -- server/whatsappProviderGateway.test.ts
