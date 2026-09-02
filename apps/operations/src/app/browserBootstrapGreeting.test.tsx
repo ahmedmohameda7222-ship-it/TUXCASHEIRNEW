@@ -46,24 +46,16 @@ describe('fresh browser bootstrap greeting handoff', () => {
     expect(html).not.toContain('aria-label="Operations"');
   });
 
-  it(
-    'requires BrowserBootstrapGate to preserve the ACTIVE authentication transition for App',
-    () => {
-      expect(gateSource).toContain('setFreshAuthenticatedSession(result.value)');
-      expect(gateSource).toContain(
-        '<App initialAuthenticatedSession={freshAuthenticatedSession} />',
-      );
-    },
-  );
+  it('requires BrowserBootstrapGate to preserve the ACTIVE authentication transition for App', () => {
+    expect(gateSource).toContain('setFreshAuthenticatedSession(result.value)');
+    expect(gateSource).toContain('<App initialAuthenticatedSession={freshAuthenticatedSession} />');
+  });
 
-  it(
-    'keeps recovered ACTIVE state direct while normal PIN and worker-switch transitions keep Greeting',
-    () => {
-      expect(appSource).toContain(
-        "if (result.ok) setScreen({ kind: 'SESSION', session: result.value });",
-      );
-      expect(appSource).toContain("setScreen({ kind: 'GREETING', session: active, copy });");
-      expect(appSource).toContain('onSwitch={applyPin}');
-    },
-  );
+  it('keeps recovered ACTIVE state direct while normal PIN and worker-switch transitions keep Greeting', () => {
+    expect(appSource).toContain(
+      "if (result.ok) setScreen({ kind: 'SESSION', session: result.value });",
+    );
+    expect(appSource).toContain("setScreen({ kind: 'GREETING', session: active, copy });");
+    expect(appSource).toContain('onSwitch={applyPin}');
+  });
 });
