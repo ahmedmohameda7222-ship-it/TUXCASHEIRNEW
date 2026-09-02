@@ -59,7 +59,13 @@ export function BrowserBootstrapGate() {
     setState('READY');
   }
 
-  if (state === 'READY') return <App initialAuthenticatedSession={freshAuthenticatedSession} />;
+  if (state === 'READY') {
+    return freshAuthenticatedSession === undefined ? (
+      <App />
+    ) : (
+      <App initialAuthenticatedSession={freshAuthenticatedSession} />
+    );
+  }
   if (state === 'LOADING') {
     return <main className="loading-shell" aria-label="Loading TUX Operations" />;
   }
