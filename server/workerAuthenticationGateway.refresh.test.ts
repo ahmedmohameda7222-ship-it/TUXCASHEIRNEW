@@ -120,9 +120,7 @@ describe('browser device-session refresh classification', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const [refreshUrl, refreshInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(refreshUrl).toBe(
-      'https://project.supabase.co/auth/v1/token?grant_type=refresh_token',
-    );
+    expect(refreshUrl).toBe('https://project.supabase.co/auth/v1/token?grant_type=refresh_token');
     expect(JSON.parse(String(refreshInit.body))).toEqual({ refresh_token: 'refresh-token' });
 
     const setCookie = captured.header('set-cookie');
