@@ -1,0 +1,76 @@
+name: Task 4 Final Verification V2
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task4-final-verify-v2
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/tux_test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tux_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tux_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Final focused Task 4 tests
+        run: |
+          npm test -- \
+            packages/application/src/whatsappRemote.test.ts \
+            server/whatsappServerConfig.test.ts \
+            server/whatsappChannelResolver.test.ts \
+            server/whatsappProviderGateway.test.ts \
+            server/whatsappOperationsRepository.test.ts \
+            server/whatsappOperationsGateway.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts
+      - name: Final migration gate
+        run: npm run test:migrations
+      - name: Final typecheck
+        run: npm run typecheck
+      - name: Final lint
+        run: npm run lint
+      - name: Final format check
+        run: npm run format:check
+      - name: Historical migration and routing integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -z "$(git diff 9733cfd0a2f90030016f201b5b737a6d63b1056c..HEAD -- supabase/migrations/20260902220000_whatsapp_inbox.sql)"
+
+          CHANNEL_MIGRATION_COMMIT="$(git log --format=%H --reverse -- supabase/migrations/20260902223000_whatsapp_channels.sql | head -n 1)"
+          test -n "${CHANNEL_MIGRATION_COMMIT}"
+          test -z "$(git diff "${CHANNEL_MIGRATION_COMMIT}"..HEAD -- supabase/migrations/20260902223000_whatsapp_channels.sql)"
+
+          if git grep -n "TUX_WHATSAPP_SHOP_ID\|TUX_WHATSAPP_WORKER_ID\|TUX_WHATSAPP_PHONE_NUMBER_ID" -- server api packages apps; then
+            echo "Forbidden WhatsApp routing shortcut found." >&2
+            exit 1
+          fi
+
+          if git grep -n "TUX_SUPABASE_SERVICE_ROLE_KEY\|SUPABASE_SERVICE_ROLE_KEY" -- apps/operations packages/platform-contracts; then
+            echo "Service-role environment variable found in renderer/platform code." >&2
+            exit 1
+          fi
+
+          test -z "$(git status --short)"
+          echo "Historical migration, routing, renderer-secret, and clean-tree checks passed."
