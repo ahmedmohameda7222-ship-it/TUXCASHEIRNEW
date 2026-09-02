@@ -1,4 +1,4 @@
-name: Task 4B WhatsApp Gateway GREEN
+name: Task 4B WhatsApp Combined GREEN
 
 on:
   push:
@@ -17,7 +17,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 4B gateway GREEN
-        run: npm test -- server/whatsappOperationsGateway.test.ts
-      - name: Task 4B gateway typecheck
+      - name: Task 4B focused GREEN
+        run: |
+          npm test -- \
+            packages/application/src/whatsappRemote.test.ts \
+            server/whatsappServerConfig.test.ts \
+            server/whatsappOperationsRepository.test.ts \
+            server/whatsappOperationsGateway.test.ts
+      - name: Task 4B typecheck
         run: npm run typecheck
+      - name: Task 4B lint
+        run: npm run lint
