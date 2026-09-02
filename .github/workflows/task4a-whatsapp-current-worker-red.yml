@@ -1,0 +1,14 @@
+name: Task 4A WhatsApp Current Worker RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task4a-red
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Task 4A migration RED
+        run: node scripts/test-whatsapp-current-worker-migration.mjs
