@@ -20,11 +20,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Add SQLite migration v10 and export
+      - name: Prepare SQLite migration/export and Instant typing
         shell: bash
         run: |
           python - <<'PY'
           import base64
+          import re
           from pathlib import Path
           migrations = Path('packages/persistence/src/sqlite/migrations.ts')
           text = migrations.read_text()
@@ -39,12 +40,37 @@ jobs:
           export_line = "export { SqliteWhatsAppStore } from './SqliteWhatsAppStore';\n"
           if export_line not in index_text:
               index.write_text(index_text + export_line)
+
+          test = Path('packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts')
+          test_text = test.read_text()
+          if '  instant,\n  parseEntityId,' not in test_text:
+              test_text = test_text.replace('  parseEntityId,\n', '  instant,\n  parseEntityId,\n', 1)
+          test_text = test_text.replace(
+              '    lastMessageAt,\n  };',
+              '    lastMessageAt: lastMessageAt === null ? null : instant(lastMessageAt),\n  };',
+              1,
+          )
+          test_text = test_text.replace('    createdAt,\n  };', '    createdAt: instant(createdAt),\n  };', 1)
+          test_text = re.sub(r"linkedAt: '([^']+)'", r"linkedAt: instant('\1')", test_text)
+          test_text = re.sub(r"updatedAt: '([^']+)'", r"updatedAt: instant('\1')", test_text)
+          test.write_text(test_text)
+
+          store = Path('packages/persistence/src/sqlite/SqliteWhatsAppStore.ts')
+          store_text = store.read_text()
+          if "import { instant } from '@tux/domain';" not in store_text:
+              store_text = store_text.replace(
+                  "import type {\n  ShopId,",
+                  "import { instant } from '@tux/domain';\nimport type {\n  ShopId,",
+                  1,
+              )
+          store_text = store_text.replace('      updatedAt: row.updated_at,', '      updatedAt: instant(row.updated_at),', 1)
+          store.write_text(store_text)
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/persistence/src/sqlite/migrations.ts packages/persistence/src/sqlite/index.ts
+          git add packages/persistence/src/sqlite/migrations.ts packages/persistence/src/sqlite/index.ts packages/persistence/src/sqlite/SqliteWhatsAppStore.ts packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
           if ! git diff --cached --quiet; then
-            git commit -m "feat: add Task 5B SQLite cache candidate"
+            git commit -m "fix: type Task 5B SQLite candidate"
             git push origin HEAD:feat/ops-whatsapp-task5b-red
           fi
       - name: Task 5B SQLite tests
