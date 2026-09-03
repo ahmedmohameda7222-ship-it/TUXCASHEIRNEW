@@ -189,7 +189,7 @@ export class OperationsWhatsAppService {
         workerId: claims.value.workerId,
         conversationId: input.conversationId,
         orderId: input.orderId,
-        linked: input.linked,
+        ...(input.linked === undefined ? {} : { linked: input.linked }),
       });
       return ok(undefined);
     } catch (cause) {

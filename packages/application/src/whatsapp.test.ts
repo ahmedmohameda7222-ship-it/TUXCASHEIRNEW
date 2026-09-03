@@ -292,7 +292,6 @@ describe('OperationsWhatsAppService', () => {
       workerId,
       conversationId,
       orderId,
-      linked: undefined,
     });
 
     session.set({ ok: true, value: { status: 'NO_ACTIVE_DAY', shopId } });
