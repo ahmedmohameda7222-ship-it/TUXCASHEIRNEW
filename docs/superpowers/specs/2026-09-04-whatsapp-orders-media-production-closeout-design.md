@@ -14,7 +14,7 @@ It supersedes stale portions of the original plan `docs/superpowers/plans/2026-0
 
 Existing approved authorities remain binding, including:
 
-- `docs/superpowers/specs/2026-09-02-whatsapp-inbox-design.md`
+- `docs/superpowers/specs/2026-09-02-tux-operations-whatsapp-inbox-design.md`
 - `docs/superpowers/specs/2026-09-03-whatsapp-runtime-transport-boundary-design.md`
 - `docs/superpowers/specs/2026-09-03-whatsapp-worker-inbox-ui-design.md`
 - the Task 7 self-review corrections and single-pass execution amendment
@@ -162,10 +162,12 @@ The resulting new Orders draft must start with zero product lines. No WhatsApp m
 
 The current application has one active draft scope per desktop main window/browser tab. Task 8 adds Business-Day-scoped parked drafts to prevent silent loss when `Create Order from Chat` is invoked while a non-empty draft already exists.
 
+A single canonical Orders-domain/application helper must decide whether an active draft contains meaningful persisted worker/customer content. The UI must not duplicate this decision. Untouched defaults are not meaningful content; any user-entered or persisted order/customer content that would be lost by replacement is meaningful and therefore requires the safe parked-draft flow. This rule must be covered by focused tests against the actual `OrderDraft` schema.
+
 Behavior:
 
-- if the current Orders draft is empty, apply the customer prefill directly to the fresh/empty draft
-- if the current draft contains products or other meaningful draft data, present an explicit choice:
+- if the current Orders draft is empty according to the canonical helper, apply the customer prefill directly to the fresh/empty draft
+- if the current draft contains meaningful draft data, present an explicit choice:
   - `Keep current order`
   - `Start new order for <customer>`
 - `Keep current order` leaves the existing draft untouched and aborts the new-order transition
@@ -181,7 +183,7 @@ Parked drafts:
 - never silently carry into a later Business Day
 - never get deleted automatically by End Day
 
-Restoring a parked draft must never overwrite a non-empty active draft. If the active draft is non-empty, the same safe principle applies: either retain/park the active draft through an explicit worker choice or cancel the restore.
+Restoring a parked draft must never overwrite a non-empty active draft. If the active draft contains meaningful content, the same safe principle applies: either retain/park the active draft through an explicit worker choice or cancel the restore.
 
 ### 4.6 End Day gate
 
@@ -251,6 +253,8 @@ Browser `localStorage` is never a media binary store.
 
 Laptop-side binary data is only transient cache/temp data. It is never the canonical history source.
 
+Inbound provider media must be fetched and durably copied into the private TUX-controlled bucket from the server side while the provider media reference is still valid; the renderer must never be responsible for preserving provider media history.
+
 ### 5.3 Retention
 
 Media binary retention is 30 days from TUX durable ingestion:
@@ -276,7 +280,7 @@ The renderer never receives:
 - permanent public Storage URLs
 - bucket administration credentials
 
-Media access is authorized by the TUX server and returned through either a server-streamed response or a short-lived signed private-object URL. Signed access must be short-lived and must not become persisted canonical application data.
+Media access is authorized by the TUX server and may be delivered as a server-streamed response or a short-lived signed private-object URL. In either form, the request must first pass TUX device/tenant authorization. Signed access must be short-lived and must not become persisted canonical application data.
 
 ### 5.5 Media validation
 
@@ -395,9 +399,11 @@ Windows notification handling is an Electron Main/OS capability, not React busin
 
 Notifications are generated only for newly observed inbound unread messages when Operations is not already focused on that conversation. Re-observation of the same stable inbound provider/message identity must not create duplicate notifications.
 
+The desktop notification watcher may operate with device authority so it can observe that a new inbound message exists even when no worker is signed in. It must use a server-authorized notification feed/envelope rather than bypassing the TUX server. The server decides whether the response may contain preview data. When there is no ACTIVE Business Day/current worker, the envelope must contain only the minimum generic notification facts needed for deduplication/display and must not expose customer/message content.
+
 ### 9.1 ACTIVE Business Day with current worker
 
-A notification may show a privacy-safe customer/message preview appropriate to the media kind.
+A notification may show a privacy-safe customer/message preview appropriate to the media kind only after the server has confirmed the active worker/day context for that notification observation.
 
 ### 9.2 No current worker or Business Day not ACTIVE
 
