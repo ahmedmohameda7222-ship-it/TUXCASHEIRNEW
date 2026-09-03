@@ -1,0 +1,65 @@
+name: Task 7B GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7b-green
+    paths:
+      - apps/operations/src/app/whatsappInboxController.ts
+      - apps/operations/src/app/whatsappInboxController.test.ts
+      - .github/workflows/task7b-green.yml
+
+jobs:
+  green:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Required Task 7B GREEN
+        run: |
+          npm test -- \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            apps/operations/src/app/whatsappView.test.ts
+      - name: Required operations typecheck
+        run: npm run typecheck -w @tux/operations
+      - name: Targeted ESLint
+        run: |
+          npx eslint \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            --max-warnings 0
+      - name: Targeted Prettier
+        run: |
+          npx prettier --check \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts
+      - name: Task 7B scope and immutability
+        run: |
+          test "$(git diff --name-only e71a4733da7f096402071db7fe4313ac6553ae42 -- \
+            ':!.github/workflows/task7b-green.yml' | sort)" = "$(printf '%s\n' \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            apps/operations/src/app/whatsappInboxController.ts | sort)"
+          git diff --exit-code e71a4733da7f096402071db7fe4313ac6553ae42 -- \
+            apps/operations/src/app/whatsappView.ts \
+            apps/operations/src/app/whatsappView.test.ts \
+            package.json package-lock.json apps/operations/package.json \
+            packages/platform-contracts \
+            supabase/migrations \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts
+          test ! -e apps/operations/src/app/whatsappInboxEnvironment.ts
+          test ! -e apps/operations/src/app/browserWhatsAppInboxEnvironment.ts
+          if git grep -n "sendMedia" -- \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts; then
+            echo 'sendMedia must remain absent.' >&2
+            exit 1
+          fi
+      - name: Working tree clean
+        run: test -z "$(git status --short)"
