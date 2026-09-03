@@ -118,8 +118,7 @@ const searchConversations: readonly WhatsAppConversation[] = [
     customerName: 'Sara',
     displayPhone: '0122 222 2222',
     normalizedPhone: '+201222222222',
-    linkedOrderId:
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as WhatsAppConversation['linkedOrderId'],
+    linkedOrderId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as WhatsAppConversation['linkedOrderId'],
   }),
 ];
 
@@ -194,9 +193,12 @@ describe('WhatsApp inbox view model', () => {
 
   it('searches normalized customer name, both phone forms, and loaded message text only', () => {
     expect(
-      filterAndSortWhatsAppConversations(searchConversations, searchMessages, 'ALL', '  AHMED ').map(
-        (item) => item.id,
-      ),
+      filterAndSortWhatsAppConversations(
+        searchConversations,
+        searchMessages,
+        'ALL',
+        '  AHMED ',
+      ).map((item) => item.id),
     ).toEqual(['customer-match']);
     expect(
       filterAndSortWhatsAppConversations(searchConversations, searchMessages, 'ALL', '010').map(
@@ -204,9 +206,12 @@ describe('WhatsApp inbox view model', () => {
       ),
     ).toEqual(['phone-match']);
     expect(
-      filterAndSortWhatsAppConversations(searchConversations, searchMessages, 'ALL', '20102222').map(
-        (item) => item.id,
-      ),
+      filterAndSortWhatsAppConversations(
+        searchConversations,
+        searchMessages,
+        'ALL',
+        '20102222',
+      ).map((item) => item.id),
     ).toEqual(['phone-match']);
     expect(
       filterAndSortWhatsAppConversations(searchConversations, searchMessages, 'ALL', 'العنوان').map(
@@ -214,9 +219,12 @@ describe('WhatsApp inbox view model', () => {
       ),
     ).toEqual(['message-match']);
     expect(
-      filterAndSortWhatsAppConversations(searchConversations, searchMessages, 'ALL', 'aaaaaaaa').map(
-        (item) => item.id,
-      ),
+      filterAndSortWhatsAppConversations(
+        searchConversations,
+        searchMessages,
+        'ALL',
+        'aaaaaaaa',
+      ).map((item) => item.id),
     ).toEqual([]);
   });
 
