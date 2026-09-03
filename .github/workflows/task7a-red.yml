@@ -1,0 +1,22 @@
+name: Task 7A RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7a-red
+    paths:
+      - apps/operations/src/app/whatsappView.test.ts
+      - .github/workflows/task7a-red.yml
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Required Task 7A RED
+        run: npm test -- apps/operations/src/app/whatsappView.test.ts
