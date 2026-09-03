@@ -7,6 +7,7 @@ import {
   OperationsExpensesService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  OperationsWhatsAppService,
   OperationsWorkerAuthenticationService,
   WorkerMenuLayoutRetryController,
   WorkerMenuLayoutService,
@@ -34,6 +35,7 @@ import {
   IndexedDbOperationsDatabase,
   IndexedDbOperatorSessionReadModel,
   IndexedDbOrderDraftStore,
+  IndexedDbWhatsAppStore,
   IndexedDbWorkerMenuLayoutStore,
 } from '@tux/persistence/browser';
 import type {
@@ -42,12 +44,14 @@ import type {
   TuxExpensesApi,
   TuxOrdersApi,
   TuxOrdersBoardApi,
+  TuxWhatsAppApi,
   TuxWorkerMenuLayoutApi,
   TuxWorkerUiPreferencesApi,
 } from '@tux/platform-contracts';
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
+import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
 export interface OperationsSessionClient {
@@ -64,6 +68,7 @@ export type OperationsOrdersBoardClient = TuxOrdersBoardApi;
 export type OperationsExpensesClient = TuxExpensesApi;
 export type OperationsBulkStockClient = TuxBulkStockApi;
 export type OperationsEndDayClient = TuxEndDayApi;
+export type OperationsWhatsAppClient = TuxWhatsAppApi;
 
 interface BrowserRuntime {
   readonly session: CoordinatedOperationsSessionService;
@@ -80,6 +85,23 @@ interface BrowserRuntime {
 }
 
 let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
+let browserWhatsAppPromise: Promise<TuxWhatsAppApi> | null = null;
+
+async function browserWhatsAppRuntime(): Promise<TuxWhatsAppApi> {
+  if (browserWhatsAppPromise === null) {
+    browserWhatsAppPromise = (async () => {
+      const store = new IndexedDbWhatsAppStore('tux-operations-v2');
+      await store.initialize();
+      return new OperationsWhatsAppService(
+        new VercelBrowserWhatsAppRemote(),
+        store,
+        { getState: async () => (await browserRuntime()).getState() },
+        () => instant(new Date()),
+      );
+    })();
+  }
+  return browserWhatsAppPromise;
+}
 
 async function browserRuntime(): Promise<BrowserRuntime> {
   if (browserRuntimePromise === null) {
@@ -475,6 +497,27 @@ async function browserRuntime(): Promise<BrowserRuntime> {
     })();
   }
   return browserRuntimePromise;
+}
+
+export function createOperationsWhatsAppClient(): OperationsWhatsAppClient {
+  const desktop = window.tuxDesktop?.whatsapp;
+  if (desktop !== undefined) return desktop;
+  return {
+    loadInbox: async (cursor) => (await browserWhatsAppRuntime()).loadInbox(cursor),
+    loadConversation: async (conversationId) =>
+      (await browserWhatsAppRuntime()).loadConversation(conversationId),
+    sendText: async (input) => (await browserWhatsAppRuntime()).sendText(input),
+    markUnread: async (conversationId) =>
+      (await browserWhatsAppRuntime()).markUnread(conversationId),
+    archive: async (conversationId, archived) =>
+      (await browserWhatsAppRuntime()).archive(conversationId, archived),
+    setFollowUp: async (conversationId, followUp) =>
+      (await browserWhatsAppRuntime()).setFollowUp(conversationId, followUp),
+    linkOrder: async (input) => (await browserWhatsAppRuntime()).linkOrder(input),
+    saveDraft: async (conversationId, text) =>
+      (await browserWhatsAppRuntime()).saveDraft(conversationId, text),
+    getDraft: async (conversationId) => (await browserWhatsAppRuntime()).getDraft(conversationId),
+  };
 }
 
 export function createOperationsSessionClient(): OperationsSessionClient {
