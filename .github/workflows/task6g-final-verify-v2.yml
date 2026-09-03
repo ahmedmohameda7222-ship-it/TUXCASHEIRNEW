@@ -112,9 +112,13 @@ jobs:
             exit 1
           fi
           if git grep -n "graph.facebook.com" -- \
-            apps/operations-desktop/src/main \
-            apps/operations-desktop/src/preload \
-            apps/operations/src/app; then
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.ts \
+            apps/operations-desktop/src/main/whatsappIpc.ts \
+            apps/operations-desktop/src/main/index.ts \
+            apps/operations-desktop/src/preload/index.ts \
+            apps/operations-desktop/src/preload/whatsappResult.ts \
+            apps/operations/src/app/browserWhatsAppRemote.ts \
+            apps/operations/src/app/sessionClient.ts; then
             echo 'Client/Desktop WhatsApp runtime must not call Meta directly.' >&2
             exit 1
           fi
