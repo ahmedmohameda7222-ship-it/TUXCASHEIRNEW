@@ -112,12 +112,12 @@ jobs:
             echo 'Hard-coded Arabic production quick-reply text detected.' >&2
             exit 1
           fi
-          if grep -Ein 'sendMedia|type=["'"']file["'"']|attachment[^a-zA-Z].*(button|input)|upload[^a-zA-Z].*(button|input)' apps/operations/src/app/WhatsAppWorkspace.tsx; then
-            echo 'Attachment/media-send affordance detected.' >&2
+          if grep -Ein 'sendMedia|attachment|upload|mediaRef|provider.*url|graph\.facebook\.com' apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Media-send/provider media path token detected.' >&2
             exit 1
           fi
-          if grep -Ein 'mediaRef|provider.*url|graph\.facebook\.com' apps/operations/src/app/WhatsAppWorkspace.tsx; then
-            echo 'Provider media fetch/render path detected.' >&2
+          if grep -En 'type="file"' apps/operations/src/app/WhatsAppWorkspace.tsx || grep -En "type='file'" apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'File input detected.' >&2
             exit 1
           fi
       - name: Migration immutability
