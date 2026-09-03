@@ -1,12 +1,5 @@
-import type {
-  BusinessDayId,
-  Instant,
-  OrderId,
-  WhatsAppConversation,
-  WhatsAppMessage,
-  WhatsAppQuickReply,
-  WorkerId,
-} from '@tux/domain';
+import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/persistence';
+import type { BusinessDayId, OrderId, WhatsAppMessage, WorkerId } from '@tux/domain';
 
 export type WhatsAppRemoteErrorCode =
   | 'OPERATOR_NOT_SYNCHRONIZED'
@@ -25,17 +18,9 @@ export class WhatsAppRemoteError extends Error {
   }
 }
 
-export interface WhatsAppInboxOrderLink {
-  readonly conversationId: string;
-  readonly orderId: OrderId;
-  readonly linkedAt: Instant;
-}
+export type WhatsAppInboxOrderLink = CachedWhatsAppOrderLink;
 
-export interface WhatsAppInboxSnapshot {
-  readonly conversations: readonly WhatsAppConversation[];
-  readonly messages: readonly WhatsAppMessage[];
-  readonly quickReplies: readonly WhatsAppQuickReply[];
-  readonly orderLinks: readonly WhatsAppInboxOrderLink[];
+export interface WhatsAppInboxSnapshot extends CachedWhatsAppInboxSnapshot {
   readonly nextCursor: string | null;
 }
 

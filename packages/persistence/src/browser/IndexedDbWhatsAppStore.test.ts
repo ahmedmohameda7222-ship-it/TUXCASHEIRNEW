@@ -1,5 +1,4 @@
 import 'fake-indexeddb/auto';
-import type { WhatsAppInboxSnapshot } from '@tux/application';
 import {
   instant,
   parseEntityId,
@@ -9,6 +8,7 @@ import {
   type WhatsAppMessage,
   type WhatsAppQuickReply,
 } from '@tux/domain';
+import type { CachedWhatsAppInboxSnapshot } from '../whatsappStore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IndexedDbWhatsAppStore } from './IndexedDbWhatsAppStore';
 import {
@@ -163,14 +163,13 @@ function snapshot(input: {
   conversations?: readonly WhatsAppConversation[];
   messages?: readonly WhatsAppMessage[];
   quickReplies?: readonly WhatsAppQuickReply[];
-  orderLinks?: WhatsAppInboxSnapshot['orderLinks'];
-}): WhatsAppInboxSnapshot {
+  orderLinks?: CachedWhatsAppInboxSnapshot['orderLinks'];
+}): CachedWhatsAppInboxSnapshot {
   return {
     conversations: input.conversations ?? [],
     messages: input.messages ?? [],
     quickReplies: input.quickReplies ?? [],
     orderLinks: input.orderLinks ?? [],
-    nextCursor: null,
   };
 }
 
