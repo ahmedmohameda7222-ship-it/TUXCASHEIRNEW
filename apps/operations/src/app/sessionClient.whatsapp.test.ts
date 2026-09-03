@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@tux/persistence/browser', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tux/persistence/browser')>();
+  const actual = await importOriginal<Record<string, unknown>>();
   class IndexedDbWhatsAppStore {
     constructor(name?: string) {
       mocks.storeConstructor(name);
@@ -39,7 +39,7 @@ vi.mock('./browserWhatsAppRemote', () => ({
 }));
 
 vi.mock('@tux/application', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tux/application')>();
+  const actual = await importOriginal<Record<string, unknown>>();
   class OperationsWhatsAppService {
     constructor(...args: unknown[]) {
       mocks.serviceConstructor(...args);
