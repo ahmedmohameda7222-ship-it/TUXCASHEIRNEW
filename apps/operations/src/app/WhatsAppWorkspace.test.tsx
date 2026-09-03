@@ -3,10 +3,7 @@ import type { WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply } from '
 import { Children, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  WhatsAppWorkspace,
-  type WhatsAppWorkspaceController,
-} from './WhatsAppWorkspace';
+import { WhatsAppWorkspace, type WhatsAppWorkspaceController } from './WhatsAppWorkspace';
 import type { WhatsAppInboxUiState } from './whatsappInboxController';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
@@ -96,7 +93,10 @@ function state(overrides: Partial<WhatsAppInboxUiState> = {}): WhatsAppInboxUiSt
   const inbox = snapshot(
     [selected],
     [message('Last message preview', selected.id)],
-    [quickReply('active-reply', 'أوردر حضرتك جاهز.'), quickReply('inactive-reply', 'Do not render', { active: false })],
+    [
+      quickReply('active-reply', 'أوردر حضرتك جاهز.'),
+      quickReply('inactive-reply', 'Do not render', { active: false }),
+    ],
   );
   return {
     snapshot: inbox,
@@ -120,7 +120,9 @@ function createController() {
   return {
     setFilter: vi.fn<WhatsAppWorkspaceController['setFilter']>(),
     setSearch: vi.fn<WhatsAppWorkspaceController['setSearch']>(),
-    selectConversation: vi.fn<WhatsAppWorkspaceController['selectConversation']>().mockResolvedValue(),
+    selectConversation: vi
+      .fn<WhatsAppWorkspaceController['selectConversation']>()
+      .mockResolvedValue(),
     insertQuickReply: vi.fn<WhatsAppWorkspaceController['insertQuickReply']>(),
     setComposerText: vi.fn<WhatsAppWorkspaceController['setComposerText']>(),
     sendCurrentText: vi.fn<WhatsAppWorkspaceController['sendCurrentText']>().mockResolvedValue(),
@@ -190,10 +192,7 @@ describe('WhatsAppWorkspace', () => {
     );
     (unread.props['onClick'] as () => void)();
 
-    const row = findElement(
-      tree,
-      (element) => element.props['data-conversation-id'] === 'Mona',
-    );
+    const row = findElement(tree, (element) => element.props['data-conversation-id'] === 'Mona');
     (row.props['onClick'] as () => void)();
 
     expect(controller.setSearch).toHaveBeenCalledWith('010');
@@ -205,37 +204,64 @@ describe('WhatsAppWorkspace', () => {
     ['DIRECT', 'Direct WhatsApp'],
     ['WEB_REQUEST', 'Website Order Request'],
     ['ORDER_LINKED', 'Existing Order Chat'],
-  ] as const)('renders %s context as %s without exposing the raw linked-order UUID', (context, label) => {
-    const selected = conversation('Customer', {
-      context,
-      linkedOrderId: LINKED_ORDER_ID as WhatsAppConversation['linkedOrderId'],
-    });
-    const inbox = snapshot([selected], []);
-    const markup = render(
-      state({
-        snapshot: inbox,
-        visibleConversations: inbox.conversations,
-        selectedConversationId: selected.id,
-        selectedMessages: [],
-      }),
-    );
+  ] as const)(
+    'renders %s context as %s without exposing the raw linked-order UUID',
+    (context, label) => {
+      const selected = conversation('Customer', {
+        context,
+        linkedOrderId: LINKED_ORDER_ID as WhatsAppConversation['linkedOrderId'],
+      });
+      const inbox = snapshot([selected], []);
+      const markup = render(
+        state({
+          snapshot: inbox,
+          visibleConversations: inbox.conversations,
+          selectedConversationId: selected.id,
+          selectedMessages: [],
+        }),
+      );
 
-    expect(markup).toContain(label);
-    expect(markup).toContain('Order linked');
-    expect(markup).not.toContain(LINKED_ORDER_ID);
-    expect(markup).not.toContain('Order #');
-  });
+      expect(markup).toContain(label);
+      expect(markup).toContain('Order linked');
+      expect(markup).not.toContain(LINKED_ORDER_ID);
+      expect(markup).not.toContain('Order #');
+    },
+  );
 
   it('renders bidi-safe text, distinct inbound/outbound bubbles, system presentation, and safe media placeholders', () => {
     const selected = conversation('Chat');
     const selectedMessages = [
       message('inbound', selected.id, { text: 'مرحبا Ahmed 010', direction: 'INBOUND' }),
-      message('outbound', selected.id, { text: 'Thanks شكراً', direction: 'OUTBOUND', status: 'READ' }),
-      message('image', selected.id, { kind: 'IMAGE', text: null, mediaRef: 'https://provider.invalid/image' }),
-      message('document', selected.id, { kind: 'DOCUMENT', text: null, mediaRef: 'provider-document-secret' }),
-      message('audio', selected.id, { kind: 'AUDIO', text: null, mediaRef: 'provider-audio-secret' }),
-      message('location', selected.id, { kind: 'LOCATION', text: null, mediaRef: 'provider-location-secret' }),
-      message('system', selected.id, { kind: 'SYSTEM', text: 'Internal status', direction: 'INBOUND' }),
+      message('outbound', selected.id, {
+        text: 'Thanks شكراً',
+        direction: 'OUTBOUND',
+        status: 'READ',
+      }),
+      message('image', selected.id, {
+        kind: 'IMAGE',
+        text: null,
+        mediaRef: 'https://provider.invalid/image',
+      }),
+      message('document', selected.id, {
+        kind: 'DOCUMENT',
+        text: null,
+        mediaRef: 'provider-document-secret',
+      }),
+      message('audio', selected.id, {
+        kind: 'AUDIO',
+        text: null,
+        mediaRef: 'provider-audio-secret',
+      }),
+      message('location', selected.id, {
+        kind: 'LOCATION',
+        text: null,
+        mediaRef: 'provider-location-secret',
+      }),
+      message('system', selected.id, {
+        kind: 'SYSTEM',
+        text: 'Internal status',
+        direction: 'INBOUND',
+      }),
     ];
     const inbox = snapshot([selected], []);
     const markup = render(
@@ -307,7 +333,10 @@ describe('WhatsAppWorkspace', () => {
     const uiState = state({ composerText: 'Send this' });
     const tree = WhatsAppWorkspace({ controller, state: uiState });
 
-    const textarea = findElement(tree, (element) => element.props['data-whatsapp-composer'] === true);
+    const textarea = findElement(
+      tree,
+      (element) => element.props['data-whatsapp-composer'] === true,
+    );
     (textarea.props['onChange'] as (event: { target: { value: string } }) => void)({
       target: { value: 'Edited text' },
     });
@@ -333,7 +362,10 @@ describe('WhatsAppWorkspace', () => {
       ['archive', () => expect(controller.setArchived).toHaveBeenCalledWith('Mona', true)],
       ['follow-up', () => expect(controller.setFollowUp).toHaveBeenCalledWith('Mona', false)],
     ] as const) {
-      const button = findElement(tree, (element) => element.props['data-whatsapp-action'] === action);
+      const button = findElement(
+        tree,
+        (element) => element.props['data-whatsapp-action'] === action,
+      );
       (button.props['onClick'] as () => void)();
       invoke();
     }
@@ -347,7 +379,9 @@ describe('WhatsAppWorkspace', () => {
       }),
     );
 
-    expect(markup).toContain('Network offline — cached WhatsApp may be stale. POS continues normally.');
+    expect(markup).toContain(
+      'Network offline — cached WhatsApp may be stale. POS continues normally.',
+    );
     expect(markup).toContain('WhatsApp session needs attention.');
     expect(markup).not.toContain('type="file"');
     expect(markup.toLowerCase()).not.toContain('attachment');

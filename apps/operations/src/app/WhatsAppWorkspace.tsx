@@ -235,7 +235,9 @@ function ConversationPanel({
           placeholder="Write a WhatsApp message"
         />
         <div className="whatsapp-composer-footer">
-          <span className="whatsapp-explicit-send-note">Messages send only when you press Send.</span>
+          <span className="whatsapp-explicit-send-note">
+            Messages send only when you press Send.
+          </span>
           <button
             type="button"
             className="primary-action whatsapp-send-action"
