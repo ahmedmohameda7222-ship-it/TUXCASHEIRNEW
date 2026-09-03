@@ -18,13 +18,31 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Add binding DEVICE_AUTH_INVALID test first
+      - name: Apply DEVICE_AUTH_INVALID minimal GREEN and binding test
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('packages/application/src/whatsapp.test.ts')
-          source = path.read_text()
+          remote = Path('packages/application/src/whatsappRemote.ts')
+          source = remote.read_text()
+          old = "  | 'DELIVERY_UNCERTAIN'\n  | 'REMOTE_UNAVAILABLE';"
+          new = "  | 'DELIVERY_UNCERTAIN'\n  | 'REMOTE_UNAVAILABLE'\n  | 'DEVICE_AUTH_INVALID';"
+          assert old in source
+          remote.write_text(source.replace(old, new, 1))
+
+          service = Path('packages/application/src/whatsapp.ts')
+          source = service.read_text()
+          old = "    code === 'DELIVERY_UNCERTAIN' ||\n    code === 'REMOTE_UNAVAILABLE'\n    ? code"
+          new = "    code === 'DELIVERY_UNCERTAIN' ||\n    code === 'REMOTE_UNAVAILABLE' ||\n    code === 'DEVICE_AUTH_INVALID'\n    ? code"
+          assert old in source
+          source = source.replace(old, new, 1)
+          old = "  if (code === 'DELIVERY_UNCERTAIN') {\n    return remoteSync('WhatsApp delivery is not confirmed yet.', error);\n  }\n  return remoteSync('WhatsApp remote operation failed.', error);"
+          new = "  if (code === 'DELIVERY_UNCERTAIN') {\n    return remoteSync('WhatsApp delivery is not confirmed yet.', error);\n  }\n  if (code === 'DEVICE_AUTH_INVALID') {\n    return remoteSync('The enrolled Operations device session is no longer valid.', error);\n  }\n  return remoteSync('WhatsApp remote operation failed.', error);"
+          assert old in source
+          service.write_text(source.replace(old, new, 1))
+
+          test_path = Path('packages/application/src/whatsapp.test.ts')
+          source = test_path.read_text()
           old_import = "import type { WhatsAppInboxSnapshot, WhatsAppRemoteGateway } from './whatsappRemote';"
           new_import = "import { WhatsAppRemoteError, type WhatsAppInboxSnapshot, type WhatsAppRemoteGateway } from './whatsappRemote';"
           assert old_import in source
@@ -32,8 +50,95 @@ jobs:
           marker = "  it('upserts a successful durable outbound message locally exactly once', async () => {"
           test = """  it('does not treat authoritative device invalidation as transient cached-offline availability', async () => {\n    vi.mocked(remote.loadInbox).mockRejectedValue(\n      new WhatsAppRemoteError('DEVICE_AUTH_INVALID', 'Device session is invalid.'),\n    );\n    const service = new OperationsWhatsAppService(remote, store, session, () => now);\n\n    const result = await service.loadInbox();\n\n    expect(result).toMatchObject({ ok: false, error: { code: 'REMOTE_SYNC_ERROR' } });\n    expect(store.loadInbox).not.toHaveBeenCalled();\n  });\n\n"""
           assert marker in source
-          source = source.replace(marker, test + marker, 1)
-          path.write_text(source)
+          test_path.write_text(source.replace(marker, test + marker, 1))
           PY
-      - name: Expected compile RED
-        run: npm run typecheck -w @tux/application
+      - name: Verify DEVICE_AUTH_INVALID GREEN
+        run: |
+          npm run typecheck -w @tux/application
+          npm test -- packages/application/src/whatsapp.test.ts
+      - name: Add wire codec test before implementation
+        run: |
+          cat > packages/application/src/whatsappWire.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { WhatsAppRemoteError } from './whatsappRemote';
+          import {
+            parseWhatsAppInboxSnapshot,
+            parseWhatsAppMessage,
+            throwWhatsAppHttpError,
+          } from './whatsappWire';
+
+          const message = {
+            id: '50000000-0000-4000-8000-000000000001',
+            shopId: '60000000-0000-4000-8000-000000000001',
+            conversationId: '40000000-0000-4000-8000-000000000001',
+            providerMessageId: 'wamid.1',
+            outboundIntentKey: null,
+            direction: 'INBOUND',
+            kind: 'TEXT',
+            text: 'hello',
+            mediaRef: null,
+            status: 'DELIVERED',
+            sentByWorkerId: null,
+            initiatedByDeviceId: null,
+            initiatedAt: null,
+            createdAt: '2026-09-03T12:00:00.000Z',
+          };
+
+          describe('WhatsApp wire codec', () => {
+            it('parses durable message and inbox payloads', () => {
+              expect(parseWhatsAppMessage(message)).toMatchObject({
+                id: message.id,
+                text: 'hello',
+              });
+              expect(
+                parseWhatsAppInboxSnapshot({
+                  conversations: [],
+                  messages: [message],
+                  quickReplies: [],
+                  orderLinks: [],
+                  nextCursor: null,
+                }).messages,
+              ).toHaveLength(1);
+            });
+
+            it.each([
+              'device_authentication_required',
+              'device_session_invalid',
+              'device_authority_invalid',
+            ])('maps %s to DEVICE_AUTH_INVALID', (error) => {
+              expect(() => throwWhatsAppHttpError(401, { error })).toThrowError(WhatsAppRemoteError);
+              try {
+                throwWhatsAppHttpError(401, { error });
+              } catch (cause) {
+                expect(cause).toMatchObject({ code: 'DEVICE_AUTH_INVALID', messageId: null });
+              }
+            });
+
+            it('preserves existing typed conflict and delivery-uncertain mappings', () => {
+              expect(() =>
+                throwWhatsAppHttpError(409, { error: 'whatsapp_operator_not_synchronized' }),
+              ).toThrowError(expect.objectContaining({ code: 'OPERATOR_NOT_SYNCHRONIZED' }));
+              expect(() =>
+                throwWhatsAppHttpError(409, { error: 'whatsapp_outbound_intent_conflict' }),
+              ).toThrowError(expect.objectContaining({ code: 'OUTBOUND_INTENT_CONFLICT' }));
+              try {
+                throwWhatsAppHttpError(503, {
+                  error: 'whatsapp_delivery_uncertain',
+                  messageId: message.id,
+                });
+              } catch (cause) {
+                expect(cause).toMatchObject({ code: 'DELIVERY_UNCERTAIN', messageId: message.id });
+              }
+            });
+
+            it('maps every other HTTP failure to REMOTE_UNAVAILABLE', () => {
+              try {
+                throwWhatsAppHttpError(500, { error: 'unexpected' });
+              } catch (cause) {
+                expect(cause).toMatchObject({ code: 'REMOTE_UNAVAILABLE', messageId: null });
+              }
+            });
+          });
+          EOF
+      - name: Expected wire codec module-missing RED
+        run: npm test -- packages/application/src/whatsappWire.test.ts
