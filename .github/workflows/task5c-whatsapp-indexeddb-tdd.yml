@@ -20,21 +20,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Apply Task 5C implementation and regression expectations
+      - name: Apply Task 5C type fix
         run: |
-          node scripts/task5c-apply-indexeddb.mjs
-          node scripts/task5c-update-indexeddb-regression.mjs
+          node scripts/task5c-fix-order-link-shop-type.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            packages/persistence/src/browser/indexedDbMigrations.ts \
-            packages/persistence/src/browser/openOperationsIndexedDb.ts \
-            packages/persistence/src/browser/IndexedDbOperationsDatabase.ts \
-            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
-            packages/persistence/src/browser/indexedDbMigrations.test.ts \
-            packages/persistence/src/browser/index.ts
+          git add packages/persistence/src/browser/IndexedDbWhatsAppStore.ts
           if ! git diff --cached --quiet; then
-            git commit -m "test: align IndexedDB migration regression with v5"
+            git commit -m "fix: narrow WhatsApp IndexedDB order-link shop"
             git push origin HEAD:feat/ops-whatsapp-task5c-red
           fi
       - name: Task 5C focused GREEN
