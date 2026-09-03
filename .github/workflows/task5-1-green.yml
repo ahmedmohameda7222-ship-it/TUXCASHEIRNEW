@@ -1,0 +1,301 @@
+name: Task 5.1 GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5-1-green
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply exact Task 5.1 cleanup
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if new in text and old not in text:
+                  return
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one occurrence of {old!r}, found {count}')
+              p.write_text(text.replace(old, new))
+
+          guard = """import assert from 'node:assert/strict';
+          import { readdir, readFile } from 'node:fs/promises';
+          import path from 'node:path';
+          import { fileURLToPath } from 'node:url';
+
+          const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+          const persistenceRoot = path.join(root, 'packages', 'persistence', 'src');
+
+          async function sourceFiles(directory) {
+            const entries = await readdir(directory, { withFileTypes: true });
+            const nested = await Promise.all(
+              entries.map(async (entry) => {
+                const target = path.join(directory, entry.name);
+                if (entry.isDirectory()) return sourceFiles(target);
+                return entry.isFile() && /\\.(?:ts|tsx)$/.test(entry.name) ? [target] : [];
+              }),
+            );
+            return nested.flat();
+          }
+
+          const violations = [];
+          for (const filename of await sourceFiles(persistenceRoot)) {
+            const source = await readFile(filename, 'utf8');
+            if (/from\\s+['\"]@tux\\/application(?:['\"\\/])/.test(source)) {
+              violations.push(path.relative(root, filename));
+            }
+          }
+
+          assert.deepEqual(
+            violations,
+            [],
+            `Persistence must not import @tux/application. Violations: ${violations.join(', ')}`,
+          );
+
+          console.log('WhatsApp package-layering guard passed.');
+          """
+          Path('scripts/test-whatsapp-package-layering.mjs').write_text(guard)
+
+          whatsapp_store = """import type {
+            Instant,
+            OrderId,
+            ShopId,
+            WhatsAppConversation,
+            WhatsAppMessage,
+            WhatsAppQuickReply,
+          } from '@tux/domain';
+
+          export interface CachedWhatsAppOrderLink {
+            readonly conversationId: string;
+            readonly orderId: OrderId;
+            readonly linkedAt: Instant;
+          }
+
+          export interface WhatsAppDraft {
+            readonly shopId: ShopId;
+            readonly conversationId: string;
+            readonly text: string;
+            readonly updatedAt: Instant;
+          }
+
+          export interface CachedWhatsAppInboxSnapshot {
+            readonly conversations: readonly WhatsAppConversation[];
+            readonly messages: readonly WhatsAppMessage[];
+            readonly quickReplies: readonly WhatsAppQuickReply[];
+            readonly orderLinks: readonly CachedWhatsAppOrderLink[];
+          }
+
+          export interface WhatsAppStore {
+            initialize(): Promise<void>;
+            upsertRemoteSnapshot(snapshot: CachedWhatsAppInboxSnapshot): Promise<void>;
+            upsertMessage(message: WhatsAppMessage): Promise<void>;
+            loadInbox(shopId: ShopId): Promise<CachedWhatsAppInboxSnapshot>;
+            listMessages(shopId: ShopId, conversationId: string): Promise<readonly WhatsAppMessage[]>;
+            saveDraft(draft: WhatsAppDraft): Promise<void>;
+            getDraft(shopId: ShopId, conversationId: string): Promise<WhatsAppDraft | null>;
+            close(): Promise<void>;
+          }
+
+          export const whatsappStoreContractVersion = 1 as const;
+          """
+          Path('packages/persistence/src/whatsappStore.ts').write_text(whatsapp_store)
+
+          replace_once(
+              'packages/persistence/src/index.ts',
+              "export type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from './whatsappStore';",
+              "export type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink, WhatsAppDraft, WhatsAppStore } from './whatsappStore';",
+          )
+
+          remote_path = Path('packages/application/src/whatsappRemote.ts')
+          remote = remote_path.read_text()
+          if "from '@tux/persistence';" not in remote:
+              remote = "import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/persistence';\n" + remote
+          remote = remote.replace('  Instant,\n', '')
+          remote = remote.replace('  WhatsAppConversation,\n', '')
+          remote = remote.replace('  WhatsAppQuickReply,\n', '')
+          old = """export interface WhatsAppInboxOrderLink {
+            readonly conversationId: string;
+            readonly orderId: OrderId;
+            readonly linkedAt: Instant;
+          }
+
+          export interface WhatsAppInboxSnapshot {
+            readonly conversations: readonly WhatsAppConversation[];
+            readonly messages: readonly WhatsAppMessage[];
+            readonly quickReplies: readonly WhatsAppQuickReply[];
+            readonly orderLinks: readonly WhatsAppInboxOrderLink[];
+            readonly nextCursor: string | null;
+          }
+          """
+          new = """export type WhatsAppInboxOrderLink = CachedWhatsAppOrderLink;
+
+          export interface WhatsAppInboxSnapshot extends CachedWhatsAppInboxSnapshot {
+            readonly nextCursor: string | null;
+          }
+          """
+          if new not in remote:
+              if old not in remote:
+                  raise SystemExit('whatsappRemote.ts: compatibility block did not match baseline')
+              remote = remote.replace(old, new)
+          remote_path.write_text(remote)
+
+          for path in [
+              'packages/persistence/src/browser/IndexedDbWhatsAppStore.ts',
+              'packages/persistence/src/sqlite/SqliteWhatsAppStore.ts',
+          ]:
+              p = Path(path)
+              text = p.read_text()
+              text = text.replace("import type { WhatsAppInboxSnapshot } from '@tux/application';\n", '')
+              text = text.replace(
+                  'async upsertRemoteSnapshot(snapshot: WhatsAppInboxSnapshot): Promise<void>',
+                  'async upsertRemoteSnapshot(snapshot: CachedWhatsAppInboxSnapshot): Promise<void>',
+              )
+              p.write_text(text)
+
+          for path in [
+              'packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts',
+              'packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts',
+          ]:
+              p = Path(path)
+              text = p.read_text()
+              text = text.replace("import type { WhatsAppInboxSnapshot } from '@tux/application';\n", '')
+              marker = "import { afterEach, describe, expect, it"
+              if "import type { CachedWhatsAppInboxSnapshot } from '../whatsappStore';" not in text:
+                  idx = text.find(marker)
+                  if idx < 0:
+                      raise SystemExit(f'{path}: vitest import marker not found')
+                  text = text[:idx] + "import type { CachedWhatsAppInboxSnapshot } from '../whatsappStore';\n" + text[idx:]
+              text = text.replace(
+                  "orderLinks?: WhatsAppInboxSnapshot['orderLinks'];",
+                  "orderLinks?: CachedWhatsAppInboxSnapshot['orderLinks'];",
+              )
+              text = text.replace('}): WhatsAppInboxSnapshot {', '}): CachedWhatsAppInboxSnapshot {')
+              text = text.replace('    nextCursor: null,\n', '')
+              p.write_text(text)
+
+          package = Path('package.json')
+          package_text = package.read_text()
+          if '"test:whatsapp-architecture"' not in package_text:
+              needle = '    "test": "vitest run",\n'
+              if needle not in package_text:
+                  raise SystemExit('package.json: test script marker not found')
+              package_text = package_text.replace(
+                  needle,
+                  needle + '    "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",\n',
+              )
+          package.write_text(package_text)
+          PY
+      - name: Format authorized files
+        run: |
+          npx prettier --write \
+            scripts/test-whatsapp-package-layering.mjs \
+            packages/persistence/src/whatsappStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/application/src/whatsappRemote.ts \
+            package.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Architecture GREEN
+        run: npm run test:whatsapp-architecture
+      - name: Persistence architecture negative grep
+        shell: bash
+        run: |
+          if git grep -n "@tux/application" -- packages/persistence/src; then
+            echo "Forbidden persistence -> application import remains." >&2
+            exit 1
+          fi
+          echo "Persistence architecture grep passed with 0 matches."
+      - name: Focused Task 5.1 regression
+        run: |
+          npm test -- \
+            packages/persistence/src/whatsappStore.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts
+      - name: Persistence typecheck
+        run: npm run typecheck -w @tux/persistence
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Schema immutability
+        shell: bash
+        run: |
+          schema_diff="$(git diff 66c981af26c4aa6779a414e78f3642c31ef4ee3e -- \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts \
+            supabase/migrations)"
+          if [ -n "$schema_diff" ]; then
+            printf '%s\n' "$schema_diff"
+            exit 1
+          fi
+          echo "Schema diff is empty."
+      - name: Assert exact source scope
+        shell: bash
+        run: |
+          git diff --name-only 66c981af26c4aa6779a414e78f3642c31ef4ee3e -- \
+            ':!.github/workflows/task5-1-green.yml' | sort > /tmp/actual
+          cat > /tmp/expected <<'EOF'
+          package.json
+          packages/application/src/whatsappRemote.ts
+          packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts
+          packages/persistence/src/browser/IndexedDbWhatsAppStore.ts
+          packages/persistence/src/index.ts
+          packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
+          packages/persistence/src/sqlite/SqliteWhatsAppStore.ts
+          packages/persistence/src/whatsappStore.ts
+          scripts/test-whatsapp-package-layering.mjs
+          EOF
+          sort -o /tmp/expected /tmp/expected
+          diff -u /tmp/expected /tmp/actual
+      - name: Commit verified Task 5.1 source
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            scripts/test-whatsapp-package-layering.mjs \
+            packages/persistence/src/whatsappStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/application/src/whatsappRemote.ts \
+            package.json; then
+            echo "Verified source already committed on this diagnostic GREEN branch."
+            exit 0
+          fi
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            scripts/test-whatsapp-package-layering.mjs \
+            packages/persistence/src/whatsappStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/application/src/whatsappRemote.ts \
+            package.json
+          git commit -m "refactor: remove WhatsApp persistence application dependency"
+          git push origin HEAD:${GITHUB_REF_NAME}
