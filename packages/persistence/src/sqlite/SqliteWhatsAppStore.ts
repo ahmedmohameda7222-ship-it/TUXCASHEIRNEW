@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
-import { instant } from '@tux/domain';
+import { assertWhatsAppMessageInvariant, instant } from '@tux/domain';
 import type {
   ShopId,
   WhatsAppConversation,
@@ -14,7 +14,20 @@ import type {
 } from '../whatsappStore';
 import { applySqliteMigrations } from './migrations';
 
-interface PayloadRow {
+interface FencedPayloadRow {
+  readonly id: string;
+  readonly shop_id: string;
+  readonly payload_json: string;
+}
+
+interface MessagePayloadRow extends FencedPayloadRow {
+  readonly conversation_id: string;
+}
+
+interface OrderLinkPayloadRow {
+  readonly shop_id: string;
+  readonly conversation_id: string;
+  readonly order_id: string;
   readonly payload_json: string;
 }
 
@@ -23,6 +36,68 @@ interface DraftRow {
   readonly conversation_id: string;
   readonly text: string;
   readonly updated_at: string;
+}
+
+function parseRecord(payloadJson: string, kind: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(payloadJson);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`Cached WhatsApp ${kind} payload must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function validateIdentity(
+  value: Record<string, unknown>,
+  row: FencedPayloadRow,
+  expectedShopId: ShopId,
+  kind: string,
+): void {
+  if (row.shop_id !== expectedShopId || value['shopId'] !== row.shop_id) {
+    throw new Error(`Cached WhatsApp ${kind} shop identity does not match the tenant-fenced row.`);
+  }
+  if (value['id'] !== row.id) {
+    throw new Error(`Cached WhatsApp ${kind} durable ID does not match the persisted row.`);
+  }
+}
+
+function parseConversation(row: FencedPayloadRow, expectedShopId: ShopId): WhatsAppConversation {
+  const value = parseRecord(row.payload_json, 'conversation');
+  validateIdentity(value, row, expectedShopId, 'conversation');
+  return value as unknown as WhatsAppConversation;
+}
+
+function parseMessage(row: MessagePayloadRow, expectedShopId: ShopId): WhatsAppMessage {
+  const value = parseRecord(row.payload_json, 'message');
+  validateIdentity(value, row, expectedShopId, 'message');
+  if (value['conversationId'] !== row.conversation_id) {
+    throw new Error('Cached WhatsApp message conversation identity does not match the persisted row.');
+  }
+  const message = value as unknown as WhatsAppMessage;
+  assertWhatsAppMessageInvariant(message);
+  return message;
+}
+
+function parseQuickReply(row: FencedPayloadRow, expectedShopId: ShopId): WhatsAppQuickReply {
+  const value = parseRecord(row.payload_json, 'quick reply');
+  validateIdentity(value, row, expectedShopId, 'quick reply');
+  return value as unknown as WhatsAppQuickReply;
+}
+
+function parseOrderLink(
+  row: OrderLinkPayloadRow,
+  expectedShopId: ShopId,
+): CachedWhatsAppInboxSnapshot['orderLinks'][number] {
+  if (row.shop_id !== expectedShopId) {
+    throw new Error('Cached WhatsApp order link shop identity does not match the tenant fence.');
+  }
+  const value = parseRecord(row.payload_json, 'order link');
+  if (value['conversationId'] !== row.conversation_id || value['orderId'] !== row.order_id) {
+    throw new Error('Cached WhatsApp order link identity does not match the persisted row.');
+  }
+  if (typeof value['linkedAt'] !== 'string') {
+    throw new Error('Cached WhatsApp order link linkedAt must be an instant string.');
+  }
+  return value as unknown as CachedWhatsAppInboxSnapshot['orderLinks'][number];
 }
 
 export class SqliteWhatsAppStore implements WhatsAppStore {
@@ -163,44 +238,42 @@ ON CONFLICT(id) DO UPDATE SET
     const database = this.#requireDatabase();
     const conversations = database
       .prepare(`
-SELECT payload_json
+SELECT id, shop_id, payload_json
 FROM whatsapp_cache_conversations
 WHERE shop_id = ?
 ORDER BY last_message_at DESC, id ASC
 `)
-      .all(shopId) as unknown as PayloadRow[];
+      .all(shopId) as unknown as FencedPayloadRow[];
     const messages = database
       .prepare(`
-SELECT payload_json
+SELECT id, shop_id, conversation_id, payload_json
 FROM whatsapp_cache_messages
 WHERE shop_id = ?
 ORDER BY created_at ASC, id ASC
 `)
-      .all(shopId) as unknown as PayloadRow[];
+      .all(shopId) as unknown as MessagePayloadRow[];
     const quickReplies = database
       .prepare(`
-SELECT payload_json
+SELECT id, shop_id, payload_json
 FROM whatsapp_cache_quick_replies
 WHERE shop_id = ?
 ORDER BY id ASC
 `)
-      .all(shopId) as unknown as PayloadRow[];
+      .all(shopId) as unknown as FencedPayloadRow[];
     const orderLinks = database
       .prepare(`
-SELECT payload_json
+SELECT shop_id, conversation_id, order_id, payload_json
 FROM whatsapp_cache_order_links
 WHERE shop_id = ?
 ORDER BY conversation_id ASC, order_id ASC
 `)
-      .all(shopId) as unknown as PayloadRow[];
+      .all(shopId) as unknown as OrderLinkPayloadRow[];
 
     return {
-      conversations: conversations.map((row) => JSON.parse(row.payload_json) as WhatsAppConversation),
-      messages: messages.map((row) => JSON.parse(row.payload_json) as WhatsAppMessage),
-      quickReplies: quickReplies.map((row) => JSON.parse(row.payload_json) as WhatsAppQuickReply),
-      orderLinks: orderLinks.map(
-        (row) => JSON.parse(row.payload_json) as CachedWhatsAppInboxSnapshot['orderLinks'][number],
-      ),
+      conversations: conversations.map((row) => parseConversation(row, shopId)),
+      messages: messages.map((row) => parseMessage(row, shopId)),
+      quickReplies: quickReplies.map((row) => parseQuickReply(row, shopId)),
+      orderLinks: orderLinks.map((row) => parseOrderLink(row, shopId)),
     };
   }
 
@@ -211,13 +284,18 @@ ORDER BY conversation_id ASC, order_id ASC
     const database = this.#requireDatabase();
     const rows = database
       .prepare(`
-SELECT payload_json
+SELECT id, shop_id, conversation_id, payload_json
 FROM whatsapp_cache_messages
 WHERE shop_id = ? AND conversation_id = ?
 ORDER BY created_at ASC, id ASC
 `)
-      .all(shopId, conversationId) as unknown as PayloadRow[];
-    return rows.map((row) => JSON.parse(row.payload_json) as WhatsAppMessage);
+      .all(shopId, conversationId) as unknown as MessagePayloadRow[];
+    return rows.map((row) => {
+      if (row.conversation_id !== conversationId) {
+        throw new Error('Cached WhatsApp message conversation does not match the requested fence.');
+      }
+      return parseMessage(row, shopId);
+    });
   }
 
   async saveDraft(draft: WhatsAppDraft): Promise<void> {
@@ -243,6 +321,9 @@ WHERE shop_id = ? AND conversation_id = ?
 `)
       .get(shopId, conversationId) as DraftRow | undefined;
     if (row === undefined) return null;
+    if (row.shop_id !== shopId || row.conversation_id !== conversationId) {
+      throw new Error('Cached WhatsApp draft identity does not match the requested tenant fence.');
+    }
     return {
       shopId: row.shop_id as ShopId,
       conversationId: row.conversation_id,
