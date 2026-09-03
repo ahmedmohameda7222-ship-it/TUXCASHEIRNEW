@@ -61,6 +61,7 @@ function ConversationRow({
 
   return (
     <button
+      key={conversation.id}
       type="button"
       className={
         selected
@@ -87,7 +88,10 @@ function ConversationRow({
             <span className="whatsapp-follow-up-indicator">Follow-up</span>
           ) : null}
           {conversation.unreadCount > 0 ? (
-            <span className="whatsapp-conversation-unread" aria-label={`${conversation.unreadCount} unread`}>
+            <span
+              className="whatsapp-conversation-unread"
+              aria-label={`${conversation.unreadCount} unread`}
+            >
               {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
             </span>
           ) : null}
@@ -119,7 +123,9 @@ function MessageBubble({ message }: { readonly message: WhatsAppMessage }) {
         <p className="whatsapp-message-placeholder">{whatsAppMessageKindLabel(message.kind)}</p>
       )}
       {message.direction === 'OUTBOUND' && !system ? (
-        <span className={`whatsapp-message-status whatsapp-message-status-${message.status.toLowerCase()}`}>
+        <span
+          className={`whatsapp-message-status whatsapp-message-status-${message.status.toLowerCase()}`}
+        >
           {whatsAppStatusLabel(message.status)}
         </span>
       ) : null}
@@ -312,24 +318,19 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
           {state.visibleConversations.length === 0 ? (
             <p className="whatsapp-empty-copy">No conversations match this view.</p>
           ) : (
-            state.visibleConversations.map((conversation) => (
-              <ConversationRow
-                key={conversation.id}
-                conversation={conversation}
-                messages={snapshotMessages}
-                selected={conversation.id === state.selectedConversationId}
-                onSelect={() => void controller.selectConversation(conversation.id)}
-              />
-            ))
+            state.visibleConversations.map((conversation) =>
+              ConversationRow({
+                conversation,
+                messages: snapshotMessages,
+                selected: conversation.id === state.selectedConversationId,
+                onSelect: () => void controller.selectConversation(conversation.id),
+              }),
+            )
           )}
         </div>
       </aside>
 
-      <ConversationPanel
-        controller={controller}
-        state={state}
-        conversation={selectedConversation}
-      />
+      {ConversationPanel({ controller, state, conversation: selectedConversation })}
     </section>
   );
 }
