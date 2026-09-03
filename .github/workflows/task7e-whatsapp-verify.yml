@@ -1,0 +1,156 @@
+name: Task 7E WhatsApp diagnostic verification
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7e-verify
+
+permissions:
+  contents: read
+
+jobs:
+  task7e:
+    name: task7e
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      TASK7_BASELINE: 2a39d9bfaf8622907646294fba8515854d4c3834
+      TASK7_CANDIDATE: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out permanent Task 7 candidate
+        uses: actions/checkout@v7
+        with:
+          ref: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Focused Task 7 suites
+        run: |
+          npm test -- \
+            apps/operations/src/app/whatsappView.test.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            apps/operations/src/app/WhatsAppWorkspace.test.tsx \
+            apps/operations/src/app/App.whatsapp.test.tsx \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsappWire.test.ts
+      - name: Task 6 runtime regressions
+        run: |
+          npm test -- \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            server/operationsDeviceAuthority.test.ts \
+            server/whatsappOperationsGateway.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts \
+            apps/operations-desktop/src/main/security.test.ts \
+            apps/operations-desktop/src/main/session.integration.test.ts \
+            apps/operations-desktop/src/preload/sessionResult.test.ts
+      - name: WhatsApp architecture guard
+        run: npm run test:whatsapp-architecture
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Migration smoke
+        run: npm run test:migrations
+      - name: Provider secret and authority fence
+        shell: bash
+        run: |
+          set -euo pipefail
+          added_lines="$(git diff --unified=0 "$TASK7_BASELINE" "$TASK7_CANDIDATE" -- \
+            apps/operations/src/app/whatsappView.ts \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/WhatsAppWorkspace.tsx \
+            apps/operations/src/app/App.tsx \
+            | grep '^+' | grep -v '^+++' || true)"
+          if printf '%s\n' "$added_lines" | grep -En 'sendMedia|graph\.facebook\.com|TUX_WHATSAPP_ACCESS_TOKEN|TUX_WHATSAPP_APP_SECRET|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN|SUPABASE_SERVICE_ROLE_KEY|TUX_SUPABASE_SERVICE_ROLE_KEY|providerPhoneNumberId'; then
+            echo 'Forbidden provider/secret/sendMedia token entered Task 7 production additions.' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$added_lines" | grep -En '\b(workerId|businessDayId|shopId|deviceId)\b'; then
+            echo 'Worker/tenant/device authority entered Task 7 production additions.' >&2
+            exit 1
+          fi
+      - name: Quick reply and media fences
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            apps/operations/src/app/WhatsAppWorkspace.tsx
+            apps/operations/src/app/whatsappInboxController.ts
+            apps/operations/src/app/whatsappView.ts
+          )
+          if grep -Pn '[\x{0600}-\x{06FF}]' "${files[@]}"; then
+            echo 'Hard-coded Arabic production quick-reply text detected.' >&2
+            exit 1
+          fi
+          if grep -Ein 'sendMedia|type=["'"']file["'"']|attachment[^a-zA-Z].*(button|input)|upload[^a-zA-Z].*(button|input)' apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Attachment/media-send affordance detected.' >&2
+            exit 1
+          fi
+          if grep -Ein 'mediaRef|provider.*url|graph\.facebook\.com' apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Provider media fetch/render path detected.' >&2
+            exit 1
+          fi
+      - name: Migration immutability
+        run: |
+          git diff --exit-code "$TASK7_BASELINE" "$TASK7_CANDIDATE" -- \
+            supabase/migrations \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts
+      - name: Package immutability
+        run: |
+          git diff --exit-code "$TASK7_BASELINE" "$TASK7_CANDIDATE" -- \
+            package-lock.json \
+            apps/operations/package.json \
+            apps/operations-desktop/package.json
+      - name: Permanent Task 7 source scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed='^(apps/operations/src/app/whatsappView\.ts|apps/operations/src/app/whatsappView\.test\.ts|apps/operations/src/app/whatsappInboxController\.ts|apps/operations/src/app/whatsappInboxController\.test\.ts|apps/operations/src/app/WhatsAppWorkspace\.tsx|apps/operations/src/app/WhatsAppWorkspace\.test\.tsx|apps/operations/src/app/App\.tsx|apps/operations/src/app/App\.whatsapp\.test\.tsx|apps/operations/src/styles/global\.css|apps/operations/src/app/icons\.tsx)$'
+          changed="$(git diff --name-only "$TASK7_BASELINE" "$TASK7_CANDIDATE")"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -Ev "$allowed"; then
+            echo 'Permanent Task 7 source scope expanded.' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$changed" | grep -E '^\.github/workflows/'; then
+            echo 'Permanent workflow change detected.' >&2
+            exit 1
+          fi
+      - name: Candidate working tree clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(git status --short)"
+          printf '%s' "$status"
+          test -z "$status"
