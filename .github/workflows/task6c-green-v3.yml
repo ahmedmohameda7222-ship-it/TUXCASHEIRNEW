@@ -1,0 +1,50 @@
+name: Task 6C GREEN V3
+on:
+  push:
+    branches: [feat/ops-whatsapp-task6c-green]
+    paths: [.github/workflows/task6c-green-v3.yml]
+permissions:
+  contents: write
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Correct only the reused Response test fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts')
+          s = p.read_text()
+          old = "const fetcher = vi.fn().mockResolvedValue(inboxResponse());"
+          new = "const fetcher = vi.fn().mockImplementation(async () => inboxResponse());"
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one reusable-response fixture, found {s.count(old)}')
+          p.write_text(s.replace(old, new))
+          PY
+      - name: Format Task 6C files
+        run: npx prettier --write apps/operations-desktop/src/main/desktopWhatsAppRemote.ts apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+      - name: Focused Task 6C tests
+        run: npm test -- apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts packages/application/src/whatsappWire.test.ts packages/sync/src/supabaseDeviceSession.test.ts
+      - name: Desktop typecheck
+        run: npm run typecheck -w @tux/operations-desktop
+      - name: Security and manifest fencing
+        run: |
+          test -z "$(git grep -n 'refreshToken' -- apps/operations-desktop/src/main/desktopWhatsAppRemote.ts || true)"
+          test -z "$(git grep -n 'graph.facebook.com\|SUPABASE_SERVICE_ROLE_KEY\|TUX_SUPABASE_SERVICE_ROLE_KEY\|TUX_WHATSAPP_ACCESS_TOKEN\|TUX_WHATSAPP_APP_SECRET\|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN' -- apps/operations-desktop/src/main/desktopWhatsAppRemote.ts || true)"
+          git diff --exit-code HEAD -- apps/operations-desktop/package.json packages/sync/package.json package.json package-lock.json packages/persistence/src/sqlite/migrations.ts packages/persistence/src/browser/indexedDbMigrations.ts supabase/migrations
+      - name: Commit verified Task 6C source only
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add apps/operations-desktop/src/main/desktopWhatsAppRemote.ts apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+          git diff --cached --quiet && exit 1
+          git commit -m "feat: add desktop WhatsApp remote adapter"
+          git push origin HEAD:feat/ops-whatsapp-task6c-green
