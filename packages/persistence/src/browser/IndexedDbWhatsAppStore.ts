@@ -1,4 +1,3 @@
-import type { WhatsAppInboxSnapshot } from '@tux/application';
 import { assertWhatsAppMessageInvariant, instant } from '@tux/domain';
 import type {
   ShopId,
@@ -125,7 +124,7 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
     }
   }
 
-  async upsertRemoteSnapshot(snapshot: WhatsAppInboxSnapshot): Promise<void> {
+  async upsertRemoteSnapshot(snapshot: CachedWhatsAppInboxSnapshot): Promise<void> {
     const database = this.#requireDatabase();
     const conversationShops = new Map(
       snapshot.conversations.map((conversation) => [conversation.id, conversation.shopId] as const),

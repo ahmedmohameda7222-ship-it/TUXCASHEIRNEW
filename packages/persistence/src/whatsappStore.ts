@@ -1,11 +1,17 @@
-import type { WhatsAppInboxOrderLink, WhatsAppInboxSnapshot } from '@tux/application';
 import type {
   Instant,
+  OrderId,
   ShopId,
   WhatsAppConversation,
   WhatsAppMessage,
   WhatsAppQuickReply,
 } from '@tux/domain';
+
+export interface CachedWhatsAppOrderLink {
+  readonly conversationId: string;
+  readonly orderId: OrderId;
+  readonly linkedAt: Instant;
+}
 
 export interface WhatsAppDraft {
   readonly shopId: ShopId;
@@ -18,12 +24,12 @@ export interface CachedWhatsAppInboxSnapshot {
   readonly conversations: readonly WhatsAppConversation[];
   readonly messages: readonly WhatsAppMessage[];
   readonly quickReplies: readonly WhatsAppQuickReply[];
-  readonly orderLinks: readonly WhatsAppInboxOrderLink[];
+  readonly orderLinks: readonly CachedWhatsAppOrderLink[];
 }
 
 export interface WhatsAppStore {
   initialize(): Promise<void>;
-  upsertRemoteSnapshot(snapshot: WhatsAppInboxSnapshot): Promise<void>;
+  upsertRemoteSnapshot(snapshot: CachedWhatsAppInboxSnapshot): Promise<void>;
   upsertMessage(message: WhatsAppMessage): Promise<void>;
   loadInbox(shopId: ShopId): Promise<CachedWhatsAppInboxSnapshot>;
   listMessages(shopId: ShopId, conversationId: string): Promise<readonly WhatsAppMessage[]>;
