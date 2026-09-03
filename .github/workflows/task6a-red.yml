@@ -1,0 +1,22 @@
+name: Task 6A RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6a-red
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Expected compile RED
+        run: npm run typecheck -w @tux/application
