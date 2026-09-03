@@ -1,0 +1,574 @@
+name: Task 6A GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6a-green
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    if: github.event.head_commit.message == 'test: run Task 6A GREEN'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply Task 6A source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          remote = Path('packages/application/src/whatsappRemote.ts')
+          source = remote.read_text()
+          old = "  | 'DELIVERY_UNCERTAIN'\n  | 'REMOTE_UNAVAILABLE';"
+          new = "  | 'DELIVERY_UNCERTAIN'\n  | 'REMOTE_UNAVAILABLE'\n  | 'DEVICE_AUTH_INVALID';"
+          assert old in source
+          remote.write_text(source.replace(old, new, 1))
+
+          service = Path('packages/application/src/whatsapp.ts')
+          source = service.read_text()
+          old = "    code === 'DELIVERY_UNCERTAIN' ||\n    code === 'REMOTE_UNAVAILABLE'\n    ? code"
+          new = "    code === 'DELIVERY_UNCERTAIN' ||\n    code === 'REMOTE_UNAVAILABLE' ||\n    code === 'DEVICE_AUTH_INVALID'\n    ? code"
+          assert old in source
+          source = source.replace(old, new, 1)
+          old = "  if (code === 'DELIVERY_UNCERTAIN') {\n    return remoteSync('WhatsApp delivery is not confirmed yet.', error);\n  }\n  return remoteSync('WhatsApp remote operation failed.', error);"
+          new = "  if (code === 'DELIVERY_UNCERTAIN') {\n    return remoteSync('WhatsApp delivery is not confirmed yet.', error);\n  }\n  if (code === 'DEVICE_AUTH_INVALID') {\n    return remoteSync('The enrolled Operations device session is no longer valid.', error);\n  }\n  return remoteSync('WhatsApp remote operation failed.', error);"
+          assert old in source
+          service.write_text(source.replace(old, new, 1))
+
+          test_path = Path('packages/application/src/whatsapp.test.ts')
+          source = test_path.read_text()
+          old_import = "import type { WhatsAppInboxSnapshot, WhatsAppRemoteGateway } from './whatsappRemote';"
+          new_import = "import { WhatsAppRemoteError, type WhatsAppInboxSnapshot, type WhatsAppRemoteGateway } from './whatsappRemote';"
+          assert old_import in source
+          source = source.replace(old_import, new_import, 1)
+          marker = "  it('upserts a successful durable outbound message locally exactly once', async () => {"
+          test = """  it('does not treat authoritative device invalidation as transient cached-offline availability', async () => {\n    vi.mocked(remote.loadInbox).mockRejectedValue(\n      new WhatsAppRemoteError('DEVICE_AUTH_INVALID', 'Device session is invalid.'),\n    );\n    const service = new OperationsWhatsAppService(remote, store, session, () => now);\n\n    const result = await service.loadInbox();\n\n    expect(result).toMatchObject({ ok: false, error: { code: 'REMOTE_SYNC_ERROR' } });\n    expect(store.loadInbox).not.toHaveBeenCalled();\n  });\n\n"""
+          assert marker in source
+          test_path.write_text(source.replace(marker, test + marker, 1))
+
+          index = Path('packages/application/src/index.ts')
+          source = index.read_text()
+          marker = "export { WhatsAppRemoteError } from './whatsappRemote';\n"
+          addition = "export {\n  parseWhatsAppInboxSnapshot,\n  parseWhatsAppMessage,\n  throwWhatsAppHttpError,\n} from './whatsappWire';\n"
+          assert marker in source
+          index.write_text(source.replace(marker, marker + addition, 1))
+
+          browser_test = Path('apps/operations/src/app/browserWhatsAppRemote.test.ts')
+          source = browser_test.read_text()
+          marker = "  it('maps Current Operator mismatch to a typed safe error', async () => {"
+          test = """  it('maps authoritative device rejection separately from transient remote unavailability', async () => {\n    vi.stubGlobal(\n      'fetch',\n      vi.fn().mockResolvedValue(json(401, { error: 'device_session_invalid' })),\n    );\n\n    await expect(new VercelBrowserWhatsAppRemote().loadInbox()).rejects.toMatchObject({\n      code: 'DEVICE_AUTH_INVALID',\n      messageId: null,\n    });\n  });\n\n"""
+          assert marker in source
+          browser_test.write_text(source.replace(marker, test + marker, 1))
+          PY
+
+          cat > packages/application/src/whatsappWire.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { WhatsAppRemoteError } from './whatsappRemote';
+          import {
+            parseWhatsAppInboxSnapshot,
+            parseWhatsAppMessage,
+            throwWhatsAppHttpError,
+          } from './whatsappWire';
+
+          const inboundMessage = {
+            id: '50000000-0000-4000-8000-000000000001',
+            shopId: '60000000-0000-4000-8000-000000000001',
+            conversationId: '40000000-0000-4000-8000-000000000001',
+            providerMessageId: 'wamid.1',
+            outboundIntentKey: null,
+            direction: 'INBOUND',
+            kind: 'TEXT',
+            text: 'hello',
+            mediaRef: null,
+            status: 'DELIVERED',
+            sentByWorkerId: null,
+            initiatedByDeviceId: null,
+            initiatedAt: null,
+            createdAt: '2026-09-03T12:00:00.000Z',
+          };
+
+          function capture(action: () => never): WhatsAppRemoteError {
+            try {
+              action();
+            } catch (error) {
+              expect(error).toBeInstanceOf(WhatsAppRemoteError);
+              return error as WhatsAppRemoteError;
+            }
+            throw new Error('Expected WhatsAppRemoteError.');
+          }
+
+          describe('WhatsApp wire codec', () => {
+            it('parses durable message and inbox payloads with domain validation', () => {
+              expect(parseWhatsAppMessage(inboundMessage)).toMatchObject({
+                id: inboundMessage.id,
+                text: 'hello',
+              });
+              expect(
+                parseWhatsAppInboxSnapshot({
+                  conversations: [],
+                  messages: [inboundMessage],
+                  quickReplies: [],
+                  orderLinks: [],
+                  nextCursor: null,
+                }).messages,
+              ).toHaveLength(1);
+            });
+
+            it('rejects a malformed outbound message that violates the domain invariant', () => {
+              expect(() =>
+                parseWhatsAppMessage({
+                  ...inboundMessage,
+                  direction: 'OUTBOUND',
+                  providerMessageId: null,
+                  outboundIntentKey: null,
+                }),
+              ).toThrow();
+            });
+
+            it.each([
+              'device_authentication_required',
+              'device_session_invalid',
+              'device_authority_invalid',
+            ])('maps %s to DEVICE_AUTH_INVALID', (error) => {
+              expect(capture(() => throwWhatsAppHttpError(401, { error }))).toMatchObject({
+                code: 'DEVICE_AUTH_INVALID',
+                messageId: null,
+              });
+            });
+
+            it('preserves Current Operator and outbound-intent conflict mappings', () => {
+              expect(
+                capture(() =>
+                  throwWhatsAppHttpError(409, {
+                    error: 'whatsapp_operator_not_synchronized',
+                  }),
+                ),
+              ).toMatchObject({ code: 'OPERATOR_NOT_SYNCHRONIZED', messageId: null });
+              expect(
+                capture(() =>
+                  throwWhatsAppHttpError(409, {
+                    error: 'whatsapp_outbound_intent_conflict',
+                  }),
+                ),
+              ).toMatchObject({ code: 'OUTBOUND_INTENT_CONFLICT', messageId: null });
+            });
+
+            it('preserves delivery uncertainty with only the durable message id', () => {
+              const error = capture(() =>
+                throwWhatsAppHttpError(503, {
+                  error: 'whatsapp_delivery_uncertain',
+                  messageId: inboundMessage.id,
+                  providerDiagnostic: 'hidden',
+                }),
+              );
+              expect(error).toMatchObject({
+                code: 'DELIVERY_UNCERTAIN',
+                messageId: inboundMessage.id,
+              });
+              expect(error.message).not.toContain('hidden');
+            });
+
+            it('maps every other HTTP failure, including malformed error payloads, to REMOTE_UNAVAILABLE', () => {
+              expect(capture(() => throwWhatsAppHttpError(500, { error: 'unexpected' }))).toMatchObject({
+                code: 'REMOTE_UNAVAILABLE',
+                messageId: null,
+              });
+              expect(capture(() => throwWhatsAppHttpError(401, 'invalid'))).toMatchObject({
+                code: 'REMOTE_UNAVAILABLE',
+                messageId: null,
+              });
+            });
+          });
+          EOF
+
+          cat > packages/application/src/whatsappWire.ts <<'EOF'
+          import {
+            assertWhatsAppMessageInvariant,
+            instant,
+            parseEntityId,
+            type DeviceId,
+            type OrderId,
+            type ShopId,
+            type WhatsAppConversation,
+            type WhatsAppConversationContext,
+            type WhatsAppMessage,
+            type WhatsAppMessageDirection,
+            type WhatsAppMessageKind,
+            type WhatsAppMessageStatus,
+            type WhatsAppQuickReply,
+            type WhatsAppQuickReplyCategory,
+            type WorkerId,
+          } from '@tux/domain';
+          import {
+            WhatsAppRemoteError,
+            type WhatsAppInboxOrderLink,
+            type WhatsAppInboxSnapshot,
+          } from './whatsappRemote';
+
+          function object(value: unknown, label: string): Record<string, unknown> {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new TypeError(`${label} must be an object.`);
+            }
+            return value as Record<string, unknown>;
+          }
+
+          function requiredString(value: unknown, label: string): string {
+            if (typeof value !== 'string' || value.trim().length === 0) {
+              throw new TypeError(`${label} is required.`);
+            }
+            return value.trim();
+          }
+
+          function nullableString(value: unknown, label: string): string | null {
+            if (value === null) return null;
+            if (typeof value !== 'string') throw new TypeError(`${label} must be a string or null.`);
+            return value;
+          }
+
+          function requiredBoolean(value: unknown, label: string): boolean {
+            if (typeof value !== 'boolean') throw new TypeError(`${label} must be a boolean.`);
+            return value;
+          }
+
+          function nonNegativeInteger(value: unknown, label: string): number {
+            if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+              throw new TypeError(`${label} must be a non-negative integer.`);
+            }
+            return value;
+          }
+
+          function enumValue<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
+            if (typeof value !== 'string' || !allowed.includes(value as T)) {
+              throw new TypeError(`${label} is invalid.`);
+            }
+            return value as T;
+          }
+
+          function nullableInstant(value: unknown, label: string) {
+            if (value === null) return null;
+            return instant(requiredString(value, label));
+          }
+
+          export function parseWhatsAppMessage(value: unknown): WhatsAppMessage {
+            const source = object(value, 'WhatsApp message');
+            const message: WhatsAppMessage = {
+              id: requiredString(source['id'], 'WhatsApp message id'),
+              shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp message shopId')),
+              conversationId: requiredString(source['conversationId'], 'WhatsApp message conversationId'),
+              providerMessageId: nullableString(
+                source['providerMessageId'],
+                'WhatsApp message providerMessageId',
+              ),
+              outboundIntentKey: nullableString(
+                source['outboundIntentKey'],
+                'WhatsApp message outboundIntentKey',
+              ),
+              direction: enumValue<WhatsAppMessageDirection>(
+                source['direction'],
+                ['INBOUND', 'OUTBOUND'],
+                'WhatsApp message direction',
+              ),
+              kind: enumValue<WhatsAppMessageKind>(
+                source['kind'],
+                ['TEXT', 'IMAGE', 'DOCUMENT', 'AUDIO', 'LOCATION', 'SYSTEM'],
+                'WhatsApp message kind',
+              ),
+              text: nullableString(source['text'], 'WhatsApp message text'),
+              mediaRef: nullableString(source['mediaRef'], 'WhatsApp message mediaRef'),
+              status: enumValue<WhatsAppMessageStatus>(
+                source['status'],
+                ['PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'],
+                'WhatsApp message status',
+              ),
+              sentByWorkerId:
+                source['sentByWorkerId'] === null
+                  ? null
+                  : parseEntityId<WorkerId>(
+                      requiredString(source['sentByWorkerId'], 'WhatsApp message sentByWorkerId'),
+                    ),
+              initiatedByDeviceId:
+                source['initiatedByDeviceId'] === null
+                  ? null
+                  : parseEntityId<DeviceId>(
+                      requiredString(
+                        source['initiatedByDeviceId'],
+                        'WhatsApp message initiatedByDeviceId',
+                      ),
+                    ),
+              initiatedAt: nullableInstant(source['initiatedAt'], 'WhatsApp message initiatedAt'),
+              createdAt: instant(requiredString(source['createdAt'], 'WhatsApp message createdAt')),
+            };
+            assertWhatsAppMessageInvariant(message);
+            return message;
+          }
+
+          function parseConversation(value: unknown): WhatsAppConversation {
+            const source = object(value, 'WhatsApp conversation');
+            return {
+              id: requiredString(source['id'], 'WhatsApp conversation id'),
+              shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp conversation shopId')),
+              normalizedPhone: requiredString(
+                source['normalizedPhone'],
+                'WhatsApp conversation normalizedPhone',
+              ),
+              displayPhone: requiredString(source['displayPhone'], 'WhatsApp conversation displayPhone'),
+              customerName: nullableString(source['customerName'], 'WhatsApp conversation customerName'),
+              context: enumValue<WhatsAppConversationContext>(
+                source['context'],
+                ['DIRECT', 'WEB_REQUEST', 'ORDER_LINKED'],
+                'WhatsApp conversation context',
+              ),
+              linkedOrderId:
+                source['linkedOrderId'] === null
+                  ? null
+                  : parseEntityId<OrderId>(
+                      requiredString(source['linkedOrderId'], 'WhatsApp conversation linkedOrderId'),
+                    ),
+              unreadCount: nonNegativeInteger(source['unreadCount'], 'WhatsApp conversation unreadCount'),
+              archived: requiredBoolean(source['archived'], 'WhatsApp conversation archived'),
+              followUp: requiredBoolean(source['followUp'], 'WhatsApp conversation followUp'),
+              lastMessageAt: nullableInstant(source['lastMessageAt'], 'WhatsApp conversation lastMessageAt'),
+            };
+          }
+
+          function parseQuickReply(value: unknown): WhatsAppQuickReply {
+            const source = object(value, 'WhatsApp quick reply');
+            return {
+              id: requiredString(source['id'], 'WhatsApp quick reply id'),
+              shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp quick reply shopId')),
+              category: enumValue<WhatsAppQuickReplyCategory>(
+                source['category'],
+                ['PREPARATION', 'DELIVERY', 'ADDRESS', 'PAYMENT', 'DELAY', 'THANKS'],
+                'WhatsApp quick reply category',
+              ),
+              language: enumValue(
+                source['language'],
+                ['ar-EG', 'en'] as const,
+                'WhatsApp quick reply language',
+              ),
+              text: requiredString(source['text'], 'WhatsApp quick reply text'),
+              usageCount: nonNegativeInteger(source['usageCount'], 'WhatsApp quick reply usageCount'),
+              active: requiredBoolean(source['active'], 'WhatsApp quick reply active'),
+            };
+          }
+
+          function parseOrderLink(value: unknown): WhatsAppInboxOrderLink {
+            const source = object(value, 'WhatsApp order link');
+            return {
+              conversationId: requiredString(source['conversationId'], 'WhatsApp order link conversationId'),
+              orderId: parseEntityId<OrderId>(
+                requiredString(source['orderId'], 'WhatsApp order link orderId'),
+              ),
+              linkedAt: instant(requiredString(source['linkedAt'], 'WhatsApp order link linkedAt')),
+            };
+          }
+
+          export function parseWhatsAppInboxSnapshot(value: unknown): WhatsAppInboxSnapshot {
+            const source = object(value, 'WhatsApp inbox response');
+            if (
+              !Array.isArray(source['conversations']) ||
+              !Array.isArray(source['messages']) ||
+              !Array.isArray(source['quickReplies']) ||
+              !Array.isArray(source['orderLinks'])
+            ) {
+              throw new TypeError('WhatsApp inbox response is invalid.');
+            }
+            const nextCursor = source['nextCursor'];
+            if (nextCursor !== null && typeof nextCursor !== 'string') {
+              throw new TypeError('WhatsApp inbox cursor is invalid.');
+            }
+            return {
+              conversations: source['conversations'].map(parseConversation),
+              messages: source['messages'].map(parseWhatsAppMessage),
+              quickReplies: source['quickReplies'].map(parseQuickReply),
+              orderLinks: source['orderLinks'].map(parseOrderLink),
+              nextCursor,
+            };
+          }
+
+          export function throwWhatsAppHttpError(status: number, payload: unknown): never {
+            const source =
+              typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+                ? (payload as Record<string, unknown>)
+                : {};
+            const code = typeof source['error'] === 'string' ? source['error'] : '';
+
+            if (status === 409 && code === 'whatsapp_operator_not_synchronized') {
+              throw new WhatsAppRemoteError(
+                'OPERATOR_NOT_SYNCHRONIZED',
+                'WhatsApp Current Operator is not synchronized.',
+              );
+            }
+            if (status === 409 && code === 'whatsapp_outbound_intent_conflict') {
+              throw new WhatsAppRemoteError(
+                'OUTBOUND_INTENT_CONFLICT',
+                'WhatsApp outbound intent conflicts with an existing message.',
+              );
+            }
+            if (
+              status === 503 &&
+              code === 'whatsapp_delivery_uncertain' &&
+              typeof source['messageId'] === 'string' &&
+              source['messageId'].trim().length > 0
+            ) {
+              throw new WhatsAppRemoteError(
+                'DELIVERY_UNCERTAIN',
+                'WhatsApp delivery is not confirmed yet.',
+                source['messageId'].trim(),
+              );
+            }
+            if (
+              status === 401 &&
+              (code === 'device_authentication_required' ||
+                code === 'device_session_invalid' ||
+                code === 'device_authority_invalid')
+            ) {
+              throw new WhatsAppRemoteError(
+                'DEVICE_AUTH_INVALID',
+                'The enrolled Operations device session is no longer valid.',
+              );
+            }
+            throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp request failed.');
+          }
+          EOF
+
+          cat > apps/operations/src/app/browserWhatsAppRemote.ts <<'EOF'
+          import {
+            parseWhatsAppInboxSnapshot,
+            parseWhatsAppMessage,
+            throwWhatsAppHttpError,
+            WhatsAppRemoteError,
+            type WhatsAppInboxSnapshot,
+            type WhatsAppRemoteGateway,
+          } from '@tux/application';
+          import type { WhatsAppMessage } from '@tux/domain';
+
+          function responseObject(value: unknown): Record<string, unknown> {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new WhatsAppRemoteError(
+                'REMOTE_UNAVAILABLE',
+                'WhatsApp remote returned an invalid response.',
+              );
+            }
+            return value as Record<string, unknown>;
+          }
+
+          async function requestJson(
+            method: 'GET' | 'POST',
+            url: string,
+            body?: Readonly<Record<string, unknown>>,
+          ): Promise<unknown> {
+            let response: Response;
+            try {
+              response = await fetch(url, {
+                method,
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers:
+                  body === undefined
+                    ? { accept: 'application/json' }
+                    : { accept: 'application/json', 'content-type': 'application/json' },
+                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+              });
+            } catch {
+              throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is unavailable.');
+            }
+
+            let payload: unknown;
+            try {
+              payload = await response.json();
+            } catch {
+              throw new WhatsAppRemoteError(
+                'REMOTE_UNAVAILABLE',
+                'WhatsApp remote returned an invalid response.',
+              );
+            }
+
+            if (!response.ok) throwWhatsAppHttpError(response.status, payload);
+            return payload;
+          }
+
+          async function mutate(body: Readonly<Record<string, unknown>>): Promise<void> {
+            await requestJson('POST', '/api/whatsapp', body);
+          }
+
+          export class VercelBrowserWhatsAppRemote implements WhatsAppRemoteGateway {
+            async loadInbox(cursor?: string): Promise<WhatsAppInboxSnapshot> {
+              const url =
+                cursor === undefined
+                  ? '/api/whatsapp'
+                  : `/api/whatsapp?after=${encodeURIComponent(cursor)}`;
+              return parseWhatsAppInboxSnapshot(await requestJson('GET', url));
+            }
+
+            async sendText(
+              input: Parameters<WhatsAppRemoteGateway['sendText']>[0],
+            ): Promise<WhatsAppMessage> {
+              const payload = responseObject(
+                await requestJson('POST', '/api/whatsapp', {
+                  action: 'SEND_MESSAGE',
+                  businessDayId: input.businessDayId,
+                  workerId: input.workerId,
+                  conversationId: input.conversationId,
+                  outboundIntentKey: input.outboundIntentKey,
+                  text: input.text,
+                }),
+              );
+              return parseWhatsAppMessage(payload['message']);
+            }
+
+            async markUnread(conversationId: string): Promise<void> {
+              await mutate({ action: 'MARK_UNREAD', conversationId });
+            }
+
+            async archive(conversationId: string, archived = true): Promise<void> {
+              await mutate({ action: 'ARCHIVE', conversationId, archived });
+            }
+
+            async setFollowUp(conversationId: string, followUp: boolean): Promise<void> {
+              await mutate({ action: 'FOLLOW_UP', conversationId, followUp });
+            }
+
+            async linkOrder(input: Parameters<WhatsAppRemoteGateway['linkOrder']>[0]): Promise<void> {
+              await mutate({
+                action: 'LINK_ORDER',
+                businessDayId: input.businessDayId,
+                workerId: input.workerId,
+                conversationId: input.conversationId,
+                orderId: input.orderId,
+                linked: input.linked ?? true,
+              });
+            }
+          }
+          EOF
+      - name: Format Task 6A files
+        run: npx prettier --write packages/application/src/whatsappWire.ts packages/application/src/whatsappWire.test.ts packages/application/src/whatsappRemote.ts packages/application/src/whatsapp.ts packages/application/src/whatsapp.test.ts packages/application/src/index.ts apps/operations/src/app/browserWhatsAppRemote.ts apps/operations/src/app/browserWhatsAppRemote.test.ts
+      - name: Verify Task 6A GREEN
+        run: |
+          npm test -- packages/application/src/whatsappWire.test.ts apps/operations/src/app/browserWhatsAppRemote.test.ts packages/application/src/whatsapp.test.ts
+          npm run typecheck -w @tux/application
+          npm run typecheck -w @tux/operations
+          npm run test:whatsapp-architecture
+      - name: Commit verified Task 6A source
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            packages/application/src/whatsappWire.ts \
+            packages/application/src/whatsappWire.test.ts \
+            packages/application/src/whatsappRemote.ts \
+            packages/application/src/whatsapp.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/index.ts \
+            apps/operations/src/app/browserWhatsAppRemote.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts
+          test -z "$(git status --short | grep -v '^??' | grep -v '^ M .github/workflows/task6a-green.yml' | grep -v '^M  ' || true)"
+          git commit -m "refactor: share WhatsApp wire contract"
+          git push origin HEAD:feat/ops-whatsapp-task6a-green
