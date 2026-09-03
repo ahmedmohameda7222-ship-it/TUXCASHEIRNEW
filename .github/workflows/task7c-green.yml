@@ -49,7 +49,7 @@ jobs:
             echo 'Forbidden provider or privileged surface found in Task 7C workspace.' >&2
             exit 1
           fi
-          if git grep -n -E 'type=["'"']file["'"']|upload|attachment' -- apps/operations/src/app/WhatsAppWorkspace.tsx; then
+          if git grep -n -E 'type=.*file|upload|attachment' -- apps/operations/src/app/WhatsAppWorkspace.tsx; then
             echo 'Forbidden media-send affordance found in Task 7C workspace.' >&2
             exit 1
           fi
