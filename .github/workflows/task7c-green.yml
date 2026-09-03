@@ -1,0 +1,63 @@
+name: Task 7C GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7c-green
+
+permissions:
+  contents: read
+
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Task 7C focused tests
+        run: npm test -- apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/app/whatsappView.test.ts
+      - name: Operations typecheck
+        run: npm run typecheck -w @tux/operations
+      - name: Task 7C targeted lint
+        run: npx eslint apps/operations/src/app/WhatsAppWorkspace.tsx apps/operations/src/app/WhatsAppWorkspace.test.tsx --max-warnings 0
+      - name: Task 7C targeted format
+        run: npx prettier --check apps/operations/src/app/WhatsAppWorkspace.tsx apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/styles/global.css
+      - name: Task 7C security fence
+        shell: bash
+        run: |
+          if git grep -n -E 'sendMedia|graph\.facebook\.com|TUX_WHATSAPP_ACCESS_TOKEN|TUX_WHATSAPP_APP_SECRET|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN|SUPABASE_SERVICE_ROLE_KEY|TUX_SUPABASE_SERVICE_ROLE_KEY|providerPhoneNumberId' -- apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Forbidden provider or privileged surface found in Task 7C workspace.' >&2
+            exit 1
+          fi
+          if git grep -n -E 'type=["'"']file["'"']|upload|attachment' -- apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Forbidden media-send affordance found in Task 7C workspace.' >&2
+            exit 1
+          fi
+      - name: Task 7C migration and package immutability
+        run: |
+          git diff --exit-code 2a39d9bfaf8622907646294fba8515854d4c3834 -- supabase/migrations packages/persistence/src/sqlite/migrations.ts packages/persistence/src/browser/indexedDbMigrations.ts
+          git diff --exit-code 2a39d9bfaf8622907646294fba8515854d4c3834 -- package-lock.json apps/operations/package.json apps/operations-desktop/package.json
+      - name: Task 7C exact source scope
+        shell: bash
+        run: |
+          mapfile -t changed < <(git diff --name-only 25ba4dc3d52c2905928d858577e19ad064029cc6 HEAD | sort)
+          printf '%s\n' "${changed[@]}"
+          expected=$(printf '%s\n' \
+            .github/workflows/task7c-green.yml \
+            apps/operations/src/app/WhatsAppWorkspace.test.tsx \
+            apps/operations/src/app/WhatsAppWorkspace.tsx \
+            apps/operations/src/styles/global.css | sort)
+          actual=$(printf '%s\n' "${changed[@]}")
+          test "$actual" = "$expected"
+      - name: Clean checkout
+        run: test -z "$(git status --short)"
