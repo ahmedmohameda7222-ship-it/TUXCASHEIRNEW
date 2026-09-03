@@ -82,9 +82,11 @@ export type {
   WorkerAuthenticationLocalSession,
   WorkerCredentialStore,
 } from './workerAuthentication';
+export { WhatsAppRemoteError } from './whatsappRemote';
 export type {
   WhatsAppInboxOrderLink,
   WhatsAppInboxSnapshot,
+  WhatsAppRemoteErrorCode,
   WhatsAppRemoteGateway,
 } from './whatsappRemote';
 export {
@@ -113,3 +115,5 @@ export type {
   WorkerUiPreferencesSyncIdentity,
   WorkerUiPreferencesSyncTarget,
 } from './workerUiPreferences';
+export { OperationsWhatsAppService } from './whatsapp';
+export type { WhatsAppSessionStateSource } from './whatsapp';

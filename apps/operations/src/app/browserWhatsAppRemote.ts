@@ -1,7 +1,8 @@
-import type {
-  WhatsAppInboxOrderLink,
-  WhatsAppInboxSnapshot,
-  WhatsAppRemoteGateway,
+import {
+  WhatsAppRemoteError,
+  type WhatsAppInboxOrderLink,
+  type WhatsAppInboxSnapshot,
+  type WhatsAppRemoteGateway,
 } from '@tux/application';
 import {
   assertWhatsAppMessageInvariant,
@@ -20,30 +21,6 @@ import {
   type WhatsAppQuickReplyCategory,
   type WorkerId,
 } from '@tux/domain';
-
-export class WhatsAppOperatorNotSynchronizedError extends Error {
-  constructor() {
-    super('WhatsApp Current Operator is not synchronized.');
-    this.name = 'WhatsAppOperatorNotSynchronizedError';
-  }
-}
-
-export class WhatsAppOutboundIntentConflictError extends Error {
-  constructor() {
-    super('WhatsApp outbound intent conflicts with an existing message.');
-    this.name = 'WhatsAppOutboundIntentConflictError';
-  }
-}
-
-export class WhatsAppDeliveryUncertainError extends Error {
-  readonly messageId: string;
-
-  constructor(messageId: string) {
-    super('WhatsApp delivery is not confirmed yet.');
-    this.name = 'WhatsAppDeliveryUncertainError';
-    this.messageId = messageId;
-  }
-}
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -225,16 +202,26 @@ function parseSnapshot(value: Record<string, unknown>): WhatsAppInboxSnapshot {
 function mapRemoteError(status: number, payload: Record<string, unknown>): never {
   const code = typeof payload['error'] === 'string' ? payload['error'] : '';
   if (status === 409 && code === 'whatsapp_operator_not_synchronized') {
-    throw new WhatsAppOperatorNotSynchronizedError();
+    throw new WhatsAppRemoteError(
+      'OPERATOR_NOT_SYNCHRONIZED',
+      'WhatsApp Current Operator is not synchronized.',
+    );
   }
   if (status === 409 && code === 'whatsapp_outbound_intent_conflict') {
-    throw new WhatsAppOutboundIntentConflictError();
+    throw new WhatsAppRemoteError(
+      'OUTBOUND_INTENT_CONFLICT',
+      'WhatsApp outbound intent conflicts with an existing message.',
+    );
   }
   if (status === 503 && code === 'whatsapp_delivery_uncertain') {
     const messageId = requiredString(payload['messageId'], 'WhatsApp uncertain message id');
-    throw new WhatsAppDeliveryUncertainError(messageId);
+    throw new WhatsAppRemoteError(
+      'DELIVERY_UNCERTAIN',
+      'WhatsApp delivery is not confirmed yet.',
+      messageId,
+    );
   }
-  throw new Error('WhatsApp request failed.');
+  throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp request failed.');
 }
 
 async function requestJson(
@@ -255,14 +242,17 @@ async function requestJson(
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
-    throw new Error('WhatsApp remote is unavailable.');
+    throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is unavailable.');
   }
 
   let payload: Record<string, unknown>;
   try {
     payload = object(await response.json(), 'WhatsApp remote response');
   } catch {
-    throw new Error('WhatsApp remote returned an invalid response.');
+    throw new WhatsAppRemoteError(
+      'REMOTE_UNAVAILABLE',
+      'WhatsApp remote returned an invalid response.',
+    );
   }
 
   if (!response.ok) mapRemoteError(response.status, payload);

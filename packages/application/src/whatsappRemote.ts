@@ -8,6 +8,23 @@ import type {
   WorkerId,
 } from '@tux/domain';
 
+export type WhatsAppRemoteErrorCode =
+  | 'OPERATOR_NOT_SYNCHRONIZED'
+  | 'OUTBOUND_INTENT_CONFLICT'
+  | 'DELIVERY_UNCERTAIN'
+  | 'REMOTE_UNAVAILABLE';
+
+export class WhatsAppRemoteError extends Error {
+  constructor(
+    readonly code: WhatsAppRemoteErrorCode,
+    message: string,
+    readonly messageId: string | null = null,
+  ) {
+    super(message);
+    this.name = 'WhatsAppRemoteError';
+  }
+}
+
 export interface WhatsAppInboxOrderLink {
   readonly conversationId: string;
   readonly orderId: OrderId;

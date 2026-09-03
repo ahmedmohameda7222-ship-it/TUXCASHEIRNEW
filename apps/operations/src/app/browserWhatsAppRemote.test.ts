@@ -1,11 +1,7 @@
+import { WhatsAppRemoteError } from '@tux/application';
 import { parseEntityId, type BusinessDayId, type OrderId, type WorkerId } from '@tux/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  VercelBrowserWhatsAppRemote,
-  WhatsAppDeliveryUncertainError,
-  WhatsAppOperatorNotSynchronizedError,
-  WhatsAppOutboundIntentConflictError,
-} from './browserWhatsAppRemote';
+import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
 
 const businessDayId = parseEntityId<BusinessDayId>('10000000-0000-4000-8000-000000000001');
 const workerId = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
@@ -165,7 +161,11 @@ describe('VercelBrowserWhatsAppRemote', () => {
         outboundIntentKey: 'intent-1',
         text: 'test',
       }),
-    ).rejects.toBeInstanceOf(WhatsAppOperatorNotSynchronizedError);
+    ).rejects.toMatchObject({
+      code: 'OPERATOR_NOT_SYNCHRONIZED',
+      message: 'WhatsApp Current Operator is not synchronized.',
+      messageId: null,
+    });
   });
 
   it('maps durable outbound-intent conflict to a typed safe error', async () => {
@@ -182,7 +182,11 @@ describe('VercelBrowserWhatsAppRemote', () => {
         outboundIntentKey: 'intent-1',
         text: 'test',
       }),
-    ).rejects.toBeInstanceOf(WhatsAppOutboundIntentConflictError);
+    ).rejects.toMatchObject({
+      code: 'OUTBOUND_INTENT_CONFLICT',
+      message: 'WhatsApp outbound intent conflicts with an existing message.',
+      messageId: null,
+    });
   });
 
   it('maps delivery uncertainty to a typed error carrying only the durable message id', async () => {
@@ -210,10 +214,10 @@ describe('VercelBrowserWhatsAppRemote', () => {
       thrown = error;
     }
 
-    expect(thrown).toBeInstanceOf(WhatsAppDeliveryUncertainError);
-    expect((thrown as WhatsAppDeliveryUncertainError).messageId).toBe(messageId);
+    expect(thrown).toBeInstanceOf(WhatsAppRemoteError);
+    expect(thrown).toMatchObject({ code: 'DELIVERY_UNCERTAIN', messageId });
     expect((thrown as Error).message).not.toContain('must-not-surface');
-    expect(Object.keys(thrown as object).sort()).toEqual(['messageId', 'name'].sort());
+    expect(Object.keys(thrown as object).sort()).toEqual(['code', 'messageId', 'name'].sort());
   });
 
   it('serializes conversation-state mutations with documented fields only', async () => {
