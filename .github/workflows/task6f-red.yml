@@ -1,0 +1,21 @@
+name: Task 6F RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6f-red
+    paths:
+      - .github/workflows/task6f-red.yml
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Expected WhatsApp client selection RED
+        run: npm test -- apps/operations/src/app/sessionClient.whatsapp.test.ts
