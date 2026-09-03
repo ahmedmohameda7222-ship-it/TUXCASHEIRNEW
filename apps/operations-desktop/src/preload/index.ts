@@ -24,6 +24,13 @@ import {
 } from './ordersResult';
 import { assertOrderTransitionResult, assertOrdersBoardResult } from './ordersBoardResult';
 import { assertSessionResult } from './sessionResult';
+import {
+  assertWhatsAppConversationResult,
+  assertWhatsAppDraftResult,
+  assertWhatsAppInboxResult,
+  assertWhatsAppMessageResult,
+  assertWhatsAppVoidResult,
+} from './whatsappResult';
 import { assertSyncHealthSnapshot } from './syncStatusResult';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
@@ -64,6 +71,15 @@ const IPC_END_DAY_BEGIN = 'tux:end-day:begin';
 const IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';
 const IPC_END_DAY_PREVIEW = 'tux:end-day:preview';
 const IPC_END_DAY_CLOSE = 'tux:end-day:close';
+const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
+const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
+const IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';
+const IPC_WHATSAPP_MARK_UNREAD = 'tux:whatsapp:mark-unread';
+const IPC_WHATSAPP_ARCHIVE = 'tux:whatsapp:archive';
+const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
+const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
+const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
+const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
 
 type WorkerMenuLayoutInput = Parameters<TuxDesktopApi['workerMenuLayout']['updateMenuLayout']>[0];
 type WorkerLegacyMenuLayoutInput = Parameters<
@@ -223,6 +239,44 @@ const api: TuxDesktopApi = Object.freeze({
       assertEndDayPreviewResult((await ipcRenderer.invoke(IPC_END_DAY_PREVIEW, input)) as unknown),
     closeDay: async (input: Parameters<TuxDesktopApi['endDay']['closeDay']>[0]) =>
       assertEndDayCloseResult((await ipcRenderer.invoke(IPC_END_DAY_CLOSE, input)) as unknown),
+  }),
+  whatsapp: Object.freeze({
+    loadInbox: async (cursor?: string) =>
+      assertWhatsAppInboxResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_LOAD_INBOX, cursor)) as unknown,
+      ),
+    loadConversation: async (conversationId: string) =>
+      assertWhatsAppConversationResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_LOAD_CONVERSATION, conversationId)) as unknown,
+      ),
+    sendText: async (input: Parameters<TuxDesktopApi['whatsapp']['sendText']>[0]) =>
+      assertWhatsAppMessageResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_TEXT, input)) as unknown,
+      ),
+    markUnread: async (conversationId: string) =>
+      assertWhatsAppVoidResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_MARK_UNREAD, conversationId)) as unknown,
+      ),
+    archive: async (conversationId: string, archived?: boolean) =>
+      assertWhatsAppVoidResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_ARCHIVE, conversationId, archived)) as unknown,
+      ),
+    setFollowUp: async (conversationId: string, followUp: boolean) =>
+      assertWhatsAppVoidResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SET_FOLLOW_UP, conversationId, followUp)) as unknown,
+      ),
+    linkOrder: async (input: Parameters<TuxDesktopApi['whatsapp']['linkOrder']>[0]) =>
+      assertWhatsAppVoidResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_LINK_ORDER, input)) as unknown,
+      ),
+    saveDraft: async (conversationId: string, text: string) =>
+      assertWhatsAppVoidResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SAVE_DRAFT, conversationId, text)) as unknown,
+      ),
+    getDraft: async (conversationId: string) =>
+      assertWhatsAppDraftResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_GET_DRAFT, conversationId)) as unknown,
+      ),
   }),
 });
 

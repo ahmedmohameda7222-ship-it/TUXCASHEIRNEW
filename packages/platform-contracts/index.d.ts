@@ -5,6 +5,7 @@ import type {
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsSessionResult,
+  OperationsWhatsAppService,
 } from '@tux/application';
 import type {
   CategoryAlignment,
@@ -109,6 +110,19 @@ export type TuxEndDayApi = Pick<
   'beginEndDay' | 'discardDraft' | 'previewReconciliation' | 'closeDay'
 >;
 
+export type TuxWhatsAppApi = Pick<
+  OperationsWhatsAppService,
+  | 'loadInbox'
+  | 'loadConversation'
+  | 'sendText'
+  | 'markUnread'
+  | 'archive'
+  | 'setFollowUp'
+  | 'linkOrder'
+  | 'saveDraft'
+  | 'getDraft'
+>;
+
 export interface TuxDesktopApi {
   readonly app: {
     readonly getVersion: () => Promise<string>;
@@ -126,4 +140,5 @@ export interface TuxDesktopApi {
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
   readonly endDay: TuxEndDayApi;
+  readonly whatsapp: TuxWhatsAppApi;
 }
