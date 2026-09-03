@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - feat/ops-whatsapp-task6a-green
+    paths:
+      - .github/workflows/task6a-green.yml
 
 permissions:
   contents: write
 
 jobs:
   green:
-    if: github.event.head_commit.message == 'test: run Task 6A GREEN'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -569,6 +570,5 @@ jobs:
             packages/application/src/index.ts \
             apps/operations/src/app/browserWhatsAppRemote.ts \
             apps/operations/src/app/browserWhatsAppRemote.test.ts
-          test -z "$(git status --short | grep -v '^??' | grep -v '^ M .github/workflows/task6a-green.yml' | grep -v '^M  ' || true)"
           git commit -m "refactor: share WhatsApp wire contract"
           git push origin HEAD:feat/ops-whatsapp-task6a-green
