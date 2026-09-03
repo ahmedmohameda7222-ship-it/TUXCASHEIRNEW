@@ -1,0 +1,147 @@
+name: Task 6F GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6f-green
+    paths:
+      - .github/workflows/task6f-green.yml
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Materialize Task 6F RED test
+        run: |
+          git fetch --no-tags --depth=1 origin d4dd638e9942e6e4ae07837c7ba2e5ab6d35b279
+          git show d4dd638e9942e6e4ae07837c7ba2e5ab6d35b279:apps/operations/src/app/sessionClient.whatsapp.test.ts > apps/operations/src/app/sessionClient.whatsapp.test.ts
+
+      - name: Implement lazy WhatsApp runtime selection
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/operations/src/app/sessionClient.ts')
+          s = p.read_text()
+
+          s = s.replace(
+              '  OperationsOrdersService,\n  OperationsWorkerAuthenticationService,',
+              '  OperationsOrdersService,\n  OperationsWhatsAppService,\n  OperationsWorkerAuthenticationService,',
+              1,
+          )
+          s = s.replace(
+              '  IndexedDbOrderDraftStore,\n  IndexedDbWorkerMenuLayoutStore,',
+              '  IndexedDbOrderDraftStore,\n  IndexedDbWhatsAppStore,\n  IndexedDbWorkerMenuLayoutStore,',
+              1,
+          )
+          s = s.replace(
+              '  TuxWorkerMenuLayoutApi,\n  TuxWorkerUiPreferencesApi,',
+              '  TuxWhatsAppApi,\n  TuxWorkerMenuLayoutApi,\n  TuxWorkerUiPreferencesApi,',
+              1,
+          )
+          s = s.replace(
+              "import { BrowserOrderPrinter } from './browserOrderPrinter';\n",
+              "import { BrowserOrderPrinter } from './browserOrderPrinter';\nimport { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';\n",
+              1,
+          )
+          s = s.replace(
+              'export type OperationsEndDayClient = TuxEndDayApi;\n',
+              'export type OperationsEndDayClient = TuxEndDayApi;\nexport type OperationsWhatsAppClient = TuxWhatsAppApi;\n',
+              1,
+          )
+          s = s.replace(
+              'let browserRuntimePromise: Promise<BrowserRuntime> | null = null;\n',
+              '''let browserRuntimePromise: Promise<BrowserRuntime> | null = null;
+          let browserWhatsAppPromise: Promise<TuxWhatsAppApi> | null = null;
+
+          async function browserWhatsAppRuntime(): Promise<TuxWhatsAppApi> {
+            if (browserWhatsAppPromise === null) {
+              browserWhatsAppPromise = (async () => {
+                const store = new IndexedDbWhatsAppStore('tux-operations-v2');
+                await store.initialize();
+                return new OperationsWhatsAppService(
+                  new VercelBrowserWhatsAppRemote(),
+                  store,
+                  { getState: async () => (await browserRuntime()).getState() },
+                  () => instant(new Date()),
+                );
+              })();
+            }
+            return browserWhatsAppPromise;
+          }
+          ''',
+              1,
+          )
+
+          marker = 'export function createOperationsSessionClient(): OperationsSessionClient {'
+          addition = '''export function createOperationsWhatsAppClient(): OperationsWhatsAppClient {
+            const desktop = window.tuxDesktop?.whatsapp;
+            if (desktop !== undefined) return desktop;
+            return {
+              loadInbox: async (cursor) => (await browserWhatsAppRuntime()).loadInbox(cursor),
+              loadConversation: async (conversationId) =>
+                (await browserWhatsAppRuntime()).loadConversation(conversationId),
+              sendText: async (input) => (await browserWhatsAppRuntime()).sendText(input),
+              markUnread: async (conversationId) =>
+                (await browserWhatsAppRuntime()).markUnread(conversationId),
+              archive: async (conversationId, archived) =>
+                (await browserWhatsAppRuntime()).archive(conversationId, archived),
+              setFollowUp: async (conversationId, followUp) =>
+                (await browserWhatsAppRuntime()).setFollowUp(conversationId, followUp),
+              linkOrder: async (input) => (await browserWhatsAppRuntime()).linkOrder(input),
+              saveDraft: async (conversationId, text) =>
+                (await browserWhatsAppRuntime()).saveDraft(conversationId, text),
+              getDraft: async (conversationId) =>
+                (await browserWhatsAppRuntime()).getDraft(conversationId),
+            };
+          }
+
+          '''
+          if marker not in s:
+              raise SystemExit('session client marker missing')
+          s = s.replace(marker, addition + marker, 1)
+          p.write_text(s)
+          PY
+
+      - name: Format Task 6F files
+        run: npx prettier --write apps/operations/src/app/sessionClient.ts apps/operations/src/app/sessionClient.whatsapp.test.ts
+
+      - name: Task 6F GREEN regressions
+        run: |
+          npm test -- \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts
+
+      - name: Operations typecheck
+        run: npm run typecheck -w @tux/operations
+
+      - name: IndexedDB and public-surface fencing
+        run: |
+          git diff --exit-code HEAD -- packages/persistence/src/browser/indexedDbMigrations.ts
+          if git grep -n "sendMedia" -- apps/operations/src/app/sessionClient.ts apps/operations/src/app/sessionClient.whatsapp.test.ts; then
+            echo 'sendMedia must remain absent.' >&2
+            exit 1
+          fi
+          test "$(grep -c "new IndexedDbWhatsAppStore('tux-operations-v2')" apps/operations/src/app/sessionClient.ts)" -eq 1
+
+      - name: Commit verified Task 6F source only
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add apps/operations/src/app/sessionClient.ts apps/operations/src/app/sessionClient.whatsapp.test.ts
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m "feat: wire WhatsApp browser runtime"
+          git push origin HEAD:feat/ops-whatsapp-task6f-green
