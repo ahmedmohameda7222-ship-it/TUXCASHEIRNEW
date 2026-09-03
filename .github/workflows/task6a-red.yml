@@ -18,5 +18,22 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Add binding DEVICE_AUTH_INVALID test first
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/application/src/whatsapp.test.ts')
+          source = path.read_text()
+          old_import = "import type { WhatsAppInboxSnapshot, WhatsAppRemoteGateway } from './whatsappRemote';"
+          new_import = "import { WhatsAppRemoteError, type WhatsAppInboxSnapshot, type WhatsAppRemoteGateway } from './whatsappRemote';"
+          assert old_import in source
+          source = source.replace(old_import, new_import, 1)
+          marker = "  it('upserts a successful durable outbound message locally exactly once', async () => {"
+          test = """  it('does not treat authoritative device invalidation as transient cached-offline availability', async () => {\n    vi.mocked(remote.loadInbox).mockRejectedValue(\n      new WhatsAppRemoteError('DEVICE_AUTH_INVALID', 'Device session is invalid.'),\n    );\n    const service = new OperationsWhatsAppService(remote, store, session, () => now);\n\n    const result = await service.loadInbox();\n\n    expect(result).toMatchObject({ ok: false, error: { code: 'REMOTE_SYNC_ERROR' } });\n    expect(store.loadInbox).not.toHaveBeenCalled();\n  });\n\n"""
+          assert marker in source
+          source = source.replace(marker, test + marker, 1)
+          path.write_text(source)
+          PY
       - name: Expected compile RED
         run: npm run typecheck -w @tux/application
