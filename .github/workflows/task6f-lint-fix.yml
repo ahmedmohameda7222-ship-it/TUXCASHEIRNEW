@@ -1,0 +1,37 @@
+name: Task 6F Lint Fix
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6f-lint-fix
+    paths:
+      - .github/workflows/task6f-lint-fix.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Task 6F regressions
+        run: |
+          npm test -- \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts
+      - name: Operations typecheck
+        run: npm run typecheck -w @tux/operations
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Scope and migration fencing
+        run: |
+          git diff --exit-code 19e30277336362c94f2b550a1b184639016c9296 -- apps/operations/src/app/sessionClient.ts
+          git diff --exit-code 19e30277336362c94f2b550a1b184639016c9296 -- packages/persistence/src/browser/indexedDbMigrations.ts
+          test "$(git diff --name-only 19e30277336362c94f2b550a1b184639016c9296 -- | grep -v '^\.github/workflows/task6f-lint-fix.yml$')" = "apps/operations/src/app/sessionClient.whatsapp.test.ts"
