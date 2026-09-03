@@ -124,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4]);
-    expect(INDEXED_DB_VERSION).toBe(4);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5]);
+    expect(INDEXED_DB_VERSION).toBe(5);
   });
 
   it('creates every production store and operational index on a fresh install', async () => {
@@ -410,6 +410,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v5 is missing');
+    ).toThrow('IndexedDB migration v6 is missing');
   });
 });
