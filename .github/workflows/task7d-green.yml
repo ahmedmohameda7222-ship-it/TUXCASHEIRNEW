@@ -64,3 +64,5 @@ jobs:
             git commit -m 'test: persist Task 7D GREEN candidate'
             git push
           fi
+      - name: Clean checkout
+        run: test -z "$(git status --short)"
