@@ -1,0 +1,23 @@
+name: Task 5D Permanent Verify
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5d-permanent-verify
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test -- packages/application/src/whatsapp.test.ts
+      - run: npm test -- apps/operations/src/app/browserWhatsAppRemote.test.ts
+      - run: npm run typecheck -w @tux/application
+      - run: npm run typecheck -w @tux/operations
