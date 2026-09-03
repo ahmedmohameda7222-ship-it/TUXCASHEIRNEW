@@ -1,0 +1,58 @@
+name: Task 5 Final Verify V2
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5-final-verify-v2
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Focused Task 5 tests
+        run: |
+          npm test -- \
+            packages/persistence/src/whatsappStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            server/whatsappOperationsGateway.test.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Migration verification
+        run: npm run test:migrations
+      - name: Remote WhatsApp migrations unchanged
+        run: |
+          test -z "$(git diff da87bb3dc7c7d77b92240f4ff4c109b7ad0d2642..HEAD -- \
+            supabase/migrations/20260902220000_whatsapp_inbox.sql \
+            supabase/migrations/20260902223000_whatsapp_channels.sql \
+            supabase/migrations/20260902224500_whatsapp_current_worker_authority.sql)"
+      - name: No provider or service-role secrets in local layers
+        run: |
+          if git grep -n "TUX_WHATSAPP_ACCESS_TOKEN\|TUX_WHATSAPP_APP_SECRET\|TUX_SUPABASE_SERVICE_ROLE_KEY\|SUPABASE_SERVICE_ROLE_KEY" -- packages/application packages/persistence apps/operations; then
+            echo "Server/provider secret reference found in local WhatsApp layers." >&2
+            exit 1
+          fi
+      - name: No outbound sendMedia before media task
+        run: |
+          if git grep -n "sendMedia" -- packages/application/src/whatsapp.ts packages/application/src/whatsappRemote.ts; then
+            echo "Outbound media was added before the media task." >&2
+            exit 1
+          fi
+      - name: Clean working tree
+        run: test -z "$(git status --short)"
