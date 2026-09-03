@@ -1,0 +1,98 @@
+name: Task 5B WhatsApp Cache Validation RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5b-validation-red
+
+permissions:
+  contents: write
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add malformed-row validation tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts')
+          text = path.read_text()
+          marker = "\n});\n"
+          addition = r'''
+
+  it('rejects malformed cached WhatsApp message payloads on read', async () => {
+    const path = await databasePath('malformed-message');
+    const store = new SqliteWhatsAppStore(path);
+    await store.initialize();
+    await store.close();
+
+    const database = new DatabaseSync(path);
+    database
+      .prepare(`
+INSERT INTO whatsapp_cache_messages(id, shop_id, conversation_id, created_at, payload_json)
+VALUES (?, ?, ?, ?, ?)
+`)
+      .run(
+        'malformed-message',
+        SHOP_A,
+        'conversation-a',
+        '2026-09-03T11:00:00.000Z',
+        JSON.stringify({ id: 'malformed-message', shopId: SHOP_A }),
+      );
+    database.close();
+
+    const reopened = new SqliteWhatsAppStore(path);
+    await reopened.initialize();
+    await expect(reopened.loadInbox(SHOP_A)).rejects.toThrow();
+    await reopened.close();
+  });
+
+  it('rejects cached conversation payloads whose tenant identity disagrees with the fenced row', async () => {
+    const path = await databasePath('tenant-mismatch');
+    const store = new SqliteWhatsAppStore(path);
+    await store.initialize();
+    await store.close();
+
+    const database = new DatabaseSync(path);
+    database
+      .prepare(`
+INSERT INTO whatsapp_cache_conversations(id, shop_id, last_message_at, payload_json)
+VALUES (?, ?, ?, ?)
+`)
+      .run(
+        'conversation-a',
+        SHOP_A,
+        '2026-09-03T11:00:00.000Z',
+        JSON.stringify(conversation(SHOP_B, 'conversation-a', '2026-09-03T11:00:00.000Z')),
+      );
+    database.close();
+
+    const reopened = new SqliteWhatsAppStore(path);
+    await reopened.initialize();
+    await expect(reopened.loadInbox(SHOP_A)).rejects.toThrow(/shop|tenant/i);
+    await reopened.close();
+  });
+'''
+          if 'rejects malformed cached WhatsApp message payloads on read' not in text:
+              head, tail = text.rsplit(marker, 1)
+              path.write_text(head + addition + marker + tail)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "test: add Task 5B cache validation RED"
+            git push origin HEAD:feat/ops-whatsapp-task5b-validation-red
+          fi
+      - name: Task 5B validation RED
+        run: npm test -- packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
