@@ -240,14 +240,12 @@ describe('DesktopWhatsAppRemote', () => {
   });
 
   it('does not retry DELIVERY_UNCERTAIN', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ error: 'whatsapp_delivery_uncertain', messageId }), {
-          status: 503,
-          headers: { 'content-type': 'application/json' },
-        }),
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'whatsapp_delivery_uncertain', messageId }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     const remote = new DesktopWhatsAppRemote({
       apiOrigin: 'https://ops.example',
       sessionManager: sessionManager() as never,
