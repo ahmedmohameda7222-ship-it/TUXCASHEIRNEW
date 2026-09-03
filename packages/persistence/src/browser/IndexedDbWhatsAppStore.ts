@@ -186,10 +186,16 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
       writes.push(requestResult(quickReplies.put(quickReply)));
     }
     for (const link of snapshot.orderLinks) {
+      const shopId = conversationShops.get(link.conversationId);
+      if (shopId === undefined) {
+        throw new Error(
+          `Cannot cache WhatsApp order link without a tenant-fenced conversation: ${link.conversationId}`,
+        );
+      }
       writes.push(
         requestResult(
           orderLinks.put({
-            shopId: conversationShops.get(link.conversationId),
+            shopId,
             conversationId: link.conversationId,
             orderId: link.orderId,
             linkedAt: link.linkedAt,
