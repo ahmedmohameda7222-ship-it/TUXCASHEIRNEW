@@ -1,0 +1,124 @@
+name: Task 6G Final Verification
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6g-verify
+    paths:
+      - .github/workflows/task6g-final-verify.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Focused WhatsApp and runtime suites
+        run: |
+          npm test -- \
+            packages/persistence/src/whatsappStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsappWire.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            server/operationsDeviceAuthority.test.ts \
+            server/whatsappOperationsGateway.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts
+
+      - name: Electron hardening regressions
+        run: |
+          npm test -- \
+            apps/operations-desktop/src/main/security.test.ts \
+            apps/operations-desktop/src/main/session.integration.test.ts \
+            apps/operations-desktop/src/preload/sessionResult.test.ts
+
+      - name: Architecture guard
+        run: npm run test:whatsapp-architecture
+
+      - name: Full typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Migration smoke tests
+        run: npm run test:migrations
+
+      - name: Migration immutability
+        run: |
+          git diff --exit-code 66c981af26c4aa6779a414e78f3642c31ef4ee3e -- \
+            supabase/migrations/20260902220000_whatsapp_inbox.sql \
+            supabase/migrations/20260902223000_whatsapp_channels.sql \
+            supabase/migrations/20260902224500_whatsapp_current_worker_authority.sql \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts
+
+      - name: Package-layer and public-surface fencing
+        run: |
+          if git grep -n "@tux/application" -- packages/persistence/src; then
+            echo 'Persistence must not import @tux/application.' >&2
+            exit 1
+          fi
+          if git grep -n "sendMedia" -- \
+            packages/platform-contracts/index.d.ts \
+            packages/application/src/whatsapp.ts \
+            packages/application/src/whatsappRemote.ts \
+            apps/operations/src/app/sessionClient.ts \
+            apps/operations-desktop/src/main/whatsappIpc.ts \
+            apps/operations-desktop/src/preload/index.ts; then
+            echo 'sendMedia must remain absent.' >&2
+            exit 1
+          fi
+
+      - name: Desktop request and secret fencing
+        run: |
+          if git grep -n "refreshToken" -- apps/operations-desktop/src/main/desktopWhatsAppRemote.ts; then
+            echo 'Desktop WhatsApp remote must not read or transmit refreshToken.' >&2
+            exit 1
+          fi
+          if git grep -n "graph.facebook.com" -- \
+            apps/operations-desktop/src/main \
+            apps/operations-desktop/src/preload \
+            apps/operations/src/app; then
+            echo 'Client/Desktop WhatsApp runtime must not call Meta directly.' >&2
+            exit 1
+          fi
+          if git grep -n "SUPABASE_SERVICE_ROLE_KEY\|TUX_SUPABASE_SERVICE_ROLE_KEY\|TUX_WHATSAPP_ACCESS_TOKEN\|TUX_WHATSAPP_APP_SECRET\|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN\|providerPhoneNumberId" -- \
+            apps/operations-desktop/src/preload \
+            apps/operations-desktop/src/main/whatsappIpc.ts \
+            apps/operations/src/app/sessionClient.ts \
+            packages/application/src/whatsapp.ts \
+            packages/persistence/src/whatsappStore.ts; then
+            echo 'Forbidden privileged secret/provider field leaked into client boundary.' >&2
+            exit 1
+          fi
+          npm test -- apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+
+      - name: Permanent Task 6 source scope
+        run: |
+          git diff --name-only 02fb36e8c336f4071aad12d330be26811770eb4f..19e30277336362c94f2b550a1b184639016c9296 | tee /tmp/task6-files.txt
+          if grep -E '^\.github/workflows/' /tmp/task6-files.txt; then
+            echo 'Diagnostic workflow leaked into permanent Task 6 ancestry.' >&2
+            exit 1
+          fi
+          if grep -E '(^|/)package-lock\.json$|apps/operations-desktop/package\.json|packages/persistence/src/(sqlite/migrations\.ts|browser/indexedDbMigrations\.ts)|^supabase/migrations/' /tmp/task6-files.txt; then
+            echo 'Forbidden package or migration file changed in permanent Task 6.' >&2
+            exit 1
+          fi
+
+      - name: Working tree clean
+        run: test -z "$(git status --short)"
