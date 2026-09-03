@@ -1,0 +1,21 @@
+name: Task 6D-E Preload Parser RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6de-parser-red
+    paths:
+      - .github/workflows/task6de-parser-red.yml
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Expected whatsappResult module-missing RED
+        run: npm test -- apps/operations-desktop/src/preload/whatsappResult.test.ts
