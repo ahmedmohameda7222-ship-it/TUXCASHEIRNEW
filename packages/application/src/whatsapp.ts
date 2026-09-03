@@ -1,4 +1,10 @@
-import { instant, type Instant, type OrderId, type ShopId, type WhatsAppMessage } from '@tux/domain';
+import {
+  instant,
+  type Instant,
+  type OrderId,
+  type ShopId,
+  type WhatsAppMessage,
+} from '@tux/domain';
 import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '@tux/persistence';
 import type { ApplicationError } from './errors';
 import { err, ok, type Result } from './result';
@@ -15,7 +21,10 @@ export interface WhatsAppSessionStateSource {
 }
 
 interface ActiveWhatsAppClaims {
-  readonly businessDayId: Extract<OperationsSessionResult, { ok: true }>['value'] extends infer State
+  readonly businessDayId: Extract<
+    OperationsSessionResult,
+    { ok: true }
+  >['value'] extends infer State
     ? State extends { status: 'ACTIVE'; businessDayId: infer Id }
       ? Id
       : never
@@ -197,10 +206,7 @@ export class OperationsWhatsAppService {
     }
   }
 
-  async saveDraft(
-    conversationId: string,
-    text: string,
-  ): Promise<Result<void, ApplicationError>> {
+  async saveDraft(conversationId: string, text: string): Promise<Result<void, ApplicationError>> {
     const shop = await this.#resolveLocalShop();
     if (!shop.ok) return shop;
     const draft: WhatsAppDraft = {
@@ -217,9 +223,7 @@ export class OperationsWhatsAppService {
     }
   }
 
-  async getDraft(
-    conversationId: string,
-  ): Promise<Result<WhatsAppDraft | null, ApplicationError>> {
+  async getDraft(conversationId: string): Promise<Result<WhatsAppDraft | null, ApplicationError>> {
     const shop = await this.#resolveLocalShop();
     if (!shop.ok) return shop;
     try {

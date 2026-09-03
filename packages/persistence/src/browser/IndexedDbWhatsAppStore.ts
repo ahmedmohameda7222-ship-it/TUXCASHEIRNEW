@@ -6,11 +6,7 @@ import type {
   WhatsAppMessage,
   WhatsAppQuickReply,
 } from '@tux/domain';
-import type {
-  CachedWhatsAppInboxSnapshot,
-  WhatsAppDraft,
-  WhatsAppStore,
-} from '../whatsappStore';
+import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '../whatsappStore';
 import { openOperationsIndexedDb } from './openOperationsIndexedDb';
 
 interface StoredOrderLink {
@@ -135,11 +131,13 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
       snapshot.conversations.map((conversation) => [conversation.id, conversation.shopId] as const),
     );
 
-    const missingConversationIds = [...new Set(
-      snapshot.orderLinks
-        .map((link) => link.conversationId)
-        .filter((conversationId) => !conversationShops.has(conversationId)),
-    )];
+    const missingConversationIds = [
+      ...new Set(
+        snapshot.orderLinks
+          .map((link) => link.conversationId)
+          .filter((conversationId) => !conversationShops.has(conversationId)),
+      ),
+    ];
     if (missingConversationIds.length > 0) {
       const read = database.transaction(['whatsappConversations'], 'readonly');
       const completion = transactionDone(read);
@@ -259,7 +257,8 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
       .filter((value) => record(value, 'message')['shopId'] === shopId)
       .map((value) => parseMessage(value, shopId))
       .sort(
-        (left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+        (left, right) =>
+          left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
       );
     const quickReplies = rawQuickReplies
       .filter((value) => record(value, 'quick reply')['shopId'] === shopId)
@@ -277,10 +276,7 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
     return { conversations, messages, quickReplies, orderLinks };
   }
 
-  async listMessages(
-    shopId: ShopId,
-    conversationId: string,
-  ): Promise<readonly WhatsAppMessage[]> {
+  async listMessages(shopId: ShopId, conversationId: string): Promise<readonly WhatsAppMessage[]> {
     const database = this.#requireDatabase();
     const transaction = database.transaction(['whatsappMessages'], 'readonly');
     const completion = transactionDone(transaction);
@@ -297,7 +293,9 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
 
   async saveDraft(draft: WhatsAppDraft): Promise<void> {
     const database = this.#requireDatabase();
-    const transaction = database.transaction(['whatsappDrafts'], 'readwrite', { durability: 'strict' });
+    const transaction = database.transaction(['whatsappDrafts'], 'readwrite', {
+      durability: 'strict',
+    });
     const completion = transactionDone(transaction);
     await requestResult(transaction.objectStore('whatsappDrafts').put(draft));
     await completion;
