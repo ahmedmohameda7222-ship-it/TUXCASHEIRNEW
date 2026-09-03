@@ -1,0 +1,19 @@
+name: Task 6D IPC RED
+on:
+  push:
+    branches: [feat/ops-whatsapp-task6d-contract-red]
+    paths: [.github/workflows/task6d-ipc-red.yml]
+permissions:
+  contents: read
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Expected IPC module-missing RED
+        run: npm test -- apps/operations-desktop/src/main/whatsappIpc.test.ts
