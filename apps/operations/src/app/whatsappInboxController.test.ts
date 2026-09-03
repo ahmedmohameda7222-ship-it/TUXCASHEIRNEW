@@ -81,10 +81,7 @@ function ok<T>(value: T) {
   return { ok: true, value } as const;
 }
 
-function failure(
-  messageText: string,
-  code: ApplicationError['code'] = 'REMOTE_SYNC_ERROR',
-) {
+function failure(messageText: string, code: ApplicationError['code'] = 'REMOTE_SYNC_ERROR') {
   return {
     ok: false,
     error: {
@@ -193,22 +190,18 @@ class TestEnvironment implements WhatsAppInboxControllerEnvironment {
   }
 
   listenerCount(): number {
-    return (
-      this.visibilityListeners.size + this.onlineListeners.size + this.offlineListeners.size
-    );
+    return this.visibilityListeners.size + this.onlineListeners.size + this.offlineListeners.size;
   }
 }
 
 function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
-  const loadInbox = vi
-    .fn<TuxWhatsAppApi['loadInbox']>()
-    .mockResolvedValue(ok(initialSnapshot));
-  const loadConversation = vi
-    .fn<TuxWhatsAppApi['loadConversation']>()
-    .mockResolvedValue(ok([]));
-  const sendText = vi.fn<TuxWhatsAppApi['sendText']>().mockResolvedValue(
-    ok(message('sent', 'default', { direction: 'OUTBOUND', outboundIntentKey: 'sent-key' })),
-  );
+  const loadInbox = vi.fn<TuxWhatsAppApi['loadInbox']>().mockResolvedValue(ok(initialSnapshot));
+  const loadConversation = vi.fn<TuxWhatsAppApi['loadConversation']>().mockResolvedValue(ok([]));
+  const sendText = vi
+    .fn<TuxWhatsAppApi['sendText']>()
+    .mockResolvedValue(
+      ok(message('sent', 'default', { direction: 'OUTBOUND', outboundIntentKey: 'sent-key' })),
+    );
   const markUnread = vi.fn<TuxWhatsAppApi['markUnread']>().mockResolvedValue(ok(undefined));
   const archive = vi.fn<TuxWhatsAppApi['archive']>().mockResolvedValue(ok(undefined));
   const setFollowUp = vi.fn<TuxWhatsAppApi['setFollowUp']>().mockResolvedValue(ok(undefined));
@@ -241,10 +234,7 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
   };
 }
 
-async function loadController(
-  inbox: WhatsAppInboxSnapshot,
-  environment = new TestEnvironment(),
-) {
+async function loadController(inbox: WhatsAppInboxSnapshot, environment = new TestEnvironment()) {
   const client = createClient(inbox);
   const controller = new WhatsAppInboxController(client.api, environment);
   await controller.refresh();
@@ -279,7 +269,9 @@ describe('WhatsAppInboxController refresh lifecycle', () => {
     expect(client.loadInbox).toHaveBeenCalledTimes(1);
 
     await settle();
-    expect(controller.getState().snapshot?.conversations.map((item) => item.id)).toEqual(['cached']);
+    expect(controller.getState().snapshot?.conversations.map((item) => item.id)).toEqual([
+      'cached',
+    ]);
     expect(controller.getState().networkOffline).toBe(true);
   });
 

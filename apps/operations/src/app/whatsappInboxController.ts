@@ -305,11 +305,7 @@ export class WhatsAppInboxController {
     const initialConversationId = this.#state.selectedConversationId;
     const initialText = this.#state.composerText;
 
-    if (
-      initialConversationId === null ||
-      this.#state.sendBusy ||
-      initialText.trim().length === 0
-    ) {
+    if (initialConversationId === null || this.#state.sendBusy || initialText.trim().length === 0) {
       return;
     }
 
@@ -587,9 +583,7 @@ export class WhatsAppInboxController {
     );
   }
 
-  async #runMutation(
-    operation: () => ReturnType<TuxWhatsAppApi['markUnread']>,
-  ): Promise<void> {
+  async #runMutation(operation: () => ReturnType<TuxWhatsAppApi['markUnread']>): Promise<void> {
     let result: Awaited<ReturnType<TuxWhatsAppApi['markUnread']>>;
     try {
       result = await operation();
