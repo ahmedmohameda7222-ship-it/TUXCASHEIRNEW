@@ -1,0 +1,269 @@
+name: Task 6B Gateway RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6b-gateway-red
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add resolver tests and minimal resolver implementation
+        run: |
+          cat > server/operationsDeviceAuthority.test.ts <<'EOF'
+          import { parseEntityId, type DeviceId, type ShopId } from '@tux/domain';
+          import { describe, expect, it, vi } from 'vitest';
+          import { resolveOperationsDeviceAuthority } from './operationsDeviceAuthority';
+
+          const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
+          const deviceId = parseEntityId<DeviceId>('22222222-2222-4222-8222-222222222222');
+          const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+          describe('resolveOperationsDeviceAuthority', () => {
+            it('derives shopId from the active RLS-visible device rather than caller shop input', async () => {
+              const fetcher = vi.fn<typeof fetch>()
+                .mockResolvedValueOnce(json(200, { id: 'user-1' }))
+                .mockResolvedValueOnce(json(200, [{ id: deviceId, shop_id: shopId }]))
+                .mockResolvedValueOnce(json(200, [{ shop_id: shopId, role: 'OPERATIONS_DEVICE' }]));
+              await expect(resolveOperationsDeviceAuthority({ projectUrl: 'https://example.supabase.co', publishableKey: 'publishable', accessToken: 'access-token', deviceId, fetcher })).resolves.toEqual({ shopId, deviceId });
+              expect(String(fetcher.mock.calls[1]?.[0])).toContain(`/rest/v1/devices?id=eq.${deviceId}`);
+              expect(String(fetcher.mock.calls[2]?.[0])).toContain(`shop_id=eq.${shopId}`);
+            });
+
+            it('fails authoritatively when the device is not visible/active for the bearer user', async () => {
+              const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json(200, { id: 'user-1' })).mockResolvedValueOnce(json(200, []));
+              await expect(resolveOperationsDeviceAuthority({ projectUrl: 'https://example.supabase.co', publishableKey: 'publishable', accessToken: 'access-token', deviceId, fetcher })).rejects.toMatchObject({ code: 'DEVICE_AUTH_INVALID' });
+            });
+
+            it('fails authoritatively for missing OPERATIONS_DEVICE membership', async () => {
+              const fetcher = vi.fn<typeof fetch>()
+                .mockResolvedValueOnce(json(200, { id: 'user-1' }))
+                .mockResolvedValueOnce(json(200, [{ id: deviceId, shop_id: shopId }]))
+                .mockResolvedValueOnce(json(200, []));
+              await expect(resolveOperationsDeviceAuthority({ projectUrl: 'https://example.supabase.co', publishableKey: 'publishable', accessToken: 'access-token', deviceId, fetcher })).rejects.toMatchObject({ code: 'DEVICE_AUTH_INVALID' });
+            });
+
+            it('classifies transport failure as REMOTE_UNAVAILABLE', async () => {
+              const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error('offline'));
+              await expect(resolveOperationsDeviceAuthority({ projectUrl: 'https://example.supabase.co', publishableKey: 'publishable', accessToken: 'access-token', deviceId, fetcher })).rejects.toMatchObject({ code: 'REMOTE_UNAVAILABLE' });
+            });
+          });
+          EOF
+
+          cat > server/operationsDeviceAuthority.ts <<'EOF'
+          import { parseEntityId, type DeviceId, type ShopId } from '@tux/domain';
+
+          export interface OperationsDeviceAuthority {
+            readonly shopId: ShopId;
+            readonly deviceId: DeviceId;
+          }
+
+          export type OperationsDeviceAuthorityErrorCode = 'DEVICE_AUTH_INVALID' | 'REMOTE_UNAVAILABLE';
+
+          export class OperationsDeviceAuthorityError extends Error {
+            constructor(readonly code: OperationsDeviceAuthorityErrorCode, message: string) {
+              super(message);
+              this.name = 'OperationsDeviceAuthorityError';
+            }
+          }
+
+          function invalid(message: string): never {
+            throw new OperationsDeviceAuthorityError('DEVICE_AUTH_INVALID', message);
+          }
+
+          function unavailable(message: string): never {
+            throw new OperationsDeviceAuthorityError('REMOTE_UNAVAILABLE', message);
+          }
+
+          function origin(raw: string): string {
+            try {
+              const url = new URL(raw.trim());
+              if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') unavailable('Invalid Supabase project URL.');
+              return url.origin;
+            } catch (error) {
+              if (error instanceof OperationsDeviceAuthorityError) throw error;
+              return unavailable('Invalid Supabase project URL.');
+            }
+          }
+
+          async function responseJson(fetcher: typeof fetch, url: string, headers: HeadersInit): Promise<{ response: Response; body: unknown }> {
+            let response: Response;
+            try {
+              response = await fetcher(url, { method: 'GET', headers, signal: AbortSignal.timeout(10_000) });
+            } catch {
+              return unavailable('Device authority backend is unavailable.');
+            }
+            if (response.status === 401 || response.status === 403) invalid('Device authority is invalid.');
+            if (!response.ok) unavailable('Device authority backend rejected the request.');
+            try {
+              return { response, body: await response.json() };
+            } catch {
+              return unavailable('Device authority backend returned invalid JSON.');
+            }
+          }
+
+          export async function resolveOperationsDeviceAuthority(input: {
+            readonly projectUrl: string;
+            readonly publishableKey: string;
+            readonly accessToken: string;
+            readonly deviceId: DeviceId;
+            readonly fetcher?: typeof fetch;
+          }): Promise<OperationsDeviceAuthority> {
+            const projectOrigin = origin(input.projectUrl);
+            const fetcher = input.fetcher ?? fetch;
+            const headers = { apikey: input.publishableKey, authorization: `Bearer ${input.accessToken}`, accept: 'application/json' };
+            const user = await responseJson(fetcher, `${projectOrigin}/auth/v1/user`, headers);
+            if (typeof user.body !== 'object' || user.body === null || Array.isArray(user.body) || typeof (user.body as Record<string, unknown>)['id'] !== 'string') unavailable('Invalid authenticated user response.');
+
+            const devices = await responseJson(fetcher, `${projectOrigin}/rest/v1/devices?id=eq.${encodeURIComponent(input.deviceId)}&active=eq.true&select=id,shop_id&limit=2`, headers);
+            if (!Array.isArray(devices.body)) unavailable('Invalid device authority response.');
+            if (devices.body.length !== 1) invalid('Active device authority is missing or ambiguous.');
+            const device = devices.body[0];
+            if (typeof device !== 'object' || device === null || Array.isArray(device)) unavailable('Invalid device authority row.');
+            const row = device as Record<string, unknown>;
+            if (row['id'] !== input.deviceId || typeof row['shop_id'] !== 'string') invalid('Device authority does not match the enrolled device.');
+            let shopId: ShopId;
+            try { shopId = parseEntityId<ShopId>(row['shop_id']); } catch { return unavailable('Invalid device shop identity.'); }
+
+            const memberships = await responseJson(fetcher, `${projectOrigin}/rest/v1/shop_memberships?shop_id=eq.${encodeURIComponent(shopId)}&active=eq.true&role=eq.OPERATIONS_DEVICE&select=shop_id,role&limit=2`, headers);
+            if (!Array.isArray(memberships.body)) unavailable('Invalid membership authority response.');
+            if (memberships.body.length !== 1) invalid('OPERATIONS_DEVICE membership is missing or ambiguous.');
+            const membership = memberships.body[0];
+            if (typeof membership !== 'object' || membership === null || Array.isArray(membership)) unavailable('Invalid membership authority row.');
+            const membershipRow = membership as Record<string, unknown>;
+            if (membershipRow['shop_id'] !== shopId || membershipRow['role'] !== 'OPERATIONS_DEVICE') invalid('OPERATIONS_DEVICE membership is invalid.');
+            return { shopId, deviceId: input.deviceId };
+          }
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('server/supabaseGateway.ts')
+          s = p.read_text()
+          old = 'interface SupabaseServerConfig {'
+          assert old in s
+          p.write_text(s.replace(old, 'export interface SupabaseServerConfig {', 1))
+          PY
+          npx prettier --write server/operationsDeviceAuthority.ts server/operationsDeviceAuthority.test.ts server/supabaseGateway.ts
+      - name: Verify resolver GREEN
+        run: |
+          npm test -- server/operationsDeviceAuthority.test.ts
+          npm run typecheck
+      - name: Add binding gateway authority REDs without changing gateway implementation
+        run: |
+          cat >> server/whatsappOperationsGateway.test.ts <<'EOF'
+
+          describe('unified WhatsApp device authority selection', () => {
+            const otherShopId = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000099');
+
+            function authorityDeps() {
+              const deps = createDependencies();
+              const resolveDeviceAuthority = vi.fn(async () => ({ shopId, deviceId }));
+              (deps.factory as unknown as Record<string, unknown>)['resolveDeviceAuthority'] = resolveDeviceAuthority;
+              return { ...deps, resolveDeviceAuthority };
+            }
+
+            function desktop(req: GatewayRequest, authorization: string | null = 'Bearer desktop-access', headerDeviceId: string | null = deviceId): GatewayRequest {
+              if (authorization !== null) req.headers.authorization = authorization;
+              if (headerDeviceId !== null) req.headers['x-tux-device-id'] = headerDeviceId;
+              return req;
+            }
+
+            it('A: browser cookie plus derived same shop uses server authority for GET', async () => {
+              const deps = authorityDeps();
+              const result = await execute(request({ method: 'GET', origin: null }), deps.factory);
+              expect(result.status()).toBe(200);
+              expect(deps.resolveDeviceAuthority).toHaveBeenCalledTimes(1);
+              expect(deps.repository.loadInbox).toHaveBeenCalledWith({ shopId, after: null });
+            });
+
+            it('B: rejects browser cookie shop mismatch with derived shop and does not call repository', async () => {
+              const deps = authorityDeps();
+              deps.resolveDeviceAuthority.mockResolvedValueOnce({ shopId: otherShopId, deviceId });
+              const result = await execute(request({ method: 'GET', origin: null }), deps.factory);
+              expect(result.status()).toBe(401);
+              expect(result.json()).toEqual({ error: 'device_session_invalid' });
+              expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+            });
+
+            it('C: accepts desktop bearer plus device header without cookies and derives tenant authority', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ method: 'GET', origin: null, cookie: null })), deps.factory);
+              expect(result.status()).toBe(200);
+              expect(deps.resolveDeviceAuthority).toHaveBeenCalledTimes(1);
+              expect(deps.repository.loadInbox).toHaveBeenCalledWith({ shopId, after: null });
+            });
+
+            it('D: Authorization without device header is 401 and never falls back to valid browser cookies', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ method: 'GET', origin: null }), 'Bearer desktop-access', null), deps.factory);
+              expect(result.status()).toBe(401);
+              expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+            });
+
+            it('E: device header without Authorization is 401 and never falls back to valid browser cookies', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ method: 'GET', origin: null }), null, deviceId), deps.factory);
+              expect(result.status()).toBe(401);
+              expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+            });
+
+            it('F: invalid desktop bearer with valid cookies does not fall back to browser auth', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ method: 'GET', origin: null }), 'Basic nope', deviceId), deps.factory);
+              expect(result.status()).toBe(401);
+              expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+            });
+
+            it('G: valid desktop POST may omit Origin', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ body: { action: 'MARK_UNREAD', conversationId }, origin: null, cookie: null })), deps.factory);
+              expect(result.status()).toBe(200);
+              expect(deps.repository.setConversationState).toHaveBeenCalled();
+            });
+
+            it('H: valid desktop POST still rejects hostile Origin host', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ body: { action: 'MARK_UNREAD', conversationId }, origin: 'https://evil.example', cookie: null })), deps.factory);
+              expect(result.status()).toBe(403);
+              expect(result.json()).toEqual({ error: 'origin_not_allowed' });
+            });
+
+            it('I: caller authority fields stay forbidden after server authority succeeds', async () => {
+              const deps = authorityDeps();
+              const result = await execute(desktop(request({ body: sendBody({ shopId: otherShopId }), cookie: null })), deps.factory);
+              expect(result.status()).toBe(400);
+              expect(deps.repository.resolveCurrentOperator).not.toHaveBeenCalled();
+            });
+
+            it('J: authoritative device invalidation prevents repository and provider work', async () => {
+              const deps = authorityDeps();
+              deps.resolveDeviceAuthority.mockRejectedValueOnce(Object.assign(new Error('invalid'), { code: 'DEVICE_AUTH_INVALID' }));
+              const result = await execute(desktop(request({ method: 'GET', origin: null, cookie: null })), deps.factory);
+              expect(result.status()).toBe(401);
+              expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+              expect(deps.factory.createProviderGateway).not.toHaveBeenCalled();
+            });
+
+            it('rejects same-host HTTP Origin when forwarded scheme is HTTPS', async () => {
+              const deps = authorityDeps();
+              const req = request({ body: { action: 'MARK_UNREAD', conversationId }, origin: 'http://ops.example' });
+              req.headers['x-forwarded-proto'] = 'https';
+              const result = await execute(req, deps.factory);
+              expect(result.status()).toBe(403);
+            });
+          });
+          EOF
+          npx prettier --write server/whatsappOperationsGateway.test.ts
+      - name: Expected gateway authority-selection RED
+        run: npm test -- server/whatsappOperationsGateway.test.ts server/operationsDeviceAuthority.test.ts
