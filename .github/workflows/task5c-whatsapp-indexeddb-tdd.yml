@@ -1,12 +1,15 @@
-name: Task 5C WhatsApp IndexedDB TDD
+name: Task 5C WhatsApp IndexedDB GREEN
 
 on:
   push:
     branches:
       - feat/ops-whatsapp-task5c-red
 
+permissions:
+  contents: write
+
 jobs:
-  tdd:
+  green:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -17,5 +20,24 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 5C RED
+      - name: Apply Task 5C implementation
+        run: |
+          node scripts/task5c-apply-indexeddb.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            packages/persistence/src/browser/indexedDbMigrations.ts \
+            packages/persistence/src/browser/openOperationsIndexedDb.ts \
+            packages/persistence/src/browser/IndexedDbOperationsDatabase.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/browser/index.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add IndexedDB WhatsApp local cache candidate"
+            git push origin HEAD:feat/ops-whatsapp-task5c-red
+          fi
+      - name: Task 5C focused GREEN
         run: npm test -- packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts
+      - name: Existing IndexedDB regression
+        run: npm test -- packages/persistence/src/browser/indexedDbMigrations.test.ts
+      - name: Persistence typecheck
+        run: npm run typecheck -w @tux/persistence
