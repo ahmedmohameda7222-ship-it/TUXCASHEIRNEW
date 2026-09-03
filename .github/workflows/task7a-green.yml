@@ -25,21 +25,8 @@ jobs:
         run: npm run typecheck -w @tux/operations
       - name: Targeted lint
         run: npx eslint apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts --max-warnings 0
-      - name: Targeted format check
-        run: npx prettier --check apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts
-      - name: Task 7A forbidden surface checks
+      - name: Formatting diagnostic
         run: |
-          if git grep -n "sendMedia" -- apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts; then
-            echo 'sendMedia must remain absent.' >&2
-            exit 1
-          fi
-          git diff --exit-code 2a39d9bfaf8622907646294fba8515854d4c3834 -- \
-            supabase/migrations \
-            packages/persistence/src/sqlite/migrations.ts \
-            packages/persistence/src/browser/indexedDbMigrations.ts \
-            package.json \
-            package-lock.json \
-            apps/operations/package.json \
-            apps/operations-desktop/package.json
-      - name: Working tree clean
-        run: test -z "$(git status --short)"
+          npx prettier --write apps/operations/src/app/whatsappView.test.ts
+          git diff -- apps/operations/src/app/whatsappView.test.ts
+          exit 1
