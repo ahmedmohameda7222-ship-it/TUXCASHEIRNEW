@@ -1,0 +1,34 @@
+name: Task 6B GREEN
+on:
+  push:
+    branches: [feat/ops-whatsapp-task6b-green]
+    paths: [.github/workflows/task6b-green.yml]
+permissions:
+  contents: write
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply verified Task 6B patch
+        run: python scripts/tmp-task6b-green.py
+      - name: Format
+        run: npx prettier --write server/operationsDeviceAuthority.ts server/operationsDeviceAuthority.test.ts server/supabaseGateway.ts server/whatsappOperationsGateway.ts server/whatsappOperationsGateway.test.ts
+      - name: Task 6B GREEN gates
+        run: |
+          npm test -- server/operationsDeviceAuthority.test.ts server/whatsappOperationsGateway.test.ts server/workerAuthenticationGateway.refresh.test.ts
+          npm run typecheck
+          npm run test:whatsapp-architecture
+          test -z "$(git diff 6c235e9a59a78aabc6da149816b966de254375cf -- packages/persistence/src/sqlite/migrations.ts packages/persistence/src/browser/indexedDbMigrations.ts supabase/migrations)"
+      - name: Commit source only
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add server/operationsDeviceAuthority.ts server/operationsDeviceAuthority.test.ts server/supabaseGateway.ts server/whatsappOperationsGateway.ts server/whatsappOperationsGateway.test.ts
+          git commit -m "feat: derive WhatsApp device authority server side"
+          git push origin HEAD:feat/ops-whatsapp-task6b-green
