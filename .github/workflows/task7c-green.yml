@@ -6,7 +6,7 @@ on:
       - feat/ops-whatsapp-task7c-green
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   green:
@@ -24,6 +24,16 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Format Task 7C authorized files
+        run: |
+          npx prettier --write apps/operations/src/app/WhatsAppWorkspace.tsx apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/styles/global.css
+          if ! git diff --quiet -- apps/operations/src/app/WhatsAppWorkspace.tsx apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/styles/global.css; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add apps/operations/src/app/WhatsAppWorkspace.tsx apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/styles/global.css
+            git commit -m 'style: format Task 7C files'
+            git push
+          fi
       - name: Task 7C focused tests
         run: npm test -- apps/operations/src/app/WhatsAppWorkspace.test.tsx apps/operations/src/app/whatsappView.test.ts
       - name: Operations typecheck
