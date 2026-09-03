@@ -1,0 +1,92 @@
+name: Task 6B RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6b-red
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add resolver tests before implementation
+        run: |
+          cat > server/operationsDeviceAuthority.test.ts <<'EOF'
+          import { parseEntityId, type DeviceId, type ShopId } from '@tux/domain';
+          import { describe, expect, it, vi } from 'vitest';
+          import {
+            OperationsDeviceAuthorityError,
+            resolveOperationsDeviceAuthority,
+          } from './operationsDeviceAuthority';
+
+          const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
+          const deviceId = parseEntityId<DeviceId>('22222222-2222-4222-8222-222222222222');
+
+          function json(status: number, body: unknown): Response {
+            return new Response(JSON.stringify(body), {
+              status,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          describe('resolveOperationsDeviceAuthority', () => {
+            it('derives shopId from the active RLS-visible device rather than caller shop input', async () => {
+              const fetcher = vi
+                .fn<typeof fetch>()
+                .mockResolvedValueOnce(json(200, { id: 'user-1' }))
+                .mockResolvedValueOnce(json(200, [{ id: deviceId, shop_id: shopId }]))
+                .mockResolvedValueOnce(json(200, [{ shop_id: shopId, role: 'OPERATIONS_DEVICE' }]));
+
+              await expect(
+                resolveOperationsDeviceAuthority({
+                  projectUrl: 'https://example.supabase.co',
+                  publishableKey: 'publishable',
+                  accessToken: 'access-token',
+                  deviceId,
+                  fetcher,
+                }),
+              ).resolves.toEqual({ shopId, deviceId });
+            });
+
+            it('fails authoritatively when the device is not visible/active for the bearer user', async () => {
+              const fetcher = vi
+                .fn<typeof fetch>()
+                .mockResolvedValueOnce(json(200, { id: 'user-1' }))
+                .mockResolvedValueOnce(json(200, []));
+              await expect(
+                resolveOperationsDeviceAuthority({
+                  projectUrl: 'https://example.supabase.co',
+                  publishableKey: 'publishable',
+                  accessToken: 'access-token',
+                  deviceId,
+                  fetcher,
+                }),
+              ).rejects.toMatchObject({ code: 'DEVICE_AUTH_INVALID' });
+            });
+
+            it('classifies transport failure as REMOTE_UNAVAILABLE', async () => {
+              const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error('offline'));
+              await expect(
+                resolveOperationsDeviceAuthority({
+                  projectUrl: 'https://example.supabase.co',
+                  publishableKey: 'publishable',
+                  accessToken: 'access-token',
+                  deviceId,
+                  fetcher,
+                }),
+              ).rejects.toMatchObject({ code: 'REMOTE_UNAVAILABLE' });
+              expect(OperationsDeviceAuthorityError).toBeDefined();
+            });
+          });
+          EOF
+      - name: Expected resolver module-missing RED
+        run: npm test -- server/operationsDeviceAuthority.test.ts
