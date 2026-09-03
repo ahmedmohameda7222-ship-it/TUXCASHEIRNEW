@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
+import { instant } from '@tux/domain';
 import type {
   ShopId,
   WhatsAppConversation,
@@ -246,7 +247,7 @@ WHERE shop_id = ? AND conversation_id = ?
       shopId: row.shop_id as ShopId,
       conversationId: row.conversation_id,
       text: row.text,
-      updatedAt: row.updated_at,
+      updatedAt: instant(row.updated_at),
     };
   }
 

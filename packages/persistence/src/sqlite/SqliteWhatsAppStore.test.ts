@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
 import {
+  instant,
   parseEntityId,
   type OrderId,
   type ShopId,
@@ -49,7 +50,7 @@ function conversation(
     unreadCount,
     archived: false,
     followUp: false,
-    lastMessageAt,
+    lastMessageAt: lastMessageAt === null ? null : instant(lastMessageAt),
   };
 }
 
@@ -74,7 +75,7 @@ function message(
     sentByWorkerId: null,
     initiatedByDeviceId: null,
     initiatedAt: null,
-    createdAt,
+    createdAt: instant(createdAt),
   };
 }
 
@@ -148,7 +149,7 @@ describe('SqliteWhatsAppStore', () => {
         {
           conversationId: 'conversation-a',
           orderId: ORDER_A,
-          linkedAt: '2026-09-03T08:01:00.000Z',
+          linkedAt: instant('2026-09-03T08:01:00.000Z'),
         },
       ],
     });
@@ -171,7 +172,7 @@ describe('SqliteWhatsAppStore', () => {
           {
             conversationId: 'conversation-a',
             orderId: ORDER_A,
-            linkedAt: '2026-09-03T09:01:00.000Z',
+            linkedAt: instant('2026-09-03T09:01:00.000Z'),
           },
         ],
       }),
@@ -186,7 +187,7 @@ describe('SqliteWhatsAppStore', () => {
       {
         conversationId: 'conversation-a',
         orderId: ORDER_A,
-        linkedAt: '2026-09-03T09:01:00.000Z',
+        linkedAt: instant('2026-09-03T09:01:00.000Z'),
       },
     ]);
     expect((await store.listMessages(SHOP_A, 'conversation-a')).map((entry) => entry.id)).toEqual([
@@ -233,8 +234,8 @@ describe('SqliteWhatsAppStore', () => {
         ],
         quickReplies: [quickReply(SHOP_A, 'reply-a'), quickReply(SHOP_B, 'reply-b')],
         orderLinks: [
-          { conversationId: 'conversation-a', orderId: ORDER_A, linkedAt: '2026-09-03T08:01:00.000Z' },
-          { conversationId: 'conversation-b', orderId: ORDER_B, linkedAt: '2026-09-03T09:01:00.000Z' },
+          { conversationId: 'conversation-a', orderId: ORDER_A, linkedAt: instant('2026-09-03T08:01:00.000Z') },
+          { conversationId: 'conversation-b', orderId: ORDER_B, linkedAt: instant('2026-09-03T09:01:00.000Z') },
         ],
       }),
     );
@@ -256,13 +257,13 @@ describe('SqliteWhatsAppStore', () => {
       shopId: SHOP_A,
       conversationId: 'conversation-a',
       text: 'Draft A',
-      updatedAt: '2026-09-03T10:00:00.000Z',
+      updatedAt: instant('2026-09-03T10:00:00.000Z'),
     });
     await first.saveDraft({
       shopId: SHOP_B,
       conversationId: 'conversation-a',
       text: 'Draft B',
-      updatedAt: '2026-09-03T10:01:00.000Z',
+      updatedAt: instant('2026-09-03T10:01:00.000Z'),
     });
     await first.close();
 
