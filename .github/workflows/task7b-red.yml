@@ -1,0 +1,22 @@
+name: Task 7B RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7b-red
+    paths:
+      - apps/operations/src/app/whatsappInboxController.test.ts
+      - .github/workflows/task7b-red.yml
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Required Task 7B RED
+        run: npm test -- apps/operations/src/app/whatsappInboxController.test.ts
