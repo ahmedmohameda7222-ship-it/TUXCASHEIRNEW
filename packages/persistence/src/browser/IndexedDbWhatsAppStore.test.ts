@@ -80,9 +80,13 @@ async function deleteDatabase(name: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(name);
     request.addEventListener('success', () => resolve(), { once: true });
-    request.addEventListener('blocked', () => reject(new Error(`IndexedDB delete blocked: ${name}`)), {
-      once: true,
-    });
+    request.addEventListener(
+      'blocked',
+      () => reject(new Error(`IndexedDB delete blocked: ${name}`)),
+      {
+        once: true,
+      },
+    );
     request.addEventListener(
       'error',
       () => reject(request.error ?? new Error(`Could not delete IndexedDB ${name}.`)),
@@ -313,8 +317,16 @@ describe('IndexedDbWhatsAppStore', () => {
         ],
         quickReplies: [quickReply(SHOP_A, 'reply-a'), quickReply(SHOP_B, 'reply-b')],
         orderLinks: [
-          { conversationId: 'conversation-a', orderId: ORDER_A, linkedAt: instant('2026-09-03T08:01:00.000Z') },
-          { conversationId: 'conversation-b', orderId: ORDER_B, linkedAt: instant('2026-09-03T09:01:00.000Z') },
+          {
+            conversationId: 'conversation-a',
+            orderId: ORDER_A,
+            linkedAt: instant('2026-09-03T08:01:00.000Z'),
+          },
+          {
+            conversationId: 'conversation-b',
+            orderId: ORDER_B,
+            linkedAt: instant('2026-09-03T09:01:00.000Z'),
+          },
         ],
       }),
     );

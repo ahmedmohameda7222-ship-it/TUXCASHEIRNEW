@@ -7,11 +7,7 @@ import type {
   WhatsAppMessage,
   WhatsAppQuickReply,
 } from '@tux/domain';
-import type {
-  CachedWhatsAppInboxSnapshot,
-  WhatsAppDraft,
-  WhatsAppStore,
-} from '../whatsappStore';
+import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '../whatsappStore';
 import { applySqliteMigrations } from './migrations';
 
 interface FencedPayloadRow {
@@ -70,7 +66,9 @@ function parseMessage(row: MessagePayloadRow, expectedShopId: ShopId): WhatsAppM
   const value = parseRecord(row.payload_json, 'message');
   validateIdentity(value, row, expectedShopId, 'message');
   if (value['conversationId'] !== row.conversation_id) {
-    throw new Error('Cached WhatsApp message conversation identity does not match the persisted row.');
+    throw new Error(
+      'Cached WhatsApp message conversation identity does not match the persisted row.',
+    );
   }
   const message = value as unknown as WhatsAppMessage;
   assertWhatsAppMessageInvariant(message);
@@ -190,7 +188,8 @@ ON CONFLICT(shop_id, conversation_id, order_id) DO UPDATE SET
         const cachedShop = conversationShops.get(orderLink.conversationId);
         const row = cachedShop
           ? null
-          : (findConversationShop.get(orderLink.conversationId) as { shop_id?: unknown } | undefined);
+          : (findConversationShop.get(orderLink.conversationId) as
+              { shop_id?: unknown } | undefined);
         const shopId = cachedShop ?? (typeof row?.shop_id === 'string' ? row.shop_id : null);
         if (shopId === null) {
           throw new Error(
@@ -216,7 +215,8 @@ ON CONFLICT(shop_id, conversation_id, order_id) DO UPDATE SET
   async upsertMessage(message: WhatsAppMessage): Promise<void> {
     const database = this.#requireDatabase();
     database
-      .prepare(`
+      .prepare(
+        `
 INSERT INTO whatsapp_cache_messages(id, shop_id, conversation_id, created_at, payload_json)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
@@ -224,7 +224,8 @@ ON CONFLICT(id) DO UPDATE SET
   conversation_id = excluded.conversation_id,
   created_at = excluded.created_at,
   payload_json = excluded.payload_json
-`)
+`,
+      )
       .run(
         message.id,
         message.shopId,
@@ -237,36 +238,44 @@ ON CONFLICT(id) DO UPDATE SET
   async loadInbox(shopId: ShopId): Promise<CachedWhatsAppInboxSnapshot> {
     const database = this.#requireDatabase();
     const conversations = database
-      .prepare(`
+      .prepare(
+        `
 SELECT id, shop_id, payload_json
 FROM whatsapp_cache_conversations
 WHERE shop_id = ?
 ORDER BY last_message_at DESC, id ASC
-`)
+`,
+      )
       .all(shopId) as unknown as FencedPayloadRow[];
     const messages = database
-      .prepare(`
+      .prepare(
+        `
 SELECT id, shop_id, conversation_id, payload_json
 FROM whatsapp_cache_messages
 WHERE shop_id = ?
 ORDER BY created_at ASC, id ASC
-`)
+`,
+      )
       .all(shopId) as unknown as MessagePayloadRow[];
     const quickReplies = database
-      .prepare(`
+      .prepare(
+        `
 SELECT id, shop_id, payload_json
 FROM whatsapp_cache_quick_replies
 WHERE shop_id = ?
 ORDER BY id ASC
-`)
+`,
+      )
       .all(shopId) as unknown as FencedPayloadRow[];
     const orderLinks = database
-      .prepare(`
+      .prepare(
+        `
 SELECT shop_id, conversation_id, order_id, payload_json
 FROM whatsapp_cache_order_links
 WHERE shop_id = ?
 ORDER BY conversation_id ASC, order_id ASC
-`)
+`,
+      )
       .all(shopId) as unknown as OrderLinkPayloadRow[];
 
     return {
@@ -277,18 +286,17 @@ ORDER BY conversation_id ASC, order_id ASC
     };
   }
 
-  async listMessages(
-    shopId: ShopId,
-    conversationId: string,
-  ): Promise<readonly WhatsAppMessage[]> {
+  async listMessages(shopId: ShopId, conversationId: string): Promise<readonly WhatsAppMessage[]> {
     const database = this.#requireDatabase();
     const rows = database
-      .prepare(`
+      .prepare(
+        `
 SELECT id, shop_id, conversation_id, payload_json
 FROM whatsapp_cache_messages
 WHERE shop_id = ? AND conversation_id = ?
 ORDER BY created_at ASC, id ASC
-`)
+`,
+      )
       .all(shopId, conversationId) as unknown as MessagePayloadRow[];
     return rows.map((row) => {
       if (row.conversation_id !== conversationId) {
@@ -301,24 +309,28 @@ ORDER BY created_at ASC, id ASC
   async saveDraft(draft: WhatsAppDraft): Promise<void> {
     const database = this.#requireDatabase();
     database
-      .prepare(`
+      .prepare(
+        `
 INSERT INTO whatsapp_drafts(shop_id, conversation_id, text, updated_at)
 VALUES (?, ?, ?, ?)
 ON CONFLICT(shop_id, conversation_id) DO UPDATE SET
   text = excluded.text,
   updated_at = excluded.updated_at
-`)
+`,
+      )
       .run(draft.shopId, draft.conversationId, draft.text, draft.updatedAt);
   }
 
   async getDraft(shopId: ShopId, conversationId: string): Promise<WhatsAppDraft | null> {
     const database = this.#requireDatabase();
     const row = database
-      .prepare(`
+      .prepare(
+        `
 SELECT shop_id, conversation_id, text, updated_at
 FROM whatsapp_drafts
 WHERE shop_id = ? AND conversation_id = ?
-`)
+`,
+      )
       .get(shopId, conversationId) as DraftRow | undefined;
     if (row === undefined) return null;
     if (row.shop_id !== shopId || row.conversation_id !== conversationId) {

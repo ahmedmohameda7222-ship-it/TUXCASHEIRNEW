@@ -124,7 +124,12 @@ CREATE TABLE local_schema_migrations (
   }
   database
     .prepare('INSERT INTO shops(id, name, active, payload_json) VALUES (?, ?, ?, ?)')
-    .run(SHOP_A, 'Existing shop', 1, JSON.stringify({ id: SHOP_A, name: 'Existing shop', active: true }));
+    .run(
+      SHOP_A,
+      'Existing shop',
+      1,
+      JSON.stringify({ id: SHOP_A, name: 'Existing shop', active: true }),
+    );
   database.close();
 }
 
@@ -234,8 +239,16 @@ describe('SqliteWhatsAppStore', () => {
         ],
         quickReplies: [quickReply(SHOP_A, 'reply-a'), quickReply(SHOP_B, 'reply-b')],
         orderLinks: [
-          { conversationId: 'conversation-a', orderId: ORDER_A, linkedAt: instant('2026-09-03T08:01:00.000Z') },
-          { conversationId: 'conversation-b', orderId: ORDER_B, linkedAt: instant('2026-09-03T09:01:00.000Z') },
+          {
+            conversationId: 'conversation-a',
+            orderId: ORDER_A,
+            linkedAt: instant('2026-09-03T08:01:00.000Z'),
+          },
+          {
+            conversationId: 'conversation-b',
+            orderId: ORDER_B,
+            linkedAt: instant('2026-09-03T09:01:00.000Z'),
+          },
         ],
       }),
     );
@@ -299,7 +312,9 @@ describe('SqliteWhatsAppStore', () => {
     expect(database.prepare('SELECT name FROM shops WHERE id = ?').get(SHOP_A)).toEqual({
       name: 'Existing shop',
     });
-    expect(database.prepare('SELECT name FROM local_schema_migrations WHERE version = 10').get()).toEqual({
+    expect(
+      database.prepare('SELECT name FROM local_schema_migrations WHERE version = 10').get(),
+    ).toEqual({
       name: 'whatsapp_local_cache',
     });
     database.close();
@@ -313,10 +328,12 @@ describe('SqliteWhatsAppStore', () => {
 
     const database = new DatabaseSync(path);
     database
-      .prepare(`
+      .prepare(
+        `
 INSERT INTO whatsapp_cache_messages(id, shop_id, conversation_id, created_at, payload_json)
 VALUES (?, ?, ?, ?, ?)
-`)
+`,
+      )
       .run(
         'malformed-message',
         SHOP_A,
@@ -340,10 +357,12 @@ VALUES (?, ?, ?, ?, ?)
 
     const database = new DatabaseSync(path);
     database
-      .prepare(`
+      .prepare(
+        `
 INSERT INTO whatsapp_cache_conversations(id, shop_id, last_message_at, payload_json)
 VALUES (?, ?, ?, ?)
-`)
+`,
+      )
       .run(
         'conversation-a',
         SHOP_A,
@@ -357,5 +376,4 @@ VALUES (?, ?, ?, ?)
     await expect(reopened.loadInbox(SHOP_A)).rejects.toThrow(/shop|tenant/i);
     await reopened.close();
   });
-
 });

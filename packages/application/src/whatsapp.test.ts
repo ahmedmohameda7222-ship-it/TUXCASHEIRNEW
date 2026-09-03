@@ -120,7 +120,11 @@ describe('OperationsWhatsAppService', () => {
   it('resolves ACTIVE Current Operator claims at call time and forwards only the Task 4 send contract', async () => {
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const first = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const first = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
     expect(first.ok).toBe(true);
     expect(remote.sendText).toHaveBeenNthCalledWith(1, {
       businessDayId,
@@ -163,7 +167,11 @@ describe('OperationsWhatsAppService', () => {
     session.set({ ok: true, value: state });
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFLICT_ERROR' } });
     expect(remote.sendText).not.toHaveBeenCalled();
@@ -173,7 +181,11 @@ describe('OperationsWhatsAppService', () => {
     vi.mocked(remote.sendText).mockRejectedValue(remoteError('OPERATOR_NOT_SYNCHRONIZED'));
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFLICT_ERROR' } });
     expect(remote.sendText).toHaveBeenCalledTimes(1);
@@ -186,7 +198,11 @@ describe('OperationsWhatsAppService', () => {
     vi.mocked(remote.sendText).mockRejectedValue(remoteError('OUTBOUND_INTENT_CONFLICT'));
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFLICT_ERROR' } });
     expect(remote.sendText).toHaveBeenCalledTimes(1);
@@ -198,7 +214,11 @@ describe('OperationsWhatsAppService', () => {
     );
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'REMOTE_SYNC_ERROR' } });
     expect(remote.sendText).toHaveBeenCalledTimes(1);
@@ -240,7 +260,11 @@ describe('OperationsWhatsAppService', () => {
   it('upserts a successful durable outbound message locally exactly once', async () => {
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toEqual({ ok: true, value: sentMessage() });
     expect(store.upsertMessage).toHaveBeenCalledTimes(1);
@@ -252,7 +276,11 @@ describe('OperationsWhatsAppService', () => {
     vi.mocked(store.upsertMessage).mockRejectedValue(new Error('disk failed'));
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    const result = await service.sendText({ conversationId, text: 'تمام', outboundIntentKey: 'intent-1' });
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
 
     expect(result).toMatchObject({ ok: false, error: { code: 'LOCAL_PERSISTENCE_ERROR' } });
     expect(remote.sendText).toHaveBeenCalledTimes(1);
@@ -268,12 +296,20 @@ describe('OperationsWhatsAppService', () => {
     });
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    await expect(service.saveDraft(conversationId, 'مسودة')).resolves.toEqual({ ok: true, value: undefined });
+    await expect(service.saveDraft(conversationId, 'مسودة')).resolves.toEqual({
+      ok: true,
+      value: undefined,
+    });
     await expect(service.getDraft(conversationId)).resolves.toEqual({
       ok: true,
       value: { shopId, conversationId, text: 'مسودة', updatedAt: now },
     });
-    expect(store.saveDraft).toHaveBeenCalledWith({ shopId, conversationId, text: 'مسودة', updatedAt: now });
+    expect(store.saveDraft).toHaveBeenCalledWith({
+      shopId,
+      conversationId,
+      text: 'مسودة',
+      updatedAt: now,
+    });
     expect(store.getDraft).toHaveBeenCalledWith(shopId, conversationId);
     expect(remote.loadInbox).not.toHaveBeenCalled();
     expect(remote.sendText).not.toHaveBeenCalled();
@@ -286,7 +322,10 @@ describe('OperationsWhatsAppService', () => {
   it('requires ACTIVE state for linkOrder and forwards only businessDayId + workerId claims', async () => {
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    await expect(service.linkOrder({ conversationId, orderId })).resolves.toEqual({ ok: true, value: undefined });
+    await expect(service.linkOrder({ conversationId, orderId })).resolves.toEqual({
+      ok: true,
+      value: undefined,
+    });
     expect(remote.linkOrder).toHaveBeenCalledWith({
       businessDayId,
       workerId,
@@ -303,9 +342,15 @@ describe('OperationsWhatsAppService', () => {
   it('uses Task 4 conversation mutation methods without manufacturing worker authority fields', async () => {
     const service = new OperationsWhatsAppService(remote, store, session, () => now);
 
-    await expect(service.markUnread(conversationId)).resolves.toEqual({ ok: true, value: undefined });
+    await expect(service.markUnread(conversationId)).resolves.toEqual({
+      ok: true,
+      value: undefined,
+    });
     await expect(service.archive(conversationId)).resolves.toEqual({ ok: true, value: undefined });
-    await expect(service.setFollowUp(conversationId, true)).resolves.toEqual({ ok: true, value: undefined });
+    await expect(service.setFollowUp(conversationId, true)).resolves.toEqual({
+      ok: true,
+      value: undefined,
+    });
 
     expect(remote.markUnread).toHaveBeenCalledWith(conversationId);
     expect(remote.archive).toHaveBeenCalledWith(conversationId, undefined);
