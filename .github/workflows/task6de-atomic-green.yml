@@ -1,0 +1,544 @@
+name: Task 6D-E Atomic GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6de-atomic
+    paths:
+      - .github/workflows/task6de-atomic-green.yml
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Materialize accepted RED contract and tests
+        run: |
+          git fetch --no-tags --depth=1 origin e92cb0322305f9ebeb231b649e5b03a4e3355a49
+          git fetch --no-tags --depth=1 origin be02c849fc411ce26346d316687834ef94afe674
+          git show e92cb0322305f9ebeb231b649e5b03a4e3355a49:packages/platform-contracts/index.d.ts > packages/platform-contracts/index.d.ts
+          git show e92cb0322305f9ebeb231b649e5b03a4e3355a49:apps/operations-desktop/src/main/whatsappIpc.test.ts > apps/operations-desktop/src/main/whatsappIpc.test.ts
+          git show be02c849fc411ce26346d316687834ef94afe674:apps/operations-desktop/src/preload/whatsappResult.test.ts > apps/operations-desktop/src/preload/whatsappResult.test.ts
+
+      - name: Implement WhatsApp IPC runtime
+        run: |
+          cat > apps/operations-desktop/src/main/whatsappIpc.ts <<'TS'
+          import { parseEntityId, type OrderId } from '@tux/domain';
+          import type { TuxWhatsAppApi } from '@tux/platform-contracts';
+          import type { BrowserWindow } from 'electron';
+          import { ipcMain } from 'electron';
+          import { assertTrustedIpcSender } from './security';
+
+          const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
+          const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
+          const IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';
+          const IPC_WHATSAPP_MARK_UNREAD = 'tux:whatsapp:mark-unread';
+          const IPC_WHATSAPP_ARCHIVE = 'tux:whatsapp:archive';
+          const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
+          const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
+          const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
+          const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
+
+          const CHANNELS = [
+            IPC_WHATSAPP_LOAD_INBOX,
+            IPC_WHATSAPP_LOAD_CONVERSATION,
+            IPC_WHATSAPP_SEND_TEXT,
+            IPC_WHATSAPP_MARK_UNREAD,
+            IPC_WHATSAPP_ARCHIVE,
+            IPC_WHATSAPP_SET_FOLLOW_UP,
+            IPC_WHATSAPP_LINK_ORDER,
+            IPC_WHATSAPP_SAVE_DRAFT,
+            IPC_WHATSAPP_GET_DRAFT,
+          ] as const;
+
+          function objectPayload(value: unknown, label: string): Record<string, unknown> {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new TypeError(`${label} IPC payload must be an object.`);
+            }
+            return value as Record<string, unknown>;
+          }
+
+          function conversationId(value: unknown): string {
+            if (typeof value !== 'string') throw new TypeError('WhatsApp conversation ID must be a string.');
+            parseEntityId<OrderId>(value);
+            return value;
+          }
+
+          function nonEmpty(value: unknown, label: string): string {
+            if (typeof value !== 'string' || value.trim().length === 0) {
+              throw new TypeError(`${label} must be a non-empty string.`);
+            }
+            return value.trim();
+          }
+
+          export class WhatsAppIpcRuntime {
+            readonly #service: TuxWhatsAppApi;
+
+            constructor(input: { readonly service: TuxWhatsAppApi }) {
+              this.#service = input.service;
+            }
+
+            register(window: BrowserWindow): void {
+              this.close();
+
+              ipcMain.handle(IPC_WHATSAPP_LOAD_INBOX, async (event, cursor: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                if (cursor !== undefined && typeof cursor !== 'string') {
+                  throw new TypeError('WhatsApp inbox cursor must be a string when provided.');
+                }
+                return this.#service.loadInbox(cursor);
+              });
+
+              ipcMain.handle(IPC_WHATSAPP_LOAD_CONVERSATION, async (event, rawConversationId: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                return this.#service.loadConversation(conversationId(rawConversationId));
+              });
+
+              ipcMain.handle(IPC_WHATSAPP_SEND_TEXT, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'WhatsApp send text');
+                return this.#service.sendText({
+                  conversationId: conversationId(input['conversationId']),
+                  outboundIntentKey: nonEmpty(input['outboundIntentKey'], 'WhatsApp outbound intent key'),
+                  text: nonEmpty(input['text'], 'WhatsApp send text'),
+                });
+              });
+
+              ipcMain.handle(IPC_WHATSAPP_MARK_UNREAD, async (event, rawConversationId: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                return this.#service.markUnread(conversationId(rawConversationId));
+              });
+
+              ipcMain.handle(
+                IPC_WHATSAPP_ARCHIVE,
+                async (event, rawConversationId: unknown, archived: unknown) => {
+                  assertTrustedIpcSender(event, window.webContents.id);
+                  if (archived !== undefined && typeof archived !== 'boolean') {
+                    throw new TypeError('WhatsApp archived flag must be a boolean when provided.');
+                  }
+                  return this.#service.archive(conversationId(rawConversationId), archived);
+                },
+              );
+
+              ipcMain.handle(
+                IPC_WHATSAPP_SET_FOLLOW_UP,
+                async (event, rawConversationId: unknown, followUp: unknown) => {
+                  assertTrustedIpcSender(event, window.webContents.id);
+                  if (typeof followUp !== 'boolean') {
+                    throw new TypeError('WhatsApp follow-up flag must be a boolean.');
+                  }
+                  return this.#service.setFollowUp(conversationId(rawConversationId), followUp);
+                },
+              );
+
+              ipcMain.handle(IPC_WHATSAPP_LINK_ORDER, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'WhatsApp link order');
+                if (typeof input['orderId'] !== 'string') {
+                  throw new TypeError('WhatsApp order ID must be a string.');
+                }
+                if (input['linked'] !== undefined && typeof input['linked'] !== 'boolean') {
+                  throw new TypeError('WhatsApp linked flag must be a boolean when provided.');
+                }
+                return this.#service.linkOrder({
+                  conversationId: conversationId(input['conversationId']),
+                  orderId: parseEntityId<OrderId>(input['orderId']),
+                  ...(input['linked'] === undefined ? {} : { linked: input['linked'] }),
+                });
+              });
+
+              ipcMain.handle(
+                IPC_WHATSAPP_SAVE_DRAFT,
+                async (event, rawConversationId: unknown, text: unknown) => {
+                  assertTrustedIpcSender(event, window.webContents.id);
+                  if (typeof text !== 'string') throw new TypeError('WhatsApp draft text must be a string.');
+                  return this.#service.saveDraft(conversationId(rawConversationId), text);
+                },
+              );
+
+              ipcMain.handle(IPC_WHATSAPP_GET_DRAFT, async (event, rawConversationId: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                return this.#service.getDraft(conversationId(rawConversationId));
+              });
+            }
+
+            close(): void {
+              for (const channel of CHANNELS) ipcMain.removeHandler(channel);
+            }
+          }
+          TS
+
+      - name: Implement defensive WhatsApp preload result parser
+        run: |
+          cat > apps/operations-desktop/src/preload/whatsappResult.ts <<'TS'
+          import {
+            parseWhatsAppInboxSnapshot,
+            parseWhatsAppMessage,
+            type ApplicationErrorCode,
+          } from '@tux/application';
+          import { instant, parseEntityId, type ShopId } from '@tux/domain';
+          import type { TuxWhatsAppApi } from '@tux/platform-contracts';
+
+          type InboxResult = Awaited<ReturnType<TuxWhatsAppApi['loadInbox']>>;
+          type ConversationResult = Awaited<ReturnType<TuxWhatsAppApi['loadConversation']>>;
+          type MessageResult = Awaited<ReturnType<TuxWhatsAppApi['sendText']>>;
+          type VoidResult = Awaited<ReturnType<TuxWhatsAppApi['markUnread']>>;
+          type DraftResult = Awaited<ReturnType<TuxWhatsAppApi['getDraft']>>;
+
+          const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const ERROR_CODES = new Set<ApplicationErrorCode>([
+            'VALIDATION_ERROR',
+            'INVALID_DRAFT',
+            'LOCAL_PERSISTENCE_ERROR',
+            'PRINT_ERROR',
+            'REMOTE_SYNC_ERROR',
+            'PIN_AUTH_ERROR',
+            'CONFLICT_ERROR',
+            'NOT_FOUND',
+            'ALREADY_CLOSED',
+            'IDEMPOTENCY_REPLAY',
+          ]);
+
+          function record(value: unknown): Record<string, unknown> {
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+              throw new TypeError('WhatsApp preload result must be an object.');
+            }
+            return value as Record<string, unknown>;
+          }
+
+          function uuid(value: unknown, label: string): string {
+            if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
+              throw new TypeError(`${label} must be a UUID.`);
+            }
+            return value;
+          }
+
+          function safeError(value: unknown): { code: ApplicationErrorCode; message: string } {
+            const source = record(value);
+            const code = source['code'];
+            if (
+              typeof code !== 'string' ||
+              !ERROR_CODES.has(code as ApplicationErrorCode) ||
+              typeof source['message'] !== 'string'
+            ) {
+              throw new TypeError('Invalid WhatsApp application error from Electron main process.');
+            }
+            return { code: code as ApplicationErrorCode, message: source['message'] };
+          }
+
+          function parseMessage(value: unknown) {
+            try {
+              const parsed = parseWhatsAppMessage(value);
+              uuid(parsed.conversationId, 'WhatsApp message conversationId');
+              return parsed;
+            } catch {
+              throw new TypeError('Invalid WhatsApp message response from Electron main process.');
+            }
+          }
+
+          function parseInbox(value: unknown) {
+            try {
+              const parsed = parseWhatsAppInboxSnapshot(value);
+              for (const conversation of parsed.conversations) {
+                uuid(conversation.id, 'WhatsApp conversation id');
+              }
+              for (const message of parsed.messages) uuid(message.conversationId, 'WhatsApp message conversationId');
+              for (const link of parsed.orderLinks) uuid(link.conversationId, 'WhatsApp order-link conversationId');
+              return parsed;
+            } catch {
+              throw new TypeError('Invalid WhatsApp inbox response from Electron main process.');
+            }
+          }
+
+          function parseDraft(value: unknown) {
+            try {
+              const source = record(value);
+              if (
+                typeof source['shopId'] !== 'string' ||
+                typeof source['text'] !== 'string' ||
+                typeof source['updatedAt'] !== 'string'
+              ) {
+                throw new TypeError('Invalid WhatsApp draft fields.');
+              }
+              return {
+                shopId: parseEntityId<ShopId>(source['shopId']),
+                conversationId: uuid(source['conversationId'], 'WhatsApp draft conversationId'),
+                text: source['text'],
+                updatedAt: instant(source['updatedAt']),
+              };
+            } catch {
+              throw new TypeError('Invalid WhatsApp draft response from Electron main process.');
+            }
+          }
+
+          function assertResult<Result>(
+            value: unknown,
+            label: string,
+            parseSuccess: (payload: unknown) => unknown,
+          ): Result {
+            const source = record(value);
+            if (typeof source['ok'] !== 'boolean') {
+              throw new TypeError(`Invalid ${label} response from Electron main process.`);
+            }
+            if (source['ok'] === true) {
+              return { ok: true, value: parseSuccess(source['value']) } as unknown as Result;
+            }
+            return { ok: false, error: safeError(source['error']) } as unknown as Result;
+          }
+
+          export function assertWhatsAppInboxResult(value: unknown): InboxResult {
+            return assertResult<InboxResult>(value, 'WhatsApp inbox', parseInbox);
+          }
+
+          export function assertWhatsAppConversationResult(value: unknown): ConversationResult {
+            return assertResult<ConversationResult>(value, 'WhatsApp conversation', (payload) => {
+              if (!Array.isArray(payload)) throw new TypeError('WhatsApp conversation must be an array.');
+              return payload.map(parseMessage);
+            });
+          }
+
+          export function assertWhatsAppMessageResult(value: unknown): MessageResult {
+            return assertResult<MessageResult>(value, 'WhatsApp message', parseMessage);
+          }
+
+          export function assertWhatsAppVoidResult(value: unknown): VoidResult {
+            return assertResult<VoidResult>(value, 'WhatsApp mutation', (payload) => {
+              if (payload !== undefined) throw new TypeError('WhatsApp mutation result must be void.');
+              return undefined;
+            });
+          }
+
+          export function assertWhatsAppDraftResult(value: unknown): DraftResult {
+            return assertResult<DraftResult>(value, 'WhatsApp draft', (payload) =>
+              payload === null ? null : parseDraft(payload),
+            );
+          }
+          TS
+
+      - name: Patch Electron main composition and preload facade
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main = Path('apps/operations-desktop/src/main/index.ts')
+          s = main.read_text()
+          s = s.replace(
+              '  OperationsOrdersService,\n  OperationsWorkerAuthenticationService,',
+              '  OperationsOrdersService,\n  OperationsWhatsAppService,\n  OperationsWorkerAuthenticationService,\n  WhatsAppRemoteError,',
+          )
+          s = s.replace(
+              '  type OperationsSessionResult,\n  type WorkerCredentialStore,',
+              '  type OperationsSessionResult,\n  type WhatsAppRemoteGateway,\n  type WorkerCredentialStore,',
+          )
+          s = s.replace(
+              '  SqliteOrderDraftStore,\n  SqliteWorkerMenuLayoutStore,',
+              '  SqliteOrderDraftStore,\n  SqliteWhatsAppStore,\n  SqliteWorkerMenuLayoutStore,',
+          )
+          s = s.replace(
+              "import { BulkStockIpcRuntime } from './bulkStockIpc';\n",
+              "import { BulkStockIpcRuntime } from './bulkStockIpc';\nimport { DesktopWhatsAppRemote, parseTuxOperationsApiOrigin } from './desktopWhatsAppRemote';\n",
+          )
+          s = s.replace(
+              "import { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';\n",
+              "import { WhatsAppIpcRuntime } from './whatsappIpc';\nimport { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';\n",
+          )
+          s = s.replace(
+              'let endDayIpcRuntime: EndDayIpcRuntime | null = null;\n',
+              'let endDayIpcRuntime: EndDayIpcRuntime | null = null;\nlet whatsappStore: SqliteWhatsAppStore | null = null;\nlet whatsappIpcRuntime: WhatsAppIpcRuntime | null = null;\n',
+          )
+          marker = 'async function initializeOperationsServices(): Promise<void> {'
+          unavailable = '''function unavailableWhatsAppRemote(): WhatsAppRemoteGateway {
+            const unavailable = async (): Promise<never> => {
+              throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is not configured.');
+            };
+            return {
+              loadInbox: unavailable,
+              sendText: unavailable,
+              markUnread: unavailable,
+              archive: unavailable,
+              setFollowUp: unavailable,
+              linkOrder: unavailable,
+            };
+          }
+
+          '''
+          if marker not in s:
+              raise SystemExit('initialize marker missing')
+          s = s.replace(marker, unavailable + marker, 1)
+
+          preferences_marker = '  const preferencesRepository: WorkerUiPreferencesRepository = {'
+          whatsapp_block = '''  whatsappStore = new SqliteWhatsAppStore(databasePath);
+            await whatsappStore.initialize();
+            let whatsappRemote: WhatsAppRemoteGateway = unavailableWhatsAppRemote();
+            const operationsApiOrigin = process.env['TUX_OPERATIONS_API_ORIGIN']?.trim();
+            if (remoteSessionManager !== null && operationsApiOrigin) {
+              try {
+                whatsappRemote = new DesktopWhatsAppRemote({
+                  apiOrigin: parseTuxOperationsApiOrigin(operationsApiOrigin),
+                  sessionManager: remoteSessionManager,
+                });
+              } catch {
+                console.error('TUX WhatsApp remote configuration is invalid; WhatsApp will remain unavailable.');
+              }
+            }
+            const whatsappService = new OperationsWhatsAppService(
+              whatsappRemote,
+              whatsappStore,
+              { getState: () => sessionService!.getState() },
+              runtime.now,
+            );
+            whatsappIpcRuntime = new WhatsAppIpcRuntime({ service: whatsappService });
+
+          '''
+          if preferences_marker not in s:
+              raise SystemExit('preferences marker missing')
+          s = s.replace(preferences_marker, whatsapp_block + preferences_marker, 1)
+
+          register_marker = "  if (endDayIpcRuntime === null) {\n    throw new Error('Operations End Day IPC runtime has not been initialized.');\n  }\n"
+          if register_marker not in s:
+              raise SystemExit('register marker missing')
+          s = s.replace(
+              register_marker,
+              register_marker + "  if (whatsappIpcRuntime === null) {\n    throw new Error('Operations WhatsApp IPC runtime has not been initialized.');\n  }\n",
+              1,
+          )
+          s = s.replace(
+              '  endDayIpcRuntime.register(window);\n',
+              '  endDayIpcRuntime.register(window);\n  whatsappIpcRuntime.register(window);\n',
+              1,
+          )
+          s = s.replace(
+              '  automaticSyncScheduler?.stop();\n',
+              '  whatsappIpcRuntime?.close();\n  void whatsappStore?.close();\n  automaticSyncScheduler?.stop();\n',
+              1,
+          )
+          s = s.replace(
+              '  automaticSyncScheduler = null;\n',
+              '  automaticSyncScheduler = null;\n  whatsappIpcRuntime = null;\n  whatsappStore = null;\n',
+              1,
+          )
+          main.write_text(s)
+
+          preload = Path('apps/operations-desktop/src/preload/index.ts')
+          s = preload.read_text()
+          s = s.replace(
+              "import { assertSessionResult } from './sessionResult';\n",
+              "import { assertSessionResult } from './sessionResult';\nimport {\n  assertWhatsAppConversationResult,\n  assertWhatsAppDraftResult,\n  assertWhatsAppInboxResult,\n  assertWhatsAppMessageResult,\n  assertWhatsAppVoidResult,\n} from './whatsappResult';\n",
+          )
+          s = s.replace(
+              "const IPC_END_DAY_CLOSE = 'tux:end-day:close';\n",
+              "const IPC_END_DAY_CLOSE = 'tux:end-day:close';\nconst IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';\nconst IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';\nconst IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';\nconst IPC_WHATSAPP_MARK_UNREAD = 'tux:whatsapp:mark-unread';\nconst IPC_WHATSAPP_ARCHIVE = 'tux:whatsapp:archive';\nconst IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';\nconst IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';\nconst IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';\nconst IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';\n",
+          )
+          close_marker = '\n});\n\nwindow.addEventListener'
+          if close_marker not in s:
+              raise SystemExit('preload api close marker missing')
+          whatsapp_api = '''
+            whatsapp: Object.freeze({
+              loadInbox: async (cursor?: string) =>
+                assertWhatsAppInboxResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_LOAD_INBOX, cursor)) as unknown,
+                ),
+              loadConversation: async (conversationId: string) =>
+                assertWhatsAppConversationResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_LOAD_CONVERSATION, conversationId)) as unknown,
+                ),
+              sendText: async (input: Parameters<TuxDesktopApi['whatsapp']['sendText']>[0]) =>
+                assertWhatsAppMessageResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_TEXT, input)) as unknown,
+                ),
+              markUnread: async (conversationId: string) =>
+                assertWhatsAppVoidResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_MARK_UNREAD, conversationId)) as unknown,
+                ),
+              archive: async (conversationId: string, archived?: boolean) =>
+                assertWhatsAppVoidResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_ARCHIVE, conversationId, archived)) as unknown,
+                ),
+              setFollowUp: async (conversationId: string, followUp: boolean) =>
+                assertWhatsAppVoidResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_SET_FOLLOW_UP, conversationId, followUp)) as unknown,
+                ),
+              linkOrder: async (input: Parameters<TuxDesktopApi['whatsapp']['linkOrder']>[0]) =>
+                assertWhatsAppVoidResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_LINK_ORDER, input)) as unknown,
+                ),
+              saveDraft: async (conversationId: string, text: string) =>
+                assertWhatsAppVoidResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_SAVE_DRAFT, conversationId, text)) as unknown,
+                ),
+              getDraft: async (conversationId: string) =>
+                assertWhatsAppDraftResult(
+                  (await ipcRenderer.invoke(IPC_WHATSAPP_GET_DRAFT, conversationId)) as unknown,
+                ),
+            }),'''
+          s = s.replace(close_marker, whatsapp_api + close_marker, 1)
+          preload.write_text(s)
+          PY
+
+      - name: Format atomic Task 6D/E files
+        run: |
+          npx prettier --write \
+            packages/platform-contracts/index.d.ts \
+            apps/operations-desktop/src/main/whatsappIpc.ts \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/main/index.ts \
+            apps/operations-desktop/src/preload/whatsappResult.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts \
+            apps/operations-desktop/src/preload/index.ts
+
+      - name: Atomic Task 6D/E focused GREEN
+        run: |
+          npm test -- \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts \
+            apps/operations-desktop/src/main/security.test.ts \
+            apps/operations-desktop/src/preload/sessionResult.test.ts
+
+      - name: Desktop typecheck GREEN
+        run: npm run typecheck -w @tux/operations-desktop
+
+      - name: Immutability and secret fencing
+        run: |
+          git diff --exit-code HEAD -- \
+            apps/operations-desktop/package.json \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts \
+            supabase/migrations
+          if git grep -n "accessToken\|refreshToken\|SUPABASE_SERVICE_ROLE_KEY\|TUX_SUPABASE_SERVICE_ROLE_KEY\|TUX_WHATSAPP_ACCESS_TOKEN\|TUX_WHATSAPP_APP_SECRET\|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN\|providerPhoneNumberId" -- \
+            apps/operations-desktop/src/preload/index.ts \
+            apps/operations-desktop/src/preload/whatsappResult.ts \
+            apps/operations-desktop/src/main/whatsappIpc.ts; then
+            echo 'Forbidden WhatsApp secret/authority token reference found in IPC/preload.' >&2
+            exit 1
+          fi
+          if git grep -n "sendMedia" -- packages/platform-contracts/index.d.ts apps/operations-desktop/src/main/whatsappIpc.ts apps/operations-desktop/src/preload/index.ts; then
+            echo 'sendMedia must remain absent.' >&2
+            exit 1
+          fi
+
+      - name: Commit verified atomic source only
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            packages/platform-contracts/index.d.ts \
+            apps/operations-desktop/src/main/whatsappIpc.ts \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/main/index.ts \
+            apps/operations-desktop/src/preload/whatsappResult.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts \
+            apps/operations-desktop/src/preload/index.ts
+          test "$(git diff --cached --name-only | wc -l)" -eq 7
+          git commit -m "feat: bridge WhatsApp through Electron IPC"
+          git push origin HEAD:feat/ops-whatsapp-task6de-atomic
