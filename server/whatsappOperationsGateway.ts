@@ -8,6 +8,7 @@ import {
   type WorkerId,
 } from '@tux/domain';
 import {
+  clearDeviceSession,
   readJsonBody,
   requireDeviceSession,
   requireSameOrigin,
@@ -31,11 +32,22 @@ import {
   type WhatsAppProviderGateway,
 } from './whatsappProviderGateway';
 import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig';
+import {
+  OperationsDeviceAuthorityError,
+  resolveOperationsDeviceAuthority,
+  type OperationsDeviceAuthority,
+} from './operationsDeviceAuthority';
 
 export interface WhatsAppOperationsDependencyFactory {
   createRepository(): WhatsAppOperationsRepository;
   createChannelResolver(): WhatsAppChannelResolver;
   createProviderGateway(): WhatsAppProviderGateway;
+  resolveDeviceAuthority(input: {
+    readonly projectUrl: string;
+    readonly publishableKey: string;
+    readonly accessToken: string;
+    readonly deviceId: DeviceId;
+  }): Promise<OperationsDeviceAuthority>;
   now(): Date;
 }
 
@@ -52,6 +64,9 @@ const productionDependencies: WhatsAppOperationsDependencyFactory = {
       graphVersion: config.graphVersion,
       accessToken: config.accessToken,
     });
+  },
+  resolveDeviceAuthority(input) {
+    return resolveOperationsDeviceAuthority(input);
   },
   now() {
     return new Date();
@@ -406,6 +421,78 @@ async function handleLinkOrder(
   }
 }
 
+function headerValue(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
+}
+
+function sendAuthorityError(response: GatewayResponse, error: unknown): void {
+  if (error instanceof OperationsDeviceAuthorityError && error.code === 'DEVICE_AUTH_INVALID') {
+    sendJson(response, 401, { error: 'device_authority_invalid' });
+    return;
+  }
+  sendJson(response, 503, { error: 'device_authority_unavailable' });
+}
+
+async function requestAuthority(
+  request: GatewayRequest,
+  response: GatewayResponse,
+  serverConfig: { readonly projectUrl: string; readonly publishableKey: string },
+  dependencies: WhatsAppOperationsDependencyFactory,
+): Promise<OperationsDeviceAuthority | null> {
+  const hasAuthorization = request.headers.authorization !== undefined;
+  const hasDeviceHeader = request.headers['x-tux-device-id'] !== undefined;
+  if (hasAuthorization || hasDeviceHeader) {
+    const authorization = headerValue(request.headers.authorization).trim();
+    const rawDeviceId = headerValue(request.headers['x-tux-device-id']).trim();
+    const bearer = /^Bearer\s+(\S+)$/i.exec(authorization)?.[1] ?? null;
+    const deviceId = parsedId<DeviceId>(rawDeviceId);
+    if (bearer === null || deviceId === null) {
+      sendJson(response, 401, { error: 'device_authentication_required' });
+      return null;
+    }
+    try {
+      return await dependencies.resolveDeviceAuthority({
+        projectUrl: serverConfig.projectUrl,
+        publishableKey: serverConfig.publishableKey,
+        accessToken: bearer,
+        deviceId,
+      });
+    } catch (error) {
+      sendAuthorityError(response, error);
+      return null;
+    }
+  }
+
+  const session = await requireDeviceSession(request, response, serverConfig);
+  if (session === null) return null;
+  const deviceId = parsedId<DeviceId>(session.deviceId);
+  const cookieShopId = parsedId<ShopId>(session.shopId);
+  if (deviceId === null || cookieShopId === null) {
+    clearDeviceSession(response);
+    sendJson(response, 401, { error: 'device_session_invalid' });
+    return null;
+  }
+
+  let authority: OperationsDeviceAuthority;
+  try {
+    authority = await dependencies.resolveDeviceAuthority({
+      projectUrl: serverConfig.projectUrl,
+      publishableKey: serverConfig.publishableKey,
+      accessToken: session.accessToken,
+      deviceId,
+    });
+  } catch (error) {
+    sendAuthorityError(response, error);
+    return null;
+  }
+  if (authority.shopId !== cookieShopId || authority.deviceId !== deviceId) {
+    clearDeviceSession(response);
+    sendJson(response, 401, { error: 'device_session_invalid' });
+    return null;
+  }
+  return authority;
+}
+
 export async function handleWhatsAppOperations(
   request: GatewayRequest,
   response: GatewayResponse,
@@ -418,18 +505,9 @@ export async function handleWhatsAppOperations(
 
   const serverConfig = requireServerConfig(response);
   if (serverConfig === null) return;
-  const session = await requireDeviceSession(request, response, serverConfig);
-  if (session === null) return;
-
-  let shopId: ShopId;
-  let deviceId: DeviceId;
-  try {
-    shopId = parseEntityId<ShopId>(session.shopId);
-    deviceId = parseEntityId<DeviceId>(session.deviceId);
-  } catch {
-    sendJson(response, 401, { error: 'device_session_invalid' });
-    return;
-  }
+  const authority = await requestAuthority(request, response, serverConfig, dependencies);
+  if (authority === null) return;
+  const { shopId, deviceId } = authority;
 
   if (request.method === 'GET') {
     await handleGet(request, response, shopId, dependencies);

@@ -18,6 +18,7 @@ import {
   type WhatsAppOperationsDependencyFactory,
 } from './whatsappOperationsGateway';
 import { WhatsAppProviderError } from './whatsappProviderGateway';
+import { OperationsDeviceAuthorityError } from './operationsDeviceAuthority';
 
 const shopId = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000001');
 const businessDayId = parseEntityId<BusinessDayId>('00000000-0000-4000-8000-000000000002');
@@ -154,13 +155,15 @@ function createDependencies() {
   const providerGateway = {
     sendMessage: vi.fn(async () => ({ providerMessageId: 'wamid.1' })),
   };
+  const resolveDeviceAuthority = vi.fn(async () => ({ shopId, deviceId }));
   const factory: WhatsAppOperationsDependencyFactory = {
     createRepository: vi.fn(() => repository as unknown as WhatsAppOperationsRepository),
     createChannelResolver: vi.fn(() => channelResolver),
     createProviderGateway: vi.fn(() => providerGateway),
+    resolveDeviceAuthority,
     now: vi.fn(() => new Date('2026-09-02T20:00:00.000Z')),
   };
-  return { factory, repository, channelResolver, providerGateway };
+  return { factory, repository, channelResolver, providerGateway, resolveDeviceAuthority };
 }
 
 async function execute(
@@ -487,5 +490,157 @@ describe('handleWhatsAppOperations', () => {
     expect(deps.repository.resolveCurrentOperator).not.toHaveBeenCalled();
     expect(deps.factory.createChannelResolver).not.toHaveBeenCalled();
     expect(deps.factory.createProviderGateway).not.toHaveBeenCalled();
+  });
+});
+
+describe('unified WhatsApp device authority selection', () => {
+  const otherShopId = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000099');
+
+  function desktop(
+    req: GatewayRequest,
+    authorization: string | null = 'Bearer desktop-access',
+    headerDeviceId: string | null = deviceId,
+  ): GatewayRequest {
+    if (authorization !== null) req.headers.authorization = authorization;
+    if (headerDeviceId !== null) req.headers['x-tux-device-id'] = headerDeviceId;
+    return req;
+  }
+
+  it('A: browser cookie plus derived same shop uses server authority for GET', async () => {
+    const deps = createDependencies();
+    const result = await execute(request({ method: 'GET', origin: null }), deps.factory);
+    expect(result.status()).toBe(200);
+    expect(deps.resolveDeviceAuthority).toHaveBeenCalledWith(expect.objectContaining({ deviceId }));
+    expect(deps.repository.loadInbox).toHaveBeenCalledWith({ shopId, after: null });
+  });
+
+  it('B: browser cookie shop mismatch with derived shop clears/rejects before repository access', async () => {
+    const deps = createDependencies();
+    deps.resolveDeviceAuthority.mockResolvedValueOnce({ shopId: otherShopId, deviceId });
+    const result = await execute(request({ method: 'GET', origin: null }), deps.factory);
+    expect(result.status()).toBe(401);
+    expect(result.json()).toEqual({ error: 'device_session_invalid' });
+    expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+  });
+
+  it('C: desktop bearer plus device header works without cookies and uses derived tenant authority', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(request({ method: 'GET', origin: null, cookie: null })),
+      deps.factory,
+    );
+    expect(result.status()).toBe(200);
+    expect(deps.resolveDeviceAuthority).toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: 'desktop-access', deviceId }),
+    );
+    expect(deps.repository.loadInbox).toHaveBeenCalledWith({ shopId, after: null });
+  });
+
+  it('D: Authorization without device header is 401 and never falls back to valid cookies', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(request({ method: 'GET', origin: null }), 'Bearer desktop-access', null),
+      deps.factory,
+    );
+    expect(result.status()).toBe(401);
+    expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+    expect(deps.resolveDeviceAuthority).not.toHaveBeenCalled();
+  });
+
+  it('E: device header without Authorization is 401 and never falls back to valid cookies', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(request({ method: 'GET', origin: null }), null, deviceId),
+      deps.factory,
+    );
+    expect(result.status()).toBe(401);
+    expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+  });
+
+  it('F: malformed desktop bearer with valid cookies is 401 with no browser fallback', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(request({ method: 'GET', origin: null }), 'Basic nope', deviceId),
+      deps.factory,
+    );
+    expect(result.status()).toBe(401);
+    expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+  });
+
+  it('G: valid Electron bearer POST may omit Origin', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(
+        request({
+          body: { action: 'MARK_UNREAD', conversationId },
+          origin: null,
+          cookie: null,
+        }),
+      ),
+      deps.factory,
+    );
+    expect(result.status()).toBe(200);
+    expect(deps.repository.setConversationState).toHaveBeenCalled();
+  });
+
+  it('H: desktop POST still rejects hostile Origin host', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(
+        request({
+          body: { action: 'MARK_UNREAD', conversationId },
+          origin: 'https://evil.example',
+          cookie: null,
+        }),
+      ),
+      deps.factory,
+    );
+    expect(result.status()).toBe(403);
+    expect(result.json()).toEqual({ error: 'origin_not_allowed' });
+  });
+
+  it('I: caller cannot select another tenant after authority resolution', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      desktop(request({ body: sendBody({ shopId: otherShopId }), cookie: null })),
+      deps.factory,
+    );
+    expect(result.status()).toBe(400);
+    expect(deps.resolveDeviceAuthority).toHaveBeenCalledTimes(1);
+    expect(deps.repository.resolveCurrentOperator).not.toHaveBeenCalled();
+  });
+
+  it('J: authoritative invalidation wins over otherwise valid browser cookies in desktop mode', async () => {
+    const deps = createDependencies();
+    deps.resolveDeviceAuthority.mockRejectedValueOnce(
+      new OperationsDeviceAuthorityError('DEVICE_AUTH_INVALID', 'invalid'),
+    );
+    const result = await execute(desktop(request({ method: 'GET', origin: null })), deps.factory);
+    expect(result.status()).toBe(401);
+    expect(result.json()).toEqual({ error: 'device_authority_invalid' });
+    expect(deps.repository.loadInbox).not.toHaveBeenCalled();
+    expect(deps.factory.createProviderGateway).not.toHaveBeenCalled();
+  });
+
+  it('rejects same-host HTTP Origin when forwarded scheme is HTTPS', async () => {
+    const deps = createDependencies();
+    const req = request({
+      body: { action: 'MARK_UNREAD', conversationId },
+      origin: 'http://ops.example',
+    });
+    req.headers['x-forwarded-proto'] = 'https';
+    const result = await execute(req, deps.factory);
+    expect(result.status()).toBe(403);
+  });
+
+  it('allows same-host HTTPS Origin when forwarded scheme is HTTPS', async () => {
+    const deps = createDependencies();
+    const req = request({
+      body: { action: 'MARK_UNREAD', conversationId },
+      origin: 'https://ops.example',
+    });
+    req.headers['x-forwarded-proto'] = 'https';
+    const result = await execute(req, deps.factory);
+    expect(result.status()).toBe(200);
   });
 });
