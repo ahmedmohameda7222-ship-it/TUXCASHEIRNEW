@@ -143,6 +143,18 @@ describe('VercelBrowserWhatsAppRemote', () => {
     ).rejects.toThrow();
   });
 
+  it('maps authoritative device rejection separately from transient remote unavailability', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(json(401, { error: 'device_session_invalid' })),
+    );
+
+    await expect(new VercelBrowserWhatsAppRemote().loadInbox()).rejects.toMatchObject({
+      code: 'DEVICE_AUTH_INVALID',
+      messageId: null,
+    });
+  });
+
   it('maps Current Operator mismatch to a typed safe error', async () => {
     vi.stubGlobal(
       'fetch',

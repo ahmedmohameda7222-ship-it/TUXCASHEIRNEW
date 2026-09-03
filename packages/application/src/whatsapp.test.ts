@@ -10,7 +10,11 @@ import {
 import type { WhatsAppStore } from '@tux/persistence';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OperationsSessionResult } from './session';
-import type { WhatsAppInboxSnapshot, WhatsAppRemoteGateway } from './whatsappRemote';
+import {
+  WhatsAppRemoteError,
+  type WhatsAppInboxSnapshot,
+  type WhatsAppRemoteGateway,
+} from './whatsappRemote';
 import { OperationsWhatsAppService } from './whatsapp';
 
 const shopId = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
@@ -255,6 +259,18 @@ describe('OperationsWhatsAppService', () => {
       },
     });
     expect(store.loadInbox).toHaveBeenCalledWith(shopId);
+  });
+
+  it('does not treat authoritative device invalidation as transient cached-offline availability', async () => {
+    vi.mocked(remote.loadInbox).mockRejectedValue(
+      new WhatsAppRemoteError('DEVICE_AUTH_INVALID', 'Device session is invalid.'),
+    );
+    const service = new OperationsWhatsAppService(remote, store, session, () => now);
+
+    const result = await service.loadInbox();
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'REMOTE_SYNC_ERROR' } });
+    expect(store.loadInbox).not.toHaveBeenCalled();
   });
 
   it('upserts a successful durable outbound message locally exactly once', async () => {
