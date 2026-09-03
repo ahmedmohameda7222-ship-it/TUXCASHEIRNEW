@@ -1,0 +1,61 @@
+name: Task 6 Test Style Fix
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task6f-lint-fix
+    paths:
+      - .github/workflows/task6-style-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format only the two Task 6 test files
+        run: |
+          npx prettier --write \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+      - name: Related WhatsApp regressions
+        run: |
+          npm test -- \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts \
+            packages/application/src/whatsappWire.test.ts
+      - name: Full typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Source scope and migration fencing
+        run: |
+          git diff --exit-code 19e30277336362c94f2b550a1b184639016c9296 -- apps/operations/src/app/sessionClient.ts
+          git diff --exit-code 19e30277336362c94f2b550a1b184639016c9296 -- packages/persistence/src/browser/indexedDbMigrations.ts packages/persistence/src/sqlite/migrations.ts supabase/migrations
+          git diff --name-only 19e30277336362c94f2b550a1b184639016c9296 -- \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+      - name: Commit verified test-only correction
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m "style: format WhatsApp Task 6 tests"
+          git push origin HEAD:feat/ops-whatsapp-task6f-lint-fix
