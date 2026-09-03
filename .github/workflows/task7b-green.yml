@@ -9,6 +9,9 @@ on:
       - apps/operations/src/app/whatsappInboxController.test.ts
       - .github/workflows/task7b-green.yml
 
+permissions:
+  contents: write
+
 jobs:
   green:
     runs-on: ubuntu-24.04
@@ -34,6 +37,23 @@ jobs:
             apps/operations/src/app/whatsappInboxController.ts \
             apps/operations/src/app/whatsappInboxController.test.ts \
             --max-warnings 0
+      - name: Apply formatter on diagnostic branch if needed
+        run: |
+          npx prettier --write \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts
+          if ! git diff --quiet -- \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add \
+              apps/operations/src/app/whatsappInboxController.ts \
+              apps/operations/src/app/whatsappInboxController.test.ts
+            git commit -m "style: format WhatsApp Task 7B files"
+            git push origin HEAD:feat/ops-whatsapp-task7b-green
+            exit 1
+          fi
       - name: Targeted Prettier
         run: |
           npx prettier --check \
