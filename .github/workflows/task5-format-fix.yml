@@ -1,0 +1,60 @@
+name: Task 5 Format Fix
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5-final-verify
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format only Task 5 files
+        run: |
+          npx prettier --write \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsapp.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts
+      - name: Verify only intended files changed
+        run: |
+          expected="$(printf '%s\n' \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsapp.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts | sort)"
+          actual="$(git diff --name-only | sort)"
+          test "$actual" = "$expected"
+      - name: Commit formatted files
+        run: |
+          git config user.name "ahmedmohameda7222-ship-it"
+          git config user.email "ahmed.mohameda7222@gmail.com"
+          git add \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsapp.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.test.ts \
+            packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/index.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts \
+            packages/persistence/src/sqlite/SqliteWhatsAppStore.ts
+          git commit -m "style: format WhatsApp Task 5 files"
+          git push origin HEAD:feat/ops-whatsapp-task5-final-verify
