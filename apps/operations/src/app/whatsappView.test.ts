@@ -16,8 +16,9 @@ import {
 function conversation(
   overrides: Partial<WhatsAppConversation> & Pick<WhatsAppConversation, 'id'>,
 ): WhatsAppConversation {
+  const { id, ...rest } = overrides;
   return {
-    id: overrides.id,
+    id,
     shopId: '11111111-1111-4111-8111-111111111111',
     normalizedPhone: '+201000000000',
     displayPhone: '0100 000 0000',
@@ -28,17 +29,18 @@ function conversation(
     archived: false,
     followUp: false,
     lastMessageAt: null,
-    ...overrides,
+    ...rest,
   } as WhatsAppConversation;
 }
 
 function message(
   overrides: Partial<WhatsAppMessage> & Pick<WhatsAppMessage, 'id' | 'conversationId'>,
 ): WhatsAppMessage {
+  const { id, conversationId, ...rest } = overrides;
   return {
-    id: overrides.id,
+    id,
     shopId: '11111111-1111-4111-8111-111111111111',
-    conversationId: overrides.conversationId,
+    conversationId,
     providerMessageId: null,
     outboundIntentKey: null,
     direction: 'INBOUND',
@@ -50,22 +52,23 @@ function message(
     initiatedByDeviceId: null,
     initiatedAt: null,
     createdAt: '2026-09-03T12:00:00.000Z',
-    ...overrides,
+    ...rest,
   } as WhatsAppMessage;
 }
 
 function quickReply(
   overrides: Partial<WhatsAppQuickReply> & Pick<WhatsAppQuickReply, 'id' | 'category' | 'text'>,
 ): WhatsAppQuickReply {
+  const { id, category, text, ...rest } = overrides;
   return {
-    id: overrides.id,
+    id,
     shopId: '11111111-1111-4111-8111-111111111111',
-    category: overrides.category,
+    category,
     language: 'ar-EG',
-    text: overrides.text,
+    text,
     usageCount: 0,
     active: true,
-    ...overrides,
+    ...rest,
   } as WhatsAppQuickReply;
 }
 
