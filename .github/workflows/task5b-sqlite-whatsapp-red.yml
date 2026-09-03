@@ -1,4 +1,4 @@
-name: Task 5B SQLite WhatsApp RED
+name: Task 5B SQLite WhatsApp GREEN
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - feat/ops-whatsapp-task5b-red
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -20,5 +20,89 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Task 5B RED
+      - name: Add SQLite migration v10 and export
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          migrations = Path('packages/persistence/src/sqlite/migrations.ts')
+          text = migrations.read_text()
+          if "name: 'whatsapp_local_cache'" not in text:
+              marker = "  },\n];\n\nexport function applySqliteMigrations"
+              addition = """  },
+  {
+    version: 10,
+    name: 'whatsapp_local_cache',
+    sql: `
+CREATE TABLE whatsapp_cache_conversations (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  last_message_at TEXT,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_conversations_shop_last
+  ON whatsapp_cache_conversations(shop_id, last_message_at, id);
+
+CREATE TABLE whatsapp_cache_messages (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_messages_conversation_created
+  ON whatsapp_cache_messages(shop_id, conversation_id, created_at, id);
+
+CREATE TABLE whatsapp_cache_quick_replies (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_quick_replies_shop
+  ON whatsapp_cache_quick_replies(shop_id, id);
+
+CREATE TABLE whatsapp_cache_order_links (
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  order_id TEXT NOT NULL,
+  linked_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  PRIMARY KEY (shop_id, conversation_id, order_id)
+);
+
+CREATE TABLE whatsapp_drafts (
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (shop_id, conversation_id)
+);
+`,
+  },
+];
+
+export function applySqliteMigrations"""
+              if marker not in text:
+                  raise SystemExit('SQLite migration insertion marker not found')
+              migrations.write_text(text.replace(marker, addition, 1))
+
+          index = Path('packages/persistence/src/sqlite/index.ts')
+          index_text = index.read_text()
+          export_line = "export { SqliteWhatsAppStore } from './SqliteWhatsAppStore';\n"
+          if export_line not in index_text:
+              index.write_text(index_text + export_line)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/persistence/src/sqlite/migrations.ts packages/persistence/src/sqlite/index.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: add Task 5B SQLite cache candidate"
+            git push origin HEAD:feat/ops-whatsapp-task5b-red
+          fi
+      - name: Task 5B SQLite tests
         run: npm test -- packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
+      - name: Existing SQLite Operations regression
+        run: npm test -- packages/persistence/src/sqlite/SqliteOperationsDatabase.test.ts
+      - name: Persistence typecheck
+        run: npm run typecheck -w @tux/persistence
