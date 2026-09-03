@@ -1,0 +1,45 @@
+name: Task 7A GREEN
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7a-green
+    paths:
+      - apps/operations/src/app/whatsappView.ts
+      - apps/operations/src/app/whatsappView.test.ts
+      - .github/workflows/task7a-green.yml
+
+jobs:
+  green:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Required Task 7A GREEN
+        run: npm test -- apps/operations/src/app/whatsappView.test.ts
+      - name: Required operations typecheck
+        run: npm run typecheck -w @tux/operations
+      - name: Targeted lint
+        run: npx eslint apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts --max-warnings 0
+      - name: Targeted format check
+        run: npx prettier --check apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts
+      - name: Task 7A forbidden surface checks
+        run: |
+          if git grep -n "sendMedia" -- apps/operations/src/app/whatsappView.ts apps/operations/src/app/whatsappView.test.ts; then
+            echo 'sendMedia must remain absent.' >&2
+            exit 1
+          fi
+          git diff --exit-code 2a39d9bfaf8622907646294fba8515854d4c3834 -- \
+            supabase/migrations \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts \
+            package.json \
+            package-lock.json \
+            apps/operations/package.json \
+            apps/operations-desktop/package.json
+      - name: Working tree clean
+        run: test -z "$(git status --short)"
