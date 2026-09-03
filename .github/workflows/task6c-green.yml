@@ -1,0 +1,28 @@
+name: Task 6C GREEN
+on:
+  push:
+    branches: [feat/ops-whatsapp-task6c-green]
+    paths: [.github/workflows/task6c-green.yml]
+permissions:
+  contents: read
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format check Task 6C files
+        run: npx prettier --check apps/operations-desktop/src/main/desktopWhatsAppRemote.ts apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+      - name: Focused Task 6C tests
+        run: npm test -- apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts packages/application/src/whatsappWire.test.ts
+      - name: Desktop typecheck
+        run: npm run typecheck -w @tux/operations-desktop
+      - name: Security fencing
+        run: |
+          test -z "$(git grep -n 'refreshToken' -- apps/operations-desktop/src/main/desktopWhatsAppRemote.ts || true)"
+          test -z "$(git grep -n 'graph.facebook.com\|SUPABASE_SERVICE_ROLE_KEY\|TUX_SUPABASE_SERVICE_ROLE_KEY\|TUX_WHATSAPP_ACCESS_TOKEN\|TUX_WHATSAPP_APP_SECRET' -- apps/operations-desktop/src/main/desktopWhatsAppRemote.ts || true)"
+          test -z "$(git diff HEAD^ -- apps/operations-desktop/package.json)"
