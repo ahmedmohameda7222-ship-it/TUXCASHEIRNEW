@@ -20,9 +20,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Apply Task 5C implementation
+      - name: Apply Task 5C implementation and regression expectations
         run: |
           node scripts/task5c-apply-indexeddb.mjs
+          node scripts/task5c-update-indexeddb-regression.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
@@ -30,9 +31,10 @@ jobs:
             packages/persistence/src/browser/openOperationsIndexedDb.ts \
             packages/persistence/src/browser/IndexedDbOperationsDatabase.ts \
             packages/persistence/src/browser/IndexedDbWhatsAppStore.ts \
+            packages/persistence/src/browser/indexedDbMigrations.test.ts \
             packages/persistence/src/browser/index.ts
           if ! git diff --cached --quiet; then
-            git commit -m "feat: add IndexedDB WhatsApp local cache candidate"
+            git commit -m "test: align IndexedDB migration regression with v5"
             git push origin HEAD:feat/ops-whatsapp-task5c-red
           fi
       - name: Task 5C focused GREEN
