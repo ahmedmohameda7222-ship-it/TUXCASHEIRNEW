@@ -1,0 +1,24 @@
+name: Task 5A WhatsApp Store RED
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task5a-red
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-24.04
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Task 5A RED
+        run: npm test -- packages/persistence/src/whatsappStore.test.ts
