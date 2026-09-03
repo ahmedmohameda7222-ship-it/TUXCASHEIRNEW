@@ -1,4 +1,4 @@
-name: Task 5B WhatsApp Cache Validation RED
+name: Task 5B WhatsApp Cache Validation GREEN
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - feat/ops-whatsapp-task5b-validation-red
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -20,15 +20,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Commit validation tests before RED
-        run: |
-          node scripts/task5b-add-validation-tests.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
-          if ! git diff --cached --quiet; then
-            git commit -m "test: add Task 5B cache validation RED"
-            git push origin HEAD:feat/ops-whatsapp-task5b-validation-red
-          fi
-      - name: Task 5B validation RED
+      - name: Task 5B WhatsApp SQLite tests
         run: npm test -- packages/persistence/src/sqlite/SqliteWhatsAppStore.test.ts
+      - name: Existing SQLite Operations regression
+        run: npm test -- packages/persistence/src/sqlite/SqliteOperationsDatabase.test.ts
+      - name: Persistence typecheck
+        run: npm run typecheck -w @tux/persistence
