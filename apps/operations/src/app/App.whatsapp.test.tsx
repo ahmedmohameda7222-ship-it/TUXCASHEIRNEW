@@ -18,16 +18,21 @@ function indexOrFail(text: string, value: string): number {
 
 describe('Operations WhatsApp ACTIVE-shell integration', () => {
   it('adds WHATSAPP to OperationsArea and preserves the exact visual navigation order', () => {
-    expect(source).toContain("type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'WHATSAPP' | 'EXPENSES' | 'BULK_STOCK'");
+    expect(source).toContain(
+      "type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'WHATSAPP' | 'EXPENSES' | 'BULK_STOCK'",
+    );
 
     const labels = ['Orders', 'Orders Board', 'WhatsApp', 'Expenses', 'Bulk Stock'];
-    const positions = labels.map((label) => indexOrFail(activeShellSource, `>${label}<`));
+    const positions = labels.map((label) => indexOrFail(activeShellSource, `\n            ${label}\n`));
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
   });
 
   it('routes WhatsApp navigation through the existing protected transition guard', () => {
-    const buttonStart = indexOrFail(activeShellSource, "area === 'WHATSAPP'");
-    const surrounding = activeShellSource.slice(Math.max(0, buttonStart - 600), buttonStart + 700);
+    const selectionIndex = indexOrFail(activeShellSource, "setArea('WHATSAPP')");
+    const surrounding = activeShellSource.slice(
+      Math.max(0, selectionIndex - 260),
+      selectionIndex + 180,
+    );
 
     expect(surrounding).toContain('requestProtectedTransition');
     expect(surrounding).toContain("setArea('WHATSAPP')");
@@ -86,7 +91,9 @@ describe('Operations WhatsApp ACTIVE-shell integration', () => {
     const outerAppSource = source.slice(appStart);
     expect(outerAppSource).not.toContain('<WhatsAppWorkspace');
     expect(outerAppSource).not.toContain('WhatsAppInboxController');
-    expect(outerAppSource).toContain("state.status === 'ACTIVE'");
+    expect(outerAppSource).toContain("screen.session.status === 'CONFIGURATION_REQUIRED'");
+    expect(outerAppSource).toContain("screen.session.status === 'NO_ACTIVE_DAY'");
+    expect(outerAppSource).toContain("screen.session.status === 'SIGN_IN_REQUIRED'");
     expect(outerAppSource).toContain('<ActiveShell');
   });
 });
