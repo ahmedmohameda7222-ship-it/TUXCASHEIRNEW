@@ -6,12 +6,15 @@ import {
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  OperationsWhatsAppService,
   OperationsWorkerAuthenticationService,
+  WhatsAppRemoteError,
   WorkerMenuLayoutRetryController,
   WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type OperationsSessionResult,
+  type WhatsAppRemoteGateway,
   type WorkerCredentialStore,
   type WorkerMenuLayoutRemoteGateway,
   type WorkerMenuLayoutSyncIdentity,
@@ -24,6 +27,7 @@ import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
+  SqliteWhatsAppStore,
   SqliteWorkerMenuLayoutStore,
 } from '@tux/persistence/sqlite';
 import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
@@ -43,6 +47,7 @@ import {
   SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
+import { DesktopWhatsAppRemote, parseTuxOperationsApiOrigin } from './desktopWhatsAppRemote';
 import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
 import { ElectronOrderPrinter } from './orderPrinter';
@@ -52,6 +57,7 @@ import {
   createSecureWebPreferences,
   parseLoopbackDevelopmentUrl,
 } from './security';
+import { WhatsAppIpcRuntime } from './whatsappIpc';
 import { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';
 import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
@@ -83,6 +89,8 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let whatsappStore: SqliteWhatsAppStore | null = null;
+let whatsappIpcRuntime: WhatsAppIpcRuntime | null = null;
 let workerMenuLayoutIpcRuntime: WorkerMenuLayoutIpcRuntime | null = null;
 let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
@@ -144,6 +152,20 @@ function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGatew
   return {
     getWorkerUiPreferences: unavailable,
     putWorkerUiPreferences: unavailable,
+  };
+}
+
+function unavailableWhatsAppRemote(): WhatsAppRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is not configured.');
+  };
+  return {
+    loadInbox: unavailable,
+    sendText: unavailable,
+    markUnread: unavailable,
+    archive: unavailable,
+    setFollowUp: unavailable,
+    linkOrder: unavailable,
   };
 }
 
@@ -239,6 +261,30 @@ async function initializeOperationsServices(): Promise<void> {
     workerAuthenticator,
     workerCredentialStore,
   );
+
+  whatsappStore = new SqliteWhatsAppStore(databasePath);
+  await whatsappStore.initialize();
+  let whatsappRemote: WhatsAppRemoteGateway = unavailableWhatsAppRemote();
+  const operationsApiOrigin = process.env['TUX_OPERATIONS_API_ORIGIN']?.trim();
+  if (remoteSessionManager !== null && operationsApiOrigin) {
+    try {
+      whatsappRemote = new DesktopWhatsAppRemote({
+        apiOrigin: parseTuxOperationsApiOrigin(operationsApiOrigin),
+        sessionManager: remoteSessionManager,
+      });
+    } catch {
+      console.error(
+        'TUX WhatsApp remote configuration is invalid; WhatsApp will remain unavailable.',
+      );
+    }
+  }
+  const whatsappService = new OperationsWhatsAppService(
+    whatsappRemote,
+    whatsappStore,
+    { getState: () => sessionService!.getState() },
+    runtime.now,
+  );
+  whatsappIpcRuntime = new WhatsAppIpcRuntime({ service: whatsappService });
 
   const preferencesRepository: WorkerUiPreferencesRepository = {
     get: (shopId, workerId) =>
@@ -538,11 +584,15 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  if (whatsappIpcRuntime === null) {
+    throw new Error('Operations WhatsApp IPC runtime has not been initialized.');
+  }
   workerMenuLayoutIpcRuntime.register(window);
   workerUiPreferencesIpcRuntime.register(window);
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
   endDayIpcRuntime.register(window);
+  whatsappIpcRuntime.register(window);
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -593,6 +643,8 @@ app.on('before-quit', () => {
   workerMenuLayoutIpcRuntime = null;
   workerUiPreferencesIpcRuntime?.close();
   workerUiPreferencesIpcRuntime = null;
+  whatsappIpcRuntime?.close();
+  void whatsappStore?.close();
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
@@ -602,6 +654,8 @@ app.on('before-quit', () => {
   void workerMenuLayoutStore?.close();
   void operationsDatabase?.close();
   automaticSyncScheduler = null;
+  whatsappIpcRuntime = null;
+  whatsappStore = null;
   endDayIpcRuntime = null;
   bulkStockIpcRuntime = null;
   expensesIpcRuntime = null;
