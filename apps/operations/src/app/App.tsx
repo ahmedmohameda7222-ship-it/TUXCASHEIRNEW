@@ -6,6 +6,12 @@ import { EndDayFlow } from './EndDayFlow';
 import { ExpensesWorkspace } from './ExpensesWorkspace';
 import { OrdersBoardWorkspace } from './OrdersBoardWorkspace';
 import { OrdersWorkspace } from './OrdersWorkspace';
+import { WhatsAppWorkspace } from './WhatsAppWorkspace';
+import {
+  createBrowserWhatsAppInboxEnvironment,
+  WhatsAppInboxController,
+} from './whatsappInboxController';
+import { formatUnreadBadge } from './whatsappView';
 import {
   createOperationsBulkStockClient,
   createOperationsEndDayClient,
@@ -13,6 +19,7 @@ import {
   createOperationsOrdersBoardClient,
   createOperationsOrdersClient,
   createOperationsSessionClient,
+  createOperationsWhatsAppClient,
   createWorkerUiPreferencesClient,
   type OperationsBulkStockClient,
   type OperationsEndDayClient,
@@ -49,7 +56,7 @@ type AppProps = {
 };
 
 type ThemePreference = 'system' | 'light' | 'dark';
-type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'EXPENSES' | 'BULK_STOCK';
+type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'WHATSAPP' | 'EXPENSES' | 'BULK_STOCK';
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 const DEFAULT_SYSTEM_ACCENT = parseSystemAccentColor('#1F6B52');
 const CLOSED_MENU_LAYOUT_EXIT_CONTROLLER: MenuLayoutExitController = {
@@ -283,6 +290,16 @@ function ActiveShell({
   const pendingProtectedActionRef = useRef<(() => void) | null>(null);
   const keepEditingRef = useRef<HTMLButtonElement>(null);
   const preferencesClient = useMemo(() => createWorkerUiPreferencesClient(), []);
+  const whatsappController = useMemo(
+    () =>
+      new WhatsAppInboxController(
+        createOperationsWhatsAppClient(),
+        createBrowserWhatsAppInboxEnvironment(),
+      ),
+    [],
+  );
+  const [whatsappState, setWhatsAppState] = useState(() => whatsappController.getState());
+  const whatsappUnreadBadge = formatUnreadBadge(whatsappState.totalUnread);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches,
   );
@@ -294,6 +311,16 @@ function ActiveShell({
   const activeSystemColorWorkerRef = useRef(session.operator.id);
   const [systemColorSaving, setSystemColorSaving] = useState(false);
   const [systemColorSaveError, setSystemColorSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWhatsAppState(whatsappController.getState());
+    const unsubscribe = whatsappController.subscribe(setWhatsAppState);
+    whatsappController.start();
+    return () => {
+      unsubscribe();
+      whatsappController.stop();
+    };
+  }, [whatsappController]);
 
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
@@ -428,6 +455,12 @@ function ActiveShell({
     action?.();
   }
 
+  useEffect(() => {
+    if (area === 'WHATSAPP') {
+      whatsappController.onAreaSelected();
+    }
+  }, [area, whatsappController]);
+
   if (!accentHydrated) {
     return (
       <main
@@ -458,6 +491,25 @@ function ActiveShell({
             onClick={() => requestProtectedTransition(() => setArea('ORDERS_BOARD'))}
           >
             Orders Board
+          </button>
+          <button
+            type="button"
+            className={area === 'WHATSAPP' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() =>
+              requestProtectedTransition(() => {
+                setArea('WHATSAPP');
+              })
+            }
+          >
+            WhatsApp
+            {whatsappUnreadBadge === null ? null : (
+              <span
+                className="nav-unread-badge"
+                aria-label={`${whatsappState.totalUnread} unread WhatsApp messages`}
+              >
+                {whatsappUnreadBadge}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -584,6 +636,8 @@ function ActiveShell({
         />
       ) : area === 'ORDERS_BOARD' ? (
         <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
+      ) : area === 'WHATSAPP' ? (
+        <WhatsAppWorkspace controller={whatsappController} state={whatsappState} />
       ) : area === 'EXPENSES' ? (
         <ExpensesWorkspace client={expensesClient} />
       ) : (
