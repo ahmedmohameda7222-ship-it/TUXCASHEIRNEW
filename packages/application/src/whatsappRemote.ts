@@ -5,7 +5,8 @@ export type WhatsAppRemoteErrorCode =
   | 'OPERATOR_NOT_SYNCHRONIZED'
   | 'OUTBOUND_INTENT_CONFLICT'
   | 'DELIVERY_UNCERTAIN'
-  | 'REMOTE_UNAVAILABLE';
+  | 'REMOTE_UNAVAILABLE'
+  | 'DEVICE_AUTH_INVALID';
 
 export class WhatsAppRemoteError extends Error {
   constructor(

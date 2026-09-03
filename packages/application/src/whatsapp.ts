@@ -56,7 +56,8 @@ function remoteCode(error: unknown): WhatsAppRemoteErrorCode | null {
   return code === 'OPERATOR_NOT_SYNCHRONIZED' ||
     code === 'OUTBOUND_INTENT_CONFLICT' ||
     code === 'DELIVERY_UNCERTAIN' ||
-    code === 'REMOTE_UNAVAILABLE'
+    code === 'REMOTE_UNAVAILABLE' ||
+    code === 'DEVICE_AUTH_INVALID'
     ? code
     : null;
 }
@@ -71,6 +72,9 @@ function mapRemoteError(error: unknown): ApplicationError {
   }
   if (code === 'DELIVERY_UNCERTAIN') {
     return remoteSync('WhatsApp delivery is not confirmed yet.', error);
+  }
+  if (code === 'DEVICE_AUTH_INVALID') {
+    return remoteSync('The enrolled Operations device session is no longer valid.', error);
   }
   return remoteSync('WhatsApp remote operation failed.', error);
 }

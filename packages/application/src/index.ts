@@ -83,6 +83,11 @@ export type {
   WorkerCredentialStore,
 } from './workerAuthentication';
 export { WhatsAppRemoteError } from './whatsappRemote';
+export {
+  parseWhatsAppInboxSnapshot,
+  parseWhatsAppMessage,
+  throwWhatsAppHttpError,
+} from './whatsappWire';
 export type {
   WhatsAppInboxOrderLink,
   WhatsAppInboxSnapshot,
