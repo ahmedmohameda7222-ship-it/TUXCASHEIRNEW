@@ -1,0 +1,149 @@
+name: Task 7E Final Verify
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-task7e-verify
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Focused Task 7 suites
+        run: |
+          npm test -- \
+            apps/operations/src/app/whatsappView.test.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            apps/operations/src/app/WhatsAppWorkspace.test.tsx \
+            apps/operations/src/app/App.whatsapp.test.tsx \
+            apps/operations/src/app/sessionClient.whatsapp.test.ts \
+            packages/application/src/whatsapp.test.ts \
+            packages/application/src/whatsappWire.test.ts
+      - name: Task 6 runtime regressions
+        run: |
+          npm test -- \
+            apps/operations/src/app/browserWhatsAppRemote.test.ts \
+            server/operationsDeviceAuthority.test.ts \
+            server/whatsappOperationsGateway.test.ts \
+            apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts \
+            apps/operations-desktop/src/main/whatsappIpc.test.ts \
+            apps/operations-desktop/src/preload/whatsappResult.test.ts \
+            apps/operations-desktop/src/main/security.test.ts \
+            apps/operations-desktop/src/main/session.integration.test.ts \
+            apps/operations-desktop/src/preload/sessionResult.test.ts
+      - name: WhatsApp architecture guard
+        run: npm run test:whatsapp-architecture
+      - name: Full typecheck
+        run: npm run typecheck
+      - name: Full lint
+        run: npm run lint
+      - name: Full format check
+        run: npm run format:check
+      - name: Migration smoke
+        run: npm run test:migrations
+      - name: Secret and provider fence
+        shell: bash
+        run: |
+          task7_prod=(
+            apps/operations/src/app/whatsappView.ts
+            apps/operations/src/app/whatsappInboxController.ts
+            apps/operations/src/app/WhatsAppWorkspace.tsx
+            apps/operations/src/app/App.tsx
+          )
+          if git diff -U0 2a39d9bfaf8622907646294fba8515854d4c3834 -- "${task7_prod[@]}" \
+            | grep '^+' \
+            | grep -E 'sendMedia|graph\.facebook\.com|TUX_WHATSAPP_ACCESS_TOKEN|TUX_WHATSAPP_APP_SECRET|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN|SUPABASE_SERVICE_ROLE_KEY|TUX_SUPABASE_SERVICE_ROLE_KEY|providerPhoneNumberId|\bworkerId\b|\bbusinessDayId\b|\bshopId\b|\bdeviceId\b'; then
+            echo 'Forbidden Task 7 authority/provider/secret addition detected.' >&2
+            exit 1
+          fi
+          if git grep -n -E 'graph\.facebook\.com|TUX_WHATSAPP_ACCESS_TOKEN|TUX_WHATSAPP_APP_SECRET|TUX_WHATSAPP_WEBHOOK_VERIFY_TOKEN|SUPABASE_SERVICE_ROLE_KEY|TUX_SUPABASE_SERVICE_ROLE_KEY|providerPhoneNumberId|sendMedia' -- \
+            apps/operations/src/app/whatsappView.ts \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Forbidden provider/backend surface found in Task 7 WhatsApp production source.' >&2
+            exit 1
+          fi
+          if git grep -n -E '\bfetch\s*\(|XMLHttpRequest|/api/whatsapp|https?://' -- \
+            apps/operations/src/app/whatsappView.ts \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/WhatsAppWorkspace.tsx; then
+            echo 'Direct backend/provider bypass found in Task 7 WhatsApp production source.' >&2
+            exit 1
+          fi
+      - name: Quick reply fence
+        shell: bash
+        run: |
+          prod=(
+            apps/operations/src/app/WhatsAppWorkspace.tsx
+            apps/operations/src/app/whatsappInboxController.ts
+            apps/operations/src/app/whatsappView.ts
+          )
+          if LC_ALL=C.UTF-8 grep -nP '[\x{0600}-\x{06FF}]' "${prod[@]}"; then
+            echo 'Hard-coded Arabic production quick-reply text detected.' >&2
+            exit 1
+          fi
+          if git grep -n -E 'DEFAULT_.*QUICK|FALLBACK_.*QUICK|quickReplies\s*=\s*\[' -- "${prod[@]}"; then
+            echo 'Hard-coded production quick-reply seed detected.' >&2
+            exit 1
+          fi
+      - name: Media fence
+        shell: bash
+        run: |
+          file=apps/operations/src/app/WhatsAppWorkspace.tsx
+          if git grep -n -E 'sendMedia|type=.*file|attachment|upload|<img|<audio|mediaRef|provider.*url|download' -- "$file"; then
+            echo 'Forbidden Task 7 media-send/provider-media behavior detected.' >&2
+            exit 1
+          fi
+      - name: Migration immutability
+        run: |
+          git diff --exit-code \
+            2a39d9bfaf8622907646294fba8515854d4c3834 -- \
+            supabase/migrations \
+            packages/persistence/src/sqlite/migrations.ts \
+            packages/persistence/src/browser/indexedDbMigrations.ts
+      - name: Package immutability
+        run: |
+          git diff --exit-code \
+            2a39d9bfaf8622907646294fba8515854d4c3834 -- \
+            package-lock.json \
+            apps/operations/package.json \
+            apps/operations-desktop/package.json
+      - name: Permanent Task 7 source scope
+        shell: bash
+        run: |
+          actual=$(git diff --name-only 2a39d9bfaf8622907646294fba8515854d4c3834 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc | sort)
+          expected=$(printf '%s\n' \
+            apps/operations/src/app/App.tsx \
+            apps/operations/src/app/App.whatsapp.test.tsx \
+            apps/operations/src/app/WhatsAppWorkspace.tsx \
+            apps/operations/src/app/WhatsAppWorkspace.test.tsx \
+            apps/operations/src/app/whatsappInboxController.ts \
+            apps/operations/src/app/whatsappInboxController.test.ts \
+            apps/operations/src/app/whatsappView.ts \
+            apps/operations/src/app/whatsappView.test.ts \
+            apps/operations/src/styles/global.css | sort)
+          printf '%s\n' "$actual"
+          test "$actual" = "$expected"
+          if git log --format= --name-only 2a39d9bfaf8622907646294fba8515854d4c3834..0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc -- .github/workflows | grep -q .; then
+            echo 'Diagnostic workflow entered permanent Task 7 ancestry.' >&2
+            exit 1
+          fi
+      - name: Clean checkout
+        run: |
+          git status --short
+          test -z "$(git status --short)"
