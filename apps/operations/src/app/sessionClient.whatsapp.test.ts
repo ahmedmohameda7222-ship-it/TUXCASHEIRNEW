@@ -5,18 +5,16 @@ const mocks = vi.hoisted(() => ({
   storeInitialize: vi.fn().mockResolvedValue(undefined),
   remoteConstructor: vi.fn(),
   serviceConstructor: vi.fn(),
-  loadInbox: vi
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      value: {
-        conversations: [],
-        messages: [],
-        quickReplies: [],
-        orderLinks: [],
-        nextCursor: null,
-      },
-    }),
+  loadInbox: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      conversations: [],
+      messages: [],
+      quickReplies: [],
+      orderLinks: [],
+      nextCursor: null,
+    },
+  }),
 }));
 
 vi.mock('@tux/persistence/browser', async (importOriginal) => {
