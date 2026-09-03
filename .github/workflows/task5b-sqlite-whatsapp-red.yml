@@ -24,69 +24,16 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import base64
           from pathlib import Path
-
           migrations = Path('packages/persistence/src/sqlite/migrations.ts')
           text = migrations.read_text()
           if "name: 'whatsapp_local_cache'" not in text:
               marker = "  },\n];\n\nexport function applySqliteMigrations"
-              addition = """  },
-  {
-    version: 10,
-    name: 'whatsapp_local_cache',
-    sql: `
-CREATE TABLE whatsapp_cache_conversations (
-  id TEXT PRIMARY KEY,
-  shop_id TEXT NOT NULL,
-  last_message_at TEXT,
-  payload_json TEXT NOT NULL
-);
-CREATE INDEX idx_whatsapp_cache_conversations_shop_last
-  ON whatsapp_cache_conversations(shop_id, last_message_at, id);
-
-CREATE TABLE whatsapp_cache_messages (
-  id TEXT PRIMARY KEY,
-  shop_id TEXT NOT NULL,
-  conversation_id TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  payload_json TEXT NOT NULL
-);
-CREATE INDEX idx_whatsapp_cache_messages_conversation_created
-  ON whatsapp_cache_messages(shop_id, conversation_id, created_at, id);
-
-CREATE TABLE whatsapp_cache_quick_replies (
-  id TEXT PRIMARY KEY,
-  shop_id TEXT NOT NULL,
-  payload_json TEXT NOT NULL
-);
-CREATE INDEX idx_whatsapp_cache_quick_replies_shop
-  ON whatsapp_cache_quick_replies(shop_id, id);
-
-CREATE TABLE whatsapp_cache_order_links (
-  shop_id TEXT NOT NULL,
-  conversation_id TEXT NOT NULL,
-  order_id TEXT NOT NULL,
-  linked_at TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  PRIMARY KEY (shop_id, conversation_id, order_id)
-);
-
-CREATE TABLE whatsapp_drafts (
-  shop_id TEXT NOT NULL,
-  conversation_id TEXT NOT NULL,
-  text TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (shop_id, conversation_id)
-);
-`,
-  },
-];
-
-export function applySqliteMigrations"""
+              addition = base64.b64decode('ICB9LAogIHsKICAgIHZlcnNpb246IDEwLAogICAgbmFtZTogJ3doYXRzYXBwX2xvY2FsX2NhY2hlJywKICAgIHNxbDogYApDUkVBVEUgVEFCTEUgd2hhdHNhcHBfY2FjaGVfY29udmVyc2F0aW9ucyAoCiAgaWQgVEVYVCBQUklNQVJZIEtFWSwKICBzaG9wX2lkIFRFWFQgTk9UIE5VTEwsCiAgbGFzdF9tZXNzYWdlX2F0IFRFWFQsCiAgcGF5bG9hZF9qc29uIFRFWFQgTk9UIE5VTEwKKTsKQ1JFQVRFIElOREVYIGlkeF93aGF0c2FwcF9jYWNoZV9jb252ZXJzYXRpb25zX3Nob3BfbGFzdAogIE9OIHdoYXRzYXBwX2NhY2hlX2NvbnZlcnNhdGlvbnMoc2hvcF9pZCwgbGFzdF9tZXNzYWdlX2F0LCBpZCk7CgpDUkVBVEUgVEFCTEUgd2hhdHNhcHBfY2FjaGVfbWVzc2FnZXMgKAogIGlkIFRFWFQgUFJJTUFSWSBLRVksCiAgc2hvcF9pZCBURVhUIE5PVCBOVUxMLAogIGNvbnZlcnNhdGlvbl9pZCBURVhUIE5PVCBOVUxMLAogIGNyZWF0ZWRfYXQgVEVYVCBOT1QgTlVMTCwKICBwYXlsb2FkX2pzb24gVEVYVCBOT1QgTlVMTAopOwpDUkVBVEUgSU5ERVggaWR4X3doYXRzYXBwX2NhY2hlX21lc3NhZ2VzX2NvbnZlcnNhdGlvbl9jcmVhdGVkCiAgT04gd2hhdHNhcHBfY2FjaGVfbWVzc2FnZXMoc2hvcF9pZCwgY29udmVyc2F0aW9uX2lkLCBjcmVhdGVkX2F0LCBpZCk7CgpDUkVBVEUgVEFCTEUgd2hhdHNhcHBfY2FjaGVfcXVpY2tfcmVwbGllcyAoCiAgaWQgVEVYVCBQUklNQVJZIEtFWSwKICBzaG9wX2lkIFRFWFQgTk9UIE5VTEwsCiAgcGF5bG9hZF9qc29uIFRFWFQgTk9UIE5VTEwKKTsKQ1JFQVRFIElOREVYIGlkeF93aGF0c2FwcF9jYWNoZV9xdWlja19yZXBsaWVzX3Nob3AKICBPTiB3aGF0c2FwcF9jYWNoZV9xdWlja19yZXBsaWVzKHNob3BfaWQsIGlkKTsKCkNSRUFURSBUQUJMRSB3aGF0c2FwcF9jYWNoZV9vcmRlcl9saW5rcyAoCiAgc2hvcF9pZCBURVhUIE5PVCBOVUxMLAogIGNvbnZlcnNhdGlvbl9pZCBURVhUIE5PVCBOVUxMLAogIG9yZGVyX2lkIFRFWFQgTk9UIE5VTEwsCiAgbGlua2VkX2F0IFRFWFQgTk9UIE5VTEwsCiAgcGF5bG9hZF9qc29uIFRFWFQgTk9UIE5VTEwsCiAgUFJJTUFSWSBLRVkgKHNob3BfaWQsIGNvbnZlcnNhdGlvbl9pZCwgb3JkZXJfaWQpCik7CgpDUkVBVEUgVEFCTEUgd2hhdHNhcHBfZHJhZnRzICgKICBzaG9wX2lkIFRFWFQgTk9UIE5VTEwsCiAgY29udmVyc2F0aW9uX2lkIFRFWFQgTk9UIE5VTEwsCiAgdGV4dCBURVhUIE5PVCBOVUxMLAogIHVwZGF0ZWRfYXQgVEVYVCBOT1QgTlVMTCwKICBQUklNQVJZIEtFWSAoc2hvcF9pZCwgY29udmVyc2F0aW9uX2lkKQopOwpgLAogIH0sCl07CgpleHBvcnQgZnVuY3Rpb24gYXBwbHlTcWxpdGVNaWdyYXRpb25z').decode()
               if marker not in text:
                   raise SystemExit('SQLite migration insertion marker not found')
               migrations.write_text(text.replace(marker, addition, 1))
-
           index = Path('packages/persistence/src/sqlite/index.ts')
           index_text = index.read_text()
           export_line = "export { SqliteWhatsAppStore } from './SqliteWhatsAppStore';\n"
