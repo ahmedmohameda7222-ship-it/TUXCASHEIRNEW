@@ -55,7 +55,9 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
     return parseWhatsAppInboxSnapshot(await this.#request('GET', url));
   }
 
-  async sendText(input: Parameters<WhatsAppRemoteGateway['sendText']>[0]): Promise<WhatsAppMessage> {
+  async sendText(
+    input: Parameters<WhatsAppRemoteGateway['sendText']>[0],
+  ): Promise<WhatsAppMessage> {
     const payload = responseObject(
       await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
         action: 'SEND_MESSAGE',

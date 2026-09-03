@@ -1,10 +1,7 @@
 import { WhatsAppRemoteError } from '@tux/application';
 import { parseEntityId, type BusinessDayId, type WorkerId } from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  DesktopWhatsAppRemote,
-  parseTuxOperationsApiOrigin,
-} from './desktopWhatsAppRemote';
+import { DesktopWhatsAppRemote, parseTuxOperationsApiOrigin } from './desktopWhatsAppRemote';
 
 const deviceId = '22222222-2222-4222-8222-222222222222';
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
@@ -31,7 +28,13 @@ function sessionManager(resolution: unknown = validResolution()) {
 
 function inboxResponse(): Response {
   return new Response(
-    JSON.stringify({ conversations: [], messages: [], quickReplies: [], orderLinks: [], nextCursor: null }),
+    JSON.stringify({
+      conversations: [],
+      messages: [],
+      quickReplies: [],
+      orderLinks: [],
+      nextCursor: null,
+    }),
     { status: 200, headers: { 'content-type': 'application/json' } },
   );
 }
@@ -56,9 +59,8 @@ function outboundMessage() {
 }
 
 describe('parseTuxOperationsApiOrigin', () => {
-  it.each(['https://ops.example', 'https://ops.example/'])(
-    'accepts HTTPS origin %s',
-    (value) => expect(parseTuxOperationsApiOrigin(value)).toBe('https://ops.example'),
+  it.each(['https://ops.example', 'https://ops.example/'])('accepts HTTPS origin %s', (value) =>
+    expect(parseTuxOperationsApiOrigin(value)).toBe('https://ops.example'),
   );
 
   it.each([
@@ -172,7 +174,7 @@ describe('DesktopWhatsAppRemote', () => {
 
   it('resolves the device session separately for every request', async () => {
     const manager = sessionManager();
-    const fetcher = vi.fn().mockResolvedValue(inboxResponse());
+    const fetcher = vi.fn().mockImplementation(async () => inboxResponse());
     const remote = new DesktopWhatsAppRemote({
       apiOrigin: 'https://ops.example',
       sessionManager: manager as never,
@@ -186,7 +188,10 @@ describe('DesktopWhatsAppRemote', () => {
   it('maps TRANSPORT_UNAVAILABLE to REMOTE_UNAVAILABLE', async () => {
     const remote = new DesktopWhatsAppRemote({
       apiOrigin: 'https://ops.example',
-      sessionManager: sessionManager({ status: 'TRANSPORT_UNAVAILABLE', message: 'offline' }) as never,
+      sessionManager: sessionManager({
+        status: 'TRANSPORT_UNAVAILABLE',
+        message: 'offline',
+      }) as never,
       fetcher: vi.fn(),
     });
     await expect(remote.loadInbox()).rejects.toMatchObject({ code: 'REMOTE_UNAVAILABLE' });
@@ -235,12 +240,14 @@ describe('DesktopWhatsAppRemote', () => {
   });
 
   it('does not retry DELIVERY_UNCERTAIN', async () => {
-    const fetcher = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ error: 'whatsapp_delivery_uncertain', messageId }),
-        { status: 503, headers: { 'content-type': 'application/json' } },
-      ),
-    );
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: 'whatsapp_delivery_uncertain', messageId }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
     const remote = new DesktopWhatsAppRemote({
       apiOrigin: 'https://ops.example',
       sessionManager: sessionManager() as never,
