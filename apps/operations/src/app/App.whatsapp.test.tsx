@@ -23,7 +23,9 @@ describe('Operations WhatsApp ACTIVE-shell integration', () => {
     );
 
     const labels = ['Orders', 'Orders Board', 'WhatsApp', 'Expenses', 'Bulk Stock'];
-    const positions = labels.map((label) => indexOrFail(activeShellSource, `\n            ${label}\n`));
+    const positions = labels.map((label) =>
+      indexOrFail(activeShellSource, `\n            ${label}\n`),
+    );
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
   });
 
