@@ -3,14 +3,23 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const migrationPath = resolve('supabase/migrations/20260904011000_whatsapp_media_storage.sql');
+const materializationMigrationPath = resolve(
+  'supabase/migrations/20260904011500_whatsapp_media_materialization.sql',
+);
 
 assert.equal(
   existsSync(migrationPath),
   true,
   '20260904011000_whatsapp_media_storage.sql is missing.',
 );
+assert.equal(
+  existsSync(materializationMigrationPath),
+  true,
+  '20260904011500_whatsapp_media_materialization.sql is missing.',
+);
 
 const sql = readFileSync(migrationPath, 'utf8');
+const materializationSql = readFileSync(materializationMigrationPath, 'utf8');
 const inboxV2 =
   sql.match(
     /create\s+or\s+replace\s+function\s+public\.get_tux_whatsapp_inbox_v2[\s\S]*?(?=revoke\s+all\s+on\s+function\s+public\.get_tux_whatsapp_inbox_v2)/i,
@@ -22,6 +31,10 @@ const listExpired =
 const markDeleted =
   sql.match(
     /create\s+or\s+replace\s+function\s+public\.mark_tux_whatsapp_media_deleted_v1[\s\S]*?(?=revoke\s+all\s+on\s+function\s+public\.mark_tux_whatsapp_media_deleted_v1|$)/i,
+  )?.[0] ?? '';
+const materializeInboundV2 =
+  materializationSql.match(
+    /create\s+or\s+replace\s+function\s+public\.materialize_tux_whatsapp_inbound_v2[\s\S]*?(?=revoke\s+all\s+on\s+function\s+public\.materialize_tux_whatsapp_inbound_v2)/i,
   )?.[0] ?? '';
 
 assert.match(sql, /insert\s+into\s+storage\.buckets[\s\S]*tux-whatsapp-media/i);
@@ -74,8 +87,14 @@ assert.doesNotMatch(
 
 assert.notEqual(inboxV2, '', 'get_tux_whatsapp_inbox_v2 is missing.');
 assert.match(inboxV2, /'media'[\s\S]*'mediaKey'[\s\S]*'availability'/i);
-assert.match(inboxV2, /deleted_at\s+is\s+not\s+null\s+or\s+media\.expires_at\s*<=\s*now\s*\(\s*\)/i);
-assert.match(inboxV2, /'location'[\s\S]*'latitude'[\s\S]*'longitude'[\s\S]*'name'[\s\S]*'address'/i);
+assert.match(
+  inboxV2,
+  /deleted_at\s+is\s+not\s+null\s+or\s+media\.expires_at\s*<=\s*now\s*\(\s*\)/i,
+);
+assert.match(
+  inboxV2,
+  /'location'[\s\S]*'latitude'[\s\S]*'longitude'[\s\S]*'name'[\s\S]*'address'/i,
+);
 for (const forbidden of [
   'provider_media_id',
   'bucket_id',
@@ -125,7 +144,57 @@ assert.match(
   /grant\s+execute\s+on\s+function\s+public\.mark_tux_whatsapp_media_deleted_v1\s*\(\s*text\s*,\s*timestamptz\s*\)\s+to\s+service_role/i,
 );
 
+assert.doesNotMatch(sql, /materialize_tux_whatsapp_inbound_v2/i);
+assert.notEqual(materializeInboundV2, '', 'materialize_tux_whatsapp_inbound_v2 is missing.');
+assert.match(materializeInboundV2, /p_kind\s+not\s+in\s*\(\s*'IMAGE'\s*,\s*'DOCUMENT'\s*,\s*'AUDIO'\s*\)/i);
+assert.match(materializeInboundV2, /p_bucket_id\s*<>\s*'tux-whatsapp-media'/i);
+assert.match(
+  materializeInboundV2,
+  /p_object_path\s*<>\s*'media\/'\s*\|\|\s*p_shop_id::text\s*\|\|\s*'\/'\s*\|\|\s*p_media_key/i,
+);
+assert.match(
+  materializeInboundV2,
+  /p_expires_at\s*<>\s*p_stored_at\s*\+\s*interval\s+'30\s+days'/i,
+);
+assert.match(
+  materializeInboundV2,
+  /where\s+message\.shop_id\s*=\s*p_shop_id[\s\S]*message\.provider_message_id\s*=\s*p_provider_message_id/i,
+);
+assert.match(materializeInboundV2, /message\.media_ref\s*=\s*p_media_key/i);
+assert.match(materializeInboundV2, /media\.provider_media_id\s*=\s*p_provider_media_id/i);
+assert.match(
+  materializeInboundV2,
+  /insert\s+into\s+public\.whatsapp_media_objects[\s\S]*p_provider_media_id[\s\S]*p_stored_at[\s\S]*p_expires_at/i,
+);
+assert.match(
+  materializeInboundV2,
+  /set\s+unread_count\s*=\s*conversation\.unread_count\s*\+\s*1/i,
+);
+assert.match(
+  materializeInboundV2,
+  /if\s+v_message_id\s+is\s+not\s+null[\s\S]*return\s+query[\s\S]*false/i,
+);
+assert.doesNotMatch(materializeInboundV2, /provider_download_url|signed_url|service_role_key/i);
+assert.match(materializationSql, /security\s+definer/i);
+assert.match(
+  materializationSql,
+  /set\s+search_path\s*=\s*pg_catalog\s*,\s*public\s*,\s*private/i,
+);
+assert.match(
+  materializationSql,
+  /revoke\s+all\s+on\s+function\s+public\.materialize_tux_whatsapp_inbound_v2[\s\S]*from\s+public\s*,\s*anon\s*,\s*authenticated/i,
+);
+assert.match(
+  materializationSql,
+  /grant\s+execute\s+on\s+function\s+public\.materialize_tux_whatsapp_inbound_v2[\s\S]*to\s+service_role/i,
+);
+assert.doesNotMatch(
+  materializationSql,
+  /grant\s+execute[\s\S]*materialize_tux_whatsapp_inbound_v2[\s\S]*to\s+(?:anon|authenticated)/i,
+);
+
 assert.doesNotMatch(sql, /delete\s+from\s+public\.whatsapp_messages/i);
+assert.doesNotMatch(materializationSql, /delete\s+from\s+public\.whatsapp_messages/i);
 assert.match(sql, /security\s+definer/i);
 assert.match(sql, /set\s+search_path\s*=\s*pg_catalog\s*,\s*public\s*,\s*private/i);
 assert.doesNotMatch(
