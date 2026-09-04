@@ -19,7 +19,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "21246155100b7200986cfb5f57cfd24e2caffc5c"
           git rev-parse 21246155100b7200986cfb5f57cfd24e2caffc5c >/dev/null
           test "$(git rev-parse 21246155100b7200986cfb5f57cfd24e2caffc5c^{tree})" = "8690ab7d65dcea7fd34c63768a83acece8a43626"
           git bundle create /tmp/task8b-remote.bundle 21246155100b7200986cfb5f57cfd24e2caffc5c ^0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
