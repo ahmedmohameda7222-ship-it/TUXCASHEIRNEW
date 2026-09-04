@@ -65,6 +65,31 @@ export interface ClaimedWhatsAppTemplateIntent extends ClaimedWhatsAppOutboundIn
   readonly languageCode: string;
 }
 
+export interface WhatsAppInboundMediaMaterializationInput {
+  readonly shopId: ShopId;
+  readonly providerMessageId: string;
+  readonly normalizedPhone: string;
+  readonly displayPhone: string;
+  readonly kind: 'IMAGE' | 'DOCUMENT' | 'AUDIO';
+  readonly providerMediaId: string;
+  readonly mediaKey: string;
+  readonly bucketId: string;
+  readonly objectPath: string;
+  readonly mimeType: string;
+  readonly fileName: string | null;
+  readonly byteSize: number;
+  readonly sha256: string | null;
+  readonly storedAt: string;
+  readonly expiresAt: string;
+  readonly providerOccurredAt: string | null;
+}
+
+export interface WhatsAppInboundMediaMaterializationResult {
+  readonly messageId: string;
+  readonly mediaKey: string;
+  readonly created: boolean;
+}
+
 export interface WhatsAppOperationsRepository {
   resolveCurrentOperator(input: {
     readonly shopId: ShopId;
@@ -76,6 +101,10 @@ export interface WhatsAppOperationsRepository {
     readonly shopId: ShopId;
     readonly after: string | null;
   }): Promise<WhatsAppInboxSnapshot>;
+
+  materializeInboundMedia(
+    input: WhatsAppInboundMediaMaterializationInput,
+  ): Promise<WhatsAppInboundMediaMaterializationResult>;
 
   claimOutboundTextIntent(input: {
     readonly shopId: ShopId;
@@ -538,6 +567,39 @@ export class SupabaseWhatsAppOperationsRepository implements WhatsAppOperationsR
       quickReplies: source['quickReplies'].map(parseQuickReply),
       orderLinks,
       nextCursor,
+    };
+  }
+
+  async materializeInboundMedia(
+    input: WhatsAppInboundMediaMaterializationInput,
+  ): Promise<WhatsAppInboundMediaMaterializationResult> {
+    const row = oneRow(
+      await this.#callRpc('materialize_tux_whatsapp_inbound_v2', {
+        p_shop_id: input.shopId,
+        p_provider_message_id: input.providerMessageId,
+        p_normalized_phone: input.normalizedPhone,
+        p_display_phone: input.displayPhone,
+        p_kind: input.kind,
+        p_provider_media_id: input.providerMediaId,
+        p_media_key: input.mediaKey,
+        p_bucket_id: input.bucketId,
+        p_object_path: input.objectPath,
+        p_mime_type: input.mimeType,
+        p_file_name: input.fileName,
+        p_byte_size: input.byteSize,
+        p_sha256: input.sha256,
+        p_stored_at: input.storedAt,
+        p_expires_at: input.expiresAt,
+        p_provider_occurred_at: input.providerOccurredAt,
+      }),
+    );
+    if (row === null) throw protocolError();
+    const mediaKey = stringValue(row['media_key']);
+    if (mediaKey !== input.mediaKey) throw protocolError();
+    return {
+      messageId: arbitraryUuid(row['message_id']),
+      mediaKey,
+      created: booleanValue(row['created']),
     };
   }
 
