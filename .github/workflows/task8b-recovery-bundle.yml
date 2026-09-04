@@ -1,0 +1,33 @@
+name: Task 8B Recovery Bundle
+
+on:
+  push:
+    branches:
+      - tmp/task8b-bundle-recovery
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify exact Task 8B and create bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "21246155100b7200986cfb5f57cfd24e2caffc5c"
+          git rev-parse 21246155100b7200986cfb5f57cfd24e2caffc5c >/dev/null
+          test "$(git rev-parse 21246155100b7200986cfb5f57cfd24e2caffc5c^{tree})" = "8690ab7d65dcea7fd34c63768a83acece8a43626"
+          git bundle create /tmp/task8b-remote.bundle 21246155100b7200986cfb5f57cfd24e2caffc5c ^0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+          git bundle verify /tmp/task8b-remote.bundle
+          sha256sum /tmp/task8b-remote.bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: task8b-remote-bundle
+          path: /tmp/task8b-remote.bundle
+          if-no-files-found: error
+          retention-days: 1
