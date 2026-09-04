@@ -1,5 +1,11 @@
 import type { WhatsAppInboxSnapshot } from '@tux/application';
-import type { WhatsAppConversation, WhatsAppMessage, WhatsAppQuickReply } from '@tux/domain';
+import type {
+  Instant,
+  OrderId,
+  WhatsAppConversation,
+  WhatsAppMessage,
+  WhatsAppQuickReply,
+} from '@tux/domain';
 import { Children, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,7 +13,7 @@ import { WhatsAppWorkspace, type WhatsAppWorkspaceController } from './WhatsAppW
 import type { WhatsAppInboxUiState } from './whatsappInboxController';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
-const LINKED_ORDER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const LINKED_ORDER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as OrderId;
 
 function conversation(
   id: string,
@@ -131,6 +137,9 @@ function createController() {
     markUnread: vi.fn<WhatsAppWorkspaceController['markUnread']>().mockResolvedValue(),
     setArchived: vi.fn<WhatsAppWorkspaceController['setArchived']>().mockResolvedValue(),
     setFollowUp: vi.fn<WhatsAppWorkspaceController['setFollowUp']>().mockResolvedValue(),
+    linkSelectedOrder: vi
+      .fn<WhatsAppWorkspaceController['linkSelectedOrder']>()
+      .mockResolvedValue(),
   } satisfies WhatsAppWorkspaceController;
 }
 
@@ -143,7 +152,12 @@ function isElement(node: ReactNode): node is TestElement {
 function findElement(node: ReactNode, predicate: (element: TestElement) => boolean): TestElement {
   let match: TestElement | null = null;
   function visit(current: ReactNode): void {
-    if (match !== null || !isElement(current)) return;
+    if (match !== null) return;
+    if (Array.isArray(current)) {
+      current.forEach(visit);
+      return;
+    }
+    if (!isElement(current)) return;
     if (predicate(current)) {
       match = current;
       return;
@@ -435,7 +449,7 @@ describe('WhatsAppWorkspace', () => {
               displayOrderNo: 184,
               status: 'ACTIVE',
               orderTypeLabel: 'Delivery',
-              createdAt: '2026-09-04T10:00:00.000Z',
+              createdAt: '2026-09-04T10:00:00.000Z' as Instant,
             },
           ],
         } as WhatsAppInboxUiState['customerOrderContext'],
@@ -470,18 +484,18 @@ describe('WhatsAppWorkspace', () => {
           },
           activeOrders: [
             {
-              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as OrderId,
               displayOrderNo: 184,
               status: 'ACTIVE',
               orderTypeLabel: 'Delivery',
-              createdAt: '2026-09-04T10:00:00.000Z',
+              createdAt: '2026-09-04T10:00:00.000Z' as Instant,
             },
             {
-              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as OrderId,
               displayOrderNo: 191,
               status: 'ACTIVE',
               orderTypeLabel: 'Delivery',
-              createdAt: '2026-09-04T10:05:00.000Z',
+              createdAt: '2026-09-04T10:05:00.000Z' as Instant,
             },
           ],
         } as WhatsAppInboxUiState['customerOrderContext'],
@@ -504,7 +518,7 @@ describe('WhatsAppWorkspace', () => {
 
     const overflow = findElement(
       tree,
-      (element) => element.props['data-whatsapp-overflow'] === true,
+      (element) => element.type === 'details' && element.props['data-whatsapp-overflow'] === true,
     );
     const archive = findElement(
       overflow.props['children'] as ReactNode,

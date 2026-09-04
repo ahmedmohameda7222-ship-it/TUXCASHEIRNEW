@@ -645,6 +645,113 @@ button:not(:disabled) {
   gap: var(--tux-space-2);
 }
 
+.whatsapp-conversation-overflow {
+  position: relative;
+}
+
+.whatsapp-conversation-overflow > summary {
+  display: grid;
+  min-width: var(--tux-touch-target);
+  min-height: var(--tux-touch-target);
+  place-items: center;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  color: var(--tux-text-primary);
+  cursor: pointer;
+  font-size: var(--tux-font-size-lg);
+  font-weight: 800;
+  list-style: none;
+}
+
+.whatsapp-conversation-overflow > summary::-webkit-details-marker {
+  display: none;
+}
+
+.whatsapp-conversation-overflow-menu {
+  position: absolute;
+  top: calc(100% + var(--tux-space-1));
+  right: 0;
+  z-index: 4;
+  display: grid;
+  min-width: 11rem;
+  gap: var(--tux-space-1);
+  padding: var(--tux-space-2);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  box-shadow: var(--tux-shadow-sm);
+}
+
+.whatsapp-conversation-overflow-menu .quiet-action {
+  min-height: var(--tux-touch-target);
+  justify-content: flex-start;
+  padding: 0 var(--tux-space-3);
+  text-align: left;
+}
+
+.whatsapp-order-context {
+  display: grid;
+  gap: var(--tux-space-3);
+  margin: var(--tux-space-3) var(--tux-space-5) 0;
+  padding: var(--tux-space-3) var(--tux-space-4);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-raised);
+}
+
+.whatsapp-order-context-heading,
+.whatsapp-order-context-order,
+.whatsapp-order-context-actions {
+  display: flex;
+  align-items: center;
+}
+
+.whatsapp-order-context-heading,
+.whatsapp-order-context-order {
+  justify-content: space-between;
+  gap: var(--tux-space-3);
+}
+
+.whatsapp-order-context-heading .eyebrow,
+.whatsapp-order-context-guidance {
+  margin: 0;
+}
+
+.whatsapp-order-context-customer,
+.whatsapp-order-context-order-copy,
+.whatsapp-order-context-candidates {
+  display: grid;
+  gap: var(--tux-space-1);
+}
+
+.whatsapp-order-context-customer,
+.whatsapp-order-context-order-copy span,
+.whatsapp-order-context-guidance {
+  color: var(--tux-text-secondary);
+  font-size: var(--tux-font-size-xs);
+}
+
+.whatsapp-order-context-order {
+  min-width: 0;
+  padding-top: var(--tux-space-2);
+  border-top: 1px solid var(--tux-border-subtle);
+}
+
+.whatsapp-order-context-order-copy {
+  min-width: 0;
+}
+
+.whatsapp-order-context-actions {
+  flex: none;
+  gap: var(--tux-space-2);
+}
+
+.whatsapp-order-context-loading {
+  min-height: var(--tux-touch-target);
+  align-content: center;
+}
+
 .secondary-action {
   padding: 0 var(--tux-space-3);
   font-weight: 700;

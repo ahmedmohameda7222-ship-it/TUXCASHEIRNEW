@@ -1,5 +1,7 @@
-import type { WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
+import type { WhatsAppCustomerOrderContext } from '@tux/application';
+import type { OrderId, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
 import type { WhatsAppInboxController, WhatsAppInboxUiState } from './whatsappInboxController';
+import { presentWhatsAppOrderContext } from './whatsappOrderContext';
 import {
   lastMessagePreview,
   sortActiveQuickReplies,
@@ -21,11 +23,14 @@ export type WhatsAppWorkspaceController = Pick<
   | 'markUnread'
   | 'setArchived'
   | 'setFollowUp'
+  | 'linkSelectedOrder'
 >;
 
 interface WhatsAppWorkspaceProps {
   readonly controller: WhatsAppWorkspaceController;
   readonly state: WhatsAppInboxUiState;
+  readonly onCreateOrderFromChat?: (context: WhatsAppCustomerOrderContext) => void;
+  readonly onViewOrder?: (orderId: OrderId) => void;
 }
 
 const FILTERS: readonly { value: WhatsAppInboxFilter; label: string }[] = [
@@ -134,14 +139,114 @@ function MessageBubble({ message }: { readonly message: WhatsAppMessage }) {
   );
 }
 
+function CustomerOrderContextCard({
+  controller,
+  state,
+  conversation,
+  onCreateOrderFromChat,
+  onViewOrder,
+}: {
+  readonly controller: WhatsAppWorkspaceController;
+  readonly state: WhatsAppInboxUiState;
+  readonly conversation: WhatsAppConversation;
+  readonly onCreateOrderFromChat: ((context: WhatsAppCustomerOrderContext) => void) | undefined;
+  readonly onViewOrder: ((orderId: OrderId) => void) | undefined;
+}) {
+  if (state.contextBusy && state.customerOrderContext === null) {
+    return (
+      <section
+        className="whatsapp-order-context whatsapp-order-context-loading"
+        data-whatsapp-region="customer-order-context"
+        aria-label="Customer and order context"
+      >
+        <span className="whatsapp-empty-copy">Loading customer / order context…</span>
+      </section>
+    );
+  }
+
+  if (state.customerOrderContext === null) return null;
+
+  const presentation = presentWhatsAppOrderContext(
+    state.customerOrderContext,
+    conversation.linkedOrderId,
+  );
+
+  const renderOrder = (order: (typeof presentation.candidates)[number]) => (
+    <div className="whatsapp-order-context-order" key={order.id}>
+      <div className="whatsapp-order-context-order-copy">
+        <strong>{order.displayLabel}</strong>
+        <span>{order.orderTypeLabel}</span>
+        <span>{order.linked ? 'Linked' : 'Not linked'}</span>
+      </div>
+      <div className="whatsapp-order-context-actions">
+        {onViewOrder === undefined ? null : (
+          <button type="button" className="quiet-action" onClick={() => onViewOrder(order.id)}>
+            View Order
+          </button>
+        )}
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => void controller.linkSelectedOrder(order.id, !order.linked)}
+        >
+          {order.linked ? 'Unlink' : 'Link'}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <section
+      className="whatsapp-order-context"
+      data-whatsapp-region="customer-order-context"
+      aria-label="Customer and order context"
+    >
+      <div className="whatsapp-order-context-heading">
+        <div>
+          <p className="eyebrow">Customer / Order</p>
+          <strong dir="auto">{presentation.customerName}</strong>
+        </div>
+        <button
+          type="button"
+          className="secondary-action"
+          disabled={onCreateOrderFromChat === undefined}
+          onClick={() => onCreateOrderFromChat?.(state.customerOrderContext!)}
+        >
+          Create Order from Chat
+        </button>
+      </div>
+
+      <div className="whatsapp-order-context-customer">
+        <span dir="ltr">{presentation.displayPhone}</span>
+        {presentation.address === null ? null : <span dir="auto">{presentation.address}</span>}
+      </div>
+
+      {presentation.activeOrderCount === 0 ? (
+        <p className="whatsapp-empty-copy">No active delivery order for this business day.</p>
+      ) : presentation.primaryOrder !== null ? (
+        renderOrder(presentation.primaryOrder)
+      ) : (
+        <div className="whatsapp-order-context-candidates">
+          <p className="whatsapp-order-context-guidance">Choose an order explicitly</p>
+          {presentation.candidates.map(renderOrder)}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ConversationPanel({
   controller,
   state,
   conversation,
+  onCreateOrderFromChat,
+  onViewOrder,
 }: {
   readonly controller: WhatsAppWorkspaceController;
   readonly state: WhatsAppInboxUiState;
   readonly conversation: WhatsAppConversation | null;
+  readonly onCreateOrderFromChat: ((context: WhatsAppCustomerOrderContext) => void) | undefined;
+  readonly onViewOrder: ((orderId: OrderId) => void) | undefined;
 }) {
   if (conversation === null) {
     return (
@@ -185,24 +290,37 @@ function ConversationPanel({
           >
             {conversation.followUp ? 'Remove follow-up' : 'Follow-up'}
           </button>
-          <button
-            type="button"
-            className="secondary-action"
-            data-whatsapp-action="archive"
-            onClick={() => void controller.setArchived(conversation.id, !conversation.archived)}
-          >
-            {conversation.archived ? 'Unarchive' : 'Archive'}
-          </button>
-          <button
-            type="button"
-            className="secondary-action"
-            data-whatsapp-action="mark-unread"
-            onClick={() => void controller.markUnread(conversation.id)}
-          >
-            Mark unread
-          </button>
+          <details className="whatsapp-conversation-overflow" data-whatsapp-overflow={true}>
+            <summary aria-label="More conversation actions">…</summary>
+            <div className="whatsapp-conversation-overflow-menu">
+              <button
+                type="button"
+                className="quiet-action"
+                data-whatsapp-action="archive"
+                onClick={() => void controller.setArchived(conversation.id, !conversation.archived)}
+              >
+                {conversation.archived ? 'Unarchive' : 'Archive'}
+              </button>
+              <button
+                type="button"
+                className="quiet-action"
+                data-whatsapp-action="mark-unread"
+                onClick={() => void controller.markUnread(conversation.id)}
+              >
+                Mark unread
+              </button>
+            </div>
+          </details>
         </div>
       </header>
+
+      <CustomerOrderContextCard
+        controller={controller}
+        state={state}
+        conversation={conversation}
+        onCreateOrderFromChat={onCreateOrderFromChat}
+        onViewOrder={onViewOrder}
+      />
 
       <div
         className="whatsapp-message-history"
@@ -265,7 +383,12 @@ function ConversationPanel({
   );
 }
 
-export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps) {
+export function WhatsAppWorkspace({
+  controller,
+  state,
+  onCreateOrderFromChat,
+  onViewOrder,
+}: WhatsAppWorkspaceProps) {
   const snapshotMessages = state.snapshot?.messages ?? [];
   const selectedConversation =
     state.selectedConversationId === null
@@ -348,7 +471,13 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
         </div>
       </aside>
 
-      {ConversationPanel({ controller, state, conversation: selectedConversation })}
+      {ConversationPanel({
+        controller,
+        state,
+        conversation: selectedConversation,
+        onCreateOrderFromChat,
+        onViewOrder,
+      })}
     </section>
   );
 }
