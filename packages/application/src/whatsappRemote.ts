@@ -2,6 +2,7 @@ import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/
 import type {
   BusinessDayId,
   OrderId,
+  WhatsAppLocationPayload,
   WhatsAppMessage,
   WhatsAppMessagingTarget,
   WorkerId,
@@ -32,6 +33,21 @@ export interface WhatsAppInboxSnapshot extends CachedWhatsAppInboxSnapshot {
   readonly nextCursor: string | null;
 }
 
+export type WhatsAppOutboundBinaryKind = 'IMAGE' | 'DOCUMENT' | 'AUDIO';
+
+export interface WhatsAppOutboundBinary {
+  readonly kind: WhatsAppOutboundBinaryKind;
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+  readonly fileName: string | null;
+}
+
+export interface WhatsAppMediaAccess {
+  readonly availability: 'AVAILABLE' | 'EXPIRED';
+  readonly url: string | null;
+  readonly expiresAt: string | null;
+}
+
 export interface WhatsAppRemoteGateway {
   loadInbox(cursor?: string): Promise<WhatsAppInboxSnapshot>;
 
@@ -48,6 +64,22 @@ export interface WhatsAppRemoteGateway {
     readonly text: string;
   }): Promise<WhatsAppMessage>;
 
+  sendMedia(input: {
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly conversationId: string;
+    readonly outboundIntentKey: string;
+    readonly media: WhatsAppOutboundBinary;
+  }): Promise<WhatsAppMessage>;
+
+  sendLocation(input: {
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly conversationId: string;
+    readonly outboundIntentKey: string;
+    readonly location: WhatsAppLocationPayload;
+  }): Promise<WhatsAppMessage>;
+
   sendTemplate(input: {
     readonly businessDayId: BusinessDayId;
     readonly workerId: WorkerId;
@@ -56,6 +88,15 @@ export interface WhatsAppRemoteGateway {
     readonly templateId: string;
     readonly outboundIntentKey: string;
   }): Promise<WhatsAppMessage>;
+
+  retryFailedMessage(input: {
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly messageId: string;
+    readonly outboundIntentKey: string;
+  }): Promise<WhatsAppMessage>;
+
+  getMediaAccess(messageId: string): Promise<WhatsAppMediaAccess>;
 
   markUnread(conversationId: string): Promise<void>;
   archive(conversationId: string, archived?: boolean): Promise<void>;
