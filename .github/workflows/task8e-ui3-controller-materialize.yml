@@ -1,0 +1,32 @@
+name: Task 8E UI3 Controller Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - '.github/workflows/task8e-ui3-controller-materialize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact controller WIP tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .recovery/ui3-controller.patch.gz.b64 | gzip -d > /tmp/ui3-controller.patch
+          git rm .recovery/ui3-controller.patch.gz.b64 .github/workflows/task8e-ui3-controller-materialize.yml
+          git apply --index /tmp/ui3-controller.patch
+          tree="$(git write-tree)"
+          test "$tree" = "92e4b53ea03a83496b2c246dcd103b88ab376b43"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'wip(task8e): wire messaging policy controller'
+          git push origin HEAD:work/operations-whatsapp-inbox-live
