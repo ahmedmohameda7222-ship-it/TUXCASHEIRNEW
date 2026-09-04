@@ -39,41 +39,41 @@ const FORBIDDEN_VALUES = [
 ] as const;
 
 function unsafeMessage(): WhatsAppMessage {
-  const media = Object.assign({ ...SAFE_MEDIA }, {
+  const media = {
+    ...SAFE_MEDIA,
     providerMediaId: FORBIDDEN_VALUES[0],
     providerDownloadUrl: FORBIDDEN_VALUES[1],
     objectPath: FORBIDDEN_VALUES[2],
     signedUrl: FORBIDDEN_VALUES[3],
     temporaryUploadUrl: FORBIDDEN_VALUES[4],
-  });
-  return Object.assign(
-    {
-      id: MESSAGE_ID,
-      shopId: SHOP_ID,
-      conversationId: CONVERSATION_ID,
-      providerMessageId: 'wamid.message.1',
-      outboundIntentKey: null,
-      direction: 'INBOUND',
-      kind: 'IMAGE',
-      text: null,
-      mediaRef: SAFE_MEDIA.mediaKey,
-      media,
-      location: null,
-      status: 'DELIVERED',
-      sentByWorkerId: null,
-      initiatedByDeviceId: null,
-      initiatedAt: null,
-      createdAt: instant('2026-09-04T12:00:01.000Z'),
-    } satisfies WhatsAppMessage,
-    {
-      providerMediaId: FORBIDDEN_VALUES[0],
-      providerDownloadUrl: FORBIDDEN_VALUES[1],
-      storageObjectPath: FORBIDDEN_VALUES[2],
-      signedStorageUrl: FORBIDDEN_VALUES[3],
-      temporaryUploadUrl: FORBIDDEN_VALUES[4],
-      binaryBlob: FORBIDDEN_VALUES[5],
-    },
-  );
+  };
+  const canonical: WhatsAppMessage = {
+    id: MESSAGE_ID,
+    shopId: SHOP_ID,
+    conversationId: CONVERSATION_ID,
+    providerMessageId: 'wamid.message.1',
+    outboundIntentKey: null,
+    direction: 'INBOUND',
+    kind: 'IMAGE',
+    text: null,
+    mediaRef: SAFE_MEDIA.mediaKey,
+    media,
+    location: null,
+    status: 'DELIVERED',
+    sentByWorkerId: null,
+    initiatedByDeviceId: null,
+    initiatedAt: null,
+    createdAt: instant('2026-09-04T12:00:01.000Z'),
+  };
+  return {
+    ...canonical,
+    providerMediaId: FORBIDDEN_VALUES[0],
+    providerDownloadUrl: FORBIDDEN_VALUES[1],
+    storageObjectPath: FORBIDDEN_VALUES[2],
+    signedStorageUrl: FORBIDDEN_VALUES[3],
+    temporaryUploadUrl: FORBIDDEN_VALUES[4],
+    binaryBlob: FORBIDDEN_VALUES[5],
+  } as WhatsAppMessage;
 }
 
 function expectCanonicalSafeMessage(message: WhatsAppMessage): void {
