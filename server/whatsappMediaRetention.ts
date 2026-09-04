@@ -98,7 +98,10 @@ export class SupabaseWhatsAppMediaRetentionRepository implements WhatsAppMediaRe
     });
   }
 
-  async markDeleted(input: { readonly mediaKey: string; readonly deletedAt: string }): Promise<void> {
+  async markDeleted(input: {
+    readonly mediaKey: string;
+    readonly deletedAt: string;
+  }): Promise<void> {
     await this.#callRpc('mark_tux_whatsapp_media_deleted_v1', {
       p_media_key: input.mediaKey,
       p_deleted_at: input.deletedAt,
