@@ -154,7 +154,8 @@ describe('Task 8D template provider payload', () => {
 describe('Task 9B inbound provider media fetch', () => {
   it('resolves Meta media metadata and downloads bytes server-side without returning the provider URL/id', async () => {
     const accessToken = 'server-media-secret';
-    const providerDownloadUrl = 'https://lookaside.fbsbx.com/whatsapp_business/attachments/private-media';
+    const providerDownloadUrl =
+      'https://lookaside.fbsbx.com/whatsapp_business/attachments/private-media';
     const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0x01]);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -246,9 +247,9 @@ describe('Task 9B inbound provider media fetch', () => {
 
     let thrown: unknown;
     try {
-      await (
-        fetchMedia as (input: { providerMediaId: string }) => Promise<unknown>
-      ).call(gateway, { providerMediaId: 'media-doc' });
+      await (fetchMedia as (input: { providerMediaId: string }) => Promise<unknown>).call(gateway, {
+        providerMediaId: 'media-doc',
+      });
     } catch (error) {
       thrown = error;
     }
