@@ -65,7 +65,11 @@ function binaryPayload(input: {
   readonly mimeType?: string;
   readonly fileName?: string;
 }): Record<string, unknown> {
-  const payload = textPayload('201012345678', 'provider-phone-1', input.messageId ?? 'wamid.media-1');
+  const payload = textPayload(
+    '201012345678',
+    'provider-phone-1',
+    input.messageId ?? 'wamid.media-1',
+  );
   const entry = (payload['entry'] as Array<Record<string, unknown>>)[0]!;
   const change = (entry['changes'] as Array<Record<string, unknown>>)[0]!;
   const value = change['value'] as Record<string, unknown>;
@@ -340,12 +344,21 @@ describe('handleWhatsAppWebhook', () => {
           body: new Response(providerBytes).body!,
         };
       });
-      const payload = binaryPayload({ type, providerMediaId, mimeType, fileName: fileName ?? undefined });
+      const payload = binaryPayload({
+        type,
+        providerMediaId,
+        mimeType,
+        fileName: fileName ?? undefined,
+      });
       const mediaKey = inboundMediaKey('wamid.media-1');
 
       const result = await post(payload, deps);
 
-      expect(result).toEqual({ status: 200, body: '{"ok":true}', contentType: 'application/json; charset=utf-8' });
+      expect(result).toEqual({
+        status: 200,
+        body: '{"ok":true}',
+        contentType: 'application/json; charset=utf-8',
+      });
       expect(deps.events).toEqual(['resolve', 'fetch-media', 'store-media', 'materialize-media']);
       expect(deps.providerGateway.fetchMedia).toHaveBeenCalledWith({ providerMediaId });
       expect(deps.mediaStore.storeInboundMedia).toHaveBeenCalledWith(
