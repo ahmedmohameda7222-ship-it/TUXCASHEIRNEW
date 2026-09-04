@@ -182,7 +182,13 @@ function optionalString(source: Readonly<Record<string, unknown>>, key: string):
 function safeFileName(value: unknown): string | null {
   const candidate = nonEmptyString(value);
   if (candidate === null) return null;
-  const withoutControls = candidate.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  const withoutControls = Array.from(candidate)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 0x1f && code !== 0x7f;
+    })
+    .join('')
+    .trim();
   return withoutControls.length === 0 ? null : withoutControls.slice(0, 255);
 }
 
