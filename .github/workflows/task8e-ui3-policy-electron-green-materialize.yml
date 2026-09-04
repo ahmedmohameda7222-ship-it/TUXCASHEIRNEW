@@ -1,0 +1,32 @@
+name: Task 8E UI3 Policy Electron GREEN Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - .github/workflows/task8e-ui3-policy-electron-green-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact policy Electron GREEN tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .recovery/ui3-policy-electron-green.patch.gz.b64 | gzip -d > /tmp/ui3-policy-electron-green.patch
+          test "$(sha256sum /tmp/ui3-policy-electron-green.patch | awk '{print $1}')" = "51f35611c761af0a0b3f39c931b33015e0b78e2ea4150b8babcd5dd7a90a7724"
+          git rm .recovery/ui3-policy-electron-green.patch.gz.b64 .github/workflows/task8e-ui3-policy-electron-green-materialize.yml
+          git apply --index /tmp/ui3-policy-electron-green.patch
+          test "$(git write-tree)" = "005c7eb09f31cccee7da6eb101ac48b895059b5b"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'wip(task8e): render policy and wire electron transport'
+          git push origin HEAD:work/operations-whatsapp-inbox-live
