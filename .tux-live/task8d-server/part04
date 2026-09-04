@@ -1,0 +1,23 @@
+stamptz;
+   v_templates jsonb;
+ begin
+-  select conversation.*
+-    into v_conversation
+-  from public.whatsapp_conversations conversation
+-  where conversation.shop_id = p_shop_id
+-    and conversation.id = p_conversation_id;
++  if p_conversation_id is not null then
++    select conversation.*
++      into v_conversation
++    from public.whatsapp_conversations conversation
++    where conversation.shop_id = p_shop_id
++      and conversation.id = p_conversation_id;
+ 
+-  if v_conversation.id is null then
+-    raise exception 'TUX_WHATSAPP_CONVERSATION_INVALID';
++    if v_conversation.id is null then
++      raise exception 'TUX_WHATSAPP_CONVERSATION_INVALID';
++    end if;
+   end if;
+ 
+   select config.*

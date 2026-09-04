@@ -1,0 +1,154 @@
+ssagingPolicyRecord> {
++    const row = oneRow(
++      await this.#callRpc('get_tux_whatsapp_messaging_policy_v1', {
++        p_shop_id: input.shopId,
++        p_conversation_id: input.conversationId,
++      }),
++    );
++    if (row === null || !Array.isArray(row['templates_json'])) throw protocolError();
++    return {
++      conversationId:
++        row['conversation_id'] === null ? null : arbitraryUuid(row['conversation_id']),
++      normalizedPhone: nullableString(row['normalized_phone']),
++      displayPhone: nullableString(row['display_phone']),
++      lastInboundAt: row['last_inbound_at'] === null ? null : parseInstant(row['last_inbound_at']),
++      freeFormUntil: row['free_form_until'] === null ? null : parseInstant(row['free_form_until']),
++      templates: row['templates_json'].map(parseStarterTemplate),
++      config: parseMessagingConfig(row),
++    };
++  }
++
++  async claimTemplateIntent(input: {
++    readonly shopId: ShopId;
++    readonly businessDayId: BusinessDayId;
++    readonly workerId: WorkerId;
++    readonly deviceId: DeviceId;
++    readonly normalizedPhone: string;
++    readonly displayPhone: string;
++    readonly templateId: string;
++    readonly outboundIntentKey: string;
++    readonly initiatedAt: string;
++  }): Promise<ClaimedWhatsAppTemplateIntent> {
++    const row = oneRow(
++      await this.#callRpc('claim_tux_whatsapp_template_intent_v1', {
++        p_shop_id: input.shopId,
++        p_business_day_id: input.businessDayId,
++        p_claimed_worker_id: input.workerId,
++        p_device_id: input.deviceId,
++        p_normalized_phone: input.normalizedPhone,
++        p_display_phone: input.displayPhone,
++        p_outbound_intent_key: input.outboundIntentKey,
++        p_template_id: input.templateId,
++        p_initiated_at: input.initiatedAt,
++      }),
++    );
++    if (row === null) throw protocolError();
++    const parsed = parseMessage(row['message_json']);
++    return {
++      created: booleanValue(row['created']),
++      recipientNormalizedPhone: stringValue(row['recipient_normalized_phone']),
++      providerTemplateName: stringValue(row['provider_template_name']),
++      languageCode: stringValue(row['language_code']),
++      message: parsed.message,
++    };
++  }
++
+   async attachProviderMessage(input: {
+     readonly shopId: ShopId;
+     readonly messageId: string;
+diff --git a/server/whatsappProviderGateway.ts b/server/whatsappProviderGateway.ts
+index 3c34e75ec7a79f6918ff91bfbb7a3ebaf8f85a1f..4ab7a4f049b55c9cde62f1848300dcc993cea192 100644
+--- a/server/whatsappProviderGateway.ts
++++ b/server/whatsappProviderGateway.ts
+@@ -1,12 +1,24 @@
+ import { normalizeEgyptianPhone } from '@tux/domain';
+ 
++export type SendWhatsAppProviderMessageInput =
++  | {
++      readonly providerPhoneNumberId: string;
++      readonly to: string;
++      readonly kind: 'TEXT';
++      readonly text: string;
++    }
++  | {
++      readonly providerPhoneNumberId: string;
++      readonly to: string;
++      readonly kind: 'TEMPLATE';
++      readonly providerTemplateName: string;
++      readonly languageCode: string;
++    };
++
+ export interface WhatsAppProviderGateway {
+-  sendMessage(input: {
+-    readonly providerPhoneNumberId: string;
+-    readonly to: string;
+-    readonly kind: 'TEXT';
+-    readonly text: string;
+-  }): Promise<{ readonly providerMessageId: string }>;
++  sendMessage(
++    input: SendWhatsAppProviderMessageInput,
++  ): Promise<{ readonly providerMessageId: string }>;
+ }
+ 
+ interface WhatsAppProviderConfig {
+@@ -62,11 +74,15 @@ export function createWhatsAppProviderGateway(
+       if (providerPhoneNumberId.length === 0) {
+         throw new Error('WhatsApp provider phone identity is invalid.');
+       }
+-      if (input.kind !== 'TEXT') {
+-        throw new Error('WhatsApp message kind is unsupported.');
+-      }
+-      if (input.text.trim().length === 0) {
+-        throw new Error('WhatsApp message text is empty.');
++      if (input.kind === 'TEXT') {
++        if (input.text.trim().length === 0) {
++          throw new Error('WhatsApp message text is empty.');
++        }
++      } else if (
++        input.providerTemplateName.trim().length === 0 ||
++        input.languageCode.trim().length === 0
++      ) {
++        throw new Error('WhatsApp template metadata is invalid.');
+       }
+ 
+       const phone = normalizeEgyptianPhone(input.to);
+@@ -85,13 +101,26 @@ export function createWhatsAppProviderGateway(
+               Authorization: `Bearer ${accessToken}`,
+               'Content-Type': 'application/json',
+             },
+-            body: JSON.stringify({
+-              messaging_product: 'whatsapp',
+-              recipient_type: 'individual',
+-              to: recipient,
+-              type: 'text',
+-              text: { body: input.text },
+-            }),
++            body: JSON.stringify(
++              input.kind === 'TEXT'
++                ? {
++                    messaging_product: 'whatsapp',
++                    recipient_type: 'individual',
++                    to: recipient,
++                    type: 'text',
++                    text: { body: input.text },
++                  }
++                : {
++                    messaging_product: 'whatsapp',
++                    recipient_type: 'individual',
++                    to: recipient,
++                    type: 'template',
++                    template: {
++                      name: input.providerTemplateName,
++                      language: { code: input.languageCode },
++                    },
++                  },
++            ),
+           },
+         );
+       } catch {
+diff --git a/supabase/migrations/20260904010000_whatsapp_messaging_policy.sql b/supabase/migrations/20260904010000_whatsapp_messaging_policy.sql
+index d53bb09ae1684273c8bfdd835bc89ea0836dab60..8fd2c402b1e56560cd2dcebcb6032f06054421fd 100644
+--- a/supabase/migrations/20260904010000_whatsapp_messaging_policy.sql
++++ b/supabase/migrations/20260904010000_whatsapp_messaging_policy.sql
+@@ -79,14 +79,16 @@ declare
+   v_last_inbound_at time

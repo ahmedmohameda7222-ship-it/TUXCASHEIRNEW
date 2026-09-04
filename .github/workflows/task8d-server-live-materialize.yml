@@ -1,0 +1,33 @@
+name: Task 8D Live Server Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: contains(github.event.head_commit.message, 'seed Task 8D server materializer')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact tested server tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .tux-live/task8d-server/part* > /tmp/task8d-server.patch
+          test "$(sha256sum /tmp/task8d-server.patch | cut -d' ' -f1)" = "27b84d9c81042abc69f5f29834e697b1f140036ffdd677ec585f14306db01b6f"
+          git rm -r .tux-live/task8d-server
+          git rm .github/workflows/task8d-server-live-materialize.yml
+          git apply --index /tmp/task8d-server.patch
+          test "$(git write-tree)" = "6a20df270c065575be3de775ad5eace92b339b20"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "wip(task8d): implement messaging policy server"
+          test "$(git rev-parse HEAD^{tree})" = "6a20df270c065575be3de775ad5eace92b339b20"
+          git push origin HEAD:refs/heads/work/operations-whatsapp-inbox-live
