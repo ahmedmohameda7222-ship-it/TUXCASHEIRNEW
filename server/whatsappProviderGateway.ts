@@ -15,10 +15,18 @@ export type SendWhatsAppProviderMessageInput =
       readonly languageCode: string;
     };
 
+export interface WhatsAppProviderMedia {
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly sha256: string | null;
+  readonly body: ReadableStream<Uint8Array>;
+}
+
 export interface WhatsAppProviderGateway {
   sendMessage(
     input: SendWhatsAppProviderMessageInput,
   ): Promise<{ readonly providerMessageId: string }>;
+  fetchMedia(input: { readonly providerMediaId: string }): Promise<WhatsAppProviderMedia>;
 }
 
 interface WhatsAppProviderConfig {
@@ -40,22 +48,67 @@ export class WhatsAppProviderError extends Error {
   }
 }
 
+function record(value: unknown): Readonly<Record<string, unknown>> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
 function providerCode(value: unknown): number | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const error = (value as Record<string, unknown>)['error'];
-  if (typeof error !== 'object' || error === null || Array.isArray(error)) return null;
-  const code = (error as Record<string, unknown>)['code'];
+  const source = record(value);
+  const error = source === null ? null : record(source['error']);
+  const code = error?.['code'];
   return typeof code === 'number' && Number.isSafeInteger(code) ? code : null;
 }
 
 function providerMessageId(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const messages = (value as Record<string, unknown>)['messages'];
+  const source = record(value);
+  const messages = source?.['messages'];
   if (!Array.isArray(messages) || messages.length === 0) return null;
-  const first = messages[0];
-  if (typeof first !== 'object' || first === null || Array.isArray(first)) return null;
-  const id = (first as Record<string, unknown>)['id'];
-  return typeof id === 'string' && id.trim().length > 0 ? id.trim() : null;
+  return nonEmptyString(record(messages[0])?.['id']);
+}
+
+function mediaMetadata(value: unknown): {
+  readonly url: string;
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly sha256: string | null;
+} | null {
+  const source = record(value);
+  if (source === null) return null;
+  const rawUrl = nonEmptyString(source['url']);
+  const mimeType = nonEmptyString(source['mime_type']);
+  const byteSize = source['file_size'];
+  const sha256 = source['sha256'] === undefined ? null : nonEmptyString(source['sha256']);
+  if (
+    rawUrl === null ||
+    mimeType === null ||
+    typeof byteSize !== 'number' ||
+    !Number.isSafeInteger(byteSize) ||
+    byteSize < 0 ||
+    (source['sha256'] !== undefined && sha256 === null)
+  ) {
+    return null;
+  }
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') return null;
+    return { url: url.toString(), mimeType, byteSize, sha256 };
+  } catch {
+    return null;
+  }
+}
+
+async function safeJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
 }
 
 export function createWhatsAppProviderGateway(
@@ -127,13 +180,7 @@ export function createWhatsAppProviderGateway(
         throw new WhatsAppProviderError(null, null, 'WhatsApp provider is unavailable.');
       }
 
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        // A non-JSON provider response is handled as a safe protocol failure below.
-      }
-
+      const payload = await safeJson(response);
       if (!response.ok) {
         throw new WhatsAppProviderError(
           response.status,
@@ -152,6 +199,67 @@ export function createWhatsAppProviderGateway(
       }
 
       return { providerMessageId: messageId };
+    },
+
+    async fetchMedia(input) {
+      const providerMediaId = input.providerMediaId.trim();
+      if (providerMediaId.length === 0) {
+        throw new Error('WhatsApp provider media identity is invalid.');
+      }
+
+      let metadataResponse: Response;
+      try {
+        metadataResponse = await fetchImpl(
+          `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(providerMediaId)}`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${accessToken}` },
+          },
+        );
+      } catch {
+        throw new WhatsAppProviderError(null, null, 'WhatsApp provider media is unavailable.');
+      }
+
+      const metadataPayload = await safeJson(metadataResponse);
+      if (!metadataResponse.ok) {
+        throw new WhatsAppProviderError(
+          metadataResponse.status,
+          providerCode(metadataPayload),
+          'WhatsApp provider media is unavailable.',
+        );
+      }
+      const metadata = mediaMetadata(metadataPayload);
+      if (metadata === null) {
+        throw new WhatsAppProviderError(
+          metadataResponse.status,
+          null,
+          'WhatsApp provider media is unavailable.',
+        );
+      }
+
+      let downloadResponse: Response;
+      try {
+        downloadResponse = await fetchImpl(metadata.url, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch {
+        throw new WhatsAppProviderError(null, null, 'WhatsApp provider media is unavailable.');
+      }
+      if (!downloadResponse.ok || downloadResponse.body === null) {
+        throw new WhatsAppProviderError(
+          downloadResponse.status,
+          null,
+          'WhatsApp provider media is unavailable.',
+        );
+      }
+
+      return {
+        mimeType: metadata.mimeType,
+        byteSize: metadata.byteSize,
+        sha256: metadata.sha256,
+        body: downloadResponse.body,
+      };
     },
   };
 }
