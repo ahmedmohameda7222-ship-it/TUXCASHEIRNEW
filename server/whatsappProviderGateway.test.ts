@@ -105,3 +105,48 @@ describe('WhatsAppProviderGateway', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('Task 8D template provider payload', () => {
+  it('builds a Meta template message only from server-owned template name and language', async () => {
+    let capturedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ messages: [{ id: 'wamid.template-1' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    const gateway = createWhatsAppProviderGateway(
+      { graphVersion: 'v23.0', accessToken: 'server-secret' },
+      fetchMock as unknown as typeof fetch,
+    );
+    const sendTemplate = gateway.sendMessage as unknown as (input: {
+      providerPhoneNumberId: string;
+      to: string;
+      kind: 'TEMPLATE';
+      providerTemplateName: string;
+      languageCode: string;
+    }) => Promise<{ providerMessageId: string }>;
+
+    await expect(
+      sendTemplate({
+        providerPhoneNumberId: 'provider-phone-1',
+        to: '01012345678',
+        kind: 'TEMPLATE',
+        providerTemplateName: 'tux_start',
+        languageCode: 'ar',
+      }),
+    ).resolves.toEqual({ providerMessageId: 'wamid.template-1' });
+
+    expect(JSON.parse(String(capturedInit?.body))).toEqual({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: '201012345678',
+      type: 'template',
+      template: {
+        name: 'tux_start',
+        language: { code: 'ar' },
+      },
+    });
+  });
+});

@@ -143,6 +143,34 @@ function createDependencies() {
     failOutboundIntent: vi.fn(async () => undefined),
     setConversationState: vi.fn(async () => undefined),
     linkOrderAuthorized: vi.fn(async () => undefined),
+    resolveContactTarget: vi.fn(async () => ({
+      conversationId,
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+    })),
+    resolveMessagingPolicy: vi.fn(async () => ({
+      conversationId,
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      lastInboundAt: '2026-09-02T19:00:00.000Z',
+      freeFormUntil: '2026-09-03T19:00:00.000Z',
+      templates: [
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          label: 'ابدأ المحادثة',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك من TUX.',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    })),
+    claimTemplateIntent: vi.fn(async () => ({
+      created: true,
+      recipientNormalizedPhone: '01012345678',
+      providerTemplateName: 'tux_start',
+      languageCode: 'ar',
+      message: message(),
+    })),
   };
   const channelResolver = {
     resolveInboundChannel: vi.fn(async () => null),
@@ -490,6 +518,138 @@ describe('handleWhatsAppOperations', () => {
     expect(deps.repository.resolveCurrentOperator).not.toHaveBeenCalled();
     expect(deps.factory.createChannelResolver).not.toHaveBeenCalled();
     expect(deps.factory.createProviderGateway).not.toHaveBeenCalled();
+  });
+});
+
+describe('Task 8D messaging policy authority', () => {
+  const templateId = '00000000-0000-4000-8000-000000000021';
+
+  it('RESOLVE_TARGET returns FREE_FORM only from the server policy window', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      request({
+        body: {
+          action: 'RESOLVE_TARGET',
+          normalizedPhone: '01012345678',
+          displayPhone: '+201012345678',
+        },
+      }),
+      deps.factory,
+    );
+
+    expect(result.status()).toBe(200);
+    expect(result.json()).toEqual({
+      target: {
+        mode: 'FREE_FORM',
+        conversationId,
+        freeFormUntil: '2026-09-03T19:00:00.000Z',
+        config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+      },
+    });
+    expect(deps.repository.resolveContactTarget).toHaveBeenCalledWith({
+      shopId,
+      normalizedPhone: '01012345678',
+    });
+  });
+
+  it('treats the exact free-form expiry boundary as closed before claiming or contacting Meta', async () => {
+    const deps = createDependencies();
+    deps.repository.resolveMessagingPolicy.mockResolvedValueOnce({
+      conversationId,
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      lastInboundAt: '2026-09-01T20:00:00.000Z',
+      freeFormUntil: '2026-09-02T20:00:00.000Z',
+      templates: [
+        {
+          id: templateId,
+          label: 'ابدأ المحادثة',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك من TUX.',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    });
+
+    const result = await execute(request({ body: sendBody() }), deps.factory);
+
+    expect(result.status()).toBe(409);
+    expect(result.json()).toEqual({ error: 'whatsapp_free_form_window_closed' });
+    expect(deps.repository.claimOutboundTextIntent).not.toHaveBeenCalled();
+    expect(deps.providerGateway.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('RESOLVE_TARGET returns BLOCKED when there is no conversation and no approved starter template', async () => {
+    const deps = createDependencies();
+    deps.repository.resolveContactTarget.mockResolvedValueOnce(null);
+    deps.repository.resolveMessagingPolicy.mockResolvedValueOnce({
+      conversationId: null,
+      normalizedPhone: null,
+      displayPhone: null,
+      lastInboundAt: null,
+      freeFormUntil: null,
+      templates: [],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    });
+
+    const result = await execute(
+      request({
+        body: {
+          action: 'RESOLVE_TARGET',
+          normalizedPhone: '01012345678',
+          displayPhone: '+201012345678',
+        },
+      }),
+      deps.factory,
+    );
+
+    expect(result.status()).toBe(200);
+    expect(result.json()).toEqual({
+      target: {
+        mode: 'BLOCKED',
+        conversationId: null,
+        reason: 'NO_APPROVED_TEMPLATE',
+        config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+      },
+    });
+  });
+
+  it('SEND_TEMPLATE uses only a TUX template id and server-owned provider template metadata', async () => {
+    const deps = createDependencies();
+    const result = await execute(
+      request({
+        body: {
+          action: 'SEND_TEMPLATE',
+          businessDayId,
+          workerId,
+          normalizedPhone: '01012345678',
+          displayPhone: '+201012345678',
+          templateId,
+          outboundIntentKey: 'template-intent-1',
+        },
+      }),
+      deps.factory,
+    );
+
+    expect(result.status()).toBe(200);
+    expect(deps.repository.claimTemplateIntent).toHaveBeenCalledWith({
+      shopId,
+      businessDayId,
+      workerId,
+      deviceId,
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      templateId,
+      outboundIntentKey: 'template-intent-1',
+      initiatedAt: '2026-09-02T20:00:00.000Z',
+    });
+    expect(deps.providerGateway.sendMessage).toHaveBeenCalledWith({
+      providerPhoneNumberId: 'provider-phone-1',
+      to: '01012345678',
+      kind: 'TEMPLATE',
+      providerTemplateName: 'tux_start',
+      languageCode: 'ar',
+    });
   });
 });
 
