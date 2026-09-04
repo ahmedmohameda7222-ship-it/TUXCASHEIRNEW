@@ -15,6 +15,8 @@ import {
   type WhatsAppMessageStatus,
   type WhatsAppQuickReply,
   type WhatsAppQuickReplyCategory,
+  type WhatsAppShopMessagingConfig,
+  type WhatsAppStarterTemplate,
   type WorkerId,
 } from '@tux/domain';
 import type { WhatsAppDataServerConfig } from './whatsappServerConfig';
@@ -42,6 +44,27 @@ export interface ClaimedWhatsAppOutboundIntent {
   readonly message: WhatsAppMessage;
 }
 
+export interface WhatsAppContactTarget {
+  readonly conversationId: string;
+  readonly normalizedPhone: string;
+  readonly displayPhone: string;
+}
+
+export interface WhatsAppMessagingPolicyRecord {
+  readonly conversationId: string | null;
+  readonly normalizedPhone: string | null;
+  readonly displayPhone: string | null;
+  readonly lastInboundAt: string | null;
+  readonly freeFormUntil: string | null;
+  readonly templates: readonly WhatsAppStarterTemplate[];
+  readonly config: WhatsAppShopMessagingConfig;
+}
+
+export interface ClaimedWhatsAppTemplateIntent extends ClaimedWhatsAppOutboundIntent {
+  readonly providerTemplateName: string;
+  readonly languageCode: string;
+}
+
 export interface WhatsAppOperationsRepository {
   resolveCurrentOperator(input: {
     readonly shopId: ShopId;
@@ -64,6 +87,28 @@ export interface WhatsAppOperationsRepository {
     readonly text: string;
     readonly initiatedAt: string;
   }): Promise<ClaimedWhatsAppOutboundIntent>;
+
+  resolveContactTarget(input: {
+    readonly shopId: ShopId;
+    readonly normalizedPhone: string;
+  }): Promise<WhatsAppContactTarget | null>;
+
+  resolveMessagingPolicy(input: {
+    readonly shopId: ShopId;
+    readonly conversationId: string | null;
+  }): Promise<WhatsAppMessagingPolicyRecord>;
+
+  claimTemplateIntent(input: {
+    readonly shopId: ShopId;
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly deviceId: DeviceId;
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+    readonly templateId: string;
+    readonly outboundIntentKey: string;
+    readonly initiatedAt: string;
+  }): Promise<ClaimedWhatsAppTemplateIntent>;
 
   attachProviderMessage(input: {
     readonly shopId: ShopId;
@@ -119,6 +164,61 @@ function stringValue(value: unknown): string {
 function nullableString(value: unknown): string | null {
   if (value === null) return null;
   return stringValue(value);
+}
+
+function finiteNumber(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw protocolError();
+  return value;
+}
+
+function parseMessagingConfig(source: UnknownRecord): WhatsAppShopMessagingConfig {
+  const storefrontUrl = stringValue(source['storefront_url']);
+  let url: URL;
+  try {
+    url = new URL(storefrontUrl);
+  } catch {
+    throw protocolError();
+  }
+  if (url.protocol !== 'https:') throw protocolError();
+
+  const latitude = source['store_latitude'];
+  const longitude = source['store_longitude'];
+  const label = source['store_location_label'];
+  const address = source['store_location_address'];
+  if (latitude === null && longitude === null) {
+    if (label !== null || address !== null) throw protocolError();
+    return { storefrontUrl, storeLocation: null };
+  }
+  if (latitude === null || longitude === null) throw protocolError();
+  const parsedLatitude = finiteNumber(latitude);
+  const parsedLongitude = finiteNumber(longitude);
+  if (
+    parsedLatitude < -90 ||
+    parsedLatitude > 90 ||
+    parsedLongitude < -180 ||
+    parsedLongitude > 180
+  ) {
+    throw protocolError();
+  }
+  return {
+    storefrontUrl,
+    storeLocation: {
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
+      label: nullableString(label),
+      address: nullableString(address),
+    },
+  };
+}
+
+function parseStarterTemplate(value: unknown): WhatsAppStarterTemplate {
+  const source = record(value);
+  return {
+    id: arbitraryUuid(source['id']),
+    label: stringValue(source['label']),
+    languageCode: stringValue(source['languageCode']),
+    previewText: stringValue(source['previewText']),
+  };
 }
 
 function booleanValue(value: unknown): boolean {
@@ -433,6 +533,82 @@ export class SupabaseWhatsAppOperationsRepository implements WhatsAppOperationsR
     return {
       created: booleanValue(row['created']),
       recipientNormalizedPhone: stringValue(row['recipient_normalized_phone']),
+      message: parsed.message,
+    };
+  }
+
+  async resolveContactTarget(input: {
+    readonly shopId: ShopId;
+    readonly normalizedPhone: string;
+  }): Promise<WhatsAppContactTarget | null> {
+    const row = oneRow(
+      await this.#callRpc('get_tux_whatsapp_contact_target_v1', {
+        p_shop_id: input.shopId,
+        p_normalized_phone: input.normalizedPhone,
+      }),
+    );
+    if (row === null) return null;
+    return {
+      conversationId: arbitraryUuid(row['conversation_id']),
+      normalizedPhone: stringValue(row['normalized_phone']),
+      displayPhone: stringValue(row['display_phone']),
+    };
+  }
+
+  async resolveMessagingPolicy(input: {
+    readonly shopId: ShopId;
+    readonly conversationId: string | null;
+  }): Promise<WhatsAppMessagingPolicyRecord> {
+    const row = oneRow(
+      await this.#callRpc('get_tux_whatsapp_messaging_policy_v1', {
+        p_shop_id: input.shopId,
+        p_conversation_id: input.conversationId,
+      }),
+    );
+    if (row === null || !Array.isArray(row['templates_json'])) throw protocolError();
+    return {
+      conversationId:
+        row['conversation_id'] === null ? null : arbitraryUuid(row['conversation_id']),
+      normalizedPhone: nullableString(row['normalized_phone']),
+      displayPhone: nullableString(row['display_phone']),
+      lastInboundAt: row['last_inbound_at'] === null ? null : parseInstant(row['last_inbound_at']),
+      freeFormUntil: row['free_form_until'] === null ? null : parseInstant(row['free_form_until']),
+      templates: row['templates_json'].map(parseStarterTemplate),
+      config: parseMessagingConfig(row),
+    };
+  }
+
+  async claimTemplateIntent(input: {
+    readonly shopId: ShopId;
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly deviceId: DeviceId;
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+    readonly templateId: string;
+    readonly outboundIntentKey: string;
+    readonly initiatedAt: string;
+  }): Promise<ClaimedWhatsAppTemplateIntent> {
+    const row = oneRow(
+      await this.#callRpc('claim_tux_whatsapp_template_intent_v1', {
+        p_shop_id: input.shopId,
+        p_business_day_id: input.businessDayId,
+        p_claimed_worker_id: input.workerId,
+        p_device_id: input.deviceId,
+        p_normalized_phone: input.normalizedPhone,
+        p_display_phone: input.displayPhone,
+        p_outbound_intent_key: input.outboundIntentKey,
+        p_template_id: input.templateId,
+        p_initiated_at: input.initiatedAt,
+      }),
+    );
+    if (row === null) throw protocolError();
+    const parsed = parseMessage(row['message_json']);
+    return {
+      created: booleanValue(row['created']),
+      recipientNormalizedPhone: stringValue(row['recipient_normalized_phone']),
+      providerTemplateName: stringValue(row['provider_template_name']),
+      languageCode: stringValue(row['language_code']),
       message: parsed.message,
     };
   }

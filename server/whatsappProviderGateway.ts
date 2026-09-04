@@ -1,12 +1,24 @@
 import { normalizeEgyptianPhone } from '@tux/domain';
 
+export type SendWhatsAppProviderMessageInput =
+  | {
+      readonly providerPhoneNumberId: string;
+      readonly to: string;
+      readonly kind: 'TEXT';
+      readonly text: string;
+    }
+  | {
+      readonly providerPhoneNumberId: string;
+      readonly to: string;
+      readonly kind: 'TEMPLATE';
+      readonly providerTemplateName: string;
+      readonly languageCode: string;
+    };
+
 export interface WhatsAppProviderGateway {
-  sendMessage(input: {
-    readonly providerPhoneNumberId: string;
-    readonly to: string;
-    readonly kind: 'TEXT';
-    readonly text: string;
-  }): Promise<{ readonly providerMessageId: string }>;
+  sendMessage(
+    input: SendWhatsAppProviderMessageInput,
+  ): Promise<{ readonly providerMessageId: string }>;
 }
 
 interface WhatsAppProviderConfig {
@@ -62,11 +74,15 @@ export function createWhatsAppProviderGateway(
       if (providerPhoneNumberId.length === 0) {
         throw new Error('WhatsApp provider phone identity is invalid.');
       }
-      if (input.kind !== 'TEXT') {
-        throw new Error('WhatsApp message kind is unsupported.');
-      }
-      if (input.text.trim().length === 0) {
-        throw new Error('WhatsApp message text is empty.');
+      if (input.kind === 'TEXT') {
+        if (input.text.trim().length === 0) {
+          throw new Error('WhatsApp message text is empty.');
+        }
+      } else if (
+        input.providerTemplateName.trim().length === 0 ||
+        input.languageCode.trim().length === 0
+      ) {
+        throw new Error('WhatsApp template metadata is invalid.');
       }
 
       const phone = normalizeEgyptianPhone(input.to);
@@ -85,13 +101,26 @@ export function createWhatsAppProviderGateway(
               Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              recipient_type: 'individual',
-              to: recipient,
-              type: 'text',
-              text: { body: input.text },
-            }),
+            body: JSON.stringify(
+              input.kind === 'TEXT'
+                ? {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: recipient,
+                    type: 'text',
+                    text: { body: input.text },
+                  }
+                : {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: recipient,
+                    type: 'template',
+                    template: {
+                      name: input.providerTemplateName,
+                      language: { code: input.languageCode },
+                    },
+                  },
+            ),
           },
         );
       } catch {

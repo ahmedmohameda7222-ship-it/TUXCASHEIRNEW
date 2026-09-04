@@ -1,5 +1,6 @@
 import {
   assertWhatsAppMessageInvariant,
+  normalizeEgyptianPhone,
   parseEntityId,
   type BusinessDayId,
   type DeviceId,
@@ -80,6 +81,8 @@ const FORBIDDEN_AUTHORITY_FIELDS = new Set([
   'to',
   'providerPhoneNumberId',
   'kind',
+  'providerTemplateName',
+  'languageCode',
 ]);
 
 function invalidRequest(response: GatewayResponse): void {
@@ -88,6 +91,34 @@ function invalidRequest(response: GatewayResponse): void {
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function validEgyptianPhonePair(
+  normalizedPhoneValue: unknown,
+  displayPhoneValue: unknown,
+): { readonly normalizedPhone: string; readonly displayPhone: string } | null {
+  const normalizedPhone = nonEmptyString(normalizedPhoneValue);
+  const displayPhone = nonEmptyString(displayPhoneValue);
+  if (normalizedPhone === null || displayPhone === null) return null;
+  const normalized = normalizeEgyptianPhone(normalizedPhone);
+  const display = normalizeEgyptianPhone(displayPhone);
+  if (
+    !normalized.valid ||
+    !display.valid ||
+    normalized.normalizedPhone !== normalizedPhone ||
+    display.normalizedPhone !== normalizedPhone ||
+    normalized.displayPhone !== displayPhone ||
+    display.displayPhone !== displayPhone
+  ) {
+    return null;
+  }
+  return { normalizedPhone, displayPhone };
+}
+
+function isFreeFormOpen(freeFormUntil: string | null, now: Date): boolean {
+  if (freeFormUntil === null) return false;
+  const expiry = Date.parse(freeFormUntil);
+  return Number.isFinite(expiry) && now.getTime() < expiry;
 }
 
 function parsedId<T extends ShopId | BusinessDayId | WorkerId | DeviceId | OrderId>(
@@ -165,6 +196,91 @@ async function handleGet(
   }
 }
 
+async function handleResolveTarget(
+  body: Readonly<Record<string, unknown>>,
+  response: GatewayResponse,
+  shopId: ShopId,
+  dependencies: WhatsAppOperationsDependencyFactory,
+): Promise<void> {
+  if (!onlyKeys(body, ['action', 'normalizedPhone', 'displayPhone'])) {
+    invalidRequest(response);
+    return;
+  }
+  const phone = validEgyptianPhonePair(body['normalizedPhone'], body['displayPhone']);
+  if (phone === null) {
+    invalidRequest(response);
+    return;
+  }
+
+  const repository = dependencies.createRepository();
+  try {
+    const contact = await repository.resolveContactTarget({
+      shopId,
+      normalizedPhone: phone.normalizedPhone,
+    });
+    const policy = await repository.resolveMessagingPolicy({
+      shopId,
+      conversationId: contact?.conversationId ?? null,
+    });
+
+    if (contact !== null) {
+      if (
+        policy.conversationId !== contact.conversationId ||
+        policy.normalizedPhone !== contact.normalizedPhone ||
+        policy.displayPhone !== contact.displayPhone
+      ) {
+        sendJson(response, 502, { error: 'whatsapp_remote_rejected' });
+        return;
+      }
+      if (isFreeFormOpen(policy.freeFormUntil, dependencies.now())) {
+        sendJson(response, 200, {
+          target: {
+            mode: 'FREE_FORM',
+            conversationId: contact.conversationId,
+            freeFormUntil: policy.freeFormUntil,
+            config: policy.config,
+          },
+        });
+        return;
+      }
+    } else if (
+      policy.conversationId !== null ||
+      policy.normalizedPhone !== null ||
+      policy.displayPhone !== null
+    ) {
+      sendJson(response, 502, { error: 'whatsapp_remote_rejected' });
+      return;
+    }
+
+    if (policy.templates.length > 0) {
+      sendJson(response, 200, {
+        target: {
+          mode: 'TEMPLATE_ONLY',
+          conversationId: contact?.conversationId ?? null,
+          normalizedPhone: phone.normalizedPhone,
+          displayPhone: phone.displayPhone,
+          templates: policy.templates,
+          config: policy.config,
+        },
+      });
+      return;
+    }
+
+    sendJson(response, 200, {
+      target: {
+        mode: 'BLOCKED',
+        conversationId: contact?.conversationId ?? null,
+        reason: 'NO_APPROVED_TEMPLATE',
+        config: policy.config,
+      },
+    });
+  } catch (error) {
+    if (!sendRepositoryError(response, error)) {
+      sendJson(response, 503, { error: 'whatsapp_remote_unavailable' });
+    }
+  }
+}
+
 async function handleSendMessage(
   body: Readonly<Record<string, unknown>>,
   response: GatewayResponse,
@@ -214,6 +330,13 @@ async function handleSendMessage(
       return;
     }
 
+    const now = dependencies.now();
+    const policy = await repository.resolveMessagingPolicy({ shopId, conversationId });
+    if (policy.conversationId !== conversationId || !isFreeFormOpen(policy.freeFormUntil, now)) {
+      sendJson(response, 409, { error: 'whatsapp_free_form_window_closed' });
+      return;
+    }
+
     const channel = await dependencies.createChannelResolver().resolveOutboundChannel({ shopId });
     if (channel === null) {
       sendJson(response, 503, { error: 'whatsapp_channel_not_configured' });
@@ -228,7 +351,7 @@ async function handleSendMessage(
       conversationId,
       outboundIntentKey,
       text,
-      initiatedAt: dependencies.now().toISOString(),
+      initiatedAt: now.toISOString(),
     });
 
     if (!claim.created) {
@@ -282,6 +405,158 @@ async function handleSendMessage(
         return;
       }
 
+      sendJson(response, 503, {
+        error: 'whatsapp_delivery_uncertain',
+        messageId: claim.message.id,
+      });
+      return;
+    }
+
+    try {
+      await repository.attachProviderMessage({
+        shopId,
+        messageId: claim.message.id,
+        providerMessageId: providerResult.providerMessageId,
+      });
+    } catch {
+      sendJson(response, 503, {
+        error: 'whatsapp_delivery_uncertain',
+        messageId: claim.message.id,
+      });
+      return;
+    }
+
+    const sentMessage = {
+      ...claim.message,
+      providerMessageId: providerResult.providerMessageId,
+      status: 'SENT' as const,
+    };
+    try {
+      assertWhatsAppMessageInvariant(sentMessage);
+    } catch {
+      sendJson(response, 503, {
+        error: 'whatsapp_delivery_uncertain',
+        messageId: claim.message.id,
+      });
+      return;
+    }
+    sendJson(response, 200, { message: sentMessage });
+  } catch (error) {
+    if (!sendRepositoryError(response, error)) {
+      sendJson(response, 503, { error: 'whatsapp_remote_unavailable' });
+    }
+  }
+}
+
+async function handleSendTemplate(
+  body: Readonly<Record<string, unknown>>,
+  response: GatewayResponse,
+  shopId: ShopId,
+  deviceId: DeviceId,
+  dependencies: WhatsAppOperationsDependencyFactory,
+): Promise<void> {
+  if (
+    !onlyKeys(body, [
+      'action',
+      'businessDayId',
+      'workerId',
+      'normalizedPhone',
+      'displayPhone',
+      'templateId',
+      'outboundIntentKey',
+    ])
+  ) {
+    invalidRequest(response);
+    return;
+  }
+
+  const businessDayId = parsedId<BusinessDayId>(body['businessDayId']);
+  const workerId = parsedId<WorkerId>(body['workerId']);
+  const phone = validEgyptianPhonePair(body['normalizedPhone'], body['displayPhone']);
+  const templateId = parsedUuid(body['templateId']);
+  const outboundIntentKey = nonEmptyString(body['outboundIntentKey']);
+  if (
+    businessDayId === null ||
+    workerId === null ||
+    phone === null ||
+    templateId === null ||
+    outboundIntentKey === null
+  ) {
+    invalidRequest(response);
+    return;
+  }
+
+  const repository = dependencies.createRepository();
+  try {
+    const channel = await dependencies.createChannelResolver().resolveOutboundChannel({ shopId });
+    if (channel === null) {
+      sendJson(response, 503, { error: 'whatsapp_channel_not_configured' });
+      return;
+    }
+
+    const claim = await repository.claimTemplateIntent({
+      shopId,
+      businessDayId,
+      workerId,
+      deviceId,
+      normalizedPhone: phone.normalizedPhone,
+      displayPhone: phone.displayPhone,
+      templateId,
+      outboundIntentKey,
+      initiatedAt: dependencies.now().toISOString(),
+    });
+
+    if (!claim.created) {
+      if (claim.message.status === 'PENDING' && claim.message.providerMessageId === null) {
+        sendJson(response, 503, {
+          error: 'whatsapp_delivery_uncertain',
+          messageId: claim.message.id,
+        });
+        return;
+      }
+      sendJson(response, 200, { message: claim.message });
+      return;
+    }
+
+    let providerResult: { readonly providerMessageId: string };
+    try {
+      providerResult = await dependencies.createProviderGateway().sendMessage({
+        providerPhoneNumberId: channel.providerPhoneNumberId,
+        to: claim.recipientNormalizedPhone,
+        kind: 'TEMPLATE',
+        providerTemplateName: claim.providerTemplateName,
+        languageCode: claim.languageCode,
+      });
+    } catch (error) {
+      if (
+        error instanceof WhatsAppProviderError &&
+        error.httpStatus !== null &&
+        error.httpStatus >= 400
+      ) {
+        const failureCode =
+          error.providerCode === null ? `HTTP_${error.httpStatus}` : String(error.providerCode);
+        try {
+          await repository.failOutboundIntent({
+            shopId,
+            messageId: claim.message.id,
+            failureCode,
+            failureMessage: error.safeMessage,
+          });
+        } catch (failureError) {
+          if (!sendRepositoryError(response, failureError)) {
+            sendJson(response, 503, {
+              error: 'whatsapp_delivery_uncertain',
+              messageId: claim.message.id,
+            });
+          }
+          return;
+        }
+        sendJson(response, 502, {
+          error: 'whatsapp_provider_rejected',
+          messageId: claim.message.id,
+        });
+        return;
+      }
       sendJson(response, 503, {
         error: 'whatsapp_delivery_uncertain',
         messageId: claim.message.id,
@@ -528,8 +803,16 @@ export async function handleWhatsAppOperations(
   }
 
   const action = nonEmptyString(body['action']);
+  if (action === 'RESOLVE_TARGET') {
+    await handleResolveTarget(body, response, shopId, dependencies);
+    return;
+  }
   if (action === 'SEND_MESSAGE') {
     await handleSendMessage(body, response, shopId, deviceId, dependencies);
+    return;
+  }
+  if (action === 'SEND_TEMPLATE') {
+    await handleSendTemplate(body, response, shopId, deviceId, dependencies);
     return;
   }
   if (action === 'MARK_UNREAD' || action === 'ARCHIVE' || action === 'FOLLOW_UP') {

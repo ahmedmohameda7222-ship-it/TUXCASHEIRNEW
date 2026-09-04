@@ -7,6 +7,45 @@ export type WhatsAppMessageDirection = 'INBOUND' | 'OUTBOUND';
 export type WhatsAppMessageKind = 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'LOCATION' | 'SYSTEM';
 export type WhatsAppConversationContext = 'DIRECT' | 'WEB_REQUEST' | 'ORDER_LINKED';
 
+export interface WhatsAppStarterTemplate {
+  readonly id: string;
+  readonly label: string;
+  readonly languageCode: string;
+  readonly previewText: string;
+}
+
+export interface WhatsAppShopMessagingConfig {
+  readonly storefrontUrl: string;
+  readonly storeLocation: null | {
+    readonly latitude: number;
+    readonly longitude: number;
+    readonly label: string | null;
+    readonly address: string | null;
+  };
+}
+
+export type WhatsAppMessagingTarget =
+  | {
+      readonly mode: 'FREE_FORM';
+      readonly conversationId: string;
+      readonly freeFormUntil: Instant;
+      readonly config: WhatsAppShopMessagingConfig;
+    }
+  | {
+      readonly mode: 'TEMPLATE_ONLY';
+      readonly conversationId: string | null;
+      readonly normalizedPhone: string;
+      readonly displayPhone: string;
+      readonly templates: readonly WhatsAppStarterTemplate[];
+      readonly config: WhatsAppShopMessagingConfig;
+    }
+  | {
+      readonly mode: 'BLOCKED';
+      readonly conversationId: string | null;
+      readonly reason: 'NO_APPROVED_TEMPLATE';
+      readonly config: WhatsAppShopMessagingConfig;
+    };
+
 export interface WhatsAppConversation {
   readonly id: string;
   readonly shopId: ShopId;
