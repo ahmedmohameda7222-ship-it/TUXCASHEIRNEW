@@ -66,6 +66,8 @@ vi.mock('@tux/application', async (importOriginal) => {
     saveDraft = vi.fn();
     getDraft = vi.fn();
     resolveCustomerOrderContext = mocks.resolveCustomerOrderContext;
+    resolveMessagingTarget = vi.fn();
+    sendTemplate = vi.fn();
   }
   return { ...actual, OperationsWhatsAppService };
 });
@@ -80,7 +82,9 @@ const methodNames = [
   'loadInbox',
   'markUnread',
   'resolveCustomerOrderContext',
+  'resolveMessagingTarget',
   'saveDraft',
+  'sendTemplate',
   'sendText',
   'setFollowUp',
 ];
