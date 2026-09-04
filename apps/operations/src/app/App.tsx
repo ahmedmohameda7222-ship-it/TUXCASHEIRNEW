@@ -1,5 +1,9 @@
-import { type OperationsSessionState } from '@tux/application';
-import { parseSystemAccentColor, type SystemAccentColor } from '@tux/domain';
+import {
+  type OperationsSessionState,
+  type OrdersCustomerPrefill,
+  type WhatsAppCustomerOrderContext,
+} from '@tux/application';
+import { parseSystemAccentColor, type OrderId, type SystemAccentColor } from '@tux/domain';
 import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BulkStockWorkspace } from './BulkStockWorkspace';
 import { EndDayFlow } from './EndDayFlow';
@@ -57,6 +61,18 @@ type AppProps = {
 
 type ThemePreference = 'system' | 'light' | 'dark';
 type OperationsArea = 'ORDERS' | 'ORDERS_BOARD' | 'WHATSAPP' | 'EXPENSES' | 'BULK_STOCK';
+
+interface OrdersPrefillIntent {
+  readonly source: 'WHATSAPP_CHAT';
+  readonly requestId: string;
+  readonly prefill: OrdersCustomerPrefill;
+}
+
+interface WhatsAppOpenIntent {
+  readonly source: 'ORDER';
+  readonly normalizedPhone: string;
+  readonly displayPhone: string;
+}
 const THEME_STORAGE_KEY = 'tux.operations.theme';
 const DEFAULT_SYSTEM_ACCENT = parseSystemAccentColor('#1F6B52');
 const CLOSED_MENU_LAYOUT_EXIT_CONTROLLER: MenuLayoutExitController = {
@@ -284,6 +300,11 @@ function ActiveShell({
   const [endDayOpen, setEndDayOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePreference>(initialTheme);
   const [area, setArea] = useState<OperationsArea>('ORDERS');
+  const [pendingOrdersPrefillIntent, setPendingOrdersPrefillIntent] =
+    useState<OrdersPrefillIntent | null>(null);
+  const [pendingWhatsAppOpenIntent, setPendingWhatsAppOpenIntent] =
+    useState<WhatsAppOpenIntent | null>(null);
+  const [pendingOrdersBoardFocusId, setPendingOrdersBoardFocusId] = useState<OrderId | null>(null);
   const [menuLayoutExitController, setMenuLayoutExitController] =
     useState<MenuLayoutExitController>(CLOSED_MENU_LAYOUT_EXIT_CONTROLLER);
   const [discardMenuChangesOpen, setDiscardMenuChangesOpen] = useState(false);
@@ -461,6 +482,26 @@ function ActiveShell({
     }
   }, [area, whatsappController]);
 
+  useEffect(() => {
+    if (area !== 'WHATSAPP' || pendingWhatsAppOpenIntent === null) return;
+    const conversation = whatsappState.snapshot?.conversations.find(
+      (candidate) => candidate.normalizedPhone === pendingWhatsAppOpenIntent.normalizedPhone,
+    );
+    if (conversation === undefined) return;
+    void whatsappController.selectConversation(conversation.id);
+    setPendingWhatsAppOpenIntent(null);
+  }, [area, pendingWhatsAppOpenIntent, whatsappController, whatsappState.snapshot]);
+
+  function ordersPrefillFromWhatsApp(context: WhatsAppCustomerOrderContext): OrdersCustomerPrefill {
+    return {
+      normalizedPhone: context.customer.normalizedPhone,
+      displayPhone: context.customer.displayPhone,
+      customerName: context.customer.customerName,
+      address: context.customer.address,
+      zoneId: context.customer.zoneId,
+    };
+  }
+
   if (!accentHydrated) {
     return (
       <main
@@ -632,12 +673,44 @@ function ActiveShell({
         <OrdersWorkspace
           session={session}
           client={ordersClient}
+          prefillIntent={pendingOrdersPrefillIntent}
+          onPrefillIntentHandled={() => setPendingOrdersPrefillIntent(null)}
           onMenuLayoutExitControllerChange={setMenuLayoutExitController}
         />
       ) : area === 'ORDERS_BOARD' ? (
-        <OrdersBoardWorkspace client={ordersBoardClient} ordersClient={ordersClient} />
+        <OrdersBoardWorkspace
+          client={ordersBoardClient}
+          ordersClient={ordersClient}
+          focusOrderId={pendingOrdersBoardFocusId}
+          onFocusOrderHandled={() => setPendingOrdersBoardFocusId(null)}
+          onWhatsAppCustomer={({ normalizedPhone, displayPhone }) =>
+            requestProtectedTransition(() => {
+              setPendingWhatsAppOpenIntent({ source: 'ORDER', normalizedPhone, displayPhone });
+              setArea('WHATSAPP');
+            })
+          }
+        />
       ) : area === 'WHATSAPP' ? (
-        <WhatsAppWorkspace controller={whatsappController} state={whatsappState} />
+        <WhatsAppWorkspace
+          controller={whatsappController}
+          state={whatsappState}
+          onCreateOrderFromChat={(context) =>
+            requestProtectedTransition(() => {
+              setPendingOrdersPrefillIntent({
+                source: 'WHATSAPP_CHAT',
+                requestId: crypto.randomUUID(),
+                prefill: ordersPrefillFromWhatsApp(context),
+              });
+              setArea('ORDERS');
+            })
+          }
+          onViewOrder={(orderId) =>
+            requestProtectedTransition(() => {
+              setPendingOrdersBoardFocusId(orderId);
+              setArea('ORDERS_BOARD');
+            })
+          }
+        />
       ) : area === 'EXPENSES' ? (
         <ExpensesWorkspace client={expensesClient} />
       ) : (

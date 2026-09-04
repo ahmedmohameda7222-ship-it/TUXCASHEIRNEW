@@ -65,6 +65,7 @@ function DetailsDrawer({
   onCancel,
   onReturn,
   onReprint,
+  onWhatsAppCustomer,
 }: {
   readonly order: OrderSnapshot;
   readonly busy: boolean;
@@ -73,11 +74,15 @@ function DetailsDrawer({
   readonly onCancel: (order: OrderSnapshot) => void;
   readonly onReturn: (order: OrderSnapshot) => void;
   readonly onReprint: (orderId: OrderId) => Promise<void>;
+  readonly onWhatsAppCustomer:
+    | ((customer: { readonly normalizedPhone: string; readonly displayPhone: string }) => void)
+    | undefined;
 }) {
   const [receiptPreview, setReceiptPreview] = useState(false);
   const lifecycle = orderLifecycle(order);
   const cancellation = lifecycle.cancellation;
   const returned = lifecycle.returned;
+  const delivery = order.fulfillment.behavior === 'DELIVERY' ? order.fulfillment.delivery : null;
   return (
     <div className="board-drawer-backdrop" role="presentation" onMouseDown={onClose}>
       <aside
@@ -192,6 +197,20 @@ function DetailsDrawer({
               onClick={() => void onReprint(order.id)}
             >
               Reprint
+            </button>
+          ) : null}
+          {delivery !== null && onWhatsAppCustomer !== undefined ? (
+            <button
+              type="button"
+              className="board-secondary-button"
+              onClick={() =>
+                onWhatsAppCustomer({
+                  normalizedPhone: delivery.normalizedPhone,
+                  displayPhone: delivery.normalizedPhone,
+                })
+              }
+            >
+              WhatsApp Customer
             </button>
           ) : null}
           {order.status === 'ACTIVE' ? (
@@ -368,9 +387,18 @@ function ReturnDialog({
 export function OrdersBoardWorkspace({
   client,
   ordersClient,
+  focusOrderId,
+  onFocusOrderHandled,
+  onWhatsAppCustomer,
 }: {
   readonly client: OperationsOrdersBoardClient;
   readonly ordersClient: OperationsOrdersClient;
+  readonly focusOrderId?: OrderId | null;
+  readonly onFocusOrderHandled?: () => void;
+  readonly onWhatsAppCustomer?: (customer: {
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+  }) => void;
 }) {
   const [orders, setOrders] = useState<readonly OrderSnapshot[]>([]);
   const [tab, setTab] = useState<BoardTab>('ACTIVE');
@@ -403,6 +431,14 @@ export function OrdersBoardWorkspace({
   useEffect(() => {
     void refresh();
   }, [client]);
+  useEffect(() => {
+    if (focusOrderId == null) return;
+    const target = orders.find((order) => order.id === focusOrderId);
+    if (target === undefined) return;
+    setSelected(target);
+    setTab(target.status);
+    onFocusOrderHandled?.();
+  }, [focusOrderId, onFocusOrderHandled, orders]);
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(interval);
@@ -642,6 +678,7 @@ export function OrdersBoardWorkspace({
           onCancel={(order) => setCancelTarget(order)}
           onReturn={(order) => setReturnTarget(order)}
           onReprint={reprint}
+          onWhatsAppCustomer={onWhatsAppCustomer}
         />
       )}
       {cancelTarget === null ? null : (
