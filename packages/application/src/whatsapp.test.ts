@@ -49,6 +49,8 @@ function sentMessage(): WhatsAppMessage {
     kind: 'TEXT',
     text: 'تمام',
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'SENT',
     sentByWorkerId: workerId,
     initiatedByDeviceId: parseEntityId('70000000-0000-4000-8000-000000000001'),

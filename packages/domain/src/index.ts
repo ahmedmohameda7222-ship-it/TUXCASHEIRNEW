@@ -131,6 +131,8 @@ export {
   assertWhatsAppMessageInvariant,
   type WhatsAppConversation,
   type WhatsAppConversationContext,
+  type WhatsAppLocationPayload,
+  type WhatsAppMediaDescriptor,
   type WhatsAppMessage,
   type WhatsAppMessageDirection,
   type WhatsAppMessageKind,

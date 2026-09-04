@@ -1,3 +1,6 @@
+export const WHATSAPP_MEDIA_BUCKET = 'tux-whatsapp-media';
+export const WHATSAPP_MEDIA_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface WhatsAppDataServerConfig {
   readonly projectUrl: string;
   readonly serviceRoleKey: string;

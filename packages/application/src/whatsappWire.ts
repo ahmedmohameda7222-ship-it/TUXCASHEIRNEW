@@ -11,6 +11,8 @@ import {
   type WhatsAppMessageDirection,
   type WhatsAppMessageKind,
   type WhatsAppMessageStatus,
+  type WhatsAppMediaDescriptor,
+  type WhatsAppLocationPayload,
   type WhatsAppMessagingTarget,
   type WhatsAppShopMessagingConfig,
   type WhatsAppStarterTemplate,
@@ -68,8 +70,95 @@ function nullableInstant(value: unknown, label: string) {
   return instant(requiredString(value, label));
 }
 
+function strictKeys(
+  source: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+): void {
+  const allowedSet = new Set(allowed);
+  for (const key of Object.keys(source)) {
+    if (!allowedSet.has(key)) throw new TypeError(`${label} contains an unsupported field.`);
+  }
+  for (const key of allowed) {
+    if (!(key in source)) throw new TypeError(`${label} is missing ${key}.`);
+  }
+}
+
+function finiteNumberValue(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    throw new TypeError(`${label} must be finite.`);
+  return value;
+}
+
+function parseMediaDescriptor(value: unknown): WhatsAppMediaDescriptor | null {
+  if (value === null) return null;
+  const source = object(value, 'WhatsApp media descriptor');
+  strictKeys(
+    source,
+    [
+      'mediaKey',
+      'kind',
+      'mimeType',
+      'fileName',
+      'byteSize',
+      'storedAt',
+      'expiresAt',
+      'availability',
+    ],
+    'WhatsApp media descriptor',
+  );
+  return {
+    mediaKey: requiredString(source['mediaKey'], 'WhatsApp media key'),
+    kind: enumValue(source['kind'], ['IMAGE', 'DOCUMENT', 'AUDIO'] as const, 'WhatsApp media kind'),
+    mimeType: requiredString(source['mimeType'], 'WhatsApp media mimeType'),
+    fileName: nullableString(source['fileName'], 'WhatsApp media fileName'),
+    byteSize: nonNegativeInteger(source['byteSize'], 'WhatsApp media byteSize'),
+    storedAt: instant(requiredString(source['storedAt'], 'WhatsApp media storedAt')),
+    expiresAt: instant(requiredString(source['expiresAt'], 'WhatsApp media expiresAt')),
+    availability: enumValue(
+      source['availability'],
+      ['AVAILABLE', 'EXPIRED'] as const,
+      'WhatsApp media availability',
+    ),
+  };
+}
+
+function parseLocationPayload(value: unknown): WhatsAppLocationPayload | null {
+  if (value === null) return null;
+  const source = object(value, 'WhatsApp location');
+  strictKeys(source, ['latitude', 'longitude', 'name', 'address'], 'WhatsApp location');
+  return {
+    latitude: finiteNumberValue(source['latitude'], 'WhatsApp location latitude'),
+    longitude: finiteNumberValue(source['longitude'], 'WhatsApp location longitude'),
+    name: nullableString(source['name'], 'WhatsApp location name'),
+    address: nullableString(source['address'], 'WhatsApp location address'),
+  };
+}
+
 export function parseWhatsAppMessage(value: unknown): WhatsAppMessage {
   const source = object(value, 'WhatsApp message');
+  strictKeys(
+    source,
+    [
+      'id',
+      'shopId',
+      'conversationId',
+      'providerMessageId',
+      'outboundIntentKey',
+      'direction',
+      'kind',
+      'text',
+      'mediaRef',
+      'media',
+      'location',
+      'status',
+      'sentByWorkerId',
+      'initiatedByDeviceId',
+      'initiatedAt',
+      'createdAt',
+    ],
+    'WhatsApp message',
+  );
   const message: WhatsAppMessage = {
     id: requiredString(source['id'], 'WhatsApp message id'),
     shopId: parseEntityId<ShopId>(requiredString(source['shopId'], 'WhatsApp message shopId')),
@@ -94,6 +183,8 @@ export function parseWhatsAppMessage(value: unknown): WhatsAppMessage {
     ),
     text: nullableString(source['text'], 'WhatsApp message text'),
     mediaRef: nullableString(source['mediaRef'], 'WhatsApp message mediaRef'),
+    media: parseMediaDescriptor(source['media']),
+    location: parseLocationPayload(source['location']),
     status: enumValue<WhatsAppMessageStatus>(
       source['status'],
       ['PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED'],

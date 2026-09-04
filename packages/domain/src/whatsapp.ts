@@ -60,6 +60,24 @@ export interface WhatsAppConversation {
   readonly lastMessageAt: Instant | null;
 }
 
+export interface WhatsAppMediaDescriptor {
+  readonly mediaKey: string;
+  readonly kind: 'IMAGE' | 'DOCUMENT' | 'AUDIO';
+  readonly mimeType: string;
+  readonly fileName: string | null;
+  readonly byteSize: number;
+  readonly storedAt: Instant;
+  readonly expiresAt: Instant;
+  readonly availability: 'AVAILABLE' | 'EXPIRED';
+}
+
+export interface WhatsAppLocationPayload {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly name: string | null;
+  readonly address: string | null;
+}
+
 export interface WhatsAppMessage {
   readonly id: string;
   readonly shopId: ShopId;
@@ -70,6 +88,8 @@ export interface WhatsAppMessage {
   readonly kind: WhatsAppMessageKind;
   readonly text: string | null;
   readonly mediaRef: string | null;
+  readonly media: WhatsAppMediaDescriptor | null;
+  readonly location: WhatsAppLocationPayload | null;
   readonly status: WhatsAppMessageStatus;
   readonly sentByWorkerId: WorkerId | null;
   readonly initiatedByDeviceId: DeviceId | null;
@@ -91,6 +111,56 @@ export interface WhatsAppQuickReply {
 }
 
 export function assertWhatsAppMessageInvariant(message: WhatsAppMessage): void {
+  const hasText = message.text !== null && message.text.trim().length > 0;
+  if (message.kind === 'TEXT') {
+    if (
+      !hasText ||
+      message.mediaRef !== null ||
+      message.media !== null ||
+      message.location !== null
+    ) {
+      throw new DomainInvariantError('WhatsApp text messages require text-only content.');
+    }
+  } else if (message.kind === 'IMAGE' || message.kind === 'DOCUMENT' || message.kind === 'AUDIO') {
+    if (
+      message.media === null ||
+      message.mediaRef === null ||
+      message.mediaRef !== message.media.mediaKey ||
+      message.media.kind !== message.kind ||
+      message.location !== null
+    ) {
+      throw new DomainInvariantError(
+        'WhatsApp binary messages require one matching safe media descriptor.',
+      );
+    }
+    if (!Number.isSafeInteger(message.media.byteSize) || message.media.byteSize < 0) {
+      throw new DomainInvariantError('WhatsApp media byte size is invalid.');
+    }
+  } else if (message.kind === 'LOCATION') {
+    if (message.location === null || message.mediaRef !== null || message.media !== null) {
+      throw new DomainInvariantError(
+        'WhatsApp location messages require structured location only.',
+      );
+    }
+    if (
+      !Number.isFinite(message.location.latitude) ||
+      message.location.latitude < -90 ||
+      message.location.latitude > 90 ||
+      !Number.isFinite(message.location.longitude) ||
+      message.location.longitude < -180 ||
+      message.location.longitude > 180
+    ) {
+      throw new DomainInvariantError('WhatsApp location coordinates are invalid.');
+    }
+  } else if (
+    !hasText ||
+    message.mediaRef !== null ||
+    message.media !== null ||
+    message.location !== null
+  ) {
+    throw new DomainInvariantError('WhatsApp system messages require text-only content.');
+  }
+
   if (message.direction === 'INBOUND') {
     if (
       message.outboundIntentKey !== null ||
