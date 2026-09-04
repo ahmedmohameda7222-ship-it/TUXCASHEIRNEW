@@ -1,0 +1,32 @@
+name: Task 8E UI3 RED Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - '.github/workflows/task8e-ui3-red-materialize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact RED tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .recovery/ui3-red.patch.gz.b64 | gzip -d > /tmp/ui3-red.patch
+          git rm .recovery/ui3-red.patch.gz.b64 .github/workflows/task8e-ui3-red-materialize.yml
+          git apply --index /tmp/ui3-red.patch
+          tree="$(git write-tree)"
+          test "$tree" = "c32c8d46d23a68e0674d61e7b9f3590e199ea800"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'wip(task8e): red policy and internal navigation'
+          git push origin HEAD:work/operations-whatsapp-inbox-live
