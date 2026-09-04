@@ -182,9 +182,7 @@ export class OperationsWhatsAppMessagingService {
     }
   }
 
-  async getMediaAccess(
-    messageId: string,
-  ): Promise<Result<WhatsAppMediaAccess, ApplicationError>> {
+  async getMediaAccess(messageId: string): Promise<Result<WhatsAppMediaAccess, ApplicationError>> {
     try {
       return ok(await this.#remote.getMediaAccess(messageId));
     } catch (cause) {
