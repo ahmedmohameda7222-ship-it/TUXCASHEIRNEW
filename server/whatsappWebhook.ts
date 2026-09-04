@@ -21,10 +21,7 @@ import {
 
 const MEDIA_VALIDATION_PREFIX_BYTES = 1024 * 1024;
 
-type WhatsAppMediaValidationCode = Extract<
-  WhatsAppMediaValidation,
-  { readonly ok: false }
->['code'];
+type WhatsAppMediaValidationCode = Extract<WhatsAppMediaValidation, { readonly ok: false }>['code'];
 
 export interface WhatsAppWebhookInput {
   readonly method: string | undefined;
