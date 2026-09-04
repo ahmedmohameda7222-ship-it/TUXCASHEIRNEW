@@ -1,0 +1,52 @@
+name: Build exact WhatsApp source bundle
+
+on:
+  push:
+    branches:
+      - infra/whatsapp-source-bundle-20260904
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASELINE_SHA: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+      IMPLEMENTATION_BRANCH: feat/operations-whatsapp-inbox
+    steps:
+      - name: Checkout exact baseline
+        uses: actions/checkout@v7
+        with:
+          ref: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+          fetch-depth: 0
+
+      - name: Verify and materialize implementation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -C "$IMPLEMENTATION_BRANCH" "$BASELINE_SHA"
+          test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
+          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
+          test -z "$(git status --short)"
+          printf '%s\n' "$BASELINE_SHA" > .tux-executor-baseline-sha
+          printf '%s\n' "$IMPLEMENTATION_BRANCH" > .tux-executor-branch
+
+      - name: Archive exact local checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ..
+          tar -czf TUXCASHEIRNEW-whatsapp-source-bundle.tar.gz TUXCASHEIRNEW
+          sha256sum TUXCASHEIRNEW-whatsapp-source-bundle.tar.gz > TUXCASHEIRNEW-whatsapp-source-bundle.sha256
+
+      - name: Upload exact source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: TUXCASHEIRNEW-whatsapp-source-bundle
+          path: |
+            ../TUXCASHEIRNEW-whatsapp-source-bundle.tar.gz
+            ../TUXCASHEIRNEW-whatsapp-source-bundle.sha256
+          if-no-files-found: error
+          retention-days: 7
