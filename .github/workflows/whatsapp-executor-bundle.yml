@@ -35,23 +35,23 @@ jobs:
           test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
           test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
           test -z "$(git status --short)"
-          printf '%s\n' "$BASELINE_SHA" > .tux-executor-baseline-sha
-          printf '%s\n' "$IMPLEMENTATION_BRANCH" > .tux-executor-branch
 
-      - name: Build exact checkout archive
+      - name: Build exact clean checkout archive
         shell: bash
         run: |
           set -euo pipefail
           cd ..
-          tar -czf TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz TUXCASHEIRNEW
-          sha256sum TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz > TUXCASHEIRNEW-whatsapp-executor-bundle.sha256
+          tar -czf "$RUNNER_TEMP/TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz" TUXCASHEIRNEW
+          sha256sum "$RUNNER_TEMP/TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz" > "$RUNNER_TEMP/TUXCASHEIRNEW-whatsapp-executor-bundle.sha256"
+          cd TUXCASHEIRNEW
+          mkdir -p .executor-artifacts
+          cp "$RUNNER_TEMP/TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz" .executor-artifacts/
+          cp "$RUNNER_TEMP/TUXCASHEIRNEW-whatsapp-executor-bundle.sha256" .executor-artifacts/
 
       - name: Upload executor bundle
         uses: actions/upload-artifact@v4
         with:
           name: TUXCASHEIRNEW-whatsapp-executor-bundle
-          path: |
-            ../TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz
-            ../TUXCASHEIRNEW-whatsapp-executor-bundle.sha256
+          path: .executor-artifacts/*
           if-no-files-found: error
           retention-days: 7
