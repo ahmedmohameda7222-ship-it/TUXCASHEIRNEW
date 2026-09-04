@@ -1,0 +1,32 @@
+name: Task 9A Migration GREEN Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - .github/workflows/task9a-migration-green-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact Task 9A migration GREEN tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .recovery/task9a-migration-green.patch.gz.b64 | gzip -d > /tmp/task9a-migration-green.patch
+          test "$(sha256sum /tmp/task9a-migration-green.patch | awk '{print $1}')" = "e969a98de48905e8044a3f9ff6daad8ee5f70908affd985777c35c582347ba6c"
+          git rm .recovery/task9a-migration-green.patch.gz.b64 .github/workflows/task9a-migration-green-materialize.yml
+          git apply --index /tmp/task9a-migration-green.patch
+          test "$(git write-tree)" = "16436dab4a07123a4b1d9b839cdc0af1c5e07f5b"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'wip(task9a): add private media migration'
+          git push origin HEAD:work/operations-whatsapp-inbox-live
