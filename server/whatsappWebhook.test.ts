@@ -101,7 +101,8 @@ function dependencies(options?: { readonly knownChannel?: boolean }) {
     materializeInbound: vi.fn(async () => {
       events.push('materialize');
     }),
-    materializeInboundMedia: vi.fn(async () => {
+    materializeInboundMedia: vi.fn(async (input: Record<string, unknown>) => {
+      void input;
       events.push('materialize-media');
     }),
   };
