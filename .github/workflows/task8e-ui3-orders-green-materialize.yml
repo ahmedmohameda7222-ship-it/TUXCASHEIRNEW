@@ -30,3 +30,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'wip(task8e): wire orders conflicts and internal navigation'
           git push origin HEAD:work/operations-whatsapp-inbox-live
+# retrigger after exact payload materialization
