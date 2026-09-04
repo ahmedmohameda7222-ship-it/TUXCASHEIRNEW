@@ -46,12 +46,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Capture Task 9B formatter diff
-        shell: bash
-        run: |
-          npx prettier --write server/whatsappWebhook.ts
-          git diff -- server/whatsappWebhook.ts
-          exit 1
+      - name: Format check
+        run: npm run format:check
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
