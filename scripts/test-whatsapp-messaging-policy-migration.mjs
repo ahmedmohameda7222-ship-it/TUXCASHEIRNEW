@@ -2,9 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const migrationPath = resolve(
-  'supabase/migrations/20260904010000_whatsapp_messaging_policy.sql',
-);
+const migrationPath = resolve('supabase/migrations/20260904010000_whatsapp_messaging_policy.sql');
 
 assert.equal(
   existsSync(migrationPath),
