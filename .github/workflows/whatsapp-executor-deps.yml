@@ -1,0 +1,33 @@
+name: WhatsApp Executor Dependencies
+
+on:
+  push:
+    branches:
+      - feat/ops-whatsapp-executor-deps
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Pack node_modules
+        shell: bash
+        run: tar -czf node_modules-linux-node24.tar.gz node_modules
+      - name: Upload dependencies
+        uses: actions/upload-artifact@v4
+        with:
+          name: tux-whatsapp-node-modules-linux-node24
+          path: node_modules-linux-node24.tar.gz
+          retention-days: 1
