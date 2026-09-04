@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: whatsapp-executor-bundle-20260904
+  cancel-in-progress: true
+
 jobs:
   bundle:
     name: bundle
