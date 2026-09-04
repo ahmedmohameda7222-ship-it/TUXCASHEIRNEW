@@ -1,0 +1,32 @@
+name: Task 8E UI1 RED Materializer
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - '.tux-live/task8e-ui1-red.patch'
+      - '.github/workflows/task8e-ui1-red-materialize.yml'
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact Task 8E UI1 RED tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .tux-live/task8e-ui1-red.patch /tmp/task8e-ui1-red.patch
+          test "$(sha256sum /tmp/task8e-ui1-red.patch | cut -d' ' -f1)" = "a0dc0943598235e6bf6bc3c9dda4606444aa6e3c9730c5d02d7f68bec3f94372"
+          git rm .tux-live/task8e-ui1-red.patch
+          git rm .github/workflows/task8e-ui1-red-materialize.yml
+          git apply --index /tmp/task8e-ui1-red.patch
+          test "$(git write-tree)" = "9830fba54da84e77bf23447de759a205d09e4792"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "wip(task8e): red premium split hierarchy"
+          test "$(git rev-parse HEAD^{tree})" = "9830fba54da84e77bf23447de759a205d09e4792"
+          git push origin HEAD:refs/heads/work/operations-whatsapp-inbox-live

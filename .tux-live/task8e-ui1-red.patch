@@ -1,0 +1,30 @@
+diff --git a/apps/operations/src/app/WhatsAppWorkspace.test.tsx b/apps/operations/src/app/WhatsAppWorkspace.test.tsx
+index 1bfed0a..ed7025f 100644
+--- a/apps/operations/src/app/WhatsAppWorkspace.test.tsx
++++ b/apps/operations/src/app/WhatsAppWorkspace.test.tsx
+@@ -158,6 +158,25 @@ function render(uiState: WhatsAppInboxUiState, controller = createController()):
+ }
+ 
+ describe('WhatsAppWorkspace', () => {
++  it('locks the approved premium two-pane hierarchy without a permanent inspector', () => {
++    const markup = render(state());
++
++    expect((markup.match(/data-whatsapp-pane=\"rail\"/g) ?? [])).toHaveLength(1);
++    expect((markup.match(/data-whatsapp-pane=\"detail\"/g) ?? [])).toHaveLength(1);
++    expect(markup).not.toContain('data-whatsapp-pane=\"inspector\"');
++    expect(markup).toContain('data-whatsapp-region=\"conversation-list\"');
++    expect(markup).toContain('data-whatsapp-region=\"conversation-header\"');
++    expect(markup).toContain('data-whatsapp-region=\"message-history\"');
++    expect(markup).toContain('data-whatsapp-region=\"composer\"');
++
++    const headerIndex = markup.indexOf('data-whatsapp-region=\"conversation-header\"');
++    const historyIndex = markup.indexOf('data-whatsapp-region=\"message-history\"');
++    const composerIndex = markup.indexOf('data-whatsapp-region=\"composer\"');
++    expect(headerIndex).toBeGreaterThan(-1);
++    expect(historyIndex).toBeGreaterThan(headerIndex);
++    expect(composerIndex).toBeGreaterThan(historyIndex);
++  });
++
+   it('renders a desktop-first two-pane rail and active conversation panel with required row metadata', () => {
+     const markup = render(state());
+ 
