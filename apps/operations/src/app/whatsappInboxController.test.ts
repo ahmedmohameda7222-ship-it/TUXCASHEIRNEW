@@ -245,6 +245,7 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     markUnread,
     archive,
     setFollowUp,
+    linkOrder,
     saveDraft,
     getDraft,
     resolveCustomerOrderContext,
@@ -930,4 +931,111 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
     expect(windowRemove).toHaveBeenCalledWith('online', callback);
     expect(windowRemove).toHaveBeenCalledWith('offline', callback);
   });
+
+  it('loads selected customer/order context with generation fencing and never lets stale context replace the current conversation', async () => {
+    const env = new TestEnvironment();
+    const first = conversation('A');
+    const second = conversation('BB');
+    const firstContext = deferred<ReturnType<typeof ok>>();
+    const secondContext = deferred<ReturnType<typeof ok>>();
+    const client = createClient(snapshot([first, second]));
+    client.resolveCustomerOrderContext.mockImplementation((conversationId: string) =>
+      conversationId === first.id ? firstContext.promise : secondContext.promise,
+    );
+    const controller = new WhatsAppInboxController(client.api, env);
+
+    controller.start();
+    await settle();
+    const firstSelection = controller.selectConversation(first.id);
+    await settle();
+    const secondSelection = controller.selectConversation(second.id);
+    await settle();
+
+    secondContext.resolve(
+      ok({
+        kind: 'NO_ACTIVE_ORDER',
+        customer: {
+          normalizedPhone: second.normalizedPhone,
+          displayPhone: second.displayPhone,
+          customerName: second.customerName ?? second.displayPhone,
+          address: null,
+          zoneId: null,
+        },
+        activeOrders: [],
+      }),
+    );
+    await secondSelection;
+    expect(controller.getState().customerOrderContext?.customer.normalizedPhone).toBe(
+      second.normalizedPhone,
+    );
+
+    firstContext.resolve(
+      ok({
+        kind: 'NO_ACTIVE_ORDER',
+        customer: {
+          normalizedPhone: first.normalizedPhone,
+          displayPhone: first.displayPhone,
+          customerName: first.customerName ?? first.displayPhone,
+          address: null,
+          zoneId: null,
+        },
+        activeOrders: [],
+      }),
+    );
+    await firstSelection;
+
+    expect(controller.getState().selectedConversationId).toBe(second.id);
+    expect(controller.getState().customerOrderContext?.customer.normalizedPhone).toBe(
+      second.normalizedPhone,
+    );
+  });
+
+  it('links and unlinks only the explicitly selected order then refreshes the selected context', async () => {
+    const env = new TestEnvironment();
+    const selected = conversation('Mona');
+    const orderId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const client = createClient(snapshot([selected]));
+    client.resolveCustomerOrderContext.mockResolvedValue(
+      ok({
+        kind: 'ONE_ACTIVE_ORDER',
+        customer: {
+          normalizedPhone: selected.normalizedPhone,
+          displayPhone: selected.displayPhone,
+          customerName: selected.customerName ?? selected.displayPhone,
+          address: null,
+          zoneId: null,
+        },
+        activeOrders: [
+          {
+            id: orderId,
+            displayOrderNo: 184,
+            status: 'ACTIVE',
+            orderTypeLabel: 'Delivery',
+            createdAt: '2026-09-04T10:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    const controller = new WhatsAppInboxController(client.api, env);
+
+    controller.start();
+    await settle();
+    await controller.selectConversation(selected.id);
+
+    await controller.linkSelectedOrder(orderId, true);
+    await controller.linkSelectedOrder(orderId, false);
+
+    expect(client.linkOrder).toHaveBeenNthCalledWith(1, {
+      conversationId: selected.id,
+      orderId,
+      linked: true,
+    });
+    expect(client.linkOrder).toHaveBeenNthCalledWith(2, {
+      conversationId: selected.id,
+      orderId,
+      linked: false,
+    });
+    expect(client.resolveCustomerOrderContext).toHaveBeenCalledWith(selected.id);
+  });
+
 });
