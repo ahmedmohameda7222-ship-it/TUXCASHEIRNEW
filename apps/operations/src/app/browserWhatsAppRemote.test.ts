@@ -37,6 +37,8 @@ function sentMessage() {
     kind: 'TEXT',
     text: 'أوردر حضرتك جاهز.',
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'SENT',
     sentByWorkerId: workerId,
     initiatedByDeviceId: '70000000-0000-4000-8000-000000000001',

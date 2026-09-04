@@ -50,6 +50,8 @@ function outboundMessage() {
     kind: 'TEXT',
     text: 'hello',
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'SENT',
     sentByWorkerId: workerId,
     initiatedByDeviceId: deviceId,

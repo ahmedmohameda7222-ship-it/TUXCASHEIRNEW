@@ -280,10 +280,10 @@ describe('SupabaseWhatsAppOperationsRepository', () => {
       after: '2026-09-02T19:59:59.000Z',
     });
 
-    expect(lastRequest(fetchMock).url).toContain('/rpc/get_tux_whatsapp_inbox_v1');
+    expect(lastRequest(fetchMock).url).toContain('/rpc/get_tux_whatsapp_inbox_v2');
     expect(lastRpcBody(fetchMock)).toEqual({
       p_shop_id: shopId,
-      p_after: '2026-09-02T19:59:59.000Z',
+      p_cursor: '2026-09-02T19:59:59.000Z',
     });
     expect(snapshot.nextCursor).toBe('2026-09-02T20:00:05.000Z');
     expect(snapshot.conversations[0]).toMatchObject({ linkedOrderId: orderId });

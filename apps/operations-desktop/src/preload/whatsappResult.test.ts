@@ -26,6 +26,8 @@ function message() {
     kind: 'TEXT',
     text: 'hello',
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'SENT',
     sentByWorkerId: WORKER_ID,
     initiatedByDeviceId: DEVICE_ID,

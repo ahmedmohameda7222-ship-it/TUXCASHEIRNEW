@@ -108,6 +108,8 @@ function message(
     kind: 'TEXT',
     text: 'أوردر حضرتك جاهز.',
     mediaRef: null,
+    media: null,
+    location: null,
     status,
     sentByWorkerId: workerId,
     initiatedByDeviceId: deviceId,
