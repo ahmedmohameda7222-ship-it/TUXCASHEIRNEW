@@ -212,6 +212,25 @@ describe('OperationsWhatsAppService', () => {
     expect(remote.sendText).toHaveBeenCalledTimes(1);
   });
 
+  it('surfaces a closed free-form window as a dedicated application error for one-shot target refresh', async () => {
+    remote.sendText = vi
+      .fn()
+      .mockRejectedValue(new WhatsAppRemoteError('FREE_FORM_WINDOW_CLOSED', 'window closed'));
+    const service = new OperationsWhatsAppService(remote, store, session, () => now);
+
+    const result = await service.sendText({
+      conversationId,
+      text: 'تمام',
+      outboundIntentKey: 'intent-1',
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'WHATSAPP_FREE_FORM_WINDOW_CLOSED' },
+    });
+    expect(remote.sendText).toHaveBeenCalledTimes(1);
+  });
+
   it('maps DELIVERY_UNCERTAIN to REMOTE_SYNC_ERROR and never resends or changes the intent key', async () => {
     vi.mocked(remote.sendText).mockRejectedValue(
       remoteError('DELIVERY_UNCERTAIN', '60000000-0000-4000-8000-000000000001'),

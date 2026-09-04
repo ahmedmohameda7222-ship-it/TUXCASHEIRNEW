@@ -3,6 +3,7 @@ import { WhatsAppRemoteError } from './whatsappRemote';
 import {
   parseWhatsAppInboxSnapshot,
   parseWhatsAppMessage,
+  parseWhatsAppMessagingTarget,
   throwWhatsAppHttpError,
 } from './whatsappWire';
 
@@ -101,6 +102,95 @@ describe('WhatsApp wire codec', () => {
       messageId: inboundMessage.id,
     });
     expect(error.message).not.toContain('hidden');
+  });
+
+  it('parses only the safe server-authoritative messaging target shape', () => {
+    const config = {
+      storefrontUrl: 'https://menu.tux.example',
+      storeLocation: {
+        latitude: 30.0444,
+        longitude: 31.2357,
+        label: 'TUX',
+        address: 'Cairo',
+      },
+    };
+    expect(
+      parseWhatsAppMessagingTarget({
+        mode: 'FREE_FORM',
+        conversationId: '40000000-0000-4000-8000-000000000001',
+        freeFormUntil: '2026-09-05T12:00:00.000Z',
+        config,
+      }),
+    ).toMatchObject({ mode: 'FREE_FORM', config });
+    expect(
+      parseWhatsAppMessagingTarget({
+        mode: 'TEMPLATE_ONLY',
+        conversationId: null,
+        normalizedPhone: '+201001234567',
+        displayPhone: '01001234567',
+        templates: [
+          {
+            id: '70000000-0000-4000-8000-000000000001',
+            label: 'Start chat',
+            languageCode: 'ar',
+            previewText: 'أهلاً بحضرتك',
+          },
+        ],
+        config,
+      }),
+    ).toMatchObject({ mode: 'TEMPLATE_ONLY', templates: [{ label: 'Start chat' }] });
+    expect(
+      parseWhatsAppMessagingTarget({
+        mode: 'BLOCKED',
+        conversationId: null,
+        reason: 'NO_APPROVED_TEMPLATE',
+        config,
+      }),
+    ).toMatchObject({ mode: 'BLOCKED', reason: 'NO_APPROVED_TEMPLATE' });
+  });
+
+  it('rejects provider, secret, signed-url, and unknown target fields instead of forwarding them', () => {
+    const base = {
+      mode: 'TEMPLATE_ONLY',
+      conversationId: null,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templates: [
+        {
+          id: '70000000-0000-4000-8000-000000000001',
+          label: 'Start chat',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    };
+    expect(() =>
+      parseWhatsAppMessagingTarget({ ...base, providerPhoneNumberId: 'secret' }),
+    ).toThrow();
+    expect(() =>
+      parseWhatsAppMessagingTarget({
+        ...base,
+        templates: [{ ...base.templates[0], providerTemplateName: 'secret_name' }],
+      }),
+    ).toThrow();
+    expect(() =>
+      parseWhatsAppMessagingTarget({
+        ...base,
+        config: { ...base.config, signedUrl: 'https://storage.example/token' },
+      }),
+    ).toThrow();
+  });
+
+  it('maps the server free-form-window race to a dedicated safe remote error', () => {
+    expect(
+      capture(() =>
+        throwWhatsAppHttpError(409, {
+          error: 'whatsapp_free_form_window_closed',
+          providerDiagnostic: 'hidden',
+        }),
+      ),
+    ).toMatchObject({ code: 'FREE_FORM_WINDOW_CLOSED', messageId: null });
   });
 
   it('maps every other HTTP failure, including malformed error payloads, to REMOTE_UNAVAILABLE', () => {

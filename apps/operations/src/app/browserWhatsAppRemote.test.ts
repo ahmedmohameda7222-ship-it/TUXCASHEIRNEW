@@ -122,6 +122,69 @@ describe('VercelBrowserWhatsAppRemote', () => {
     );
   });
 
+  it('resolves the server messaging target without client authority fields', async () => {
+    const target = {
+      mode: 'TEMPLATE_ONLY',
+      conversationId: null,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templates: [
+        {
+          id: '70000000-0000-4000-8000-000000000001',
+          label: 'Start chat',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(json(200, { target }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new VercelBrowserWhatsAppRemote().resolveMessagingTarget({
+        normalizedPhone: '+201001234567',
+        displayPhone: '01001234567',
+      }),
+    ).resolves.toEqual(target);
+
+    const [, init] = lastFetch(fetchMock);
+    expect(JSON.parse(String(init.body))).toEqual({
+      action: 'RESOLVE_TARGET',
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+    });
+    expect(String(init.body)).not.toMatch(/shopId|deviceId|workerId|provider|token|signedUrl/i);
+  });
+
+  it('sends only the TUX template id plus call-time claims', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(200, { message: sentMessage() }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new VercelBrowserWhatsAppRemote().sendTemplate({
+      businessDayId,
+      workerId,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templateId: '70000000-0000-4000-8000-000000000001',
+      outboundIntentKey: 'intent-template',
+    });
+
+    const [, init] = lastFetch(fetchMock);
+    expect(JSON.parse(String(init.body))).toEqual({
+      action: 'SEND_TEMPLATE',
+      businessDayId,
+      workerId,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templateId: '70000000-0000-4000-8000-000000000001',
+      outboundIntentKey: 'intent-template',
+    });
+    expect(String(init.body)).not.toMatch(
+      /shopId|deviceId|providerTemplateName|languageCode|providerPhoneNumberId|token/i,
+    );
+  });
+
   it('rejects a successful SEND_MESSAGE payload that violates the WhatsApp message invariant', async () => {
     const invalidMessage = {
       ...sentMessage(),

@@ -172,6 +172,78 @@ describe('DesktopWhatsAppRemote', () => {
     }
   });
 
+  it('resolves messaging target and sends templates without client tenant/provider authority', async () => {
+    const target = {
+      mode: 'TEMPLATE_ONLY',
+      conversationId: null,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templates: [
+        {
+          id: '77777777-7777-4777-8777-777777777777',
+          label: 'Start chat',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ target }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: outboundMessage() }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    const remote = new DesktopWhatsAppRemote({
+      apiOrigin: 'https://ops.example',
+      sessionManager: sessionManager() as never,
+      fetcher,
+    });
+
+    await expect(
+      remote.resolveMessagingTarget({
+        normalizedPhone: '+201001234567',
+        displayPhone: '01001234567',
+      }),
+    ).resolves.toEqual(target);
+    await remote.sendTemplate({
+      businessDayId,
+      workerId,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templateId: '77777777-7777-4777-8777-777777777777',
+      outboundIntentKey: 'intent-template',
+    });
+
+    const resolveBody = JSON.parse(String((fetcher.mock.calls[0]?.[1] as RequestInit).body));
+    const templateBody = JSON.parse(String((fetcher.mock.calls[1]?.[1] as RequestInit).body));
+    expect(resolveBody).toEqual({
+      action: 'RESOLVE_TARGET',
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+    });
+    expect(templateBody).toEqual({
+      action: 'SEND_TEMPLATE',
+      businessDayId,
+      workerId,
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      templateId: '77777777-7777-4777-8777-777777777777',
+      outboundIntentKey: 'intent-template',
+    });
+    expect(JSON.stringify([resolveBody, templateBody])).not.toMatch(
+      /shopId|deviceId|providerTemplateName|languageCode|providerPhoneNumberId|refreshToken|service_role/i,
+    );
+  });
+
   it('resolves the device session separately for every request', async () => {
     const manager = sessionManager();
     const fetcher = vi.fn().mockImplementation(async () => inboxResponse());
