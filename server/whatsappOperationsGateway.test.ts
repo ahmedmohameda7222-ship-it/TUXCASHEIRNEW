@@ -11,7 +11,11 @@ import {
 } from '@tux/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
-import type { WhatsAppOperationsRepository } from './whatsappOperationsRepository';
+import type {
+  WhatsAppContactTarget,
+  WhatsAppMessagingPolicyRecord,
+  WhatsAppOperationsRepository,
+} from './whatsappOperationsRepository';
 import { WhatsAppOperationsRepositoryError } from './whatsappOperationsRepository';
 import {
   handleWhatsAppOperations,
@@ -143,12 +147,12 @@ function createDependencies() {
     failOutboundIntent: vi.fn(async () => undefined),
     setConversationState: vi.fn(async () => undefined),
     linkOrderAuthorized: vi.fn(async () => undefined),
-    resolveContactTarget: vi.fn(async () => ({
+    resolveContactTarget: vi.fn(async (): Promise<WhatsAppContactTarget | null> => ({
       conversationId,
       normalizedPhone: '01012345678',
       displayPhone: '+201012345678',
     })),
-    resolveMessagingPolicy: vi.fn(async () => ({
+    resolveMessagingPolicy: vi.fn(async (): Promise<WhatsAppMessagingPolicyRecord> => ({
       conversationId,
       normalizedPhone: '01012345678',
       displayPhone: '+201012345678',
