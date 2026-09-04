@@ -161,17 +161,17 @@ describe('WhatsAppWorkspace', () => {
   it('locks the approved premium two-pane hierarchy without a permanent inspector', () => {
     const markup = render(state());
 
-    expect((markup.match(/data-whatsapp-pane=\"rail\"/g) ?? [])).toHaveLength(1);
-    expect((markup.match(/data-whatsapp-pane=\"detail\"/g) ?? [])).toHaveLength(1);
-    expect(markup).not.toContain('data-whatsapp-pane=\"inspector\"');
-    expect(markup).toContain('data-whatsapp-region=\"conversation-list\"');
-    expect(markup).toContain('data-whatsapp-region=\"conversation-header\"');
-    expect(markup).toContain('data-whatsapp-region=\"message-history\"');
-    expect(markup).toContain('data-whatsapp-region=\"composer\"');
+    expect(markup.match(/data-whatsapp-pane="rail"/g) ?? []).toHaveLength(1);
+    expect(markup.match(/data-whatsapp-pane="detail"/g) ?? []).toHaveLength(1);
+    expect(markup).not.toContain('data-whatsapp-pane="inspector"');
+    expect(markup).toContain('data-whatsapp-region="conversation-list"');
+    expect(markup).toContain('data-whatsapp-region="conversation-header"');
+    expect(markup).toContain('data-whatsapp-region="message-history"');
+    expect(markup).toContain('data-whatsapp-region="composer"');
 
-    const headerIndex = markup.indexOf('data-whatsapp-region=\"conversation-header\"');
-    const historyIndex = markup.indexOf('data-whatsapp-region=\"message-history\"');
-    const composerIndex = markup.indexOf('data-whatsapp-region=\"composer\"');
+    const headerIndex = markup.indexOf('data-whatsapp-region="conversation-header"');
+    const historyIndex = markup.indexOf('data-whatsapp-region="message-history"');
+    const composerIndex = markup.indexOf('data-whatsapp-region="composer"');
     expect(headerIndex).toBeGreaterThan(-1);
     expect(historyIndex).toBeGreaterThan(headerIndex);
     expect(composerIndex).toBeGreaterThan(historyIndex);

@@ -70,10 +70,11 @@ function ConversationRow({
       }
       data-conversation-id={conversation.id}
       aria-pressed={selected}
+      aria-current={selected ? 'true' : undefined}
       onClick={onSelect}
     >
       <span className="whatsapp-conversation-row-heading">
-        <strong>{whatsAppConversationDisplayName(conversation)}</strong>
+        <strong dir="auto">{whatsAppConversationDisplayName(conversation)}</strong>
         {time === null ? null : <time dateTime={String(conversation.lastMessageAt)}>{time}</time>}
       </span>
       <span className="whatsapp-conversation-context">
@@ -144,7 +145,10 @@ function ConversationPanel({
 }) {
   if (conversation === null) {
     return (
-      <section className="whatsapp-conversation-panel whatsapp-conversation-panel-empty">
+      <section
+        className="whatsapp-conversation-panel whatsapp-conversation-panel-empty"
+        data-whatsapp-pane="detail"
+      >
         <div>
           <h2>No conversation selected</h2>
           <p>Choose a conversation from the inbox rail.</p>
@@ -156,12 +160,16 @@ function ConversationPanel({
   const quickReplies = sortActiveQuickReplies(state.snapshot?.quickReplies ?? []);
 
   return (
-    <section className="whatsapp-conversation-panel" aria-label="Active WhatsApp conversation">
-      <header className="whatsapp-conversation-header">
+    <section
+      className="whatsapp-conversation-panel"
+      aria-label="Active WhatsApp conversation"
+      data-whatsapp-pane="detail"
+    >
+      <header className="whatsapp-conversation-header" data-whatsapp-region="conversation-header">
         <div className="whatsapp-conversation-identity">
           <div>
             <p className="eyebrow">{whatsAppConversationLabel(conversation)}</p>
-            <h2>{whatsAppConversationDisplayName(conversation)}</h2>
+            <h2 dir="auto">{whatsAppConversationDisplayName(conversation)}</h2>
           </div>
           <p>{conversation.displayPhone}</p>
           {conversation.linkedOrderId === null ? null : (
@@ -196,7 +204,11 @@ function ConversationPanel({
         </div>
       </header>
 
-      <div className="whatsapp-message-history" aria-label="Message history">
+      <div
+        className="whatsapp-message-history"
+        aria-label="Message history"
+        data-whatsapp-region="message-history"
+      >
         {state.selectedMessages.length === 0 ? (
           <p className="whatsapp-empty-copy">No loaded messages in this conversation.</p>
         ) : (
@@ -204,7 +216,7 @@ function ConversationPanel({
         )}
       </div>
 
-      <div className="whatsapp-composer-zone">
+      <div className="whatsapp-composer-zone" data-whatsapp-region="composer">
         <div className="whatsapp-quick-replies" aria-label="Quick replies">
           {quickReplies.length === 0 ? (
             <span className="whatsapp-empty-copy">No saved quick replies.</span>
@@ -264,7 +276,7 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
 
   return (
     <section className="whatsapp-workspace" aria-label="WhatsApp inbox">
-      <aside className="whatsapp-conversation-rail">
+      <aside className="whatsapp-conversation-rail" data-whatsapp-pane="rail">
         <header className="whatsapp-rail-heading">
           <div>
             <p className="eyebrow">Worker inbox</p>
@@ -316,7 +328,11 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
           ))}
         </div>
 
-        <div className="whatsapp-conversation-list" aria-label="Conversations">
+        <div
+          className="whatsapp-conversation-list"
+          aria-label="Conversations"
+          data-whatsapp-region="conversation-list"
+        >
           {state.visibleConversations.length === 0 ? (
             <p className="whatsapp-empty-copy">No conversations match this view.</p>
           ) : (
