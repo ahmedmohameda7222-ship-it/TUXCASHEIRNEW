@@ -16,12 +16,10 @@ jobs:
   bundle:
     name: bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       BASELINE_SHA: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
       IMPLEMENTATION_BRANCH: feat/operations-whatsapp-inbox
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - name: Checkout exact baseline history
         uses: actions/checkout@v7
@@ -29,7 +27,7 @@ jobs:
           ref: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
           fetch-depth: 0
 
-      - name: Materialize exact implementation branch locally
+      - name: Materialize and verify exact implementation branch
         shell: bash
         run: |
           set -euo pipefail
@@ -37,37 +35,18 @@ jobs:
           test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
           test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
           test -z "$(git status --short)"
-
-      - name: Install locked Node dependencies for offline execution
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify source tree stayed clean
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
-          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
-          test -z "$(git status --short)"
-          node --version
-          npm --version
-
-      - name: Build offline checkout archive
-        shell: bash
-        run: |
-          set -euo pipefail
           printf '%s\n' "$BASELINE_SHA" > .tux-executor-baseline-sha
           printf '%s\n' "$IMPLEMENTATION_BRANCH" > .tux-executor-branch
+
+      - name: Build exact checkout archive
+        shell: bash
+        run: |
+          set -euo pipefail
           cd ..
           tar -czf TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz TUXCASHEIRNEW
           sha256sum TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz > TUXCASHEIRNEW-whatsapp-executor-bundle.sha256
 
-      - name: Upload offline executor bundle
+      - name: Upload executor bundle
         uses: actions/upload-artifact@v4
         with:
           name: TUXCASHEIRNEW-whatsapp-executor-bundle
