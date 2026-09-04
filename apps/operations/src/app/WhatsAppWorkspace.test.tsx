@@ -409,4 +409,112 @@ describe('WhatsAppWorkspace', () => {
     expect(markup).not.toContain('sendMedia');
     expect(markup.toLowerCase()).not.toContain('upload');
   });
+
+  it('renders a compact customer/order context card with human order labels and explicit create/link actions', () => {
+    const selected = conversation('مريم', {
+      linkedOrderId: LINKED_ORDER_ID as WhatsAppConversation['linkedOrderId'],
+    });
+    const inbox = snapshot([selected], []);
+    const markup = render(
+      state({
+        snapshot: inbox,
+        visibleConversations: inbox.conversations,
+        selectedConversationId: selected.id,
+        customerOrderContext: {
+          kind: 'ONE_ACTIVE_ORDER',
+          customer: {
+            normalizedPhone: selected.normalizedPhone,
+            displayPhone: selected.displayPhone,
+            customerName: 'مريم Hassan',
+            address: 'Nasr City القاهرة',
+            zoneId: null,
+          },
+          activeOrders: [
+            {
+              id: LINKED_ORDER_ID,
+              displayOrderNo: 184,
+              status: 'ACTIVE',
+              orderTypeLabel: 'Delivery',
+              createdAt: '2026-09-04T10:00:00.000Z',
+            },
+          ],
+        } as WhatsAppInboxUiState['customerOrderContext'],
+      }),
+    );
+
+    expect(markup).toContain('data-whatsapp-region="customer-order-context"');
+    expect(markup).toContain('Customer / Order');
+    expect(markup).toContain('Order #184');
+    expect(markup).toContain('Unlink');
+    expect(markup).toContain('Create Order from Chat');
+    expect(markup).toContain('dir="auto"');
+    expect(markup).not.toContain(LINKED_ORDER_ID);
+  });
+
+  it('renders every multiple-order candidate explicitly and never promotes one to a primary selection', () => {
+    const selected = conversation('Multiple');
+    const inbox = snapshot([selected], []);
+    const markup = render(
+      state({
+        snapshot: inbox,
+        visibleConversations: inbox.conversations,
+        selectedConversationId: selected.id,
+        customerOrderContext: {
+          kind: 'MULTIPLE_ACTIVE_ORDERS',
+          customer: {
+            normalizedPhone: selected.normalizedPhone,
+            displayPhone: selected.displayPhone,
+            customerName: 'Multiple',
+            address: null,
+            zoneId: null,
+          },
+          activeOrders: [
+            {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              displayOrderNo: 184,
+              status: 'ACTIVE',
+              orderTypeLabel: 'Delivery',
+              createdAt: '2026-09-04T10:00:00.000Z',
+            },
+            {
+              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              displayOrderNo: 191,
+              status: 'ACTIVE',
+              orderTypeLabel: 'Delivery',
+              createdAt: '2026-09-04T10:05:00.000Z',
+            },
+          ],
+        } as WhatsAppInboxUiState['customerOrderContext'],
+      }),
+    );
+
+    expect(markup).toContain('Order #184');
+    expect(markup).toContain('Order #191');
+    expect(markup).toContain('Choose an order explicitly');
+    expect(markup).not.toContain('data-whatsapp-primary-order="true"');
+  });
+
+  it('keeps Archive and Mark unread inside an accessible overflow while Follow-up remains secondary', () => {
+    const controller = createController();
+    const tree = WhatsAppWorkspace({ controller, state: state() });
+    const markup = render(state(), controller);
+
+    expect(markup).toContain('data-whatsapp-overflow="true"');
+    expect(markup).toContain('aria-label="More conversation actions"');
+
+    const overflow = findElement(
+      tree,
+      (element) => element.props['data-whatsapp-overflow'] === true,
+    );
+    const archive = findElement(
+      overflow.props['children'] as ReactNode,
+      (element) => element.props['data-whatsapp-action'] === 'archive',
+    );
+    const markUnread = findElement(
+      overflow.props['children'] as ReactNode,
+      (element) => element.props['data-whatsapp-action'] === 'mark-unread',
+    );
+    expect(archive).toBeDefined();
+    expect(markUnread).toBeDefined();
+  });
 });
