@@ -16,6 +16,8 @@ jobs:
     env:
       BASELINE_SHA: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
       IMPLEMENTATION_BRANCH: feat/operations-whatsapp-inbox
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - name: Checkout exact baseline history
         uses: actions/checkout@v7
