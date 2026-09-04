@@ -1,9 +1,11 @@
 import type { IncomingMessage } from 'node:http';
 import type { GatewayRequest, GatewayResponse } from '../server/supabaseGateway';
 import { SupabaseWhatsAppChannelResolver } from '../server/whatsappChannelResolver';
+import { createWhatsAppProviderGateway } from '../server/whatsappProviderGateway';
 import { loadWhatsAppServerConfig } from '../server/whatsappServerConfig';
 import {
   SupabaseWhatsAppInboundMaterializer,
+  SupabaseWhatsAppInboundMediaStore,
   handleWhatsAppWebhook,
   type WhatsAppWebhookDiagnostic,
   type WhatsAppWebhookResult,
@@ -75,14 +77,17 @@ export default async function handler(
     }
   }
 
-  const channelResolver = new SupabaseWhatsAppChannelResolver({
+  const dataConfig = {
     projectUrl: config.projectUrl,
     serviceRoleKey: config.serviceRoleKey,
+  };
+  const channelResolver = new SupabaseWhatsAppChannelResolver(dataConfig);
+  const materializer = new SupabaseWhatsAppInboundMaterializer(dataConfig);
+  const providerGateway = createWhatsAppProviderGateway({
+    graphVersion: config.graphVersion,
+    accessToken: config.accessToken,
   });
-  const materializer = new SupabaseWhatsAppInboundMaterializer({
-    projectUrl: config.projectUrl,
-    serviceRoleKey: config.serviceRoleKey,
-  });
+  const mediaStore = new SupabaseWhatsAppInboundMediaStore(dataConfig);
 
   const result = await handleWhatsAppWebhook(
     {
@@ -96,6 +101,8 @@ export default async function handler(
       webhookVerifyToken: config.webhookVerifyToken,
       channelResolver,
       materializer,
+      providerGateway,
+      mediaStore,
       diagnosticSink,
     },
   );
