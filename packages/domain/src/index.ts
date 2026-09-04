@@ -135,6 +135,9 @@ export {
   type WhatsAppMessageDirection,
   type WhatsAppMessageKind,
   type WhatsAppMessageStatus,
+  type WhatsAppMessagingTarget,
+  type WhatsAppShopMessagingConfig,
+  type WhatsAppStarterTemplate,
   type WhatsAppQuickReply,
   type WhatsAppQuickReplyCategory,
 } from './whatsapp';

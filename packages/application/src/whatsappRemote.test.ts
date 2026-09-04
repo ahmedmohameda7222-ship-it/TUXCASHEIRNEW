@@ -10,7 +10,13 @@ it('defines a provider-agnostic WhatsApp remote contract', () => {
       orderLinks: [],
       nextCursor: null,
     }),
+    resolveMessagingTarget: async () => {
+      throw new Error('not called');
+    },
     sendText: async () => {
+      throw new Error('not called');
+    },
+    sendTemplate: async () => {
       throw new Error('not called');
     },
     markUnread: async () => undefined,

@@ -171,7 +171,9 @@ function unavailableWhatsAppRemote(): WhatsAppRemoteGateway {
   };
   return {
     loadInbox: unavailable,
+    resolveMessagingTarget: unavailable,
     sendText: unavailable,
+    sendTemplate: unavailable,
     markUnread: unavailable,
     archive: unavailable,
     setFollowUp: unavailable,

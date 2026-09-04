@@ -74,7 +74,9 @@ function remoteError(code: string, messageId: string | null = null): Error {
 function createRemote(): WhatsAppRemoteGateway {
   return {
     loadInbox: vi.fn().mockResolvedValue(remoteSnapshot()),
+    resolveMessagingTarget: vi.fn().mockRejectedValue(new Error('not called')),
     sendText: vi.fn().mockResolvedValue(sentMessage()),
+    sendTemplate: vi.fn().mockRejectedValue(new Error('not called')),
     markUnread: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
     setFollowUp: vi.fn().mockResolvedValue(undefined),
