@@ -2,12 +2,7 @@ import 'fake-indexeddb/auto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  instant,
-  parseEntityId,
-  type ShopId,
-  type WhatsAppMessage,
-} from '@tux/domain';
+import { instant, parseEntityId, type ShopId, type WhatsAppMessage } from '@tux/domain';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IndexedDbWhatsAppStore } from './browser/IndexedDbWhatsAppStore';
 import { SqliteWhatsAppStore } from './sqlite/SqliteWhatsAppStore';
