@@ -1,10 +1,11 @@
-import { assertWhatsAppMessageInvariant, instant } from '@tux/domain';
+import { instant } from '@tux/domain';
 import type {
   ShopId,
   WhatsAppConversation,
   WhatsAppMessage,
   WhatsAppQuickReply,
 } from '@tux/domain';
+import { sanitizeWhatsAppMessageForCache } from '../whatsappCacheSanitization';
 import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '../whatsappStore';
 import { openOperationsIndexedDb } from './openOperationsIndexedDb';
 
@@ -71,9 +72,7 @@ function parseMessage(
   ) {
     throw new Error('Cached WhatsApp message identity does not match the tenant fence.');
   }
-  const message = data as unknown as WhatsAppMessage;
-  assertWhatsAppMessageInvariant(message);
-  return message;
+  return sanitizeWhatsAppMessageForCache(data as unknown as WhatsAppMessage);
 }
 
 function parseQuickReply(value: unknown, expectedShopId: ShopId): WhatsAppQuickReply {
@@ -153,7 +152,7 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
       await completion;
     }
 
-    for (const message of snapshot.messages) assertWhatsAppMessageInvariant(message);
+    const safeMessages = snapshot.messages.map(sanitizeWhatsAppMessageForCache);
     for (const link of snapshot.orderLinks) {
       if (!conversationShops.has(link.conversationId)) {
         throw new Error(
@@ -176,7 +175,7 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
     for (const conversation of snapshot.conversations) {
       writes.push(requestResult(conversations.put(conversation)));
     }
-    for (const message of snapshot.messages) {
+    for (const message of safeMessages) {
       writes.push(requestResult(messages.put(message)));
     }
     for (const quickReply of snapshot.quickReplies) {
@@ -215,13 +214,13 @@ export class IndexedDbWhatsAppStore implements WhatsAppStore {
   }
 
   async upsertMessage(message: WhatsAppMessage): Promise<void> {
-    assertWhatsAppMessageInvariant(message);
+    const safeMessage = sanitizeWhatsAppMessageForCache(message);
     const database = this.#requireDatabase();
     const transaction = database.transaction(['whatsappMessages'], 'readwrite', {
       durability: 'strict',
     });
     const completion = transactionDone(transaction);
-    await requestResult(transaction.objectStore('whatsappMessages').put(message));
+    await requestResult(transaction.objectStore('whatsappMessages').put(safeMessage));
     await completion;
   }
 

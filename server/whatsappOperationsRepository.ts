@@ -166,6 +166,11 @@ function nullableString(value: unknown): string | null {
   return stringValue(value);
 }
 
+function optionalNullableString(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  return stringValue(value);
+}
+
 function finiteNumber(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw protocolError();
   return value;
@@ -265,6 +270,37 @@ function parseNullableInstant(value: unknown): ReturnType<typeof instant> | null
   return value === null ? null : parseInstant(value);
 }
 
+function parseMedia(value: unknown): WhatsAppMessage['media'] {
+  if (value === undefined || value === null) return null;
+  const source = record(value);
+  return {
+    mediaKey: stringValue(source['mediaKey']),
+    kind: enumValue(source['kind'], ['IMAGE', 'DOCUMENT', 'AUDIO'] as const),
+    mimeType: stringValue(source['mimeType']),
+    fileName: optionalNullableString(source['fileName']),
+    byteSize: integerValue(source['byteSize']),
+    storedAt: parseInstant(source['storedAt']),
+    expiresAt: parseInstant(source['expiresAt']),
+    availability: enumValue(source['availability'], ['AVAILABLE', 'EXPIRED'] as const),
+  };
+}
+
+function parseLocation(value: unknown): WhatsAppMessage['location'] {
+  if (value === undefined || value === null) return null;
+  const source = record(value);
+  const latitude = finiteNumber(source['latitude']);
+  const longitude = finiteNumber(source['longitude']);
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    throw protocolError();
+  }
+  return {
+    latitude,
+    longitude,
+    name: optionalNullableString(source['name']),
+    address: optionalNullableString(source['address']),
+  };
+}
+
 function parseMessage(value: unknown): {
   readonly message: WhatsAppMessage;
   readonly updatedAt: string;
@@ -287,6 +323,8 @@ function parseMessage(value: unknown): {
     ]),
     text: nullableString(source['text']),
     mediaRef: nullableString(source['media_ref']),
+    media: parseMedia(source['media']),
+    location: parseLocation(source['location']),
     status: enumValue<WhatsAppMessageStatus>(source['status'], [
       'PENDING',
       'SENT',
@@ -466,9 +504,9 @@ export class SupabaseWhatsAppOperationsRepository implements WhatsAppOperationsR
     readonly after: string | null;
   }): Promise<WhatsAppInboxSnapshot> {
     const source = record(
-      await this.#callRpc('get_tux_whatsapp_inbox_v1', {
+      await this.#callRpc('get_tux_whatsapp_inbox_v2', {
         p_shop_id: input.shopId,
-        p_after: input.after,
+        p_cursor: input.after,
       }),
     );
     if (

@@ -1,11 +1,12 @@
 import { DatabaseSync } from 'node:sqlite';
-import { assertWhatsAppMessageInvariant, instant } from '@tux/domain';
+import { instant } from '@tux/domain';
 import type {
   ShopId,
   WhatsAppConversation,
   WhatsAppMessage,
   WhatsAppQuickReply,
 } from '@tux/domain';
+import { sanitizeWhatsAppMessageForCache } from '../whatsappCacheSanitization';
 import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '../whatsappStore';
 import { applySqliteMigrations } from './migrations';
 
@@ -69,9 +70,7 @@ function parseMessage(row: MessagePayloadRow, expectedShopId: ShopId): WhatsAppM
       'Cached WhatsApp message conversation identity does not match the persisted row.',
     );
   }
-  const message = value as unknown as WhatsAppMessage;
-  assertWhatsAppMessageInvariant(message);
-  return message;
+  return sanitizeWhatsAppMessageForCache(value as unknown as WhatsAppMessage);
 }
 
 function parseQuickReply(row: FencedPayloadRow, expectedShopId: ShopId): WhatsAppQuickReply {
@@ -123,6 +122,7 @@ export class SqliteWhatsAppStore implements WhatsAppStore {
     const conversationShops = new Map(
       snapshot.conversations.map((conversation) => [conversation.id, conversation.shopId] as const),
     );
+    const safeMessages = snapshot.messages.map(sanitizeWhatsAppMessageForCache);
 
     database.exec('BEGIN IMMEDIATE');
     try {
@@ -152,7 +152,7 @@ ON CONFLICT(id) DO UPDATE SET
   created_at = excluded.created_at,
   payload_json = excluded.payload_json
 `);
-      for (const message of snapshot.messages) {
+      for (const message of safeMessages) {
         upsertMessage.run(
           message.id,
           message.shopId,
@@ -212,6 +212,7 @@ ON CONFLICT(shop_id, conversation_id, order_id) DO UPDATE SET
   }
 
   async upsertMessage(message: WhatsAppMessage): Promise<void> {
+    const safeMessage = sanitizeWhatsAppMessageForCache(message);
     const database = this.#requireDatabase();
     database
       .prepare(
@@ -226,11 +227,11 @@ ON CONFLICT(id) DO UPDATE SET
 `,
       )
       .run(
-        message.id,
-        message.shopId,
-        message.conversationId,
-        message.createdAt,
-        JSON.stringify(message),
+        safeMessage.id,
+        safeMessage.shopId,
+        safeMessage.conversationId,
+        safeMessage.createdAt,
+        JSON.stringify(safeMessage),
       );
   }
 
