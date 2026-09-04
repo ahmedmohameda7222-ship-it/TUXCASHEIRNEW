@@ -99,3 +99,25 @@ describe('Operations WhatsApp ACTIVE-shell integration', () => {
     expect(outerAppSource).toContain('<ActiveShell');
   });
 });
+
+describe('Task 8E typed internal WhatsApp/Orders navigation', () => {
+  it('defines app-owned typed intents and wires WhatsApp context actions through protected transitions', () => {
+    expect(source).toContain('interface OrdersPrefillIntent');
+    expect(source).toContain("readonly source: 'WHATSAPP_CHAT'");
+    expect(source).toContain('interface WhatsAppOpenIntent');
+    expect(source).toContain("readonly source: 'ORDER'");
+    expect(activeShellSource).toContain('pendingOrdersPrefillIntent');
+    expect(activeShellSource).toContain('pendingWhatsAppOpenIntent');
+    expect(activeShellSource).toContain('onCreateOrderFromChat');
+    expect(activeShellSource).toContain('onViewOrder');
+    expect(activeShellSource).toContain('onWhatsAppCustomer');
+    expect(activeShellSource).toContain('requestProtectedTransition');
+  });
+
+  it('never routes Task 8E messaging through external WhatsApp surfaces', () => {
+    expect(source).not.toContain('wa.me');
+    expect(source).not.toContain('web.whatsapp.com');
+    expect(source).not.toContain('WhatsApp Desktop');
+    expect(source).not.toContain('window.open(');
+  });
+});

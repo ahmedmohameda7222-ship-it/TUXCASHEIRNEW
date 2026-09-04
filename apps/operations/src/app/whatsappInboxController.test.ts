@@ -1043,3 +1043,170 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
     expect(client.resolveCustomerOrderContext).toHaveBeenCalledWith(selected.id);
   });
 });
+
+describe('WhatsAppInboxController Task 8E policy composer', () => {
+  it('inserts the canonical Send Menu reply without auto-sending', async () => {
+    const selected = conversation('menu', {
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+    });
+    const { client, controller } = await loadController(snapshot([selected]));
+    const resolveMessagingTarget = vi.fn().mockResolvedValue(
+      ok({
+        mode: 'FREE_FORM',
+        conversationId: selected.id,
+        freeFormUntil: '2026-09-05T10:00:00.000Z',
+        config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+      }),
+    );
+    (client.api as unknown as Record<string, unknown>)['resolveMessagingTarget'] =
+      resolveMessagingTarget;
+
+    await controller.selectConversation(selected.id);
+    (controller as unknown as { insertMenuReply(): void }).insertMenuReply();
+
+    expect(controller.getState().composerText).toBe('منيو TUX 👇\nhttps://tux.example/menu');
+    expect(client.sendText).not.toHaveBeenCalled();
+    expect(resolveMessagingTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['FREE_FORM', 'TEMPLATE_ONLY', 'BLOCKED'] as const)(
+    'stores the server-authoritative %s messaging target for the selected conversation',
+    async (mode) => {
+      const selected = conversation(`target-${mode}`, {
+        normalizedPhone: '+201012345678',
+        displayPhone: '010 1234 5678',
+      });
+      const { client, controller } = await loadController(snapshot([selected]));
+      const target =
+        mode === 'FREE_FORM'
+          ? {
+              mode,
+              conversationId: selected.id,
+              freeFormUntil: '2026-09-05T10:00:00.000Z',
+              config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+            }
+          : mode === 'TEMPLATE_ONLY'
+            ? {
+                mode,
+                conversationId: selected.id,
+                normalizedPhone: selected.normalizedPhone,
+                displayPhone: selected.displayPhone,
+                templates: [
+                  {
+                    id: 'starter-1',
+                    label: 'Start chat',
+                    languageCode: 'ar',
+                    previewText: 'أهلاً بحضرتك',
+                  },
+                ],
+                config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+              }
+            : {
+                mode,
+                conversationId: selected.id,
+                reason: 'NO_APPROVED_TEMPLATE',
+                config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+              };
+      (client.api as unknown as Record<string, unknown>)['resolveMessagingTarget'] = vi
+        .fn()
+        .mockResolvedValue(ok(target));
+
+      await controller.selectConversation(selected.id);
+
+      expect(
+        (controller.getState() as unknown as { messagingTarget: { mode: string } | null })
+          .messagingTarget?.mode,
+      ).toBe(mode);
+    },
+  );
+
+  it('preserves the draft and refreshes target exactly once after FREE_FORM_WINDOW_CLOSED', async () => {
+    const selected = conversation('closed', {
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+    });
+    const { client, controller } = await loadController(snapshot([selected]));
+    const resolveMessagingTarget = vi
+      .fn()
+      .mockResolvedValueOnce(
+        ok({
+          mode: 'FREE_FORM',
+          conversationId: selected.id,
+          freeFormUntil: '2026-09-04T10:00:00.000Z',
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          mode: 'TEMPLATE_ONLY',
+          conversationId: selected.id,
+          normalizedPhone: selected.normalizedPhone,
+          displayPhone: selected.displayPhone,
+          templates: [],
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        }),
+      );
+    (client.api as unknown as Record<string, unknown>)['resolveMessagingTarget'] =
+      resolveMessagingTarget;
+    client.sendText.mockResolvedValueOnce(
+      failure(
+        'The WhatsApp free-form messaging window has closed.',
+        'WHATSAPP_FREE_FORM_WINDOW_CLOSED',
+      ),
+    );
+
+    await controller.selectConversation(selected.id);
+    controller.setComposerText('keep this draft');
+    await controller.sendCurrentText();
+
+    expect(controller.getState().composerText).toBe('keep this draft');
+    expect(resolveMessagingTarget).toHaveBeenCalledTimes(2);
+    expect(
+      (controller.getState() as unknown as { messagingTarget: { mode: string } | null })
+        .messagingTarget?.mode,
+    ).toBe('TEMPLATE_ONLY');
+    expect(client.sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends only an explicitly selected server-approved template', async () => {
+    const selected = conversation('template', {
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+    });
+    const { client, controller, environment } = await loadController(snapshot([selected]));
+    (client.api as unknown as Record<string, unknown>)['resolveMessagingTarget'] = vi
+      .fn()
+      .mockResolvedValue(
+        ok({
+          mode: 'TEMPLATE_ONLY',
+          conversationId: selected.id,
+          normalizedPhone: selected.normalizedPhone,
+          displayPhone: selected.displayPhone,
+          templates: [
+            {
+              id: 'starter-1',
+              label: 'Start chat',
+              languageCode: 'ar',
+              previewText: 'أهلاً بحضرتك',
+            },
+          ],
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        }),
+      );
+    const sendTemplate = vi.fn().mockResolvedValue(ok(message('template-sent', selected.id)));
+    (client.api as unknown as Record<string, unknown>)['sendTemplate'] = sendTemplate;
+
+    await controller.selectConversation(selected.id);
+    await (controller as unknown as { sendSelectedTemplate(templateId: string): Promise<void> })
+      .sendSelectedTemplate('starter-1');
+
+    expect(sendTemplate).toHaveBeenCalledExactlyOnceWith({
+      normalizedPhone: selected.normalizedPhone,
+      displayPhone: selected.displayPhone,
+      templateId: 'starter-1',
+      outboundIntentKey: 'intent-1',
+    });
+    expect(environment.createIntentKey).toHaveBeenCalledTimes(1);
+  });
+});

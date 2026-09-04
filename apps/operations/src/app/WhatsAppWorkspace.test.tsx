@@ -532,3 +532,71 @@ describe('WhatsAppWorkspace', () => {
     expect(markUnread).toBeDefined();
   });
 });
+
+describe('WhatsAppWorkspace Task 8E policy presentation', () => {
+  it('keeps the normal sticky composer and Send Menu available in FREE_FORM mode', () => {
+    const markup = render(
+      state({
+        messagingTarget: {
+          mode: 'FREE_FORM',
+          conversationId: 'Mona',
+          freeFormUntil: '2026-09-05T10:00:00.000Z' as Instant,
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      } as Partial<WhatsAppInboxUiState>),
+    );
+
+    expect(markup).toContain('data-whatsapp-policy="FREE_FORM"');
+    expect(markup).toContain('Send Menu');
+    expect(markup).toContain('data-whatsapp-send="true"');
+    expect(markup).not.toContain('No approved WhatsApp template');
+  });
+
+  it('preserves the draft, disables free-form send, and renders approved templates in TEMPLATE_ONLY mode', () => {
+    const markup = render(
+      state({
+        composerText: 'draft must stay visible',
+        messagingTarget: {
+          mode: 'TEMPLATE_ONLY',
+          conversationId: 'Mona',
+          normalizedPhone: '+201012345678',
+          displayPhone: '010 1234 5678',
+          templates: [
+            {
+              id: 'starter-1',
+              label: 'Start chat',
+              languageCode: 'ar',
+              previewText: 'أهلاً بحضرتك',
+            },
+          ],
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      } as Partial<WhatsAppInboxUiState>),
+    );
+
+    expect(markup).toContain('data-whatsapp-policy="TEMPLATE_ONLY"');
+    expect(markup).toContain('draft must stay visible');
+    expect(markup).toContain('Start chat');
+    expect(markup).toContain('أهلاً بحضرتك');
+    expect(markup).toContain('data-template-id="starter-1"');
+    expect(markup).toContain('disabled=""');
+  });
+
+  it('keeps history visible and replaces outbound controls with an inline BLOCKED explanation', () => {
+    const markup = render(
+      state({
+        messagingTarget: {
+          mode: 'BLOCKED',
+          conversationId: 'Mona',
+          reason: 'NO_APPROVED_TEMPLATE',
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      } as Partial<WhatsAppInboxUiState>),
+    );
+
+    expect(markup).toContain('data-whatsapp-policy="BLOCKED"');
+    expect(markup).toContain('data-whatsapp-region="message-history"');
+    expect(markup).toContain('No approved WhatsApp template is available');
+    expect(markup).not.toContain('data-whatsapp-send="true"');
+  });
+});
