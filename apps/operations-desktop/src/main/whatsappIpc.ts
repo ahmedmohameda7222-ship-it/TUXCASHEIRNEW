@@ -13,6 +13,7 @@ const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
 const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
 const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
 const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
+const IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT = 'tux:whatsapp:resolve-customer-order-context';
 
 const CHANNELS = [
   IPC_WHATSAPP_LOAD_INBOX,
@@ -24,6 +25,7 @@ const CHANNELS = [
   IPC_WHATSAPP_LINK_ORDER,
   IPC_WHATSAPP_SAVE_DRAFT,
   IPC_WHATSAPP_GET_DRAFT,
+  IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT,
 ] as const;
 
 function objectPayload(value: unknown, label: string): Record<string, unknown> {
@@ -135,6 +137,14 @@ export class WhatsAppIpcRuntime {
       assertTrustedIpcSender(event, window.webContents.id);
       return this.#service.getDraft(conversationId(rawConversationId));
     });
+
+    ipcMain.handle(
+      IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT,
+      async (event, rawConversationId: unknown) => {
+        assertTrustedIpcSender(event, window.webContents.id);
+        return this.#service.resolveCustomerOrderContext(conversationId(rawConversationId));
+      },
+    );
   }
 
   close(): void {

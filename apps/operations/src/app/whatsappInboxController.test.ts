@@ -208,6 +208,21 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
   const linkOrder = vi.fn<TuxWhatsAppApi['linkOrder']>().mockResolvedValue(ok(undefined));
   const saveDraft = vi.fn<TuxWhatsAppApi['saveDraft']>().mockResolvedValue(ok(undefined));
   const getDraft = vi.fn<TuxWhatsAppApi['getDraft']>().mockResolvedValue(ok(null));
+  const resolveCustomerOrderContext = vi
+    .fn<TuxWhatsAppApi['resolveCustomerOrderContext']>()
+    .mockResolvedValue(
+      ok({
+        kind: 'NO_ACTIVE_ORDER',
+        customer: {
+          normalizedPhone: '01012345678',
+          displayPhone: '+201012345678',
+          customerName: 'Customer',
+          address: null,
+          zoneId: null,
+        },
+        activeOrders: [],
+      }),
+    );
 
   const api: TuxWhatsAppApi = {
     loadInbox,
@@ -219,6 +234,7 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     linkOrder,
     saveDraft,
     getDraft,
+    resolveCustomerOrderContext,
   };
 
   return {
@@ -231,6 +247,7 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     setFollowUp,
     saveDraft,
     getDraft,
+    resolveCustomerOrderContext,
   };
 }
 

@@ -3,7 +3,13 @@ import {
   parseWhatsAppMessage,
   type ApplicationErrorCode,
 } from '@tux/application';
-import { instant, parseEntityId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type DeliveryZoneId,
+  type OrderId,
+  type ShopId,
+} from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 
 type InboxResult = Awaited<ReturnType<TuxWhatsAppApi['loadInbox']>>;
@@ -11,6 +17,9 @@ type ConversationResult = Awaited<ReturnType<TuxWhatsAppApi['loadConversation']>
 type MessageResult = Awaited<ReturnType<TuxWhatsAppApi['sendText']>>;
 type VoidResult = Awaited<ReturnType<TuxWhatsAppApi['markUnread']>>;
 type DraftResult = Awaited<ReturnType<TuxWhatsAppApi['getDraft']>>;
+type CustomerOrderContextResult = Awaited<
+  ReturnType<TuxWhatsAppApi['resolveCustomerOrderContext']>
+>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ERROR_CODES = new Set<ApplicationErrorCode>([
@@ -100,6 +109,93 @@ function parseDraft(value: unknown) {
   }
 }
 
+function exactKeys(source: Record<string, unknown>, keys: readonly string[], label: string): void {
+  const actual = Object.keys(source).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new TypeError(`Invalid ${label} fields.`);
+  }
+}
+
+function parseCustomerOrderContext(value: unknown) {
+  const source = record(value);
+  exactKeys(source, ['kind', 'customer', 'activeOrders'], 'WhatsApp customer-order context');
+  const kind = source['kind'];
+  if (
+    kind !== 'NO_ACTIVE_ORDER' &&
+    kind !== 'ONE_ACTIVE_ORDER' &&
+    kind !== 'MULTIPLE_ACTIVE_ORDERS'
+  ) {
+    throw new TypeError('Invalid WhatsApp customer-order context kind.');
+  }
+
+  const customerSource = record(source['customer']);
+  exactKeys(
+    customerSource,
+    ['normalizedPhone', 'displayPhone', 'customerName', 'address', 'zoneId'],
+    'WhatsApp customer context',
+  );
+  if (
+    typeof customerSource['normalizedPhone'] !== 'string' ||
+    typeof customerSource['displayPhone'] !== 'string' ||
+    typeof customerSource['customerName'] !== 'string' ||
+    (customerSource['address'] !== null && typeof customerSource['address'] !== 'string') ||
+    (customerSource['zoneId'] !== null && typeof customerSource['zoneId'] !== 'string')
+  ) {
+    throw new TypeError('Invalid WhatsApp customer context values.');
+  }
+  const customer = {
+    normalizedPhone: customerSource['normalizedPhone'],
+    displayPhone: customerSource['displayPhone'],
+    customerName: customerSource['customerName'],
+    address: customerSource['address'] as string | null,
+    zoneId:
+      customerSource['zoneId'] === null
+        ? null
+        : parseEntityId<DeliveryZoneId>(customerSource['zoneId']),
+  };
+
+  if (!Array.isArray(source['activeOrders'])) {
+    throw new TypeError('WhatsApp active orders must be an array.');
+  }
+  const activeOrders = source['activeOrders'].map((value) => {
+    const orderSource = record(value);
+    exactKeys(
+      orderSource,
+      ['id', 'displayOrderNo', 'status', 'orderTypeLabel', 'createdAt'],
+      'WhatsApp active-order summary',
+    );
+    if (
+      typeof orderSource['id'] !== 'string' ||
+      typeof orderSource['displayOrderNo'] !== 'number' ||
+      !Number.isSafeInteger(orderSource['displayOrderNo']) ||
+      orderSource['displayOrderNo'] <= 0 ||
+      orderSource['status'] !== 'ACTIVE' ||
+      typeof orderSource['orderTypeLabel'] !== 'string' ||
+      typeof orderSource['createdAt'] !== 'string'
+    ) {
+      throw new TypeError('Invalid WhatsApp active-order summary values.');
+    }
+    return {
+      id: parseEntityId<OrderId>(orderSource['id']),
+      displayOrderNo: orderSource['displayOrderNo'],
+      status: 'ACTIVE' as const,
+      orderTypeLabel: orderSource['orderTypeLabel'],
+      createdAt: instant(orderSource['createdAt']),
+    };
+  });
+
+  if (
+    (kind === 'NO_ACTIVE_ORDER' && activeOrders.length !== 0) ||
+    (kind === 'ONE_ACTIVE_ORDER' && activeOrders.length !== 1) ||
+    (kind === 'MULTIPLE_ACTIVE_ORDERS' && activeOrders.length < 2)
+  ) {
+    throw new TypeError('WhatsApp customer-order context cardinality does not match its kind.');
+  }
+
+  return { kind, customer, activeOrders };
+}
+
 function assertResult<Result>(
   value: unknown,
   label: string,
@@ -140,5 +236,15 @@ export function assertWhatsAppVoidResult(value: unknown): VoidResult {
 export function assertWhatsAppDraftResult(value: unknown): DraftResult {
   return assertResult<DraftResult>(value, 'WhatsApp draft', (payload) =>
     payload === null ? null : parseDraft(payload),
+  );
+}
+
+export function assertWhatsAppCustomerOrderContextResult(
+  value: unknown,
+): CustomerOrderContextResult {
+  return assertResult<CustomerOrderContextResult>(
+    value,
+    'WhatsApp customer-order context',
+    parseCustomerOrderContext,
   );
 }

@@ -28,7 +28,7 @@ import {
   type WorkerMenuLayout,
   type WorkerUiPreferences,
 } from '@tux/domain';
-import type { WorkerUiPreferencesRepository } from '@tux/persistence';
+import type { OperationsDatabase, WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   IndexedDbBulkStockStore,
   IndexedDbExpenseLedgerStore,
@@ -71,6 +71,7 @@ export type OperationsEndDayClient = TuxEndDayApi;
 export type OperationsWhatsAppClient = TuxWhatsAppApi;
 
 interface BrowserRuntime {
+  readonly database: OperationsDatabase;
   readonly session: CoordinatedOperationsSessionService;
   readonly workerMenuLayout: TuxWorkerMenuLayoutApi;
   readonly workerUiPreferences: TuxWorkerUiPreferencesApi;
@@ -92,11 +93,15 @@ async function browserWhatsAppRuntime(): Promise<TuxWhatsAppApi> {
     browserWhatsAppPromise = (async () => {
       const store = new IndexedDbWhatsAppStore('tux-operations-v2');
       await store.initialize();
+      const database: OperationsDatabase = {
+        transaction: async (work) => (await browserRuntime()).database.transaction(work),
+      };
       return new OperationsWhatsAppService(
         new VercelBrowserWhatsAppRemote(),
         store,
         { getState: async () => (await browserRuntime()).getState() },
         () => instant(new Date()),
+        database,
       );
     })();
   }
@@ -456,6 +461,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
       }
 
       return {
+        database,
         session,
         workerMenuLayout,
         workerUiPreferences,
@@ -517,6 +523,8 @@ export function createOperationsWhatsAppClient(): OperationsWhatsAppClient {
     saveDraft: async (conversationId, text) =>
       (await browserWhatsAppRuntime()).saveDraft(conversationId, text),
     getDraft: async (conversationId) => (await browserWhatsAppRuntime()).getDraft(conversationId),
+    resolveCustomerOrderContext: async (conversationId) =>
+      (await browserWhatsAppRuntime()).resolveCustomerOrderContext(conversationId),
   };
 }
 

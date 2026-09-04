@@ -30,6 +30,7 @@ import {
   assertWhatsAppInboxResult,
   assertWhatsAppMessageResult,
   assertWhatsAppVoidResult,
+  assertWhatsAppCustomerOrderContextResult,
 } from './whatsappResult';
 import { assertSyncHealthSnapshot } from './syncStatusResult';
 
@@ -83,6 +84,7 @@ const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
 const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
 const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
 const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
+const IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT = 'tux:whatsapp:resolve-customer-order-context';
 
 type WorkerMenuLayoutInput = Parameters<TuxDesktopApi['workerMenuLayout']['updateMenuLayout']>[0];
 type WorkerLegacyMenuLayoutInput = Parameters<
@@ -305,6 +307,13 @@ const api: TuxDesktopApi = Object.freeze({
     getDraft: async (conversationId: string) =>
       assertWhatsAppDraftResult(
         (await ipcRenderer.invoke(IPC_WHATSAPP_GET_DRAFT, conversationId)) as unknown,
+      ),
+    resolveCustomerOrderContext: async (conversationId: string) =>
+      assertWhatsAppCustomerOrderContextResult(
+        (await ipcRenderer.invoke(
+          IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT,
+          conversationId,
+        )) as unknown,
       ),
   }),
 });
