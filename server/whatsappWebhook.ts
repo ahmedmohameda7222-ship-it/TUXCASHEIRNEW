@@ -68,7 +68,10 @@ export type WhatsAppInboundMediaStoreResult =
     }
   | {
       readonly status: 'REJECTED';
-      readonly code: WhatsAppMediaValidation extends { readonly ok: false; readonly code: infer Code }
+      readonly code: WhatsAppMediaValidation extends {
+        readonly ok: false;
+        readonly code: infer Code;
+      }
         ? Code
         : never;
     };
@@ -298,16 +301,12 @@ function translateProviderMessage(
   return null;
 }
 
-function isBinaryKind(
-  kind: WhatsAppInboundMaterializeInput['kind'],
-): kind is WhatsAppMediaKind {
+function isBinaryKind(kind: WhatsAppInboundMaterializeInput['kind']): kind is WhatsAppMediaKind {
   return kind === 'IMAGE' || kind === 'DOCUMENT' || kind === 'AUDIO';
 }
 
 export function inboundWhatsAppMediaKey(shopId: ShopId, providerMessageId: string): string {
-  return createHash('sha256')
-    .update(`inbound:${shopId}:${providerMessageId}`)
-    .digest('hex');
+  return createHash('sha256').update(`inbound:${shopId}:${providerMessageId}`).digest('hex');
 }
 
 async function readValidationPrefix(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
@@ -320,7 +319,8 @@ async function readValidationPrefix(stream: ReadableStream<Uint8Array>): Promise
       if (next.done) break;
       if (next.value.byteLength === 0) continue;
       const remaining = MEDIA_VALIDATION_PREFIX_BYTES - length;
-      const piece = next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
+      const piece =
+        next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
       chunks.push(piece);
       length += piece.byteLength;
     }
@@ -431,20 +431,17 @@ export class SupabaseWhatsAppInboundMediaStore implements WhatsAppInboundMediaSt
 
     let uploadResponse: Response;
     try {
-      uploadResponse = await this.#fetch(
-        storageObjectUrl(this.config, objectPath),
-        {
-          method: 'POST',
-          headers: {
-            apikey: this.config.serviceRoleKey,
-            Authorization: `Bearer ${this.config.serviceRoleKey}`,
-            'Content-Type': input.mimeType,
-            'x-upsert': 'true',
-          },
-          body: monitoredBody,
-          duplex: 'half',
-        } as RequestInit,
-      );
+      uploadResponse = await this.#fetch(storageObjectUrl(this.config, objectPath), {
+        method: 'POST',
+        headers: {
+          apikey: this.config.serviceRoleKey,
+          Authorization: `Bearer ${this.config.serviceRoleKey}`,
+          'Content-Type': input.mimeType,
+          'x-upsert': 'true',
+        },
+        body: monitoredBody,
+        duplex: 'half',
+      } as RequestInit);
     } catch {
       await this.#deleteObject(objectPath);
       throw new Error('WhatsApp media storage is unavailable.');
@@ -663,7 +660,12 @@ async function handleVerifiedPost(
         }
 
         if (isBinaryKind(translated.kind)) {
-          const failure = await handleBinaryMessage(translated, channel.shopId, phone, dependencies);
+          const failure = await handleBinaryMessage(
+            translated,
+            channel.shopId,
+            phone,
+            dependencies,
+          );
           if (failure !== null) return failure;
           continue;
         }
