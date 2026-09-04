@@ -172,10 +172,9 @@ function task9CService(
   gateway: Task9CRemote,
   getState: () => Promise<OperationsSessionResult>,
 ): Task9CMessagingService {
-  return new OperationsWhatsAppMessagingService(
-    gateway as WhatsAppRemoteGateway,
-    { getState },
-  ) as Task9CMessagingService;
+  return new OperationsWhatsAppMessagingService(gateway as WhatsAppRemoteGateway, {
+    getState,
+  }) as Task9CMessagingService;
 }
 
 describe('OperationsWhatsAppMessagingService', () => {
@@ -253,7 +252,7 @@ describe('OperationsWhatsAppMessagingService', () => {
     expect(gateway.sendTemplate).not.toHaveBeenCalled();
   });
 
-  it('sends binary media only after sendMedia and resolves Current Operator claims at call time', async () => {
+  it('sends binary media after sendMedia and resolves claims at call time', async () => {
     const gateway = remote();
     let state = active();
     const service = task9CService(gateway, async () => state);
@@ -285,7 +284,7 @@ describe('OperationsWhatsAppMessagingService', () => {
     });
   });
 
-  it('has no offline fallback when a media send fails remotely and does not expose signed URLs', async () => {
+  it('has no media-send offline fallback or signed URL exposure', async () => {
     const gateway = remote();
     gateway.sendMedia = vi.fn().mockRejectedValue(
       new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is unavailable.'),
@@ -345,7 +344,7 @@ describe('OperationsWhatsAppMessagingService', () => {
     expect(valid).toMatchObject({ ok: true, value: { kind: 'LOCATION' } });
   });
 
-  it('retries a failed message with fresh Current Operator claims and maps PENDING refusal to conflict', async () => {
+  it('retries FAILED with fresh claims and maps PENDING refusal to conflict', async () => {
     const gateway = remote();
     const service = task9CService(gateway, async () => active());
 
@@ -374,7 +373,7 @@ describe('OperationsWhatsAppMessagingService', () => {
     expect(pending).toMatchObject({ ok: false, error: { code: 'CONFLICT_ERROR' } });
   });
 
-  it('does not require Current Operator claims for read-only media access and strips remote causes', async () => {
+  it('allows read-only media access without Current Operator claims', async () => {
     const gateway = remote();
     const service = task9CService(gateway, async () => ({
       ok: true,
