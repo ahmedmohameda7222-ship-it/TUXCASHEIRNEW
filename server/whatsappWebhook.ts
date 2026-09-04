@@ -21,6 +21,11 @@ import {
 
 const MEDIA_VALIDATION_PREFIX_BYTES = 1024 * 1024;
 
+type WhatsAppMediaValidationCode = Extract<
+  WhatsAppMediaValidation,
+  { readonly ok: false }
+>['code'];
+
 export interface WhatsAppWebhookInput {
   readonly method: string | undefined;
   readonly url: string;
@@ -68,12 +73,7 @@ export type WhatsAppInboundMediaStoreResult =
     }
   | {
       readonly status: 'REJECTED';
-      readonly code: WhatsAppMediaValidation extends {
-        readonly ok: false;
-        readonly code: infer Code;
-      }
-        ? Code
-        : never;
+      readonly code: WhatsAppMediaValidationCode;
     };
 
 export interface WhatsAppInboundMediaStore {
