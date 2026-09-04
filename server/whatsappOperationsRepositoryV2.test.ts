@@ -113,14 +113,16 @@ function inboxPayload(): Record<string, unknown> {
 
 describe('SupabaseWhatsAppOperationsRepository inbox v2', () => {
   it('parses only safe media and structured location fields', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse(inboxPayload()));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse(inboxPayload()),
+    );
     const snapshot = await repository(fetchMock).loadInbox({
       shopId,
       after: '2026-09-04T11:59:00.000Z',
     });
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
-    const rpcBody = JSON.parse(String((init as RequestInit | undefined)?.body));
+    const rpcBody = JSON.parse(String(init?.body));
     expect(String(url)).toBe(inboxV2Url);
     expect(rpcBody).toEqual({
       p_shop_id: shopId,
