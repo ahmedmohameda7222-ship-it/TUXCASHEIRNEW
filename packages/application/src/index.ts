@@ -88,6 +88,7 @@ export { WhatsAppRemoteError } from './whatsappRemote';
 export {
   parseWhatsAppInboxSnapshot,
   parseWhatsAppMessage,
+  parseWhatsAppMessagingTarget,
   throwWhatsAppHttpError,
 } from './whatsappWire';
 export type {
@@ -123,6 +124,7 @@ export type {
   WorkerUiPreferencesSyncTarget,
 } from './workerUiPreferences';
 export { OperationsWhatsAppService } from './whatsapp';
+export { OperationsWhatsAppMessagingService } from './whatsappMessaging';
 export type { WhatsAppSessionStateSource } from './whatsapp';
 export type {
   WhatsAppActiveOrderSummary,

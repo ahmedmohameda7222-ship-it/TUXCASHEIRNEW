@@ -65,6 +65,7 @@ function remoteCode(error: unknown): WhatsAppRemoteErrorCode | null {
   return code === 'OPERATOR_NOT_SYNCHRONIZED' ||
     code === 'OUTBOUND_INTENT_CONFLICT' ||
     code === 'DELIVERY_UNCERTAIN' ||
+    code === 'FREE_FORM_WINDOW_CLOSED' ||
     code === 'REMOTE_UNAVAILABLE' ||
     code === 'DEVICE_AUTH_INVALID'
     ? code
@@ -81,6 +82,12 @@ function mapRemoteError(error: unknown): ApplicationError {
   }
   if (code === 'DELIVERY_UNCERTAIN') {
     return remoteSync('WhatsApp delivery is not confirmed yet.', error);
+  }
+  if (code === 'FREE_FORM_WINDOW_CLOSED') {
+    return {
+      code: 'WHATSAPP_FREE_FORM_WINDOW_CLOSED',
+      message: 'The WhatsApp free-form messaging window has closed.',
+    };
   }
   if (code === 'DEVICE_AUTH_INVALID') {
     return remoteSync('The enrolled Operations device session is no longer valid.', error);

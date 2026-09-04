@@ -1,10 +1,17 @@
 import type { CachedWhatsAppInboxSnapshot, CachedWhatsAppOrderLink } from '@tux/persistence';
-import type { BusinessDayId, OrderId, WhatsAppMessage, WorkerId } from '@tux/domain';
+import type {
+  BusinessDayId,
+  OrderId,
+  WhatsAppMessage,
+  WhatsAppMessagingTarget,
+  WorkerId,
+} from '@tux/domain';
 
 export type WhatsAppRemoteErrorCode =
   | 'OPERATOR_NOT_SYNCHRONIZED'
   | 'OUTBOUND_INTENT_CONFLICT'
   | 'DELIVERY_UNCERTAIN'
+  | 'FREE_FORM_WINDOW_CLOSED'
   | 'REMOTE_UNAVAILABLE'
   | 'DEVICE_AUTH_INVALID';
 
@@ -28,12 +35,26 @@ export interface WhatsAppInboxSnapshot extends CachedWhatsAppInboxSnapshot {
 export interface WhatsAppRemoteGateway {
   loadInbox(cursor?: string): Promise<WhatsAppInboxSnapshot>;
 
+  resolveMessagingTarget(input: {
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+  }): Promise<WhatsAppMessagingTarget>;
+
   sendText(input: {
     readonly businessDayId: BusinessDayId;
     readonly workerId: WorkerId;
     readonly conversationId: string;
     readonly outboundIntentKey: string;
     readonly text: string;
+  }): Promise<WhatsAppMessage>;
+
+  sendTemplate(input: {
+    readonly businessDayId: BusinessDayId;
+    readonly workerId: WorkerId;
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+    readonly templateId: string;
+    readonly outboundIntentKey: string;
   }): Promise<WhatsAppMessage>;
 
   markUnread(conversationId: string): Promise<void>;

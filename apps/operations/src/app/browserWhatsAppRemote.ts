@@ -1,12 +1,13 @@
 import {
   parseWhatsAppInboxSnapshot,
   parseWhatsAppMessage,
+  parseWhatsAppMessagingTarget,
   throwWhatsAppHttpError,
   WhatsAppRemoteError,
   type WhatsAppInboxSnapshot,
   type WhatsAppRemoteGateway,
 } from '@tux/application';
-import type { WhatsAppMessage } from '@tux/domain';
+import type { WhatsAppMessage, WhatsAppMessagingTarget } from '@tux/domain';
 
 function responseObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -64,6 +65,19 @@ export class VercelBrowserWhatsAppRemote implements WhatsAppRemoteGateway {
     return parseWhatsAppInboxSnapshot(await requestJson('GET', url));
   }
 
+  async resolveMessagingTarget(
+    input: Parameters<WhatsAppRemoteGateway['resolveMessagingTarget']>[0],
+  ): Promise<WhatsAppMessagingTarget> {
+    const payload = responseObject(
+      await requestJson('POST', '/api/whatsapp', {
+        action: 'RESOLVE_TARGET',
+        normalizedPhone: input.normalizedPhone,
+        displayPhone: input.displayPhone,
+      }),
+    );
+    return parseWhatsAppMessagingTarget(payload['target']);
+  }
+
   async sendText(
     input: Parameters<WhatsAppRemoteGateway['sendText']>[0],
   ): Promise<WhatsAppMessage> {
@@ -75,6 +89,23 @@ export class VercelBrowserWhatsAppRemote implements WhatsAppRemoteGateway {
         conversationId: input.conversationId,
         outboundIntentKey: input.outboundIntentKey,
         text: input.text,
+      }),
+    );
+    return parseWhatsAppMessage(payload['message']);
+  }
+
+  async sendTemplate(
+    input: Parameters<WhatsAppRemoteGateway['sendTemplate']>[0],
+  ): Promise<WhatsAppMessage> {
+    const payload = responseObject(
+      await requestJson('POST', '/api/whatsapp', {
+        action: 'SEND_TEMPLATE',
+        businessDayId: input.businessDayId,
+        workerId: input.workerId,
+        normalizedPhone: input.normalizedPhone,
+        displayPhone: input.displayPhone,
+        templateId: input.templateId,
+        outboundIntentKey: input.outboundIntentKey,
       }),
     );
     return parseWhatsAppMessage(payload['message']);
