@@ -7,6 +7,8 @@ const conversationId = '00000000-0000-4000-8000-000000000002';
 const imageMessageId = '00000000-0000-4000-8000-000000000003';
 const locationMessageId = '00000000-0000-4000-8000-000000000004';
 const inboxV2Url = 'https://example.supabase.co/rest/v1/rpc/get_tux_whatsapp_inbox_v2';
+const materializeInboundV2Url =
+  'https://example.supabase.co/rest/v1/rpc/materialize_tux_whatsapp_inbound_v2';
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -173,5 +175,67 @@ describe('SupabaseWhatsAppOperationsRepository inbox v2', () => {
     ]) {
       expect(serialized).not.toContain(forbidden);
     }
+  });
+
+  it('materializes inbound media through the server-only v2 RPC contract', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe(materializeInboundV2Url);
+      const headers = new Headers(init?.headers);
+      expect(headers.get('apikey')).toBe('server-only-service-role-key');
+      expect(headers.get('authorization')).toBe('Bearer server-only-service-role-key');
+      expect(JSON.parse(String(init?.body))).toEqual({
+        p_shop_id: shopId,
+        p_provider_message_id: 'wamid.inbound.media',
+        p_normalized_phone: '01012345678',
+        p_display_phone: '+201012345678',
+        p_kind: 'IMAGE',
+        p_provider_media_id: 'meta-private-media-id',
+        p_media_key: 'tux-media-image-1',
+        p_bucket_id: 'tux-whatsapp-media',
+        p_object_path: `media/${shopId}/tux-media-image-1`,
+        p_mime_type: 'image/jpeg',
+        p_file_name: 'photo.jpg',
+        p_byte_size: 4,
+        p_sha256: 'canonical-sha256',
+        p_stored_at: '2026-09-04T12:00:00.000Z',
+        p_expires_at: '2026-10-04T12:00:00.000Z',
+        p_provider_occurred_at: '2026-09-04T11:59:59.000Z',
+      });
+      return jsonResponse([
+        {
+          message_id: imageMessageId,
+          media_key: 'tux-media-image-1',
+          created: true,
+        },
+      ]);
+    });
+
+    const result = await repository(fetchMock).materializeInboundMedia({
+      shopId,
+      providerMessageId: 'wamid.inbound.media',
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      kind: 'IMAGE',
+      providerMediaId: 'meta-private-media-id',
+      mediaKey: 'tux-media-image-1',
+      bucketId: 'tux-whatsapp-media',
+      objectPath: `media/${shopId}/tux-media-image-1`,
+      mimeType: 'image/jpeg',
+      fileName: 'photo.jpg',
+      byteSize: 4,
+      sha256: 'canonical-sha256',
+      storedAt: '2026-09-04T12:00:00.000Z',
+      expiresAt: '2026-10-04T12:00:00.000Z',
+      providerOccurredAt: '2026-09-04T11:59:59.000Z',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      messageId: imageMessageId,
+      mediaKey: 'tux-media-image-1',
+      created: true,
+    });
+    expect(JSON.stringify(result)).not.toContain('meta-private-media-id');
+    expect(JSON.stringify(result)).not.toContain('media/');
   });
 });
