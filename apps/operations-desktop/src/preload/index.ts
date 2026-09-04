@@ -31,6 +31,7 @@ import {
   assertWhatsAppMessageResult,
   assertWhatsAppVoidResult,
   assertWhatsAppCustomerOrderContextResult,
+  assertWhatsAppMessagingTargetResult,
 } from './whatsappResult';
 import { assertSyncHealthSnapshot } from './syncStatusResult';
 
@@ -85,6 +86,8 @@ const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
 const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
 const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
 const IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT = 'tux:whatsapp:resolve-customer-order-context';
+const IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET = 'tux:whatsapp:resolve-messaging-target';
+const IPC_WHATSAPP_SEND_TEMPLATE = 'tux:whatsapp:send-template';
 
 type WorkerMenuLayoutInput = Parameters<TuxDesktopApi['workerMenuLayout']['updateMenuLayout']>[0];
 type WorkerLegacyMenuLayoutInput = Parameters<
@@ -314,6 +317,16 @@ const api: TuxDesktopApi = Object.freeze({
           IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT,
           conversationId,
         )) as unknown,
+      ),
+    resolveMessagingTarget: async (
+      input: Parameters<TuxDesktopApi['whatsapp']['resolveMessagingTarget']>[0],
+    ) =>
+      assertWhatsAppMessagingTargetResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET, input)) as unknown,
+      ),
+    sendTemplate: async (input: Parameters<TuxDesktopApi['whatsapp']['sendTemplate']>[0]) =>
+      assertWhatsAppMessageResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_TEMPLATE, input)) as unknown,
       ),
   }),
 });

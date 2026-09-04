@@ -145,7 +145,14 @@ describe('WhatsAppIpcRuntime', () => {
       [
         channels[11],
         'sendTemplate',
-        [{ normalizedPhone: '+201012345678', displayPhone: '010 1234 5678', templateId: 'starter-1', outboundIntentKey: 'intent-1' }],
+        [
+          {
+            normalizedPhone: '+201012345678',
+            displayPhone: '010 1234 5678',
+            templateId: 'starter-1',
+            outboundIntentKey: 'intent-1',
+          },
+        ],
       ],
     ];
 

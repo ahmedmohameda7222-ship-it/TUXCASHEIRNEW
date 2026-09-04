@@ -823,6 +823,36 @@ button:not(:disabled) {
   color: var(--tux-destructive);
 }
 
+.whatsapp-policy-note,
+.whatsapp-policy-blocked {
+  color: var(--tux-text-secondary);
+}
+
+.whatsapp-policy-blocked {
+  gap: var(--tux-space-1);
+}
+
+.whatsapp-template-list {
+  display: grid;
+  gap: var(--tux-space-2);
+}
+
+.whatsapp-template-action {
+  display: grid;
+  gap: var(--tux-space-1);
+  min-height: var(--tux-touch-target);
+  padding: var(--tux-space-3);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-md);
+  background: var(--tux-surface-raised);
+  text-align: left;
+}
+
+.whatsapp-template-action > span {
+  color: var(--tux-text-secondary);
+  unicode-bidi: plaintext;
+}
+
 .whatsapp-composer-zone {
   position: sticky;
   bottom: 0;

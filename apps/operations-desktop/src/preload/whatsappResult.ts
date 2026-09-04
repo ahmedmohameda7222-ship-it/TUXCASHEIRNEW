@@ -20,6 +20,7 @@ type DraftResult = Awaited<ReturnType<TuxWhatsAppApi['getDraft']>>;
 type CustomerOrderContextResult = Awaited<
   ReturnType<TuxWhatsAppApi['resolveCustomerOrderContext']>
 >;
+type MessagingTargetResult = Awaited<ReturnType<TuxWhatsAppApi['resolveMessagingTarget']>>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ERROR_CODES = new Set<ApplicationErrorCode>([
@@ -33,6 +34,7 @@ const ERROR_CODES = new Set<ApplicationErrorCode>([
   'NOT_FOUND',
   'ALREADY_CLOSED',
   'IDEMPOTENCY_REPLAY',
+  'WHATSAPP_FREE_FORM_WINDOW_CLOSED',
 ]);
 
 function record(value: unknown): Record<string, unknown> {
@@ -196,6 +198,134 @@ function parseCustomerOrderContext(value: unknown) {
   return { kind, customer, activeOrders };
 }
 
+function parseMessagingConfig(value: unknown) {
+  const source = record(value);
+  exactKeys(source, ['storefrontUrl', 'storeLocation'], 'WhatsApp messaging config');
+  if (typeof source['storefrontUrl'] !== 'string') {
+    throw new TypeError('Invalid WhatsApp storefront URL.');
+  }
+  let storefrontUrl: string;
+  try {
+    const url = new URL(source['storefrontUrl']);
+    if (url.protocol !== 'https:') throw new TypeError('WhatsApp storefront URL must use HTTPS.');
+    storefrontUrl = url.toString();
+  } catch {
+    throw new TypeError('Invalid WhatsApp storefront URL.');
+  }
+
+  if (source['storeLocation'] === null) return { storefrontUrl, storeLocation: null };
+  const location = record(source['storeLocation']);
+  exactKeys(location, ['latitude', 'longitude', 'label', 'address'], 'WhatsApp store location');
+  if (
+    typeof location['latitude'] !== 'number' ||
+    !Number.isFinite(location['latitude']) ||
+    location['latitude'] < -90 ||
+    location['latitude'] > 90 ||
+    typeof location['longitude'] !== 'number' ||
+    !Number.isFinite(location['longitude']) ||
+    location['longitude'] < -180 ||
+    location['longitude'] > 180 ||
+    (location['label'] !== null && typeof location['label'] !== 'string') ||
+    (location['address'] !== null && typeof location['address'] !== 'string')
+  ) {
+    throw new TypeError('Invalid WhatsApp store location.');
+  }
+  return {
+    storefrontUrl,
+    storeLocation: {
+      latitude: location['latitude'],
+      longitude: location['longitude'],
+      label: location['label'] as string | null,
+      address: location['address'] as string | null,
+    },
+  };
+}
+
+function optionalConversationId(value: unknown): string | null {
+  return value === null ? null : uuid(value, 'WhatsApp messaging target conversationId');
+}
+
+function parseMessagingTarget(value: unknown) {
+  const source = record(value);
+  const mode = source['mode'];
+  if (mode === 'FREE_FORM') {
+    exactKeys(
+      source,
+      ['mode', 'conversationId', 'freeFormUntil', 'config'],
+      'WhatsApp FREE_FORM target',
+    );
+    if (typeof source['freeFormUntil'] !== 'string')
+      throw new TypeError('Invalid free-form expiry.');
+    return {
+      mode,
+      conversationId: uuid(source['conversationId'], 'WhatsApp messaging target conversationId'),
+      freeFormUntil: instant(source['freeFormUntil']),
+      config: parseMessagingConfig(source['config']),
+    };
+  }
+  if (mode === 'TEMPLATE_ONLY') {
+    exactKeys(
+      source,
+      ['mode', 'conversationId', 'normalizedPhone', 'displayPhone', 'templates', 'config'],
+      'WhatsApp TEMPLATE_ONLY target',
+    );
+    if (
+      typeof source['normalizedPhone'] !== 'string' ||
+      source['normalizedPhone'].trim().length === 0 ||
+      typeof source['displayPhone'] !== 'string' ||
+      source['displayPhone'].trim().length === 0 ||
+      !Array.isArray(source['templates'])
+    ) {
+      throw new TypeError('Invalid WhatsApp template target.');
+    }
+    const templates = source['templates'].map((value) => {
+      const template = record(value);
+      exactKeys(
+        template,
+        ['id', 'label', 'languageCode', 'previewText'],
+        'WhatsApp starter template',
+      );
+      if (
+        typeof template['id'] !== 'string' ||
+        template['id'].trim().length === 0 ||
+        typeof template['label'] !== 'string' ||
+        template['label'].trim().length === 0 ||
+        typeof template['languageCode'] !== 'string' ||
+        template['languageCode'].trim().length === 0 ||
+        typeof template['previewText'] !== 'string'
+      )
+        throw new TypeError('Invalid WhatsApp starter template.');
+      return {
+        id: template['id'],
+        label: template['label'],
+        languageCode: template['languageCode'],
+        previewText: template['previewText'],
+      };
+    });
+    return {
+      mode,
+      conversationId: optionalConversationId(source['conversationId']),
+      normalizedPhone: source['normalizedPhone'],
+      displayPhone: source['displayPhone'],
+      templates,
+      config: parseMessagingConfig(source['config']),
+    };
+  }
+  if (mode === 'BLOCKED') {
+    exactKeys(source, ['mode', 'conversationId', 'reason', 'config'], 'WhatsApp BLOCKED target');
+    if (source['reason'] !== 'NO_APPROVED_TEMPLATE') {
+      throw new TypeError('Invalid WhatsApp blocked reason.');
+    }
+    return {
+      mode,
+      conversationId: optionalConversationId(source['conversationId']),
+      reason: 'NO_APPROVED_TEMPLATE' as const,
+      config: parseMessagingConfig(source['config']),
+    };
+  }
+  throw new TypeError('Invalid WhatsApp messaging target mode.');
+}
+
 function assertResult<Result>(
   value: unknown,
   label: string,
@@ -246,5 +376,13 @@ export function assertWhatsAppCustomerOrderContextResult(
     value,
     'WhatsApp customer-order context',
     parseCustomerOrderContext,
+  );
+}
+
+export function assertWhatsAppMessagingTargetResult(value: unknown): MessagingTargetResult {
+  return assertResult<MessagingTargetResult>(
+    value,
+    'WhatsApp messaging target',
+    parseMessagingTarget,
   );
 }

@@ -18,6 +18,8 @@ export type WhatsAppWorkspaceController = Pick<
   | 'setSearch'
   | 'selectConversation'
   | 'insertQuickReply'
+  | 'insertMenuReply'
+  | 'sendSelectedTemplate'
   | 'setComposerText'
   | 'sendCurrentText'
   | 'markUnread'
@@ -334,51 +336,127 @@ function ConversationPanel({
         )}
       </div>
 
-      <div className="whatsapp-composer-zone" data-whatsapp-region="composer">
-        <div className="whatsapp-quick-replies" aria-label="Quick replies">
-          {quickReplies.length === 0 ? (
-            <span className="whatsapp-empty-copy">No saved quick replies.</span>
-          ) : (
-            quickReplies.map((reply) => (
-              <button
-                type="button"
-                className="whatsapp-quick-reply"
-                key={reply.id}
-                data-quick-reply-id={reply.id}
-                onClick={() => controller.insertQuickReply(reply.text)}
-              >
-                {reply.text}
-              </button>
-            ))
-          )}
+      {state.messagingTarget?.mode === 'BLOCKED' ? (
+        <div
+          className="whatsapp-composer-zone whatsapp-policy-blocked"
+          data-whatsapp-region="composer"
+          data-whatsapp-policy="BLOCKED"
+          role="status"
+        >
+          <strong>Messaging unavailable</strong>
+          <span>No approved WhatsApp template is available for this customer right now.</span>
         </div>
-        <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
-          Message
-        </label>
-        <textarea
-          id="whatsapp-composer"
-          className="whatsapp-composer"
-          data-whatsapp-composer={true}
-          rows={3}
-          value={state.composerText}
-          onChange={(event) => controller.setComposerText(event.target.value)}
-          placeholder="Write a WhatsApp message"
-        />
-        <div className="whatsapp-composer-footer">
-          <span className="whatsapp-explicit-send-note">
-            Messages send only when you press Send.
+      ) : state.messagingTarget?.mode === 'TEMPLATE_ONLY' ? (
+        <div
+          className="whatsapp-composer-zone whatsapp-policy-template-only"
+          data-whatsapp-region="composer"
+          data-whatsapp-policy="TEMPLATE_ONLY"
+        >
+          <div className="whatsapp-policy-note" role="status">
+            The free-form messaging window is closed. Choose an approved template to restart chat.
+          </div>
+          <div className="whatsapp-template-list" aria-label="Approved WhatsApp templates">
+            {state.messagingTarget.templates.length === 0 ? (
+              <span className="whatsapp-empty-copy">
+                No approved WhatsApp template is available.
+              </span>
+            ) : (
+              state.messagingTarget.templates.map((template) => (
+                <button
+                  type="button"
+                  className="whatsapp-template-action"
+                  key={template.id}
+                  data-template-id={template.id}
+                  disabled={state.sendBusy}
+                  onClick={() => void controller.sendSelectedTemplate(template.id)}
+                >
+                  <strong>{template.label}</strong>
+                  <span dir="auto">{template.previewText}</span>
+                </button>
+              ))
+            )}
+          </div>
+          <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
+            Saved draft
+          </label>
+          <textarea
+            id="whatsapp-composer"
+            className="whatsapp-composer"
+            data-whatsapp-composer={true}
+            rows={3}
+            value={state.composerText}
+            disabled={true}
+            readOnly={true}
+            aria-describedby="whatsapp-template-only-note"
+          />
+          <span id="whatsapp-template-only-note" className="whatsapp-explicit-send-note">
+            Your draft is preserved until free-form messaging is available again.
           </span>
-          <button
-            type="button"
-            className="primary-action whatsapp-send-action"
-            data-whatsapp-send={true}
-            disabled={state.sendBusy || state.composerText.trim().length === 0}
-            onClick={() => void controller.sendCurrentText()}
-          >
-            {state.sendBusy ? 'Sending…' : 'Send'}
-          </button>
         </div>
-      </div>
+      ) : (
+        <div
+          className="whatsapp-composer-zone"
+          data-whatsapp-region="composer"
+          data-whatsapp-policy="FREE_FORM"
+        >
+          <div className="whatsapp-quick-replies" aria-label="Quick replies">
+            {quickReplies.length === 0 ? (
+              <span className="whatsapp-empty-copy">No saved quick replies.</span>
+            ) : (
+              quickReplies.map((reply) => (
+                <button
+                  type="button"
+                  className="whatsapp-quick-reply"
+                  key={reply.id}
+                  data-quick-reply-id={reply.id}
+                  onClick={() => controller.insertQuickReply(reply.text)}
+                >
+                  {reply.text}
+                </button>
+              ))
+            )}
+            <button
+              type="button"
+              className="whatsapp-quick-reply"
+              data-whatsapp-send-menu={true}
+              disabled={state.messagingTarget === null}
+              onClick={() => controller.insertMenuReply()}
+            >
+              Send Menu
+            </button>
+          </div>
+          <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
+            Message
+          </label>
+          <textarea
+            id="whatsapp-composer"
+            className="whatsapp-composer"
+            data-whatsapp-composer={true}
+            rows={3}
+            value={state.composerText}
+            onChange={(event) => controller.setComposerText(event.target.value)}
+            placeholder="Write a WhatsApp message"
+          />
+          <div className="whatsapp-composer-footer">
+            <span className="whatsapp-explicit-send-note">
+              Messages send only when you press Send.
+            </span>
+            <button
+              type="button"
+              className="primary-action whatsapp-send-action"
+              data-whatsapp-send={true}
+              disabled={
+                state.messagingTarget?.mode !== 'FREE_FORM' ||
+                state.sendBusy ||
+                state.composerText.trim().length === 0
+              }
+              onClick={() => void controller.sendCurrentText()}
+            >
+              {state.sendBusy ? 'Sending…' : 'Send'}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

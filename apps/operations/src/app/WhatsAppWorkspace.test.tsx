@@ -133,6 +133,10 @@ function createController() {
       .fn<WhatsAppWorkspaceController['selectConversation']>()
       .mockResolvedValue(),
     insertQuickReply: vi.fn<WhatsAppWorkspaceController['insertQuickReply']>(),
+    insertMenuReply: vi.fn<WhatsAppWorkspaceController['insertMenuReply']>(),
+    sendSelectedTemplate: vi
+      .fn<WhatsAppWorkspaceController['sendSelectedTemplate']>()
+      .mockResolvedValue(),
     setComposerText: vi.fn<WhatsAppWorkspaceController['setComposerText']>(),
     sendCurrentText: vi.fn<WhatsAppWorkspaceController['sendCurrentText']>().mockResolvedValue(),
     markUnread: vi.fn<WhatsAppWorkspaceController['markUnread']>().mockResolvedValue(),

@@ -14,6 +14,8 @@ const IPC_WHATSAPP_LINK_ORDER = 'tux:whatsapp:link-order';
 const IPC_WHATSAPP_SAVE_DRAFT = 'tux:whatsapp:save-draft';
 const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
 const IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT = 'tux:whatsapp:resolve-customer-order-context';
+const IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET = 'tux:whatsapp:resolve-messaging-target';
+const IPC_WHATSAPP_SEND_TEMPLATE = 'tux:whatsapp:send-template';
 
 const CHANNELS = [
   IPC_WHATSAPP_LOAD_INBOX,
@@ -26,6 +28,8 @@ const CHANNELS = [
   IPC_WHATSAPP_SAVE_DRAFT,
   IPC_WHATSAPP_GET_DRAFT,
   IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT,
+  IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET,
+  IPC_WHATSAPP_SEND_TEMPLATE,
 ] as const;
 
 function objectPayload(value: unknown, label: string): Record<string, unknown> {
@@ -46,6 +50,14 @@ function nonEmpty(value: unknown, label: string): string {
     throw new TypeError(`${label} must be a non-empty string.`);
   }
   return value.trim();
+}
+
+function exactKeys(value: Record<string, unknown>, keys: readonly string[], label: string): void {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new TypeError(`${label} IPC payload contains unexpected fields.`);
+  }
 }
 
 export class WhatsAppIpcRuntime {
@@ -145,6 +157,32 @@ export class WhatsAppIpcRuntime {
         return this.#service.resolveCustomerOrderContext(conversationId(rawConversationId));
       },
     );
+
+    ipcMain.handle(IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET, async (event, rawInput: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      const input = objectPayload(rawInput, 'WhatsApp resolve messaging target');
+      exactKeys(input, ['normalizedPhone', 'displayPhone'], 'WhatsApp resolve messaging target');
+      return this.#service.resolveMessagingTarget({
+        normalizedPhone: nonEmpty(input['normalizedPhone'], 'WhatsApp normalized phone'),
+        displayPhone: nonEmpty(input['displayPhone'], 'WhatsApp display phone'),
+      });
+    });
+
+    ipcMain.handle(IPC_WHATSAPP_SEND_TEMPLATE, async (event, rawInput: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      const input = objectPayload(rawInput, 'WhatsApp send template');
+      exactKeys(
+        input,
+        ['normalizedPhone', 'displayPhone', 'templateId', 'outboundIntentKey'],
+        'WhatsApp send template',
+      );
+      return this.#service.sendTemplate({
+        normalizedPhone: nonEmpty(input['normalizedPhone'], 'WhatsApp normalized phone'),
+        displayPhone: nonEmpty(input['displayPhone'], 'WhatsApp display phone'),
+        templateId: nonEmpty(input['templateId'], 'WhatsApp template ID'),
+        outboundIntentKey: nonEmpty(input['outboundIntentKey'], 'WhatsApp outbound intent key'),
+      });
+    });
   }
 
   close(): void {
