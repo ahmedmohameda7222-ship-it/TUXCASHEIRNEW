@@ -61,7 +61,7 @@ Expected grandparent:
 
 Working tree must be clean before publication.
 
-If the local checkout no longer exists, do not invent or reconstruct behavior from memory. Report `LOCAL CHECKPOINT LOST` and stop so the planner can recover from an exported git bundle/patch or rerun Task 8A/8B from the frozen baseline.
+If the previous local checkout no longer exists, do **not** stop merely because the runtime was recycled. Automatically recover from the previously verified offline executor bundle, restore the frozen baseline, reinstall/use the locked dependency bootstrap through the already-approved GitHub Actions fallback if required, and re-execute Task 8A then Task 8B with the same RED/GREEN gates before continuing. A recycled runtime is not a product-decision blocker and does not require planner approval.
 
 ## Atomic publication requirement
 
