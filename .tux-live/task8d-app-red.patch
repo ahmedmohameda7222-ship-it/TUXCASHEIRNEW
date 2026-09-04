@@ -1,0 +1,446 @@
+diff --git a/apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts b/apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+index 5131321664582d4620d29d4075b24d4fbb0aa77a..c36c197f17ef1cba1867d3a5351728916a748736 100644
+--- a/apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
++++ b/apps/operations-desktop/src/main/desktopWhatsAppRemote.test.ts
+@@ -172,6 +172,78 @@ describe('DesktopWhatsAppRemote', () => {
+     }
+   });
+ 
++  it('resolves messaging target and sends templates without client tenant/provider authority', async () => {
++    const target = {
++      mode: 'TEMPLATE_ONLY',
++      conversationId: null,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templates: [
++        {
++          id: '77777777-7777-4777-8777-777777777777',
++          label: 'Start chat',
++          languageCode: 'ar',
++          previewText: 'أهلاً بحضرتك',
++        },
++      ],
++      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
++    };
++    const fetcher = vi
++      .fn()
++      .mockResolvedValueOnce(
++        new Response(JSON.stringify({ target }), {
++          status: 200,
++          headers: { 'content-type': 'application/json' },
++        }),
++      )
++      .mockResolvedValueOnce(
++        new Response(JSON.stringify({ message: outboundMessage() }), {
++          status: 200,
++          headers: { 'content-type': 'application/json' },
++        }),
++      );
++    const remote = new DesktopWhatsAppRemote({
++      apiOrigin: 'https://ops.example',
++      sessionManager: sessionManager() as never,
++      fetcher,
++    });
++
++    await expect(
++      remote.resolveMessagingTarget({
++        normalizedPhone: '+201001234567',
++        displayPhone: '01001234567',
++      }),
++    ).resolves.toEqual(target);
++    await remote.sendTemplate({
++      businessDayId,
++      workerId,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '77777777-7777-4777-8777-777777777777',
++      outboundIntentKey: 'intent-template',
++    });
++
++    const resolveBody = JSON.parse(String((fetcher.mock.calls[0]?.[1] as RequestInit).body));
++    const templateBody = JSON.parse(String((fetcher.mock.calls[1]?.[1] as RequestInit).body));
++    expect(resolveBody).toEqual({
++      action: 'RESOLVE_TARGET',
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++    });
++    expect(templateBody).toEqual({
++      action: 'SEND_TEMPLATE',
++      businessDayId,
++      workerId,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '77777777-7777-4777-8777-777777777777',
++      outboundIntentKey: 'intent-template',
++    });
++    expect(JSON.stringify([resolveBody, templateBody])).not.toMatch(
++      /shopId|deviceId|providerTemplateName|languageCode|providerPhoneNumberId|refreshToken|service_role/i,
++    );
++  });
++
+   it('resolves the device session separately for every request', async () => {
+     const manager = sessionManager();
+     const fetcher = vi.fn().mockImplementation(async () => inboxResponse());
+diff --git a/apps/operations/src/app/browserWhatsAppRemote.test.ts b/apps/operations/src/app/browserWhatsAppRemote.test.ts
+index 47ffba6b30fbf47d5eb11831062ffbaf86775bec..10927dd3bf5c96481cc120e3e8d5730328857fe3 100644
+--- a/apps/operations/src/app/browserWhatsAppRemote.test.ts
++++ b/apps/operations/src/app/browserWhatsAppRemote.test.ts
+@@ -122,6 +122,69 @@ describe('VercelBrowserWhatsAppRemote', () => {
+     );
+   });
+ 
++  it('resolves the server messaging target without client authority fields', async () => {
++    const target = {
++      mode: 'TEMPLATE_ONLY',
++      conversationId: null,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templates: [
++        {
++          id: '70000000-0000-4000-8000-000000000001',
++          label: 'Start chat',
++          languageCode: 'ar',
++          previewText: 'أهلاً بحضرتك',
++        },
++      ],
++      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
++    };
++    const fetchMock = vi.fn().mockResolvedValue(json(200, { target }));
++    vi.stubGlobal('fetch', fetchMock);
++
++    await expect(
++      new VercelBrowserWhatsAppRemote().resolveMessagingTarget({
++        normalizedPhone: '+201001234567',
++        displayPhone: '01001234567',
++      }),
++    ).resolves.toEqual(target);
++
++    const [, init] = lastFetch(fetchMock);
++    expect(JSON.parse(String(init.body))).toEqual({
++      action: 'RESOLVE_TARGET',
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++    });
++    expect(String(init.body)).not.toMatch(/shopId|deviceId|workerId|provider|token|signedUrl/i);
++  });
++
++  it('sends only the TUX template id plus call-time claims', async () => {
++    const fetchMock = vi.fn().mockResolvedValue(json(200, { message: sentMessage() }));
++    vi.stubGlobal('fetch', fetchMock);
++
++    await new VercelBrowserWhatsAppRemote().sendTemplate({
++      businessDayId,
++      workerId,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template',
++    });
++
++    const [, init] = lastFetch(fetchMock);
++    expect(JSON.parse(String(init.body))).toEqual({
++      action: 'SEND_TEMPLATE',
++      businessDayId,
++      workerId,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template',
++    });
++    expect(String(init.body)).not.toMatch(
++      /shopId|deviceId|providerTemplateName|languageCode|providerPhoneNumberId|token/i,
++    );
++  });
++
+   it('rejects a successful SEND_MESSAGE payload that violates the WhatsApp message invariant', async () => {
+     const invalidMessage = {
+       ...sentMessage(),
+diff --git a/packages/application/src/whatsapp.test.ts b/packages/application/src/whatsapp.test.ts
+index 6071812aef414c651edb2cd850ca46f5111201d5..2de604f3c3f399e4750a08334dcfb46e6e34234d 100644
+--- a/packages/application/src/whatsapp.test.ts
++++ b/packages/application/src/whatsapp.test.ts
+@@ -212,6 +212,25 @@ describe('OperationsWhatsAppService', () => {
+     expect(remote.sendText).toHaveBeenCalledTimes(1);
+   });
+ 
++  it('surfaces a closed free-form window as a dedicated application error for one-shot target refresh', async () => {
++    remote.sendText = vi
++      .fn()
++      .mockRejectedValue(new WhatsAppRemoteError('FREE_FORM_WINDOW_CLOSED', 'window closed'));
++    const service = new OperationsWhatsAppService(remote, store, session, () => now);
++
++    const result = await service.sendText({
++      conversationId,
++      text: 'تمام',
++      outboundIntentKey: 'intent-1',
++    });
++
++    expect(result).toMatchObject({
++      ok: false,
++      error: { code: 'WHATSAPP_FREE_FORM_WINDOW_CLOSED' },
++    });
++    expect(remote.sendText).toHaveBeenCalledTimes(1);
++  });
++
+   it('maps DELIVERY_UNCERTAIN to REMOTE_SYNC_ERROR and never resends or changes the intent key', async () => {
+     vi.mocked(remote.sendText).mockRejectedValue(
+       remoteError('DELIVERY_UNCERTAIN', '60000000-0000-4000-8000-000000000001'),
+diff --git a/packages/application/src/whatsappMessaging.test.ts b/packages/application/src/whatsappMessaging.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc1b76476d5f5bd67a86d60c5aa027979062037d
+--- /dev/null
++++ b/packages/application/src/whatsappMessaging.test.ts
+@@ -0,0 +1,145 @@
++import {
++  instant,
++  parseEntityId,
++  type BusinessDayId,
++  type ShopId,
++  type WorkerId,
++} from '@tux/domain';
++import { describe, expect, it, vi } from 'vitest';
++import type { OperationsSessionResult } from './session';
++import type { WhatsAppRemoteGateway } from './whatsappRemote';
++import { OperationsWhatsAppMessagingService } from './whatsappMessaging';
++
++const shopId = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
++const businessDayId = parseEntityId<BusinessDayId>('20000000-0000-4000-8000-000000000001');
++const workerId = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000001');
++const workerId2 = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000002');
++const conversationId = '40000000-0000-4000-8000-000000000001';
++
++function active(worker = workerId): OperationsSessionResult {
++  return {
++    ok: true,
++    value: {
++      status: 'ACTIVE',
++      shopId,
++      businessDayId,
++      businessDayStartedAt: instant('2026-09-04T08:00:00.000Z'),
++      operator: { id: worker, displayName: 'Worker' },
++    },
++  };
++}
++
++function remote(): WhatsAppRemoteGateway {
++  return {
++    loadInbox: vi.fn().mockResolvedValue({
++      conversations: [],
++      messages: [],
++      quickReplies: [],
++      orderLinks: [],
++      nextCursor: null,
++    }),
++    resolveMessagingTarget: vi.fn().mockResolvedValue({
++      mode: 'FREE_FORM',
++      conversationId,
++      freeFormUntil: instant('2026-09-05T08:00:00.000Z'),
++      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
++    }),
++    sendText: vi.fn(),
++    sendTemplate: vi.fn().mockResolvedValue({
++      id: '50000000-0000-4000-8000-000000000001',
++      shopId,
++      conversationId,
++      providerMessageId: 'wamid.template',
++      outboundIntentKey: 'intent-template',
++      direction: 'OUTBOUND',
++      kind: 'TEXT',
++      text: 'أهلاً بحضرتك',
++      mediaRef: null,
++      status: 'SENT',
++      sentByWorkerId: workerId,
++      initiatedByDeviceId: parseEntityId('60000000-0000-4000-8000-000000000001'),
++      initiatedAt: instant('2026-09-04T10:00:00.000Z'),
++      createdAt: instant('2026-09-04T10:00:00.000Z'),
++    }),
++    markUnread: vi.fn(),
++    archive: vi.fn(),
++    setFollowUp: vi.fn(),
++    linkOrder: vi.fn(),
++  };
++}
++
++describe('OperationsWhatsAppMessagingService', () => {
++  it('resolves messaging target without accepting client tenant or worker authority', async () => {
++    const gateway = remote();
++    const service = new OperationsWhatsAppMessagingService(gateway, {
++      getState: async () => active(),
++    });
++
++    const result = await service.resolveMessagingTarget({
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++    });
++
++    expect(result).toMatchObject({ ok: true, value: { mode: 'FREE_FORM', conversationId } });
++    expect(gateway.resolveMessagingTarget).toHaveBeenCalledWith({
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++    });
++  });
++
++  it('resolves ACTIVE Current Operator claims at template-send call time', async () => {
++    const gateway = remote();
++    let state = active();
++    const service = new OperationsWhatsAppMessagingService(gateway, {
++      getState: async () => state,
++    });
++
++    await service.sendTemplate({
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template',
++    });
++    state = active(workerId2);
++    await service.sendTemplate({
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template-2',
++    });
++
++    expect(gateway.sendTemplate).toHaveBeenNthCalledWith(1, {
++      businessDayId,
++      workerId,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template',
++    });
++    expect(gateway.sendTemplate).toHaveBeenNthCalledWith(2, {
++      businessDayId,
++      workerId: workerId2,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template-2',
++    });
++  });
++
++  it('rejects template send when there is no ACTIVE Current Operator', async () => {
++    const gateway = remote();
++    const service = new OperationsWhatsAppMessagingService(gateway, {
++      getState: async () => ({ ok: true, value: { status: 'NO_ACTIVE_DAY', shopId } }),
++    });
++
++    const result = await service.sendTemplate({
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templateId: '70000000-0000-4000-8000-000000000001',
++      outboundIntentKey: 'intent-template',
++    });
++
++    expect(result).toMatchObject({ ok: false, error: { code: 'CONFLICT_ERROR' } });
++    expect(gateway.sendTemplate).not.toHaveBeenCalled();
++  });
++});
+diff --git a/packages/application/src/whatsappWire.test.ts b/packages/application/src/whatsappWire.test.ts
+index 6e504354562c840f1e946172b04b50027bd76337..14ccfd305761a5b1aed35d47c05206e50cad5dc5 100644
+--- a/packages/application/src/whatsappWire.test.ts
++++ b/packages/application/src/whatsappWire.test.ts
+@@ -3,6 +3,7 @@ import { WhatsAppRemoteError } from './whatsappRemote';
+ import {
+   parseWhatsAppInboxSnapshot,
+   parseWhatsAppMessage,
++  parseWhatsAppMessagingTarget,
+   throwWhatsAppHttpError,
+ } from './whatsappWire';
+ 
+@@ -103,6 +104,95 @@ describe('WhatsApp wire codec', () => {
+     expect(error.message).not.toContain('hidden');
+   });
+ 
++  it('parses only the safe server-authoritative messaging target shape', () => {
++    const config = {
++      storefrontUrl: 'https://menu.tux.example',
++      storeLocation: {
++        latitude: 30.0444,
++        longitude: 31.2357,
++        label: 'TUX',
++        address: 'Cairo',
++      },
++    };
++    expect(
++      parseWhatsAppMessagingTarget({
++        mode: 'FREE_FORM',
++        conversationId: '40000000-0000-4000-8000-000000000001',
++        freeFormUntil: '2026-09-05T12:00:00.000Z',
++        config,
++      }),
++    ).toMatchObject({ mode: 'FREE_FORM', config });
++    expect(
++      parseWhatsAppMessagingTarget({
++        mode: 'TEMPLATE_ONLY',
++        conversationId: null,
++        normalizedPhone: '+201001234567',
++        displayPhone: '01001234567',
++        templates: [
++          {
++            id: '70000000-0000-4000-8000-000000000001',
++            label: 'Start chat',
++            languageCode: 'ar',
++            previewText: 'أهلاً بحضرتك',
++          },
++        ],
++        config,
++      }),
++    ).toMatchObject({ mode: 'TEMPLATE_ONLY', templates: [{ label: 'Start chat' }] });
++    expect(
++      parseWhatsAppMessagingTarget({
++        mode: 'BLOCKED',
++        conversationId: null,
++        reason: 'NO_APPROVED_TEMPLATE',
++        config,
++      }),
++    ).toMatchObject({ mode: 'BLOCKED', reason: 'NO_APPROVED_TEMPLATE' });
++  });
++
++  it('rejects provider, secret, signed-url, and unknown target fields instead of forwarding them', () => {
++    const base = {
++      mode: 'TEMPLATE_ONLY',
++      conversationId: null,
++      normalizedPhone: '+201001234567',
++      displayPhone: '01001234567',
++      templates: [
++        {
++          id: '70000000-0000-4000-8000-000000000001',
++          label: 'Start chat',
++          languageCode: 'ar',
++          previewText: 'أهلاً بحضرتك',
++        },
++      ],
++      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
++    };
++    expect(() =>
++      parseWhatsAppMessagingTarget({ ...base, providerPhoneNumberId: 'secret' }),
++    ).toThrow();
++    expect(() =>
++      parseWhatsAppMessagingTarget({
++        ...base,
++        templates: [{ ...base.templates[0], providerTemplateName: 'secret_name' }],
++      }),
++    ).toThrow();
++    expect(() =>
++      parseWhatsAppMessagingTarget({
++        ...base,
++        config: { ...base.config, signedUrl: 'https://storage.example/token' },
++      }),
++    ).toThrow();
++  });
++
++  it('maps the server free-form-window race to a dedicated safe remote error', () => {
++    expect(
++      capture(() =>
++        throwWhatsAppHttpError(409, {
++          error: 'whatsapp_free_form_window_closed',
++          providerDiagnostic: 'hidden',
++        }),
++      ),
++    ).toMatchObject({ code: 'FREE_FORM_WINDOW_CLOSED', messageId: null });
++  });
++
+   it('maps every other HTTP failure, including malformed error payloads, to REMOTE_UNAVAILABLE', () => {
+     expect(capture(() => throwWhatsAppHttpError(500, { error: 'unexpected' }))).toMatchObject({
+       code: 'REMOTE_UNAVAILABLE',
