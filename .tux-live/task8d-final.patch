@@ -1,0 +1,62 @@
+diff --git a/apps/operations-desktop/src/main/index.ts b/apps/operations-desktop/src/main/index.ts
+index 53680e0..77393a2 100644
+--- a/apps/operations-desktop/src/main/index.ts
++++ b/apps/operations-desktop/src/main/index.ts
+@@ -171,7 +171,9 @@ function unavailableWhatsAppRemote(): WhatsAppRemoteGateway {
+   };
+   return {
+     loadInbox: unavailable,
++    resolveMessagingTarget: unavailable,
+     sendText: unavailable,
++    sendTemplate: unavailable,
+     markUnread: unavailable,
+     archive: unavailable,
+     setFollowUp: unavailable,
+diff --git a/packages/application/src/whatsapp.test.ts b/packages/application/src/whatsapp.test.ts
+index 2de604f..9e6dbc9 100644
+--- a/packages/application/src/whatsapp.test.ts
++++ b/packages/application/src/whatsapp.test.ts
+@@ -74,7 +74,9 @@ function remoteError(code: string, messageId: string | null = null): Error {
+ function createRemote(): WhatsAppRemoteGateway {
+   return {
+     loadInbox: vi.fn().mockResolvedValue(remoteSnapshot()),
++    resolveMessagingTarget: vi.fn().mockRejectedValue(new Error('not called')),
+     sendText: vi.fn().mockResolvedValue(sentMessage()),
++    sendTemplate: vi.fn().mockRejectedValue(new Error('not called')),
+     markUnread: vi.fn().mockResolvedValue(undefined),
+     archive: vi.fn().mockResolvedValue(undefined),
+     setFollowUp: vi.fn().mockResolvedValue(undefined),
+diff --git a/packages/application/src/whatsappRemote.test.ts b/packages/application/src/whatsappRemote.test.ts
+index 1998259..134830d 100644
+--- a/packages/application/src/whatsappRemote.test.ts
++++ b/packages/application/src/whatsappRemote.test.ts
+@@ -10,9 +10,15 @@ it('defines a provider-agnostic WhatsApp remote contract', () => {
+       orderLinks: [],
+       nextCursor: null,
+     }),
++    resolveMessagingTarget: async () => {
++      throw new Error('not called');
++    },
+     sendText: async () => {
+       throw new Error('not called');
+     },
++    sendTemplate: async () => {
++      throw new Error('not called');
++    },
+     markUnread: async () => undefined,
+     archive: async () => undefined,
+     setFollowUp: async () => undefined,
+diff --git a/packages/domain/src/index.ts b/packages/domain/src/index.ts
+index f93d484..2d43021 100644
+--- a/packages/domain/src/index.ts
++++ b/packages/domain/src/index.ts
+@@ -135,6 +135,9 @@ export {
+   type WhatsAppMessageDirection,
+   type WhatsAppMessageKind,
+   type WhatsAppMessageStatus,
++  type WhatsAppMessagingTarget,
++  type WhatsAppShopMessagingConfig,
++  type WhatsAppStarterTemplate,
+   type WhatsAppQuickReply,
+   type WhatsAppQuickReplyCategory,
+ } from './whatsapp';
