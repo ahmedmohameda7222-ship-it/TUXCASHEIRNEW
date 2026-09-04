@@ -5,7 +5,10 @@ import { parseEntityId, type ShopId } from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { readRawBody } from '../api/whatsapp-webhook';
 import { WhatsAppProviderError } from './whatsappProviderGateway';
-import { handleWhatsAppWebhook } from './whatsappWebhook';
+import {
+  handleWhatsAppWebhook,
+  type WhatsAppInboundMediaStoreResult,
+} from './whatsappWebhook';
 
 const appSecret = 'test-app-secret';
 const webhookVerifyToken = 'test-verify-token';
@@ -101,7 +104,7 @@ function dependencies(options?: { readonly knownChannel?: boolean }) {
     materializeInbound: vi.fn(async () => {
       events.push('materialize');
     }),
-    materializeInboundMedia: vi.fn(async () => {
+    materializeInboundMedia: vi.fn(async (_input: Record<string, unknown>) => {
       events.push('materialize-media');
     }),
   };
@@ -119,24 +122,26 @@ function dependencies(options?: { readonly knownChannel?: boolean }) {
     }),
   };
   const mediaStore = {
-    storeInboundMedia: vi.fn(async (input: Record<string, unknown>) => {
-      events.push('store-media');
-      const mediaKey = inboundMediaKey(String(input['providerMessageId']));
-      return {
-        status: 'STORED' as const,
-        media: {
-          mediaKey,
-          bucketId: 'tux-whatsapp-media',
-          objectPath: `media/${shopId}/${mediaKey}`,
-          mimeType: String(input['mimeType']),
-          fileName: (input['fileName'] as string | null | undefined) ?? null,
-          byteSize: Number(input['byteSize']),
-          sha256: 'canonical-sha256',
-          storedAt,
-          expiresAt,
-        },
-      };
-    }),
+    storeInboundMedia: vi.fn(
+      async (input: Record<string, unknown>): Promise<WhatsAppInboundMediaStoreResult> => {
+        events.push('store-media');
+        const mediaKey = inboundMediaKey(String(input['providerMessageId']));
+        return {
+          status: 'STORED',
+          media: {
+            mediaKey,
+            bucketId: 'tux-whatsapp-media',
+            objectPath: `media/${shopId}/${mediaKey}`,
+            mimeType: String(input['mimeType']),
+            fileName: (input['fileName'] as string | null | undefined) ?? null,
+            byteSize: Number(input['byteSize']),
+            sha256: 'canonical-sha256',
+            storedAt,
+            expiresAt,
+          },
+        };
+      },
+    ),
   };
   const diagnosticSink = vi.fn();
   return { channelResolver, materializer, providerGateway, mediaStore, diagnosticSink, events };
@@ -348,7 +353,7 @@ describe('handleWhatsAppWebhook', () => {
         type,
         providerMediaId,
         mimeType,
-        fileName: fileName ?? undefined,
+        ...(fileName === null ? {} : { fileName }),
       });
       const mediaKey = inboundMediaKey('wamid.media-1');
 
