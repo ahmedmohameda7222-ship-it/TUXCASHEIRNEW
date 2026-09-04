@@ -436,3 +436,59 @@ describe('SupabaseWhatsAppOperationsRepository', () => {
     ).rejects.toMatchObject({ code: 'PROTOCOL_ERROR' });
   });
 });
+
+describe('Task 8D repository policy RPCs', () => {
+  it('resolves safe messaging policy/config/templates through the service-role RPC', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse([
+        {
+          conversation_id: conversationId,
+          normalized_phone: '01012345678',
+          display_phone: '+201012345678',
+          last_inbound_at: '2026-09-02T19:00:00.000Z',
+          free_form_until: '2026-09-03T19:00:00.000Z',
+          storefront_url: 'https://menu.tux.example',
+          store_latitude: null,
+          store_longitude: null,
+          store_location_label: null,
+          store_location_address: null,
+          templates_json: [
+            {
+              id: '00000000-0000-4000-8000-000000000021',
+              label: 'ابدأ المحادثة',
+              languageCode: 'ar',
+              previewText: 'أهلاً بحضرتك من TUX.',
+            },
+          ],
+        },
+      ]),
+    );
+    const remote = repository(fetchMock);
+    const method = Reflect.get(remote, 'resolveMessagingPolicy') as unknown;
+    expect(method).toEqual(expect.any(Function));
+
+    const result = await (method as Function).call(remote, { shopId, conversationId });
+
+    expect(lastRequest(fetchMock).url).toContain('/rpc/get_tux_whatsapp_messaging_policy_v1');
+    expect(lastRpcBody(fetchMock)).toEqual({
+      p_shop_id: shopId,
+      p_conversation_id: conversationId,
+    });
+    expect(result).toEqual({
+      conversationId,
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      lastInboundAt: '2026-09-02T19:00:00.000Z',
+      freeFormUntil: '2026-09-03T19:00:00.000Z',
+      templates: [
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          label: 'ابدأ المحادثة',
+          languageCode: 'ar',
+          previewText: 'أهلاً بحضرتك من TUX.',
+        },
+      ],
+      config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
+    });
+  });
+});
