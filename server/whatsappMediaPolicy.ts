@@ -101,13 +101,13 @@ export function validateWhatsAppMediaContent(input: {
   ) {
     return { ok: false, code: 'TOO_LARGE' };
   }
-  let valid = false;
-  if (input.kind === 'IMAGE') {
-    valid =
-      input.mimeType === 'image/jpeg'
+  const valid =
+    input.kind === 'IMAGE'
+      ? input.mimeType === 'image/jpeg'
         ? startsWith(input.prefix, [0xff, 0xd8, 0xff])
-        : startsWith(input.prefix, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  } else if (input.kind === 'AUDIO') valid = validAudio(input.mimeType, input.prefix);
-  else valid = validDocument(input.mimeType, input.prefix);
+        : startsWith(input.prefix, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+      : input.kind === 'AUDIO'
+        ? validAudio(input.mimeType, input.prefix)
+        : validDocument(input.mimeType, input.prefix);
   return valid ? { ok: true } : { ok: false, code: 'CONTENT_MISMATCH' };
 }

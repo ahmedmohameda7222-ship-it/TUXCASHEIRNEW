@@ -28,7 +28,7 @@ export async function runWhatsAppMediaRetention(input: {
   let deleted = 0;
   let failed = 0;
   for (const media of expired.slice(0, 100)) {
-    let outcome: 'DELETED' | 'NOT_FOUND' | 'FAILED' = 'FAILED';
+    let outcome: 'DELETED' | 'NOT_FOUND' | 'FAILED';
     try {
       outcome = await input.storage.deleteObject({
         bucketId: media.bucketId,
