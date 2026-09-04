@@ -188,6 +188,7 @@ function createDependencies() {
   };
   const providerGateway = {
     sendMessage: vi.fn(async () => ({ providerMessageId: 'wamid.1' })),
+    fetchMedia: vi.fn(),
   };
   const resolveDeviceAuthority = vi.fn(async () => ({ shopId, deviceId }));
   const factory: WhatsAppOperationsDependencyFactory = {
