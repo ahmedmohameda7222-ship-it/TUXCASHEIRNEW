@@ -1,5 +1,5 @@
-import type { WhatsAppInboxSnapshot } from '@tux/application';
-import type { WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
+import type { WhatsAppCustomerOrderContext, WhatsAppInboxSnapshot } from '@tux/application';
+import type { OrderId, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import {
   filterAndSortWhatsAppConversations,
@@ -25,6 +25,8 @@ export interface WhatsAppInboxUiState {
   readonly errorMessage: string | null;
   readonly composerText: string;
   readonly sendBusy: boolean;
+  readonly customerOrderContext: WhatsAppCustomerOrderContext | null;
+  readonly contextBusy: boolean;
 }
 
 export interface WhatsAppInboxControllerEnvironment {
@@ -117,6 +119,8 @@ export class WhatsAppInboxController {
       errorMessage: null,
       composerText: '',
       sendBusy: false,
+      customerOrderContext: null,
+      contextBusy: false,
     };
   }
 
@@ -233,12 +237,14 @@ export class WhatsAppInboxController {
       selectedConversationId: conversationId,
       ...(previousConversationId === conversationId
         ? {}
-        : { selectedMessages: [], composerText: '' }),
+        : { selectedMessages: [], composerText: '', customerOrderContext: null }),
+      contextBusy: true,
     });
 
-    const [messagesResult, draftResult] = await Promise.all([
+    const [messagesResult, draftResult, contextResult] = await Promise.all([
       this.#client.loadConversation(conversationId),
       this.#client.getDraft(conversationId),
+      this.#client.resolveCustomerOrderContext(conversationId),
     ]);
 
     if (!this.#selectionIsCurrent(generation, conversationId)) return;
@@ -262,6 +268,18 @@ export class WhatsAppInboxController {
       this.#publish({ composerText: text });
     } else {
       this.#publish({ errorMessage: draftResult.error.message });
+    }
+
+    if (!this.#selectionIsCurrent(generation, conversationId)) return;
+
+    if (contextResult.ok) {
+      this.#publish({ customerOrderContext: contextResult.value, contextBusy: false });
+    } else {
+      this.#publish({
+        customerOrderContext: null,
+        contextBusy: false,
+        errorMessage: contextResult.error.message,
+      });
     }
   }
 
@@ -389,6 +407,44 @@ export class WhatsAppInboxController {
     }
   }
 
+  async linkSelectedOrder(orderId: OrderId, linked: boolean): Promise<void> {
+    const conversationId = this.#state.selectedConversationId;
+    if (conversationId === null) return;
+
+    let result: Awaited<ReturnType<TuxWhatsAppApi['linkOrder']>>;
+    try {
+      result = await this.#client.linkOrder({ conversationId, orderId, linked });
+    } catch {
+      this.#publish({ errorMessage: 'WhatsApp order link failed.' });
+      return;
+    }
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.error.message });
+      return;
+    }
+
+    const generation = this.#selectionGeneration;
+    this.#publish({ contextBusy: true, errorMessage: null });
+    let contextResult: Awaited<ReturnType<TuxWhatsAppApi['resolveCustomerOrderContext']>>;
+    try {
+      contextResult = await this.#client.resolveCustomerOrderContext(conversationId);
+    } catch {
+      if (this.#selectionIsCurrent(generation, conversationId)) {
+        this.#publish({
+          contextBusy: false,
+          errorMessage: 'Could not refresh WhatsApp order context.',
+        });
+      }
+      return;
+    }
+    if (!this.#selectionIsCurrent(generation, conversationId)) return;
+    if (contextResult.ok) {
+      this.#publish({ customerOrderContext: contextResult.value, contextBusy: false });
+    } else {
+      this.#publish({ contextBusy: false, errorMessage: contextResult.error.message });
+    }
+  }
+
   async markUnread(conversationId: string): Promise<void> {
     await this.#runMutation(() => this.#client.markUnread(conversationId));
   }
@@ -501,6 +557,8 @@ export class WhatsAppInboxController {
       selectedConversationId: null,
       selectedMessages: [],
       composerText: '',
+      customerOrderContext: null,
+      contextBusy: false,
     });
   }
 

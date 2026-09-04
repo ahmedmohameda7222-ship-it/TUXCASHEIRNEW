@@ -1,5 +1,5 @@
 import type { WhatsAppCustomerOrderContext } from '@tux/application';
-import type { OrderId } from '@tux/domain';
+import type { Instant, OrderId } from '@tux/domain';
 import { describe, expect, it } from 'vitest';
 import { presentWhatsAppOrderContext } from './whatsappOrderContext';
 
@@ -20,7 +20,7 @@ function order(id: OrderId, displayOrderNo: number) {
     displayOrderNo,
     status: 'ACTIVE' as const,
     orderTypeLabel: 'Delivery',
-    createdAt: '2026-09-04T10:00:00.000Z' as const,
+    createdAt: '2026-09-04T10:00:00.000Z' as Instant,
   };
 }
 

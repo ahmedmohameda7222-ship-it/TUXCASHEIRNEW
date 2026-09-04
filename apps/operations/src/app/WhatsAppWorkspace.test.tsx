@@ -112,6 +112,8 @@ function state(overrides: Partial<WhatsAppInboxUiState> = {}): WhatsAppInboxUiSt
     errorMessage: null,
     composerText: '',
     sendBusy: false,
+    customerOrderContext: null,
+    contextBusy: false,
     ...overrides,
   };
 }

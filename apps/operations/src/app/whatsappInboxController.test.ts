@@ -1,5 +1,5 @@
 import type { ApplicationError, WhatsAppInboxSnapshot } from '@tux/application';
-import type { WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
+import type { Instant, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import type { WhatsAppDraft } from '@tux/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -936,8 +936,10 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
     const env = new TestEnvironment();
     const first = conversation('A');
     const second = conversation('BB');
-    const firstContext = deferred<ReturnType<typeof ok>>();
-    const secondContext = deferred<ReturnType<typeof ok>>();
+    const firstContext =
+      deferred<Awaited<ReturnType<TuxWhatsAppApi['resolveCustomerOrderContext']>>>();
+    const secondContext =
+      deferred<Awaited<ReturnType<TuxWhatsAppApi['resolveCustomerOrderContext']>>>();
     const client = createClient(snapshot([first, second]));
     client.resolveCustomerOrderContext.mockImplementation((conversationId: string) =>
       conversationId === first.id ? firstContext.promise : secondContext.promise,
@@ -993,7 +995,10 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
   it('links and unlinks only the explicitly selected order then refreshes the selected context', async () => {
     const env = new TestEnvironment();
     const selected = conversation('Mona');
-    const orderId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const orderId =
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' as WhatsAppConversation['linkedOrderId'] extends infer T
+        ? Exclude<T, null>
+        : never;
     const client = createClient(snapshot([selected]));
     client.resolveCustomerOrderContext.mockResolvedValue(
       ok({
@@ -1011,7 +1016,7 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
             displayOrderNo: 184,
             status: 'ACTIVE',
             orderTypeLabel: 'Delivery',
-            createdAt: '2026-09-04T10:00:00.000Z',
+            createdAt: '2026-09-04T10:00:00.000Z' as Instant,
           },
         ],
       }),
@@ -1037,5 +1042,4 @@ describe('createBrowserWhatsAppInboxEnvironment', () => {
     });
     expect(client.resolveCustomerOrderContext).toHaveBeenCalledWith(selected.id);
   });
-
 });
