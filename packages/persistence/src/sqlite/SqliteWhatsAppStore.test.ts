@@ -71,6 +71,8 @@ function message(
     kind: 'TEXT',
     text,
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'DELIVERED',
     sentByWorkerId: null,
     initiatedByDeviceId: null,
