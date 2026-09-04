@@ -83,6 +83,32 @@ function isOrderSnapshot(value: unknown): boolean {
   );
 }
 
+function isParkedOrderSummary(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const allowed = new Set([
+    'id',
+    'parkedAt',
+    'parkedByWorkerId',
+    'lineCount',
+    'customerName',
+    'displayPhone',
+    'totalQuantity',
+  ]);
+  if (Object.keys(value).some((key) => !allowed.has(key))) return false;
+  return (
+    typeof value['id'] === 'string' &&
+    value['id'].length > 0 &&
+    typeof value['parkedAt'] === 'string' &&
+    isEntityId(value['parkedByWorkerId']) &&
+    isSafeInteger(value['lineCount']) &&
+    Number(value['lineCount']) >= 0 &&
+    typeof value['customerName'] === 'string' &&
+    typeof value['displayPhone'] === 'string' &&
+    isSafeInteger(value['totalQuantity']) &&
+    Number(value['totalQuantity']) >= 0
+  );
+}
+
 function assertResult<Result>(
   value: unknown,
   success: (payload: unknown) => boolean,
@@ -121,7 +147,9 @@ export function assertOrdersWorkspaceResult(value: unknown): OrdersWorkspaceResu
         typeof operator['displayName'] === 'string' &&
         (payload['recoveryState'] === 'NONE' ||
           payload['recoveryState'] === 'PREVIOUS_ORDER_ALREADY_SAVED') &&
-        isOrderDraft(payload['draft'])
+        isOrderDraft(payload['draft']) &&
+        Array.isArray(payload['parkedDrafts']) &&
+        payload['parkedDrafts'].every(isParkedOrderSummary)
       );
     },
     'Orders workspace',
