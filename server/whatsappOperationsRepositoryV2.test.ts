@@ -6,6 +6,7 @@ const shopId = parseEntityId<ShopId>('00000000-0000-4000-8000-000000000001');
 const conversationId = '00000000-0000-4000-8000-000000000002';
 const imageMessageId = '00000000-0000-4000-8000-000000000003';
 const locationMessageId = '00000000-0000-4000-8000-000000000004';
+const inboxV2Url = 'https://example.supabase.co/rest/v1/rpc/get_tux_whatsapp_inbox_v2';
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -75,7 +76,8 @@ function inboxPayload(): Record<string, unknown> {
         bucket_id: 'tux-whatsapp-media',
         object_path: 'media/shop/private-object',
         provider_download_url: 'https://lookaside.fbsbx.com/private-provider-download',
-        signed_access_url: 'https://example.supabase.co/storage/v1/object/sign/private?token=top-secret',
+        signed_access_url:
+          'https://example.supabase.co/storage/v1/object/sign/private?token=top-secret',
         service_role_key: 'server-only-service-role-key',
       },
       {
@@ -110,7 +112,7 @@ function inboxPayload(): Record<string, unknown> {
 }
 
 describe('SupabaseWhatsAppOperationsRepository inbox v2', () => {
-  it('uses get_tux_whatsapp_inbox_v2 and parses only safe media and structured location fields', async () => {
+  it('parses only safe media and structured location fields', async () => {
     const fetchMock = vi.fn(async () => jsonResponse(inboxPayload()));
     const snapshot = await repository(fetchMock).loadInbox({
       shopId,
@@ -118,10 +120,9 @@ describe('SupabaseWhatsAppOperationsRepository inbox v2', () => {
     });
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(String(url)).toBe(
-      'https://example.supabase.co/rest/v1/rpc/get_tux_whatsapp_inbox_v2',
-    );
-    expect(JSON.parse(String((init as RequestInit | undefined)?.body))).toEqual({
+    const rpcBody = JSON.parse(String((init as RequestInit | undefined)?.body));
+    expect(String(url)).toBe(inboxV2Url);
+    expect(rpcBody).toEqual({
       p_shop_id: shopId,
       p_cursor: '2026-09-04T11:59:00.000Z',
     });

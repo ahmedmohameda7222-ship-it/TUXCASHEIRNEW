@@ -2,7 +2,12 @@ import 'fake-indexeddb/auto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { instant, parseEntityId, type ShopId, type WhatsAppMessage } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type ShopId,
+  type WhatsAppMessage,
+} from '@tux/domain';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IndexedDbWhatsAppStore } from './browser/IndexedDbWhatsAppStore';
 import { SqliteWhatsAppStore } from './sqlite/SqliteWhatsAppStore';
@@ -104,7 +109,9 @@ async function deleteIndexedDb(name: string): Promise<void> {
 
 afterEach(async () => {
   await Promise.all(createdIndexedDbNames.splice(0).map(deleteIndexedDb));
-  await Promise.all(createdRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    createdRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('WhatsApp cache sanitization', () => {
