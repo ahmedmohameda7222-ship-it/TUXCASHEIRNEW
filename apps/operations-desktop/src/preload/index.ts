@@ -50,6 +50,9 @@ const IPC_WORKER_UI_PREFERENCES_UPDATE_MENU_LAYOUT = 'tux:worker-ui-preferences:
 const IPC_WORKER_UI_PREFERENCES_UPDATE_ACCENT = 'tux:worker-ui-preferences:update-accent';
 const IPC_WORKER_UI_PREFERENCES_RESET_MENU_LAYOUT = 'tux:worker-ui-preferences:reset-menu-layout';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
+const IPC_ORDERS_START_FROM_PREFILL = 'tux:orders:start-from-prefill';
+const IPC_ORDERS_RESTORE_PARKED = 'tux:orders:restore-parked';
+const IPC_ORDERS_DISCARD_PARKED = 'tux:orders:discard-parked';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
@@ -171,6 +174,32 @@ const api: TuxDesktopApi = Object.freeze({
       assertOrdersWorkspaceResult(
         (await ipcRenderer.invoke(IPC_ORDERS_LOAD_WORKSPACE, draftScopeId)) as unknown,
       ),
+    startOrderFromCustomerPrefill: async (
+      input: Parameters<TuxDesktopApi['orders']['startOrderFromCustomerPrefill']>[0],
+    ) =>
+      assertOrdersWorkspaceResult(
+        (await ipcRenderer.invoke(IPC_ORDERS_START_FROM_PREFILL, input)) as unknown,
+      ),
+    restoreParkedDraft: async (
+      input: Parameters<TuxDesktopApi['orders']['restoreParkedDraft']>[0],
+    ) =>
+      assertOrdersWorkspaceResult(
+        (await ipcRenderer.invoke(IPC_ORDERS_RESTORE_PARKED, input)) as unknown,
+      ),
+    discardParkedDraft: async (
+      input: Parameters<TuxDesktopApi['orders']['discardParkedDraft']>[0],
+    ) => {
+      const result = (await ipcRenderer.invoke(IPC_ORDERS_DISCARD_PARKED, input)) as unknown;
+      if (
+        typeof result !== 'object' ||
+        result === null ||
+        Array.isArray(result) ||
+        !('ok' in result)
+      ) {
+        throw new TypeError('Invalid Orders parked-discard response from Electron main process.');
+      }
+      return result as Awaited<ReturnType<TuxDesktopApi['orders']['discardParkedDraft']>>;
+    },
     saveDraft: async (draft: OrderDraft) =>
       assertSaveDraftResult((await ipcRenderer.invoke(IPC_ORDERS_SAVE_DRAFT, draft)) as unknown),
     findCustomerByPhone: async (shopId: ShopId, normalizedPhone: string) =>

@@ -1,5 +1,7 @@
 import {
   allocateDisplayOrderNo,
+  hasMeaningfulOrderDraft,
+  normalizeEgyptianPhone,
   assertOrderSnapshotIntegrity,
   operationsSyncPayloadJson,
   parseEntityId,
@@ -12,6 +14,7 @@ import {
   type BusinessDayId,
   type CustomerContact,
   type CustomerContactId,
+  type DeliveryZoneId,
   type EntityId,
   type Instant,
   type InventoryItemId,
@@ -26,12 +29,14 @@ import {
   type OrderItemId,
   type OrderSnapshot,
   type OrderValidationIssue,
+  type ParkedOrderDraft,
   type OutboxEvent,
   type OutboxEventId,
   type PaymentId,
   type PaymentPart,
   type ShopId,
   type Worker,
+  type WorkerId,
 } from '@tux/domain';
 import type {
   OperationsDatabase,
@@ -48,6 +53,24 @@ export interface OrdersRuntime {
   createUuid(): string;
 }
 
+export interface OrdersCustomerPrefill {
+  readonly normalizedPhone: string;
+  readonly displayPhone: string;
+  readonly customerName: string;
+  readonly address: string | null;
+  readonly zoneId: DeliveryZoneId | null;
+}
+
+export interface ParkedOrderSummary {
+  readonly id: string;
+  readonly parkedAt: Instant;
+  readonly parkedByWorkerId: WorkerId;
+  readonly lineCount: number;
+  readonly customerName: string;
+  readonly displayPhone: string;
+  readonly totalQuantity: number;
+}
+
 export interface OrdersWorkspace {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
@@ -58,6 +81,7 @@ export interface OrdersWorkspace {
   };
   readonly draft: OrderDraft;
   readonly recoveryState: 'NONE' | 'PREVIOUS_ORDER_ALREADY_SAVED';
+  readonly parkedDrafts: readonly ParkedOrderSummary[];
 }
 
 export interface OrderPlacement {
@@ -135,6 +159,42 @@ export function createEmptyOrderDraft(input: {
       finalFeeMinor: ZERO_MONEY,
     },
     payment: { mode: 'NONE' },
+  };
+}
+
+function parkedOrderSummary(value: ParkedOrderDraft): ParkedOrderSummary {
+  const totalQuantity = value.draft.lines.reduce((total, line) => total + line.quantity, 0);
+  if (!Number.isSafeInteger(totalQuantity)) {
+    throw new RangeError('Parked order draft quantity exceeded the safe integer range.');
+  }
+  return {
+    id: value.id,
+    parkedAt: value.parkedAt,
+    parkedByWorkerId: value.parkedByWorkerId,
+    lineCount: value.draft.lines.length,
+    customerName: value.draft.delivery.customerName,
+    displayPhone: value.draft.delivery.displayPhone,
+    totalQuantity,
+  };
+}
+
+function parkedOrderDraft(input: {
+  readonly id: string;
+  readonly draft: OrderDraft;
+  readonly parkedAt: Instant;
+  readonly parkedByWorkerId: WorkerId;
+}): ParkedOrderDraft {
+  return {
+    id: input.id,
+    shopId: input.draft.shopId,
+    businessDayId: input.draft.businessDayId,
+    draftScopeId: input.draft.draftScopeId,
+    draft: input.draft,
+    parkedAt: input.parkedAt,
+    parkedByWorkerId: input.parkedByWorkerId,
+    state: 'PARKED',
+    resolvedAt: null,
+    resolvedByWorkerId: null,
   };
 }
 
@@ -249,16 +309,192 @@ export class OperationsOrdersService {
             recoveryState = 'PREVIOUS_ORDER_ALREADY_SAVED';
           }
         }
-        return ok({
+        return this.#workspaceResult({
           shopId,
-          businessDayId: day.id,
+          day,
           configuration,
-          operator: { id: operator.id, displayName: operator.displayName },
+          operator,
           draft,
           recoveryState,
         });
       } catch (cause) {
         return err(persistenceError('Could not load the local Orders workspace.', cause));
+      }
+    });
+  }
+
+  async startOrderFromCustomerPrefill(input: {
+    readonly draftScopeId: string;
+    readonly prefill: OrdersCustomerPrefill;
+    readonly parkCurrent: boolean;
+  }): Promise<OrdersWorkspaceResult> {
+    return this.#coordinator.runExclusive(async () => {
+      try {
+        if (input.draftScopeId.trim().length === 0) {
+          return err({ code: 'VALIDATION_ERROR', message: 'Draft scope is required.' });
+        }
+        const normalized = normalizeEgyptianPhone(
+          input.prefill.normalizedPhone.trim() || input.prefill.displayPhone,
+        );
+        if (!normalized.valid) {
+          return err({
+            code: 'VALIDATION_ERROR',
+            message: 'A valid Egyptian mobile number is required.',
+          });
+        }
+        const context = await this.#resolveContext();
+        if (!context.ok) return context;
+        const { shopId, day, configuration, operator } = context.value;
+        const key = { shopId, businessDayId: day.id, draftScopeId: input.draftScopeId };
+        const current = await this.#draftStore.get(key);
+        const meaningful = hasMeaningfulOrderDraft(current);
+        if (meaningful && !input.parkCurrent) {
+          return err({
+            code: 'CONFLICT_ERROR',
+            message: 'The current order contains customer work and must be parked explicitly.',
+          });
+        }
+        const zone =
+          input.prefill.zoneId === null
+            ? undefined
+            : configuration.deliveryZones.find(
+                (candidate) => candidate.id === input.prefill.zoneId && candidate.active,
+              );
+        const now = this.#runtime.now();
+        const base = createEmptyOrderDraft({
+          shopId,
+          businessDayId: day.id,
+          draftScopeId: input.draftScopeId,
+          configuration,
+          now,
+          checkoutIntentKey: this.#runtime.createUuid(),
+        });
+        const replacement: OrderDraft = {
+          ...base,
+          revision: current?.revision ?? base.revision,
+          delivery: {
+            ...base.delivery,
+            normalizedPhone: normalized.normalizedPhone,
+            displayPhone: input.prefill.displayPhone.trim() || normalized.displayPhone,
+            customerName: input.prefill.customerName.trim(),
+            address: input.prefill.address?.trim() ?? '',
+            zoneId: zone?.id ?? null,
+            zoneLabel: zone?.name ?? '',
+            configuredFeeMinor: zone?.feeMinor ?? ZERO_MONEY,
+            finalFeeMinor: zone?.feeMinor ?? ZERO_MONEY,
+          },
+        };
+        if (current !== null && meaningful) {
+          await this.#draftStore.parkAndReplace({
+            activeKey: key,
+            expectedActiveRevision: current.revision,
+            parked: parkedOrderDraft({
+              id: this.#runtime.createUuid(),
+              draft: current,
+              parkedAt: now,
+              parkedByWorkerId: operator.id,
+            }),
+            replacement,
+          });
+        } else {
+          await this.#draftStore.put(replacement);
+        }
+        return this.#workspaceResult({
+          shopId,
+          day,
+          configuration,
+          operator,
+          draft: replacement,
+          recoveryState: 'NONE',
+        });
+      } catch (cause) {
+        return err(persistenceError('Could not start the customer-prefilled order.', cause));
+      }
+    });
+  }
+
+  async restoreParkedDraft(input: {
+    readonly draftScopeId: string;
+    readonly parkedDraftId: string;
+    readonly parkCurrent: boolean;
+  }): Promise<OrdersWorkspaceResult> {
+    return this.#coordinator.runExclusive(async () => {
+      try {
+        if (input.draftScopeId.trim().length === 0 || input.parkedDraftId.trim().length === 0) {
+          return err({
+            code: 'VALIDATION_ERROR',
+            message: 'Draft scope and parked draft are required.',
+          });
+        }
+        const context = await this.#resolveContext();
+        if (!context.ok) return context;
+        const { shopId, day, configuration, operator } = context.value;
+        const key = { shopId, businessDayId: day.id, draftScopeId: input.draftScopeId };
+        const current = await this.#draftStore.get(key);
+        if (current === null) {
+          return err({
+            code: 'CONFLICT_ERROR',
+            message: 'The active Orders draft is unavailable.',
+          });
+        }
+        const meaningful = hasMeaningfulOrderDraft(current);
+        if (meaningful && !input.parkCurrent) {
+          return err({
+            code: 'CONFLICT_ERROR',
+            message: 'The current order contains customer work and must be parked explicitly.',
+          });
+        }
+        const now = this.#runtime.now();
+        const restored = await this.#draftStore.restoreParked({
+          activeKey: key,
+          expectedActiveRevision: current.revision,
+          parkedId: input.parkedDraftId,
+          parkActiveAs:
+            meaningful && input.parkCurrent
+              ? parkedOrderDraft({
+                  id: this.#runtime.createUuid(),
+                  draft: current,
+                  parkedAt: now,
+                  parkedByWorkerId: operator.id,
+                })
+              : null,
+          restoredAt: now,
+          restoredByWorkerId: operator.id,
+        });
+        return this.#workspaceResult({
+          shopId,
+          day,
+          configuration,
+          operator,
+          draft: restored.restoredDraft,
+          recoveryState: 'NONE',
+        });
+      } catch (cause) {
+        return err(persistenceError('Could not restore the parked order draft.', cause));
+      }
+    });
+  }
+
+  async discardParkedDraft(input: {
+    readonly parkedDraftId: string;
+  }): Promise<Result<true, ApplicationError>> {
+    return this.#coordinator.runExclusive(async () => {
+      try {
+        if (input.parkedDraftId.trim().length === 0) {
+          return err({ code: 'VALIDATION_ERROR', message: 'Parked draft is required.' });
+        }
+        const context = await this.#resolveContext();
+        if (!context.ok) return context;
+        await this.#draftStore.discardParked({
+          shopId: context.value.shopId,
+          businessDayId: context.value.day.id,
+          parkedId: input.parkedDraftId,
+          resolvedAt: this.#runtime.now(),
+          resolvedByWorkerId: context.value.operator.id,
+        });
+        return ok(true);
+      } catch (cause) {
+        return err(persistenceError('Could not discard the parked order draft.', cause));
       }
     });
   }
@@ -563,6 +799,26 @@ export class OperationsOrdersService {
         cause,
       });
     }
+  }
+
+  async #workspaceResult(input: {
+    readonly shopId: ShopId;
+    readonly day: OpenBusinessDay;
+    readonly configuration: OperationsConfigurationSnapshot;
+    readonly operator: Worker;
+    readonly draft: OrderDraft;
+    readonly recoveryState: OrdersWorkspace['recoveryState'];
+  }): Promise<OrdersWorkspaceResult> {
+    const parkedDrafts = await this.#draftStore.listParked(input.shopId, input.day.id);
+    return ok({
+      shopId: input.shopId,
+      businessDayId: input.day.id,
+      configuration: input.configuration,
+      operator: { id: input.operator.id, displayName: input.operator.displayName },
+      draft: input.draft,
+      recoveryState: input.recoveryState,
+      parkedDrafts: parkedDrafts.map(parkedOrderSummary),
+    });
   }
 
   async #recoverCommittedDraftOnLoad(

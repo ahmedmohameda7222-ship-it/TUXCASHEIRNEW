@@ -585,6 +585,10 @@ export function createOperationsOrdersClient(): OperationsOrdersClient {
   return {
     loadWorkspace: async (draftScopeId) =>
       (await browserRuntime()).orders.loadWorkspace(draftScopeId),
+    startOrderFromCustomerPrefill: async (input) =>
+      (await browserRuntime()).orders.startOrderFromCustomerPrefill(input),
+    restoreParkedDraft: async (input) => (await browserRuntime()).orders.restoreParkedDraft(input),
+    discardParkedDraft: async (input) => (await browserRuntime()).orders.discardParkedDraft(input),
     saveDraft: async (draft) => (await browserRuntime()).orders.saveDraft(draft),
     findCustomerByPhone: async (shopId, normalizedPhone) =>
       (await browserRuntime()).orders.findCustomerByPhone(shopId, normalizedPhone),

@@ -61,9 +61,11 @@ export type {
   OrderPlacement,
   OrderPlacementError,
   OrderPlacementResult,
+  OrdersCustomerPrefill,
   OrdersRuntime,
   OrdersWorkspace,
   OrdersWorkspaceResult,
+  ParkedOrderSummary,
 } from './orders';
 export { err, ok } from './result';
 export type { Result } from './result';

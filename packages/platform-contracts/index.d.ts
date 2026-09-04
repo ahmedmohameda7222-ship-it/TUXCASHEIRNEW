@@ -87,7 +87,14 @@ export interface TuxWorkerUiPreferencesApi {
 
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
-  'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
+  | 'loadWorkspace'
+  | 'startOrderFromCustomerPrefill'
+  | 'restoreParkedDraft'
+  | 'discardParkedDraft'
+  | 'saveDraft'
+  | 'findCustomerByPhone'
+  | 'placeOrder'
+  | 'reprintOrder'
 >;
 
 export type TuxOrdersBoardApi = Pick<

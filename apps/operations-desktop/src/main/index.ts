@@ -21,7 +21,14 @@ import {
   type WorkerUiPreferencesRemoteGateway,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
-import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  parseOrderDraft,
+  type DeliveryZoneId,
+  type OrderId,
+  type ShopId,
+} from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   SqliteOperationsDatabase,
@@ -68,6 +75,9 @@ const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
+const IPC_ORDERS_START_FROM_PREFILL = 'tux:orders:start-from-prefill';
+const IPC_ORDERS_RESTORE_PARKED = 'tux:orders:restore-parked';
+const IPC_ORDERS_DISCARD_PARKED = 'tux:orders:discard-parked';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
@@ -452,6 +462,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_SESSION_SIGN_OUT,
     IPC_SYNC_GET_STATUS,
     IPC_ORDERS_LOAD_WORKSPACE,
+    IPC_ORDERS_START_FROM_PREFILL,
+    IPC_ORDERS_RESTORE_PARKED,
+    IPC_ORDERS_DISCARD_PARKED,
     IPC_ORDERS_SAVE_DRAFT,
     IPC_ORDERS_FIND_CUSTOMER,
     IPC_ORDERS_PLACE,
@@ -498,6 +511,59 @@ function registerIpcHandlers(window: BrowserWindow): void {
       throw new TypeError('Orders draft-scope IPC payload must be a string.');
     }
     return currentOrdersService().loadWorkspace(draftScopeId);
+  });
+  ipcMain.handle(IPC_ORDERS_START_FROM_PREFILL, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders customer prefill');
+    const prefill = input['prefill'];
+    assertObjectPayload(prefill, 'Orders customer prefill values');
+    if (
+      typeof input['draftScopeId'] !== 'string' ||
+      typeof input['parkCurrent'] !== 'boolean' ||
+      typeof prefill['normalizedPhone'] !== 'string' ||
+      typeof prefill['displayPhone'] !== 'string' ||
+      typeof prefill['customerName'] !== 'string' ||
+      (prefill['address'] !== null && typeof prefill['address'] !== 'string') ||
+      (prefill['zoneId'] !== null && typeof prefill['zoneId'] !== 'string')
+    ) {
+      throw new TypeError('Orders customer-prefill IPC payload is invalid.');
+    }
+    return currentOrdersService().startOrderFromCustomerPrefill({
+      draftScopeId: input['draftScopeId'],
+      parkCurrent: input['parkCurrent'],
+      prefill: {
+        normalizedPhone: prefill['normalizedPhone'],
+        displayPhone: prefill['displayPhone'],
+        customerName: prefill['customerName'],
+        address: prefill['address'] as string | null,
+        zoneId:
+          prefill['zoneId'] === null ? null : parseEntityId<DeliveryZoneId>(prefill['zoneId']),
+      },
+    });
+  });
+  ipcMain.handle(IPC_ORDERS_RESTORE_PARKED, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders parked restore');
+    if (
+      typeof input['draftScopeId'] !== 'string' ||
+      typeof input['parkedDraftId'] !== 'string' ||
+      typeof input['parkCurrent'] !== 'boolean'
+    ) {
+      throw new TypeError('Orders parked-restore IPC payload is invalid.');
+    }
+    return currentOrdersService().restoreParkedDraft({
+      draftScopeId: input['draftScopeId'],
+      parkedDraftId: input['parkedDraftId'],
+      parkCurrent: input['parkCurrent'],
+    });
+  });
+  ipcMain.handle(IPC_ORDERS_DISCARD_PARKED, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders parked discard');
+    if (typeof input['parkedDraftId'] !== 'string') {
+      throw new TypeError('Orders parked-discard IPC payload is invalid.');
+    }
+    return currentOrdersService().discardParkedDraft({ parkedDraftId: input['parkedDraftId'] });
   });
   ipcMain.handle(IPC_ORDERS_SAVE_DRAFT, async (event, draft: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
