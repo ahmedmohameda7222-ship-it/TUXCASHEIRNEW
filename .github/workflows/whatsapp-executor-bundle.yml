@@ -1,0 +1,72 @@
+name: Build WhatsApp executor bundle
+
+on:
+  push:
+    branches:
+      - infra/whatsapp-executor-bundle-20260904
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASELINE_SHA: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+      IMPLEMENTATION_BRANCH: feat/operations-whatsapp-inbox
+    steps:
+      - name: Checkout exact baseline history
+        uses: actions/checkout@v7
+        with:
+          ref: 0684c49f3988545ea68efdfa1d0a1ce4de9e0cdc
+          fetch-depth: 0
+
+      - name: Materialize exact implementation branch locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -C "$IMPLEMENTATION_BRANCH" "$BASELINE_SHA"
+          test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
+          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
+          test -z "$(git status --short)"
+
+      - name: Install locked Node dependencies for offline execution
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source tree stayed clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --abbrev-ref HEAD)" = "$IMPLEMENTATION_BRANCH"
+          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
+          test -z "$(git status --short)"
+          node --version
+          npm --version
+
+      - name: Build offline checkout archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$BASELINE_SHA" > .tux-executor-baseline-sha
+          printf '%s\n' "$IMPLEMENTATION_BRANCH" > .tux-executor-branch
+          cd ..
+          tar -czf TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz TUXCASHEIRNEW
+          sha256sum TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz > TUXCASHEIRNEW-whatsapp-executor-bundle.sha256
+
+      - name: Upload offline executor bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: TUXCASHEIRNEW-whatsapp-executor-bundle
+          path: |
+            ../TUXCASHEIRNEW-whatsapp-executor-bundle.tar.gz
+            ../TUXCASHEIRNEW-whatsapp-executor-bundle.sha256
+          if-no-files-found: error
+          retention-days: 7
