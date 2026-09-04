@@ -94,6 +94,9 @@ export {
 export type {
   WhatsAppInboxOrderLink,
   WhatsAppInboxSnapshot,
+  WhatsAppMediaAccess,
+  WhatsAppOutboundBinary,
+  WhatsAppOutboundBinaryKind,
   WhatsAppRemoteErrorCode,
   WhatsAppRemoteGateway,
 } from './whatsappRemote';
