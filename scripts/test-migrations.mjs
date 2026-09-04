@@ -346,6 +346,13 @@ psql(
      create schema public;
      drop schema if exists auth cascade;
      create schema auth;
+     drop schema if exists storage cascade;
+     create schema storage;
+     create table storage.buckets (
+       id text primary key,
+       name text not null unique,
+       public boolean not null default false
+     );
      do $$
      begin
        if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon noinherit; end if;
