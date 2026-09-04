@@ -17,6 +17,8 @@ const inboundMessage = {
   kind: 'TEXT',
   text: 'hello',
   mediaRef: null,
+  media: null,
+  location: null,
   status: 'DELIVERED',
   sentByWorkerId: null,
   initiatedByDeviceId: null,
@@ -49,6 +51,52 @@ describe('WhatsApp wire codec', () => {
         nextCursor: null,
       }).messages,
     ).toHaveLength(1);
+  });
+
+  it('parses only safe durable media/location descriptors and rejects signed/provider fields', () => {
+    const mediaMessage = {
+      ...inboundMessage,
+      kind: 'IMAGE',
+      text: null,
+      mediaRef: 'media-key-1',
+      media: {
+        mediaKey: 'media-key-1',
+        kind: 'IMAGE',
+        mimeType: 'image/jpeg',
+        fileName: 'photo.jpg',
+        byteSize: 123,
+        storedAt: '2026-09-04T12:00:00.000Z',
+        expiresAt: '2026-10-04T12:00:00.000Z',
+        availability: 'AVAILABLE',
+      },
+      location: null,
+    };
+    expect(parseWhatsAppMessage(mediaMessage)).toMatchObject({
+      media: { mediaKey: 'media-key-1', availability: 'AVAILABLE' },
+    });
+    expect(() =>
+      parseWhatsAppMessage({
+        ...mediaMessage,
+        media: { ...mediaMessage.media, signedUrl: 'https://storage.example/secret' },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseWhatsAppMessage({
+        ...mediaMessage,
+        providerMediaId: 'provider-secret',
+      }),
+    ).toThrow();
+
+    expect(
+      parseWhatsAppMessage({
+        ...inboundMessage,
+        kind: 'LOCATION',
+        text: null,
+        mediaRef: null,
+        media: null,
+        location: { latitude: 30.0444, longitude: 31.2357, name: 'TUX', address: 'Cairo' },
+      }),
+    ).toMatchObject({ location: { latitude: 30.0444, longitude: 31.2357 } });
   });
 
   it('rejects a malformed outbound message that violates the domain invariant', () => {

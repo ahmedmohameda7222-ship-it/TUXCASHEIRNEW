@@ -12,6 +12,8 @@ const validOutbound: WhatsAppMessage = {
   kind: 'TEXT',
   text: 'تمام، أوردر حضرتك بيتجهز دلوقتي.',
   mediaRef: null,
+  media: null,
+  location: null,
   status: 'PENDING',
   sentByWorkerId: '22222222-2222-4222-8222-222222222222' as NonNullable<
     WhatsAppMessage['sentByWorkerId']
@@ -48,6 +50,54 @@ describe('WhatsApp message invariants', () => {
         outboundIntentKey: null,
       }),
     ).toThrow('Inbound WhatsApp messages cannot carry outbound attribution.');
+  });
+
+  it('enforces safe media and location content shapes', () => {
+    const media = {
+      mediaKey: 'media-key-1',
+      kind: 'IMAGE' as const,
+      mimeType: 'image/jpeg',
+      fileName: 'photo.jpg',
+      byteSize: 123,
+      storedAt: '2026-09-04T12:00:00.000Z' as WhatsAppMessage['createdAt'],
+      expiresAt: '2026-10-04T12:00:00.000Z' as WhatsAppMessage['createdAt'],
+      availability: 'AVAILABLE' as const,
+    };
+    expect(() =>
+      assertWhatsAppMessageInvariant({
+        ...validOutbound,
+        kind: 'IMAGE',
+        text: null,
+        mediaRef: media.mediaKey,
+        media,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertWhatsAppMessageInvariant({
+        ...validOutbound,
+        kind: 'IMAGE',
+        text: null,
+        mediaRef: 'provider-media-id',
+        media,
+      }),
+    ).toThrow();
+    expect(() =>
+      assertWhatsAppMessageInvariant({
+        ...validOutbound,
+        kind: 'LOCATION',
+        text: null,
+        mediaRef: null,
+        media: null,
+        location: { latitude: 30.0444, longitude: 31.2357, name: 'TUX', address: 'Cairo' },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertWhatsAppMessageInvariant({
+        ...validOutbound,
+        kind: 'TEXT',
+        media,
+      }),
+    ).toThrow();
   });
 });
 
