@@ -387,7 +387,7 @@ describe('handleWhatsAppWebhook', () => {
         sha256: 'canonical-sha256',
         storedAt,
         expiresAt,
-        providerOccurredAt: '2026-09-02T23:00:00.000Z',
+        providerOccurredAt: '2026-09-02T19:00:00.000Z',
       });
       expect(deps.materializer.materializeInbound).not.toHaveBeenCalled();
       expect(result.body).not.toContain(providerMediaId);
