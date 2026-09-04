@@ -40,6 +40,8 @@ const channels = [
   'tux:whatsapp:save-draft',
   'tux:whatsapp:get-draft',
   'tux:whatsapp:resolve-customer-order-context',
+  'tux:whatsapp:resolve-messaging-target',
+  'tux:whatsapp:send-template',
 ] as const;
 
 function service(): TuxWhatsAppApi {
@@ -79,6 +81,19 @@ function service(): TuxWhatsAppApi {
         activeOrders: [],
       },
     })) as never,
+    resolveMessagingTarget: vi.fn(async () => ({
+      ok: true,
+      value: {
+        mode: 'FREE_FORM',
+        conversationId,
+        freeFormUntil: '2026-09-05T10:00:00.000Z',
+        config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+      },
+    })) as never,
+    sendTemplate: vi.fn(async () => ({
+      ok: false,
+      error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
+    })) as never,
   };
 }
 
@@ -102,7 +117,7 @@ beforeEach(() => {
 });
 
 describe('WhatsAppIpcRuntime', () => {
-  it('registers exactly all ten WhatsApp channels', () => {
+  it('registers exactly all twelve WhatsApp channels', () => {
     register();
     expect([...electron.handlers.keys()]).toEqual(channels);
   });
@@ -122,6 +137,16 @@ describe('WhatsAppIpcRuntime', () => {
       [channels[7], 'saveDraft', [conversationId, '']],
       [channels[8], 'getDraft', [conversationId]],
       [channels[9], 'resolveCustomerOrderContext' as keyof TuxWhatsAppApi, [conversationId]],
+      [
+        channels[10],
+        'resolveMessagingTarget',
+        [{ normalizedPhone: '+201012345678', displayPhone: '010 1234 5678' }],
+      ],
+      [
+        channels[11],
+        'sendTemplate',
+        [{ normalizedPhone: '+201012345678', displayPhone: '010 1234 5678', templateId: 'starter-1', outboundIntentKey: 'intent-1' }],
+      ],
     ];
 
     for (const [channel, method, args] of cases) {
@@ -205,6 +230,60 @@ describe('WhatsAppIpcRuntime', () => {
     register(api as TuxWhatsAppApi);
     await expect(handler(channels[9])({}, 'bad')).rejects.toThrow();
     expect(api.resolveCustomerOrderContext).not.toHaveBeenCalled();
+  });
+
+  it('accepts only customer phone identity when resolving a messaging target', async () => {
+    const api = service();
+    register(api);
+    const event = { sender: { id: 77 } };
+
+    await expect(
+      handler(channels[10])(event, {
+        normalizedPhone: '+201012345678',
+        displayPhone: '010 1234 5678',
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(api.resolveMessagingTarget).toHaveBeenCalledExactlyOnceWith({
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+    });
+
+    await expect(
+      handler(channels[10])(event, {
+        normalizedPhone: '+201012345678',
+        displayPhone: '010 1234 5678',
+        shopId: 'forged-shop',
+      }),
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('accepts only public template intent fields and rejects renderer-supplied trusted authority', async () => {
+    const api = service();
+    register(api);
+    const event = { sender: { id: 77 } };
+
+    await handler(channels[11])(event, {
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+      templateId: 'starter-1',
+      outboundIntentKey: 'intent-1',
+    });
+    expect(api.sendTemplate).toHaveBeenCalledExactlyOnceWith({
+      normalizedPhone: '+201012345678',
+      displayPhone: '010 1234 5678',
+      templateId: 'starter-1',
+      outboundIntentKey: 'intent-1',
+    });
+
+    await expect(
+      handler(channels[11])(event, {
+        normalizedPhone: '+201012345678',
+        displayPhone: '010 1234 5678',
+        templateId: 'starter-1',
+        outboundIntentKey: 'intent-2',
+        workerId: 'forged-worker',
+      }),
+    ).rejects.toThrow(TypeError);
   });
 
   it('removes every WhatsApp handler on close', () => {

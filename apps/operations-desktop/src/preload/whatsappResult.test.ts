@@ -6,6 +6,7 @@ import {
   assertWhatsAppMessageResult,
   assertWhatsAppVoidResult,
   assertWhatsAppCustomerOrderContextResult,
+  assertWhatsAppMessagingTargetResult,
 } from './whatsappResult';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
@@ -109,6 +110,58 @@ describe('WhatsApp preload result parsing', () => {
         activeOrders: [{ displayOrderNo: 17 }, { displayOrderNo: 18 }],
       },
     });
+  });
+
+  it('accepts only the safe public messaging target projection', () => {
+    expect(
+      assertWhatsAppMessagingTargetResult({
+        ok: true,
+        value: {
+          mode: 'FREE_FORM',
+          conversationId: CONVERSATION_ID,
+          freeFormUntil: '2026-09-05T10:00:00.000Z',
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      }),
+    ).toMatchObject({ ok: true, value: { mode: 'FREE_FORM' } });
+
+    expect(
+      assertWhatsAppMessagingTargetResult({
+        ok: true,
+        value: {
+          mode: 'TEMPLATE_ONLY',
+          conversationId: CONVERSATION_ID,
+          normalizedPhone: '+201012345678',
+          displayPhone: '010 1234 5678',
+          templates: [
+            { id: 'starter-1', label: 'Start chat', languageCode: 'ar', previewText: 'أهلاً' },
+          ],
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      }),
+    ).toMatchObject({ ok: true, value: { mode: 'TEMPLATE_ONLY' } });
+
+    expect(() =>
+      assertWhatsAppMessagingTargetResult({
+        ok: true,
+        value: {
+          mode: 'TEMPLATE_ONLY',
+          conversationId: CONVERSATION_ID,
+          normalizedPhone: '+201012345678',
+          displayPhone: '010 1234 5678',
+          templates: [
+            {
+              id: 'starter-1',
+              label: 'Start chat',
+              languageCode: 'ar',
+              previewText: 'أهلاً',
+              providerTemplateName: 'must-not-cross-preload',
+            },
+          ],
+          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+        },
+      }),
+    ).toThrow(TypeError);
   });
 
   it('rejects non-object Result values', () => {
