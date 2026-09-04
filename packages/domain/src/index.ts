@@ -83,6 +83,12 @@ export {
   undoOrderDone,
 } from './orderLifecycle';
 export type * from './orderDraft';
+export { hasMeaningfulOrderDraft } from './orderDraft';
+export {
+  assertParkedOrderDraftInvariant,
+  type ParkedOrderDraft,
+  type ParkedOrderDraftState,
+} from './parkedOrderDraft';
 export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
 export {
   parsePoundsToMinor,

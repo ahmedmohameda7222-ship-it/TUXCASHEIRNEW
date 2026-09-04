@@ -82,3 +82,19 @@ export interface DraftLineCustomization {
   readonly comboBeverageProductIds: readonly ProductId[];
   readonly itemNote: string | null;
 }
+
+export function hasMeaningfulOrderDraft(draft: OrderDraft | null): boolean {
+  if (draft === null) return false;
+  return (
+    draft.lines.length > 0 ||
+    (draft.orderNote?.trim().length ?? 0) > 0 ||
+    draft.discountMinor !== 0 ||
+    draft.payment.mode !== 'NONE' ||
+    draft.delivery.displayPhone.trim().length > 0 ||
+    draft.delivery.normalizedPhone.trim().length > 0 ||
+    draft.delivery.customerName.trim().length > 0 ||
+    draft.delivery.address.trim().length > 0 ||
+    draft.delivery.zoneId !== null ||
+    draft.delivery.finalFeeMinor !== 0
+  );
+}
