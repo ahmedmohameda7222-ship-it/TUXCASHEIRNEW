@@ -467,7 +467,11 @@ describe('Task 8D repository policy RPCs', () => {
     const method = Reflect.get(remote, 'resolveMessagingPolicy') as unknown;
     expect(method).toEqual(expect.any(Function));
 
-    const result = await (method as Function).call(remote, { shopId, conversationId });
+    const resolveMessagingPolicy = method as (input: {
+      shopId: ShopId;
+      conversationId: string;
+    }) => Promise<unknown>;
+    const result = await resolveMessagingPolicy.call(remote, { shopId, conversationId });
 
     expect(lastRequest(fetchMock).url).toContain('/rpc/get_tux_whatsapp_messaging_policy_v1');
     expect(lastRpcBody(fetchMock)).toEqual({
