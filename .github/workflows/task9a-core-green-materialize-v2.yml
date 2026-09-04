@@ -1,11 +1,11 @@
-name: Task 9A Core GREEN Materializer
+name: Task 9A Core GREEN Materializer v2
 
 on:
   push:
     branches:
       - work/operations-whatsapp-inbox-live
     paths:
-      - .github/workflows/task9a-core-green-materialize.yml
+      - .github/workflows/task9a-core-green-materialize-v2.yml
 
 permissions:
   contents: write
@@ -21,9 +21,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .recovery/task9a-core-green.patch.gz.b64 | gzip -d > /tmp/task9a-core-green.patch
+          cat .recovery/task9a-core-c00.txt .recovery/task9a-core-c01.txt .recovery/task9a-core-c02.txt .recovery/task9a-core-c03.txt .recovery/task9a-core-c04.txt .recovery/task9a-core-c05.txt .recovery/task9a-core-c06.txt .recovery/task9a-core-c07.txt | base64 -d | gzip -d > /tmp/task9a-core-green.patch
           test "$(sha256sum /tmp/task9a-core-green.patch | awk '{print $1}')" = "49f8cc64b0f83df8315b2f25f58816b3dc9d4b2ea2786a2d62668b60123b5292"
-          git rm .recovery/task9a-core-green.patch.gz.b64 .github/workflows/task9a-core-green-materialize.yml
+          git rm .recovery/task9a-core-c00.txt .recovery/task9a-core-c01.txt .recovery/task9a-core-c02.txt .recovery/task9a-core-c03.txt .recovery/task9a-core-c04.txt .recovery/task9a-core-c05.txt .recovery/task9a-core-c06.txt .recovery/task9a-core-c07.txt .github/workflows/task9a-core-green-materialize-v2.yml
           git apply --index /tmp/task9a-core-green.patch
           test "$(git write-tree)" = "f7b42c6e0c3d4a15dcf90eeaf6efc0798a475261"
           git config user.name 'github-actions[bot]'
