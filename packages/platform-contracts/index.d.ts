@@ -122,6 +122,8 @@ export type TuxWhatsAppApi = Pick<
   | 'loadInbox'
   | 'loadConversation'
   | 'resolveCustomerOrderContext'
+  | 'resolveMessagingTarget'
+  | 'sendTemplate'
   | 'sendText'
   | 'markUnread'
   | 'archive'

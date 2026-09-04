@@ -224,6 +224,20 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
       }),
     );
 
+  const resolveMessagingTarget = vi
+    .fn<TuxWhatsAppApi['resolveMessagingTarget']>()
+    .mockResolvedValue(
+      ok({
+        mode: 'FREE_FORM',
+        conversationId: '00000000-0000-4000-8000-000000000001',
+        freeFormUntil: '2026-09-05T10:00:00.000Z' as Instant,
+        config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+      }),
+    );
+  const sendTemplate = vi
+    .fn<TuxWhatsAppApi['sendTemplate']>()
+    .mockResolvedValue(ok(message('template-default', '00000000-0000-4000-8000-000000000001')));
+
   const api: TuxWhatsAppApi = {
     loadInbox,
     loadConversation,
@@ -235,6 +249,8 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     saveDraft,
     getDraft,
     resolveCustomerOrderContext,
+    resolveMessagingTarget,
+    sendTemplate,
   };
 
   return {
@@ -249,6 +265,8 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     saveDraft,
     getDraft,
     resolveCustomerOrderContext,
+    resolveMessagingTarget,
+    sendTemplate,
   };
 }
 
@@ -1198,8 +1216,9 @@ describe('WhatsAppInboxController Task 8E policy composer', () => {
     (client.api as unknown as Record<string, unknown>)['sendTemplate'] = sendTemplate;
 
     await controller.selectConversation(selected.id);
-    await (controller as unknown as { sendSelectedTemplate(templateId: string): Promise<void> })
-      .sendSelectedTemplate('starter-1');
+    await (
+      controller as unknown as { sendSelectedTemplate(templateId: string): Promise<void> }
+    ).sendSelectedTemplate('starter-1');
 
     expect(sendTemplate).toHaveBeenCalledExactlyOnceWith({
       normalizedPhone: selected.normalizedPhone,

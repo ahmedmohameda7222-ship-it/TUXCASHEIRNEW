@@ -4,6 +4,7 @@ import {
   type OrderId,
   type ShopId,
   type WhatsAppMessage,
+  type WhatsAppMessagingTarget,
 } from '@tux/domain';
 import type {
   CachedWhatsAppInboxSnapshot,
@@ -156,6 +157,53 @@ export class OperationsWhatsAppService {
       session: this.#session,
       conversationId,
     });
+  }
+
+  async resolveMessagingTarget(input: {
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+  }): Promise<Result<WhatsAppMessagingTarget, ApplicationError>> {
+    try {
+      return ok(await this.#remote.resolveMessagingTarget(input));
+    } catch (cause) {
+      return err(mapRemoteError(cause));
+    }
+  }
+
+  async sendTemplate(input: {
+    readonly normalizedPhone: string;
+    readonly displayPhone: string;
+    readonly templateId: string;
+    readonly outboundIntentKey: string;
+  }): Promise<Result<WhatsAppMessage, ApplicationError>> {
+    const claims = await this.#resolveActiveClaims();
+    if (!claims.ok) return claims;
+
+    let message: WhatsAppMessage;
+    try {
+      message = await this.#remote.sendTemplate({
+        businessDayId: claims.value.businessDayId,
+        workerId: claims.value.workerId,
+        normalizedPhone: input.normalizedPhone,
+        displayPhone: input.displayPhone,
+        templateId: input.templateId,
+        outboundIntentKey: input.outboundIntentKey,
+      });
+    } catch (cause) {
+      return err(mapRemoteError(cause));
+    }
+
+    try {
+      await this.#store.upsertMessage(message);
+    } catch (cause) {
+      return err(
+        localPersistence(
+          'WhatsApp template was sent remotely but could not be written to the local cache.',
+          cause,
+        ),
+      );
+    }
+    return ok(message);
   }
 
   async loadConversation(

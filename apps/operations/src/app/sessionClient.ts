@@ -512,6 +512,9 @@ export function createOperationsWhatsAppClient(): OperationsWhatsAppClient {
     loadInbox: async (cursor) => (await browserWhatsAppRuntime()).loadInbox(cursor),
     loadConversation: async (conversationId) =>
       (await browserWhatsAppRuntime()).loadConversation(conversationId),
+    resolveMessagingTarget: async (input) =>
+      (await browserWhatsAppRuntime()).resolveMessagingTarget(input),
+    sendTemplate: async (input) => (await browserWhatsAppRuntime()).sendTemplate(input),
     sendText: async (input) => (await browserWhatsAppRuntime()).sendText(input),
     markUnread: async (conversationId) =>
       (await browserWhatsAppRuntime()).markUnread(conversationId),

@@ -1,5 +1,10 @@
 import type { WhatsAppCustomerOrderContext, WhatsAppInboxSnapshot } from '@tux/application';
-import type { OrderId, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
+import type {
+  OrderId,
+  WhatsAppConversation,
+  WhatsAppMessage,
+  WhatsAppMessagingTarget,
+} from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import {
   filterAndSortWhatsAppConversations,
@@ -26,6 +31,7 @@ export interface WhatsAppInboxUiState {
   readonly composerText: string;
   readonly sendBusy: boolean;
   readonly customerOrderContext: WhatsAppCustomerOrderContext | null;
+  readonly messagingTarget: WhatsAppMessagingTarget | null;
   readonly contextBusy: boolean;
 }
 
@@ -120,6 +126,7 @@ export class WhatsAppInboxController {
       composerText: '',
       sendBusy: false,
       customerOrderContext: null,
+      messagingTarget: null,
       contextBusy: false,
     };
   }
@@ -237,14 +244,28 @@ export class WhatsAppInboxController {
       selectedConversationId: conversationId,
       ...(previousConversationId === conversationId
         ? {}
-        : { selectedMessages: [], composerText: '', customerOrderContext: null }),
+        : {
+            selectedMessages: [],
+            composerText: '',
+            customerOrderContext: null,
+            messagingTarget: null,
+          }),
       contextBusy: true,
     });
 
-    const [messagesResult, draftResult, contextResult] = await Promise.all([
+    const selectedConversation = this.#state.snapshot.conversations.find(
+      (item) => item.id === conversationId,
+    );
+    if (selectedConversation === undefined) return;
+
+    const [messagesResult, draftResult, contextResult, targetResult] = await Promise.all([
       this.#client.loadConversation(conversationId),
       this.#client.getDraft(conversationId),
       this.#client.resolveCustomerOrderContext(conversationId),
+      this.#client.resolveMessagingTarget({
+        normalizedPhone: selectedConversation.normalizedPhone,
+        displayPhone: selectedConversation.displayPhone,
+      }),
     ]);
 
     if (!this.#selectionIsCurrent(generation, conversationId)) return;
@@ -280,6 +301,13 @@ export class WhatsAppInboxController {
         contextBusy: false,
         errorMessage: contextResult.error.message,
       });
+    }
+
+    if (!this.#selectionIsCurrent(generation, conversationId)) return;
+    if (targetResult.ok) {
+      this.#publish({ messagingTarget: targetResult.value });
+    } else {
+      this.#publish({ messagingTarget: null, errorMessage: targetResult.error.message });
     }
   }
 
@@ -317,6 +345,41 @@ export class WhatsAppInboxController {
 
   insertQuickReply(text: string): void {
     this.setComposerText(insertQuickReplyText(this.#state.composerText, text));
+  }
+
+  insertMenuReply(): void {
+    const target = this.#state.messagingTarget;
+    if (target === null) return;
+    this.insertQuickReply(`منيو TUX 👇\n${target.config.storefrontUrl}`);
+  }
+
+  async sendSelectedTemplate(templateId: string): Promise<void> {
+    const target = this.#state.messagingTarget;
+    const conversationId = this.#state.selectedConversationId;
+    if (target?.mode !== 'TEMPLATE_ONLY' || conversationId === null || this.#state.sendBusy) return;
+    if (!target.templates.some((template) => template.id === templateId)) return;
+    const conversation = this.#state.snapshot?.conversations.find(
+      (item) => item.id === conversationId,
+    );
+    if (conversation === undefined) return;
+
+    this.#publish({ sendBusy: true, errorMessage: null });
+    try {
+      const result = await this.#client.sendTemplate({
+        normalizedPhone: conversation.normalizedPhone,
+        displayPhone: conversation.displayPhone,
+        templateId,
+        outboundIntentKey: this.#environment.createIntentKey(),
+      });
+      if (!result.ok) {
+        this.#publish({ sendBusy: false, errorMessage: result.error.message });
+        return;
+      }
+      this.#publish({ sendBusy: false });
+      await this.refresh();
+    } catch {
+      this.#publish({ sendBusy: false, errorMessage: 'WhatsApp template send failed.' });
+    }
   }
 
   async sendCurrentText(): Promise<void> {
@@ -370,6 +433,12 @@ export class WhatsAppInboxController {
     if (!result.ok) {
       if (this.#sendVisualContextMatches(attempt)) {
         this.#publish({ errorMessage: result.error.message });
+      }
+      if (
+        result.error.code === 'WHATSAPP_FREE_FORM_WINDOW_CLOSED' &&
+        this.#state.selectedConversationId === attempt.conversationId
+      ) {
+        await this.#refreshSelectedMessagingTarget(attempt.conversationId);
       }
       return;
     }
@@ -455,6 +524,27 @@ export class WhatsAppInboxController {
 
   async setFollowUp(conversationId: string, followUp: boolean): Promise<void> {
     await this.#runMutation(() => this.#client.setFollowUp(conversationId, followUp));
+  }
+
+  async #refreshSelectedMessagingTarget(conversationId: string): Promise<void> {
+    const generation = this.#selectionGeneration;
+    const conversation = this.#state.snapshot?.conversations.find(
+      (item) => item.id === conversationId,
+    );
+    if (conversation === undefined) return;
+    try {
+      const result = await this.#client.resolveMessagingTarget({
+        normalizedPhone: conversation.normalizedPhone,
+        displayPhone: conversation.displayPhone,
+      });
+      if (!this.#selectionIsCurrent(generation, conversationId)) return;
+      if (result.ok) this.#publish({ messagingTarget: result.value });
+      else this.#publish({ errorMessage: result.error.message });
+    } catch {
+      if (this.#selectionIsCurrent(generation, conversationId)) {
+        this.#publish({ errorMessage: 'Could not refresh WhatsApp messaging availability.' });
+      }
+    }
   }
 
   async #drainRefreshes(): Promise<void> {
@@ -558,6 +648,7 @@ export class WhatsAppInboxController {
       selectedMessages: [],
       composerText: '',
       customerOrderContext: null,
+      messagingTarget: null,
       contextBusy: false,
     });
   }
