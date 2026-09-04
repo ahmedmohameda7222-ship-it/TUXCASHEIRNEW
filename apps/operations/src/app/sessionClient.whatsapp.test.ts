@@ -5,6 +5,20 @@ const mocks = vi.hoisted(() => ({
   storeInitialize: vi.fn().mockResolvedValue(undefined),
   remoteConstructor: vi.fn(),
   serviceConstructor: vi.fn(),
+  resolveCustomerOrderContext: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      kind: 'NO_ACTIVE_ORDER',
+      customer: {
+        normalizedPhone: '01012345678',
+        displayPhone: '+201012345678',
+        customerName: 'Customer',
+        address: null,
+        zoneId: null,
+      },
+      activeOrders: [],
+    },
+  }),
   loadInbox: vi.fn().mockResolvedValue({
     ok: true,
     value: {
@@ -51,6 +65,7 @@ vi.mock('@tux/application', async (importOriginal) => {
     linkOrder = vi.fn();
     saveDraft = vi.fn();
     getDraft = vi.fn();
+    resolveCustomerOrderContext = mocks.resolveCustomerOrderContext;
   }
   return { ...actual, OperationsWhatsAppService };
 });
@@ -64,6 +79,7 @@ const methodNames = [
   'loadConversation',
   'loadInbox',
   'markUnread',
+  'resolveCustomerOrderContext',
   'saveDraft',
   'sendText',
   'setFollowUp',
@@ -107,5 +123,13 @@ describe('createOperationsWhatsAppClient', () => {
     expect(mocks.remoteConstructor).toHaveBeenCalledTimes(1);
     expect(mocks.serviceConstructor).toHaveBeenCalledTimes(1);
     expect(mocks.loadInbox).toHaveBeenCalledTimes(1);
+
+    const context = await client.resolveCustomerOrderContext(
+      '22222222-2222-4222-8222-222222222222',
+    );
+    expect(context).toMatchObject({ ok: true, value: { kind: 'NO_ACTIVE_ORDER' } });
+    expect(mocks.resolveCustomerOrderContext).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+    );
   });
 });

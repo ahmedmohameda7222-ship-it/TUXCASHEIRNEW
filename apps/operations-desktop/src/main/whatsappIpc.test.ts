@@ -39,6 +39,7 @@ const channels = [
   'tux:whatsapp:link-order',
   'tux:whatsapp:save-draft',
   'tux:whatsapp:get-draft',
+  'tux:whatsapp:resolve-customer-order-context',
 ] as const;
 
 function service(): TuxWhatsAppApi {
@@ -64,6 +65,20 @@ function service(): TuxWhatsAppApi {
     linkOrder: vi.fn(async () => ({ ok: true, value: undefined })) as never,
     saveDraft: vi.fn(async () => ({ ok: true, value: undefined })) as never,
     getDraft: vi.fn(async () => ({ ok: true, value: null })) as never,
+    resolveCustomerOrderContext: vi.fn(async () => ({
+      ok: true,
+      value: {
+        kind: 'NO_ACTIVE_ORDER',
+        customer: {
+          normalizedPhone: '01012345678',
+          displayPhone: '+201012345678',
+          customerName: 'Customer',
+          address: null,
+          zoneId: null,
+        },
+        activeOrders: [],
+      },
+    })) as never,
   };
 }
 
@@ -87,7 +102,7 @@ beforeEach(() => {
 });
 
 describe('WhatsAppIpcRuntime', () => {
-  it('registers exactly all nine WhatsApp channels', () => {
+  it('registers exactly all ten WhatsApp channels', () => {
     register();
     expect([...electron.handlers.keys()]).toEqual(channels);
   });
@@ -106,6 +121,7 @@ describe('WhatsAppIpcRuntime', () => {
       [channels[6], 'linkOrder', [{ conversationId, orderId, linked: true }]],
       [channels[7], 'saveDraft', [conversationId, '']],
       [channels[8], 'getDraft', [conversationId]],
+      [channels[9], 'resolveCustomerOrderContext' as keyof TuxWhatsAppApi, [conversationId]],
     ];
 
     for (const [channel, method, args] of cases) {
@@ -180,6 +196,15 @@ describe('WhatsAppIpcRuntime', () => {
     register(api);
     await expect(handler(channels[8])({}, 'bad')).rejects.toThrow();
     expect(api.getDraft).not.toHaveBeenCalled();
+  });
+
+  it('validates customer-order context conversationId before invoking the service', async () => {
+    const api = service() as TuxWhatsAppApi & {
+      resolveCustomerOrderContext: ReturnType<typeof vi.fn>;
+    };
+    register(api as TuxWhatsAppApi);
+    await expect(handler(channels[9])({}, 'bad')).rejects.toThrow();
+    expect(api.resolveCustomerOrderContext).not.toHaveBeenCalled();
   });
 
   it('removes every WhatsApp handler on close', () => {

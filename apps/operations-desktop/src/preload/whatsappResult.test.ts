@@ -5,6 +5,7 @@ import {
   assertWhatsAppInboxResult,
   assertWhatsAppMessageResult,
   assertWhatsAppVoidResult,
+  assertWhatsAppCustomerOrderContextResult,
 } from './whatsappResult';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
@@ -48,6 +49,35 @@ function inbox() {
   };
 }
 
+function customerOrderContext() {
+  return {
+    kind: 'MULTIPLE_ACTIVE_ORDERS',
+    customer: {
+      normalizedPhone: '01012345678',
+      displayPhone: '+201012345678',
+      customerName: 'Customer',
+      address: 'Address',
+      zoneId: '66666666-6666-4666-8666-666666666666',
+    },
+    activeOrders: [
+      {
+        id: ORDER_ID,
+        displayOrderNo: 17,
+        status: 'ACTIVE',
+        orderTypeLabel: 'Delivery',
+        createdAt: '2026-09-03T12:00:00.000Z',
+      },
+      {
+        id: '77777777-7777-4777-8777-777777777777',
+        displayOrderNo: 18,
+        status: 'ACTIVE',
+        orderTypeLabel: 'Delivery',
+        createdAt: '2026-09-03T12:01:00.000Z',
+      },
+    ],
+  };
+}
+
 function draft() {
   return {
     shopId: SHOP_ID,
@@ -70,6 +100,15 @@ describe('WhatsApp preload result parsing', () => {
     });
     expect(assertWhatsAppDraftResult({ ok: true, value: draft() })).toMatchObject({ ok: true });
     expect(assertWhatsAppDraftResult({ ok: true, value: null })).toEqual({ ok: true, value: null });
+    expect(
+      assertWhatsAppCustomerOrderContextResult({ ok: true, value: customerOrderContext() }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        kind: 'MULTIPLE_ACTIVE_ORDERS',
+        activeOrders: [{ displayOrderNo: 17 }, { displayOrderNo: 18 }],
+      },
+    });
   });
 
   it('rejects non-object Result values', () => {
@@ -89,6 +128,21 @@ describe('WhatsApp preload result parsing', () => {
     expect(() => assertWhatsAppVoidResult({ ok: true, value: 'not-void' })).toThrow(TypeError);
     expect(() =>
       assertWhatsAppDraftResult({ ok: true, value: { ...draft(), shopId: 'forged' } }),
+    ).toThrow(TypeError);
+    expect(() =>
+      assertWhatsAppCustomerOrderContextResult({
+        ok: true,
+        value: {
+          ...customerOrderContext(),
+          activeOrders: [{ ...customerOrderContext().activeOrders[0], items: [{ secret: true }] }],
+        },
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      assertWhatsAppCustomerOrderContextResult({
+        ok: true,
+        value: { ...customerOrderContext(), kind: 'ONE_ACTIVE_ORDER' },
+      }),
     ).toThrow(TypeError);
   });
 

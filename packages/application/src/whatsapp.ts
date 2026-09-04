@@ -5,10 +5,19 @@ import {
   type ShopId,
   type WhatsAppMessage,
 } from '@tux/domain';
-import type { CachedWhatsAppInboxSnapshot, WhatsAppDraft, WhatsAppStore } from '@tux/persistence';
+import type {
+  CachedWhatsAppInboxSnapshot,
+  OperationsDatabase,
+  WhatsAppDraft,
+  WhatsAppStore,
+} from '@tux/persistence';
 import type { ApplicationError } from './errors';
 import { err, ok, type Result } from './result';
 import type { OperationsSessionResult } from './session';
+import {
+  resolveWhatsAppCustomerOrderContext,
+  type WhatsAppCustomerOrderContext,
+} from './whatsappOrderContext';
 import {
   WhatsAppRemoteError,
   type WhatsAppInboxSnapshot,
@@ -88,17 +97,20 @@ export class OperationsWhatsAppService {
   readonly #store: WhatsAppStore;
   readonly #session: WhatsAppSessionStateSource;
   readonly #now: () => Instant;
+  readonly #database: OperationsDatabase | null;
 
   constructor(
     remote: WhatsAppRemoteGateway,
     store: WhatsAppStore,
     session: WhatsAppSessionStateSource,
     now: () => Instant = () => instant(new Date()),
+    database: OperationsDatabase | null = null,
   ) {
     this.#remote = remote;
     this.#store = store;
     this.#session = session;
     this.#now = now;
+    this.#database = database;
   }
 
   async loadInbox(cursor?: string): Promise<Result<WhatsAppInboxSnapshot, ApplicationError>> {
@@ -123,6 +135,20 @@ export class OperationsWhatsAppService {
       }
       return err(mapRemoteError(cause));
     }
+  }
+
+  async resolveCustomerOrderContext(
+    conversationId: string,
+  ): Promise<Result<WhatsAppCustomerOrderContext, ApplicationError>> {
+    if (this.#database === null) {
+      return err(conflict('Local Operations data is required to resolve WhatsApp order context.'));
+    }
+    return resolveWhatsAppCustomerOrderContext({
+      database: this.#database,
+      store: this.#store,
+      session: this.#session,
+      conversationId,
+    });
   }
 
   async loadConversation(

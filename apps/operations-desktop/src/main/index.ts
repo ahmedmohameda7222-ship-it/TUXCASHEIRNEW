@@ -293,6 +293,7 @@ async function initializeOperationsServices(): Promise<void> {
     whatsappStore,
     { getState: () => sessionService!.getState() },
     runtime.now,
+    operationsDatabase,
   );
   whatsappIpcRuntime = new WhatsAppIpcRuntime({ service: whatsappService });
 

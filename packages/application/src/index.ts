@@ -124,3 +124,10 @@ export type {
 } from './workerUiPreferences';
 export { OperationsWhatsAppService } from './whatsapp';
 export type { WhatsAppSessionStateSource } from './whatsapp';
+export type {
+  WhatsAppActiveOrderSummary,
+  WhatsAppCustomerContext,
+  WhatsAppCustomerOrderContext,
+  WhatsAppOrderContextSessionSource,
+} from './whatsappOrderContext';
+export { resolveWhatsAppCustomerOrderContext } from './whatsappOrderContext';
