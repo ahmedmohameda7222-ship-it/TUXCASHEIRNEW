@@ -1,0 +1,166 @@
+diff --git a/apps/operations/src/app/WhatsAppWorkspace.test.tsx b/apps/operations/src/app/WhatsAppWorkspace.test.tsx
+index ed7025f..06f1a4c 100644
+--- a/apps/operations/src/app/WhatsAppWorkspace.test.tsx
++++ b/apps/operations/src/app/WhatsAppWorkspace.test.tsx
+@@ -161,17 +161,17 @@ describe('WhatsAppWorkspace', () => {
+   it('locks the approved premium two-pane hierarchy without a permanent inspector', () => {
+     const markup = render(state());
+ 
+-    expect((markup.match(/data-whatsapp-pane=\"rail\"/g) ?? [])).toHaveLength(1);
+-    expect((markup.match(/data-whatsapp-pane=\"detail\"/g) ?? [])).toHaveLength(1);
+-    expect(markup).not.toContain('data-whatsapp-pane=\"inspector\"');
+-    expect(markup).toContain('data-whatsapp-region=\"conversation-list\"');
+-    expect(markup).toContain('data-whatsapp-region=\"conversation-header\"');
+-    expect(markup).toContain('data-whatsapp-region=\"message-history\"');
+-    expect(markup).toContain('data-whatsapp-region=\"composer\"');
+-
+-    const headerIndex = markup.indexOf('data-whatsapp-region=\"conversation-header\"');
+-    const historyIndex = markup.indexOf('data-whatsapp-region=\"message-history\"');
+-    const composerIndex = markup.indexOf('data-whatsapp-region=\"composer\"');
++    expect(markup.match(/data-whatsapp-pane="rail"/g) ?? []).toHaveLength(1);
++    expect(markup.match(/data-whatsapp-pane="detail"/g) ?? []).toHaveLength(1);
++    expect(markup).not.toContain('data-whatsapp-pane="inspector"');
++    expect(markup).toContain('data-whatsapp-region="conversation-list"');
++    expect(markup).toContain('data-whatsapp-region="conversation-header"');
++    expect(markup).toContain('data-whatsapp-region="message-history"');
++    expect(markup).toContain('data-whatsapp-region="composer"');
++
++    const headerIndex = markup.indexOf('data-whatsapp-region="conversation-header"');
++    const historyIndex = markup.indexOf('data-whatsapp-region="message-history"');
++    const composerIndex = markup.indexOf('data-whatsapp-region="composer"');
+     expect(headerIndex).toBeGreaterThan(-1);
+     expect(historyIndex).toBeGreaterThan(headerIndex);
+     expect(composerIndex).toBeGreaterThan(historyIndex);
+diff --git a/apps/operations/src/app/WhatsAppWorkspace.tsx b/apps/operations/src/app/WhatsAppWorkspace.tsx
+index e5708f0..0f5d752 100644
+--- a/apps/operations/src/app/WhatsAppWorkspace.tsx
++++ b/apps/operations/src/app/WhatsAppWorkspace.tsx
+@@ -70,10 +70,11 @@ function ConversationRow({
+       }
+       data-conversation-id={conversation.id}
+       aria-pressed={selected}
++      aria-current={selected ? 'true' : undefined}
+       onClick={onSelect}
+     >
+       <span className="whatsapp-conversation-row-heading">
+-        <strong>{whatsAppConversationDisplayName(conversation)}</strong>
++        <strong dir="auto">{whatsAppConversationDisplayName(conversation)}</strong>
+         {time === null ? null : <time dateTime={String(conversation.lastMessageAt)}>{time}</time>}
+       </span>
+       <span className="whatsapp-conversation-context">
+@@ -144,7 +145,10 @@ function ConversationPanel({
+ }) {
+   if (conversation === null) {
+     return (
+-      <section className="whatsapp-conversation-panel whatsapp-conversation-panel-empty">
++      <section
++        className="whatsapp-conversation-panel whatsapp-conversation-panel-empty"
++        data-whatsapp-pane="detail"
++      >
+         <div>
+           <h2>No conversation selected</h2>
+           <p>Choose a conversation from the inbox rail.</p>
+@@ -156,12 +160,16 @@ function ConversationPanel({
+   const quickReplies = sortActiveQuickReplies(state.snapshot?.quickReplies ?? []);
+ 
+   return (
+-    <section className="whatsapp-conversation-panel" aria-label="Active WhatsApp conversation">
+-      <header className="whatsapp-conversation-header">
++    <section
++      className="whatsapp-conversation-panel"
++      aria-label="Active WhatsApp conversation"
++      data-whatsapp-pane="detail"
++    >
++      <header className="whatsapp-conversation-header" data-whatsapp-region="conversation-header">
+         <div className="whatsapp-conversation-identity">
+           <div>
+             <p className="eyebrow">{whatsAppConversationLabel(conversation)}</p>
+-            <h2>{whatsAppConversationDisplayName(conversation)}</h2>
++            <h2 dir="auto">{whatsAppConversationDisplayName(conversation)}</h2>
+           </div>
+           <p>{conversation.displayPhone}</p>
+           {conversation.linkedOrderId === null ? null : (
+@@ -196,7 +204,11 @@ function ConversationPanel({
+         </div>
+       </header>
+ 
+-      <div className="whatsapp-message-history" aria-label="Message history">
++      <div
++        className="whatsapp-message-history"
++        aria-label="Message history"
++        data-whatsapp-region="message-history"
++      >
+         {state.selectedMessages.length === 0 ? (
+           <p className="whatsapp-empty-copy">No loaded messages in this conversation.</p>
+         ) : (
+@@ -204,7 +216,7 @@ function ConversationPanel({
+         )}
+       </div>
+ 
+-      <div className="whatsapp-composer-zone">
++      <div className="whatsapp-composer-zone" data-whatsapp-region="composer">
+         <div className="whatsapp-quick-replies" aria-label="Quick replies">
+           {quickReplies.length === 0 ? (
+             <span className="whatsapp-empty-copy">No saved quick replies.</span>
+@@ -264,7 +276,7 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
+ 
+   return (
+     <section className="whatsapp-workspace" aria-label="WhatsApp inbox">
+-      <aside className="whatsapp-conversation-rail">
++      <aside className="whatsapp-conversation-rail" data-whatsapp-pane="rail">
+         <header className="whatsapp-rail-heading">
+           <div>
+             <p className="eyebrow">Worker inbox</p>
+@@ -316,7 +328,11 @@ export function WhatsAppWorkspace({ controller, state }: WhatsAppWorkspaceProps)
+           ))}
+         </div>
+ 
+-        <div className="whatsapp-conversation-list" aria-label="Conversations">
++        <div
++          className="whatsapp-conversation-list"
++          aria-label="Conversations"
++          data-whatsapp-region="conversation-list"
++        >
+           {state.visibleConversations.length === 0 ? (
+             <p className="whatsapp-empty-copy">No conversations match this view.</p>
+           ) : (
+diff --git a/apps/operations/src/styles/global.css b/apps/operations/src/styles/global.css
+index b66fa2a..fa2cfea 100644
+--- a/apps/operations/src/styles/global.css
++++ b/apps/operations/src/styles/global.css
+@@ -403,7 +403,7 @@ button:not(:disabled) {
+ 
+ .whatsapp-workspace {
+   display: grid;
+-  grid-template-columns: minmax(18rem, 23rem) minmax(0, 1fr);
++  grid-template-columns: clamp(300px, 26vw, 360px) minmax(0, 1fr);
+   height: calc(100vh - 4rem);
+   min-height: 32rem;
+   background: var(--tux-surface-canvas);
+@@ -519,6 +519,7 @@ button:not(:disabled) {
+ }
+ 
+ .whatsapp-conversation-list {
++  flex: 1;
+   min-height: 0;
+   overflow: auto;
+   border-top: 1px solid var(--tux-border-subtle);
+@@ -716,6 +717,9 @@ button:not(:disabled) {
+ }
+ 
+ .whatsapp-composer-zone {
++  position: sticky;
++  bottom: 0;
++  z-index: 1;
+   display: grid;
+   gap: var(--tux-space-2);
+   padding: var(--tux-space-4) var(--tux-space-5) var(--tux-space-5);
+@@ -782,7 +786,7 @@ button:not(:disabled) {
+   }
+ 
+   .whatsapp-workspace {
+-    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
++    grid-template-columns: clamp(300px, 26vw, 340px) minmax(0, 1fr);
+     height: calc(100vh - 6rem);
+   }
+ 
