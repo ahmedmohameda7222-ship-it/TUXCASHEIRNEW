@@ -1,6 +1,25 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeEgyptianPhone, type ShopId } from '@tux/domain';
 import type { WhatsAppChannelResolver } from './whatsappChannelResolver';
+import {
+  WHATSAPP_MEDIA_LIMITS,
+  WHATSAPP_MEDIA_MIME_TYPES,
+  validateWhatsAppMediaContent,
+  type WhatsAppMediaKind,
+  type WhatsAppMediaValidation,
+} from './whatsappMediaPolicy';
+import {
+  SupabaseWhatsAppOperationsRepository,
+  type WhatsAppInboundMediaMaterializationInput,
+} from './whatsappOperationsRepository';
+import type { WhatsAppProviderGateway } from './whatsappProviderGateway';
+import {
+  WHATSAPP_MEDIA_BUCKET,
+  WHATSAPP_MEDIA_RETENTION_MS,
+  type WhatsAppDataServerConfig,
+} from './whatsappServerConfig';
+
+const MEDIA_VALIDATION_PREFIX_BYTES = 1024 * 1024;
 
 export interface WhatsAppWebhookInput {
   readonly method: string | undefined;
@@ -29,6 +48,41 @@ export interface WhatsAppInboundMaterializeInput {
 
 export interface WhatsAppInboundMaterializer {
   materializeInbound(input: WhatsAppInboundMaterializeInput): Promise<void>;
+  materializeInboundMedia(input: WhatsAppInboundMediaMaterializationInput): Promise<void>;
+}
+
+export type WhatsAppInboundMediaStoreResult =
+  | {
+      readonly status: 'STORED';
+      readonly media: {
+        readonly mediaKey: string;
+        readonly bucketId: string;
+        readonly objectPath: string;
+        readonly mimeType: string;
+        readonly fileName: string | null;
+        readonly byteSize: number;
+        readonly sha256: string;
+        readonly storedAt: string;
+        readonly expiresAt: string;
+      };
+    }
+  | {
+      readonly status: 'REJECTED';
+      readonly code: WhatsAppMediaValidation extends { readonly ok: false; readonly code: infer Code }
+        ? Code
+        : never;
+    };
+
+export interface WhatsAppInboundMediaStore {
+  storeInboundMedia(input: {
+    readonly shopId: ShopId;
+    readonly providerMessageId: string;
+    readonly kind: WhatsAppMediaKind;
+    readonly mimeType: string;
+    readonly byteSize: number;
+    readonly fileName: string | null;
+    readonly body: ReadableStream<Uint8Array>;
+  }): Promise<WhatsAppInboundMediaStoreResult>;
 }
 
 export type WhatsAppWebhookDiagnostic =
@@ -37,19 +91,18 @@ export type WhatsAppWebhookDiagnostic =
   | 'invalid_sender_phone'
   | 'unsupported_message'
   | 'channel_resolver_unavailable'
-  | 'materializer_unavailable';
+  | 'materializer_unavailable'
+  | 'media_unavailable'
+  | 'media_rejected';
 
 export interface WhatsAppWebhookDependencies {
   readonly appSecret: string;
   readonly webhookVerifyToken: string;
   readonly channelResolver: WhatsAppChannelResolver;
   readonly materializer: WhatsAppInboundMaterializer;
+  readonly providerGateway: Pick<WhatsAppProviderGateway, 'fetchMedia'>;
+  readonly mediaStore: WhatsAppInboundMediaStore;
   readonly diagnosticSink?: (diagnostic: WhatsAppWebhookDiagnostic) => void;
-}
-
-interface MaterializerConfig {
-  readonly projectUrl: string;
-  readonly serviceRoleKey: string;
 }
 
 function jsonResult(
@@ -119,8 +172,15 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function optionalString(source: Record<string, unknown>, key: string): string | null {
+function optionalString(source: Readonly<Record<string, unknown>>, key: string): string | null {
   return nonEmptyString(source[key]);
+}
+
+function safeFileName(value: unknown): string | null {
+  const candidate = nonEmptyString(value);
+  if (candidate === null) return null;
+  const withoutControls = candidate.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  return withoutControls.length === 0 ? null : withoutControls.slice(0, 255);
 }
 
 function providerOccurredAt(timestamp: unknown): string | null {
@@ -238,13 +298,196 @@ function translateProviderMessage(
   return null;
 }
 
-export class SupabaseWhatsAppInboundMaterializer implements WhatsAppInboundMaterializer {
-  readonly #config: MaterializerConfig;
-  readonly #fetch: typeof fetch;
+function isBinaryKind(
+  kind: WhatsAppInboundMaterializeInput['kind'],
+): kind is WhatsAppMediaKind {
+  return kind === 'IMAGE' || kind === 'DOCUMENT' || kind === 'AUDIO';
+}
 
-  constructor(config: MaterializerConfig, fetchImpl: typeof fetch = fetch) {
+export function inboundWhatsAppMediaKey(shopId: ShopId, providerMessageId: string): string {
+  return createHash('sha256')
+    .update(`inbound:${shopId}:${providerMessageId}`)
+    .digest('hex');
+}
+
+async function readValidationPrefix(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (length < MEDIA_VALIDATION_PREFIX_BYTES) {
+      const next = await reader.read();
+      if (next.done) break;
+      if (next.value.byteLength === 0) continue;
+      const remaining = MEDIA_VALIDATION_PREFIX_BYTES - length;
+      const piece = next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
+      chunks.push(piece);
+      length += piece.byteLength;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  const prefix = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    prefix.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return prefix;
+}
+
+function storageObjectUrl(config: WhatsAppDataServerConfig, objectPath: string): string {
+  const encodedPath = objectPath.split('/').map(encodeURIComponent).join('/');
+  return `${config.projectUrl}/storage/v1/object/${WHATSAPP_MEDIA_BUCKET}/${encodedPath}`;
+}
+
+export class SupabaseWhatsAppInboundMediaStore implements WhatsAppInboundMediaStore {
+  readonly #fetch: typeof fetch;
+  readonly #now: () => number;
+
+  constructor(
+    private readonly config: WhatsAppDataServerConfig,
+    fetchImpl: typeof fetch = fetch,
+    now: () => number = Date.now,
+  ) {
+    this.#fetch = fetchImpl;
+    this.#now = now;
+  }
+
+  async #deleteObject(objectPath: string): Promise<void> {
+    try {
+      await this.#fetch(storageObjectUrl(this.config, objectPath), {
+        method: 'DELETE',
+        headers: {
+          apikey: this.config.serviceRoleKey,
+          Authorization: `Bearer ${this.config.serviceRoleKey}`,
+        },
+      });
+    } catch {
+      // Best-effort cleanup only; materialization never proceeds after a failed upload/validation.
+    }
+  }
+
+  async storeInboundMedia(input: {
+    readonly shopId: ShopId;
+    readonly providerMessageId: string;
+    readonly kind: WhatsAppMediaKind;
+    readonly mimeType: string;
+    readonly byteSize: number;
+    readonly fileName: string | null;
+    readonly body: ReadableStream<Uint8Array>;
+  }): Promise<WhatsAppInboundMediaStoreResult> {
+    const allowed = WHATSAPP_MEDIA_MIME_TYPES[input.kind] as readonly string[];
+    if (!allowed.includes(input.mimeType)) return { status: 'REJECTED', code: 'MIME_NOT_ALLOWED' };
+    if (
+      !Number.isSafeInteger(input.byteSize) ||
+      input.byteSize < 0 ||
+      input.byteSize > WHATSAPP_MEDIA_LIMITS[input.kind]
+    ) {
+      return { status: 'REJECTED', code: 'TOO_LARGE' };
+    }
+
+    const [validationBody, uploadBody] = input.body.tee();
+    const prefix = await readValidationPrefix(validationBody);
+    const validation = validateWhatsAppMediaContent({
+      kind: input.kind,
+      mimeType: input.mimeType,
+      byteSize: input.byteSize,
+      prefix,
+    });
+    if (!validation.ok) {
+      await uploadBody.cancel().catch(() => undefined);
+      return { status: 'REJECTED', code: validation.code };
+    }
+
+    const mediaKey = inboundWhatsAppMediaKey(input.shopId, input.providerMessageId);
+    const objectPath = `media/${input.shopId}/${mediaKey}`;
+    const hash = createHash('sha256');
+    const uploadReader = uploadBody.getReader();
+    let streamedBytes = 0;
+    const monitoredBody = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const next = await uploadReader.read();
+          if (next.done) {
+            controller.close();
+            return;
+          }
+          streamedBytes += next.value.byteLength;
+          if (streamedBytes > WHATSAPP_MEDIA_LIMITS[input.kind]) {
+            controller.error(new Error('WhatsApp media exceeded the bounded stream limit.'));
+            return;
+          }
+          hash.update(next.value);
+          controller.enqueue(next.value);
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+      async cancel(reason) {
+        await uploadReader.cancel(reason);
+      },
+    });
+
+    let uploadResponse: Response;
+    try {
+      uploadResponse = await this.#fetch(
+        storageObjectUrl(this.config, objectPath),
+        {
+          method: 'POST',
+          headers: {
+            apikey: this.config.serviceRoleKey,
+            Authorization: `Bearer ${this.config.serviceRoleKey}`,
+            'Content-Type': input.mimeType,
+            'x-upsert': 'true',
+          },
+          body: monitoredBody,
+          duplex: 'half',
+        } as RequestInit,
+      );
+    } catch {
+      await this.#deleteObject(objectPath);
+      throw new Error('WhatsApp media storage is unavailable.');
+    }
+
+    if (!uploadResponse.ok) {
+      await this.#deleteObject(objectPath);
+      throw new Error('WhatsApp media storage is unavailable.');
+    }
+    if (streamedBytes !== input.byteSize) {
+      await this.#deleteObject(objectPath);
+      return { status: 'REJECTED', code: 'CONTENT_MISMATCH' };
+    }
+
+    const storedAtMs = this.#now();
+    const storedAt = new Date(storedAtMs).toISOString();
+    const expiresAt = new Date(storedAtMs + WHATSAPP_MEDIA_RETENTION_MS).toISOString();
+    return {
+      status: 'STORED',
+      media: {
+        mediaKey,
+        bucketId: WHATSAPP_MEDIA_BUCKET,
+        objectPath,
+        mimeType: input.mimeType,
+        fileName: safeFileName(input.fileName),
+        byteSize: streamedBytes,
+        sha256: hash.digest('hex'),
+        storedAt,
+        expiresAt,
+      },
+    };
+  }
+}
+
+export class SupabaseWhatsAppInboundMaterializer implements WhatsAppInboundMaterializer {
+  readonly #config: WhatsAppDataServerConfig;
+  readonly #fetch: typeof fetch;
+  readonly #repository: SupabaseWhatsAppOperationsRepository;
+
+  constructor(config: WhatsAppDataServerConfig, fetchImpl: typeof fetch = fetch) {
     this.#config = config;
     this.#fetch = fetchImpl;
+    this.#repository = new SupabaseWhatsAppOperationsRepository(config, fetchImpl);
   }
 
   async materializeInbound(input: WhatsAppInboundMaterializeInput): Promise<void> {
@@ -280,6 +523,81 @@ export class SupabaseWhatsAppInboundMaterializer implements WhatsAppInboundMater
       throw new Error('WhatsApp inbound materializer is unavailable.');
     }
   }
+
+  async materializeInboundMedia(input: WhatsAppInboundMediaMaterializationInput): Promise<void> {
+    try {
+      await this.#repository.materializeInboundMedia(input);
+    } catch {
+      throw new Error('WhatsApp inbound materializer is unavailable.');
+    }
+  }
+}
+
+async function handleBinaryMessage(
+  translated: TranslatedProviderMessage,
+  shopId: ShopId,
+  phone: { readonly normalizedPhone: string; readonly displayPhone: string },
+  dependencies: WhatsAppWebhookDependencies,
+): Promise<WhatsAppWebhookResult | null> {
+  if (!isBinaryKind(translated.kind) || translated.mediaRef === null) return null;
+
+  let providerMedia;
+  try {
+    providerMedia = await dependencies.providerGateway.fetchMedia({
+      providerMediaId: translated.mediaRef,
+    });
+  } catch {
+    emitDiagnostic(dependencies, 'media_unavailable');
+    return jsonResult(503, { error: 'whatsapp_media_unavailable' });
+  }
+
+  let stored: WhatsAppInboundMediaStoreResult;
+  try {
+    stored = await dependencies.mediaStore.storeInboundMedia({
+      shopId,
+      providerMessageId: translated.providerMessageId,
+      kind: translated.kind,
+      mimeType: providerMedia.mimeType,
+      byteSize: providerMedia.byteSize,
+      fileName:
+        translated.kind === 'DOCUMENT' ? safeFileName(translated.mediaMetadata['filename']) : null,
+      body: providerMedia.body,
+    });
+  } catch {
+    emitDiagnostic(dependencies, 'media_unavailable');
+    return jsonResult(503, { error: 'whatsapp_media_unavailable' });
+  }
+
+  if (stored.status === 'REJECTED') {
+    emitDiagnostic(dependencies, 'media_rejected');
+    return null;
+  }
+
+  try {
+    await dependencies.materializer.materializeInboundMedia({
+      shopId,
+      providerMessageId: translated.providerMessageId,
+      normalizedPhone: phone.normalizedPhone,
+      displayPhone: phone.displayPhone,
+      kind: translated.kind,
+      providerMediaId: translated.mediaRef,
+      mediaKey: stored.media.mediaKey,
+      bucketId: stored.media.bucketId,
+      objectPath: stored.media.objectPath,
+      mimeType: stored.media.mimeType,
+      fileName: stored.media.fileName,
+      byteSize: stored.media.byteSize,
+      sha256: stored.media.sha256,
+      storedAt: stored.media.storedAt,
+      expiresAt: stored.media.expiresAt,
+      providerOccurredAt: translated.providerOccurredAt,
+    });
+  } catch {
+    emitDiagnostic(dependencies, 'materializer_unavailable');
+    return jsonResult(503, { error: 'whatsapp_materialization_unavailable' });
+  }
+
+  return null;
 }
 
 async function handleVerifiedPost(
@@ -341,6 +659,12 @@ async function handleVerifiedPost(
         const phone = normalizeEgyptianPhone(translated.senderPhone);
         if (!phone.valid) {
           emitDiagnostic(dependencies, 'invalid_sender_phone');
+          continue;
+        }
+
+        if (isBinaryKind(translated.kind)) {
+          const failure = await handleBinaryMessage(translated, channel.shopId, phone, dependencies);
+          if (failure !== null) return failure;
           continue;
         }
 
