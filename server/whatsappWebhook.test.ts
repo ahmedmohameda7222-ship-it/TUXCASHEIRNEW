@@ -5,10 +5,7 @@ import { parseEntityId, type ShopId } from '@tux/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { readRawBody } from '../api/whatsapp-webhook';
 import { WhatsAppProviderError } from './whatsappProviderGateway';
-import {
-  handleWhatsAppWebhook,
-  type WhatsAppInboundMediaStoreResult,
-} from './whatsappWebhook';
+import { handleWhatsAppWebhook, type WhatsAppInboundMediaStoreResult } from './whatsappWebhook';
 
 const appSecret = 'test-app-secret';
 const webhookVerifyToken = 'test-verify-token';
