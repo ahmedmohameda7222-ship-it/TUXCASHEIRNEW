@@ -1,0 +1,32 @@
+name: Task 9A Media Model RED Materializer
+
+on:
+  push:
+    branches:
+      - work/operations-whatsapp-inbox-live
+    paths:
+      - .github/workflows/task9a-model-red-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Materialize exact Task 9A media RED tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .recovery/task9a-model-red.patch.gz.b64 | gzip -d > /tmp/task9a-model-red.patch
+          test "$(sha256sum /tmp/task9a-model-red.patch | awk '{print $1}')" = "3912caceb4d5bade1bee96a6116b34d5eb722331d090a67565216af2ac107b51"
+          git rm .recovery/task9a-model-red.patch.gz.b64 .github/workflows/task9a-model-red-materialize.yml
+          git apply --index /tmp/task9a-model-red.patch
+          test "$(git write-tree)" = "4869129a42633a15addc298ffc17e1b46fa6130c"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'wip(task9a): red safe media model and retention'
+          git push origin HEAD:work/operations-whatsapp-inbox-live
