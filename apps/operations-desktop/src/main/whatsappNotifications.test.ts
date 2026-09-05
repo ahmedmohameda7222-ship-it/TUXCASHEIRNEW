@@ -27,21 +27,27 @@ function context(
 }
 
 describe('notificationPresentation', () => {
-  it('suppresses a notification while the focused Operations window is viewing that conversation', () => {
-    expect(
-      notificationPresentation(
-        message,
-        context({ windowFocused: true, focusedConversationId: message.conversationId }),
-      ),
-    ).toBeNull();
-  });
+  it(
+    'suppresses a notification while the focused Operations window is viewing that conversation',
+    () => {
+      expect(
+        notificationPresentation(
+          message,
+          context({ windowFocused: true, focusedConversationId: message.conversationId }),
+        ),
+      ).toBeNull();
+    },
+  );
 
-  it('allows a privacy-safe customer/text preview only for an ACTIVE local operator session', () => {
-    expect(notificationPresentation(message, context())).toEqual({
-      title: 'Mona',
-      body: 'Order ready for pickup',
-    });
-  });
+  it(
+    'allows a privacy-safe customer/text preview only for an ACTIVE local operator session',
+    () => {
+      expect(notificationPresentation(message, context())).toEqual({
+        title: 'Mona',
+        body: 'Order ready for pickup',
+      });
+    },
+  );
 
   it('renders exact generic-only copy when the local operator session is not ACTIVE', () => {
     const presentation = notificationPresentation(
@@ -63,15 +69,12 @@ describe('notificationPresentation', () => {
     ['DOCUMENT', 'Document message'],
     ['AUDIO', 'Voice / audio message'],
     ['LOCATION', 'Location message'],
-  ] as const)(
-    'uses safe kind-only fallback copy for %s without preview text',
-    (kind, body) => {
-      expect(notificationPresentation({ ...message, kind, preview: null }, context())).toEqual({
-        title: 'Mona',
-        body,
-      });
-    },
-  );
+  ] as const)('uses safe kind-only fallback copy for %s without preview text', (kind, body) => {
+    expect(notificationPresentation({ ...message, kind, preview: null }, context())).toEqual({
+      title: 'Mona',
+      body,
+    });
+  });
 });
 
 describe('WhatsAppNotifications', () => {
@@ -89,20 +92,23 @@ describe('WhatsAppNotifications', () => {
     expect(show).toHaveBeenCalledWith({ title: 'Mona', body: 'Order ready for pickup' });
   });
 
-  it('does not surface a previously suppressed same-conversation message later in the runtime', () => {
-    const show = vi.fn();
-    let current = context({ windowFocused: true, focusedConversationId: message.conversationId });
-    const notifications = new WhatsAppNotifications({
-      getContext: () => current,
-      show,
-    });
+  it(
+    'does not surface a previously suppressed same-conversation message later in the runtime',
+    () => {
+      const show = vi.fn();
+      let current = context({ windowFocused: true, focusedConversationId: message.conversationId });
+      const notifications = new WhatsAppNotifications({
+        getContext: () => current,
+        show,
+      });
 
-    notifications.observe(message);
-    current = context({ windowFocused: false, focusedConversationId: null });
-    notifications.observe(message);
+      notifications.observe(message);
+      current = context({ windowFocused: false, focusedConversationId: null });
+      notifications.observe(message);
 
-    expect(show).not.toHaveBeenCalled();
-  });
+      expect(show).not.toHaveBeenCalled();
+    },
+  );
 
   it('swallows OS notification failures and reports them without throwing into POS flows', () => {
     const reportError = vi.fn();
