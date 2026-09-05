@@ -134,9 +134,9 @@ describe('VercelBrowserWhatsAppRemote Task 9C transport', () => {
   });
 
   it('never uploads selected bytes when CREATE_MEDIA_UPLOAD is rejected', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      json(409, { error: 'whatsapp_free_form_window_closed' }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json(409, { error: 'whatsapp_free_form_window_closed' }));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
