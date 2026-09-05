@@ -110,8 +110,7 @@ function parseNotificationEnvelope(value: unknown): WhatsAppNotificationEnvelope
   }
   const cursor = source['cursor'];
   return {
-    cursor:
-      cursor === null ? null : responseString(cursor, 'WhatsApp notification feed cursor'),
+    cursor: cursor === null ? null : responseString(cursor, 'WhatsApp notification feed cursor'),
     messages: source['messages'].map(parseNotificationMessage),
   };
 }
