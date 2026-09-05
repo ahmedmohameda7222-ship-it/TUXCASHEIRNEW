@@ -2,11 +2,21 @@ import { parseEntityId, type OrderId } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
+import {
+  parseWhatsAppMessageId,
+  parseWhatsAppRetryInput,
+  parseWhatsAppSendLocationInput,
+  parseWhatsAppSendMediaInput,
+} from '../whatsappBoundary';
 import { assertTrustedIpcSender } from './security';
 
 const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
 const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
 const IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';
+const IPC_WHATSAPP_SEND_MEDIA = 'tux:whatsapp:send-media';
+const IPC_WHATSAPP_SEND_LOCATION = 'tux:whatsapp:send-location';
+const IPC_WHATSAPP_RETRY_FAILED = 'tux:whatsapp:retry-failed';
+const IPC_WHATSAPP_GET_MEDIA_ACCESS = 'tux:whatsapp:get-media-access';
 const IPC_WHATSAPP_MARK_UNREAD = 'tux:whatsapp:mark-unread';
 const IPC_WHATSAPP_ARCHIVE = 'tux:whatsapp:archive';
 const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
@@ -21,6 +31,10 @@ const CHANNELS = [
   IPC_WHATSAPP_LOAD_INBOX,
   IPC_WHATSAPP_LOAD_CONVERSATION,
   IPC_WHATSAPP_SEND_TEXT,
+  IPC_WHATSAPP_SEND_MEDIA,
+  IPC_WHATSAPP_SEND_LOCATION,
+  IPC_WHATSAPP_RETRY_FAILED,
+  IPC_WHATSAPP_GET_MEDIA_ACCESS,
   IPC_WHATSAPP_MARK_UNREAD,
   IPC_WHATSAPP_ARCHIVE,
   IPC_WHATSAPP_SET_FOLLOW_UP,
@@ -91,6 +105,26 @@ export class WhatsAppIpcRuntime {
         outboundIntentKey: nonEmpty(input['outboundIntentKey'], 'WhatsApp outbound intent key'),
         text: nonEmpty(input['text'], 'WhatsApp send text'),
       });
+    });
+
+    ipcMain.handle(IPC_WHATSAPP_SEND_MEDIA, async (event, rawInput: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      return this.#service.sendMedia(parseWhatsAppSendMediaInput(rawInput));
+    });
+
+    ipcMain.handle(IPC_WHATSAPP_SEND_LOCATION, async (event, rawInput: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      return this.#service.sendLocation(parseWhatsAppSendLocationInput(rawInput));
+    });
+
+    ipcMain.handle(IPC_WHATSAPP_RETRY_FAILED, async (event, rawInput: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      return this.#service.retryFailedMessage(parseWhatsAppRetryInput(rawInput));
+    });
+
+    ipcMain.handle(IPC_WHATSAPP_GET_MEDIA_ACCESS, async (event, rawMessageId: unknown) => {
+      assertTrustedIpcSender(event, window.webContents.id);
+      return this.#service.getMediaAccess(parseWhatsAppMessageId(rawMessageId));
     });
 
     ipcMain.handle(IPC_WHATSAPP_MARK_UNREAD, async (event, rawConversationId: unknown) => {
