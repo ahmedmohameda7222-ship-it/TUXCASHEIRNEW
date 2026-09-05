@@ -1,10 +1,4 @@
-import {
-  instant,
-  parseEntityId,
-  type DeviceId,
-  type ShopId,
-  type WhatsAppMessage,
-} from '@tux/domain';
+import { parseEntityId, type DeviceId, type ShopId, type WhatsAppMessage } from '@tux/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
@@ -94,6 +88,16 @@ function inboundMessage(input: {
 }
 
 function snapshot(): WhatsAppInboxSnapshot {
+  const textMessage = inboundMessage({
+    id: textMessageId,
+    kind: 'TEXT',
+    text: 'SECRET TEXT PREVIEW',
+  });
+  const imageMessage = inboundMessage({
+    id: imageMessageId,
+    kind: 'IMAGE',
+    text: 'SECRET IMAGE CAPTION',
+  });
   return {
     conversations: [
       {
@@ -107,13 +111,10 @@ function snapshot(): WhatsAppInboxSnapshot {
         unreadCount: 2,
         archived: false,
         followUp: false,
-        lastMessageAt: instant('2026-09-05T20:30:00.000Z'),
+        lastMessageAt: textMessage.createdAt,
       },
     ],
-    messages: [
-      inboundMessage({ id: textMessageId, kind: 'TEXT', text: 'SECRET TEXT PREVIEW' }),
-      inboundMessage({ id: imageMessageId, kind: 'IMAGE', text: 'SECRET IMAGE CAPTION' }),
-    ],
+    messages: [textMessage, imageMessage],
     quickReplies: [],
     orderLinks: [],
     nextCursor: 'cursor-2',
