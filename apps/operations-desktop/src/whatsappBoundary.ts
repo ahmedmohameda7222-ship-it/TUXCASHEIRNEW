@@ -64,13 +64,29 @@ function nullableText(value: unknown, label: string): string | null {
   return value;
 }
 
+function hasUnsafeFileNameCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (
+      character === '/' ||
+      character === '\\' ||
+      codePoint === undefined ||
+      codePoint < 0x20 ||
+      codePoint === 0x7f
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function safeFileName(value: unknown): string | null {
   if (value === null) return null;
   if (
     typeof value !== 'string' ||
     value.length === 0 ||
     value.length > 255 ||
-    /[\\/\u0000-\u001f\u007f]/u.test(value)
+    hasUnsafeFileNameCharacter(value)
   ) {
     throw new TypeError('WhatsApp media filename is unsafe.');
   }
