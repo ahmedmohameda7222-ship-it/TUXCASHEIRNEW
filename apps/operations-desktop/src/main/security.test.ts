@@ -64,7 +64,12 @@ function requestDecision(
   const handler = session.requestHandler;
   if (handler === null) throw new Error('Permission request handler was not installed.');
   let decision: boolean | null = null;
-  handler(input.webContents ?? webContents(), input.permission, (granted) => (decision = granted), input.details);
+  handler(
+    input.webContents ?? webContents(),
+    input.permission,
+    (granted) => (decision = granted),
+    input.details,
+  );
   if (decision === null) throw new Error('Permission request callback was not resolved.');
   return decision;
 }
