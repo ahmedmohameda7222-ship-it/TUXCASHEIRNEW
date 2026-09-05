@@ -638,9 +638,7 @@ function ConversationPanel({
         {state.selectedMessages.length === 0 ? (
           <p className="whatsapp-empty-copy">No loaded messages in this conversation.</p>
         ) : (
-          state.selectedMessages.map((item) =>
-            MessageBubble({ message: item, state, controller }),
-          )
+          state.selectedMessages.map((item) => MessageBubble({ message: item, state, controller }))
         )}
       </div>
 
@@ -733,9 +731,7 @@ function ConversationPanel({
               Send Menu
             </button>
           </div>
-          {state.networkOffline
-            ? null
-            : FreeFormMediaComposer({ controller, state })}
+          {state.networkOffline ? null : FreeFormMediaComposer({ controller, state })}
           <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
             Message
           </label>
