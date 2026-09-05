@@ -28,10 +28,7 @@ function context(
 
 describe('notificationPresentation', () => {
   it('suppresses the focused conversation', () => {
-    const focused = context({
-      windowFocused: true,
-      focusedConversationId: message.conversationId,
-    });
+    const focused = context({ windowFocused: true, focusedConversationId: message.conversationId });
 
     expect(notificationPresentation(message, focused)).toBeNull();
   });
@@ -67,10 +64,7 @@ describe('notificationPresentation', () => {
     ] as const;
 
     for (const [kind, body] of fallbacks) {
-      const presentation = notificationPresentation(
-        { ...message, kind, preview: null },
-        context(),
-      );
+      const presentation = notificationPresentation({ ...message, kind, preview: null }, context());
       expect(presentation).toEqual({ title: 'Mona', body });
     }
   });
@@ -88,18 +82,12 @@ describe('WhatsAppNotifications', () => {
     notifications.observe(message);
 
     expect(show).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenCalledWith({
-      title: 'Mona',
-      body: 'Order ready for pickup',
-    });
+    expect(show).toHaveBeenCalledWith({ title: 'Mona', body: 'Order ready for pickup' });
   });
 
   it('does not resurface a message suppressed while focused', () => {
     const show = vi.fn();
-    let current = context({
-      windowFocused: true,
-      focusedConversationId: message.conversationId,
-    });
+    let current = context({ windowFocused: true, focusedConversationId: message.conversationId });
     const notifications = new WhatsAppNotifications({
       getContext: () => current,
       show,
