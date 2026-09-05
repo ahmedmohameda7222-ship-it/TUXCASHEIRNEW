@@ -114,8 +114,8 @@ function createDependencies() {
       conversationId,
       normalizedPhone: '01012345678',
       displayPhone: '+201012345678',
-      lastInboundAt: '2026-09-04T09:00:00.000Z',
-      freeFormUntil: '2026-09-05T09:00:00.000Z',
+      lastInboundAt: '2026-09-04T09:00:00.000Z' as string | null,
+      freeFormUntil: '2026-09-05T09:00:00.000Z' as string | null,
       templates: [],
       config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
     })),
@@ -135,12 +135,20 @@ function createDependencies() {
       recipientNormalizedPhone: '01012345678',
       message: message(),
     })),
-    resolveMediaAccess: vi.fn(async () => ({
-      messageId,
-      objectPath: mediaObjectPath,
-      expiresAt: '2026-10-04T10:00:00.000Z',
-      deletedAt: null,
-    })),
+    resolveMediaAccess: vi.fn(
+      async () =>
+        ({
+          messageId,
+          objectPath: mediaObjectPath,
+          expiresAt: '2026-10-04T10:00:00.000Z',
+          deletedAt: null,
+        }) as {
+          messageId: string;
+          objectPath: string;
+          expiresAt: string;
+          deletedAt: string | null;
+        } | null,
+    ),
     attachProviderMessage: vi.fn(async () => undefined),
     failOutboundIntent: vi.fn(async () => undefined),
   };
