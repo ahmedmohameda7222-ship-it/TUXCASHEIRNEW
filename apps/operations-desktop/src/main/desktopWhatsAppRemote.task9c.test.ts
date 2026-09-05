@@ -147,7 +147,9 @@ describe('DesktopWhatsAppRemote Task 9C transport', () => {
 
   it('never cookie-downgrades when device session resolution is unavailable for media create', async () => {
     const manager = {
-      resolveSession: vi.fn().mockResolvedValue({ status: 'TRANSPORT_UNAVAILABLE', message: 'offline' }),
+      resolveSession: vi
+        .fn()
+        .mockResolvedValue({ status: 'TRANSPORT_UNAVAILABLE', message: 'offline' }),
     };
     const fetcher = vi.fn();
     const remote = new DesktopWhatsAppRemote({
