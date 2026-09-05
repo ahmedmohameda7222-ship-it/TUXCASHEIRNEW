@@ -142,9 +142,7 @@ function createController() {
     setComposerText: vi.fn<WhatsAppWorkspaceController['setComposerText']>(),
     sendCurrentText: vi.fn<WhatsAppWorkspaceController['sendCurrentText']>().mockResolvedValue(),
     selectMediaFile: vi.fn<WhatsAppWorkspaceController['selectMediaFile']>(),
-    sendCurrentMedia: vi
-      .fn<WhatsAppWorkspaceController['sendCurrentMedia']>()
-      .mockResolvedValue(),
+    sendCurrentMedia: vi.fn<WhatsAppWorkspaceController['sendCurrentMedia']>().mockResolvedValue(),
     cancelMedia: vi.fn<WhatsAppWorkspaceController['cancelMedia']>(),
     startVoiceRecording: vi
       .fn<WhatsAppWorkspaceController['startVoiceRecording']>()
@@ -161,9 +159,7 @@ function createController() {
     retryFailedMessage: vi
       .fn<WhatsAppWorkspaceController['retryFailedMessage']>()
       .mockResolvedValue(),
-    loadMediaAccess: vi
-      .fn<WhatsAppWorkspaceController['loadMediaAccess']>()
-      .mockResolvedValue(),
+    loadMediaAccess: vi.fn<WhatsAppWorkspaceController['loadMediaAccess']>().mockResolvedValue(),
     markUnread: vi.fn<WhatsAppWorkspaceController['markUnread']>().mockResolvedValue(),
     setArchived: vi.fn<WhatsAppWorkspaceController['setArchived']>().mockResolvedValue(),
     setFollowUp: vi.fn<WhatsAppWorkspaceController['setFollowUp']>().mockResolvedValue(),
