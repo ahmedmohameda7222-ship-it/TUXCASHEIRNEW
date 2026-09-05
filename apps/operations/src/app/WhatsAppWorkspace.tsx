@@ -242,7 +242,9 @@ function MessageBubble({
         </p>
       ) : message.kind === 'LOCATION' && message.location !== null ? (
         <div className="whatsapp-message-location">
-          {message.location.name === null ? null : <strong dir="auto">{message.location.name}</strong>}
+          {message.location.name === null ? null : (
+            <strong dir="auto">{message.location.name}</strong>
+          )}
           {message.location.address === null ? null : (
             <span dir="auto">{message.location.address}</span>
           )}
