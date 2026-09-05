@@ -7,6 +7,10 @@ import type {
 } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import {
+  WhatsAppMediaComposer,
+  type WhatsAppMediaComposerState,
+} from './whatsappMediaComposer';
+import {
   filterAndSortWhatsAppConversations,
   insertQuickReply as insertQuickReplyText,
   totalUnreadCount,
@@ -15,6 +19,12 @@ import {
 
 const POLL_INTERVAL_MS = 15_000;
 const DRAFT_DEBOUNCE_MS = 250;
+
+export interface WhatsAppTransientMediaAccess {
+  readonly availability: 'AVAILABLE' | 'EXPIRED';
+  readonly url: string | null;
+  readonly expiresAt: string | null;
+}
 
 export interface WhatsAppInboxUiState {
   readonly snapshot: WhatsAppInboxSnapshot | null;
@@ -33,6 +43,8 @@ export interface WhatsAppInboxUiState {
   readonly customerOrderContext: WhatsAppCustomerOrderContext | null;
   readonly messagingTarget: WhatsAppMessagingTarget | null;
   readonly contextBusy: boolean;
+  readonly mediaComposerState?: WhatsAppMediaComposerState;
+  readonly mediaAccessByMessageId?: Readonly<Record<string, WhatsAppTransientMediaAccess>>;
 }
 
 export interface WhatsAppInboxControllerEnvironment {
@@ -88,6 +100,7 @@ export function createBrowserWhatsAppInboxEnvironment(): WhatsAppInboxController
 export class WhatsAppInboxController {
   readonly #client: TuxWhatsAppApi;
   readonly #environment: WhatsAppInboxControllerEnvironment;
+  readonly #mediaComposer: WhatsAppMediaComposer | null;
   readonly #listeners = new Set<(state: WhatsAppInboxUiState) => void>();
 
   #state: WhatsAppInboxUiState;
@@ -108,9 +121,14 @@ export class WhatsAppInboxController {
 
   #sendAttempt: SendAttempt | null = null;
 
-  constructor(client: TuxWhatsAppApi, environment: WhatsAppInboxControllerEnvironment) {
+  constructor(
+    client: TuxWhatsAppApi,
+    environment: WhatsAppInboxControllerEnvironment,
+    mediaComposer: WhatsAppMediaComposer | null = null,
+  ) {
     this.#client = client;
     this.#environment = environment;
+    this.#mediaComposer = mediaComposer;
     this.#state = {
       snapshot: null,
       visibleConversations: [],
@@ -128,6 +146,8 @@ export class WhatsAppInboxController {
       customerOrderContext: null,
       messagingTarget: null,
       contextBusy: false,
+      mediaComposerState: mediaComposer?.getState() ?? { kind: 'IDLE' },
+      mediaAccessByMessageId: {},
     };
   }
 
@@ -174,6 +194,7 @@ export class WhatsAppInboxController {
       this.#draftTimer = null;
     }
     void this.#flushPendingDraft();
+    this.#disposeTransientMedia();
 
     if (!this.#started) return;
     this.#started = false;
@@ -238,6 +259,7 @@ export class WhatsAppInboxController {
     const generation = ++this.#selectionGeneration;
     if (previousConversationId !== conversationId) {
       this.#sendAttempt = null;
+      this.#resetTransientMedia();
     }
 
     this.#publish({
@@ -351,6 +373,139 @@ export class WhatsAppInboxController {
     const target = this.#state.messagingTarget;
     if (target === null) return;
     this.insertQuickReply(`منيو TUX 👇\n${target.config.storefrontUrl}`);
+  }
+
+  selectMediaFile(input: {
+    readonly bytes: Uint8Array;
+    readonly mimeType: string;
+    readonly fileName: string;
+  }): void {
+    if (this.#mediaComposer === null || this.#state.messagingTarget?.mode !== 'FREE_FORM') return;
+    this.#mediaComposer.selectFile(input);
+    const mediaComposerState = this.#mediaComposer.getState();
+    this.#publish({
+      mediaComposerState,
+      ...(mediaComposerState.kind === 'ERROR' ? { errorMessage: mediaComposerState.message } : {}),
+    });
+  }
+
+  async sendCurrentMedia(): Promise<void> {
+    const mediaComposer = this.#mediaComposer;
+    const conversationId = this.#state.selectedConversationId;
+    if (
+      mediaComposer === null ||
+      conversationId === null ||
+      this.#state.messagingTarget?.mode !== 'FREE_FORM' ||
+      this.#state.sendBusy
+    ) {
+      return;
+    }
+    const media = mediaComposer.getReadyMedia();
+    if (media === null) return;
+
+    this.#publish({ sendBusy: true, errorMessage: null });
+    let result: Awaited<ReturnType<TuxWhatsAppApi['sendMedia']>>;
+    try {
+      result = await this.#client.sendMedia({
+        conversationId,
+        outboundIntentKey: this.#environment.createIntentKey(),
+        media,
+      });
+    } catch {
+      this.#publish({ sendBusy: false, errorMessage: 'WhatsApp media send failed.' });
+      return;
+    }
+
+    this.#publish({ sendBusy: false });
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.error.message });
+      if (
+        result.error.code === 'WHATSAPP_FREE_FORM_WINDOW_CLOSED' &&
+        this.#state.selectedConversationId === conversationId
+      ) {
+        await this.#refreshSelectedMessagingTarget(conversationId);
+      }
+      return;
+    }
+
+    mediaComposer.cancel();
+    this.#publish({ mediaComposerState: mediaComposer.getState() });
+    await this.refresh();
+  }
+
+  async sendStoreLocation(): Promise<void> {
+    const target = this.#state.messagingTarget;
+    if (this.#mediaComposer === null || target?.mode !== 'FREE_FORM') return;
+    const action = this.#mediaComposer.resolveStoreLocation(target.config.storeLocation);
+    if (!action.enabled) {
+      this.#publish({ errorMessage: action.message });
+      return;
+    }
+    await this.#sendLocation(action.location);
+  }
+
+  async sendCurrentLocation(): Promise<void> {
+    if (this.#mediaComposer === null || this.#state.messagingTarget?.mode !== 'FREE_FORM') return;
+    const result = await this.#mediaComposer.requestCurrentLocation();
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.message });
+      return;
+    }
+    await this.#sendLocation(result.location);
+  }
+
+  async retryFailedMessage(messageId: string): Promise<void> {
+    if (this.#state.sendBusy) return;
+    const message = this.#state.selectedMessages.find((item) => item.id === messageId);
+    if (message?.direction !== 'OUTBOUND' || message.status !== 'FAILED') return;
+
+    this.#publish({ sendBusy: true, errorMessage: null });
+    let result: Awaited<ReturnType<TuxWhatsAppApi['retryFailedMessage']>>;
+    try {
+      result = await this.#client.retryFailedMessage({
+        messageId,
+        outboundIntentKey: this.#environment.createIntentKey(),
+      });
+    } catch {
+      this.#publish({ sendBusy: false, errorMessage: 'WhatsApp retry failed.' });
+      return;
+    }
+
+    this.#publish({ sendBusy: false });
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.error.message });
+      return;
+    }
+    await this.refresh();
+  }
+
+  async loadMediaAccess(messageId: string): Promise<void> {
+    const message = this.#state.selectedMessages.find((item) => item.id === messageId);
+    if (
+      message === undefined ||
+      (message.kind !== 'IMAGE' && message.kind !== 'DOCUMENT' && message.kind !== 'AUDIO')
+    ) {
+      return;
+    }
+
+    let result: Awaited<ReturnType<TuxWhatsAppApi['getMediaAccess']>>;
+    try {
+      result = await this.#client.getMediaAccess(messageId);
+    } catch {
+      this.#publish({ errorMessage: 'WhatsApp media is unavailable.' });
+      return;
+    }
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.error.message });
+      return;
+    }
+
+    this.#publish({
+      mediaAccessByMessageId: {
+        ...(this.#state.mediaAccessByMessageId ?? {}),
+        [messageId]: result.value,
+      },
+    });
   }
 
   async sendSelectedTemplate(templateId: string): Promise<void> {
@@ -526,6 +681,48 @@ export class WhatsAppInboxController {
     await this.#runMutation(() => this.#client.setFollowUp(conversationId, followUp));
   }
 
+  async #sendLocation(location: {
+    readonly latitude: number;
+    readonly longitude: number;
+    readonly name: string | null;
+    readonly address: string | null;
+  }): Promise<void> {
+    const conversationId = this.#state.selectedConversationId;
+    if (
+      conversationId === null ||
+      this.#state.messagingTarget?.mode !== 'FREE_FORM' ||
+      this.#state.sendBusy
+    ) {
+      return;
+    }
+
+    this.#publish({ sendBusy: true, errorMessage: null });
+    let result: Awaited<ReturnType<TuxWhatsAppApi['sendLocation']>>;
+    try {
+      result = await this.#client.sendLocation({
+        conversationId,
+        outboundIntentKey: this.#environment.createIntentKey(),
+        location,
+      });
+    } catch {
+      this.#publish({ sendBusy: false, errorMessage: 'WhatsApp location send failed.' });
+      return;
+    }
+
+    this.#publish({ sendBusy: false });
+    if (!result.ok) {
+      this.#publish({ errorMessage: result.error.message });
+      if (
+        result.error.code === 'WHATSAPP_FREE_FORM_WINDOW_CLOSED' &&
+        this.#state.selectedConversationId === conversationId
+      ) {
+        await this.#refreshSelectedMessagingTarget(conversationId);
+      }
+      return;
+    }
+    await this.refresh();
+  }
+
   async #refreshSelectedMessagingTarget(conversationId: string): Promise<void> {
     const generation = this.#selectionGeneration;
     const conversation = this.#state.snapshot?.conversations.find(
@@ -643,6 +840,7 @@ export class WhatsAppInboxController {
 
     ++this.#selectionGeneration;
     this.#sendAttempt = null;
+    this.#resetTransientMedia();
     this.#publish({
       selectedConversationId: null,
       selectedMessages: [],
@@ -730,6 +928,22 @@ export class WhatsAppInboxController {
       this.#state.composerText === attempt.text &&
       this.#sendAttempt?.outboundIntentKey === attempt.outboundIntentKey
     );
+  }
+
+  #resetTransientMedia(): void {
+    if (this.#mediaComposer !== null) this.#mediaComposer.cancel();
+    this.#publish({
+      mediaComposerState: this.#mediaComposer?.getState() ?? { kind: 'IDLE' },
+      mediaAccessByMessageId: {},
+    });
+  }
+
+  #disposeTransientMedia(): void {
+    if (this.#mediaComposer !== null) this.#mediaComposer.dispose();
+    this.#publish({
+      mediaComposerState: this.#mediaComposer?.getState() ?? { kind: 'IDLE' },
+      mediaAccessByMessageId: {},
+    });
   }
 
   async #runMutation(operation: () => ReturnType<TuxWhatsAppApi['markUnread']>): Promise<void> {
