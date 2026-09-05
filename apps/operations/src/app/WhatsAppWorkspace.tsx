@@ -150,17 +150,19 @@ function BinaryMessageContent({
   }
 
   const media = message.media;
-  const access = state.mediaAccessByMessageId?.[message.id];
-  const expired = media?.availability === 'EXPIRED' || access?.availability === 'EXPIRED';
   const label = whatsAppMessageKindLabel(message.kind);
+  if (media === null || media === undefined) {
+    return <p className="whatsapp-message-placeholder">{label}</p>;
+  }
 
-  if (media === null || expired) {
+  const access = state.mediaAccessByMessageId?.[message.id];
+  const expired = media.availability === 'EXPIRED' || access?.availability === 'EXPIRED';
+
+  if (expired) {
     return (
       <div className="whatsapp-message-media whatsapp-message-media-expired">
         <span>{label}</span>
-        {media?.fileName === null || media?.fileName === undefined ? null : (
-          <span dir="auto">{media.fileName}</span>
-        )}
+        {media.fileName === null ? null : <span dir="auto">{media.fileName}</span>}
         <strong>Media expired</strong>
       </div>
     );
@@ -253,7 +255,7 @@ function MessageBubble({
           </span>
         </div>
       ) : message.kind === 'IMAGE' || message.kind === 'DOCUMENT' || message.kind === 'AUDIO' ? (
-        <BinaryMessageContent message={message} state={state} controller={controller} />
+        BinaryMessageContent({ message, state, controller })
       ) : (
         <p className="whatsapp-message-placeholder">{whatsAppMessageKindLabel(message.kind)}</p>
       )}
@@ -636,9 +638,9 @@ function ConversationPanel({
         {state.selectedMessages.length === 0 ? (
           <p className="whatsapp-empty-copy">No loaded messages in this conversation.</p>
         ) : (
-          state.selectedMessages.map((item) => (
-            <MessageBubble key={item.id} message={item} state={state} controller={controller} />
-          ))
+          state.selectedMessages.map((item) =>
+            MessageBubble({ message: item, state, controller }),
+          )
         )}
       </div>
 
@@ -731,7 +733,7 @@ function ConversationPanel({
               Send Menu
             </button>
           </div>
-          <FreeFormMediaComposer controller={controller} state={state} />
+          {state.networkOffline ? null : FreeFormMediaComposer({ controller, state })}
           <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
             Message
           </label>
