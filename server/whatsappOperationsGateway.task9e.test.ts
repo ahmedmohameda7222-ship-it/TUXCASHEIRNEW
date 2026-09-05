@@ -145,79 +145,73 @@ afterEach(() => {
 });
 
 describe('Task 9E notification envelope privacy fence', () => {
-  it(
-    'returns generic-only metadata when no ACTIVE current operator is server-authorized',
-    async () => {
-      const result = await execute(dependencies(false));
+  it('returns generic-only server metadata without an active operator', async () => {
+    const result = await execute(dependencies(false));
 
-      expect(result.status()).toBe(200);
-      expect(result.json()).toEqual({
-        cursor: 'cursor-2',
-        messages: [
-          {
-            messageId: textMessageId,
-            conversationId,
-            createdAt: '2026-09-05T20:30:00.000Z',
-            kind: 'TEXT',
-            preview: null,
-            customerName: null,
-          },
-          {
-            messageId: imageMessageId,
-            conversationId,
-            createdAt: '2026-09-05T20:30:00.000Z',
-            kind: 'IMAGE',
-            preview: null,
-            customerName: null,
-          },
-        ],
-      });
-      for (const secret of [
-        'SECRET CUSTOMER',
-        'SECRET TEXT PREVIEW',
-        'SECRET IMAGE CAPTION',
-        '01012345678',
-        '+201012345678',
-        'SECRET_FILE_NAME.jpg',
-        'SECRET_MEDIA_KEY',
-        'wamid.secret',
-      ]) {
-        expect(result.raw()).not.toContain(secret);
-      }
-    },
-  );
+    expect(result.status()).toBe(200);
+    expect(result.json()).toEqual({
+      cursor: 'cursor-2',
+      messages: [
+        {
+          messageId: textMessageId,
+          conversationId,
+          createdAt: '2026-09-05T20:30:00.000Z',
+          kind: 'TEXT',
+          preview: null,
+          customerName: null,
+        },
+        {
+          messageId: imageMessageId,
+          conversationId,
+          createdAt: '2026-09-05T20:30:00.000Z',
+          kind: 'IMAGE',
+          preview: null,
+          customerName: null,
+        },
+      ],
+    });
+    for (const secret of [
+      'SECRET CUSTOMER',
+      'SECRET TEXT PREVIEW',
+      'SECRET IMAGE CAPTION',
+      '01012345678',
+      '+201012345678',
+      'SECRET_FILE_NAME.jpg',
+      'SECRET_MEDIA_KEY',
+      'wamid.secret',
+    ]) {
+      expect(result.raw()).not.toContain(secret);
+    }
+  });
 
-  it(
-    'allows only safe text/customer preview after server ACTIVE-operator authorization',
-    async () => {
-      const result = await execute(dependencies(true));
-      const payload = result.json();
+  it('returns safe preview data only with server operator authority', async () => {
+    const result = await execute(dependencies(true));
+    const payload = result.json();
 
-      expect(payload).toEqual({
-        cursor: 'cursor-2',
-        messages: [
-          {
-            messageId: textMessageId,
-            conversationId,
-            createdAt: '2026-09-05T20:30:00.000Z',
-            kind: 'TEXT',
-            preview: 'SECRET TEXT PREVIEW',
-            customerName: 'SECRET CUSTOMER',
-          },
-          {
-            messageId: imageMessageId,
-            conversationId,
-            createdAt: '2026-09-05T20:30:00.000Z',
-            kind: 'IMAGE',
-            preview: null,
-            customerName: 'SECRET CUSTOMER',
-          },
-        ],
-      });
-      expect(result.raw()).not.toContain('SECRET IMAGE CAPTION');
-      expect(result.raw()).not.toContain('SECRET_FILE_NAME.jpg');
-      expect(result.raw()).not.toContain('SECRET_MEDIA_KEY');
-      expect(result.raw()).not.toContain('wamid.secret');
-    },
-  );
+    expect(payload).toEqual({
+      cursor: 'cursor-2',
+      messages: [
+        {
+          messageId: textMessageId,
+          conversationId,
+          createdAt: '2026-09-05T20:30:00.000Z',
+          kind: 'TEXT',
+          preview: 'SECRET TEXT PREVIEW',
+          customerName: 'SECRET CUSTOMER',
+        },
+        {
+          messageId: imageMessageId,
+          conversationId,
+          createdAt: '2026-09-05T20:30:00.000Z',
+          kind: 'IMAGE',
+          preview: null,
+          customerName: 'SECRET CUSTOMER',
+        },
+      ],
+    });
+    expect(result.raw()).not.toContain('SECRET IMAGE CAPTION');
+    expect(result.raw()).not.toContain('SECRET_FILE_NAME.jpg');
+    expect(result.raw()).not.toContain('SECRET_MEDIA_KEY');
+    expect(result.raw()).not.toContain('wamid.secret');
+  });
 });
