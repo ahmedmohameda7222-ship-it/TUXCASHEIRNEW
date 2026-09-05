@@ -186,7 +186,9 @@ function createController() {
 }
 
 function render(uiState: WhatsAppInboxUiState): string {
-  return renderToStaticMarkup(<WhatsAppWorkspace controller={createController().controller} state={uiState} />);
+  return renderToStaticMarkup(
+    <WhatsAppWorkspace controller={createController().controller} state={uiState} />,
+  );
 }
 
 describe('WhatsAppWorkspace Task 9D media presentation', () => {
@@ -315,7 +317,10 @@ describe('WhatsAppWorkspace Task 9D composer extensions', () => {
       tree,
       (element) => element.props['data-whatsapp-send-media'] === true,
     );
-    const cancel = findElement(tree, (element) => element.props['data-whatsapp-cancel-media'] === true);
+    const cancel = findElement(
+      tree,
+      (element) => element.props['data-whatsapp-cancel-media'] === true,
+    );
     const store = findElement(
       tree,
       (element) => element.props['data-whatsapp-store-location'] === true,
@@ -343,7 +348,9 @@ describe('WhatsAppWorkspace Task 9D composer extensions', () => {
   });
 
   it('renders direct voice Record → Stop → Preview → Send / Cancel states', () => {
-    const recording = render(state([], { mediaComposerState: { kind: 'RECORDING', startedAtMs: 1000 } }));
+    const recording = render(
+      state([], { mediaComposerState: { kind: 'RECORDING', startedAtMs: 1000 } }),
+    );
     const ready = render(
       state([], {
         mediaComposerState: {
