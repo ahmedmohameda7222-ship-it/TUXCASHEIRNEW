@@ -1,8 +1,5 @@
 import type { WhatsAppOutboundBinary } from '@tux/application';
-import type {
-  WhatsAppLocationPayload,
-  WhatsAppShopMessagingConfig,
-} from '@tux/domain';
+import type { WhatsAppLocationPayload, WhatsAppShopMessagingConfig } from '@tux/domain';
 
 export type WhatsAppMediaComposerState =
   | { readonly kind: 'IDLE' }
@@ -60,10 +57,7 @@ const MEDIA_POLICY = new Map<string, MediaPolicy>([
   ['text/plain', { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false }],
   ['application/pdf', { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false }],
   ['application/msword', { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false }],
-  [
-    'application/vnd.ms-excel',
-    { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false },
-  ],
+  ['application/vnd.ms-excel', { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false }],
   [
     'application/vnd.ms-powerpoint',
     { kind: 'DOCUMENT', maxBytes: DOCUMENT_MAX_BYTES, preview: false },
