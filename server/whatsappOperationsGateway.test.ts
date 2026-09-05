@@ -195,6 +195,9 @@ function createDependencies() {
     createRepository: vi.fn(() => repository as unknown as WhatsAppOperationsRepository),
     createChannelResolver: vi.fn(() => channelResolver),
     createProviderGateway: vi.fn(() => providerGateway),
+    createMediaStorage: vi.fn((): never => {
+      throw new Error('Media storage must not be constructed by this legacy gateway suite.');
+    }),
     resolveDeviceAuthority,
     now: vi.fn(() => new Date('2026-09-02T20:00:00.000Z')),
   };
