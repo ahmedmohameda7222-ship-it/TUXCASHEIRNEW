@@ -22,6 +22,15 @@ export type WhatsAppWorkspaceController = Pick<
   | 'sendSelectedTemplate'
   | 'setComposerText'
   | 'sendCurrentText'
+  | 'selectMediaFile'
+  | 'sendCurrentMedia'
+  | 'cancelMedia'
+  | 'startVoiceRecording'
+  | 'stopVoiceRecording'
+  | 'sendStoreLocation'
+  | 'sendCurrentLocation'
+  | 'retryFailedMessage'
+  | 'loadMediaAccess'
   | 'markUnread'
   | 'setArchived'
   | 'setFollowUp'
@@ -41,6 +50,24 @@ const FILTERS: readonly { value: WhatsAppInboxFilter; label: string }[] = [
   { value: 'FOLLOW_UP', label: 'Follow-up' },
   { value: 'ARCHIVED', label: 'Archived' },
 ];
+
+const MEDIA_ACCEPT = [
+  'image/jpeg',
+  'image/png',
+  'audio/aac',
+  'audio/amr',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/ogg',
+  'text/plain',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+].join(',');
 
 function formatConversationTime(value: WhatsAppConversation['lastMessageAt']): string | null {
   if (value === null) return null;
@@ -109,7 +136,93 @@ function ConversationRow({
   );
 }
 
-function MessageBubble({ message }: { readonly message: WhatsAppMessage }) {
+function BinaryMessageContent({
+  message,
+  state,
+  controller,
+}: {
+  readonly message: WhatsAppMessage;
+  readonly state: WhatsAppInboxUiState;
+  readonly controller: WhatsAppWorkspaceController;
+}) {
+  if (message.kind !== 'IMAGE' && message.kind !== 'DOCUMENT' && message.kind !== 'AUDIO') {
+    return null;
+  }
+
+  const media = message.media;
+  const access = state.mediaAccessByMessageId?.[message.id];
+  const expired = media?.availability === 'EXPIRED' || access?.availability === 'EXPIRED';
+  const label = whatsAppMessageKindLabel(message.kind);
+
+  if (media === null || expired) {
+    return (
+      <div className="whatsapp-message-media whatsapp-message-media-expired">
+        <span>{label}</span>
+        {media?.fileName === null || media?.fileName === undefined ? null : (
+          <span dir="auto">{media.fileName}</span>
+        )}
+        <strong>Media expired</strong>
+      </div>
+    );
+  }
+
+  if (access?.availability !== 'AVAILABLE' || access.url === null) {
+    return (
+      <div className="whatsapp-message-media">
+        <span>{label}</span>
+        {media.fileName === null ? null : <span dir="auto">{media.fileName}</span>}
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-load-media={message.id}
+          onClick={() => void controller.loadMediaAccess(message.id)}
+        >
+          Load media
+        </button>
+      </div>
+    );
+  }
+
+  if (message.kind === 'IMAGE') {
+    return (
+      <figure className="whatsapp-message-media">
+        <img
+          src={access.url}
+          alt={media.fileName ?? 'WhatsApp image'}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+        {media.fileName === null ? null : <figcaption dir="auto">{media.fileName}</figcaption>}
+      </figure>
+    );
+  }
+
+  if (message.kind === 'AUDIO') {
+    return (
+      <div className="whatsapp-message-media">
+        <audio controls preload="none" src={access.url} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="whatsapp-message-media">
+      <a href={access.url} download={media.fileName ?? undefined} rel="noreferrer">
+        {media.fileName ?? 'Document'}
+      </a>
+    </div>
+  );
+}
+
+function MessageBubble({
+  message,
+  state,
+  controller,
+}: {
+  readonly message: WhatsAppMessage;
+  readonly state: WhatsAppInboxUiState;
+  readonly controller: WhatsAppWorkspaceController;
+}) {
   const system = message.kind === 'SYSTEM';
   const className = system
     ? 'whatsapp-message whatsapp-message-system'
@@ -127,15 +240,40 @@ function MessageBubble({ message }: { readonly message: WhatsAppMessage }) {
         <p dir="auto" className="whatsapp-message-text">
           {message.text}
         </p>
+      ) : message.kind === 'LOCATION' && message.location !== null ? (
+        <div className="whatsapp-message-location">
+          {message.location.name === null ? null : <strong dir="auto">{message.location.name}</strong>}
+          {message.location.address === null ? null : (
+            <span dir="auto">{message.location.address}</span>
+          )}
+          <span dir="ltr">
+            {message.location.latitude}, {message.location.longitude}
+          </span>
+        </div>
+      ) : message.kind === 'IMAGE' || message.kind === 'DOCUMENT' || message.kind === 'AUDIO' ? (
+        <BinaryMessageContent message={message} state={state} controller={controller} />
       ) : (
         <p className="whatsapp-message-placeholder">{whatsAppMessageKindLabel(message.kind)}</p>
       )}
       {message.direction === 'OUTBOUND' && !system ? (
-        <span
-          className={`whatsapp-message-status whatsapp-message-status-${message.status.toLowerCase()}`}
-        >
-          {whatsAppStatusLabel(message.status)}
-        </span>
+        <div className="whatsapp-message-delivery">
+          <span
+            className={`whatsapp-message-status whatsapp-message-status-${message.status.toLowerCase()}`}
+          >
+            {whatsAppStatusLabel(message.status)}
+          </span>
+          {message.status === 'FAILED' ? (
+            <button
+              type="button"
+              className="quiet-action"
+              data-whatsapp-retry-message={message.id}
+              disabled={state.sendBusy}
+              onClick={() => void controller.retryFailedMessage(message.id)}
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );
@@ -237,6 +375,170 @@ function CustomerOrderContextCard({
   );
 }
 
+function FreeFormMediaComposer({
+  controller,
+  state,
+}: {
+  readonly controller: WhatsAppWorkspaceController;
+  readonly state: WhatsAppInboxUiState;
+}) {
+  const mediaState = state.mediaComposerState ?? { kind: 'IDLE' as const };
+  const fileControls = (
+    <>
+      <label className="quiet-action whatsapp-media-file-action">
+        Attachment
+        <input
+          type="file"
+          accept={MEDIA_ACCEPT}
+          data-whatsapp-attachment={true}
+          disabled={state.sendBusy}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            if (file === undefined) return;
+            void file.arrayBuffer().then((buffer) => {
+              controller.selectMediaFile({
+                bytes: new Uint8Array(buffer),
+                mimeType: file.type,
+                fileName: file.name,
+              });
+            });
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        className="quiet-action"
+        data-whatsapp-record-voice={true}
+        disabled={state.sendBusy}
+        onClick={() => void controller.startVoiceRecording()}
+      >
+        Record voice
+      </button>
+    </>
+  );
+
+  let mediaPreview = null;
+  if (mediaState.kind === 'FILE_READY') {
+    mediaPreview = (
+      <div className="whatsapp-media-composer-preview">
+        {mediaState.previewUrl === null ? null : mediaState.mediaKind === 'IMAGE' ? (
+          <img src={mediaState.previewUrl} alt="Attachment preview" />
+        ) : mediaState.mediaKind === 'AUDIO' ? (
+          <audio controls src={mediaState.previewUrl} />
+        ) : null}
+        <span dir="auto">{mediaState.fileName}</span>
+        <button
+          type="button"
+          className="primary-action"
+          data-whatsapp-send-media={true}
+          disabled={state.sendBusy}
+          onClick={() => void controller.sendCurrentMedia()}
+        >
+          Send attachment
+        </button>
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-cancel-media={true}
+          disabled={state.sendBusy}
+          onClick={() => controller.cancelMedia()}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  } else if (mediaState.kind === 'RECORDING') {
+    mediaPreview = (
+      <div className="whatsapp-media-composer-preview" role="status">
+        <strong>Recording…</strong>
+        <button
+          type="button"
+          className="primary-action"
+          data-whatsapp-stop-voice={true}
+          onClick={() => void controller.stopVoiceRecording()}
+        >
+          Stop recording
+        </button>
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-cancel-media={true}
+          onClick={() => controller.cancelMedia()}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  } else if (mediaState.kind === 'AUDIO_READY') {
+    mediaPreview = (
+      <div className="whatsapp-media-composer-preview">
+        <audio controls src={mediaState.previewUrl} />
+        <button
+          type="button"
+          className="primary-action"
+          data-whatsapp-send-media={true}
+          disabled={state.sendBusy}
+          onClick={() => void controller.sendCurrentMedia()}
+        >
+          Send voice
+        </button>
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-cancel-media={true}
+          disabled={state.sendBusy}
+          onClick={() => controller.cancelMedia()}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  } else if (mediaState.kind === 'ERROR') {
+    mediaPreview = (
+      <div className="whatsapp-media-composer-preview">
+        <span role="alert">{mediaState.message}</span>
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-cancel-media={true}
+          onClick={() => controller.cancelMedia()}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="whatsapp-media-composer" aria-label="WhatsApp media and location">
+      {mediaState.kind === 'RECORDING' || mediaState.kind === 'AUDIO_READY' ? null : (
+        <div className="whatsapp-media-composer-actions">{fileControls}</div>
+      )}
+      {mediaPreview}
+      <div className="whatsapp-media-composer-actions">
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-store-location={true}
+          disabled={state.sendBusy || state.messagingTarget?.config.storeLocation === null}
+          onClick={() => void controller.sendStoreLocation()}
+        >
+          Store Location
+        </button>
+        <button
+          type="button"
+          className="quiet-action"
+          data-whatsapp-current-location={true}
+          disabled={state.sendBusy}
+          onClick={() => void controller.sendCurrentLocation()}
+        >
+          Current Location
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConversationPanel({
   controller,
   state,
@@ -332,7 +634,9 @@ function ConversationPanel({
         {state.selectedMessages.length === 0 ? (
           <p className="whatsapp-empty-copy">No loaded messages in this conversation.</p>
         ) : (
-          state.selectedMessages.map((item) => <MessageBubble key={item.id} message={item} />)
+          state.selectedMessages.map((item) => (
+            <MessageBubble key={item.id} message={item} state={state} controller={controller} />
+          ))
         )}
       </div>
 
@@ -425,6 +729,7 @@ function ConversationPanel({
               Send Menu
             </button>
           </div>
+          <FreeFormMediaComposer controller={controller} state={state} />
           <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
             Message
           </label>
