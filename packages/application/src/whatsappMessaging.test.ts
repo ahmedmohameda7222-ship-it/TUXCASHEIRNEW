@@ -45,6 +45,8 @@ function remote(): WhatsAppRemoteGateway {
       config: { storefrontUrl: 'https://menu.tux.example', storeLocation: null },
     }),
     sendText: vi.fn(),
+    sendMedia: vi.fn(),
+    sendLocation: vi.fn(),
     sendTemplate: vi.fn().mockResolvedValue({
       id: '50000000-0000-4000-8000-000000000001',
       shopId,
@@ -61,6 +63,8 @@ function remote(): WhatsAppRemoteGateway {
       initiatedAt: instant('2026-09-04T10:00:00.000Z'),
       createdAt: instant('2026-09-04T10:00:00.000Z'),
     }),
+    retryFailedMessage: vi.fn(),
+    getMediaAccess: vi.fn(),
     markUnread: vi.fn(),
     archive: vi.fn(),
     setFollowUp: vi.fn(),
