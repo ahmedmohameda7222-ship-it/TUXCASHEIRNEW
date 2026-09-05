@@ -1,3 +1,4 @@
+import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const harness = vi.hoisted(() => ({
@@ -30,9 +31,8 @@ beforeEach(async () => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-function whatsapp(): Record<string, (...args: never[]) => Promise<unknown>> {
-  return (harness.exposed as { whatsapp: Record<string, (...args: never[]) => Promise<unknown>> })
-    .whatsapp;
+function whatsapp(): TuxDesktopApi['whatsapp'] {
+  return (harness.exposed as TuxDesktopApi).whatsapp;
 }
 
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -81,7 +81,7 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
         mimeType: 'image/jpeg',
         fileName: 'photo.jpg',
       },
-    } as never);
+    });
     expect(harness.invoke).toHaveBeenLastCalledWith('tux:whatsapp:send-media', {
       conversationId,
       outboundIntentKey: 'media-intent',
@@ -97,13 +97,13 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
       conversationId,
       outboundIntentKey: 'location-intent',
       location: { latitude: 30.0444, longitude: 31.2357, name: null, address: null },
-    } as never);
+    });
     expect(harness.invoke).toHaveBeenLastCalledWith(
       'tux:whatsapp:send-location',
       expect.objectContaining({ conversationId, outboundIntentKey: 'location-intent' }),
     );
 
-    await whatsapp().retryFailedMessage({ messageId, outboundIntentKey: 'retry-intent' } as never);
+    await whatsapp().retryFailedMessage({ messageId, outboundIntentKey: 'retry-intent' });
     expect(harness.invoke).toHaveBeenLastCalledWith('tux:whatsapp:retry-failed', {
       messageId,
       outboundIntentKey: 'retry-intent',
@@ -134,7 +134,7 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
           mimeType: 'image/jpeg',
           fileName: 'too-large.jpg',
         },
-      } as never),
+      }),
     ).rejects.toThrow(TypeError);
     expect(harness.invoke).not.toHaveBeenCalled();
   });
@@ -145,7 +145,7 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
         conversationId,
         outboundIntentKey: 'location-intent',
         location: { latitude: 95, longitude: 31.2, name: null, address: null },
-      } as never),
+      }),
     ).rejects.toThrow(TypeError);
     expect(harness.invoke).not.toHaveBeenCalled();
 
@@ -157,7 +157,7 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
         expiresAt: '2026-09-05T10:05:00.000Z',
       },
     });
-    await expect(whatsapp().getMediaAccess(messageId as never)).resolves.toMatchObject({
+    await expect(whatsapp().getMediaAccess(messageId)).resolves.toMatchObject({
       ok: true,
       value: { availability: 'AVAILABLE' },
     });
@@ -172,6 +172,6 @@ describe('desktop WhatsApp Task 9C preload bridge', () => {
         objectPath: 'media/private/secret',
       },
     });
-    await expect(whatsapp().getMediaAccess(messageId as never)).rejects.toThrow(TypeError);
+    await expect(whatsapp().getMediaAccess(messageId)).rejects.toThrow(TypeError);
   });
 });
