@@ -6,7 +6,7 @@ import type {
   WhatsAppMessagingTarget,
 } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
-import { WhatsAppMediaComposer, type WhatsAppMediaComposerState } from './whatsappMediaComposer';
+import type { WhatsAppMediaComposer, WhatsAppMediaComposerState } from './whatsappMediaComposer';
 import {
   filterAndSortWhatsAppConversations,
   insertQuickReply as insertQuickReplyText,
