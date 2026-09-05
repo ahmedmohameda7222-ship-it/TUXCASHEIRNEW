@@ -5,3 +5,4 @@ export { IndexedDbOperatorSessionReadModel } from './IndexedDbOperatorSessionRea
 export { IndexedDbOrderDraftStore } from './IndexedDbOrderDraftStore';
 export { IndexedDbWorkerMenuLayoutStore } from './IndexedDbWorkerMenuLayoutStore';
 export { IndexedDbWorkerUiPreferencesStore } from './IndexedDbWorkerUiPreferencesStore';
+export { IndexedDbWhatsAppStore } from './IndexedDbWhatsAppStore';

@@ -53,5 +53,6 @@ export default defineConfig({
     url: 'http://127.0.0.1:4173',
     timeout: 120_000,
     reuseExistingServer: !process.env['CI'],
+    env: { TUX_E2E_BROWSER_FALLBACK: '1' },
   },
 });

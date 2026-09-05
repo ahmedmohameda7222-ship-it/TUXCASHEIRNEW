@@ -5,6 +5,7 @@ import type {
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsSessionResult,
+  OperationsWhatsAppService,
 } from '@tux/application';
 import type {
   CategoryAlignment,
@@ -86,7 +87,14 @@ export interface TuxWorkerUiPreferencesApi {
 
 export type TuxOrdersApi = Pick<
   OperationsOrdersService,
-  'loadWorkspace' | 'saveDraft' | 'findCustomerByPhone' | 'placeOrder' | 'reprintOrder'
+  | 'loadWorkspace'
+  | 'startOrderFromCustomerPrefill'
+  | 'restoreParkedDraft'
+  | 'discardParkedDraft'
+  | 'saveDraft'
+  | 'findCustomerByPhone'
+  | 'placeOrder'
+  | 'reprintOrder'
 >;
 
 export type TuxOrdersBoardApi = Pick<
@@ -109,6 +117,26 @@ export type TuxEndDayApi = Pick<
   'beginEndDay' | 'discardDraft' | 'previewReconciliation' | 'closeDay'
 >;
 
+export type TuxWhatsAppApi = Pick<
+  OperationsWhatsAppService,
+  | 'loadInbox'
+  | 'loadConversation'
+  | 'resolveCustomerOrderContext'
+  | 'resolveMessagingTarget'
+  | 'sendTemplate'
+  | 'sendText'
+  | 'sendMedia'
+  | 'sendLocation'
+  | 'retryFailedMessage'
+  | 'getMediaAccess'
+  | 'markUnread'
+  | 'archive'
+  | 'setFollowUp'
+  | 'linkOrder'
+  | 'saveDraft'
+  | 'getDraft'
+>;
+
 export interface TuxDesktopApi {
   readonly app: {
     readonly getVersion: () => Promise<string>;
@@ -126,4 +154,5 @@ export interface TuxDesktopApi {
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
   readonly endDay: TuxEndDayApi;
+  readonly whatsapp: TuxWhatsAppApi;
 }

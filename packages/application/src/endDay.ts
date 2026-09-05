@@ -4,6 +4,7 @@ import {
   calculateEndDayFinancialProjection,
   closeBusinessDay,
   endDayReconciliationMethods,
+  hasMeaningfulOrderDraft,
   normalizeEndDayVarianceReason,
   operationsSyncPayloadJson,
   parseEntityId,
@@ -19,7 +20,6 @@ import {
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type OperationsSyncPayloadV1,
-  type OrderDraft,
   type OutboxEvent,
   type OutboxEventId,
   type PaymentLogicType,
@@ -61,6 +61,11 @@ export type EndDayGate =
   | {
       readonly kind: 'UNFINISHED_DRAFT';
       readonly businessDayId: BusinessDayId;
+    }
+  | {
+      readonly kind: 'PARKED_DRAFTS_BLOCKED';
+      readonly businessDayId: BusinessDayId;
+      readonly parkedDraftCount: number;
     }
   | {
       readonly kind: 'READY';
@@ -121,21 +126,6 @@ function normalizedDraftScopeId(value: string): string {
     throw new DomainInvariantError('Orders draft scope is invalid for End Day.');
   }
   return scope;
-}
-
-function hasMeaningfulDraft(draft: OrderDraft | null): boolean {
-  if (draft === null) return false;
-  return (
-    draft.lines.length > 0 ||
-    (draft.orderNote?.trim().length ?? 0) > 0 ||
-    draft.discountMinor !== 0 ||
-    draft.payment.mode !== 'NONE' ||
-    draft.delivery.displayPhone.trim().length > 0 ||
-    draft.delivery.customerName.trim().length > 0 ||
-    draft.delivery.address.trim().length > 0 ||
-    draft.delivery.zoneId !== null ||
-    draft.delivery.finalFeeMinor !== 0
-  );
 }
 
 export class OperationsEndDayService {
@@ -329,8 +319,17 @@ export class OperationsEndDayService {
       businessDayId: context.day.id,
       draftScopeId,
     });
-    if (hasMeaningfulDraft(draft)) {
+    if (hasMeaningfulOrderDraft(draft)) {
       return { kind: 'UNFINISHED_DRAFT', businessDayId: context.day.id };
+    }
+
+    const parkedDrafts = await this.#draftStore.listParked(context.shopId, context.day.id);
+    if (parkedDrafts.length > 0) {
+      return {
+        kind: 'PARKED_DRAFTS_BLOCKED',
+        businessDayId: context.day.id,
+        parkedDraftCount: parkedDrafts.length,
+      };
     }
 
     return {
@@ -424,12 +423,19 @@ export class OperationsEndDayService {
   }
 
   #gateError(gate: Exclude<EndDayGate, { kind: 'READY' }>): ApplicationError {
-    return gate.kind === 'ACTIVE_ORDERS_BLOCKED'
-      ? {
-          code: 'CONFLICT_ERROR',
-          message: `End Day is blocked by Active orders: ${gate.activeOrderNos.map((number) => `#${number}`).join(', ')}.`,
-        }
-      : { code: 'CONFLICT_ERROR', message: 'End Day is blocked by an unfinished order draft.' };
+    if (gate.kind === 'ACTIVE_ORDERS_BLOCKED') {
+      return {
+        code: 'CONFLICT_ERROR',
+        message: `End Day is blocked by Active orders: ${gate.activeOrderNos.map((number) => `#${number}`).join(', ')}.`,
+      };
+    }
+    if (gate.kind === 'PARKED_DRAFTS_BLOCKED') {
+      return {
+        code: 'CONFLICT_ERROR',
+        message: `End Day is blocked by ${gate.parkedDraftCount} parked order draft${gate.parkedDraftCount === 1 ? '' : 's'}.`,
+      };
+    }
+    return { code: 'CONFLICT_ERROR', message: 'End Day is blocked by an unfinished order draft.' };
   }
 
   async #resolveCurrentContext(): Promise<Result<EndDayContext, ApplicationError>> {

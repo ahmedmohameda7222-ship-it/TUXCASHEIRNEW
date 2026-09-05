@@ -225,7 +225,10 @@ function fixture() {
       endedAt: null,
     }),
   } as unknown as OperatorSessionReadModel;
-  const draftStore = { get: async () => null } as unknown as OrderDraftStore;
+  const draftStore = {
+    get: async () => null,
+    listParked: async () => [],
+  } as unknown as OrderDraftStore;
   const expenseStore = {
     listByBusinessDay: async () => expenses,
   } as unknown as ExpenseLedgerStore;

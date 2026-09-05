@@ -61,9 +61,11 @@ export type {
   OrderPlacement,
   OrderPlacementError,
   OrderPlacementResult,
+  OrdersCustomerPrefill,
   OrdersRuntime,
   OrdersWorkspace,
   OrdersWorkspaceResult,
+  ParkedOrderSummary,
 } from './orders';
 export { err, ok } from './result';
 export type { Result } from './result';
@@ -82,6 +84,22 @@ export type {
   WorkerAuthenticationLocalSession,
   WorkerCredentialStore,
 } from './workerAuthentication';
+export { WhatsAppRemoteError } from './whatsappRemote';
+export {
+  parseWhatsAppInboxSnapshot,
+  parseWhatsAppMessage,
+  parseWhatsAppMessagingTarget,
+  throwWhatsAppHttpError,
+} from './whatsappWire';
+export type {
+  WhatsAppInboxOrderLink,
+  WhatsAppInboxSnapshot,
+  WhatsAppMediaAccess,
+  WhatsAppOutboundBinary,
+  WhatsAppOutboundBinaryKind,
+  WhatsAppRemoteErrorCode,
+  WhatsAppRemoteGateway,
+} from './whatsappRemote';
 export {
   WorkerMenuLayoutConflictError,
   WorkerMenuLayoutRetryController,
@@ -108,3 +126,13 @@ export type {
   WorkerUiPreferencesSyncIdentity,
   WorkerUiPreferencesSyncTarget,
 } from './workerUiPreferences';
+export { OperationsWhatsAppService } from './whatsapp';
+export { OperationsWhatsAppMessagingService } from './whatsappMessaging';
+export type { WhatsAppSessionStateSource } from './whatsapp';
+export type {
+  WhatsAppActiveOrderSummary,
+  WhatsAppCustomerContext,
+  WhatsAppCustomerOrderContext,
+  WhatsAppOrderContextSessionSource,
+} from './whatsappOrderContext';
+export { resolveWhatsAppCustomerOrderContext } from './whatsappOrderContext';

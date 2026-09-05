@@ -34,12 +34,21 @@ export function assertEndDayGateResult(value: unknown): EndDayGateResult {
     if (
       typeof kind !== 'string' ||
       typeof value['value']['businessDayId'] !== 'string' ||
-      !['ACTIVE_ORDERS_BLOCKED', 'UNFINISHED_DRAFT', 'READY'].includes(kind)
+      !['ACTIVE_ORDERS_BLOCKED', 'UNFINISHED_DRAFT', 'PARKED_DRAFTS_BLOCKED', 'READY'].includes(
+        kind,
+      )
     ) {
       throw new TypeError('End Day gate is invalid.');
     }
     if (kind === 'ACTIVE_ORDERS_BLOCKED' && !Array.isArray(value['value']['activeOrderNos'])) {
       throw new TypeError('End Day Active Orders gate is invalid.');
+    }
+    if (
+      kind === 'PARKED_DRAFTS_BLOCKED' &&
+      (!Number.isSafeInteger(value['value']['parkedDraftCount']) ||
+        Number(value['value']['parkedDraftCount']) <= 0)
+    ) {
+      throw new TypeError('End Day parked drafts gate is invalid.');
     }
     if (kind === 'READY' && !Array.isArray(value['value']['paymentMethods'])) {
       throw new TypeError('End Day READY gate is invalid.');

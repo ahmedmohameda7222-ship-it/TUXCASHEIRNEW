@@ -23,6 +23,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   workerMenuLayoutUpdateFromFlatProductOrder,
   type OperationsSessionState,
+  type OrdersCustomerPrefill,
   type OrdersWorkspace as OrdersWorkspaceData,
 } from '@tux/application';
 import {
@@ -31,6 +32,7 @@ import {
   decrementDraftLine,
   decrementProductUnit,
   duplicateDraftLineUnit,
+  hasMeaningfulOrderDraft,
   normalizeEgyptianPhone,
   parseEntityId,
   productQuantityInDraft,
@@ -345,13 +347,22 @@ function MenuEditCategoryTab({
   );
 }
 
+export interface OrdersWorkspacePrefillIntent {
+  readonly requestId: string;
+  readonly prefill: OrdersCustomerPrefill;
+}
+
 export function OrdersWorkspace({
   session,
   client,
+  prefillIntent,
+  onPrefillIntentHandled,
   onMenuLayoutExitControllerChange,
 }: {
   readonly session: ActiveSession;
   readonly client: OperationsOrdersClient;
+  readonly prefillIntent?: OrdersWorkspacePrefillIntent | null;
+  readonly onPrefillIntentHandled?: () => void;
   readonly onMenuLayoutExitControllerChange?: (controller: MenuLayoutExitController) => void;
 }) {
   const draftScopeId = useMemo(resolveOrdersDraftScopeId, []);
@@ -397,6 +408,10 @@ export function OrdersWorkspace({
   const [quickInfoProductId, setQuickInfoProductId] = useState<ProductId | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [prefillConflict, setPrefillConflict] = useState<OrdersWorkspacePrefillIntent | null>(null);
+  const [restoreConflictDraftId, setRestoreConflictDraftId] = useState<string | null>(null);
+  const [discardParkedDraftId, setDiscardParkedDraftId] = useState<string | null>(null);
+  const handledPrefillRequestRef = useRef<string | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [desktopCartResizable, setDesktopCartResizable] = useState(desktopCartResizeMatches);
@@ -589,6 +604,65 @@ export function OrdersWorkspace({
     setWorkspace((current) => (current === null ? null : { ...current, draft: next }));
   }
 
+  function setCurrentWorkspace(next: OrdersWorkspaceData): void {
+    setWorkspace(next);
+    draftRef.current = next.draft;
+    setDraft(next.draft);
+  }
+
+  async function startFromPrefill(
+    intent: OrdersWorkspacePrefillIntent,
+    parkCurrent: boolean,
+  ): Promise<void> {
+    setGlobalError(null);
+    const result = parkCurrent
+      ? await client.startOrderFromCustomerPrefill({
+          draftScopeId,
+          prefill: intent.prefill,
+          parkCurrent: true,
+        })
+      : await client.startOrderFromCustomerPrefill({
+          draftScopeId,
+          prefill: intent.prefill,
+          parkCurrent: false,
+        });
+    if (!result.ok) {
+      setGlobalError(result.error.message);
+      return;
+    }
+    setCurrentWorkspace(result.value);
+    setPrefillConflict(null);
+    handledPrefillRequestRef.current = intent.requestId;
+    onPrefillIntentHandled?.();
+  }
+
+  async function restoreParkedOrder(parkedDraftId: string, parkCurrent: boolean): Promise<void> {
+    setGlobalError(null);
+    const result = await client.restoreParkedDraft({ draftScopeId, parkedDraftId, parkCurrent });
+    if (!result.ok) {
+      setGlobalError(result.error.message);
+      return;
+    }
+    setCurrentWorkspace(result.value);
+    setRestoreConflictDraftId(null);
+  }
+
+  async function discardParkedOrder(parkedDraftId: string): Promise<void> {
+    setGlobalError(null);
+    const result = await client.discardParkedDraft({ parkedDraftId });
+    if (!result.ok) {
+      setGlobalError(result.error.message);
+      return;
+    }
+    const reloaded = await client.loadWorkspace(draftScopeId);
+    if (!reloaded.ok) {
+      setGlobalError(reloaded.error.message);
+      return;
+    }
+    setCurrentWorkspace(reloaded.value);
+    setDiscardParkedDraftId(null);
+  }
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -621,6 +695,17 @@ export function OrdersWorkspace({
       cancelled = true;
     };
   }, [client, draftScopeId, session.businessDayId, session.operator.id]);
+
+  useEffect(() => {
+    if (workspace === null || draft === null || prefillIntent == null) return;
+    if (handledPrefillRequestRef.current === prefillIntent.requestId) return;
+    if (hasMeaningfulOrderDraft(draft)) {
+      setPrefillConflict(prefillIntent);
+      return;
+    }
+    handledPrefillRequestRef.current = prefillIntent.requestId;
+    void startFromPrefill(prefillIntent, false);
+  }, [draft, prefillIntent?.requestId, workspace]);
 
   useEffect(() => {
     const shopId = session.shopId;
@@ -1512,6 +1597,120 @@ export function OrdersWorkspace({
       }
     >
       <section className="menu-pane" aria-label="Menu">
+        {prefillConflict === null ? null : (
+          <section className="orders-prefill-conflict" role="status">
+            <div>
+              <strong>Current order has unsaved work</strong>
+              <span dir="auto">
+                Choose what to do before starting an order for{' '}
+                {prefillConflict.prefill.customerName}.
+              </span>
+            </div>
+            <div className="orders-inline-actions">
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => {
+                  handledPrefillRequestRef.current = prefillConflict.requestId;
+                  setPrefillConflict(null);
+                  onPrefillIntentHandled?.();
+                }}
+              >
+                Keep current order
+              </button>
+              <button
+                type="button"
+                className="primary-action"
+                onClick={() => void startFromPrefill(prefillConflict, true)}
+              >
+                Start new order for <span dir="auto">{prefillConflict.prefill.customerName}</span>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {workspace.parkedDrafts.length === 0 ? null : (
+          <section className="parked-orders" aria-label="Parked Orders">
+            <div className="parked-orders-heading">
+              <div>
+                <p className="eyebrow">Business Day</p>
+                <h2>Parked Orders</h2>
+              </div>
+              <span>{workspace.parkedDrafts.length}</span>
+            </div>
+            <div className="parked-orders-list">
+              {workspace.parkedDrafts.map((parked) => (
+                <article className="parked-order-row" key={parked.id}>
+                  <div>
+                    <strong dir="auto">{parked.customerName || 'Parked order'}</strong>
+                    <span dir="ltr">{parked.displayPhone}</span>
+                    <span>
+                      {parked.lineCount} lines · {parked.totalQuantity} items
+                    </span>
+                  </div>
+                  {restoreConflictDraftId === parked.id ? (
+                    <div className="orders-inline-choice" role="status">
+                      <span>Restoring this parked order would replace the current draft.</span>
+                      <button
+                        type="button"
+                        className="secondary-action"
+                        onClick={() => setRestoreConflictDraftId(null)}
+                      >
+                        Keep current order
+                      </button>
+                      <button
+                        type="button"
+                        className="primary-action"
+                        onClick={() => void restoreParkedOrder(parked.id, true)}
+                      >
+                        Park current and Restore
+                      </button>
+                    </div>
+                  ) : discardParkedDraftId === parked.id ? (
+                    <div className="orders-inline-choice" role="status">
+                      <span>Discard this parked order permanently?</span>
+                      <button
+                        type="button"
+                        className="secondary-action"
+                        onClick={() => setDiscardParkedDraftId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="destructive-action"
+                        onClick={() => void discardParkedOrder(parked.id)}
+                      >
+                        Discard parked order
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="orders-inline-actions">
+                      <button
+                        type="button"
+                        className="secondary-action"
+                        onClick={() => {
+                          if (hasMeaningfulOrderDraft(draft)) setRestoreConflictDraftId(parked.id);
+                          else void restoreParkedOrder(parked.id, false);
+                        }}
+                      >
+                        Restore
+                      </button>
+                      <button
+                        type="button"
+                        className="quiet-action"
+                        onClick={() => setDiscardParkedDraftId(parked.id)}
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div
           className={
             menuEditActive
