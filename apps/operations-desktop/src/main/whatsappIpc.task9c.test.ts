@@ -58,7 +58,9 @@ function service() {
 
 function register() {
   const api = service();
-  new WhatsAppIpcRuntime({ service: api as never }).register({ webContents: { id: 77 } } as never);
+  new WhatsAppIpcRuntime({ service: api as never }).register({
+    webContents: { id: 77 },
+  } as never);
   return api;
 }
 
@@ -91,7 +93,12 @@ describe('WhatsAppIpcRuntime Task 9C boundary', () => {
     await handler('tux:whatsapp:send-location')(event, {
       conversationId,
       outboundIntentKey: 'location-intent',
-      location: { latitude: 30.0444, longitude: 31.2357, name: 'TUX', address: 'Cairo' },
+      location: {
+        latitude: 30.0444,
+        longitude: 31.2357,
+        name: 'TUX',
+        address: 'Cairo',
+      },
     });
     await handler('tux:whatsapp:retry-failed')(event, {
       messageId,
@@ -111,24 +118,35 @@ describe('WhatsAppIpcRuntime Task 9C boundary', () => {
     const send = handler('tux:whatsapp:send-media');
 
     await expect(
-      send({}, {
-        conversationId,
-        outboundIntentKey: 'media-intent',
-        media: {
-          kind: 'IMAGE',
-          bytes: new Uint8Array([0xff, 0xd8, 0xff]),
-          mimeType: 'image/jpeg',
-          fileName: 'photo.jpg',
-          filePath: 'C:\\Users\\worker\\secret.jpg',
+      send(
+        {},
+        {
+          conversationId,
+          outboundIntentKey: 'media-intent',
+          media: {
+            kind: 'IMAGE',
+            bytes: new Uint8Array([0xff, 0xd8, 0xff]),
+            mimeType: 'image/jpeg',
+            fileName: 'photo.jpg',
+            filePath: 'C:\\Users\\worker\\secret.jpg',
+          },
         },
-      }),
+      ),
     ).rejects.toThrow(TypeError);
     await expect(
-      send({}, {
-        conversationId,
-        outboundIntentKey: 'media-intent',
-        media: { kind: 'IMAGE', bytes: [1, 2, 3], mimeType: 'image/jpeg', fileName: null },
-      }),
+      send(
+        {},
+        {
+          conversationId,
+          outboundIntentKey: 'media-intent',
+          media: {
+            kind: 'IMAGE',
+            bytes: [1, 2, 3],
+            mimeType: 'image/jpeg',
+            fileName: null,
+          },
+        },
+      ),
     ).rejects.toThrow(TypeError);
     expect(api.sendMedia).not.toHaveBeenCalled();
   });
