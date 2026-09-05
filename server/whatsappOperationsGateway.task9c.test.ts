@@ -329,19 +329,22 @@ describe('Task 9C WhatsApp server actions', () => {
     expect(deps.repository.failOutboundIntent).not.toHaveBeenCalled();
   });
 
-  it('does not duplicate provider send when finalize replays an existing durable attempt', async () => {
-    const deps = createDependencies();
-    deps.repository.claimOutboundMediaIntent.mockResolvedValueOnce({
-      created: false,
-      recipientNormalizedPhone: '01012345678',
-      message: outboundMessage('SENT'),
-    });
+  it(
+    'does not duplicate provider send when finalize replays an existing durable attempt',
+    async () => {
+      const deps = createDependencies();
+      deps.repository.claimOutboundMediaIntent.mockResolvedValueOnce({
+        created: false,
+        recipientNormalizedPhone: '01012345678',
+        message: outboundMessage('SENT'),
+      });
 
-    const result = await execute(finalizeBody(), deps.factory);
+      const result = await execute(finalizeBody(), deps.factory);
 
-    expect(result.status()).toBe(200);
-    expect(deps.providerGateway.sendMessage).not.toHaveBeenCalled();
-  });
+      expect(result.status()).toBe(200);
+      expect(deps.providerGateway.sendMessage).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects location send when the free-form window is closed', async () => {
     const deps = createDependencies();
@@ -404,10 +407,7 @@ describe('Task 9C WhatsApp server actions', () => {
       deletedAt: null,
     });
 
-    const result = await execute(
-      { action: 'GET_MEDIA_ACCESS', messageId },
-      deps.factory,
-    );
+    const result = await execute({ action: 'GET_MEDIA_ACCESS', messageId }, deps.factory);
 
     expect(result.status()).toBe(200);
     expect(result.json()).toMatchObject({
@@ -420,10 +420,7 @@ describe('Task 9C WhatsApp server actions', () => {
     const deps = createDependencies();
     deps.repository.resolveMediaAccess.mockResolvedValueOnce(null);
 
-    const result = await execute(
-      { action: 'GET_MEDIA_ACCESS', messageId },
-      deps.factory,
-    );
+    const result = await execute({ action: 'GET_MEDIA_ACCESS', messageId }, deps.factory);
 
     expect(result.status()).toBe(404);
     expect(result.json()).toMatchObject({ error: 'whatsapp_media_not_found' });
