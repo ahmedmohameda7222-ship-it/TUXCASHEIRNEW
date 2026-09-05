@@ -141,6 +141,29 @@ function createController() {
       .mockResolvedValue(),
     setComposerText: vi.fn<WhatsAppWorkspaceController['setComposerText']>(),
     sendCurrentText: vi.fn<WhatsAppWorkspaceController['sendCurrentText']>().mockResolvedValue(),
+    selectMediaFile: vi.fn<WhatsAppWorkspaceController['selectMediaFile']>(),
+    sendCurrentMedia: vi
+      .fn<WhatsAppWorkspaceController['sendCurrentMedia']>()
+      .mockResolvedValue(),
+    cancelMedia: vi.fn<WhatsAppWorkspaceController['cancelMedia']>(),
+    startVoiceRecording: vi
+      .fn<WhatsAppWorkspaceController['startVoiceRecording']>()
+      .mockResolvedValue(),
+    stopVoiceRecording: vi
+      .fn<WhatsAppWorkspaceController['stopVoiceRecording']>()
+      .mockResolvedValue(),
+    sendStoreLocation: vi
+      .fn<WhatsAppWorkspaceController['sendStoreLocation']>()
+      .mockResolvedValue(),
+    sendCurrentLocation: vi
+      .fn<WhatsAppWorkspaceController['sendCurrentLocation']>()
+      .mockResolvedValue(),
+    retryFailedMessage: vi
+      .fn<WhatsAppWorkspaceController['retryFailedMessage']>()
+      .mockResolvedValue(),
+    loadMediaAccess: vi
+      .fn<WhatsAppWorkspaceController['loadMediaAccess']>()
+      .mockResolvedValue(),
     markUnread: vi.fn<WhatsAppWorkspaceController['markUnread']>().mockResolvedValue(),
     setArchived: vi.fn<WhatsAppWorkspaceController['setArchived']>().mockResolvedValue(),
     setFollowUp: vi.fn<WhatsAppWorkspaceController['setFollowUp']>().mockResolvedValue(),
