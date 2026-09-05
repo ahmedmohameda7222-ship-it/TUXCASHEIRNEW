@@ -27,29 +27,23 @@ function context(
 }
 
 describe('notificationPresentation', () => {
-  it(
-    'suppresses a notification while the focused Operations window is viewing that conversation',
-    () => {
-      expect(
-        notificationPresentation(
-          message,
-          context({ windowFocused: true, focusedConversationId: message.conversationId }),
-        ),
-      ).toBeNull();
-    },
-  );
+  it('suppresses the focused conversation', () => {
+    const focused = context({
+      windowFocused: true,
+      focusedConversationId: message.conversationId,
+    });
 
-  it(
-    'allows a privacy-safe customer/text preview only for an ACTIVE local operator session',
-    () => {
-      expect(notificationPresentation(message, context())).toEqual({
-        title: 'Mona',
-        body: 'Order ready for pickup',
-      });
-    },
-  );
+    expect(notificationPresentation(message, focused)).toBeNull();
+  });
 
-  it('renders exact generic-only copy when the local operator session is not ACTIVE', () => {
+  it('shows a safe preview for an ACTIVE local session', () => {
+    expect(notificationPresentation(message, context())).toEqual({
+      title: 'Mona',
+      body: 'Order ready for pickup',
+    });
+  });
+
+  it('uses exact generic copy outside an ACTIVE local session', () => {
     const presentation = notificationPresentation(
       {
         ...message,
@@ -64,21 +58,26 @@ describe('notificationPresentation', () => {
     expect(JSON.stringify(presentation)).not.toContain('SECRET CUSTOMER');
   });
 
-  it.each([
-    ['IMAGE', 'Image message'],
-    ['DOCUMENT', 'Document message'],
-    ['AUDIO', 'Voice / audio message'],
-    ['LOCATION', 'Location message'],
-  ] as const)('uses safe kind-only fallback copy for %s without preview text', (kind, body) => {
-    expect(notificationPresentation({ ...message, kind, preview: null }, context())).toEqual({
-      title: 'Mona',
-      body,
-    });
+  it('uses kind-only fallback copy when preview text is absent', () => {
+    const fallbacks = [
+      ['IMAGE', 'Image message'],
+      ['DOCUMENT', 'Document message'],
+      ['AUDIO', 'Voice / audio message'],
+      ['LOCATION', 'Location message'],
+    ] as const;
+
+    for (const [kind, body] of fallbacks) {
+      const presentation = notificationPresentation(
+        { ...message, kind, preview: null },
+        context(),
+      );
+      expect(presentation).toEqual({ title: 'Mona', body });
+    }
   });
 });
 
 describe('WhatsAppNotifications', () => {
-  it('notifies a stable message id at most once per app runtime', () => {
+  it('dedupes a stable message id for the app runtime', () => {
     const show = vi.fn();
     const notifications = new WhatsAppNotifications({
       getContext: () => context(),
@@ -89,28 +88,31 @@ describe('WhatsAppNotifications', () => {
     notifications.observe(message);
 
     expect(show).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenCalledWith({ title: 'Mona', body: 'Order ready for pickup' });
+    expect(show).toHaveBeenCalledWith({
+      title: 'Mona',
+      body: 'Order ready for pickup',
+    });
   });
 
-  it(
-    'does not surface a previously suppressed same-conversation message later in the runtime',
-    () => {
-      const show = vi.fn();
-      let current = context({ windowFocused: true, focusedConversationId: message.conversationId });
-      const notifications = new WhatsAppNotifications({
-        getContext: () => current,
-        show,
-      });
+  it('does not resurface a message suppressed while focused', () => {
+    const show = vi.fn();
+    let current = context({
+      windowFocused: true,
+      focusedConversationId: message.conversationId,
+    });
+    const notifications = new WhatsAppNotifications({
+      getContext: () => current,
+      show,
+    });
 
-      notifications.observe(message);
-      current = context({ windowFocused: false, focusedConversationId: null });
-      notifications.observe(message);
+    notifications.observe(message);
+    current = context({ windowFocused: false, focusedConversationId: null });
+    notifications.observe(message);
 
-      expect(show).not.toHaveBeenCalled();
-    },
-  );
+    expect(show).not.toHaveBeenCalled();
+  });
 
-  it('swallows OS notification failures and reports them without throwing into POS flows', () => {
+  it('swallows OS notification failures', () => {
     const reportError = vi.fn();
     const notifications = new WhatsAppNotifications({
       getContext: () => context(),
