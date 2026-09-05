@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",
     "format": "prettier --write \"api/**/*.{ts,tsx}\" \"server/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
-    "format:check": "prettier --write apps/operations/src/app/sessionClient.ts && git diff --exit-code -- apps/operations/src/app/sessionClient.ts",
+    "format:check": "prettier --check \"api/**/*.{ts,tsx}\" \"server/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
     "dev:provision": "npm run dev:provision -w @tux/operations-desktop --",
     "test:migrations": "node scripts/test-migrations.mjs && node scripts/test-whatsapp-migration.mjs && node scripts/test-whatsapp-channel-migration.mjs && node scripts/test-whatsapp-current-worker-migration.mjs && node scripts/test-whatsapp-messaging-policy-migration.mjs && node scripts/test-whatsapp-media-migration.mjs && node scripts/test-worker-pin-rate-limit.mjs && node scripts/test-bootstrap-request-provenance.mjs && node scripts/test-worker-menu-layout-migration.mjs",
     "package:win": "npm run build && electron-builder --win nsis --x64",
