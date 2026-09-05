@@ -3,10 +3,7 @@ import {
   WhatsAppNotificationFeed,
   type WhatsAppNotificationEnvelope,
 } from './whatsappNotificationFeed';
-import {
-  WhatsAppNotifications,
-  type WhatsAppNotificationContext,
-} from './whatsappNotifications';
+import { WhatsAppNotifications, type WhatsAppNotificationContext } from './whatsappNotifications';
 
 const message = {
   messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
