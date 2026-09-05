@@ -1,5 +1,5 @@
 import type { WhatsAppLocationPayload } from '@tux/domain';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   WhatsAppMediaComposer,
   type WhatsAppAudioRecording,
@@ -91,12 +91,13 @@ describe('WhatsAppMediaComposer transient file state', () => {
     ['application/pdf', 'menu.pdf', 'DOCUMENT', false],
     ['audio/ogg', 'note.ogg', 'AUDIO', true],
   ] as const)(
-    'classifies %s as %s media without persisting it',
+    'classifies %s (%s) as %s media without persisting it',
     (mimeType, fileName, mediaKind, hasPreview) => {
       const environment = new TestEnvironment();
       const composer = new WhatsAppMediaComposer(environment);
+      const input = mediaInput({ mimeType, fileName });
 
-      composer.selectFile(mediaInput({ mimeType, fileName }));
+      composer.selectFile(input);
 
       expect(composer.getState()).toMatchObject({
         kind: 'FILE_READY',
@@ -106,7 +107,7 @@ describe('WhatsAppMediaComposer transient file state', () => {
         previewUrl: hasPreview ? 'blob:tux-1' : null,
       });
       expect(composer.getReadyMedia()).toMatchObject({ kind: mediaKind, mimeType, fileName });
-      expect(composer.getReadyMedia()?.bytes).toBe(mediaInput({ mimeType, fileName }).bytes);
+      expect(composer.getReadyMedia()?.bytes).toBe(input.bytes);
       expect(environment.createdUrls).toHaveLength(hasPreview ? 1 : 0);
     },
   );
