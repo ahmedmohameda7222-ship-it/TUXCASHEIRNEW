@@ -41,7 +41,10 @@ function transientHttpsUrl(value: unknown, label: string): string {
   return parsed.toString();
 }
 
-function parseMediaUpload(value: unknown): { readonly mediaKey: string; readonly uploadUrl: string } {
+function parseMediaUpload(value: unknown): {
+  readonly mediaKey: string;
+  readonly uploadUrl: string;
+} {
   const source = responseObject(value);
   if (Object.keys(source).some((key) => key !== 'mediaKey' && key !== 'uploadUrl')) {
     throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp media upload is invalid.');
