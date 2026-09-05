@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
@@ -62,6 +63,7 @@ import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
   assertTrustedIpcSender,
   createSecureWebPreferences,
+  installOperationsPermissionHandlers,
   parseLoopbackDevelopmentUrl,
 } from './security';
 import { WhatsAppIpcRuntime } from './whatsappIpc';
@@ -686,9 +688,21 @@ async function createMainWindow(): Promise<BrowserWindow> {
 
   const developmentUrl = process.env['TUX_OPERATIONS_DEV_URL'];
   if (developmentUrl === undefined || developmentUrl.trim() === '') {
-    await window.loadFile(path.join(__dirname, '../../../operations/dist/index.html'));
+    const rendererPath = path.join(__dirname, '../../../operations/dist/index.html');
+    installOperationsPermissionHandlers(
+      window.webContents.session,
+      window.webContents.id,
+      pathToFileURL(rendererPath).toString(),
+    );
+    await window.loadFile(rendererPath);
   } else {
-    await window.loadURL(parseLoopbackDevelopmentUrl(developmentUrl));
+    const trustedDevelopmentUrl = parseLoopbackDevelopmentUrl(developmentUrl);
+    installOperationsPermissionHandlers(
+      window.webContents.session,
+      window.webContents.id,
+      trustedDevelopmentUrl,
+    );
+    await window.loadURL(trustedDevelopmentUrl);
   }
 
   return window;
