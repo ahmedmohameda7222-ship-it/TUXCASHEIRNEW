@@ -15,6 +15,10 @@ import {
   createBrowserWhatsAppInboxEnvironment,
   WhatsAppInboxController,
 } from './whatsappInboxController';
+import {
+  createBrowserWhatsAppMediaComposerEnvironment,
+  WhatsAppMediaComposer,
+} from './whatsappMediaComposer';
 import { formatUnreadBadge } from './whatsappView';
 import {
   createOperationsBulkStockClient,
@@ -316,6 +320,7 @@ function ActiveShell({
       new WhatsAppInboxController(
         createOperationsWhatsAppClient(),
         createBrowserWhatsAppInboxEnvironment(),
+        new WhatsAppMediaComposer(createBrowserWhatsAppMediaComposerEnvironment()),
       ),
     [],
   );
