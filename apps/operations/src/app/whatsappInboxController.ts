@@ -386,6 +386,36 @@ export class WhatsAppInboxController {
     });
   }
 
+  cancelMedia(): void {
+    if (this.#mediaComposer === null) return;
+    this.#mediaComposer.cancel();
+    this.#publish({ mediaComposerState: this.#mediaComposer.getState(), errorMessage: null });
+  }
+
+  async startVoiceRecording(): Promise<void> {
+    if (this.#mediaComposer === null || this.#state.messagingTarget?.mode !== 'FREE_FORM') return;
+    await this.#mediaComposer.startRecording();
+    const mediaComposerState = this.#mediaComposer.getState();
+    this.#publish({
+      mediaComposerState,
+      ...(mediaComposerState.kind === 'ERROR'
+        ? { errorMessage: mediaComposerState.message }
+        : { errorMessage: null }),
+    });
+  }
+
+  async stopVoiceRecording(): Promise<void> {
+    if (this.#mediaComposer === null || this.#state.messagingTarget?.mode !== 'FREE_FORM') return;
+    await this.#mediaComposer.stopRecording();
+    const mediaComposerState = this.#mediaComposer.getState();
+    this.#publish({
+      mediaComposerState,
+      ...(mediaComposerState.kind === 'ERROR'
+        ? { errorMessage: mediaComposerState.message }
+        : { errorMessage: null }),
+    });
+  }
+
   async sendCurrentMedia(): Promise<void> {
     const mediaComposer = this.#mediaComposer;
     const conversationId = this.#state.selectedConversationId;
