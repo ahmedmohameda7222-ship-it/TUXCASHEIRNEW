@@ -182,21 +182,48 @@ async function handleGet(
   request: GatewayRequest,
   response: GatewayResponse,
   shopId: ShopId,
+  deviceId: DeviceId,
   dependencies: WhatsAppOperationsDependencyFactory,
 ): Promise<void> {
   let after: string | null;
+  let notificationFeed: boolean;
   try {
     const requestUrl = new URL(request.url ?? '/api/whatsapp', 'https://tux.invalid');
     const rawAfter = requestUrl.searchParams.get('after');
     after = rawAfter !== null && rawAfter.trim().length === 0 ? null : rawAfter;
+    notificationFeed = requestUrl.searchParams.get('feed') === 'notifications';
   } catch {
     invalidRequest(response);
     return;
   }
 
   try {
-    const snapshot = await dependencies.createRepository().loadInbox({ shopId, after });
-    sendJson(response, 200, { ...snapshot });
+    const repository = dependencies.createRepository();
+    const previewAllowed = notificationFeed
+      ? await repository.hasActiveNotificationOperator({ shopId, deviceId })
+      : false;
+    const snapshot = await repository.loadInbox({ shopId, after });
+    if (!notificationFeed) {
+      sendJson(response, 200, { ...snapshot });
+      return;
+    }
+
+    const customerNames = new Map(
+      snapshot.conversations.map((conversation) => [conversation.id, conversation.customerName]),
+    );
+    const messages = [];
+    for (const message of snapshot.messages) {
+      if (message.direction !== 'INBOUND' || message.kind === 'SYSTEM') continue;
+      messages.push({
+        messageId: message.id,
+        conversationId: message.conversationId,
+        createdAt: message.createdAt,
+        kind: message.kind,
+        preview: previewAllowed && message.kind === 'TEXT' ? message.text : null,
+        customerName: previewAllowed ? (customerNames.get(message.conversationId) ?? null) : null,
+      });
+    }
+    sendJson(response, 200, { cursor: snapshot.nextCursor, messages });
   } catch (error) {
     if (!sendRepositoryError(response, error)) {
       sendJson(response, 503, { error: 'whatsapp_remote_unavailable' });
@@ -793,7 +820,7 @@ export async function handleWhatsAppOperations(
   const { shopId, deviceId } = authority;
 
   if (request.method === 'GET') {
-    await handleGet(request, response, shopId, dependencies);
+    await handleGet(request, response, shopId, deviceId, dependencies);
     return;
   }
   if (!requireSameOrigin(request, response)) return;
