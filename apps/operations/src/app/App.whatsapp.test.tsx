@@ -121,3 +121,15 @@ describe('Task 8E typed internal WhatsApp/Orders navigation', () => {
     expect(source).not.toContain('window.open(');
   });
 });
+
+describe('Task 9D media composer composition', () => {
+  it('injects exactly one browser media composer into the ACTIVE-shell WhatsApp controller', () => {
+    expect(source).toContain('WhatsAppMediaComposer');
+    expect(source).toContain('createBrowserWhatsAppMediaComposerEnvironment');
+    expect(activeShellSource).toContain(
+      'new WhatsAppMediaComposer(createBrowserWhatsAppMediaComposerEnvironment())',
+    );
+    expect(count(activeShellSource, 'new WhatsAppMediaComposer(')).toBe(1);
+    expect(count(activeShellSource, 'createBrowserWhatsAppMediaComposerEnvironment()')).toBe(1);
+  });
+});
