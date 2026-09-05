@@ -202,6 +202,18 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     .mockResolvedValue(
       ok(message('sent', 'default', { direction: 'OUTBOUND', outboundIntentKey: 'sent-key' })),
     );
+  const sendMedia = vi
+    .fn<TuxWhatsAppApi['sendMedia']>()
+    .mockResolvedValue(failure('Media send is not used by this controller fixture.'));
+  const sendLocation = vi
+    .fn<TuxWhatsAppApi['sendLocation']>()
+    .mockResolvedValue(failure('Location send is not used by this controller fixture.'));
+  const retryFailedMessage = vi
+    .fn<TuxWhatsAppApi['retryFailedMessage']>()
+    .mockResolvedValue(failure('Retry is not used by this controller fixture.'));
+  const getMediaAccess = vi
+    .fn<TuxWhatsAppApi['getMediaAccess']>()
+    .mockResolvedValue(failure('Media access is not used by this controller fixture.'));
   const markUnread = vi.fn<TuxWhatsAppApi['markUnread']>().mockResolvedValue(ok(undefined));
   const archive = vi.fn<TuxWhatsAppApi['archive']>().mockResolvedValue(ok(undefined));
   const setFollowUp = vi.fn<TuxWhatsAppApi['setFollowUp']>().mockResolvedValue(ok(undefined));
@@ -242,6 +254,10 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     loadInbox,
     loadConversation,
     sendText,
+    sendMedia,
+    sendLocation,
+    retryFailedMessage,
+    getMediaAccess,
     markUnread,
     archive,
     setFollowUp,
@@ -258,6 +274,10 @@ function createClient(initialSnapshot: WhatsAppInboxSnapshot = snapshot()) {
     loadInbox,
     loadConversation,
     sendText,
+    sendMedia,
+    sendLocation,
+    retryFailedMessage,
+    getMediaAccess,
     markUnread,
     archive,
     setFollowUp,
@@ -747,7 +767,6 @@ describe('WhatsAppInboxController send semantics', () => {
 
     await controller.sendCurrentText();
     await settle();
-
     expect(controller.getState().composerText).toBe('uncertain');
     expect(client.sendText).toHaveBeenCalledTimes(1);
   });
