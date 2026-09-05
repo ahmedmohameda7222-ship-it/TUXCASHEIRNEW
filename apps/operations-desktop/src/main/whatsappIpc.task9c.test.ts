@@ -154,17 +154,23 @@ describe('WhatsAppIpcRuntime Task 9C boundary', () => {
   it('rejects invalid coordinates and malformed message ids before service invocation', async () => {
     const api = register();
     await expect(
-      handler('tux:whatsapp:send-location')({}, {
-        conversationId,
-        outboundIntentKey: 'location-intent',
-        location: { latitude: 91, longitude: 31.2, name: null, address: null },
-      }),
+      handler('tux:whatsapp:send-location')(
+        {},
+        {
+          conversationId,
+          outboundIntentKey: 'location-intent',
+          location: { latitude: 91, longitude: 31.2, name: null, address: null },
+        },
+      ),
     ).rejects.toThrow(TypeError);
     await expect(
-      handler('tux:whatsapp:retry-failed')({}, {
-        messageId: 'not-a-uuid',
-        outboundIntentKey: 'retry-intent',
-      }),
+      handler('tux:whatsapp:retry-failed')(
+        {},
+        {
+          messageId: 'not-a-uuid',
+          outboundIntentKey: 'retry-intent',
+        },
+      ),
     ).rejects.toThrow(TypeError);
     await expect(handler('tux:whatsapp:get-media-access')({}, 'not-a-uuid')).rejects.toThrow(
       TypeError,
