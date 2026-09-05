@@ -1,4 +1,10 @@
-import { parseEntityId, type DeviceId, type ShopId, type WhatsAppMessage } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type DeviceId,
+  type ShopId,
+  type WhatsAppMessage,
+} from '@tux/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
@@ -101,7 +107,7 @@ function snapshot(): WhatsAppInboxSnapshot {
         unreadCount: 2,
         archived: false,
         followUp: false,
-        lastMessageAt: '2026-09-05T20:30:00.000Z',
+        lastMessageAt: instant('2026-09-05T20:30:00.000Z'),
       },
     ],
     messages: [
