@@ -154,15 +154,15 @@ function createClient(
   selected: WhatsAppConversation,
   selectedMessages: readonly WhatsAppMessage[] = [],
 ) {
-  const loadInbox = vi.fn<TuxWhatsAppApi['loadInbox']>().mockResolvedValue(
-    ok(snapshot(selected, selectedMessages)),
-  );
+  const loadInbox = vi
+    .fn<TuxWhatsAppApi['loadInbox']>()
+    .mockResolvedValue(ok(snapshot(selected, selectedMessages)));
   const loadConversation = vi
     .fn<TuxWhatsAppApi['loadConversation']>()
     .mockResolvedValue(ok(selectedMessages));
-  const sendText = vi.fn<TuxWhatsAppApi['sendText']>().mockResolvedValue(
-    ok(outboundMessage('text-sent', selected.id)),
-  );
+  const sendText = vi
+    .fn<TuxWhatsAppApi['sendText']>()
+    .mockResolvedValue(ok(outboundMessage('text-sent', selected.id)));
   const sendMedia = vi.fn<TuxWhatsAppApi['sendMedia']>().mockResolvedValue(
     ok(
       outboundMessage('media-sent', selected.id, {
@@ -199,15 +199,13 @@ function createClient(
   const retryFailedMessage = vi
     .fn<TuxWhatsAppApi['retryFailedMessage']>()
     .mockResolvedValue(ok(outboundMessage('retry-sent', selected.id)));
-  const getMediaAccess = vi
-    .fn<TuxWhatsAppApi['getMediaAccess']>()
-    .mockResolvedValue(
-      ok({
-        availability: 'AVAILABLE',
-        url: 'https://storage.example/signed/object',
-        expiresAt: '2026-09-05T10:05:00.000Z',
-      }),
-    );
+  const getMediaAccess = vi.fn<TuxWhatsAppApi['getMediaAccess']>().mockResolvedValue(
+    ok({
+      availability: 'AVAILABLE',
+      url: 'https://storage.example/signed/object',
+      expiresAt: '2026-09-05T10:05:00.000Z',
+    }),
+  );
   const resolveMessagingTarget = vi
     .fn<TuxWhatsAppApi['resolveMessagingTarget']>()
     .mockResolvedValue(
