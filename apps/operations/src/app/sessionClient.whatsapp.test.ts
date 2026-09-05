@@ -59,6 +59,10 @@ vi.mock('@tux/application', async (importOriginal) => {
     loadInbox = mocks.loadInbox;
     loadConversation = vi.fn();
     sendText = vi.fn();
+    sendMedia = vi.fn();
+    sendLocation = vi.fn();
+    retryFailedMessage = vi.fn();
+    getMediaAccess = vi.fn();
     markUnread = vi.fn();
     archive = vi.fn();
     setFollowUp = vi.fn();
@@ -77,13 +81,17 @@ import { createOperationsWhatsAppClient } from './sessionClient';
 const methodNames = [
   'archive',
   'getDraft',
+  'getMediaAccess',
   'linkOrder',
   'loadConversation',
   'loadInbox',
   'markUnread',
   'resolveCustomerOrderContext',
   'resolveMessagingTarget',
+  'retryFailedMessage',
   'saveDraft',
+  'sendLocation',
+  'sendMedia',
   'sendTemplate',
   'sendText',
   'setFollowUp',
@@ -116,7 +124,7 @@ describe('createOperationsWhatsAppClient', () => {
     const client = createOperationsWhatsAppClient();
 
     expect(Object.keys(client).sort()).toEqual(methodNames);
-    expect('sendMedia' in client).toBe(false);
+    expect('sendMedia' in client).toBe(true);
     expect(mocks.storeConstructor).not.toHaveBeenCalled();
 
     await client.loadInbox();
