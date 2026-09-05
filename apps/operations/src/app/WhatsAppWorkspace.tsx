@@ -733,7 +733,9 @@ function ConversationPanel({
               Send Menu
             </button>
           </div>
-          {state.networkOffline ? null : FreeFormMediaComposer({ controller, state })}
+          {state.networkOffline
+            ? null
+            : FreeFormMediaComposer({ controller, state })}
           <label className="whatsapp-composer-label" htmlFor="whatsapp-composer">
             Message
           </label>
