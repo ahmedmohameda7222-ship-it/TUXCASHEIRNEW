@@ -103,6 +103,110 @@ function validLocation(location: WhatsAppLocationPayload): boolean {
   );
 }
 
+function mediaBlob(input: { readonly bytes: Uint8Array; readonly mimeType: string }): Blob {
+  const bytes = new Uint8Array(input.bytes.byteLength);
+  bytes.set(input.bytes);
+  return new Blob([bytes.buffer], { type: input.mimeType });
+}
+
+function preferredRecorderMimeType(): string {
+  const candidates = ['audio/ogg;codecs=opus', 'audio/mp4'];
+  const mimeType = candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+  if (mimeType === undefined) {
+    throw new Error('No approved WhatsApp audio recorder format is available.');
+  }
+  return mimeType;
+}
+
+async function startBrowserAudioRecording(): Promise<WhatsAppAudioRecording> {
+  if (navigator.mediaDevices?.getUserMedia === undefined || typeof MediaRecorder === 'undefined') {
+    throw new Error('Browser audio recording is unavailable.');
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, { mimeType: preferredRecorderMimeType() });
+  } catch (error) {
+    for (const track of stream.getTracks()) track.stop();
+    throw error;
+  }
+
+  const chunks: Blob[] = [];
+  recorder.addEventListener('dataavailable', (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  });
+  recorder.start();
+
+  const stopTracks = (): void => {
+    for (const track of stream.getTracks()) track.stop();
+  };
+
+  return {
+    stop: () =>
+      new Promise((resolve, reject) => {
+        recorder.addEventListener(
+          'error',
+          () => {
+            stopTracks();
+            reject(new Error('Voice recording failed.'));
+          },
+          { once: true },
+        );
+        recorder.addEventListener(
+          'stop',
+          () => {
+            stopTracks();
+            const mimeType = recorder.mimeType.split(';', 1)[0]?.toLowerCase() ?? '';
+            const blob = new Blob(chunks, { type: mimeType });
+            void blob
+              .arrayBuffer()
+              .then((buffer) => resolve({ bytes: new Uint8Array(buffer), mimeType }))
+              .catch(reject);
+          },
+          { once: true },
+        );
+        if (recorder.state === 'inactive') {
+          stopTracks();
+          reject(new Error('Voice recording is not active.'));
+          return;
+        }
+        recorder.stop();
+      }),
+    cancel: () => {
+      if (recorder.state !== 'inactive') recorder.stop();
+      stopTracks();
+    },
+  };
+}
+
+export function createBrowserWhatsAppMediaComposerEnvironment(): WhatsAppMediaComposerEnvironment {
+  return {
+    nowMs: () => Date.now(),
+    createObjectUrl: (input) => URL.createObjectURL(mediaBlob(input)),
+    revokeObjectUrl: (url) => URL.revokeObjectURL(url),
+    startAudioRecording: startBrowserAudioRecording,
+    getCurrentLocation: () =>
+      new Promise((resolve, reject) => {
+        if (navigator.geolocation === undefined) {
+          reject(new Error('Geolocation is unavailable.'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) =>
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              name: null,
+              address: null,
+            }),
+          () => reject(new Error('Geolocation is unavailable.')),
+          { enableHighAccuracy: false, maximumAge: 30_000, timeout: 10_000 },
+        );
+      }),
+  };
+}
+
 export class WhatsAppMediaComposer {
   readonly #environment: WhatsAppMediaComposerEnvironment;
   #state: WhatsAppMediaComposerState = { kind: 'IDLE' };
