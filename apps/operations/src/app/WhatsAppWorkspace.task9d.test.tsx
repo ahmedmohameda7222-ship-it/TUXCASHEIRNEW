@@ -387,8 +387,7 @@ describe('WhatsAppWorkspace Task 9D composer extensions', () => {
           : ({
               mode,
               conversationId: 'conversation-1',
-              normalizedPhone: '+201012345678',
-              displayPhone: '010 1234 5678',
+              reason: 'NO_APPROVED_TEMPLATE',
               config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
             } as NonNullable<WhatsAppInboxUiState['messagingTarget']>);
       const markup = render(state([], { messagingTarget }));
