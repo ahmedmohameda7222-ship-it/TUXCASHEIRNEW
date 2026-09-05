@@ -1,9 +1,11 @@
 import type { ApplicationError, WhatsAppInboxSnapshot } from '@tux/application';
 import type {
+  DeviceId,
   Instant,
   WhatsAppConversation,
   WhatsAppLocationPayload,
   WhatsAppMessage,
+  WorkerId,
 } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import { describe, expect, it, vi } from 'vitest';
@@ -18,8 +20,8 @@ import {
 } from './whatsappMediaComposer';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
-const WORKER_ID = '22222222-2222-4222-8222-222222222222';
-const DEVICE_ID = '33333333-3333-4333-8333-333333333333';
+const WORKER_ID = '22222222-2222-4222-8222-222222222222' as WorkerId;
+const DEVICE_ID = '33333333-3333-4333-8333-333333333333' as DeviceId;
 
 function ok<T>(value: T) {
   return { ok: true, value } as const;
