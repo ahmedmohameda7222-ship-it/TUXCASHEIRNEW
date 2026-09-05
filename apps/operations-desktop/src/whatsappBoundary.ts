@@ -1,22 +1,18 @@
 import type { WhatsAppLocationPayload, WhatsAppOutboundBinary } from '@tux/application';
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const MEDIA_POLICY = {
+const MEDIA_POLICY: Record<
+  WhatsAppOutboundBinary['kind'],
+  { readonly maxBytes: number; readonly mimeTypes: ReadonlySet<string> }
+> = {
   IMAGE: {
     maxBytes: 5 * 1024 * 1024,
     mimeTypes: new Set(['image/jpeg', 'image/png']),
   },
   AUDIO: {
     maxBytes: 16 * 1024 * 1024,
-    mimeTypes: new Set([
-      'audio/aac',
-      'audio/amr',
-      'audio/mpeg',
-      'audio/mp4',
-      'audio/ogg',
-    ]),
+    mimeTypes: new Set(['audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg']),
   },
   DOCUMENT: {
     maxBytes: 100 * 1024 * 1024,
@@ -31,7 +27,7 @@ const MEDIA_POLICY = {
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     ]),
   },
-} as const;
+};
 
 function objectPayload(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -94,7 +90,7 @@ function media(value: unknown): WhatsAppOutboundBinary {
   }
   const mimeType = nonEmpty(source['mimeType'], 'WhatsApp media MIME type').toLowerCase();
   const policy = MEDIA_POLICY[kind];
-  if (!policy.mimeTypes.has(mimeType as never)) {
+  if (!policy.mimeTypes.has(mimeType)) {
     throw new TypeError('WhatsApp media MIME type is unsupported.');
   }
   if (source['bytes'].byteLength > policy.maxBytes) {
