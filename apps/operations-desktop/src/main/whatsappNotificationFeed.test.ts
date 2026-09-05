@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { WhatsAppNotificationFeed, type WhatsAppNotificationEnvelope } from './whatsappNotificationFeed';
-import { WhatsAppNotifications, type WhatsAppNotificationContext } from './whatsappNotifications';
+import {
+  WhatsAppNotificationFeed,
+  type WhatsAppNotificationEnvelope,
+} from './whatsappNotificationFeed';
+import {
+  WhatsAppNotifications,
+  type WhatsAppNotificationContext,
+} from './whatsappNotifications';
 
 const message = {
   messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -27,7 +33,7 @@ function activeContext(
 }
 
 describe('WhatsAppNotificationFeed', () => {
-  it('advances the server cursor between polls', async () => {
+  it('advances the server cursor', async () => {
     const load = vi
       .fn()
       .mockResolvedValueOnce(envelope('cursor-1'))
@@ -44,7 +50,7 @@ describe('WhatsAppNotificationFeed', () => {
     expect(load.mock.calls).toEqual([[null], ['cursor-1']]);
   });
 
-  it('dedupes a repeated server envelope through the runtime notification policy', async () => {
+  it('dedupes a repeated server envelope', async () => {
     const show = vi.fn();
     const notifications = new WhatsAppNotifications({
       getContext: () => activeContext(),
@@ -62,7 +68,7 @@ describe('WhatsAppNotificationFeed', () => {
     expect(show).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps transport failure nonfatal and preserves the previous cursor', async () => {
+  it('keeps transport failure nonfatal without advancing the cursor', async () => {
     const reportError = vi.fn();
     const load = vi
       .fn()
@@ -82,7 +88,7 @@ describe('WhatsAppNotificationFeed', () => {
     expect(reportError).toHaveBeenCalledTimes(1);
   });
 
-  it('strips customer and preview metadata before observing when the local session is inactive', async () => {
+  it('strips preview metadata when the local session is inactive', async () => {
     const observe = vi.fn();
     const feed = new WhatsAppNotificationFeed({
       load: vi.fn().mockResolvedValue(envelope('cursor-1')),
@@ -99,7 +105,7 @@ describe('WhatsAppNotificationFeed', () => {
     });
   });
 
-  it('uses a 15 second cadence and stops the timer cleanly', () => {
+  it('uses a 15 second cadence and stops cleanly', () => {
     const scheduled: Array<() => void> = [];
     const clearInterval = vi.fn();
     const setInterval = vi.fn((callback: () => void, delayMs: number) => {
