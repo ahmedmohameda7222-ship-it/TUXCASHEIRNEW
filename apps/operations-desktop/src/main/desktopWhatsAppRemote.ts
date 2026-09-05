@@ -5,6 +5,7 @@ import {
   throwWhatsAppHttpError,
   WhatsAppRemoteError,
   type WhatsAppInboxSnapshot,
+  type WhatsAppMediaAccess,
   type WhatsAppRemoteGateway,
 } from '@tux/application';
 import type { WhatsAppMessage, WhatsAppMessagingTarget } from '@tux/domain';
@@ -33,6 +34,69 @@ function responseObject(value: unknown): Record<string, unknown> {
     throw new TypeError('WhatsApp response must be an object.');
   }
   return value as Record<string, unknown>;
+}
+
+function responseString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new TypeError(`${label} is invalid.`);
+  }
+  return value.trim();
+}
+
+function transientHttpsUrl(value: unknown, label: string): string {
+  const raw = responseString(value, label);
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new TypeError(`${label} is invalid.`);
+  }
+  if (parsed.protocol !== 'https:' || parsed.username !== '' || parsed.password !== '') {
+    throw new TypeError(`${label} is invalid.`);
+  }
+  return parsed.toString();
+}
+
+function parseMediaUpload(value: unknown): { readonly mediaKey: string; readonly uploadUrl: string } {
+  const source = responseObject(value);
+  if (Object.keys(source).some((key) => key !== 'mediaKey' && key !== 'uploadUrl')) {
+    throw new TypeError('WhatsApp media upload is invalid.');
+  }
+  const mediaKey = responseString(source['mediaKey'], 'WhatsApp media key');
+  if (!/^[0-9a-f]{64}$/.test(mediaKey)) throw new TypeError('WhatsApp media key is invalid.');
+  return {
+    mediaKey,
+    uploadUrl: transientHttpsUrl(source['uploadUrl'], 'WhatsApp media upload URL'),
+  };
+}
+
+function parseMediaAccess(value: unknown): WhatsAppMediaAccess {
+  const source = responseObject(value);
+  if (
+    Object.keys(source).some(
+      (key) => key !== 'availability' && key !== 'url' && key !== 'expiresAt',
+    )
+  ) {
+    throw new TypeError('WhatsApp media access is invalid.');
+  }
+  if (source['availability'] === 'EXPIRED') {
+    if (source['url'] !== null || source['expiresAt'] !== null) {
+      throw new TypeError('WhatsApp media access is invalid.');
+    }
+    return { availability: 'EXPIRED', url: null, expiresAt: null };
+  }
+  if (source['availability'] !== 'AVAILABLE') {
+    throw new TypeError('WhatsApp media access is invalid.');
+  }
+  const expiresAt = responseString(source['expiresAt'], 'WhatsApp media access expiry');
+  if (!Number.isFinite(Date.parse(expiresAt))) {
+    throw new TypeError('WhatsApp media access expiry is invalid.');
+  }
+  return {
+    availability: 'AVAILABLE',
+    url: transientHttpsUrl(source['url'], 'WhatsApp media access URL'),
+    expiresAt,
+  };
 }
 
 export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
@@ -85,6 +149,56 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
     return parseWhatsAppMessage(payload['message']);
   }
 
+  async sendMedia(
+    input: Parameters<WhatsAppRemoteGateway['sendMedia']>[0],
+  ): Promise<WhatsAppMessage> {
+    const metadata = {
+      businessDayId: input.businessDayId,
+      workerId: input.workerId,
+      conversationId: input.conversationId,
+      outboundIntentKey: input.outboundIntentKey,
+      kind: input.media.kind,
+      mimeType: input.media.mimeType,
+      fileName: input.media.fileName,
+      byteSize: input.media.bytes.byteLength,
+    } as const;
+    const createPayload = responseObject(
+      await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
+        action: 'CREATE_MEDIA_UPLOAD',
+        ...metadata,
+      }),
+    );
+    const upload = parseMediaUpload(createPayload['upload']);
+    await this.#uploadSignedMedia(upload.uploadUrl, input.media.mimeType, input.media.bytes);
+    const finalizePayload = responseObject(
+      await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
+        action: 'FINALIZE_MEDIA_SEND',
+        ...metadata,
+        mediaKey: upload.mediaKey,
+      }),
+    );
+    return parseWhatsAppMessage(finalizePayload['message']);
+  }
+
+  async sendLocation(
+    input: Parameters<WhatsAppRemoteGateway['sendLocation']>[0],
+  ): Promise<WhatsAppMessage> {
+    const payload = responseObject(
+      await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
+        action: 'SEND_LOCATION',
+        businessDayId: input.businessDayId,
+        workerId: input.workerId,
+        conversationId: input.conversationId,
+        outboundIntentKey: input.outboundIntentKey,
+        latitude: input.location.latitude,
+        longitude: input.location.longitude,
+        name: input.location.name,
+        address: input.location.address,
+      }),
+    );
+    return parseWhatsAppMessage(payload['message']);
+  }
+
   async sendTemplate(
     input: Parameters<WhatsAppRemoteGateway['sendTemplate']>[0],
   ): Promise<WhatsAppMessage> {
@@ -100,6 +214,31 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
       }),
     );
     return parseWhatsAppMessage(payload['message']);
+  }
+
+  async retryFailedMessage(
+    input: Parameters<WhatsAppRemoteGateway['retryFailedMessage']>[0],
+  ): Promise<WhatsAppMessage> {
+    const payload = responseObject(
+      await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
+        action: 'RETRY_FAILED',
+        businessDayId: input.businessDayId,
+        workerId: input.workerId,
+        messageId: input.messageId,
+        outboundIntentKey: input.outboundIntentKey,
+      }),
+    );
+    return parseWhatsAppMessage(payload['message']);
+  }
+
+  async getMediaAccess(messageId: string): Promise<WhatsAppMediaAccess> {
+    const payload = responseObject(
+      await this.#request('POST', new URL('/api/whatsapp', this.#apiOrigin), {
+        action: 'GET_MEDIA_ACCESS',
+        messageId,
+      }),
+    );
+    return parseMediaAccess(payload['mediaAccess']);
   }
 
   async markUnread(conversationId: string): Promise<void> {
@@ -123,6 +262,22 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
       orderId: input.orderId,
       linked: input.linked ?? true,
     });
+  }
+
+  async #uploadSignedMedia(url: string, mimeType: string, bytes: Uint8Array): Promise<void> {
+    let response: Response;
+    try {
+      response = await this.#fetcher(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType },
+        body: bytes,
+      });
+    } catch {
+      throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp media upload is unavailable.');
+    }
+    if (!response.ok) {
+      throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp media upload failed.');
+    }
   }
 
   async #mutate(body: Readonly<Record<string, unknown>>): Promise<void> {
