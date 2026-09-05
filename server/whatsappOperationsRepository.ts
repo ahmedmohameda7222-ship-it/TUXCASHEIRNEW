@@ -97,6 +97,11 @@ export interface WhatsAppOperationsRepository {
     readonly workerId: WorkerId;
   }): Promise<{ readonly businessDayId: BusinessDayId; readonly workerId: WorkerId } | null>;
 
+  hasActiveNotificationOperator(input: {
+    readonly shopId: ShopId;
+    readonly deviceId: DeviceId;
+  }): Promise<boolean>;
+
   loadInbox(input: {
     readonly shopId: ShopId;
     readonly after: string | null;
@@ -526,6 +531,66 @@ export class SupabaseWhatsAppOperationsRepository implements WhatsAppOperationsR
       businessDayId: id<BusinessDayId>(row['business_day_id']),
       workerId: id<WorkerId>(row['worker_id']),
     };
+  }
+
+  async hasActiveNotificationOperator(input: {
+    readonly shopId: ShopId;
+    readonly deviceId: DeviceId;
+  }): Promise<boolean> {
+    const url = new URL(`${this.#config.projectUrl}/rest/v1/worker_sessions`);
+    url.searchParams.set('select', 'business_day_id,worker_id');
+    url.searchParams.set('shop_id', `eq.${input.shopId}`);
+    url.searchParams.set('device_id', `eq.${input.deviceId}`);
+    url.searchParams.set('ended_at', 'is.null');
+    url.searchParams.set('limit', '2');
+
+    let response: Response;
+    try {
+      response = await this.#fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          apikey: this.#config.serviceRoleKey,
+          Authorization: `Bearer ${this.#config.serviceRoleKey}`,
+        },
+      });
+    } catch {
+      throw new WhatsAppOperationsRepositoryError(
+        'REMOTE_UNAVAILABLE',
+        'WhatsApp remote is unavailable.',
+      );
+    }
+
+    const raw = await response.text().catch(() => {
+      throw protocolError();
+    });
+    let payload: unknown;
+    try {
+      payload = raw.length === 0 ? [] : JSON.parse(raw);
+    } catch {
+      throw protocolError();
+    }
+    if (!response.ok) {
+      throw new WhatsAppOperationsRepositoryError(
+        'REMOTE_REJECTED',
+        'WhatsApp remote rejected the request.',
+      );
+    }
+    if (!Array.isArray(payload)) throw protocolError();
+    if (payload.length !== 1) return false;
+
+    const candidate = record(payload[0]);
+    const businessDayId = id<BusinessDayId>(candidate['business_day_id']);
+    const workerId = id<WorkerId>(candidate['worker_id']);
+    const currentOperator = await this.resolveCurrentOperator({
+      shopId: input.shopId,
+      businessDayId,
+      workerId,
+    });
+    return (
+      currentOperator !== null &&
+      currentOperator.businessDayId === businessDayId &&
+      currentOperator.workerId === workerId
+    );
   }
 
   async loadInbox(input: {
