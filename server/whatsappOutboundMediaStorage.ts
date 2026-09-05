@@ -44,10 +44,7 @@ export interface WhatsAppOutboundMediaStorage {
   }): Promise<WhatsAppInspectedOutboundMedia>;
 }
 
-function encodedObjectUrl(
-  config: WhatsAppDataServerConfig,
-  objectPath: string,
-): string {
+function encodedObjectUrl(config: WhatsAppDataServerConfig, objectPath: string): string {
   const encoded = objectPath.split('/').map(encodeURIComponent).join('/');
   return `${config.projectUrl}/storage/v1/object/${WHATSAPP_MEDIA_BUCKET}/${encoded}`;
 }
@@ -55,7 +52,11 @@ function encodedObjectUrl(
 async function readBoundedBody(
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
-): Promise<{ readonly bytes: Uint8Array; readonly prefix: Uint8Array; readonly sha256: string }> {
+): Promise<{
+  readonly bytes: Uint8Array;
+  readonly prefix: Uint8Array;
+  readonly sha256: string;
+}> {
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   const prefixChunks: Uint8Array[] = [];
@@ -74,8 +75,7 @@ async function readBoundedBody(
       hash.update(next.value);
       if (prefixLength < VALIDATION_PREFIX_BYTES) {
         const remaining = VALIDATION_PREFIX_BYTES - prefixLength;
-        const piece =
-          next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
+        const piece = next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
         prefixChunks.push(piece);
         prefixLength += piece.byteLength;
       }
