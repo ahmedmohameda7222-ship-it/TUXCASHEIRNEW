@@ -66,9 +66,10 @@ describe('notificationPresentation', () => {
   ] as const)(
     'uses safe kind-only fallback copy for %s without preview text',
     (kind, body) => {
-      expect(
-        notificationPresentation({ ...message, kind, preview: null }, context()),
-      ).toEqual({ title: 'Mona', body });
+      expect(notificationPresentation({ ...message, kind, preview: null }, context())).toEqual({
+        title: 'Mona',
+        body,
+      });
     },
   );
 });
