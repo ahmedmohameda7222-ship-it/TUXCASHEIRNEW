@@ -15,7 +15,9 @@ const message: WhatsAppNotificationMessage = {
   customerName: 'Mona',
 };
 
-function context(overrides: Partial<WhatsAppNotificationContext> = {}): WhatsAppNotificationContext {
+function context(
+  overrides: Partial<WhatsAppNotificationContext> = {},
+): WhatsAppNotificationContext {
   return {
     sessionActive: true,
     focusedConversationId: null,
@@ -61,11 +63,14 @@ describe('notificationPresentation', () => {
     ['DOCUMENT', 'Document message'],
     ['AUDIO', 'Voice / audio message'],
     ['LOCATION', 'Location message'],
-  ] as const)('uses safe kind-only fallback copy for %s without preview text', (kind, body) => {
-    expect(
-      notificationPresentation({ ...message, kind, preview: null }, context()),
-    ).toEqual({ title: 'Mona', body });
-  });
+  ] as const)(
+    'uses safe kind-only fallback copy for %s without preview text',
+    (kind, body) => {
+      expect(
+        notificationPresentation({ ...message, kind, preview: null }, context()),
+      ).toEqual({ title: 'Mona', body });
+    },
+  );
 });
 
 describe('WhatsAppNotifications', () => {
