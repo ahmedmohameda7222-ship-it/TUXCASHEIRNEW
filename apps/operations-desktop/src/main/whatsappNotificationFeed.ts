@@ -1,5 +1,7 @@
 import type { WhatsAppNotificationMessage } from './whatsappNotifications';
 
+export type { WhatsAppNotificationMessage };
+
 export interface WhatsAppNotificationEnvelope {
   readonly cursor: string | null;
   readonly messages: readonly WhatsAppNotificationMessage[];
