@@ -50,6 +50,8 @@ function message(
     kind: 'TEXT',
     text: id,
     mediaRef: null,
+    media: null,
+    location: null,
     status: 'DELIVERED',
     sentByWorkerId: null,
     initiatedByDeviceId: null,
@@ -360,7 +362,7 @@ describe('WhatsAppWorkspace', () => {
 
     const reply = findElement(
       tree,
-      (element) => element.props['data-quick-reply-id'] === 'active-reply',
+      (element) => element.props['data-whatsapp-quick-reply-id'] === 'active-reply',
     );
     (reply.props['onClick'] as () => void)();
 
