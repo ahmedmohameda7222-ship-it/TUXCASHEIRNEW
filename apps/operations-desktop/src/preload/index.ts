@@ -7,6 +7,12 @@ import {
 } from '@tux/domain';
 import type { TuxDesktopApi } from '@tux/platform-contracts';
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import {
+  parseWhatsAppMessageId,
+  parseWhatsAppRetryInput,
+  parseWhatsAppSendLocationInput,
+  parseWhatsAppSendMediaInput,
+} from '../whatsappBoundary';
 import { assertBulkStockBoardResult, assertBulkStockMutationResult } from './bulkStockResult';
 import {
   assertEndDayCloseResult,
@@ -24,16 +30,17 @@ import {
 } from './ordersResult';
 import { assertOrderTransitionResult, assertOrdersBoardResult } from './ordersBoardResult';
 import { assertSessionResult } from './sessionResult';
+import { assertSyncHealthSnapshot } from './syncStatusResult';
+import { assertWhatsAppMediaAccessResult } from './whatsappMediaAccessResult';
 import {
   assertWhatsAppConversationResult,
+  assertWhatsAppCustomerOrderContextResult,
   assertWhatsAppDraftResult,
   assertWhatsAppInboxResult,
   assertWhatsAppMessageResult,
-  assertWhatsAppVoidResult,
-  assertWhatsAppCustomerOrderContextResult,
   assertWhatsAppMessagingTargetResult,
+  assertWhatsAppVoidResult,
 } from './whatsappResult';
-import { assertSyncHealthSnapshot } from './syncStatusResult';
 
 const IPC_GET_APP_VERSION = 'tux:app:get-version';
 const IPC_SESSION_GET_STATE = 'tux:session:get-state';
@@ -79,6 +86,10 @@ const IPC_END_DAY_CLOSE = 'tux:end-day:close';
 const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
 const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
 const IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';
+const IPC_WHATSAPP_SEND_MEDIA = 'tux:whatsapp:send-media';
+const IPC_WHATSAPP_SEND_LOCATION = 'tux:whatsapp:send-location';
+const IPC_WHATSAPP_RETRY_FAILED = 'tux:whatsapp:retry-failed';
+const IPC_WHATSAPP_GET_MEDIA_ACCESS = 'tux:whatsapp:get-media-access';
 const IPC_WHATSAPP_MARK_UNREAD = 'tux:whatsapp:mark-unread';
 const IPC_WHATSAPP_ARCHIVE = 'tux:whatsapp:archive';
 const IPC_WHATSAPP_SET_FOLLOW_UP = 'tux:whatsapp:set-follow-up';
@@ -287,6 +298,32 @@ const api: TuxDesktopApi = Object.freeze({
       assertWhatsAppMessageResult(
         (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_TEXT, input)) as unknown,
       ),
+    sendMedia: async (rawInput: Parameters<TuxDesktopApi['whatsapp']['sendMedia']>[0]) => {
+      const input = parseWhatsAppSendMediaInput(rawInput);
+      return assertWhatsAppMessageResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_MEDIA, input)) as unknown,
+      );
+    },
+    sendLocation: async (rawInput: Parameters<TuxDesktopApi['whatsapp']['sendLocation']>[0]) => {
+      const input = parseWhatsAppSendLocationInput(rawInput);
+      return assertWhatsAppMessageResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_LOCATION, input)) as unknown,
+      );
+    },
+    retryFailedMessage: async (
+      rawInput: Parameters<TuxDesktopApi['whatsapp']['retryFailedMessage']>[0],
+    ) => {
+      const input = parseWhatsAppRetryInput(rawInput);
+      return assertWhatsAppMessageResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_RETRY_FAILED, input)) as unknown,
+      );
+    },
+    getMediaAccess: async (rawMessageId: string) => {
+      const messageId = parseWhatsAppMessageId(rawMessageId);
+      return assertWhatsAppMediaAccessResult(
+        (await ipcRenderer.invoke(IPC_WHATSAPP_GET_MEDIA_ACCESS, messageId)) as unknown,
+      );
+    },
     markUnread: async (conversationId: string) =>
       assertWhatsAppVoidResult(
         (await ipcRenderer.invoke(IPC_WHATSAPP_MARK_UNREAD, conversationId)) as unknown,
