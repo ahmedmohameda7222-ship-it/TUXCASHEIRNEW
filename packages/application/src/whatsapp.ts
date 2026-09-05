@@ -3,6 +3,7 @@ import {
   type Instant,
   type OrderId,
   type ShopId,
+  type WhatsAppLocationPayload,
   type WhatsAppMessage,
   type WhatsAppMessagingTarget,
 } from '@tux/domain';
@@ -15,6 +16,7 @@ import type {
 import type { ApplicationError } from './errors';
 import { err, ok, type Result } from './result';
 import type { OperationsSessionResult } from './session';
+import { OperationsWhatsAppMessagingService } from './whatsappMessaging';
 import {
   resolveWhatsAppCustomerOrderContext,
   type WhatsAppCustomerOrderContext,
@@ -22,6 +24,8 @@ import {
 import {
   WhatsAppRemoteError,
   type WhatsAppInboxSnapshot,
+  type WhatsAppMediaAccess,
+  type WhatsAppOutboundBinary,
   type WhatsAppRemoteErrorCode,
   type WhatsAppRemoteGateway,
 } from './whatsappRemote';
@@ -106,6 +110,7 @@ export class OperationsWhatsAppService {
   readonly #session: WhatsAppSessionStateSource;
   readonly #now: () => Instant;
   readonly #database: OperationsDatabase | null;
+  readonly #messaging: OperationsWhatsAppMessagingService;
 
   constructor(
     remote: WhatsAppRemoteGateway,
@@ -119,6 +124,7 @@ export class OperationsWhatsAppService {
     this.#session = session;
     this.#now = now;
     this.#database = database;
+    this.#messaging = new OperationsWhatsAppMessagingService(remote, session);
   }
 
   async loadInbox(cursor?: string): Promise<Result<WhatsAppInboxSnapshot, ApplicationError>> {
@@ -250,6 +256,33 @@ export class OperationsWhatsAppService {
       );
     }
     return ok(message);
+  }
+
+  sendMedia(input: {
+    readonly conversationId: string;
+    readonly outboundIntentKey: string;
+    readonly media: WhatsAppOutboundBinary;
+  }): Promise<Result<WhatsAppMessage, ApplicationError>> {
+    return this.#messaging.sendMedia(input);
+  }
+
+  sendLocation(input: {
+    readonly conversationId: string;
+    readonly outboundIntentKey: string;
+    readonly location: WhatsAppLocationPayload;
+  }): Promise<Result<WhatsAppMessage, ApplicationError>> {
+    return this.#messaging.sendLocation(input);
+  }
+
+  retryFailedMessage(input: {
+    readonly messageId: string;
+    readonly outboundIntentKey: string;
+  }): Promise<Result<WhatsAppMessage, ApplicationError>> {
+    return this.#messaging.retryFailedMessage(input);
+  }
+
+  getMediaAccess(messageId: string): Promise<Result<WhatsAppMediaAccess, ApplicationError>> {
+    return this.#messaging.getMediaAccess(messageId);
   }
 
   async markUnread(conversationId: string): Promise<Result<void, ApplicationError>> {
