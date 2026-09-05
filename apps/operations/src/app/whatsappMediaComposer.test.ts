@@ -6,10 +6,7 @@ import {
   type WhatsAppMediaComposerEnvironment,
 } from './whatsappMediaComposer';
 
-function location(
-  latitude = 30.0444,
-  longitude = 31.2357,
-): WhatsAppLocationPayload {
+function location(latitude = 30.0444, longitude = 31.2357): WhatsAppLocationPayload {
   return {
     latitude,
     longitude,
@@ -73,11 +70,13 @@ class TestEnvironment implements WhatsAppMediaComposerEnvironment {
   };
 }
 
-function mediaInput(overrides: {
-  readonly bytes?: Uint8Array;
-  readonly mimeType?: string;
-  readonly fileName?: string;
-} = {}) {
+function mediaInput(
+  overrides: {
+    readonly bytes?: Uint8Array;
+    readonly mimeType?: string;
+    readonly fileName?: string;
+  } = {},
+) {
   return {
     bytes: overrides.bytes ?? new Uint8Array([0xff, 0xd8, 0xff]),
     mimeType: overrides.mimeType ?? 'image/jpeg',
