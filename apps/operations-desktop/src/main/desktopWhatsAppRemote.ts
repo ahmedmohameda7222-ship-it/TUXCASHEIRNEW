@@ -273,7 +273,7 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
       response = await this.#fetcher(url, {
         method: 'PUT',
         headers: { 'Content-Type': mimeType },
-        body: bytes,
+        body: new Uint8Array(bytes),
       });
     } catch {
       throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp media upload is unavailable.');
