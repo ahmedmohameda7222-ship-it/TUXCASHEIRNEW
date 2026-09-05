@@ -23,15 +23,20 @@ import {
   type WhatsAppChannelResolver,
 } from './whatsappChannelResolver';
 import {
-  SupabaseWhatsAppOperationsRepository,
   WhatsAppOperationsRepositoryError,
   type WhatsAppOperationsRepository,
 } from './whatsappOperationsRepository';
+import { SupabaseWhatsAppOutboundRepository } from './whatsappOutboundRepository';
+import { handleWhatsAppOutboundAction } from './whatsappOutboundActions';
 import {
-  createWhatsAppProviderGateway,
-  WhatsAppProviderError,
-  type WhatsAppProviderGateway,
-} from './whatsappProviderGateway';
+  SupabaseWhatsAppOutboundMediaStorage,
+  type WhatsAppOutboundMediaStorage,
+} from './whatsappOutboundMediaStorage';
+import {
+  createWhatsAppExtendedProviderGateway,
+  type WhatsAppExtendedProviderGateway,
+} from './whatsappOutboundProviderGateway';
+import { WhatsAppProviderError } from './whatsappProviderGateway';
 import { loadWhatsAppDataServerConfig, loadWhatsAppServerConfig } from './whatsappServerConfig';
 import {
   OperationsDeviceAuthorityError,
@@ -42,7 +47,8 @@ import {
 export interface WhatsAppOperationsDependencyFactory {
   createRepository(): WhatsAppOperationsRepository;
   createChannelResolver(): WhatsAppChannelResolver;
-  createProviderGateway(): WhatsAppProviderGateway;
+  createProviderGateway(): WhatsAppExtendedProviderGateway;
+  createMediaStorage(): WhatsAppOutboundMediaStorage;
   resolveDeviceAuthority(input: {
     readonly projectUrl: string;
     readonly publishableKey: string;
@@ -54,17 +60,20 @@ export interface WhatsAppOperationsDependencyFactory {
 
 const productionDependencies: WhatsAppOperationsDependencyFactory = {
   createRepository() {
-    return new SupabaseWhatsAppOperationsRepository(loadWhatsAppDataServerConfig());
+    return new SupabaseWhatsAppOutboundRepository(loadWhatsAppDataServerConfig());
   },
   createChannelResolver() {
     return new SupabaseWhatsAppChannelResolver(loadWhatsAppDataServerConfig());
   },
   createProviderGateway() {
     const config = loadWhatsAppServerConfig();
-    return createWhatsAppProviderGateway({
+    return createWhatsAppExtendedProviderGateway({
       graphVersion: config.graphVersion,
       accessToken: config.accessToken,
     });
+  },
+  createMediaStorage() {
+    return new SupabaseWhatsAppOutboundMediaStorage(loadWhatsAppDataServerConfig());
   },
   resolveDeviceAuthority(input) {
     return resolveOperationsDeviceAuthority(input);
@@ -80,7 +89,6 @@ const FORBIDDEN_AUTHORITY_FIELDS = new Set([
   'sentByWorkerId',
   'to',
   'providerPhoneNumberId',
-  'kind',
   'providerTemplateName',
   'languageCode',
 ]);
@@ -803,6 +811,19 @@ export async function handleWhatsAppOperations(
   }
 
   const action = nonEmptyString(body['action']);
+  if (
+    action !== null &&
+    (await handleWhatsAppOutboundAction({
+      action,
+      body,
+      response,
+      shopId,
+      deviceId,
+      dependencies,
+    }))
+  ) {
+    return;
+  }
   if (action === 'RESOLVE_TARGET') {
     await handleResolveTarget(body, response, shopId, dependencies);
     return;
