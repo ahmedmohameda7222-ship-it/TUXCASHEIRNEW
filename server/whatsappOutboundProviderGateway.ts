@@ -25,7 +25,8 @@ export type SendWhatsAppExtendedProviderMessageInput =
       readonly address: string | null;
     };
 
-export interface WhatsAppExtendedProviderGateway extends Omit<WhatsAppProviderGateway, 'sendMessage'> {
+export interface WhatsAppExtendedProviderGateway
+  extends Omit<WhatsAppProviderGateway, 'sendMessage'> {
   sendMessage(
     input: SendWhatsAppExtendedProviderMessageInput,
   ): Promise<{ readonly providerMessageId: string }>;
@@ -80,7 +81,9 @@ function safeMediaUrl(value: string): string {
   }
 }
 
-function providerPayload(input: Exclude<SendWhatsAppExtendedProviderMessageInput, SendWhatsAppProviderMessageInput>) {
+function providerPayload(
+  input: Exclude<SendWhatsAppExtendedProviderMessageInput, SendWhatsAppProviderMessageInput>,
+) {
   const phone = normalizeEgyptianPhone(input.to);
   if (!phone.valid) throw new Error('WhatsApp recipient phone is invalid.');
   const to = phone.displayPhone.slice(1);
