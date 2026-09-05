@@ -1,9 +1,4 @@
-import {
-  parseEntityId,
-  type DeviceId,
-  type ShopId,
-  type WhatsAppMessage,
-} from '@tux/domain';
+import { parseEntityId, type DeviceId, type ShopId, type WhatsAppMessage } from '@tux/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WhatsAppInboxSnapshot } from '@tux/application';
 import type { GatewayRequest, GatewayResponse } from './supabaseGateway';
