@@ -105,9 +105,7 @@ function isAllowedPermissionRequest(
 ): boolean {
   if (permission === 'geolocation') return true;
   return (
-    permission === 'media' &&
-    details.mediaTypes?.length === 1 &&
-    details.mediaTypes[0] === 'audio'
+    permission === 'media' && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio'
   );
 }
 
