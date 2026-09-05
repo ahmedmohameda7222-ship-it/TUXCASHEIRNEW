@@ -197,7 +197,7 @@ export class SupabaseWhatsAppOutboundMediaStorage
           ...this.#headers(input.mimeType),
           'x-upsert': 'true',
         },
-        body: material.bytes,
+        body: new Uint8Array(material.bytes),
       });
       if (!promoted.ok) throw new Error('WhatsApp media storage request failed.');
       await this.#delete(quarantinePath);
