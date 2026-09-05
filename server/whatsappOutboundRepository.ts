@@ -181,8 +181,7 @@ function parseInternalMessage(
       source['initiated_by_device_id'] === null
         ? null
         : requiredString(source['initiated_by_device_id']),
-    initiatedAt:
-      source['initiated_at'] === null ? null : requiredString(source['initiated_at']),
+    initiatedAt: source['initiated_at'] === null ? null : requiredString(source['initiated_at']),
     createdAt: requiredString(source['created_at']),
   });
 }
@@ -373,11 +372,7 @@ export class SupabaseWhatsAppOutboundRepository
     return {
       created: booleanValue(row['created']),
       recipientNormalizedPhone: requiredString(row['recipient_normalized_phone']),
-      message: parseInternalMessage(
-        row['message_json'],
-        row['media_json'],
-        row['location_json'],
-      ),
+      message: parseInternalMessage(row['message_json'], row['media_json'], row['location_json']),
     };
   }
 

@@ -352,12 +352,7 @@ async function createMediaUpload(context: ActionContext): Promise<void> {
   const conversationId = parsedUuid(context.body['conversationId']);
   const outboundIntentKey = requiredString(context.body['outboundIntentKey'], 200);
   const media = mediaDeclaration(context.body);
-  if (
-    claims === null ||
-    conversationId === null ||
-    outboundIntentKey === null ||
-    media === null
-  ) {
+  if (claims === null || conversationId === null || outboundIntentKey === null || media === null) {
     invalidRequest(context.response);
     return;
   }

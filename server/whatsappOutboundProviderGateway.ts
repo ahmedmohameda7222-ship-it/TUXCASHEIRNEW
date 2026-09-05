@@ -25,8 +25,10 @@ export type SendWhatsAppExtendedProviderMessageInput =
       readonly address: string | null;
     };
 
-export interface WhatsAppExtendedProviderGateway
-  extends Omit<WhatsAppProviderGateway, 'sendMessage'> {
+export interface WhatsAppExtendedProviderGateway extends Omit<
+  WhatsAppProviderGateway,
+  'sendMessage'
+> {
   sendMessage(
     input: SendWhatsAppExtendedProviderMessageInput,
   ): Promise<{ readonly providerMessageId: string }>;
@@ -117,9 +119,7 @@ function providerPayload(
   const type = input.kind.toLowerCase() as 'image' | 'document' | 'audio';
   const media = {
     link,
-    ...(input.kind === 'DOCUMENT' && input.fileName !== null
-      ? { filename: input.fileName }
-      : {}),
+    ...(input.kind === 'DOCUMENT' && input.fileName !== null ? { filename: input.fileName } : {}),
   };
   return {
     messaging_product: 'whatsapp',

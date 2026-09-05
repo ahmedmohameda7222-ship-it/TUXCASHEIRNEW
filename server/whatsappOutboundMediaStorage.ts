@@ -75,7 +75,8 @@ async function readBoundedBody(
       hash.update(next.value);
       if (prefixLength < VALIDATION_PREFIX_BYTES) {
         const remaining = VALIDATION_PREFIX_BYTES - prefixLength;
-        const piece = next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
+        const piece =
+          next.value.byteLength <= remaining ? next.value : next.value.slice(0, remaining);
         prefixChunks.push(piece);
         prefixLength += piece.byteLength;
       }
