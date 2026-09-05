@@ -518,8 +518,7 @@ export function createOperationsWhatsAppClient(): OperationsWhatsAppClient {
     sendText: async (input) => (await browserWhatsAppRuntime()).sendText(input),
     sendMedia: async (input) => (await browserWhatsAppRuntime()).sendMedia(input),
     sendLocation: async (input) => (await browserWhatsAppRuntime()).sendLocation(input),
-    retryFailedMessage: async (input) =>
-      (await browserWhatsAppRuntime()).retryFailedMessage(input),
+    retryFailedMessage: async (input) => (await browserWhatsAppRuntime()).retryFailedMessage(input),
     getMediaAccess: async (messageId) => (await browserWhatsAppRuntime()).getMediaAccess(messageId),
     markUnread: async (conversationId) =>
       (await browserWhatsAppRuntime()).markUnread(conversationId),
