@@ -29,10 +29,15 @@ import { WhatsAppIpcRuntime } from './whatsappIpc';
 
 const conversationId = '11111111-1111-4111-8111-111111111111';
 const orderId = '22222222-2222-4222-8222-222222222222';
+const messageId = '33333333-3333-4333-8333-333333333333';
 const channels = [
   'tux:whatsapp:load-inbox',
   'tux:whatsapp:load-conversation',
   'tux:whatsapp:send-text',
+  'tux:whatsapp:send-media',
+  'tux:whatsapp:send-location',
+  'tux:whatsapp:retry-failed',
+  'tux:whatsapp:get-media-access',
   'tux:whatsapp:mark-unread',
   'tux:whatsapp:archive',
   'tux:whatsapp:set-follow-up',
@@ -58,6 +63,22 @@ function service(): TuxWhatsAppApi {
     })) as never,
     loadConversation: vi.fn(async () => ({ ok: true, value: [] })) as never,
     sendText: vi.fn(async () => ({
+      ok: false,
+      error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
+    })) as never,
+    sendMedia: vi.fn(async () => ({
+      ok: false,
+      error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
+    })) as never,
+    sendLocation: vi.fn(async () => ({
+      ok: false,
+      error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
+    })) as never,
+    retryFailedMessage: vi.fn(async () => ({
+      ok: false,
+      error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
+    })) as never,
+    getMediaAccess: vi.fn(async () => ({
       ok: false,
       error: { code: 'REMOTE_SYNC_ERROR', message: 'not used' },
     })) as never,
@@ -117,7 +138,7 @@ beforeEach(() => {
 });
 
 describe('WhatsAppIpcRuntime', () => {
-  it('registers exactly all twelve WhatsApp channels', () => {
+  it('registers exactly all sixteen WhatsApp channels', () => {
     register();
     expect([...electron.handlers.keys()]).toEqual(channels);
   });
@@ -130,20 +151,49 @@ describe('WhatsAppIpcRuntime', () => {
       [channels[0], 'loadInbox', ['cursor']],
       [channels[1], 'loadConversation', [conversationId]],
       [channels[2], 'sendText', [{ conversationId, outboundIntentKey: 'intent-1', text: 'hello' }]],
-      [channels[3], 'markUnread', [conversationId]],
-      [channels[4], 'archive', [conversationId, true]],
-      [channels[5], 'setFollowUp', [conversationId, true]],
-      [channels[6], 'linkOrder', [{ conversationId, orderId, linked: true }]],
-      [channels[7], 'saveDraft', [conversationId, '']],
-      [channels[8], 'getDraft', [conversationId]],
-      [channels[9], 'resolveCustomerOrderContext' as keyof TuxWhatsAppApi, [conversationId]],
       [
-        channels[10],
+        channels[3],
+        'sendMedia',
+        [
+          {
+            conversationId,
+            outboundIntentKey: 'media-intent',
+            media: {
+              kind: 'IMAGE',
+              bytes: new Uint8Array([0xff, 0xd8, 0xff]),
+              mimeType: 'image/jpeg',
+              fileName: 'photo.jpg',
+            },
+          },
+        ],
+      ],
+      [
+        channels[4],
+        'sendLocation',
+        [
+          {
+            conversationId,
+            outboundIntentKey: 'location-intent',
+            location: { latitude: 30.0444, longitude: 31.2357, name: 'TUX', address: 'Cairo' },
+          },
+        ],
+      ],
+      [channels[5], 'retryFailedMessage', [{ messageId, outboundIntentKey: 'retry-intent' }]],
+      [channels[6], 'getMediaAccess', [messageId]],
+      [channels[7], 'markUnread', [conversationId]],
+      [channels[8], 'archive', [conversationId, true]],
+      [channels[9], 'setFollowUp', [conversationId, true]],
+      [channels[10], 'linkOrder', [{ conversationId, orderId, linked: true }]],
+      [channels[11], 'saveDraft', [conversationId, '']],
+      [channels[12], 'getDraft', [conversationId]],
+      [channels[13], 'resolveCustomerOrderContext', [conversationId]],
+      [
+        channels[14],
         'resolveMessagingTarget',
         [{ normalizedPhone: '+201012345678', displayPhone: '010 1234 5678' }],
       ],
       [
-        channels[11],
+        channels[15],
         'sendTemplate',
         [
           {
@@ -195,8 +245,8 @@ describe('WhatsAppIpcRuntime', () => {
   it('rejects non-boolean archive and follow-up flags without invoking the service', async () => {
     const api = service();
     register(api);
-    await expect(handler(channels[4])({}, conversationId, 'yes')).rejects.toThrow();
-    await expect(handler(channels[5])({}, conversationId, 1)).rejects.toThrow();
+    await expect(handler(channels[8])({}, conversationId, 'yes')).rejects.toThrow();
+    await expect(handler(channels[9])({}, conversationId, 1)).rejects.toThrow();
     expect(api.archive).not.toHaveBeenCalled();
     expect(api.setFollowUp).not.toHaveBeenCalled();
   });
@@ -209,24 +259,24 @@ describe('WhatsAppIpcRuntime', () => {
   ])('rejects malformed linkOrder payload %# without invoking the service', async (value) => {
     const api = service();
     register(api);
-    await expect(handler(channels[6])({}, value)).rejects.toThrow();
+    await expect(handler(channels[10])({}, value)).rejects.toThrow();
     expect(api.linkOrder).not.toHaveBeenCalled();
   });
 
   it('permits an empty draft string but rejects malformed draft arguments', async () => {
     const api = service();
     register(api);
-    await handler(channels[7])({}, conversationId, '');
+    await handler(channels[11])({}, conversationId, '');
     expect(api.saveDraft).toHaveBeenCalledWith(conversationId, '');
-    await expect(handler(channels[7])({}, 'bad', '')).rejects.toThrow();
-    await expect(handler(channels[7])({}, conversationId, 1)).rejects.toThrow();
+    await expect(handler(channels[11])({}, 'bad', '')).rejects.toThrow();
+    await expect(handler(channels[11])({}, conversationId, 1)).rejects.toThrow();
     expect(api.saveDraft).toHaveBeenCalledTimes(1);
   });
 
   it('validates getDraft conversationId before invoking the service', async () => {
     const api = service();
     register(api);
-    await expect(handler(channels[8])({}, 'bad')).rejects.toThrow();
+    await expect(handler(channels[12])({}, 'bad')).rejects.toThrow();
     expect(api.getDraft).not.toHaveBeenCalled();
   });
 
@@ -235,7 +285,7 @@ describe('WhatsAppIpcRuntime', () => {
       resolveCustomerOrderContext: ReturnType<typeof vi.fn>;
     };
     register(api as TuxWhatsAppApi);
-    await expect(handler(channels[9])({}, 'bad')).rejects.toThrow();
+    await expect(handler(channels[13])({}, 'bad')).rejects.toThrow();
     expect(api.resolveCustomerOrderContext).not.toHaveBeenCalled();
   });
 
@@ -245,7 +295,7 @@ describe('WhatsAppIpcRuntime', () => {
     const event = { sender: { id: 77 } };
 
     await expect(
-      handler(channels[10])(event, {
+      handler(channels[14])(event, {
         normalizedPhone: '+201012345678',
         displayPhone: '010 1234 5678',
       }),
@@ -256,7 +306,7 @@ describe('WhatsAppIpcRuntime', () => {
     });
 
     await expect(
-      handler(channels[10])(event, {
+      handler(channels[14])(event, {
         normalizedPhone: '+201012345678',
         displayPhone: '010 1234 5678',
         shopId: 'forged-shop',
@@ -269,7 +319,7 @@ describe('WhatsAppIpcRuntime', () => {
     register(api);
     const event = { sender: { id: 77 } };
 
-    await handler(channels[11])(event, {
+    await handler(channels[15])(event, {
       normalizedPhone: '+201012345678',
       displayPhone: '010 1234 5678',
       templateId: 'starter-1',
@@ -283,7 +333,7 @@ describe('WhatsAppIpcRuntime', () => {
     });
 
     await expect(
-      handler(channels[11])(event, {
+      handler(channels[15])(event, {
         normalizedPhone: '+201012345678',
         displayPhone: '010 1234 5678',
         templateId: 'starter-1',
