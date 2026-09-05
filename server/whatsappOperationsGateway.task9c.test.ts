@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   parseEntityId,
   type BusinessDayId,
@@ -20,6 +21,11 @@ const workerId = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000001')
 const deviceId = parseEntityId<DeviceId>('40000000-0000-4000-8000-000000000001');
 const conversationId = '50000000-0000-4000-8000-000000000001';
 const messageId = '60000000-0000-4000-8000-000000000001';
+const outboundIntentKey = 'media-intent';
+const mediaKey = createHash('sha256')
+  .update(`outbound:${shopId}:${outboundIntentKey}`)
+  .digest('hex');
+const mediaObjectPath = `media/${shopId}/${mediaKey}`;
 
 function jwt(): string {
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -77,17 +83,26 @@ function message(status: 'PENDING' | 'SENT' | 'FAILED' = 'PENDING'): WhatsAppMes
     shopId,
     conversationId,
     providerMessageId: status === 'SENT' ? 'wamid.sent' : null,
-    outboundIntentKey: 'media-intent',
+    outboundIntentKey,
     direction: 'OUTBOUND',
     kind: 'IMAGE',
     text: null,
-    mediaRef: 'media-key',
-    media: null,
+    mediaRef: mediaKey,
+    media: {
+      mediaKey,
+      kind: 'IMAGE',
+      mimeType: 'image/jpeg',
+      fileName: 'photo.jpg',
+      byteSize: 3,
+      storedAt: '2026-09-04T10:00:00.000Z',
+      expiresAt: '2026-10-04T10:00:00.000Z',
+      availability: 'AVAILABLE',
+    },
     location: null,
     status,
     sentByWorkerId: workerId,
     initiatedByDeviceId: deviceId,
-    initiatedAt: null,
+    initiatedAt: '2026-09-04T10:00:00.000Z',
     createdAt: '2026-09-04T10:00:00.000Z',
   } as unknown as WhatsAppMessage;
 }
@@ -109,10 +124,20 @@ function createDependencies() {
       recipientNormalizedPhone: '01012345678',
       message: message(),
     })),
+    claimOutboundLocationIntent: vi.fn(async () => ({
+      created: true,
+      recipientNormalizedPhone: '01012345678',
+      message: message(),
+    })),
     resolveRetryableMessage: vi.fn(async () => message('FAILED')),
+    claimRetryIntent: vi.fn(async () => ({
+      created: true,
+      recipientNormalizedPhone: '01012345678',
+      message: message(),
+    })),
     resolveMediaAccess: vi.fn(async () => ({
       messageId,
-      objectPath: 'media/path',
+      objectPath: mediaObjectPath,
       expiresAt: '2026-10-04T10:00:00.000Z',
       deletedAt: null,
     })),
@@ -125,7 +150,7 @@ function createDependencies() {
   };
   const mediaStorage = {
     createSignedUpload: vi.fn(async () => ({
-      objectPath: 'quarantine/path',
+      objectPath: `quarantine/${shopId}/${mediaKey}`,
       url: 'https://example.supabase.co/storage/v1/upload/signed',
     })),
     createSignedDownload: vi.fn(async () => ({
@@ -134,7 +159,7 @@ function createDependencies() {
       urlExpiresAt: '2026-09-04T10:05:00.000Z',
     })),
     inspectUploadedMedia: vi.fn(async () => ({
-      objectPath: 'media/path',
+      objectPath: mediaObjectPath,
       prefix: new Uint8Array([0xff, 0xd8, 0xff]),
       byteSize: 3,
       sha256: 'sha256',
@@ -176,7 +201,7 @@ function uploadBody(overrides: Record<string, unknown> = {}) {
     businessDayId,
     workerId,
     conversationId,
-    outboundIntentKey: 'media-intent',
+    outboundIntentKey,
     kind: 'IMAGE',
     mimeType: 'image/jpeg',
     fileName: 'photo.jpg',
@@ -191,8 +216,8 @@ function finalizeBody() {
     businessDayId,
     workerId,
     conversationId,
-    outboundIntentKey: 'media-intent',
-    mediaKey: 'media-key',
+    outboundIntentKey,
+    mediaKey,
     kind: 'IMAGE',
     mimeType: 'image/jpeg',
     fileName: 'photo.jpg',
@@ -345,7 +370,7 @@ describe('Task 9C WhatsApp server actions', () => {
     const deps = createDependencies();
     deps.repository.resolveMediaAccess.mockResolvedValueOnce({
       messageId,
-      objectPath: 'media/path',
+      objectPath: mediaObjectPath,
       expiresAt: '2026-09-03T10:00:00.000Z',
       deletedAt: null,
     });
