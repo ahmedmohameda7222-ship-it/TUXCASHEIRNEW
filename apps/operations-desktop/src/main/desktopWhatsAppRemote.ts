@@ -10,6 +10,10 @@ import {
 } from '@tux/application';
 import type { WhatsAppMessage, WhatsAppMessagingTarget } from '@tux/domain';
 import type { SupabaseDeviceSessionManager } from '@tux/sync';
+import type {
+  WhatsAppNotificationEnvelope,
+  WhatsAppNotificationMessage,
+} from './whatsappNotificationFeed';
 
 export const TUX_OPERATIONS_API_ORIGIN_ENV = 'TUX_OPERATIONS_API_ORIGIN' as const;
 
@@ -41,6 +45,75 @@ function responseString(value: unknown, label: string): string {
     throw new TypeError(`${label} is invalid.`);
   }
   return value.trim();
+}
+
+function nullableResponseString(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new TypeError(`${label} is invalid.`);
+  return value;
+}
+
+function hasExactKeys(source: Record<string, unknown>, allowed: readonly string[]): boolean {
+  if (Object.keys(source).length !== allowed.length) return false;
+  const accepted = new Set(allowed);
+  return Object.keys(source).every((key) => accepted.has(key));
+}
+
+function parseNotificationMessage(value: unknown): WhatsAppNotificationMessage {
+  const source = responseObject(value);
+  if (
+    !hasExactKeys(source, [
+      'messageId',
+      'conversationId',
+      'createdAt',
+      'kind',
+      'preview',
+      'customerName',
+    ])
+  ) {
+    throw new TypeError('WhatsApp notification message is invalid.');
+  }
+  const createdAt = responseString(source['createdAt'], 'WhatsApp notification timestamp');
+  if (!Number.isFinite(Date.parse(createdAt))) {
+    throw new TypeError('WhatsApp notification timestamp is invalid.');
+  }
+  const kind = source['kind'];
+  if (
+    kind !== 'TEXT' &&
+    kind !== 'IMAGE' &&
+    kind !== 'DOCUMENT' &&
+    kind !== 'AUDIO' &&
+    kind !== 'LOCATION'
+  ) {
+    throw new TypeError('WhatsApp notification kind is invalid.');
+  }
+  return {
+    messageId: responseString(source['messageId'], 'WhatsApp notification message id'),
+    conversationId: responseString(
+      source['conversationId'],
+      'WhatsApp notification conversation id',
+    ),
+    createdAt,
+    kind,
+    preview: nullableResponseString(source['preview'], 'WhatsApp notification preview'),
+    customerName: nullableResponseString(
+      source['customerName'],
+      'WhatsApp notification customer name',
+    ),
+  };
+}
+
+function parseNotificationEnvelope(value: unknown): WhatsAppNotificationEnvelope {
+  const source = responseObject(value);
+  if (!hasExactKeys(source, ['cursor', 'messages']) || !Array.isArray(source['messages'])) {
+    throw new TypeError('WhatsApp notification feed is invalid.');
+  }
+  const cursor = source['cursor'];
+  return {
+    cursor:
+      cursor === null ? null : responseString(cursor, 'WhatsApp notification feed cursor'),
+    messages: source['messages'].map(parseNotificationMessage),
+  };
 }
 
 function transientHttpsUrl(value: unknown, label: string): string {
@@ -121,6 +194,13 @@ export class DesktopWhatsAppRemote implements WhatsAppRemoteGateway {
     const url = new URL('/api/whatsapp', this.#apiOrigin);
     if (cursor !== undefined) url.searchParams.set('after', cursor);
     return parseWhatsAppInboxSnapshot(await this.#request('GET', url));
+  }
+
+  async loadNotificationFeed(cursor: string | null): Promise<WhatsAppNotificationEnvelope> {
+    const url = new URL('/api/whatsapp', this.#apiOrigin);
+    url.searchParams.set('feed', 'notifications');
+    if (cursor !== null) url.searchParams.set('after', cursor);
+    return parseNotificationEnvelope(await this.#request('GET', url));
   }
 
   async resolveMessagingTarget(
