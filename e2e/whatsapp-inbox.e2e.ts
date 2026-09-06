@@ -182,6 +182,110 @@ async function enterActiveShell(page: Page): Promise<void> {
   });
 }
 
+async function seedActiveDeliveryOrders(
+  page: Page,
+  displayOrderNos: readonly number[],
+): Promise<readonly string[]> {
+  return page.evaluate(
+    async ({ databaseName, shopId, workerId, orderNos }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const day = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        const tx = database.transaction('businessDays', 'readonly');
+        const request = tx.objectStore('businessDays').index('shopStatus').get([shopId, 'OPEN']);
+        request.onsuccess = () => {
+          if (request.result === undefined) reject(new Error('Open Business Day not found.'));
+          else resolve(request.result as Record<string, unknown>);
+        };
+        request.onerror = () => reject(request.error);
+      });
+      const businessDayId = String(day['id']);
+      const ids = orderNos.map(
+        (orderNo) => `d0000000-0000-4000-8000-${String(orderNo).padStart(12, '0')}`,
+      );
+      await new Promise<void>((resolve, reject) => {
+        const tx = database.transaction(['businessDays', 'orders'], 'readwrite');
+        const orders = tx.objectStore('orders');
+        for (const [index, orderNo] of orderNos.entries()) {
+          orders.put({
+            id: ids[index],
+            shopId,
+            businessDayId,
+            displayOrderNo: orderNo,
+            idempotencyKey: `whatsapp-e2e-order-${orderNo}`,
+            status: 'ACTIVE',
+            source: 'POS',
+            operatorWorkerId: workerId,
+            operatorName: 'WhatsApp E2E Worker',
+            createdAt: `2026-09-06T00:${String(index + 1).padStart(2, '0')}:00.000Z`,
+            fulfillment: {
+              orderTypeId: '70000000-0000-4000-8000-000000000003',
+              orderTypeLabel: 'Delivery',
+              behavior: 'DELIVERY',
+              delivery: {
+                customerContactId: null,
+                customerName: 'E2E Customer',
+                normalizedPhone: '+201001234567',
+                address: 'E2E Address',
+                zoneId: '90000000-0000-4000-8000-000000000001',
+                zoneLabel: 'E2E Zone',
+                configuredFeeMinor: 0,
+                finalFeeMinor: 0,
+              },
+            },
+            items: [
+              {
+                id: `e0000000-0000-4000-8000-${String(orderNo).padStart(12, '0')}`,
+                productId: '40000000-0000-4000-8000-000000000001',
+                productName: 'E2E Burger',
+                unitPriceMinor: 10_000,
+                quantity: 1,
+                modifiers: [],
+                comboBeverages: [],
+                itemNote: null,
+              },
+            ],
+            orderNote: null,
+            itemsSubtotalMinor: 10_000,
+            discountMinor: 0,
+            deliveryFeeMinor: 0,
+            totalMinor: 10_000,
+            payments: [
+              {
+                id: `f0000000-0000-4000-8000-${String(orderNo).padStart(12, '0')}`,
+                method: {
+                  id: '80000000-0000-4000-8000-000000000001',
+                  label: 'Cash',
+                  logicType: 'CASH',
+                },
+                allocatedMinor: 10_000,
+                receivedMinor: 10_000,
+                changeMinor: 0,
+              },
+            ],
+          });
+        }
+        const highest = Math.max(Number(day['lastAllocatedDisplayOrderNo'] ?? 0), ...orderNos);
+        tx.objectStore('businessDays').put({ ...day, lastAllocatedDisplayOrderNo: highest });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      database.close();
+      return ids;
+    },
+    {
+      databaseName: DATABASE,
+      shopId: SHOP,
+      workerId: WORKER,
+      orderNos: [...displayOrderNos],
+    },
+  );
+}
+
 async function openWhatsAppConversation(page: Page): Promise<void> {
   await page
     .getByRole('navigation', { name: 'Operations' })
@@ -221,12 +325,73 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
   await page
     .getByRole('textbox', { name: 'Message', exact: true })
     .fill('Yes — what would you like?');
+  const sendResponsePromise = page.waitForResponse((response) => {
+    if (response.request().method() !== 'POST') return false;
+    if (new URL(response.url()).pathname !== '/api/whatsapp') return false;
+    return response.request().postData()?.includes('SEND_MESSAGE') === true;
+  });
   await page.getByRole('button', { name: 'Send', exact: true }).click();
+  const sendResponse = await sendResponsePromise;
+  expect(sendResponse.status()).toBe(200);
+  expect(sendResponse.request().postDataJSON()).toMatchObject({
+    action: 'SEND_MESSAGE',
+    workerId: WORKER,
+    conversationId: CONVERSATION,
+  });
+  await expect(sendResponse.json()).resolves.toMatchObject({
+    message: { sentByWorkerId: WORKER },
+  });
   await expect(page.getByLabel('Message history')).toContainText('Yes — what would you like?');
 
   const counters = await page.request.get('/__tux_whatsapp_assertions__');
   expect(counters.ok()).toBe(true);
   await expect(counters.json()).resolves.toMatchObject({ sendMessage: 1 });
+});
+
+test('one active delivery order is shown directly', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'FREE_FORM');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  await seedActiveDeliveryOrders(page, [41]);
+  await openWhatsAppConversation(page);
+
+  const context = page.getByLabel('Customer and order context');
+  await expect(context).toContainText('Order #41');
+  await expect(context).toContainText('Delivery');
+  await expect(context).toContainText('Not linked');
+  await expect(context.getByText('Choose an order explicitly')).toHaveCount(0);
+});
+
+test('multiple active orders require explicit link selection', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'FREE_FORM');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  const [, selectedOrderId] = await seedActiveDeliveryOrders(page, [41, 42]);
+  await openWhatsAppConversation(page);
+
+  const context = page.getByLabel('Customer and order context');
+  await expect(context.getByText('Choose an order explicitly')).toBeVisible();
+  await expect(context.getByText('Order #41')).toBeVisible();
+  await expect(context.getByText('Order #42')).toBeVisible();
+
+  const selectedOrder = context.getByText('Order #42').locator('..').locator('..');
+  const linkResponsePromise = page.waitForResponse((response) => {
+    if (response.request().method() !== 'POST') return false;
+    if (new URL(response.url()).pathname !== '/api/whatsapp') return false;
+    return response.request().postData()?.includes('LINK_ORDER') === true;
+  });
+  await selectedOrder.getByRole('button', { name: 'Link', exact: true }).click();
+  const linkResponse = await linkResponsePromise;
+  expect(linkResponse.status()).toBe(200);
+  expect(linkResponse.request().postDataJSON()).toMatchObject({
+    action: 'LINK_ORDER',
+    workerId: WORKER,
+    conversationId: CONVERSATION,
+    orderId: selectedOrderId,
+    linked: true,
+  });
 });
 
 test('FREE_FORM Send Menu inserts canonical URL without auto-send', async ({ page }, testInfo) => {
