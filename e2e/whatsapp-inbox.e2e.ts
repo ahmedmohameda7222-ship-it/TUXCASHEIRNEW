@@ -397,6 +397,43 @@ test('multiple active orders require explicit link selection', async ({ page }, 
   });
 });
 
+test('Create Order from Chat starts empty customer-prefilled draft', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'FREE_FORM');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  await openWhatsAppConversation(page);
+
+  await page.getByRole('button', { name: 'Create Order from Chat', exact: true }).click();
+  await expect(page.getByLabel('Current order')).toContainText('Your order is empty.');
+
+  const drafts = await page.evaluate(async (databaseName) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
+      const tx = database.transaction('drafts', 'readonly');
+      const request = tx.objectStore('drafts').getAll();
+      request.onsuccess = () => resolve(request.result as Record<string, unknown>[]);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return rows;
+  }, DRAFT_DATABASE);
+
+  expect(drafts).toHaveLength(1);
+  expect(drafts[0]).toMatchObject({
+    lines: [],
+    delivery: {
+      normalizedPhone: '+201001234567',
+      displayPhone: '01001234567',
+      customerName: 'E2E Customer',
+    },
+  });
+});
+
 test('FREE_FORM Send Menu inserts canonical URL without auto-send', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await configureWhatsAppScenario(page, 'FREE_FORM');
