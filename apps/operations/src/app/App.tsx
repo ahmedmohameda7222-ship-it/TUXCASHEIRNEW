@@ -349,6 +349,24 @@ function ActiveShell({
   }, [whatsappController]);
 
   useEffect(() => {
+    void window.tuxDesktop?.whatsapp
+      .setNotificationViewState({
+        focusedConversationId:
+          area === 'WHATSAPP' ? whatsappState.selectedConversationId : null,
+      })
+      .catch(() => undefined);
+  }, [area, whatsappState.selectedConversationId]);
+
+  useEffect(
+    () => () => {
+      void window.tuxDesktop?.whatsapp
+        .setNotificationViewState({ focusedConversationId: null })
+        .catch(() => undefined);
+    },
+    [],
+  );
+
+  useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.dataset['theme'] = theme;
     try {
