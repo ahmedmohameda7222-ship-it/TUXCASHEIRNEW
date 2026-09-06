@@ -6,7 +6,7 @@
 
 **Architecture:** `TUXCASHEIRNEW` remains canonical. Rewrite only a disposable TUX-MENU clone with `git filter-repo --to-subdirectory-filter apps/menu`, merge that full history into `work/monorepo-foundation`, then integrate `@tux/menu` using existing npm workspaces and one root lock. Temporary `/admin` remains in Menu during Phase A; canonical catalog/API and standalone `apps/admin` remain mandatory later phases.
 
-**Tech Stack:** Git, npm workspaces, Node 24 CI, React 19, TypeScript, Vite, Playwright, ESLint, Prettier, GitHub Actions, Vercel.
+**Tech Stack:** Git, `git-filter-repo`, GitHub CLI/API, npm workspaces, Node 24 CI, React 19, TypeScript, Vite, Playwright, Chromium, ESLint, Prettier, GitHub Actions, Vercel.
 
 **Spec:** `docs/superpowers/specs/2026-09-06-tux-monorepo-foundation-design.md`
 
@@ -22,6 +22,100 @@
 - Preserve Menu dependency versions unless workspace compatibility strictly requires otherwise.
 - Strict TDD for new guards/config behavior. Invoke `systematic-debugging` for any unexpected baseline/import/install/CI failure before changing code.
 - Invoke `verification-before-completion` before any Phase A GREEN/completion claim.
+- **Task 0 is a hard pre-execution gate.** No Phase A implementation write may begin unless Task 0 returns exactly `EXECUTOR CAPABLE`.
+- If any mandatory executor capability is unavailable and no approved equivalent is defined in advance, return exactly `EXECUTOR NOT CAPABLE`, stop implementation, and hand off to a full repository executor. Do not weaken the architecture or substitute a degraded implementation path.
+
+## Current Continuation State
+
+This plan amendment was made after Task 1 baseline review in a weaker Classic ChatGPT harness.
+
+```text
+Task 1:
+COMPLETE WITH DEFERRED BYTE-IDENTICAL CHARACTERIZATION
+
+Task 2:
+NOT STARTED
+BLOCKED BEFORE FIRST WRITE IN THE CLASSIC HARNESS
+
+Task 3+:
+NOT STARTED
+```
+
+Accepted Task 1 authority remains:
+
+```text
+Operations live:
+work/operations-whatsapp-inbox-live
+11e3e9a1c64b2725e956647d081891e59ffb75a8
+tree 530d8860e30c28505dad8091e573b1766e559665
+
+TUX-MENU source:
+ahmedmohameda7222-ship-it/TUX-MENU
+main
+285635181a9ee1ec2f760feb38abae8fa19a201d
+tree e9ddcc696470d7bb116e1d888a77ade84f95bf83
+```
+
+The Task 1 Menu `npm run typecheck` and browser-rendered characterization were not waived. They remain deferred only because the Classic harness could not execute them before import. Once Task 2 has established the pristine byte-identical imported snapshot, the full executor must run the deferred Menu typecheck/build/rendered route characterization against that still-pristine `apps/menu/**` state before Task 3 changes the imported subtree. Blob identity must be re-confirmed first if any characterization fails.
+
+For this continuation, a full executor runs **Task 0 first**. If and only if Task 0 returns `EXECUTOR CAPABLE`, it proceeds directly to **Task 2**; it does not reopen Task 1 architecture/baseline decisions unless an authority SHA has genuinely advanced.
+
+## Executor Classification and Handoff Rule
+
+The Classic ChatGPT implementation harness used during planning is classified:
+
+```text
+EXECUTOR NOT CAPABLE
+```
+
+It may be used only for planning, review, GitHub evidence inspection, checkpoint auditing, and handoff preparation. It is not approved to execute Phase A implementation tasks.
+
+The preferred implementation environment is Codex App / Codex CLI in a full repository workspace, or an equivalent executor that passes Task 0 completely. The full executor must provide, at minimum:
+
+```text
+full Git repository checkout
+shell and writable temporary filesystem
+GitHub network access
+authenticated Git fetch/push credentials
+git worktree and merge support
+git filter-repo
+Node satisfying >=20.19.0 <27
+npm and deterministic npm ci
+root lockfile generation
+TypeScript / ESLint / Prettier / Vite execution
+local HTTP server binding
+Playwright + Chromium installation and launch
+localhost browser access
+GitHub Actions workflow-file push permission
+GitHub Actions trigger/dispatch capability
+CI run/job/log/artifact inspection
+exact-SHA verification
+Windows-package CI evidence inspection
+```
+
+No history import, rendered test, root-lock rule, CI gate, or other architecture requirement may be weakened to accommodate a weaker executor.
+
+## Future Architectural Plan Capability-Preflight Rule
+
+Every future architectural implementation plan must identify the following **before implementation begins**:
+
+```text
+required executor capabilities
+external dependencies
+network requirements
+credentials requirements
+platform-specific requirements
+browser requirements
+CI requirements
+database/provider requirements
+```
+
+For every required capability the plan must either:
+
+1. prove the selected executor supports it during a pre-execution capability gate; or
+2. define an approved behaviorally/forensically equivalent execution path in advance.
+
+If no equivalent exists, the plan must declare a pre-execution handoff requirement. A missing capability must never first appear as a surprise blocker in the middle of an implementation task.
 
 ## Planned Current-Tree Changes
 
@@ -42,6 +136,364 @@ tsconfig.e2e.json
 ```
 
 Do not create `packages/shared`, legacy catalog adapters, or `apps/admin`.
+
+---
+
+### Task 0 — Execution Environment Capability Gate
+
+**Files:** Read-only repository inspection plus disposable `.tmp/**`, ignored build outputs, local `node_modules`, disposable worktrees, and temporary remote probe branches that are deleted before the gate finishes. No tracked Phase A implementation file may remain changed.
+
+**Produces:** exactly one classification: `EXECUTOR CAPABLE` or `EXECUTOR NOT CAPABLE`.
+
+**Rule:** Run this task before any Phase A implementation write. If any mandatory check fails, do not continue to Task 1/2/3+. Invoke `systematic-debugging` only to classify whether the failure is environmental or repository-specific; do not modify production/application code to make the gate pass.
+
+#### A. Repository / Git capability
+
+- [ ] **Step A1: Verify executable, checkout, branch, cleanliness, and writable temporary filesystem**
+
+```bash
+set -euo pipefail
+REPO='ahmedmohameda7222-ship-it/TUXCASHEIRNEW'
+FOUNDATION_BRANCH='work/monorepo-foundation'
+LIVE_BRANCH='work/operations-whatsapp-inbox-live'
+SOURCE_REPO='ahmedmohameda7222-ship-it/TUX-MENU'
+SOURCE_URL='https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git'
+EXPECTED_LIVE_HEAD='11e3e9a1c64b2725e956647d081891e59ffb75a8'
+EXPECTED_LIVE_TREE='530d8860e30c28505dad8091e573b1766e559665'
+EXPECTED_SOURCE_HEAD='285635181a9ee1ec2f760feb38abae8fa19a201d'
+EXPECTED_SOURCE_TREE='e9ddcc696470d7bb116e1d888a77ade84f95bf83'
+
+command -v git
+git --version
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+git fetch origin --prune
+if git show-ref --verify --quiet "refs/heads/$FOUNDATION_BRANCH"; then
+  git switch "$FOUNDATION_BRANCH"
+else
+  git switch --track -c "$FOUNDATION_BRANCH" "origin/$FOUNDATION_BRANCH"
+fi
+test "$(git branch --show-current)" = "$FOUNDATION_BRANCH"
+test -z "$(git status --porcelain)"
+mkdir -p .tmp
+touch .tmp/executor-capability-write-probe
+rm .tmp/executor-capability-write-probe
+```
+
+Expected: all commands succeed and the tracked worktree remains clean.
+
+- [ ] **Step A2: Verify remote fetch/clone and full source checkout**
+
+```bash
+git fetch origin "$FOUNDATION_BRANCH" "$LIVE_BRANCH"
+rm -rf .tmp/executor-capability-tux-menu
+git clone --no-single-branch "$SOURCE_URL" .tmp/executor-capability-tux-menu
+git -C .tmp/executor-capability-tux-menu switch --detach "$EXPECTED_SOURCE_HEAD"
+git -C .tmp/executor-capability-tux-menu fsck --full
+```
+
+- [ ] **Step A3: Verify worktree operations**
+
+```bash
+rm -rf .tmp/executor-capability-worktree
+git worktree add --detach .tmp/executor-capability-worktree HEAD
+test "$(git -C .tmp/executor-capability-worktree rev-parse HEAD)" = "$(git rev-parse HEAD)"
+git worktree remove --force .tmp/executor-capability-worktree
+```
+
+- [ ] **Step A4: Verify ordinary merge and unrelated-history merge support in disposable repositories**
+
+```bash
+rm -rf .tmp/executor-merge-a .tmp/executor-merge-b
+GIT_AUTHOR_NAME='Executor Capability Probe' \
+GIT_AUTHOR_EMAIL='executor-capability@example.invalid' \
+GIT_COMMITTER_NAME='Executor Capability Probe' \
+GIT_COMMITTER_EMAIL='executor-capability@example.invalid' \
+  git init -q -b main .tmp/executor-merge-a
+printf 'a\n' > .tmp/executor-merge-a/a.txt
+git -C .tmp/executor-merge-a add a.txt
+git -C .tmp/executor-merge-a -c user.name='Executor Capability Probe' -c user.email='executor-capability@example.invalid' commit -q -m a
+
+GIT_AUTHOR_NAME='Executor Capability Probe' \
+GIT_AUTHOR_EMAIL='executor-capability@example.invalid' \
+GIT_COMMITTER_NAME='Executor Capability Probe' \
+GIT_COMMITTER_EMAIL='executor-capability@example.invalid' \
+  git init -q -b main .tmp/executor-merge-b
+printf 'b\n' > .tmp/executor-merge-b/b.txt
+git -C .tmp/executor-merge-b add b.txt
+git -C .tmp/executor-merge-b -c user.name='Executor Capability Probe' -c user.email='executor-capability@example.invalid' commit -q -m b
+
+git -C .tmp/executor-merge-a remote add other "$ROOT/.tmp/executor-merge-b"
+git -C .tmp/executor-merge-a fetch -q other main
+git -C .tmp/executor-merge-a -c user.name='Executor Capability Probe' -c user.email='executor-capability@example.invalid' \
+  merge --allow-unrelated-histories --no-ff -m 'executor capability unrelated merge' other/main
+test "$(git -C .tmp/executor-merge-a show --no-patch --pretty='%P' HEAD | wc -w | tr -d ' ')" = '2'
+```
+
+- [ ] **Step A5: Verify `git filter-repo` exists and is executable**
+
+```bash
+command -v git-filter-repo || git filter-repo --version
+git filter-repo --version
+```
+
+Expected: GREEN. Absence of `git filter-repo` is a mandatory failure; do not synthesize history with low-level GitHub APIs.
+
+#### B. Node / npm capability
+
+- [ ] **Step B1: Verify Node engine and npm**
+
+```bash
+command -v node
+command -v npm
+node --version
+npm --version
+node --input-type=module <<'NODE'
+const [major, minor] = process.versions.node.split('.').map(Number);
+if (major < 20 || major >= 27 || (major === 20 && minor < 19)) {
+  throw new Error(`Node ${process.versions.node} does not satisfy >=20.19.0 <27`);
+}
+NODE
+```
+
+- [ ] **Step B2: Prove locked root install and workspace command execution without changing the canonical lock**
+
+```bash
+LOCK_BEFORE="$(git hash-object package-lock.json)"
+rm -rf node_modules apps/*/node_modules packages/*/node_modules
+npm ci
+test "$(git hash-object package-lock.json)" = "$LOCK_BEFORE"
+npm run typecheck -w @tux/operations
+```
+
+- [ ] **Step B3: Prove safe lockfile generation in a disposable package**
+
+```bash
+rm -rf .tmp/executor-npm-lock-probe
+mkdir -p .tmp/executor-npm-lock-probe
+cat > .tmp/executor-npm-lock-probe/package.json <<'JSON'
+{"name":"executor-capability-probe","version":"0.0.0","private":true}
+JSON
+(cd .tmp/executor-npm-lock-probe && npm install --package-lock-only --ignore-scripts)
+test -f .tmp/executor-npm-lock-probe/package-lock.json
+test "$(git hash-object package-lock.json)" = "$LOCK_BEFORE"
+```
+
+- [ ] **Step B4: Prove build output creation**
+
+```bash
+rm -rf apps/operations/dist
+npm run build -w @tux/operations
+test -f apps/operations/dist/index.html
+```
+
+#### C. Browser / rendered-testing capability
+
+- [ ] **Step C1: Verify Playwright package and Chromium installation**
+
+```bash
+npx playwright --version
+npx playwright install chromium
+```
+
+- [ ] **Step C2: Verify Chromium launch**
+
+```bash
+node --input-type=module <<'NODE'
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch({ headless: true });
+await browser.close();
+NODE
+```
+
+- [ ] **Step C3: Verify Vite preview, localhost binding, and browser-to-localhost access**
+
+```bash
+rm -f .tmp/executor-vite.pid .tmp/executor-vite.log
+(
+  cd apps/operations
+  npx vite preview --host 127.0.0.1 --port 4179 > ../../.tmp/executor-vite.log 2>&1 &
+  echo $! > ../../.tmp/executor-vite.pid
+)
+node --input-type=module <<'NODE'
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+let response;
+for (let attempt = 0; attempt < 40; attempt += 1) {
+  try {
+    response = await page.goto('http://127.0.0.1:4179', { waitUntil: 'domcontentloaded', timeout: 2000 });
+    if (response?.ok()) break;
+  } catch {}
+  await new Promise((resolve) => setTimeout(resolve, 250));
+}
+if (!response?.ok()) throw new Error('Chromium could not reach local Vite preview');
+await browser.close();
+NODE
+kill "$(cat .tmp/executor-vite.pid)"
+```
+
+Expected: Chromium launches and reaches a locally bound Vite server.
+
+#### D. CI / GitHub capability
+
+- [ ] **Step D1: Verify authenticated GitHub CLI/API access**
+
+```bash
+command -v gh
+gh --version
+gh auth status
+gh repo view "$REPO" --json nameWithOwner,defaultBranchRef
+```
+
+- [ ] **Step D2: Prove authenticated push and workflow-file push permission on a disposable branch only**
+
+```bash
+PROBE_BRANCH="executor-capability-probe-$(date +%s)-$$"
+rm -rf .tmp/executor-push-probe
+git worktree add -b "$PROBE_BRANCH" .tmp/executor-push-probe HEAD
+printf '\n# executor capability probe; disposable branch only\n' >> .tmp/executor-push-probe/.github/workflows/ci.yml
+git -C .tmp/executor-push-probe add .github/workflows/ci.yml
+git -C .tmp/executor-push-probe \
+  -c user.name='Executor Capability Probe' \
+  -c user.email='executor-capability@example.invalid' \
+  commit -q -m 'chore: executor capability probe'
+git -C .tmp/executor-push-probe push --set-upstream origin "$PROBE_BRANCH"
+git ls-remote --exit-code origin "refs/heads/$PROBE_BRANCH"
+git push origin --delete "$PROBE_BRANCH"
+git worktree remove --force .tmp/executor-push-probe
+git branch -D "$PROBE_BRANCH"
+```
+
+Expected: temporary branch push succeeds, including a workflow-file change, then the remote/local probe branch is deleted. Never use `main`, Operations live, TUX-MENU, or PR #54 for this probe.
+
+- [ ] **Step D3: Prove Actions run/job/log/artifact inspection and tested-SHA visibility**
+
+```bash
+RUN_ID="$(gh run list -R "$REPO" --workflow ci.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+test -n "$RUN_ID"
+gh run view "$RUN_ID" -R "$REPO" --json headSha,status,conclusion,jobs > .tmp/executor-actions-run.json
+gh run view "$RUN_ID" -R "$REPO" --log > .tmp/executor-actions.log
+gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" > .tmp/executor-actions-artifacts.json
+node --input-type=module <<'NODE'
+import fs from 'node:fs';
+const run = JSON.parse(fs.readFileSync('.tmp/executor-actions-run.json', 'utf8'));
+if (!run.headSha) throw new Error('Actions run did not expose headSha');
+if (!Array.isArray(run.jobs)) throw new Error('Actions jobs unavailable');
+NODE
+```
+
+- [ ] **Step D4: Prove Actions write/trigger permission without changing repository files**
+
+The pre-Task8 workflow may not yet expose `workflow_dispatch`, so Task 0 proves the executor capability in two parts: Step D2 proves it can push the eventual workflow change, and this step proves it has Actions write/trigger permission by rerunning the repository's permanent non-production CI workflow.
+
+```bash
+SAFE_RUN_ID="$(gh run list -R "$REPO" --workflow ci.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId')"
+test -n "$SAFE_RUN_ID"
+gh api --method POST "repos/$REPO/actions/runs/$SAFE_RUN_ID/rerun"
+```
+
+Expected: request accepted. This may create a redundant CI run on its original SHA; it must not target a deployment/mutation workflow. Once Task 8 adds `workflow_dispatch`, the executor must immediately use the actual dispatch path there and Task 9 must dispatch the exact final SHA. Failure of the actual dispatch path later is handled with `systematic-debugging`, not by weakening exact-SHA verification.
+
+#### E. Filesystem / repository-scale capability
+
+- [ ] **Step E1: Verify available storage and full source history checkout**
+
+```bash
+df -Pk "$ROOT"
+du -sh .tmp/executor-capability-tux-menu
+git -C .tmp/executor-capability-tux-menu rev-list --count "$EXPECTED_SOURCE_HEAD"
+git -C .tmp/executor-capability-tux-menu fsck --full
+```
+
+- [ ] **Step E2: Prove real history rewriting on a disposable full-history clone**
+
+```bash
+rm -rf .tmp/executor-filter-probe
+git clone --local .tmp/executor-capability-tux-menu .tmp/executor-filter-probe
+FILTER_BEFORE_COUNT="$(git -C .tmp/executor-filter-probe rev-list --count "$EXPECTED_SOURCE_HEAD")"
+git -C .tmp/executor-filter-probe switch --detach "$EXPECTED_SOURCE_HEAD"
+git -C .tmp/executor-filter-probe filter-repo --force --to-subdirectory-filter __executor_capability_probe
+FILTER_AFTER_COUNT="$(git -C .tmp/executor-filter-probe rev-list --count HEAD)"
+test "$FILTER_AFTER_COUNT" -gt 0
+git -C .tmp/executor-filter-probe fsck --full
+printf 'filter-before=%s filter-after=%s\n' "$FILTER_BEFORE_COUNT" "$FILTER_AFTER_COUNT"
+```
+
+Expected: rewrite succeeds on the real source-history scale. This probe is disposable; do not use its rewritten history for Task 2.
+
+- [ ] **Step E3: Confirm build output remains writable and tracked tree clean**
+
+```bash
+test -f apps/operations/dist/index.html
+test -z "$(git status --porcelain)"
+```
+
+#### F. External-authority capability
+
+- [ ] **Step F1: Verify both remotes and exact authority objects are resolvable**
+
+```bash
+FOUNDATION_REMOTE="$(git ls-remote origin "refs/heads/$FOUNDATION_BRANCH" | awk '{print $1}')"
+LIVE_REMOTE="$(git ls-remote origin "refs/heads/$LIVE_BRANCH" | awk '{print $1}')"
+SOURCE_REMOTE="$(git ls-remote "$SOURCE_URL" refs/heads/main | awk '{print $1}')"
+test -n "$FOUNDATION_REMOTE"
+test "$LIVE_REMOTE" = "$EXPECTED_LIVE_HEAD"
+test "$SOURCE_REMOTE" = "$EXPECTED_SOURCE_HEAD"
+git fetch origin "$LIVE_BRANCH"
+test "$(git rev-parse "origin/$LIVE_BRANCH^{tree}")" = "$EXPECTED_LIVE_TREE"
+test "$(git -C .tmp/executor-capability-tux-menu rev-parse "$EXPECTED_SOURCE_HEAD^{tree}")" = "$EXPECTED_SOURCE_TREE"
+```
+
+If either authority legitimately advanced, do not classify the executor as incapable merely because the SHA changed. Stop the implementation gate, inspect/reconcile the authority change under the plan's authority rules, then rerun Task 0 against the newly approved SHA.
+
+- [ ] **Step F2: Clean capability artifacts and prove no tracked change**
+
+```bash
+rm -rf \
+  .tmp/executor-capability-tux-menu \
+  .tmp/executor-filter-probe \
+  .tmp/executor-merge-a \
+  .tmp/executor-merge-b \
+  .tmp/executor-npm-lock-probe
+rm -f \
+  .tmp/executor-actions-run.json \
+  .tmp/executor-actions.log \
+  .tmp/executor-actions-artifacts.json \
+  .tmp/executor-vite.pid \
+  .tmp/executor-vite.log
+rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/operations/dist
+test -z "$(git status --porcelain)"
+```
+
+- [ ] **Step F3: Classify the executor**
+
+If **every** mandatory check above succeeded, report exactly:
+
+```text
+EXECUTOR CAPABLE
+```
+
+If **any** mandatory capability failed, report exactly:
+
+```text
+EXECUTOR NOT CAPABLE
+```
+
+and stop implementation. The missing capability becomes a handoff condition. Do not proceed partially and do not ask for a degraded-import decision.
+
+### Executor Capability Matrix — Tasks 2–9
+
+| Task | Required capability | Current Classic harness | Full repository executor | Potential blocker | Resolution |
+| --- | --- | --- | --- | --- | --- |
+| Task 2 — history import/provenance | Full Git clone/fetch, complete source history, writable temp clones, `git filter-repo`, unrelated-history merge, tree/blob inventory diff, ancestry inspection, authenticated push; then pristine Menu typecheck/build/browser characterization | **Not capable.** Shell GitHub DNS/authenticated Git and `git filter-repo` are unavailable; low-level connector history synthesis is rejected. | Must pass Task 0 A/E/F plus B/C for deferred pristine characterization. | Lossy/synthetic history, missing blob proof, inability to run pristine checks. | Use a full repository executor; preserve exact source SHA/tree; perform approved filtered import only. |
+| Task 3 — SQL quarantine | Local imported tree, Git move/commit, filesystem search, canonical migration diff | Connector file writes are technically possible, but Task 2 pristine state does not exist locally; executing here would break sequencing. | Standard local Git/filesystem after Task 2. | Quarantining before pristine characterization or touching canonical migrations. | Run only after Task 2 provenance and deferred pristine characterization are complete. |
+| Task 4 — workspace/root lock | Root `npm ci`, workspace scripts, deterministic lock generation, package-lock editing, clean reinstall, Git diff/commit | **Not approved/capable end-to-end.** No full repository execution contract. | Must pass Task 0 B plus Git push. | Discovering npm/toolchain incompatibility after package edits; nested-lock fallback temptation. | Task 0 proves Node/npm/root install/lock generation first; one-root-lock rule remains mandatory. |
+| Task 5 — quality alignment | Prettier, ESLint, TypeScript, Vite build, scoped edits/diffs, environment-doc inspection | Partial text editing is possible, but local lint/type/build verification is not a valid full-repo execution path. | Must pass Task 0 B. | Formatting/type fixes made without executable verification; semantic fixes disguised as lint cleanup. | Full executor only; `systematic-debugging` for any semantic/runtime diagnostic. |
+| Task 6 — rendered browser coverage | Playwright package, Chromium installation/launch, Vite/local server, localhost browser access, route/assets assertions | **Not capable** of the required local rendered test loop. HTTP-only fetch is explicitly insufficient. | Must pass Task 0 C. | Discovering missing browser libs, inability to bind localhost, replacing rendered tests with HTTP-only checks. | Task 0 launches Chromium and reaches local Vite before implementation. |
+| Task 7 — architecture guards | Node execution, `node:test`, writable temp fixtures, filesystem traversal, current-tree CLI | Partial Node capability is insufficient without the canonical full checkout and verified workspace. | Must pass Task 0 A/B. | Fixture/temp-filesystem restrictions or inability to execute current-tree guard. | Full executor; strict RED/GREEN TDD remains unchanged. |
+| Task 8 — CI/deployment integration | Authenticated workflow-file push, GitHub Actions read/write, run/job/log/artifact inspection, exact SHA visibility, local npm/build/Playwright, Vercel root-lock simulation | GitHub connector can inspect/change some GitHub objects, but it is not an approved substitute for authenticated Git + local verification + Actions control. | Must pass Task 0 B/C/D; Vercel preview is conditional if local simulation exposes a platform discrepancy. | Workflow token lacks workflow-file permission; Actions cannot be triggered/inspected; deployment config only works with nested lock. | Task 0 probes workflow-file push and Actions trigger/read; never restore nested lock. |
+| Task 9 — complete final verification | Clean full checkout, full npm gates, Operations/Menu E2E, architecture/migration guards, external authority fetch, exact-head CI dispatch, jobs/logs/artifacts, Windows-package evidence | **Not capable** end-to-end. | Must pass all Task 0 groups A–F. | Final SHA cannot be proven, Windows job evidence unavailable, missing browser/toolchain, authority network unavailable. | Full executor only; `verification-before-completion` before any GREEN claim. |
 
 ---
 
@@ -237,6 +689,8 @@ git remote remove tux-menu-import
 rm -rf .tmp/tux-menu-filtered .tmp/tux-menu-source-check .tmp/source-tree.txt .tmp/rewritten-tree.txt .tmp/import-tree.txt
 test -z "$(git status --porcelain)"
 ```
+
+**Deferred Task 1 characterization boundary:** after Step 4 has proven the pristine imported snapshot, and before Task 3 mutates `apps/menu/**`, run the deferred Menu typecheck, production build, and browser-rendered characterization for `/`, `/order-now`, `/tux-burger`, and `/admin` against the still-pristine imported source. If any check fails, first re-prove source/import blob identity, invoke `systematic-debugging`, classify pre-existing source/toolchain vs import/environment failure, and stop before Task 3 if unresolved. Do not fix imported application code inside Task 2 merely to make characterization GREEN.
 
 ---
 
@@ -1065,8 +1519,9 @@ Do not start Phase B. Stop for user review/acceptance of Phase A.
 
 ## Plan Self-Review Coverage
 
-- Task 1: source/target authority and baselines.
-- Task 2: full-history filtered import and provenance.
+- Task 0: complete executor-capability preflight, explicit `EXECUTOR CAPABLE` / `EXECUTOR NOT CAPABLE` classification, Tasks 2–9 capability matrix, and pre-execution handoff rule.
+- Task 1: source/target authority and baselines; current continuation classification records accepted deferred byte-identical characterization.
+- Task 2: full-history filtered import and provenance, plus mandatory deferred pristine Menu characterization before Task 3.
 - Task 3: legacy SQL quarantine and single migration authority.
 - Task 4: `@tux/menu`, root lock, deterministic root install.
 - Task 5: existing root quality policy and environment ownership.
@@ -1074,4 +1529,5 @@ Do not start Phase B. Stop for user review/acceptance of Phase A.
 - Task 7: exact positive/negative architecture guard fixtures and current-tree implementation.
 - Task 8: permanent Menu/architecture CI, exact-head dispatch, independent deployment.
 - Task 9: full Operations/Menu/Windows/migration/WhatsApp verification.
+- Future architectural plans must declare executor/network/credential/platform/browser/CI/database/provider requirements before implementation and gate or pre-approve an equivalent path.
 - No Phase B catalog work, no `apps/admin`, no Menu canonical-backend cutover, and no old-repository retirement are implemented by this plan.
