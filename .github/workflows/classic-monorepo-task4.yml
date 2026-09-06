@@ -1,0 +1,190 @@
+name: Classic Monorepo Task 4 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task4.json'
+      - '.github/workflows/classic-monorepo-task4.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task4:
+    name: Task 4 workspace identity and one root lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: bab4a9889a9d298bd3b8ad9cc54116da676b04dc
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate request and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task4.json').read_text())
+          assert request['serial'] == 9
+          assert request['mode'] == 'task4-workspace'
+          assert request['target_branch'] == 'work/monorepo-foundation'
+          assert request['expected_target_sha'] == 'bab4a9889a9d298bd3b8ad9cc54116da676b04dc'
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task4 "$EXPECTED_SHA"
+          test -f apps/menu/package-lock.json
+          test -z "$(git status --porcelain)"
+      - name: Prove RED workspace identity before implementation
+        shell: bash
+        run: |
+          set +e
+          node --input-type=module <<'NODE' > "$RUNNER_TEMP/task4-red.log" 2>&1
+          import fs from 'node:fs';
+          const menu = JSON.parse(fs.readFileSync('apps/menu/package.json', 'utf8'));
+          if (menu.name !== '@tux/menu') throw new Error(`expected @tux/menu, got ${menu.name}`);
+          NODE
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/task4-red.log"
+          test "$rc" -ne 0
+          grep -F 'expected @tux/menu, got tux-burger-website' "$RUNNER_TEMP/task4-red.log"
+          echo 'TASK4_WORKSPACE_IDENTITY_RED_CONFIRMED'
+      - name: Rename Menu workspace and add root Menu scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          menu_path = Path('apps/menu/package.json')
+          menu = json.loads(menu_path.read_text())
+          assert menu['name'] == 'tux-burger-website'
+          menu['name'] = '@tux/menu'
+          menu_path.write_text(json.dumps(menu, indent=2) + '\n')
+
+          root_path = Path('package.json')
+          root = json.loads(root_path.read_text())
+          scripts = root['scripts']
+          additions = {
+              'dev:menu': 'npm run dev -w @tux/menu',
+              'build:menu': 'npm run build -w @tux/menu',
+              'typecheck:menu': 'npm run typecheck -w @tux/menu',
+              'test:e2e:menu': 'playwright test --config playwright.menu.config.ts',
+              'test:monorepo-architecture': 'node --test scripts/monorepo-architecture-guard.test.mjs && node scripts/test-monorepo-architecture.mjs',
+          }
+          for key, value in additions.items():
+              if key in scripts and scripts[key] != value:
+                  raise SystemExit(f'conflicting root script {key}: {scripts[key]}')
+              scripts[key] = value
+          root_path.write_text(json.dumps(root, indent=2) + '\n')
+          PY
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const menu = JSON.parse(fs.readFileSync('apps/menu/package.json', 'utf8'));
+          if (menu.name !== '@tux/menu') throw new Error('workspace identity missing');
+          NODE
+          echo 'TASK4_WORKSPACE_IDENTITY_GREEN_CONFIRMED'
+      - name: Generate canonical root lock without scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts
+          npm ls -w @tux/menu --depth=0
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const menu = lock.packages?.['apps/menu'];
+          if (!menu) throw new Error('root lock missing apps/menu workspace entry');
+          console.log('ROOT_LOCK_MENU_ENTRY_OK');
+          NODE
+      - name: Prove clean root install and build before nested-lock deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          npm ci
+          npm run build:menu
+          test -f apps/menu/dist/index.html
+          set +e
+          npm run typecheck:menu > "$RUNNER_TEMP/typecheck-before-delete.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/typecheck-before-delete.log"
+          test "$rc" -ne 0
+          grep -F 'src/App.tsx(36,41): error TS2322' "$RUNNER_TEMP/typecheck-before-delete.log"
+          grep -F 'RouteComponentProps' "$RUNNER_TEMP/typecheck-before-delete.log"
+          error_count="$(grep -c 'error TS' "$RUNNER_TEMP/typecheck-before-delete.log")"
+          test "$error_count" = '1'
+          echo 'TASK4_KNOWN_PREEXISTING_TYPECHECK_RED_CARRIED_TO_TASK5'
+      - name: Delete nested lock and prove root-only reproducibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm apps/menu/package-lock.json
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          npm ci
+          npm ls -w @tux/menu --depth=0
+          npm run build:menu
+          test -f apps/menu/dist/index.html
+          set +e
+          npm run typecheck:menu > "$RUNNER_TEMP/typecheck-after-delete.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/typecheck-after-delete.log"
+          test "$rc" -ne 0
+          grep -F 'src/App.tsx(36,41): error TS2322' "$RUNNER_TEMP/typecheck-after-delete.log"
+          grep -F 'RouteComponentProps' "$RUNNER_TEMP/typecheck-after-delete.log"
+          test "$(grep -c 'error TS' "$RUNNER_TEMP/typecheck-after-delete.log")" = '1'
+          nested="$(find apps packages -name package-lock.json -print)"
+          test -z "$nested"
+          echo 'TASK4_ROOT_ONLY_LOCK_REPRODUCIBILITY_GREEN'
+      - name: Verify exact Task 4 scope and Operations non-regression boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$EXPECTED_SHA" -- apps/operations/package.json apps/operations-desktop/package.json packages/*/package.json
+          git add package.json package-lock.json apps/menu/package.json apps/menu/package-lock.json
+          changed="$(git diff --cached --name-only --no-renames "$EXPECTED_SHA" | sort)"
+          printf 'TASK4_STAGED_FILES:\n%s\n' "$changed"
+          cat > "$RUNNER_TEMP/task4-expected.txt" <<'EOF'
+          apps/menu/package-lock.json
+          apps/menu/package.json
+          package-lock.json
+          package.json
+          EOF
+          diff -u "$RUNNER_TEMP/task4-expected.txt" <(printf '%s\n' "$changed")
+          git diff --cached --check
+      - name: Commit and push Task 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build(monorepo): integrate menu workspace'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK4_HEAD=%s\nTASK4_TREE=%s\nTASK4_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
