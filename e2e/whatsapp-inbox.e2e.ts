@@ -76,7 +76,10 @@ async function seedBrowserFallback(page: Page): Promise<void> {
       const orderTypeId = '70000000-0000-4000-8000-000000000001';
       const paymentMethodId = '80000000-0000-4000-8000-000000000001';
       await new Promise<void>((resolve, reject) => {
-        const tx = database.transaction(['shops', 'workers', 'configurationSnapshots'], 'readwrite');
+        const tx = database.transaction(
+          ['shops', 'workers', 'configurationSnapshots'],
+          'readwrite',
+        );
         tx.objectStore('shops').put({ id: shopId, name: 'TUX WhatsApp E2E', active: true });
         tx.objectStore('workers').put({
           id: workerId,
