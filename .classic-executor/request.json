@@ -1,5 +1,5 @@
 {
-  "serial": 1,
+  "serial": 2,
   "mode": "plan-amendment",
   "target_branch": "work/monorepo-foundation",
   "expected_target_sha": "8bfacf2bb96e60958e9a4953199f4707ad05c43f"
