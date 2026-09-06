@@ -1,0 +1,9 @@
+{
+  "serial": 7,
+  "mode": "task2-finalize",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "2d32d29dead9b872ce392e9c186678d59de7603f",
+  "source_sha": "285635181a9ee1ec2f760feb38abae8fa19a201d",
+  "source_tree": "e9ddcc696470d7bb116e1d888a77ade84f95bf83",
+  "accepted_characterization": "typecheck pre-existing RED at src/App.tsx(36,41); build must be GREEN; rendered routes must be GREEN"
+}
