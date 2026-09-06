@@ -56,6 +56,7 @@ jobs:
           git switch --detach "$EXPECTED_SHA"
           python3 - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
           path = Path('docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md')
           text = path.read_text()
           marker = '## Classic ChatGPT Remote Execution Model'
@@ -64,25 +65,26 @@ jobs:
           anchor = '## Planned Current-Tree Changes'
           if anchor not in text:
               raise SystemExit('plan insertion anchor missing')
-          section = '''## Classic ChatGPT Remote Execution Model
+          section = dedent('''\
+          ## Classic ChatGPT Remote Execution Model
 
-This process amendment supersedes earlier executor-handoff language that classified the Classic ChatGPT harness itself as unable to implement Phase A. The approved product architecture and Tasks 1–9 remain unchanged; only the execution plane changes.
+          This process amendment supersedes earlier executor-handoff language that classified the Classic ChatGPT harness itself as unable to implement Phase A. The approved product architecture and Tasks 1–9 remain unchanged; only the execution plane changes.
 
-- **Control plane:** Classic ChatGPT plus the GitHub connector remains the implementation controller. It reads repository state, reviews diffs/commits, writes reviewed files, advances control requests, inspects Actions evidence, performs systematic debugging, and decides each next step.
-- **Temporary execution plane:** GitHub-hosted Actions on the tooling-only branch `tooling/classic-monorepo-executor` executes repository operations that require full Git/network/filesystem/npm/browser/Windows capabilities. The helper branch is never merged into `work/monorepo-foundation` or `main`.
-- **Task 0 remote preflight:** Before Task 2, one comprehensive Linux + Windows helper run must prove the capabilities required by Tasks 2–9. If that remote preflight is GREEN, missing capabilities in the local Classic shell are no longer implementation blockers.
-- **Expected-SHA fail-closed rule:** Before every mutating helper run, the runner must prove the actual `work/monorepo-foundation` remote HEAD equals the exact SHA in `.classic-executor/request.json`. Any mismatch fails before mutation so Classic can inspect and reconcile the advance.
-- **Constrained requests only:** The helper accepts reviewed repository-specific modes; `request.json` never carries arbitrary shell commands or secrets. No production Supabase or Meta credential is exposed to the helper.
-- **Runner commit identity:** New Phase A commits created by the helper use an automation identity and the repository `GITHUB_TOKEN`. Imported TUX-MENU historical commits retain their source history metadata through `git filter-repo` and are never synthesized.
-- **TDD evidence:** Required RED and GREEN executions may run in GitHub Actions. Classic must inspect the corresponding run/job/log evidence before treating the cycle as proven.
-- **Permanent CI remains authoritative:** The helper workflow is not a substitute for `.github/workflows/ci.yml`. Task 8 still adds the permanent Menu and monorepo-architecture gates while retaining Operations quality, edge-security, Windows packaging, and the required-quality gate.
-- **Classic-compatible exact-head trigger:** Task 8 may add a direct `push` trigger limited to `work/monorepo-foundation` so a final legitimate Classic/GitHub-connector commit runs permanent CI on its exact pushed SHA. Runner pushes using `GITHUB_TOKEN` are not assumed to recursively trigger ordinary push workflows.
-- **Final exact-head checkpoint:** Task 9 uses a real final provenance/verification documentation commit created directly through the Classic/GitHub control plane on `work/monorepo-foundation`; the resulting permanent CI run must expose the same final HEAD SHA and all required jobs must be inspected.
-- **Retirement:** After Phase A is independently GREEN and accepted, the helper branch/workflow is retired or deleted. Its Actions run history remains audit evidence but the helper never becomes product architecture.
+          - **Control plane:** Classic ChatGPT plus the GitHub connector remains the implementation controller. It reads repository state, reviews diffs/commits, writes reviewed files, advances control requests, inspects Actions evidence, performs systematic debugging, and decides each next step.
+          - **Temporary execution plane:** GitHub-hosted Actions on the tooling-only branch `tooling/classic-monorepo-executor` executes repository operations that require full Git/network/filesystem/npm/browser/Windows capabilities. The helper branch is never merged into `work/monorepo-foundation` or `main`.
+          - **Task 0 remote preflight:** Before Task 2, one comprehensive Linux + Windows helper run must prove the capabilities required by Tasks 2–9. If that remote preflight is GREEN, missing capabilities in the local Classic shell are no longer implementation blockers.
+          - **Expected-SHA fail-closed rule:** Before every mutating helper run, the runner must prove the actual `work/monorepo-foundation` remote HEAD equals the exact SHA in `.classic-executor/request.json`. Any mismatch fails before mutation so Classic can inspect and reconcile the advance.
+          - **Constrained requests only:** The helper accepts reviewed repository-specific modes; `request.json` never carries arbitrary shell commands or secrets. No production Supabase or Meta credential is exposed to the helper.
+          - **Runner commit identity:** New Phase A commits created by the helper use an automation identity and the repository `GITHUB_TOKEN`. Imported TUX-MENU historical commits retain their source history metadata through `git filter-repo` and are never synthesized.
+          - **TDD evidence:** Required RED and GREEN executions may run in GitHub Actions. Classic must inspect the corresponding run/job/log evidence before treating the cycle as proven.
+          - **Permanent CI remains authoritative:** The helper workflow is not a substitute for `.github/workflows/ci.yml`. Task 8 still adds the permanent Menu and monorepo-architecture gates while retaining Operations quality, edge-security, Windows packaging, and the required-quality gate.
+          - **Classic-compatible exact-head trigger:** Task 8 may add a direct `push` trigger limited to `work/monorepo-foundation` so a final legitimate Classic/GitHub-connector commit runs permanent CI on its exact pushed SHA. Runner pushes using `GITHUB_TOKEN` are not assumed to recursively trigger ordinary push workflows.
+          - **Final exact-head checkpoint:** Task 9 uses a real final provenance/verification documentation commit created directly through the Classic/GitHub control plane on `work/monorepo-foundation`; the resulting permanent CI run must expose the same final HEAD SHA and all required jobs must be inspected.
+          - **Retirement:** After Phase A is independently GREEN and accepted, the helper branch/workflow is retired or deleted. Its Actions run history remains audit evidence but the helper never becomes product architecture.
 
-After remote Task 0 is GREEN, environment limitations of the local Classic shell are not stop conditions. Stop only for an unreconciled authority change, a protected production mutation, a genuine unresolved correctness/test failure after `systematic-debugging`, or a destructive ambiguity not resolved by the approved spec/plan.
+          After remote Task 0 is GREEN, environment limitations of the local Classic shell are not stop conditions. Stop only for an unreconciled authority change, a protected production mutation, a genuine unresolved correctness/test failure after `systematic-debugging`, or a destructive ambiguity not resolved by the approved spec/plan.
 
-'''
+          ''')
           path.write_text(text.replace(anchor, section + anchor, 1))
           PY
           git diff --check
