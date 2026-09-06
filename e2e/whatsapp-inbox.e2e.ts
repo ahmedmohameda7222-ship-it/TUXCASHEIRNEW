@@ -92,9 +92,7 @@ async function seedBrowserFallback(page: Page): Promise<void> {
           shopId,
           version: 1,
           updatedAt: '2026-09-06T00:00:00.000Z',
-          categories: [
-            { id: categoryId, shopId, name: 'Burgers', sortOrder: 0, active: true },
-          ],
+          categories: [{ id: categoryId, shopId, name: 'Burgers', sortOrder: 0, active: true }],
           products: [
             {
               id: productId,
