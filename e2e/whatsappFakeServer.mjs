@@ -134,7 +134,7 @@ function target() {
   };
 }
 
-function sentMessage(body, text, kind) {
+function sentMessage(body, text) {
   const index = sentByIntent.size + 1;
   return {
     id: `c0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -153,13 +153,7 @@ function sentMessage(body, text, kind) {
     initiatedByDeviceId: DEVICE,
     initiatedAt: STARTED_AT,
     createdAt: STARTED_AT,
-    e2eKind: kind,
   };
-}
-
-function publicMessage(message) {
-  const { e2eKind: _e2eKind, ...publicValue } = message;
-  return publicValue;
 }
 
 async function handleControl(request, response, url) {
@@ -194,12 +188,12 @@ async function handleApi(request, response, url) {
     const intentKey = `message:${body.outboundIntentKey}`;
     let message = sentByIntent.get(intentKey);
     if (message === undefined) {
-      message = sentMessage(body, body.text, 'message');
+      message = sentMessage(body, body.text);
       sentByIntent.set(intentKey, message);
-      messages.push(publicMessage(message));
+      messages.push(message);
       counters.sendMessage += 1;
     }
-    writeJson(response, 200, { message: publicMessage(message) });
+    writeJson(response, 200, { message });
     return true;
   }
   if (body.action === 'SEND_TEMPLATE') {
@@ -210,12 +204,12 @@ async function handleApi(request, response, url) {
     const intentKey = `template:${body.outboundIntentKey}`;
     let message = sentByIntent.get(intentKey);
     if (message === undefined) {
-      message = sentMessage(body, STARTER_TEMPLATE_TEXT, 'template');
+      message = sentMessage(body, STARTER_TEMPLATE_TEXT);
       sentByIntent.set(intentKey, message);
-      messages.push(publicMessage(message));
+      messages.push(message);
       counters.sendTemplate += 1;
     }
-    writeJson(response, 200, { message: publicMessage(message) });
+    writeJson(response, 200, { message });
     return true;
   }
   writeJson(response, 400, { error: 'unsupported_whatsapp_e2e_action' });
