@@ -1,0 +1,235 @@
+name: Classic Monorepo Task 2 Retry
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task2-retry.json'
+      - '.github/workflows/classic-monorepo-task2-retry.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task2-import:
+    name: Task 2 explicit-tip import and pristine characterization
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      SOURCE_HEAD: 285635181a9ee1ec2f760feb38abae8fa19a201d
+      SOURCE_TREE: e9ddcc696470d7bb116e1d888a77ade84f95bf83
+      SOURCE_URL: https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate constrained retry request and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json, re
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task2-retry.json').read_text())
+          if request.get('mode') != 'task2-import':
+              raise SystemExit('unsupported retry mode')
+          if request.get('target_branch') != 'work/monorepo-foundation':
+              raise SystemExit('unsupported target branch')
+          expected = request.get('expected_target_sha')
+          if not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{40}', expected):
+              raise SystemExit('expected_target_sha must be a full SHA-1')
+          print(f'EXPECTED_SHA={expected}')
+          PY
+          actual_target="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          actual_source="$(git ls-remote "$SOURCE_URL" refs/heads/main | awk '{print $1}')"
+          printf 'ACTUAL_TARGET=%s\nACTUAL_SOURCE=%s\n' "$actual_target" "$actual_source"
+          test "$actual_source" = "$SOURCE_HEAD"
+      - name: Check out exact expected implementation head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_target="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual_target" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task2 "$EXPECTED_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Rewrite approved full source clone and create explicit import-tip ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user git-filter-repo
+          export PATH="$HOME/.local/bin:$PATH"
+          source_dir="$RUNNER_TEMP/tux-menu-task2"
+          rm -rf "$source_dir"
+          git clone --no-single-branch "$SOURCE_URL" "$source_dir"
+          test "$(git -C "$source_dir" rev-parse origin/main)" = "$SOURCE_HEAD"
+          git -C "$source_dir" switch --detach "$SOURCE_HEAD"
+          test "$(git -C "$source_dir" rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          git -C "$source_dir" fsck --full
+          git -C "$source_dir" ls-tree -r "$SOURCE_HEAD" | sort > "$RUNNER_TEMP/source-tree.txt"
+          source_count="$(git -C "$source_dir" rev-list --count "$SOURCE_HEAD")"
+          source_files="$(wc -l < "$RUNNER_TEMP/source-tree.txt" | tr -d ' ')"
+          printf '%s\n' "$source_count" > "$RUNNER_TEMP/source-count.txt"
+          printf '%s\n' "$source_files" > "$RUNNER_TEMP/source-file-count.txt"
+          git -C "$source_dir" filter-repo --force --to-subdirectory-filter apps/menu
+          rewritten="$(git -C "$source_dir" rev-parse HEAD)"
+          test "$(git -C "$source_dir" rev-list --count "$rewritten")" = "$source_count"
+          git -C "$source_dir" branch -f classic-import-tip "$rewritten"
+          printf '%s\n' "$rewritten" > "$RUNNER_TEMP/rewritten-sha.txt"
+          git -C "$source_dir" ls-tree -r "$rewritten" apps/menu \
+            | sed 's#\tapps/menu/#\t#' | sort > "$RUNNER_TEMP/rewritten-tree.txt"
+          diff -u "$RUNNER_TEMP/source-tree.txt" "$RUNNER_TEMP/rewritten-tree.txt"
+          printf 'SOURCE_COMMIT_COUNT=%s\nSOURCE_FILE_COUNT=%s\nREWRITTEN_IMPORT_SHA=%s\n' \
+            "$source_count" "$source_files" "$rewritten"
+      - name: Merge exact rewritten tip and verify pristine inventory ancestry and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/tux-menu-task2"
+          rewritten="$(cat "$RUNNER_TEMP/rewritten-sha.txt")"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add tux-menu-import "$source_dir"
+          git fetch tux-menu-import classic-import-tip
+          test "$(git rev-parse FETCH_HEAD)" = "$rewritten"
+          git merge --allow-unrelated-histories --no-ff "$rewritten" \
+            -m 'chore(monorepo): import TUX-MENU history under apps/menu'
+          import_merge="$(git rev-parse HEAD)"
+          printf '%s\n' "$import_merge" > "$RUNNER_TEMP/import-merge.txt"
+          test "$(git show --no-patch --pretty='%P' "$import_merge" | wc -w | tr -d ' ')" = '2'
+          git ls-tree -r "$import_merge" apps/menu \
+            | sed 's#\tapps/menu/#\t#' | sort > "$RUNNER_TEMP/import-tree.txt"
+          diff -u "$RUNNER_TEMP/source-tree.txt" "$RUNNER_TEMP/import-tree.txt"
+          unexpected="$(git diff --name-only "$EXPECTED_SHA" "$import_merge" | grep -v '^apps/menu/' || true)"
+          test -z "$unexpected"
+          git log --follow --oneline -20 -- apps/menu/src/App.tsx
+          test "$(git log --follow --format='%H' -- apps/menu/src/App.tsx | wc -l | tr -d ' ')" -gt 1
+          printf 'IMPORT_MERGE_SHA=%s\nIMPORT_MERGE_PARENTS=%s\n' \
+            "$import_merge" "$(git show --no-patch --pretty='%P' "$import_merge")"
+      - name: Run deferred pristine Menu locked install typecheck and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_before="$(git hash-object apps/menu/package-lock.json)"
+          package_before="$(git hash-object apps/menu/package.json)"
+          npm --prefix apps/menu --workspaces=false ci
+          npm --prefix apps/menu --workspaces=false run typecheck
+          npm --prefix apps/menu --workspaces=false run build
+          test "$(git hash-object apps/menu/package-lock.json)" = "$lock_before"
+          test "$(git hash-object apps/menu/package.json)" = "$package_before"
+          test -f apps/menu/dist/index.html
+          test -z "$(git status --porcelain --untracked-files=no -- apps/menu)"
+          echo 'PRISTINE_MENU_TYPECHECK_BUILD_OK'
+      - name: Run deferred pristine Chromium rendered routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$RUNNER_TEMP/menu-playwright-harness"
+          rm -rf "$harness"
+          mkdir -p "$harness"
+          printf '%s\n' \
+            '{"name":"tux-menu-pristine-characterization","private":true,"type":"module","dependencies":{"@playwright/test":"1.62.1"}}' \
+            > "$harness/package.json"
+          (cd "$harness" && npm install --ignore-scripts)
+          (cd "$harness" && npx playwright install --with-deps chromium)
+          npm --prefix apps/menu --workspaces=false run preview -- \
+            --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 &
+          preview_pid=$!
+          cleanup() { kill "$preview_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          cat > "$harness/characterize.mjs" <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          const checks = [
+            ['/', /TUX/i],
+            ['/order-now', /Order\s*Now/i],
+            ['/tux-burger', /Tux Burger/i],
+            ['/admin', /(Admin\s*Login|Admin|Login)/i],
+          ];
+          for (const [route, pattern] of checks) {
+            let response;
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+              try {
+                response = await page.goto(`http://127.0.0.1:4174${route}`, {
+                  waitUntil: 'networkidle', timeout: 5000,
+                });
+                if (response?.ok()) break;
+              } catch {}
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+            if (!response?.ok()) throw new Error(`${route}: rendered navigation failed`);
+            const body = await page.locator('body').innerText();
+            if (!pattern.test(body)) {
+              throw new Error(`${route}: rendered anchor missing; body starts: ${body.slice(0, 500)}`);
+            }
+            console.log(`RENDER_OK ${route}`);
+          }
+          await browser.close();
+          NODE
+          node "$harness/characterize.mjs"
+          test -z "$(git status --porcelain --untracked-files=no -- apps/menu)"
+          echo 'PRISTINE_MENU_RENDERED_CHARACTERIZATION_OK'
+      - name: Record exact Task 2 provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          rewritten="$(cat "$RUNNER_TEMP/rewritten-sha.txt")"
+          import_merge="$(cat "$RUNNER_TEMP/import-merge.txt")"
+          source_count="$(cat "$RUNNER_TEMP/source-count.txt")"
+          source_files="$(cat "$RUNNER_TEMP/source-file-count.txt")"
+          base_tree="$(git rev-parse "$EXPECTED_SHA^{tree}")"
+          filter_version="$(python3 -m pip show git-filter-repo | awk '/^Version:/{print $2}')"
+          mkdir -p docs/superpowers/provenance
+          cat > docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md <<EOF
+          # TUX-MENU History Import Provenance
+
+          - Source repository: \`ahmedmohameda7222-ship-it/TUX-MENU\`
+          - Source branch: \`main\`
+          - Original source HEAD: \`$SOURCE_HEAD\`
+          - Original source tree: \`$SOURCE_TREE\`
+          - Original reachable commit count: \`$source_count\`
+          - Original tracked-file count: \`$source_files\`
+          - Canonical base before import: \`$EXPECTED_SHA\`
+          - Canonical base tree: \`$base_tree\`
+          - Rewrite method: \`git filter-repo --to-subdirectory-filter apps/menu\`
+          - Rewrite tool version: \`$filter_version\`
+          - Rewritten import tip: \`$rewritten\`
+          - Import merge commit: \`$import_merge\`
+
+          The pristine import merge was verified by comparing the complete original \`git ls-tree -r\` mode/type/blob/path inventory with \`apps/menu/**\` after stripping the prefix. The inventories matched exactly, the rewritten reachable commit count matched the original source count, the import merge has two parents, and source history is visible through \`apps/menu/src/App.tsx\`. Neither source repository history was rewritten.
+
+          Before any Task 3 mutation of \`apps/menu/**\`, the pristine imported package completed its own locked \`npm ci\`, TypeScript check, production build, and Chromium-rendered characterization of \`/\`, \`/order-now\`, \`/tux-burger\`, and \`/admin\` without modifying tracked Menu source or lockfiles.
+          EOF
+          git diff --check
+          git add docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '1'
+          git commit -m 'docs(monorepo): record TUX-MENU import provenance'
+      - name: Recheck exact target then push complete Task 2 history
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_target="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual_target" = "$EXPECTED_SHA"
+          rewritten="$(cat "$RUNNER_TEMP/rewritten-sha.txt")"
+          import_merge="$(cat "$RUNNER_TEMP/import-merge.txt")"
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$import_merge"
+          git ls-tree -r "$import_merge" apps/menu \
+            | sed 's#\tapps/menu/#\t#' | sort > "$RUNNER_TEMP/final-import-tree.txt"
+          diff -u "$RUNNER_TEMP/source-tree.txt" "$RUNNER_TEMP/final-import-tree.txt"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK2_FINAL_HEAD=%s\nTASK2_FINAL_TREE=%s\nTASK2_FINAL_PARENT=%s\nREWRITTEN_IMPORT_SHA=%s\nIMPORT_MERGE_SHA=%s\n' \
+            "$final_head" "$final_tree" "$final_parent" "$rewritten" "$import_merge"
