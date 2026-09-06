@@ -46,7 +46,7 @@ import {
   type AutomaticOutboxScheduler,
   type OutboxSyncSummary,
 } from '@tux/sync';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification } from 'electron';
 import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
@@ -67,6 +67,8 @@ import {
   parseLoopbackDevelopmentUrl,
 } from './security';
 import { WhatsAppIpcRuntime } from './whatsappIpc';
+import { WhatsAppNotificationFeed } from './whatsappNotificationFeed';
+import { WhatsAppNotifications } from './whatsappNotifications';
 import { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';
 import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
@@ -89,6 +91,7 @@ const IPC_BOARD_MARK_DONE = 'tux:orders-board:mark-done';
 const IPC_BOARD_UNDO_DONE = 'tux:orders-board:undo-done';
 const IPC_BOARD_CANCEL = 'tux:orders-board:cancel';
 const IPC_BOARD_RETURN = 'tux:orders-board:return';
+const IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE = 'tux:whatsapp:set-notification-view-state';
 
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
@@ -103,6 +106,10 @@ let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
 let whatsappStore: SqliteWhatsAppStore | null = null;
 let whatsappIpcRuntime: WhatsAppIpcRuntime | null = null;
+let desktopWhatsAppRemote: DesktopWhatsAppRemote | null = null;
+let whatsappNotificationFeed: WhatsAppNotificationFeed | null = null;
+let whatsappNotificationSessionActive = false;
+let whatsappNotificationFocusedConversationId: string | null = null;
 let workerMenuLayoutIpcRuntime: WorkerMenuLayoutIpcRuntime | null = null;
 let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
@@ -132,6 +139,8 @@ function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
 }
 
 function trackWorkerPersistenceIdentity(result: OperationsSessionResult): void {
+  whatsappNotificationSessionActive = result.ok && result.value.status === 'ACTIVE';
+  if (!whatsappNotificationSessionActive) whatsappNotificationFocusedConversationId = null;
   if (!result.ok || result.value.status !== 'ACTIVE') {
     activeWorkerMenuLayoutIdentity = null;
     activeWorkerUiPreferencesIdentity = null;
@@ -282,15 +291,18 @@ async function initializeOperationsServices(): Promise<void> {
 
   whatsappStore = new SqliteWhatsAppStore(databasePath);
   await whatsappStore.initialize();
+  desktopWhatsAppRemote = null;
   let whatsappRemote: WhatsAppRemoteGateway = unavailableWhatsAppRemote();
   const operationsApiOrigin = process.env['TUX_OPERATIONS_API_ORIGIN']?.trim();
   if (remoteSessionManager !== null && operationsApiOrigin) {
     try {
-      whatsappRemote = new DesktopWhatsAppRemote({
+      desktopWhatsAppRemote = new DesktopWhatsAppRemote({
         apiOrigin: parseTuxOperationsApiOrigin(operationsApiOrigin),
         sessionManager: remoteSessionManager,
       });
+      whatsappRemote = desktopWhatsAppRemote;
     } catch {
+      desktopWhatsAppRemote = null;
       console.error(
         'TUX WhatsApp remote configuration is invalid; WhatsApp will remain unavailable.',
       );
@@ -304,6 +316,7 @@ async function initializeOperationsServices(): Promise<void> {
     operationsDatabase,
   );
   whatsappIpcRuntime = new WhatsAppIpcRuntime({ service: whatsappService });
+  trackWorkerPersistenceIdentity(await sessionService.getState());
 
   const preferencesRepository: WorkerUiPreferencesRepository = {
     get: (shopId, workerId) =>
@@ -483,6 +496,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_BOARD_UNDO_DONE,
     IPC_BOARD_CANCEL,
     IPC_BOARD_RETURN,
+    IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE,
   ]) {
     ipcMain.removeHandler(channel);
   }
@@ -513,6 +527,21 @@ function registerIpcHandlers(window: BrowserWindow): void {
     const result = await currentSessionService().signOut();
     trackWorkerPersistenceIdentity(result);
     return result;
+  });
+  ipcMain.handle(IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE, (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'WhatsApp notification view state');
+    if (Object.keys(input).some((key) => key !== 'focusedConversationId')) {
+      throw new TypeError('WhatsApp notification view-state IPC payload is invalid.');
+    }
+    const focusedConversationId = input['focusedConversationId'];
+    if (
+      focusedConversationId !== null &&
+      (typeof focusedConversationId !== 'string' || focusedConversationId.trim().length === 0)
+    ) {
+      throw new TypeError('WhatsApp notification view-state IPC payload is invalid.');
+    }
+    whatsappNotificationFocusedConversationId = focusedConversationId as string | null;
   });
   ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
@@ -686,6 +715,36 @@ async function createMainWindow(): Promise<BrowserWindow> {
   window.once('ready-to-show', () => window.show());
   registerIpcHandlers(window);
 
+  if (desktopWhatsAppRemote !== null) {
+    const notifications = new WhatsAppNotifications({
+      getContext: () => ({
+        sessionActive: whatsappNotificationSessionActive,
+        focusedConversationId: whatsappNotificationFocusedConversationId,
+        windowFocused: window.isFocused(),
+      }),
+      show: (presentation) => {
+        new Notification({
+          title: presentation.title,
+          body: presentation.body,
+        }).show();
+      },
+      reportError: (error) => console.warn('TUX WhatsApp notification display failed.', error),
+    });
+    whatsappNotificationFeed?.stop();
+    whatsappNotificationFeed = new WhatsAppNotificationFeed({
+      load: (cursor) => desktopWhatsAppRemote!.loadNotificationFeed(cursor),
+      notifications,
+      isSessionActive: () => whatsappNotificationSessionActive,
+      reportError: (error) => console.warn('TUX WhatsApp notification feed failed.', error),
+    });
+    whatsappNotificationFeed.start();
+    window.once('closed', () => {
+      whatsappNotificationFeed?.stop();
+      whatsappNotificationFeed = null;
+      whatsappNotificationFocusedConversationId = null;
+    });
+  }
+
   const developmentUrl = process.env['TUX_OPERATIONS_DEV_URL'];
   if (developmentUrl === undefined || developmentUrl.trim() === '') {
     const rendererPath = path.join(__dirname, '../../../operations/dist/index.html');
@@ -720,6 +779,11 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
   configurationSyncTimer = null;
+  whatsappNotificationFeed?.stop();
+  whatsappNotificationFeed = null;
+  whatsappNotificationFocusedConversationId = null;
+  whatsappNotificationSessionActive = false;
+  desktopWhatsAppRemote = null;
   workerMenuLayoutRetry?.stop();
   workerMenuLayoutRetry = null;
   workerUiPreferencesRetry?.stop();
