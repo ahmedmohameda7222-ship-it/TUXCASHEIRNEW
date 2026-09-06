@@ -1,5 +1,9 @@
 import type { WhatsAppInboxSnapshot } from '@tux/application';
-import type { Instant, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
+import type {
+  Instant,
+  WhatsAppConversation,
+  WhatsAppMessage,
+} from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -78,11 +82,12 @@ class Environment implements WhatsAppInboxControllerEnvironment {
   readonly addOfflineListener = () => () => undefined;
 }
 
-describe('WhatsAppInboxController Task 10A selected conversation refresh', () => {
-  it('reloads messages for the still-selected conversation after the inbox refreshes', async () => {
+describe('Task 10A selected conversation refresh', () => {
+  it('reloads messages for a stable selection', async () => {
     const selected = conversation();
     const inbound = message('inbound-1', 'INBOUND', 'Can I order?');
-    const outbound = message('outbound-1', 'OUTBOUND', 'Yes — what would you like?');
+    const reply = 'Yes — what would you like?';
+    const outbound = message('outbound-1', 'OUTBOUND', reply);
     const loadInbox = vi
       .fn<TuxWhatsAppApi['loadInbox']>()
       .mockResolvedValue(ok(snapshot(selected)));
@@ -112,22 +117,22 @@ describe('WhatsAppInboxController Task 10A selected conversation refresh', () =>
           mode: 'FREE_FORM',
           conversationId: selected.id,
           freeFormUntil: '2026-09-06T03:00:00.000Z' as Instant,
-          config: { storefrontUrl: 'https://tux.example/menu', storeLocation: null },
+          config: { storefrontUrl: 'https://tux/menu', storeLocation: null },
         }),
       ),
     } as unknown as TuxWhatsAppApi;
     const controller = new WhatsAppInboxController(api, new Environment());
 
     await controller.refresh();
-    expect(controller.getState().selectedMessages.map((item) => item.id)).toEqual([
-      'inbound-1',
-    ]);
+    const initial = controller.getState().selectedMessages;
+    expect(initial.map((item) => item.id)).toEqual(['inbound-1']);
 
     await controller.refresh();
 
     expect(loadConversation).toHaveBeenCalledTimes(2);
     expect(controller.getState().selectedConversationId).toBe(selected.id);
-    expect(controller.getState().selectedMessages.map((item) => item.id)).toEqual([
+    const refreshed = controller.getState().selectedMessages;
+    expect(refreshed.map((item) => item.id)).toEqual([
       'inbound-1',
       'outbound-1',
     ]);
