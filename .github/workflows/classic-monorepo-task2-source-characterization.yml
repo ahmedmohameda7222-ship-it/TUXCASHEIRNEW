@@ -1,0 +1,85 @@
+name: Classic Monorepo Task 2 Source Characterization
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task2-source-characterization.json'
+      - '.github/workflows/classic-monorepo-task2-source-characterization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  characterize-source:
+    name: Characterize exact original TUX-MENU source
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_URL: https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git
+      SOURCE_HEAD: 285635181a9ee1ec2f760feb38abae8fa19a201d
+      SOURCE_TREE: e9ddcc696470d7bb116e1d888a77ade84f95bf83
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_TARGET_SHA: 2d32d29dead9b872ce392e9c186678d59de7603f
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Re-prove authorities and clone untouched source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')" = "$EXPECTED_TARGET_SHA"
+          test "$(git ls-remote "$SOURCE_URL" refs/heads/main | awk '{print $1}')" = "$SOURCE_HEAD"
+          source_dir="$RUNNER_TEMP/tux-menu-original"
+          git clone --no-single-branch "$SOURCE_URL" "$source_dir"
+          git -C "$source_dir" switch --detach "$SOURCE_HEAD"
+          test "$(git -C "$source_dir" rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          git -C "$source_dir" ls-tree -r "$SOURCE_HEAD" | sort > "$RUNNER_TEMP/original-tree.txt"
+          test "$(wc -l < "$RUNNER_TEMP/original-tree.txt" | tr -d ' ')" = '114'
+          echo "SOURCE_DIR=$source_dir" >> "$GITHUB_ENV"
+      - name: Locked install exact original source
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_before="$(git -C "$SOURCE_DIR" hash-object package-lock.json)"
+          package_before="$(git -C "$SOURCE_DIR" hash-object package.json)"
+          (cd "$SOURCE_DIR" && npm ci)
+          test "$(git -C "$SOURCE_DIR" hash-object package-lock.json)" = "$lock_before"
+          test "$(git -C "$SOURCE_DIR" hash-object package.json)" = "$package_before"
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain --untracked-files=no)"
+      - name: Capture exact original source typecheck result
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          (cd "$SOURCE_DIR" && npm run typecheck) > "$RUNNER_TEMP/original-typecheck.log" 2>&1
+          rc=$?
+          cat "$RUNNER_TEMP/original-typecheck.log"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          if test "$rc" -eq 0; then
+            echo 'ORIGINAL_SOURCE_TYPECHECK_GREEN'
+          else
+            grep -F "src/App.tsx(36,41): error TS2322" "$RUNNER_TEMP/original-typecheck.log"
+            grep -F "RouteComponentProps" "$RUNNER_TEMP/original-typecheck.log"
+            echo 'ORIGINAL_SOURCE_TYPECHECK_PREEXISTING_RED'
+          fi
+          exit 0
+      - name: Prove original source production build independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$SOURCE_DIR" && npm run build)
+          test -f "$SOURCE_DIR/dist/index.html"
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain --untracked-files=no)"
+          echo 'ORIGINAL_SOURCE_BUILD_GREEN'
+      - name: Require expected pre-existing classification
+        shell: bash
+        env:
+          TYPECHECK_RC: ${{ steps.typecheck.outputs.rc }}
+        run: |
+          set -euo pipefail
+          test "$TYPECHECK_RC" -ne 0
+          echo 'TASK2_TYPECHECK_FAILURE_CLASSIFIED_AS_PREEXISTING_SOURCE_BEHAVIOR'
