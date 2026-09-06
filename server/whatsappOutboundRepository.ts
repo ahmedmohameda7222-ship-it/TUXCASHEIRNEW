@@ -186,6 +186,41 @@ function parseInternalMessage(
   });
 }
 
+function outboundMediaMetadata(media: WhatsAppOutboundMediaMetadata): UnknownRecord {
+  return {
+    media_key: media.mediaKey,
+    object_path: media.objectPath,
+    mime_type: media.mimeType,
+    file_name: media.fileName,
+    byte_size: media.byteSize,
+    sha256: media.sha256,
+    stored_at: media.storedAt,
+    expires_at: media.expiresAt,
+  };
+}
+
+function outboundMediaWire(media: WhatsAppOutboundMediaMetadata): UnknownRecord {
+  return {
+    media_key: media.mediaKey,
+    kind: media.kind,
+    mime_type: media.mimeType,
+    file_name: media.fileName,
+    byte_size: media.byteSize,
+    stored_at: media.storedAt,
+    expires_at: media.expiresAt,
+    availability: 'AVAILABLE',
+  };
+}
+
+function outboundLocationMetadata(location: WhatsAppLocationPayload): UnknownRecord {
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    name: location.name,
+    address: location.address,
+  };
+}
+
 export class SupabaseWhatsAppOutboundRepository
   extends SupabaseWhatsAppOperationsRepository
   implements WhatsAppOutboundRepository
@@ -247,7 +282,8 @@ export class SupabaseWhatsAppOutboundRepository
       }
       if (
         message === 'TUX_WHATSAPP_OUTBOUND_INTENT_CONFLICT' ||
-        message === 'TUX_WHATSAPP_RETRY_NOT_ALLOWED'
+        message === 'TUX_WHATSAPP_RETRY_NOT_ALLOWED' ||
+        message === 'TUX_WHATSAPP_MEDIA_EXPIRED'
       ) {
         throw new WhatsAppOperationsRepositoryError(
           'OUTBOUND_INTENT_CONFLICT',
@@ -274,22 +310,17 @@ export class SupabaseWhatsAppOutboundRepository
     readonly initiatedAt: string;
   }): Promise<ClaimedWhatsAppOutboundIntent> {
     const row = oneRow(
-      await this.#callOutboundRpc('claim_tux_whatsapp_outbound_media_v1', {
+      await this.#callOutboundRpc('claim_tux_whatsapp_outbound_intent_v2', {
         p_shop_id: input.shopId,
         p_business_day_id: input.businessDayId,
         p_claimed_worker_id: input.workerId,
         p_device_id: input.deviceId,
         p_conversation_id: input.conversationId,
         p_outbound_intent_key: input.outboundIntentKey,
-        p_media_key: input.media.mediaKey,
         p_kind: input.media.kind,
-        p_object_path: input.media.objectPath,
-        p_mime_type: input.media.mimeType,
-        p_file_name: input.media.fileName,
-        p_byte_size: input.media.byteSize,
-        p_sha256: input.media.sha256,
-        p_stored_at: input.media.storedAt,
-        p_expires_at: input.media.expiresAt,
+        p_text: null,
+        p_media_ref: input.media.mediaKey,
+        p_media_metadata: outboundMediaMetadata(input.media),
         p_initiated_at: input.initiatedAt,
       }),
     );
@@ -297,7 +328,7 @@ export class SupabaseWhatsAppOutboundRepository
     return {
       created: booleanValue(row['created']),
       recipientNormalizedPhone: requiredString(row['recipient_normalized_phone']),
-      message: parseInternalMessage(row['message_json'], row['media_json'], null),
+      message: parseInternalMessage(row['message_json'], outboundMediaWire(input.media), null),
     };
   }
 
@@ -312,17 +343,17 @@ export class SupabaseWhatsAppOutboundRepository
     readonly initiatedAt: string;
   }): Promise<ClaimedWhatsAppOutboundIntent> {
     const row = oneRow(
-      await this.#callOutboundRpc('claim_tux_whatsapp_outbound_location_v1', {
+      await this.#callOutboundRpc('claim_tux_whatsapp_outbound_intent_v2', {
         p_shop_id: input.shopId,
         p_business_day_id: input.businessDayId,
         p_claimed_worker_id: input.workerId,
         p_device_id: input.deviceId,
         p_conversation_id: input.conversationId,
         p_outbound_intent_key: input.outboundIntentKey,
-        p_latitude: input.location.latitude,
-        p_longitude: input.location.longitude,
-        p_name: input.location.name,
-        p_address: input.location.address,
+        p_kind: 'LOCATION',
+        p_text: null,
+        p_media_ref: null,
+        p_media_metadata: outboundLocationMetadata(input.location),
         p_initiated_at: input.initiatedAt,
       }),
     );
@@ -330,7 +361,7 @@ export class SupabaseWhatsAppOutboundRepository
     return {
       created: booleanValue(row['created']),
       recipientNormalizedPhone: requiredString(row['recipient_normalized_phone']),
-      message: parseInternalMessage(row['message_json'], null, row['location_json']),
+      message: parseInternalMessage(row['message_json'], null, input.location),
     };
   }
 
@@ -363,7 +394,7 @@ export class SupabaseWhatsAppOutboundRepository
         p_business_day_id: input.businessDayId,
         p_claimed_worker_id: input.workerId,
         p_device_id: input.deviceId,
-        p_message_id: input.messageId,
+        p_failed_message_id: input.messageId,
         p_outbound_intent_key: input.outboundIntentKey,
         p_initiated_at: input.initiatedAt,
       }),
