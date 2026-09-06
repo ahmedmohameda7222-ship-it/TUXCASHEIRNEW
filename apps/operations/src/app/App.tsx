@@ -349,19 +349,18 @@ function ActiveShell({
   }, [whatsappController]);
 
   useEffect(() => {
-    void window.tuxDesktop?.whatsapp
-      .setNotificationViewState({
-        focusedConversationId:
-          area === 'WHATSAPP' ? whatsappState.selectedConversationId : null,
-      })
-      .catch(() => undefined);
+    const update = window.tuxDesktop?.whatsapp.setNotificationViewState({
+      focusedConversationId: area === 'WHATSAPP' ? whatsappState.selectedConversationId : null,
+    });
+    void update?.catch(() => undefined);
   }, [area, whatsappState.selectedConversationId]);
 
   useEffect(
     () => () => {
-      void window.tuxDesktop?.whatsapp
-        .setNotificationViewState({ focusedConversationId: null })
-        .catch(() => undefined);
+      const update = window.tuxDesktop?.whatsapp.setNotificationViewState({
+        focusedConversationId: null,
+      });
+      void update?.catch(() => undefined);
     },
     [],
   );
