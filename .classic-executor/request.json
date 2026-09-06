@@ -1,6 +1,6 @@
 {
-  "serial": 3,
-  "mode": "preflight",
+  "serial": 4,
+  "mode": "task2-import",
   "target_branch": "work/monorepo-foundation",
   "expected_target_sha": "2d32d29dead9b872ce392e9c186678d59de7603f"
 }
