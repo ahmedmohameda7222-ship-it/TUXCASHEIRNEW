@@ -135,11 +135,7 @@ export type TuxWhatsAppApi = Pick<
   | 'linkOrder'
   | 'saveDraft'
   | 'getDraft'
-> & {
-  readonly setNotificationViewState: (input: {
-    readonly focusedConversationId: string | null;
-  }) => Promise<void>;
-};
+>;
 
 export interface TuxDesktopApi {
   readonly app: {
@@ -158,5 +154,9 @@ export interface TuxDesktopApi {
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
   readonly endDay: TuxEndDayApi;
-  readonly whatsapp: TuxWhatsAppApi;
+  readonly whatsapp: TuxWhatsAppApi & {
+    readonly setNotificationViewState: (input: {
+      readonly focusedConversationId: string | null;
+    }) => Promise<void>;
+  };
 }
