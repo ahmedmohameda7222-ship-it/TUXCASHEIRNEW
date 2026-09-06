@@ -1,0 +1,7 @@
+{
+  "serial": 9,
+  "mode": "task4-workspace",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "bab4a9889a9d298bd3b8ad9cc54116da676b04dc",
+  "known_preexisting_typecheck": "src/App.tsx(36,41) TS2322 RouteComponentProps"
+}
