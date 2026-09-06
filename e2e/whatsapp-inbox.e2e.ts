@@ -293,7 +293,10 @@ async function openWhatsAppConversation(page: Page): Promise<void> {
     .click();
   const conversation = page.locator(`[data-conversation-id="${CONVERSATION}"]`);
   await expect(conversation).toContainText('E2E Customer');
-  await conversation.click();
+  if ((await conversation.getAttribute('aria-current')) !== 'true') {
+    await conversation.click();
+  }
+  await expect(conversation).toHaveAttribute('aria-current', 'true');
   await expect(page.getByLabel('Message history')).toContainText('Can I order?');
 }
 
