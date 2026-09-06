@@ -333,9 +333,8 @@ export class OperationsOrdersService {
         if (input.draftScopeId.trim().length === 0) {
           return err({ code: 'VALIDATION_ERROR', message: 'Draft scope is required.' });
         }
-        const normalized = normalizeEgyptianPhone(
-          input.prefill.normalizedPhone.trim() || input.prefill.displayPhone,
-        );
+        const canonicalPhone = input.prefill.normalizedPhone.trim();
+        const normalized = normalizeEgyptianPhone(canonicalPhone || input.prefill.displayPhone);
         if (!normalized.valid) {
           return err({
             code: 'VALIDATION_ERROR',
@@ -374,7 +373,7 @@ export class OperationsOrdersService {
           revision: current?.revision ?? base.revision,
           delivery: {
             ...base.delivery,
-            normalizedPhone: normalized.normalizedPhone,
+            normalizedPhone: canonicalPhone || normalized.displayPhone,
             displayPhone: input.prefill.displayPhone.trim() || normalized.displayPhone,
             customerName: input.prefill.customerName.trim(),
             address: input.prefill.address?.trim() ?? '',
