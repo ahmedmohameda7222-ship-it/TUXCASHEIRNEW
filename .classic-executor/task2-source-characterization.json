@@ -1,0 +1,8 @@
+{
+  "serial": 6,
+  "mode": "task2-source-characterization",
+  "source_repository": "ahmedmohameda7222-ship-it/TUX-MENU",
+  "source_sha": "285635181a9ee1ec2f760feb38abae8fa19a201d",
+  "source_tree": "e9ddcc696470d7bb116e1d888a77ade84f95bf83",
+  "expected_target_sha": "2d32d29dead9b872ce392e9c186678d59de7603f"
+}
