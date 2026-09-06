@@ -193,7 +193,10 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
     ],
   });
 
-  await page.getByRole('button', { name: /^WhatsApp\b/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Operations' })
+    .getByRole('button', { name: /^WhatsApp\b/ })
+    .click();
   const conversation = page.locator(`[data-conversation-id="${CONVERSATION}"]`);
   await expect(conversation).toContainText('E2E Customer');
   await conversation.click();
