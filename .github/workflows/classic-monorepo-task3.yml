@@ -1,0 +1,103 @@
+name: Classic Monorepo Task 3 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task3.json'
+      - '.github/workflows/classic-monorepo-task3.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task3:
+    name: Task 3 quarantine legacy SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: a9fb71ceaf89aac02f6e5e0cf4d719105932335f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate request and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task3.json').read_text())
+          assert request == {
+            'serial': 8,
+            'mode': 'task3-quarantine',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'a9fb71ceaf89aac02f6e5e0cf4d719105932335f',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task3 "$EXPECTED_SHA"
+          test -f apps/menu/supabase_setup.sql
+          test ! -e apps/menu/legacy/supabase_setup.sql.reference
+          test -z "$(git status --porcelain)"
+      - name: Move legacy SQL to non-executable reference and create authority README
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apps/menu/legacy
+          git mv apps/menu/supabase_setup.sql apps/menu/legacy/supabase_setup.sql.reference
+          cat > apps/menu/legacy/README.md <<'EOF'
+          # Legacy TUX-MENU Database Reference
+
+          `supabase_setup.sql.reference` is historical reference material imported from TUX-MENU. It is not a migration or executable database authority for TUXCASHEIRNEW.
+
+          Do not run it against the canonical TUX Supabase project and do not copy it into `supabase/migrations/`.
+
+          The historical model uses `product_sections`, text identifiers, `price NUMERIC`, and legacy `product-images` assumptions. Canonical TUX is shop-scoped and uses `menu_categories`, UUID identifiers, `price_minor BIGINT`, modifiers, combo options, inventory/configuration contracts, and root `supabase/migrations/`.
+
+          Catalog reconciliation belongs to Phase B.
+          EOF
+          git diff --check
+      - name: Verify sole migration authority and quarantine invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$EXPECTED_SHA" -- supabase/migrations
+          test -z "$(git status --porcelain -- supabase/migrations)"
+          nested="$(find apps packages -type d -path '*/supabase/migrations' -print)"
+          test -z "$nested"
+          executable_legacy="$(find . \( -path './.git' -o -path './.tmp' -o -path './node_modules' \) -prune -o -name supabase_setup.sql -print)"
+          test -z "$executable_legacy"
+          test -f apps/menu/legacy/supabase_setup.sql.reference
+          test -f apps/menu/legacy/README.md
+          changed="$(git diff --name-only "$EXPECTED_SHA")"
+          printf 'TASK3_CHANGED_FILES:\n%s\n' "$changed"
+          test "$(printf '%s\n' "$changed" | grep -c '^apps/menu/legacy/')" = '2'
+          test "$(printf '%s\n' "$changed" | grep -c '^apps/menu/supabase_setup.sql$')" = '1'
+          test "$(printf '%s\n' "$changed" | wc -l | tr -d ' ')" = '3'
+      - name: Commit and push Task 3 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A apps/menu
+          git commit -m 'docs(menu): quarantine legacy Supabase setup'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK3_HEAD=%s\nTASK3_TREE=%s\nTASK3_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
