@@ -142,10 +142,12 @@ export async function resolveWhatsAppCustomerOrderContext(input: {
         ),
       );
     }
+    const localLookupPhone = phone.normalizedPhone;
+    const canonicalPhone = phone.displayPhone;
 
     const local = await input.database.transaction(async (transaction) => {
       const [contact, orders] = await Promise.all([
-        transaction.customerContacts.getByNormalizedPhone(shopId, phone.normalizedPhone),
+        transaction.customerContacts.getByNormalizedPhone(shopId, localLookupPhone),
         transaction.orders.listByBusinessDay(businessDayId),
       ]);
       return { contact, orders };
@@ -153,14 +155,14 @@ export async function resolveWhatsAppCustomerOrderContext(input: {
 
     const customer: WhatsAppCustomerContext = local.contact
       ? {
-          normalizedPhone: phone.normalizedPhone,
+          normalizedPhone: canonicalPhone,
           displayPhone: local.contact.displayPhone,
           customerName: local.contact.name,
           address: local.contact.latestAddress,
           zoneId: local.contact.latestZoneId,
         }
       : {
-          normalizedPhone: phone.normalizedPhone,
+          normalizedPhone: canonicalPhone,
           displayPhone: conversation.displayPhone,
           customerName: conversation.customerName?.trim() || conversation.displayPhone,
           address: null,
@@ -168,7 +170,7 @@ export async function resolveWhatsAppCustomerOrderContext(input: {
         };
 
     const activeOrders = local.orders
-      .map((order) => summarizeMatchingOrder(order, shopId, phone.normalizedPhone))
+      .map((order) => summarizeMatchingOrder(order, shopId, localLookupPhone))
       .filter((order): order is WhatsAppActiveOrderSummary => order !== null)
       .sort(compareOrders);
 
