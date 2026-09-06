@@ -13,6 +13,9 @@ const DEVICE = '90000000-0000-4000-8000-000000000001';
 const CONVERSATION = 'a0000000-0000-4000-8000-000000000001';
 const INBOUND_MESSAGE = 'b0000000-0000-4000-8000-000000000001';
 const STARTED_AT = '2026-09-06T00:00:00.000Z';
+const STARTER_TEMPLATE_ID = 'starter-order-follow-up';
+const STARTER_TEMPLATE_TEXT = 'Following up on your TUX order.';
+const POLICIES = new Set(['FREE_FORM', 'TEMPLATE_ONLY', 'BLOCKED']);
 
 const conversation = {
   id: CONVERSATION,
@@ -28,29 +31,41 @@ const conversation = {
   lastMessageAt: STARTED_AT,
 };
 
-const messages = [
-  {
-    id: INBOUND_MESSAGE,
-    shopId: SHOP,
-    conversationId: CONVERSATION,
-    providerMessageId: null,
-    outboundIntentKey: null,
-    direction: 'INBOUND',
-    kind: 'TEXT',
-    text: 'Can I order?',
-    mediaRef: null,
-    media: null,
-    location: null,
-    status: 'DELIVERED',
-    sentByWorkerId: null,
-    initiatedByDeviceId: null,
-    initiatedAt: null,
-    createdAt: STARTED_AT,
-  },
-];
+function initialMessages() {
+  return [
+    {
+      id: INBOUND_MESSAGE,
+      shopId: SHOP,
+      conversationId: CONVERSATION,
+      providerMessageId: null,
+      outboundIntentKey: null,
+      direction: 'INBOUND',
+      kind: 'TEXT',
+      text: 'Can I order?',
+      mediaRef: null,
+      media: null,
+      location: null,
+      status: 'DELIVERED',
+      sentByWorkerId: null,
+      initiatedByDeviceId: null,
+      initiatedAt: null,
+      createdAt: STARTED_AT,
+    },
+  ];
+}
 
+let policy = 'FREE_FORM';
+let messages = initialMessages();
 const sentByIntent = new Map();
-const counters = { sendMessage: 0 };
+const counters = { sendMessage: 0, sendTemplate: 0 };
+
+function resetScenario(nextPolicy) {
+  policy = nextPolicy;
+  messages = initialMessages();
+  sentByIntent.clear();
+  counters.sendMessage = 0;
+  counters.sendTemplate = 0;
+}
 
 function writeJson(response, status, body) {
   const bytes = JSON.stringify(body);
@@ -78,19 +93,48 @@ function snapshot() {
   };
 }
 
+function config() {
+  return {
+    storefrontUrl: 'https://menu.tux.example',
+    storeLocation: null,
+  };
+}
+
 function target() {
+  if (policy === 'TEMPLATE_ONLY') {
+    return {
+      mode: 'TEMPLATE_ONLY',
+      conversationId: CONVERSATION,
+      normalizedPhone: conversation.normalizedPhone,
+      displayPhone: conversation.displayPhone,
+      templates: [
+        {
+          id: STARTER_TEMPLATE_ID,
+          label: 'Order follow-up',
+          languageCode: 'en',
+          previewText: STARTER_TEMPLATE_TEXT,
+        },
+      ],
+      config: config(),
+    };
+  }
+  if (policy === 'BLOCKED') {
+    return {
+      mode: 'BLOCKED',
+      conversationId: CONVERSATION,
+      reason: 'NO_APPROVED_TEMPLATE',
+      config: config(),
+    };
+  }
   return {
     mode: 'FREE_FORM',
     conversationId: CONVERSATION,
     freeFormUntil: '2099-01-01T00:00:00.000Z',
-    config: {
-      storefrontUrl: 'https://menu.tux.example',
-      storeLocation: null,
-    },
+    config: config(),
   };
 }
 
-function sentMessage(body) {
+function sentMessage(body, text, kind) {
   const index = sentByIntent.size + 1;
   return {
     id: `c0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -100,7 +144,7 @@ function sentMessage(body) {
     outboundIntentKey: body.outboundIntentKey,
     direction: 'OUTBOUND',
     kind: 'TEXT',
-    text: body.text,
+    text,
     mediaRef: null,
     media: null,
     location: null,
@@ -109,7 +153,25 @@ function sentMessage(body) {
     initiatedByDeviceId: DEVICE,
     initiatedAt: STARTED_AT,
     createdAt: STARTED_AT,
+    e2eKind: kind,
   };
+}
+
+function publicMessage(message) {
+  const { e2eKind: _e2eKind, ...publicValue } = message;
+  return publicValue;
+}
+
+async function handleControl(request, response, url) {
+  if (request.method !== 'POST' || url.pathname !== '/__tux_whatsapp_control__') return false;
+  const body = await readJson(request);
+  if (!POLICIES.has(body.policy)) {
+    writeJson(response, 400, { error: 'invalid_whatsapp_e2e_policy' });
+    return true;
+  }
+  resetScenario(body.policy);
+  writeJson(response, 200, { ok: true, policy });
+  return true;
 }
 
 async function handleApi(request, response, url) {
@@ -129,14 +191,31 @@ async function handleApi(request, response, url) {
     return true;
   }
   if (body.action === 'SEND_MESSAGE') {
-    let message = sentByIntent.get(body.outboundIntentKey);
+    const intentKey = `message:${body.outboundIntentKey}`;
+    let message = sentByIntent.get(intentKey);
     if (message === undefined) {
-      message = sentMessage(body);
-      sentByIntent.set(body.outboundIntentKey, message);
-      messages.push(message);
+      message = sentMessage(body, body.text, 'message');
+      sentByIntent.set(intentKey, message);
+      messages.push(publicMessage(message));
       counters.sendMessage += 1;
     }
-    writeJson(response, 200, { message });
+    writeJson(response, 200, { message: publicMessage(message) });
+    return true;
+  }
+  if (body.action === 'SEND_TEMPLATE') {
+    if (policy !== 'TEMPLATE_ONLY' || body.templateId !== STARTER_TEMPLATE_ID) {
+      writeJson(response, 400, { error: 'invalid_whatsapp_e2e_template' });
+      return true;
+    }
+    const intentKey = `template:${body.outboundIntentKey}`;
+    let message = sentByIntent.get(intentKey);
+    if (message === undefined) {
+      message = sentMessage(body, STARTER_TEMPLATE_TEXT, 'template');
+      sentByIntent.set(intentKey, message);
+      messages.push(publicMessage(message));
+      counters.sendTemplate += 1;
+    }
+    writeJson(response, 200, { message: publicMessage(message) });
     return true;
   }
   writeJson(response, 400, { error: 'unsupported_whatsapp_e2e_action' });
@@ -177,6 +256,7 @@ async function serveStatic(response, pathname) {
 createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${HOST}:${PORT}`);
   try {
+    if (await handleControl(request, response, url)) return;
     if (await handleApi(request, response, url)) return;
     await serveStatic(response, url.pathname);
   } catch {
