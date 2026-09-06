@@ -99,6 +99,7 @@ const IPC_WHATSAPP_GET_DRAFT = 'tux:whatsapp:get-draft';
 const IPC_WHATSAPP_RESOLVE_CUSTOMER_ORDER_CONTEXT = 'tux:whatsapp:resolve-customer-order-context';
 const IPC_WHATSAPP_RESOLVE_MESSAGING_TARGET = 'tux:whatsapp:resolve-messaging-target';
 const IPC_WHATSAPP_SEND_TEMPLATE = 'tux:whatsapp:send-template';
+const IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE = 'tux:whatsapp:set-notification-view-state';
 
 type WorkerMenuLayoutInput = Parameters<TuxDesktopApi['workerMenuLayout']['updateMenuLayout']>[0];
 type WorkerLegacyMenuLayoutInput = Parameters<
@@ -365,6 +366,11 @@ const api: TuxDesktopApi = Object.freeze({
       assertWhatsAppMessageResult(
         (await ipcRenderer.invoke(IPC_WHATSAPP_SEND_TEMPLATE, input)) as unknown,
       ),
+    setNotificationViewState: async (
+      input: Parameters<TuxDesktopApi['whatsapp']['setNotificationViewState']>[0],
+    ) => {
+      await ipcRenderer.invoke(IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE, input);
+    },
   }),
 });
 
