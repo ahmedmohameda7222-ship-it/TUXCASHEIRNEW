@@ -1,0 +1,6 @@
+{
+  "serial": 8,
+  "mode": "task3-quarantine",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "a9fb71ceaf89aac02f6e5e0cf4d719105932335f"
+}
