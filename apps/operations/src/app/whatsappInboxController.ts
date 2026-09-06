@@ -771,6 +771,26 @@ export class WhatsAppInboxController {
     }
   }
 
+  async #refreshSelectedMessages(conversationId: string): Promise<void> {
+    const generation = this.#selectionGeneration;
+    let result: Awaited<ReturnType<TuxWhatsAppApi['loadConversation']>>;
+    try {
+      result = await this.#client.loadConversation(conversationId);
+    } catch {
+      if (this.#selectionIsCurrent(generation, conversationId)) {
+        this.#publish({ errorMessage: 'Could not refresh WhatsApp conversation.' });
+      }
+      return;
+    }
+
+    if (!this.#selectionIsCurrent(generation, conversationId)) return;
+    if (result.ok) {
+      this.#publish({ selectedMessages: [...result.value] });
+    } else {
+      this.#publish({ errorMessage: result.error.message });
+    }
+  }
+
   async #drainRefreshes(): Promise<void> {
     this.#publish({ refreshing: true });
     try {
@@ -850,6 +870,7 @@ export class WhatsAppInboxController {
       selectedConversationId !== null &&
       visibleConversations.some((item) => item.id === selectedConversationId)
     ) {
+      await this.#refreshSelectedMessages(selectedConversationId);
       return;
     }
 
