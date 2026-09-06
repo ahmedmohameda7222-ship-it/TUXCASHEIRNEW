@@ -78,8 +78,8 @@ class Environment implements WhatsAppInboxControllerEnvironment {
   readonly addOfflineListener = () => () => undefined;
 }
 
-describe('Task 10A selected conversation refresh', () => {
-  it('reloads messages for a stable selection', async () => {
+describe('Task 10A explicit text send presentation', () => {
+  it('shows the returned outbound message once without reloading the stable selection', async () => {
     const selected = conversation();
     const inbound = message('inbound-1', 'INBOUND', 'Can I order?');
     const reply = 'Yes — what would you like?';
@@ -89,11 +89,14 @@ describe('Task 10A selected conversation refresh', () => {
       .mockResolvedValue(ok(snapshot(selected)));
     const loadConversation = vi
       .fn<TuxWhatsAppApi['loadConversation']>()
-      .mockResolvedValueOnce(ok([inbound]))
-      .mockResolvedValue(ok([inbound, outbound]));
+      .mockResolvedValue(ok([inbound]));
+    const sendText = vi.fn<TuxWhatsAppApi['sendText']>().mockResolvedValue(ok(outbound));
+    const saveDraft = vi.fn<TuxWhatsAppApi['saveDraft']>().mockResolvedValue(ok(undefined));
     const api = {
       loadInbox,
       loadConversation,
+      sendText,
+      saveDraft,
       getDraft: vi.fn().mockResolvedValue(ok(null)),
       resolveCustomerOrderContext: vi.fn().mockResolvedValue(
         ok({
@@ -120,14 +123,15 @@ describe('Task 10A selected conversation refresh', () => {
     const controller = new WhatsAppInboxController(api, new Environment());
 
     await controller.refresh();
-    const initial = controller.getState().selectedMessages;
-    expect(initial.map((item) => item.id)).toEqual(['inbound-1']);
+    controller.setComposerText(reply);
+    await controller.sendCurrentText();
 
-    await controller.refresh();
-
-    expect(loadConversation).toHaveBeenCalledTimes(2);
-    expect(controller.getState().selectedConversationId).toBe(selected.id);
-    const refreshed = controller.getState().selectedMessages;
-    expect(refreshed.map((item) => item.id)).toEqual(['inbound-1', 'outbound-1']);
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(loadConversation).toHaveBeenCalledTimes(1);
+    expect(controller.getState().composerText).toBe('');
+    expect(controller.getState().selectedMessages.map((item) => item.id)).toEqual([
+      'inbound-1',
+      'outbound-1',
+    ]);
   });
 });
