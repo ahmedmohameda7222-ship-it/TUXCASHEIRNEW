@@ -16,57 +16,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  request:
-    name: Validate executor request
+  bootstrap:
+    name: Bootstrap Classic remote executor
     runs-on: ubuntu-latest
-    outputs:
-      serial: ${{ steps.request.outputs.serial }}
-      mode: ${{ steps.request.outputs.mode }}
-      target_branch: ${{ steps.request.outputs.target_branch }}
-      expected_sha: ${{ steps.request.outputs.expected_sha }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: request
-        name: Parse constrained request
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, re
-          from pathlib import Path
-
-          request = json.loads(Path('.classic-executor/request.json').read_text())
-          allowed = {'plan-amendment', 'preflight', 'task2-import'}
-          mode = request.get('mode')
-          serial = request.get('serial')
-          target = request.get('target_branch')
-          expected = request.get('expected_target_sha')
-          if mode not in allowed:
-              raise SystemExit(f'unsupported executor mode: {mode!r}')
-          if not isinstance(serial, int) or serial < 1:
-              raise SystemExit('serial must be a positive integer')
-          if target != 'work/monorepo-foundation':
-              raise SystemExit(f'unsupported target branch: {target!r}')
-          if not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{40}', expected):
-              raise SystemExit('expected_target_sha must be a full SHA-1')
-          print(f'serial={serial}')
-          print(f'mode={mode}')
-          print(f'target_branch={target}')
-          print(f'expected_sha={expected}')
-          PY
-
-  plan-amendment:
-    name: Amend plan for Classic remote execution
-    needs: request
-    if: needs.request.outputs.mode == 'plan-amendment'
-    runs-on: ubuntu-latest
-    env:
-      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
-      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Validate constrained bootstrap request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json, re
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/request.json').read_text())
+          if request.get('mode') != 'plan-amendment':
+              raise SystemExit(f"bootstrap only accepts plan-amendment, got {request.get('mode')!r}")
+          if request.get('target_branch') != 'work/monorepo-foundation':
+              raise SystemExit('unexpected target branch')
+          expected = request.get('expected_target_sha')
+          if not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{40}', expected):
+              raise SystemExit('expected_target_sha must be a full SHA-1')
+          print('TARGET_BRANCH=work/monorepo-foundation')
+          print(f'EXPECTED_SHA={expected}')
+          PY
       - name: Fail closed on target advance
         shell: bash
         run: |
@@ -74,7 +48,7 @@ jobs:
           actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_SHA" "$actual"
           test "$actual" = "$EXPECTED_SHA"
-      - name: Patch approved plan process model only
+      - name: Amend approved plan process model only
         shell: bash
         run: |
           set -euo pipefail
@@ -82,16 +56,15 @@ jobs:
           git switch --detach "$EXPECTED_SHA"
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path('docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md')
           text = path.read_text()
           marker = '## Classic ChatGPT Remote Execution Model'
           if marker in text:
-              raise SystemExit('Classic remote execution model already exists at expected SHA; refusing duplicate amendment')
+              raise SystemExit('Classic remote execution model already exists; refusing duplicate amendment')
           anchor = '## Planned Current-Tree Changes'
           if anchor not in text:
               raise SystemExit('plan insertion anchor missing')
-          section = r'''## Classic ChatGPT Remote Execution Model
+          section = '''## Classic ChatGPT Remote Execution Model
 
 This process amendment supersedes earlier executor-handoff language that classified the Classic ChatGPT harness itself as unable to implement Phase A. The approved product architecture and Tasks 1–9 remain unchanged; only the execution plane changes.
 
@@ -100,7 +73,7 @@ This process amendment supersedes earlier executor-handoff language that classif
 - **Task 0 remote preflight:** Before Task 2, one comprehensive Linux + Windows helper run must prove the capabilities required by Tasks 2–9. If that remote preflight is GREEN, missing capabilities in the local Classic shell are no longer implementation blockers.
 - **Expected-SHA fail-closed rule:** Before every mutating helper run, the runner must prove the actual `work/monorepo-foundation` remote HEAD equals the exact SHA in `.classic-executor/request.json`. Any mismatch fails before mutation so Classic can inspect and reconcile the advance.
 - **Constrained requests only:** The helper accepts reviewed repository-specific modes; `request.json` never carries arbitrary shell commands or secrets. No production Supabase or Meta credential is exposed to the helper.
-- **Runner commit identity:** New Phase A commits created by the helper use an automation identity and the repository `GITHUB_TOKEN`. Imported TUX-MENU historical commits are different: they retain source history metadata through `git filter-repo` and are never synthesized.
+- **Runner commit identity:** New Phase A commits created by the helper use an automation identity and the repository `GITHUB_TOKEN`. Imported TUX-MENU historical commits retain their source history metadata through `git filter-repo` and are never synthesized.
 - **TDD evidence:** Required RED and GREEN executions may run in GitHub Actions. Classic must inspect the corresponding run/job/log evidence before treating the cycle as proven.
 - **Permanent CI remains authoritative:** The helper workflow is not a substitute for `.github/workflows/ci.yml`. Task 8 still adds the permanent Menu and monorepo-architecture gates while retaining Operations quality, edge-security, Windows packaging, and the required-quality gate.
 - **Classic-compatible exact-head trigger:** Task 8 may add a direct `push` trigger limited to `work/monorepo-foundation` so a final legitimate Classic/GitHub-connector commit runs permanent CI on its exact pushed SHA. Runner pushes using `GITHUB_TOKEN` are not assumed to recursively trigger ordinary push workflows.
@@ -113,6 +86,7 @@ After remote Task 0 is GREEN, environment limitations of the local Classic shell
           path.write_text(text.replace(anchor, section + anchor, 1))
           PY
           git diff --check
+          test "$(git diff --name-only | wc -l | tr -d ' ')" = '1'
           git diff -- docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md
       - name: Commit and push plan amendment
         shell: bash
@@ -121,320 +95,6 @@ After remote Task 0 is GREEN, environment limitations of the local Classic shell
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md
-          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '1'
           git commit -m 'docs(monorepo): add Classic remote execution model'
           git push origin HEAD:"$TARGET_BRANCH"
-          printf 'AMENDMENT_HEAD=%s\nAMENDMENT_TREE=%s\nAMENDMENT_PARENT=%s\n' \
-            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)"
-
-  preflight-linux:
-    name: Remote preflight Linux
-    needs: request
-    if: needs.request.outputs.mode == 'preflight'
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
-      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
-      SOURCE_HEAD: 285635181a9ee1ec2f760feb38abae8fa19a201d
-      SOURCE_TREE: e9ddcc696470d7bb116e1d888a77ade84f95bf83
-      SOURCE_URL: https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.request.outputs.expected_sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Verify target, Git, GitHub network, filesystem and Actions API
-        shell: bash
-        run: |
-          set -euo pipefail
-          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
-          test "$actual" = "$EXPECTED_SHA"
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          git --version
-          git fsck --full
-          mkdir -p "$RUNNER_TEMP/classic-executor-write-probe"
-          touch "$RUNNER_TEMP/classic-executor-write-probe/ok"
-          test -f "$RUNNER_TEMP/classic-executor-write-probe/ok"
-          git ls-remote origin "refs/heads/$TARGET_BRANCH"
-          git ls-remote "$SOURCE_URL" refs/heads/main
-          gh --version
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.head_sha'
-          df -h . "$RUNNER_TEMP"
-      - name: Install and exercise git-filter-repo at real source-history scale
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m pip install --user git-filter-repo
-          export PATH="$HOME/.local/bin:$PATH"
-          git filter-repo --version
-          rm -rf "$RUNNER_TEMP/tux-menu-source" "$RUNNER_TEMP/tux-menu-filter-probe"
-          git clone --no-single-branch "$SOURCE_URL" "$RUNNER_TEMP/tux-menu-source"
-          test "$(git -C "$RUNNER_TEMP/tux-menu-source" rev-parse origin/main)" = "$SOURCE_HEAD"
-          git -C "$RUNNER_TEMP/tux-menu-source" switch --detach "$SOURCE_HEAD"
-          test "$(git -C "$RUNNER_TEMP/tux-menu-source" rev-parse HEAD^{tree})" = "$SOURCE_TREE"
-          git -C "$RUNNER_TEMP/tux-menu-source" fsck --full
-          count="$(git -C "$RUNNER_TEMP/tux-menu-source" rev-list --count "$SOURCE_HEAD")"
-          test "$count" -gt 0
-          git clone --local "$RUNNER_TEMP/tux-menu-source" "$RUNNER_TEMP/tux-menu-filter-probe"
-          git -C "$RUNNER_TEMP/tux-menu-filter-probe" switch --detach "$SOURCE_HEAD"
-          git -C "$RUNNER_TEMP/tux-menu-filter-probe" filter-repo --force --to-subdirectory-filter __classic_executor_preflight
-          test "$(git -C "$RUNNER_TEMP/tux-menu-filter-probe" rev-list --count HEAD)" -gt 0
-          git -C "$RUNNER_TEMP/tux-menu-filter-probe" fsck --full
-          printf 'SOURCE_COMMIT_COUNT=%s\n' "$count"
-      - name: Prove authenticated push without mutating remote refs
-        shell: bash
-        run: |
-          set -euo pipefail
-          probe="refs/heads/tooling/classic-executor-push-probe-${GITHUB_RUN_ID}"
-          git push --dry-run origin HEAD:"$probe"
-      - name: Verify Node npm registry root install workspace and build
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --version
-          npm --version
-          node --input-type=module <<'NODE'
-          const [major, minor] = process.versions.node.split('.').map(Number);
-          if (major < 20 || major >= 27 || (major === 20 && minor < 19)) {
-            throw new Error(`Node ${process.versions.node} does not satisfy >=20.19.0 <27`);
-          }
-          NODE
-          npm ping
-          npm ci
-          npm run typecheck -w @tux/operations
-          npm run build -w @tux/operations
-          test -f apps/operations/dist/index.html
-      - name: Verify Playwright Chromium localhost and Vite preview
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx playwright --version
-          npx playwright install --with-deps chromium
-          node --input-type=module <<'NODE'
-          import { chromium } from '@playwright/test';
-          const browser = await chromium.launch({ headless: true });
-          await browser.close();
-          NODE
-          (cd apps/operations && npx vite preview --host 127.0.0.1 --port 4179 > "$RUNNER_TEMP/classic-vite.log" 2>&1 & echo $! > "$RUNNER_TEMP/classic-vite.pid")
-          cleanup() { if test -f "$RUNNER_TEMP/classic-vite.pid"; then kill "$(cat "$RUNNER_TEMP/classic-vite.pid")" 2>/dev/null || true; fi; }
-          trap cleanup EXIT
-          node --input-type=module <<'NODE'
-          import { chromium } from '@playwright/test';
-          const browser = await chromium.launch({ headless: true });
-          const page = await browser.newPage();
-          let ok = false;
-          for (let attempt = 0; attempt < 60; attempt += 1) {
-            try {
-              const response = await page.goto('http://127.0.0.1:4179', { waitUntil: 'domcontentloaded', timeout: 2000 });
-              if (response?.ok()) { ok = true; break; }
-            } catch {}
-            await new Promise((resolve) => setTimeout(resolve, 250));
-          }
-          if (!ok) throw new Error('Chromium could not reach local Vite preview');
-          console.log('LOCALHOST_CHROMIUM_OK');
-          await browser.close();
-          NODE
-      - name: Linux preflight result
-        shell: bash
-        run: echo 'CLASSIC_REMOTE_EXECUTOR_LINUX_READY'
-
-  preflight-windows:
-    name: Remote preflight Windows
-    needs: request
-    if: needs.request.outputs.mode == 'preflight'
-    runs-on: windows-latest
-    timeout-minutes: 15
-    env:
-      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
-      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.request.outputs.expected_sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Verify Windows checkout Git Node and npm
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $actualLine = git ls-remote origin "refs/heads/$env:TARGET_BRANCH"
-          $actual = ($actualLine -split "`t")[0]
-          if ($actual -ne $env:EXPECTED_SHA) { throw "target advanced: $actual" }
-          if ((git rev-parse HEAD).Trim() -ne $env:EXPECTED_SHA) { throw 'checkout SHA mismatch' }
-          git --version
-          node --version
-          npm --version
-          npm ping
-          Write-Output 'CLASSIC_REMOTE_EXECUTOR_WINDOWS_READY'
-
-  task2-import:
-    name: Task 2 history import and pristine characterization
-    needs: request
-    if: needs.request.outputs.mode == 'task2-import'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
-      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
-      SOURCE_HEAD: 285635181a9ee1ec2f760feb38abae8fa19a201d
-      SOURCE_TREE: e9ddcc696470d7bb116e1d888a77ade84f95bf83
-      SOURCE_URL: https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Fail closed and prepare exact target
-        shell: bash
-        run: |
-          set -euo pipefail
-          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_SHA" "$actual"
-          test "$actual" = "$EXPECTED_SHA"
-          git fetch origin "$TARGET_BRANCH"
-          git switch -C classic-task2 "$EXPECTED_SHA"
-          test -z "$(git status --porcelain)"
-      - name: Create pristine filtered source history and prove blob inventory
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m pip install --user git-filter-repo
-          export PATH="$HOME/.local/bin:$PATH"
-          source_dir="$RUNNER_TEMP/tux-menu-task2"
-          rm -rf "$source_dir"
-          git clone --no-single-branch "$SOURCE_URL" "$source_dir"
-          test "$(git -C "$source_dir" rev-parse origin/main)" = "$SOURCE_HEAD"
-          git -C "$source_dir" switch --detach "$SOURCE_HEAD"
-          test "$(git -C "$source_dir" rev-parse HEAD^{tree})" = "$SOURCE_TREE"
-          git -C "$source_dir" ls-tree -r "$SOURCE_HEAD" | sort > "$RUNNER_TEMP/source-tree.txt"
-          git -C "$source_dir" rev-list --count "$SOURCE_HEAD" > "$RUNNER_TEMP/source-count.txt"
-          git -C "$source_dir" filter-repo --force --to-subdirectory-filter apps/menu
-          rewritten="$(git -C "$source_dir" rev-parse HEAD)"
-          printf '%s\n' "$rewritten" > "$RUNNER_TEMP/rewritten-sha.txt"
-          git -C "$source_dir" ls-tree -r "$rewritten" apps/menu | sed 's#\tapps/menu/#\t#' | sort > "$RUNNER_TEMP/rewritten-tree.txt"
-          diff -u "$RUNNER_TEMP/source-tree.txt" "$RUNNER_TEMP/rewritten-tree.txt"
-          git -C "$source_dir" fsck --full
-          printf 'REWRITTEN_IMPORT_SHA=%s\n' "$rewritten"
-      - name: Merge unrelated filtered history and prove pristine snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_dir="$RUNNER_TEMP/tux-menu-task2"
-          rewritten="$(cat "$RUNNER_TEMP/rewritten-sha.txt")"
-          base_tree="$(git rev-parse "$EXPECTED_SHA^{tree}")"
-          printf '%s\n' "$base_tree" > "$RUNNER_TEMP/base-tree.txt"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git remote add tux-menu-import "$source_dir"
-          git fetch tux-menu-import
-          test "$(git rev-parse FETCH_HEAD)" = "$rewritten"
-          git merge --allow-unrelated-histories --no-ff "$rewritten" -m 'chore(monorepo): import TUX-MENU history under apps/menu'
-          import_merge="$(git rev-parse HEAD)"
-          printf '%s\n' "$import_merge" > "$RUNNER_TEMP/import-merge.txt"
-          test "$(git show --no-patch --pretty='%P' "$import_merge" | wc -w | tr -d ' ')" = '2'
-          git ls-tree -r "$import_merge" apps/menu | sed 's#\tapps/menu/#\t#' | sort > "$RUNNER_TEMP/import-tree.txt"
-          diff -u "$RUNNER_TEMP/source-tree.txt" "$RUNNER_TEMP/import-tree.txt"
-          git log --follow --oneline -- apps/menu/src/App.tsx | head -20
-          printf 'IMPORT_MERGE_SHA=%s\n' "$import_merge"
-      - name: Deferred pristine Menu install typecheck and build
-        shell: bash
-        run: |
-          set -euo pipefail
-          lock_before="$(git hash-object apps/menu/package-lock.json)"
-          (cd apps/menu && npm ci)
-          (cd apps/menu && npm run typecheck)
-          (cd apps/menu && npm run build)
-          test "$(git hash-object apps/menu/package-lock.json)" = "$lock_before"
-          test -f apps/menu/dist/index.html
-          test -z "$(git status --porcelain --untracked-files=no -- apps/menu)"
-          echo 'PRISTINE_MENU_TYPECHECK_BUILD_OK'
-      - name: Deferred pristine Chromium rendered characterization
-        shell: bash
-        run: |
-          set -euo pipefail
-          harness="$RUNNER_TEMP/menu-playwright-harness"
-          rm -rf "$harness"
-          mkdir -p "$harness"
-          cat > "$harness/package.json" <<'JSON'
-          {"name":"tux-menu-pristine-characterization","private":true,"type":"module","dependencies":{"@playwright/test":"1.62.1"}}
-          JSON
-          (cd "$harness" && npm install --ignore-scripts)
-          (cd "$harness" && npx playwright install --with-deps chromium)
-          (cd apps/menu && npm run preview -- --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 & echo $! > "$RUNNER_TEMP/menu-preview.pid")
-          cleanup() { if test -f "$RUNNER_TEMP/menu-preview.pid"; then kill "$(cat "$RUNNER_TEMP/menu-preview.pid")" 2>/dev/null || true; fi; }
-          trap cleanup EXIT
-          cat > "$harness/characterize.mjs" <<'NODE'
-          import { chromium } from '@playwright/test';
-          const browser = await chromium.launch({ headless: true });
-          const page = await browser.newPage();
-          const checks = [
-            ['/', /TUX/i],
-            ['/order-now', /Order\s*Now/i],
-            ['/tux-burger', /Tux Burger/i],
-            ['/admin', /(Admin\s*Login|Admin|Login)/i],
-          ];
-          for (const [route, pattern] of checks) {
-            let response;
-            for (let attempt = 0; attempt < 60; attempt += 1) {
-              try {
-                response = await page.goto(`http://127.0.0.1:4174${route}`, { waitUntil: 'networkidle', timeout: 5000 });
-                if (response?.ok()) break;
-              } catch {}
-              await new Promise((resolve) => setTimeout(resolve, 250));
-            }
-            if (!response?.ok()) throw new Error(`${route}: HTTP/render navigation failure`);
-            const body = await page.locator('body').innerText();
-            if (!pattern.test(body)) throw new Error(`${route}: rendered anchor missing; body starts: ${body.slice(0, 500)}`);
-            console.log(`RENDER_OK ${route}`);
-          }
-          await browser.close();
-          NODE
-          (cd "$harness" && node characterize.mjs)
-          test -z "$(git status --porcelain --untracked-files=no -- apps/menu)"
-          echo 'PRISTINE_MENU_RENDERED_CHARACTERIZATION_OK'
-      - name: Write provenance commit and push Task 2
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p docs/superpowers/provenance
-          rewritten="$(cat "$RUNNER_TEMP/rewritten-sha.txt")"
-          import_merge="$(cat "$RUNNER_TEMP/import-merge.txt")"
-          source_count="$(cat "$RUNNER_TEMP/source-count.txt")"
-          base_tree="$(cat "$RUNNER_TEMP/base-tree.txt")"
-          filter_version="$(git -C "$RUNNER_TEMP/tux-menu-task2" filter-repo --version 2>&1 | head -1)"
-          cat > docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md <<EOF
-          # TUX-MENU History Import Provenance
-
-          - Source repository: \`ahmedmohameda7222-ship-it/TUX-MENU\`
-          - Source branch: \`main\`
-          - Original source HEAD: \`$SOURCE_HEAD\`
-          - Original source tree: \`$SOURCE_TREE\`
-          - Original reachable commit count: \`$source_count\`
-          - Canonical base before import: \`$EXPECTED_SHA\`
-          - Canonical base tree: \`$base_tree\`
-          - Rewrite method: \`git filter-repo --to-subdirectory-filter apps/menu\`
-          - Rewrite tool version: \`$filter_version\`
-          - Rewritten import tip: \`$rewritten\`
-          - Import merge commit: \`$import_merge\`
-
-          The pristine import merge was verified by comparing the original \`git ls-tree -r\` mode/type/blob/path inventory with \`apps/menu/**\` after stripping the prefix. The inventories matched exactly. Neither source repository history was rewritten.
-
-          Before any Task 3 mutation of \`apps/menu/**\`, the pristine imported package completed its own locked \`npm ci\`, typecheck, production build, and Chromium-rendered characterization of \`/\`, \`/order-now\`, \`/tux-burger\`, and \`/admin\` without modifying tracked Menu source or lockfiles.
-          EOF
-          git add docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md
-          git commit -m 'docs(monorepo): record TUX-MENU import provenance'
-          final_head="$(git rev-parse HEAD)"
-          final_tree="$(git rev-parse HEAD^{tree})"
-          final_parent="$(git rev-parse HEAD^)"
-          git push origin HEAD:"$TARGET_BRANCH"
-          printf 'TASK2_FINAL_HEAD=%s\nTASK2_FINAL_TREE=%s\nTASK2_FINAL_PARENT=%s\nREWRITTEN_IMPORT_SHA=%s\nIMPORT_MERGE_SHA=%s\n' \
-            "$final_head" "$final_tree" "$final_parent" "$rewritten" "$import_merge"
+          printf 'AMENDMENT_HEAD=%s\nAMENDMENT_TREE=%s\nAMENDMENT_PARENT=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)"
