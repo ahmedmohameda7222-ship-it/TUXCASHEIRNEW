@@ -1,6 +1,6 @@
 {
-  "serial": 2,
-  "mode": "plan-amendment",
+  "serial": 3,
+  "mode": "preflight",
   "target_branch": "work/monorepo-foundation",
-  "expected_target_sha": "8bfacf2bb96e60958e9a4953199f4707ad05c43f"
+  "expected_target_sha": "2d32d29dead9b872ce392e9c186678d59de7603f"
 }
