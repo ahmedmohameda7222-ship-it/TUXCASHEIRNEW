@@ -66,8 +66,8 @@ const configuration: OperationsConfigurationSnapshot = {
   ],
 };
 const prefill: OrdersCustomerPrefill = {
-  normalizedPhone: '01012345678',
-  displayPhone: '+20 10 1234 5678',
+  normalizedPhone: '+201012345678',
+  displayPhone: '01012345678',
   customerName: 'Customer One',
   address: '1 Street',
   zoneId,
@@ -218,7 +218,8 @@ describe('OperationsOrdersService parked draft handoff', () => {
     expect(result.value.draft.payment).toEqual({ mode: 'NONE' });
     expect(result.value.draft.discountMinor).toBe(0);
     expect(result.value.draft.delivery).toMatchObject({
-      normalizedPhone: '01012345678',
+      normalizedPhone: '+201012345678',
+      displayPhone: '01012345678',
       customerName: 'Customer One',
       address: '1 Street',
       zoneId,
