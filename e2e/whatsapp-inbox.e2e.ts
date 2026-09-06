@@ -245,7 +245,7 @@ test('FREE_FORM Send Menu inserts canonical URL without auto-send', async ({ pag
   await expect(counters.json()).resolves.toMatchObject({ sendMessage: 0, sendTemplate: 0 });
 });
 
-test('TEMPLATE_ONLY renders starter template and sends it exactly once', async ({ page }, testInfo) => {
+test('TEMPLATE_ONLY renders and sends starter template once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await configureWhatsAppScenario(page, 'TEMPLATE_ONLY');
   await seedBrowserFallback(page);
@@ -269,7 +269,7 @@ test('TEMPLATE_ONLY renders starter template and sends it exactly once', async (
   await expect(counters.json()).resolves.toMatchObject({ sendMessage: 0, sendTemplate: 1 });
 });
 
-test('BLOCKED keeps history visible and exposes no outbound send action', async ({ page }, testInfo) => {
+test('BLOCKED preserves history without outbound actions', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
   await configureWhatsAppScenario(page, 'BLOCKED');
   await seedBrowserFallback(page);
