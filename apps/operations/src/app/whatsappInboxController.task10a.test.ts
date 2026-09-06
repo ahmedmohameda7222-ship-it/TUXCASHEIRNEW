@@ -83,7 +83,9 @@ describe('WhatsAppInboxController Task 10A selected conversation refresh', () =>
     const selected = conversation();
     const inbound = message('inbound-1', 'INBOUND', 'Can I order?');
     const outbound = message('outbound-1', 'OUTBOUND', 'Yes — what would you like?');
-    const loadInbox = vi.fn<TuxWhatsAppApi['loadInbox']>().mockResolvedValue(ok(snapshot(selected)));
+    const loadInbox = vi
+      .fn<TuxWhatsAppApi['loadInbox']>()
+      .mockResolvedValue(ok(snapshot(selected)));
     const loadConversation = vi
       .fn<TuxWhatsAppApi['loadConversation']>()
       .mockResolvedValueOnce(ok([inbound]))
@@ -117,7 +119,9 @@ describe('WhatsAppInboxController Task 10A selected conversation refresh', () =>
     const controller = new WhatsAppInboxController(api, new Environment());
 
     await controller.refresh();
-    expect(controller.getState().selectedMessages.map((item) => item.id)).toEqual(['inbound-1']);
+    expect(controller.getState().selectedMessages.map((item) => item.id)).toEqual([
+      'inbound-1',
+    ]);
 
     await controller.refresh();
 
