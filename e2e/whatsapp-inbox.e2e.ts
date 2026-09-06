@@ -405,7 +405,9 @@ test('Create Order from Chat starts empty customer-prefilled draft', async ({ pa
   await openWhatsAppConversation(page);
 
   await page.getByRole('button', { name: 'Create Order from Chat', exact: true }).click();
-  await expect(page.getByLabel('Current order')).toContainText('Your order is empty.');
+  await expect(page.getByRole('complementary', { name: 'Current order' })).toContainText(
+    'Your order is empty.',
+  );
 
   const drafts = await page.evaluate(async (databaseName) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
