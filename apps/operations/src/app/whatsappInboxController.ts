@@ -649,6 +649,18 @@ export class WhatsAppInboxController {
 
     await this.refresh();
 
+    const sentMessage = result.value;
+    if (
+      this.#state.selectedConversationId === attempt.conversationId &&
+      sentMessage.conversationId === attempt.conversationId
+    ) {
+      const selectedMessages = [
+        ...this.#state.selectedMessages.filter((item) => item.id !== sentMessage.id),
+        sentMessage,
+      ].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      this.#publish({ selectedMessages });
+    }
+
     if (
       draftClearError !== null &&
       this.#state.selectedConversationId === attempt.conversationId &&
