@@ -1,0 +1,12 @@
+name: Classic Executor Smoke
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo CLASSIC_EXECUTOR_SMOKE_OK
