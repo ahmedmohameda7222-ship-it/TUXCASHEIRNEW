@@ -158,6 +158,11 @@ async function enterActiveShell(page: Page): Promise<void> {
   await expect(page.getByText('No active Business Day')).toBeVisible();
   await page.getByLabel('Enter PIN to Start Day').fill('1234');
   await page.getByRole('button', { name: 'Start Day' }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.welcome-action') !== null ||
+      document.querySelector('[aria-label="Operations"]') !== null,
+  );
   const continueButton = page.locator('.welcome-action');
   if (await continueButton.isVisible().catch(() => false)) await continueButton.click();
   await expect(page.getByRole('navigation', { name: 'Operations' })).toBeVisible({
