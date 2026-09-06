@@ -68,7 +68,7 @@ jobs:
           Catalog reconciliation belongs to Phase B.
           EOF
           git diff --check
-      - name: Verify sole migration authority and quarantine invariants
+      - name: Verify sole migration authority and exact staged quarantine scope
         shell: bash
         run: |
           set -euo pipefail
@@ -80,11 +80,21 @@ jobs:
           test -z "$executable_legacy"
           test -f apps/menu/legacy/supabase_setup.sql.reference
           test -f apps/menu/legacy/README.md
-          changed="$(git diff --name-only "$EXPECTED_SHA")"
-          printf 'TASK3_CHANGED_FILES:\n%s\n' "$changed"
-          test "$(printf '%s\n' "$changed" | grep -c '^apps/menu/legacy/')" = '2'
-          test "$(printf '%s\n' "$changed" | grep -c '^apps/menu/supabase_setup.sql$')" = '1'
-          test "$(printf '%s\n' "$changed" | wc -l | tr -d ' ')" = '3'
+          git add -A apps/menu
+          staged="$(git diff --cached --name-only --no-renames "$EXPECTED_SHA" -- apps/menu | sort)"
+          printf 'TASK3_STAGED_FILES:\n%s\n' "$staged"
+          cat > "$RUNNER_TEMP/task3-expected-files.txt" <<'EOF'
+          apps/menu/legacy/README.md
+          apps/menu/legacy/supabase_setup.sql.reference
+          apps/menu/supabase_setup.sql
+          EOF
+          diff -u "$RUNNER_TEMP/task3-expected-files.txt" <(printf '%s\n' "$staged")
+          status="$(git diff --cached --name-status --no-renames "$EXPECTED_SHA" -- apps/menu)"
+          printf 'TASK3_STAGED_STATUS:\n%s\n' "$status"
+          grep -F $'A\tapps/menu/legacy/README.md' <<< "$status"
+          grep -F $'A\tapps/menu/legacy/supabase_setup.sql.reference' <<< "$status"
+          grep -F $'D\tapps/menu/supabase_setup.sql' <<< "$status"
+          test -z "$(git diff --cached --name-only "$EXPECTED_SHA" -- . ':!apps/menu')"
       - name: Commit and push Task 3 only
         shell: bash
         run: |
@@ -93,7 +103,6 @@ jobs:
           test "$actual" = "$EXPECTED_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A apps/menu
           git commit -m 'docs(menu): quarantine legacy Supabase setup'
           final_head="$(git rev-parse HEAD)"
           final_tree="$(git rev-parse HEAD^{tree})"
