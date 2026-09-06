@@ -10,93 +10,210 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: classic-monorepo-executor
   cancel-in-progress: false
 
 jobs:
-  bootstrap:
-    name: Bootstrap Classic remote executor
+  request:
+    name: Validate executor request
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.request.outputs.mode }}
+      target_branch: ${{ steps.request.outputs.target_branch }}
+      expected_sha: ${{ steps.request.outputs.expected_sha }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Validate constrained bootstrap request
+      - id: request
+        name: Parse constrained request
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY' >> "$GITHUB_ENV"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json, re
           from pathlib import Path
           request = json.loads(Path('.classic-executor/request.json').read_text())
-          if request.get('mode') != 'plan-amendment':
-              raise SystemExit(f"bootstrap only accepts plan-amendment, got {request.get('mode')!r}")
-          if request.get('target_branch') != 'work/monorepo-foundation':
-              raise SystemExit('unexpected target branch')
+          allowed = {'plan-amendment', 'preflight', 'task2-import'}
+          mode = request.get('mode')
+          serial = request.get('serial')
+          target = request.get('target_branch')
           expected = request.get('expected_target_sha')
+          if mode not in allowed:
+              raise SystemExit(f'unsupported executor mode: {mode!r}')
+          if not isinstance(serial, int) or serial < 1:
+              raise SystemExit('serial must be a positive integer')
+          if target != 'work/monorepo-foundation':
+              raise SystemExit(f'unsupported target branch: {target!r}')
           if not isinstance(expected, str) or not re.fullmatch(r'[0-9a-f]{40}', expected):
               raise SystemExit('expected_target_sha must be a full SHA-1')
-          print('TARGET_BRANCH=work/monorepo-foundation')
-          print(f'EXPECTED_SHA={expected}')
+          print(f'mode={mode}')
+          print(f'target_branch={target}')
+          print(f'expected_sha={expected}')
+          print(f'validated serial={serial} mode={mode}', file=__import__('sys').stderr)
           PY
-      - name: Fail closed on target advance
+
+  preflight-linux:
+    name: Remote preflight Linux
+    needs: request
+    if: needs.request.outputs.mode == 'preflight'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
+      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
+      SOURCE_HEAD: 285635181a9ee1ec2f760feb38abae8fa19a201d
+      SOURCE_TREE: e9ddcc696470d7bb116e1d888a77ade84f95bf83
+      SOURCE_URL: https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.request.outputs.expected_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Prove exact target Git GitHub network filesystem and Actions visibility
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_SHA" "$actual"
+          printf 'EXPECTED_TARGET_SHA=%s\nACTUAL_TARGET_SHA=%s\n' "$EXPECTED_SHA" "$actual"
           test "$actual" = "$EXPECTED_SHA"
-      - name: Amend approved plan process model only
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          git --version
+          git fsck --full
+          mkdir -p "$RUNNER_TEMP/classic-executor-write-probe"
+          touch "$RUNNER_TEMP/classic-executor-write-probe/ok"
+          test -f "$RUNNER_TEMP/classic-executor-write-probe/ok"
+          git ls-remote origin "refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote "$SOURCE_URL" refs/heads/main | awk '{print $1}')" = "$SOURCE_HEAD"
+          gh --version
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.head_sha')" = "$GITHUB_SHA"
+          df -h . "$RUNNER_TEMP"
+      - name: Install and exercise git-filter-repo on full approved source history
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin "$TARGET_BRANCH"
-          git switch --detach "$EXPECTED_SHA"
-          python3 - <<'PY'
-          from pathlib import Path
-          from textwrap import dedent
-          path = Path('docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md')
-          text = path.read_text()
-          marker = '## Classic ChatGPT Remote Execution Model'
-          if marker in text:
-              raise SystemExit('Classic remote execution model already exists; refusing duplicate amendment')
-          anchor = '## Planned Current-Tree Changes'
-          if anchor not in text:
-              raise SystemExit('plan insertion anchor missing')
-          section = dedent('''\
-          ## Classic ChatGPT Remote Execution Model
-
-          This process amendment supersedes earlier executor-handoff language that classified the Classic ChatGPT harness itself as unable to implement Phase A. The approved product architecture and Tasks 1–9 remain unchanged; only the execution plane changes.
-
-          - **Control plane:** Classic ChatGPT plus the GitHub connector remains the implementation controller. It reads repository state, reviews diffs/commits, writes reviewed files, advances control requests, inspects Actions evidence, performs systematic debugging, and decides each next step.
-          - **Temporary execution plane:** GitHub-hosted Actions on the tooling-only branch `tooling/classic-monorepo-executor` executes repository operations that require full Git/network/filesystem/npm/browser/Windows capabilities. The helper branch is never merged into `work/monorepo-foundation` or `main`.
-          - **Task 0 remote preflight:** Before Task 2, one comprehensive Linux + Windows helper run must prove the capabilities required by Tasks 2–9. If that remote preflight is GREEN, missing capabilities in the local Classic shell are no longer implementation blockers.
-          - **Expected-SHA fail-closed rule:** Before every mutating helper run, the runner must prove the actual `work/monorepo-foundation` remote HEAD equals the exact SHA in `.classic-executor/request.json`. Any mismatch fails before mutation so Classic can inspect and reconcile the advance.
-          - **Constrained requests only:** The helper accepts reviewed repository-specific modes; `request.json` never carries arbitrary shell commands or secrets. No production Supabase or Meta credential is exposed to the helper.
-          - **Runner commit identity:** New Phase A commits created by the helper use an automation identity and the repository `GITHUB_TOKEN`. Imported TUX-MENU historical commits retain their source history metadata through `git filter-repo` and are never synthesized.
-          - **TDD evidence:** Required RED and GREEN executions may run in GitHub Actions. Classic must inspect the corresponding run/job/log evidence before treating the cycle as proven.
-          - **Permanent CI remains authoritative:** The helper workflow is not a substitute for `.github/workflows/ci.yml`. Task 8 still adds the permanent Menu and monorepo-architecture gates while retaining Operations quality, edge-security, Windows packaging, and the required-quality gate.
-          - **Classic-compatible exact-head trigger:** Task 8 may add a direct `push` trigger limited to `work/monorepo-foundation` so a final legitimate Classic/GitHub-connector commit runs permanent CI on its exact pushed SHA. Runner pushes using `GITHUB_TOKEN` are not assumed to recursively trigger ordinary push workflows.
-          - **Final exact-head checkpoint:** Task 9 uses a real final provenance/verification documentation commit created directly through the Classic/GitHub control plane on `work/monorepo-foundation`; the resulting permanent CI run must expose the same final HEAD SHA and all required jobs must be inspected.
-          - **Retirement:** After Phase A is independently GREEN and accepted, the helper branch/workflow is retired or deleted. Its Actions run history remains audit evidence but the helper never becomes product architecture.
-
-          After remote Task 0 is GREEN, environment limitations of the local Classic shell are not stop conditions. Stop only for an unreconciled authority change, a protected production mutation, a genuine unresolved correctness/test failure after `systematic-debugging`, or a destructive ambiguity not resolved by the approved spec/plan.
-
-          ''')
-          path.write_text(text.replace(anchor, section + anchor, 1))
-          PY
-          git diff --check
-          test "$(git diff --name-only | wc -l | tr -d ' ')" = '1'
-          git diff -- docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md
-      - name: Commit and push plan amendment
+          python3 -m pip install --user git-filter-repo
+          export PATH="$HOME/.local/bin:$PATH"
+          git filter-repo --version
+          source_dir="$RUNNER_TEMP/tux-menu-source"
+          probe_dir="$RUNNER_TEMP/tux-menu-filter-probe"
+          rm -rf "$source_dir" "$probe_dir"
+          git clone --no-single-branch "$SOURCE_URL" "$source_dir"
+          test "$(git -C "$source_dir" rev-parse origin/main)" = "$SOURCE_HEAD"
+          git -C "$source_dir" switch --detach "$SOURCE_HEAD"
+          test "$(git -C "$source_dir" rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          git -C "$source_dir" fsck --full
+          source_count="$(git -C "$source_dir" rev-list --count "$SOURCE_HEAD")"
+          test "$source_count" -gt 0
+          git clone --local "$source_dir" "$probe_dir"
+          git -C "$probe_dir" switch --detach "$SOURCE_HEAD"
+          git -C "$probe_dir" filter-repo --force --to-subdirectory-filter __classic_executor_preflight
+          filtered_count="$(git -C "$probe_dir" rev-list --count HEAD)"
+          test "$filtered_count" -gt 0
+          git -C "$probe_dir" fsck --full
+          printf 'SOURCE_COMMIT_COUNT=%s\nFILTERED_COMMIT_COUNT=%s\n' "$source_count" "$filtered_count"
+      - name: Prove authenticated repository push capability without creating a ref
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/superpowers/plans/2026-09-06-tux-monorepo-foundation.md
-          git commit -m 'docs(monorepo): add Classic remote execution model'
-          git push origin HEAD:"$TARGET_BRANCH"
-          printf 'AMENDMENT_HEAD=%s\nAMENDMENT_TREE=%s\nAMENDMENT_PARENT=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)"
+          probe="refs/heads/tooling/classic-executor-push-probe-${GITHUB_RUN_ID}"
+          git push --dry-run origin HEAD:"$probe"
+          echo 'AUTHENTICATED_PUSH_DRY_RUN_OK'
+      - name: Prove Node npm registry root install workspace execution and build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          node --input-type=module <<'NODE'
+          const [major, minor] = process.versions.node.split('.').map(Number);
+          if (major < 20 || major >= 27 || (major === 20 && minor < 19)) {
+            throw new Error(`Node ${process.versions.node} does not satisfy >=20.19.0 <27`);
+          }
+          NODE
+          npm ping
+          lock_before="$(git hash-object package-lock.json)"
+          npm ci
+          test "$(git hash-object package-lock.json)" = "$lock_before"
+          npm run typecheck -w @tux/operations
+          npm run build -w @tux/operations
+          test -f apps/operations/dist/index.html
+          echo 'ROOT_INSTALL_WORKSPACE_BUILD_OK'
+      - name: Prove Playwright Chromium launch localhost binding and browser access
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright --version
+          npx playwright install --with-deps chromium
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          await browser.close();
+          console.log('CHROMIUM_LAUNCH_OK');
+          NODE
+          (cd apps/operations && npx vite preview --host 127.0.0.1 --port 4179 > "$RUNNER_TEMP/classic-vite.log" 2>&1 & echo $! > "$RUNNER_TEMP/classic-vite.pid")
+          cleanup() {
+            if test -f "$RUNNER_TEMP/classic-vite.pid"; then
+              kill "$(cat "$RUNNER_TEMP/classic-vite.pid")" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          let ok = false;
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            try {
+              const response = await page.goto('http://127.0.0.1:4179', { waitUntil: 'domcontentloaded', timeout: 2000 });
+              if (response?.ok()) { ok = true; break; }
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+          if (!ok) throw new Error('Chromium could not reach local Vite preview');
+          console.log('LOCALHOST_CHROMIUM_OK');
+          await browser.close();
+          NODE
+      - name: Linux preflight result
+        run: echo 'CLASSIC_REMOTE_EXECUTOR_LINUX_READY'
+
+  preflight-windows:
+    name: Remote preflight Windows
+    needs: request
+    if: needs.request.outputs.mode == 'preflight'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      TARGET_BRANCH: ${{ needs.request.outputs.target_branch }}
+      EXPECTED_SHA: ${{ needs.request.outputs.expected_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.request.outputs.expected_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Prove Windows checkout Git Node npm and remote authority
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $actualLine = git ls-remote origin "refs/heads/$env:TARGET_BRANCH"
+          $actual = ($actualLine -split "`t")[0]
+          Write-Output "EXPECTED_TARGET_SHA=$env:EXPECTED_SHA"
+          Write-Output "ACTUAL_TARGET_SHA=$actual"
+          if ($actual -ne $env:EXPECTED_SHA) { throw "target advanced: $actual" }
+          if ((git rev-parse HEAD).Trim() -ne $env:EXPECTED_SHA) { throw 'checkout SHA mismatch' }
+          git --version
+          node --version
+          npm --version
+          npm ping
+          Write-Output 'CLASSIC_REMOTE_EXECUTOR_WINDOWS_READY'
