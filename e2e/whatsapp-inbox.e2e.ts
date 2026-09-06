@@ -182,6 +182,16 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
 
   const inboxResponse = await inboxResponsePromise;
   expect(inboxResponse.status()).toBe(200);
+  expect(inboxResponse.headers()['content-type']).toContain('application/json');
+  await expect(inboxResponse.json()).resolves.toMatchObject({
+    conversations: [
+      {
+        id: CONVERSATION,
+        customerName: 'E2E Customer',
+        unreadCount: 1,
+      },
+    ],
+  });
 
   await page.getByRole('button', { name: 'WhatsApp', exact: true }).click();
   const conversation = page.locator(`[data-conversation-id="${CONVERSATION}"]`);
