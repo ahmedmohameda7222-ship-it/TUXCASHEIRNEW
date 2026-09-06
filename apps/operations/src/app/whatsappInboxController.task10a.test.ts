@@ -1,9 +1,5 @@
 import type { WhatsAppInboxSnapshot } from '@tux/application';
-import type {
-  Instant,
-  WhatsAppConversation,
-  WhatsAppMessage,
-} from '@tux/domain';
+import type { Instant, WhatsAppConversation, WhatsAppMessage } from '@tux/domain';
 import type { TuxWhatsAppApi } from '@tux/platform-contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -132,9 +128,6 @@ describe('Task 10A selected conversation refresh', () => {
     expect(loadConversation).toHaveBeenCalledTimes(2);
     expect(controller.getState().selectedConversationId).toBe(selected.id);
     const refreshed = controller.getState().selectedMessages;
-    expect(refreshed.map((item) => item.id)).toEqual([
-      'inbound-1',
-      'outbound-1',
-    ]);
+    expect(refreshed.map((item) => item.id)).toEqual(['inbound-1', 'outbound-1']);
   });
 });
