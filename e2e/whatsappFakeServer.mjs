@@ -212,6 +212,10 @@ async function handleApi(request, response, url) {
     writeJson(response, 200, { message });
     return true;
   }
+  if (body.action === 'LINK_ORDER') {
+    writeJson(response, 200, { ok: true });
+    return true;
+  }
   writeJson(response, 400, { error: 'unsupported_whatsapp_e2e_action' });
   return true;
 }
