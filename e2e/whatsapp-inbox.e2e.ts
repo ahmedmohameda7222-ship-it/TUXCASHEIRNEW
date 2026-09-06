@@ -6,6 +6,10 @@ const WORKER = '20000000-0000-4000-8000-000000000001';
 const DATABASE = 'tux-operations-v2';
 const DRAFT_DATABASE = 'tux-operations-v2-drafts';
 const CONVERSATION = 'a0000000-0000-4000-8000-000000000001';
+const STOREFRONT_URL = 'https://menu.tux.example';
+const STARTER_TEMPLATE_LABEL = 'Order follow-up';
+
+type WhatsAppE2ePolicy = 'FREE_FORM' | 'TEMPLATE_ONLY' | 'BLOCKED';
 
 function pinHash(pin: string): string {
   const salt = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
@@ -153,6 +157,14 @@ async function seedBrowserFallback(page: Page): Promise<void> {
   await page.unroute('**/__tux_whatsapp_e2e_seed__');
 }
 
+async function configureWhatsAppScenario(page: Page, policy: WhatsAppE2ePolicy): Promise<void> {
+  const response = await page.request.post('/__tux_whatsapp_control__', {
+    data: { policy, reset: true },
+  });
+  expect(response.ok()).toBe(true);
+  await expect(response.json()).resolves.toEqual({ ok: true, policy });
+}
+
 async function enterActiveShell(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByText('No active Business Day')).toBeVisible();
@@ -170,8 +182,20 @@ async function enterActiveShell(page: Page): Promise<void> {
   });
 }
 
+async function openWhatsAppConversation(page: Page): Promise<void> {
+  await page
+    .getByRole('navigation', { name: 'Operations' })
+    .getByRole('button', { name: /^WhatsApp\b/ })
+    .click();
+  const conversation = page.locator(`[data-conversation-id="${CONVERSATION}"]`);
+  await expect(conversation).toContainText('E2E Customer');
+  await conversation.click();
+  await expect(page.getByLabel('Message history')).toContainText('Can I order?');
+}
+
 test('inbound unread opens and explicit reply sends exactly once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'FREE_FORM');
   await seedBrowserFallback(page);
 
   const inboxResponsePromise = page.waitForResponse(
@@ -193,15 +217,7 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
     ],
   });
 
-  await page
-    .getByRole('navigation', { name: 'Operations' })
-    .getByRole('button', { name: /^WhatsApp\b/ })
-    .click();
-  const conversation = page.locator(`[data-conversation-id="${CONVERSATION}"]`);
-  await expect(conversation).toContainText('E2E Customer');
-  await conversation.click();
-  await expect(page.getByLabel('Message history')).toContainText('Can I order?');
-
+  await openWhatsAppConversation(page);
   await page
     .getByRole('textbox', { name: 'Message', exact: true })
     .fill('Yes — what would you like?');
@@ -211,4 +227,60 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
   const counters = await page.request.get('/__tux_whatsapp_assertions__');
   expect(counters.ok()).toBe(true);
   await expect(counters.json()).resolves.toMatchObject({ sendMessage: 1 });
+});
+
+test('FREE_FORM Send Menu inserts canonical URL without auto-send', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'FREE_FORM');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  await openWhatsAppConversation(page);
+
+  await page.getByRole('button', { name: 'Send Menu', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+    `منيو TUX 👇\n${STOREFRONT_URL}`,
+  );
+
+  const counters = await page.request.get('/__tux_whatsapp_assertions__');
+  await expect(counters.json()).resolves.toMatchObject({ sendMessage: 0, sendTemplate: 0 });
+});
+
+test('TEMPLATE_ONLY renders starter template and sends it exactly once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'TEMPLATE_ONLY');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  await openWhatsAppConversation(page);
+
+  const composer = page.locator('[data-whatsapp-policy="TEMPLATE_ONLY"]');
+  await expect(composer).toBeVisible();
+  await expect(composer.getByText('The free-form messaging window is closed.')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Saved draft', exact: true })).toBeDisabled();
+
+  const templateResponse = page.waitForResponse((response) => {
+    if (response.request().method() !== 'POST') return false;
+    if (new URL(response.url()).pathname !== '/api/whatsapp') return false;
+    return response.request().postData()?.includes('SEND_TEMPLATE') === true;
+  });
+  await page.getByRole('button', { name: new RegExp(STARTER_TEMPLATE_LABEL) }).click();
+  expect((await templateResponse).status()).toBe(200);
+
+  const counters = await page.request.get('/__tux_whatsapp_assertions__');
+  await expect(counters.json()).resolves.toMatchObject({ sendMessage: 0, sendTemplate: 1 });
+});
+
+test('BLOCKED keeps history visible and exposes no outbound send action', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-browser-fallback');
+  await configureWhatsAppScenario(page, 'BLOCKED');
+  await seedBrowserFallback(page);
+  await enterActiveShell(page);
+  await openWhatsAppConversation(page);
+
+  const composer = page.locator('[data-whatsapp-policy="BLOCKED"]');
+  await expect(composer).toBeVisible();
+  await expect(composer.getByText('Messaging unavailable')).toBeVisible();
+  await expect(page.getByLabel('Message history')).toContainText('Can I order?');
+  await expect(page.locator('[data-whatsapp-send-menu]')).toHaveCount(0);
+  await expect(page.locator('[data-whatsapp-send]')).toHaveCount(0);
+  await expect(page.locator('[data-template-id]')).toHaveCount(0);
 });
