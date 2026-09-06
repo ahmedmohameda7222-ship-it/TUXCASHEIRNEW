@@ -202,7 +202,9 @@ test('inbound unread opens and explicit reply sends exactly once', async ({ page
   await conversation.click();
   await expect(page.getByLabel('Message history')).toContainText('Can I order?');
 
-  await page.getByLabel('Message').fill('Yes — what would you like?');
+  await page
+    .getByRole('textbox', { name: 'Message', exact: true })
+    .fill('Yes — what would you like?');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByLabel('Message history')).toContainText('Yes — what would you like?');
 
