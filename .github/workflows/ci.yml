@@ -52,6 +52,10 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: WhatsApp architecture gate
+        run: npm run test:whatsapp-architecture
+      - name: WhatsApp security gate
+        run: npm run test:whatsapp-security
       - name: Typecheck
         run: npm run typecheck
       - name: Production builds
