@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TUX logo">
+  <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M175 51C175 24 200 8 256 8C312 8 337 24 337 51C337 62 332 65 322 65H190C180 65 175 62 175 51Z" fill="none" stroke-width="6"/>
+    <circle cx="210" cy="27" r="3" stroke="none"/>
+    <circle cx="242" cy="17" r="3" stroke="none"/>
+    <circle cx="271" cy="16" r="3" stroke="none"/>
+    <circle cx="303" cy="28" r="3" stroke="none"/>
+    <path d="M172 85C184 75 196 95 208 85C220 75 232 95 244 85C256 75 268 95 280 85C292 75 304 95 316 85C322 80 328 80 334 84" fill="none" stroke-width="7"/>
+    <rect x="169" y="105" width="174" height="22" rx="4" fill="none" stroke-width="6"/>
+    <rect x="177" y="145" width="158" height="33" rx="13" fill="none" stroke-width="6"/>
+    <path d="M170 190L98 270L148 286L128 318L226 472L170 190Z" stroke="none"/>
+    <path d="M342 190L414 270L364 286L384 318L286 472L342 190Z" stroke="none"/>
+    <path d="M197 201L256 246L315 201L286 449L256 506L226 449L197 201Z" fill="#ffffff" stroke-width="6"/>
+    <path d="M214 205L256 238L298 205L290 224L256 251L222 224L214 205Z" stroke="none"/>
+    <path d="M205 215L226 448L256 492L286 448L307 215" fill="none" stroke-width="5"/>
+    <path d="M220 215L256 242L292 215L292 260L256 238L220 260V215Z" stroke="none"/>
+    <path d="M226 238L256 259L286 238L286 267L256 248L226 267V238Z" stroke="none"/>
+  </g>
+  <text x="256" y="486" text-anchor="middle" fill="#000000" font-family="Impact, Arial Black, sans-serif" font-size="82" font-weight="900" letter-spacing="-2">TUX</text>
+</svg>
