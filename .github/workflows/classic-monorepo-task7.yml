@@ -1,0 +1,355 @@
+name: Classic Monorepo Task 7 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task7.json'
+      - '.github/workflows/classic-monorepo-task7.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task7:
+    name: Task 7 permanent architecture guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: cdb804f9b47291206c1390af8065ef7acf31d3f9
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target and clean state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task7.json').read_text())
+          assert request == {
+            'serial': 19,
+            'mode': 'task7-architecture-guards',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'cdb804f9b47291206c1390af8065ef7acf31d3f9',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task7 "$EXPECTED_SHA"
+          test ! -e scripts/monorepo-architecture-guard.mjs
+          test ! -e scripts/monorepo-architecture-guard.test.mjs
+          test ! -e scripts/test-monorepo-architecture.mjs
+          test -z "$(git status --porcelain)"
+          npm ci
+      - name: Write exact RED fixture tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > scripts/monorepo-architecture-guard.test.mjs <<'EOF'
+          import assert from 'node:assert/strict';
+          import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+          import os from 'node:os';
+          import path from 'node:path';
+          import test from 'node:test';
+          import { collectArchitectureViolations } from './monorepo-architecture-guard.mjs';
+
+          async function fixture(files) {
+            const root = await mkdtemp(path.join(os.tmpdir(), 'tux-monorepo-guard-'));
+            for (const [relative, content] of Object.entries(files)) {
+              const filename = path.join(root, relative);
+              await mkdir(path.dirname(filename), { recursive: true });
+              await writeFile(filename, content);
+            }
+            return root;
+          }
+
+          const validRoot = {
+            'package.json': JSON.stringify({
+              workspaces: ['apps/*', 'packages/*'],
+              scripts: {
+                build: 'npm run build --workspaces --if-present',
+                typecheck: 'npm run typecheck --workspaces --if-present',
+                'test:e2e:menu': 'playwright test --config playwright.menu.config.ts',
+                'test:monorepo-architecture': 'node scripts/test-monorepo-architecture.mjs',
+              },
+            }),
+            'package-lock.json': '{}',
+            'apps/menu/package.json': JSON.stringify({ name: '@tux/menu' }),
+            'apps/operations/package.json': JSON.stringify({ name: '@tux/operations' }),
+            'apps/menu/src/a.ts': "import '@tux/domain';\n",
+            'supabase/migrations/001.sql': '-- canonical',
+            '.github/workflows/ci.yml': [
+              'npm run typecheck:menu',
+              'npm run build:menu',
+              'npm run test:e2e:menu',
+              'npm run test:monorepo-architecture',
+            ].join('\n'),
+          };
+
+          test('accepts canonical current-tree structure', async () => {
+            const root = await fixture(validRoot);
+            try {
+              assert.deepEqual(await collectArchitectureViolations(root), []);
+            } finally {
+              await rm(root, { recursive: true, force: true });
+            }
+          });
+
+          test('rejects relative and package-name cross-app imports', async () => {
+            const root = await fixture({
+              ...validRoot,
+              'apps/menu/src/a.ts': "import '../../operations/src/main';\nimport '@tux/operations';\n",
+            });
+            try {
+              const violations = await collectArchitectureViolations(root);
+              assert.equal(violations.filter((value) => value.includes('cross-app import')).length >= 2, true);
+            } finally {
+              await rm(root, { recursive: true, force: true });
+            }
+          });
+
+          test('rejects nested lock, legacy SQL, and second migration authority', async () => {
+            const root = await fixture({
+              ...validRoot,
+              'apps/menu/package-lock.json': '{}',
+              'apps/menu/supabase_setup.sql': '-- legacy',
+              'apps/menu/supabase/migrations/001.sql': '-- second',
+            });
+            try {
+              const violations = await collectArchitectureViolations(root);
+              assert.equal(violations.some((value) => value.includes('nested package-lock')), true);
+              assert.equal(violations.some((value) => value.includes('legacy executable SQL')), true);
+              assert.equal(violations.some((value) => value.includes('second Supabase migration authority')), true);
+            } finally {
+              await rm(root, { recursive: true, force: true });
+            }
+          });
+
+          test('rejects wrong Menu identity and missing permanent CI coverage', async () => {
+            const root = await fixture({
+              ...validRoot,
+              'apps/menu/package.json': JSON.stringify({ name: 'tux-burger-website' }),
+              '.github/workflows/ci.yml': 'npm run build\n',
+            });
+            try {
+              const violations = await collectArchitectureViolations(root);
+              assert.equal(violations.some((value) => value.includes('@tux/menu')), true);
+              assert.equal(violations.some((value) => value.includes('CI coverage')), true);
+            } finally {
+              await rm(root, { recursive: true, force: true });
+            }
+          });
+          EOF
+      - name: Prove fixture suite RED before implementation exists
+        shell: bash
+        run: |
+          set +e
+          node --test scripts/monorepo-architecture-guard.test.mjs > "$RUNNER_TEMP/task7-red.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/task7-red.log"
+          test "$rc" -ne 0
+          grep -E 'ERR_MODULE_NOT_FOUND|Cannot find module|monorepo-architecture-guard\.mjs' "$RUNNER_TEMP/task7-red.log"
+          echo 'TASK7_RED_MISSING_IMPLEMENTATION_CONFIRMED'
+      - name: Create exact guard implementation and current-tree CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > scripts/monorepo-architecture-guard.mjs <<'EOF'
+          import { readdir, readFile } from 'node:fs/promises';
+          import path from 'node:path';
+
+          const ignoredDirectories = new Set(['.git', '.tmp', 'node_modules', 'dist', 'coverage']);
+          const sourceExtension = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/;
+          const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)['"]([^'"]+)['"]/g;
+
+          async function walk(root) {
+            const result = [];
+            async function visit(directory) {
+              for (const entry of await readdir(directory, { withFileTypes: true })) {
+                if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+                const absolute = path.join(directory, entry.name);
+                if (entry.isDirectory()) await visit(absolute);
+                else if (entry.isFile()) result.push(absolute);
+              }
+            }
+            await visit(root);
+            return result;
+          }
+
+          function appNameFromPath(root, filename) {
+            const parts = path.relative(root, filename).split(path.sep);
+            return parts[0] === 'apps' && parts.length > 2 ? parts[1] : null;
+          }
+
+          export async function collectArchitectureViolations(root) {
+            const files = await walk(root);
+            const violations = [];
+            const appPackageNames = new Map();
+
+            for (const filename of files.filter((value) => path.basename(value) === 'package.json')) {
+              const appName = appNameFromPath(root, filename);
+              if (!appName) continue;
+              const pkg = JSON.parse(await readFile(filename, 'utf8'));
+              if (typeof pkg.name === 'string') appPackageNames.set(pkg.name, appName);
+            }
+
+            for (const filename of files.filter((value) => sourceExtension.test(value))) {
+              const sourceApp = appNameFromPath(root, filename);
+              if (!sourceApp) continue;
+              const source = await readFile(filename, 'utf8');
+              for (const match of source.matchAll(importPattern)) {
+                const specifier = match[1];
+                const packageTarget = appPackageNames.get(specifier);
+                if (packageTarget && packageTarget !== sourceApp) {
+                  violations.push(`cross-app import: ${path.relative(root, filename)} -> ${specifier}`);
+                  continue;
+                }
+                if (!specifier.startsWith('.')) continue;
+                const targetApp = appNameFromPath(root, path.resolve(path.dirname(filename), specifier));
+                if (targetApp && targetApp !== sourceApp) {
+                  violations.push(`cross-app import: ${path.relative(root, filename)} -> ${specifier}`);
+                }
+              }
+            }
+
+            for (const filename of files) {
+              const relative = path.relative(root, filename).split(path.sep).join('/');
+              if (relative !== 'package-lock.json' && relative.endsWith('/package-lock.json')) {
+                violations.push(`nested package-lock: ${relative}`);
+              }
+              if (path.basename(filename) === 'supabase_setup.sql') {
+                violations.push(`legacy executable SQL: ${relative}`);
+              }
+            }
+
+            const migrationAuthorities = new Set();
+            for (const filename of files) {
+              const relative = path.relative(root, filename).split(path.sep).join('/');
+              const match = relative.match(/^(.*?supabase\/migrations)(?:\/|$)/);
+              if (match) migrationAuthorities.add(match[1]);
+            }
+            for (const authority of migrationAuthorities) {
+              if (authority !== 'supabase/migrations') {
+                violations.push(`second Supabase migration authority: ${authority}`);
+              }
+            }
+
+            const rootPackage = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+            const menuPackage = JSON.parse(await readFile(path.join(root, 'apps/menu/package.json'), 'utf8'));
+            if (!rootPackage.workspaces?.includes('apps/*')) violations.push('root workspaces must include apps/*');
+            if (menuPackage.name !== '@tux/menu') violations.push('Menu workspace must be named @tux/menu');
+            for (const script of ['build', 'typecheck', 'test:e2e:menu', 'test:monorepo-architecture']) {
+              if (!rootPackage.scripts?.[script]) violations.push(`root script missing: ${script}`);
+            }
+
+            const ci = await readFile(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+            for (const command of [
+              'npm run typecheck:menu',
+              'npm run build:menu',
+              'npm run test:e2e:menu',
+              'npm run test:monorepo-architecture',
+            ]) {
+              if (!ci.includes(command)) violations.push(`CI coverage missing: ${command}`);
+            }
+
+            return violations.sort();
+          }
+
+          export async function assertMonorepoArchitecture(root) {
+            const violations = await collectArchitectureViolations(root);
+            if (violations.length > 0) {
+              throw new Error(`Monorepo architecture violations:\n${violations.join('\n')}`);
+            }
+          }
+          EOF
+          cat > scripts/test-monorepo-architecture.mjs <<'EOF'
+          import path from 'node:path';
+          import { fileURLToPath } from 'node:url';
+          import { assertMonorepoArchitecture } from './monorepo-architecture-guard.mjs';
+
+          const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+          await assertMonorepoArchitecture(root);
+          console.log('Monorepo architecture guard passed.');
+          EOF
+      - name: Prove fixtures GREEN and current tree RED only for Task 8 CI coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/monorepo-architecture-guard.test.mjs
+          node --input-type=module <<'NODE'
+          import path from 'node:path';
+          import { collectArchitectureViolations } from './scripts/monorepo-architecture-guard.mjs';
+          const violations = await collectArchitectureViolations(path.resolve('.'));
+          console.log('CURRENT_TREE_VIOLATIONS=' + JSON.stringify(violations));
+          const expected = [
+            'CI coverage missing: npm run build:menu',
+            'CI coverage missing: npm run test:e2e:menu',
+            'CI coverage missing: npm run test:monorepo-architecture',
+            'CI coverage missing: npm run typecheck:menu',
+          ].sort();
+          if (JSON.stringify(violations) !== JSON.stringify(expected)) {
+            throw new Error(`unexpected current-tree architecture violations: ${JSON.stringify(violations)}`);
+          }
+          console.log('TASK7_CURRENT_TREE_ONLY_TASK8_CI_RED_CONFIRMED');
+          NODE
+          set +e
+          node scripts/test-monorepo-architecture.mjs > "$RUNNER_TEMP/task7-current-tree.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/task7-current-tree.log"
+          test "$rc" -ne 0
+          grep -F 'CI coverage missing:' "$RUNNER_TEMP/task7-current-tree.log"
+      - name: Verify exact Task 7 scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git status --porcelain | awk '{print $2}' | sort)"
+          printf 'TASK7_CHANGED_FILES:\n%s\n' "$changed"
+          cat > "$RUNNER_TEMP/task7-expected.txt" <<'EOF'
+          scripts/monorepo-architecture-guard.mjs
+          scripts/monorepo-architecture-guard.test.mjs
+          scripts/test-monorepo-architecture.mjs
+          EOF
+          diff -u "$RUNNER_TEMP/task7-expected.txt" <(printf '%s\n' "$changed")
+          git diff --exit-code "$EXPECTED_SHA" -- apps packages api server supabase .github package.json package-lock.json e2e playwright.menu.config.ts tsconfig.e2e.json
+          git diff --check
+      - name: Commit and push Task 7
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/monorepo-architecture-guard.mjs scripts/monorepo-architecture-guard.test.mjs scripts/test-monorepo-architecture.mjs
+          staged="$(git diff --cached --name-only | sort)"
+          cat > "$RUNNER_TEMP/task7-staged-expected.txt" <<'EOF'
+          scripts/monorepo-architecture-guard.mjs
+          scripts/monorepo-architecture-guard.test.mjs
+          scripts/test-monorepo-architecture.mjs
+          EOF
+          diff -u "$RUNNER_TEMP/task7-staged-expected.txt" <(printf '%s\n' "$staged")
+          git commit -m 'test(monorepo): add architecture guards'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK7_HEAD=%s\nTASK7_TREE=%s\nTASK7_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
