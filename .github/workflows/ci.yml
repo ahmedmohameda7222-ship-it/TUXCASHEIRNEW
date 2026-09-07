@@ -1,6 +1,12 @@
 name: TUX V2 CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact commit SHA expected after checkout
+        required: true
+        type: string
   pull_request:
     branches:
       - main
@@ -9,6 +15,7 @@ on:
     branches:
       - main
       - integration/tux-operations-v2
+      - work/monorepo-foundation
       - 'feat/ops-*'
       - 'fix/operations-*'
       - 'ui/tux-pos-refinement'
@@ -40,6 +47,9 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - name: Prove dispatched exact HEAD
+        if: github.event_name == 'workflow_dispatch'
+        run: test "$(git rev-parse HEAD)" = "${{ inputs.expected_sha }}"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -143,6 +153,51 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  menu:
+    name: menu
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked root dependencies
+        run: npm ci
+      - name: Menu typecheck
+        run: npm run typecheck:menu
+      - name: Menu production build
+        run: npm run build:menu
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered Menu E2E
+        run: npm run test:e2e:menu
+      - name: Upload Menu rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-rendered-e2e
+          path: |
+            playwright-report-menu
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  architecture:
+    name: monorepo-architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Monorepo architecture guards
+        run: npm run test:monorepo-architecture
+
   required-quality-gate:
     name: Required quality gate
     if: always()
@@ -150,6 +205,8 @@ jobs:
       - quality
       - edge-security
       - windows-package
+      - menu
+      - architecture
     runs-on: ubuntu-latest
     steps:
       - name: Require every permanent gate
@@ -157,7 +214,11 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
+          MENU_RESULT: ${{ needs.menu.result }}
+          ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
           test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
+          test "$MENU_RESULT" = "success"
+          test "$ARCHITECTURE_RESULT" = "success"

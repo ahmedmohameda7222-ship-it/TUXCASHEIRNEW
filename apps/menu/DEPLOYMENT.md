@@ -1,6 +1,20 @@
 # Deployment Guide — TUX Menu (Phase A)
 
-TUX Menu is a Vite + React browser application inside the TUX monorepo. During Phase A, its dynamic Menu/Admin data path still uses the legacy Supabase browser client. The fallback catalog can render without Supabase configuration, but dynamic legacy Menu/Admin data requires the browser-visible variables below.
+TUX Menu is an independent Vite + React browser application inside the canonical `ahmedmohameda7222-ship-it/TUXCASHEIRNEW` monorepo. The Operations application remains a separate Vercel project and retains authority for Operations, API routes, and cron behavior.
+
+## Vercel project contract
+
+Configure the Menu Vercel project with:
+
+- Repository: `ahmedmohameda7222-ship-it/TUXCASHEIRNEW`
+- Root Directory: `apps/menu`
+- Framework: Vite
+- Install command: `cd ../.. && npm ci`
+- Build command: `cd ../.. && npm run build:menu`
+- Output Directory: `dist`
+- SPA rewrite: `/(.*)` → `/index.html`
+
+The repository has one authoritative npm lockfile at the monorepo root. Do not add or restore `apps/menu/package-lock.json`. Menu deployment must install from the root lock and build the `@tux/menu` workspace from the repository root.
 
 ## Monorepo commands
 
@@ -11,13 +25,14 @@ npm ci
 npm run dev:menu
 npm run typecheck:menu
 npm run build:menu
+npm run test:e2e:menu
 ```
 
 The production build output is `apps/menu/dist/`.
 
 ## Browser-visible legacy Supabase configuration
 
-Phase A uses only these Vite browser variables for the legacy Menu/Admin backend:
+Phase A uses only these Menu-specific Vite browser variables for the legacy Menu/Admin backend:
 
 ```dotenv
 VITE_SUPABASE_URL=
@@ -38,4 +53,4 @@ During Phase A, the WhatsApp order destination remains configured in `src/lib/co
 
 Root `supabase/migrations/` is the only executable database migration authority. The file under `apps/menu/legacy/supabase_setup.sql.reference` is historical reference material only and must never be executed or copied into canonical migrations.
 
-Canonical catalog/API ownership and standalone Admin extraction belong to later approved phases; Phase A does not perform those cutovers.
+Canonical catalog/API ownership and standalone Admin extraction belong to later approved phases; Phase A does not perform those cutovers. The temporary `/admin` route remains inside Menu during Phase A; standalone `apps/admin` is mandatory Phase C work.
