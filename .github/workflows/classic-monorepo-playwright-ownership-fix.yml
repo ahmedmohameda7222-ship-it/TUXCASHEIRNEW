@@ -60,8 +60,8 @@ jobs:
           set -euo pipefail
           npx playwright test --list > /tmp/operations-before.txt
           npx playwright test --config playwright.menu.config.ts --list > /tmp/menu-before.txt
-          grep -F 'e2e/menu/menu.e2e.ts' /tmp/operations-before.txt
-          grep -F 'e2e/menu/menu.e2e.ts' /tmp/menu-before.txt
+          grep -F 'menu/menu.e2e.ts' /tmp/operations-before.txt
+          grep -F 'menu.e2e.ts' /tmp/menu-before.txt
           echo 'PLAYWRIGHT_OWNERSHIP_RED_CONFIRMED'
       - name: Isolate Menu suite from Operations Playwright projects
         shell: bash
@@ -90,11 +90,11 @@ jobs:
           set -euo pipefail
           npx playwright test --list > /tmp/operations-after.txt
           npx playwright test --config playwright.menu.config.ts --list > /tmp/menu-after.txt
-          if grep -F 'e2e/menu/menu.e2e.ts' /tmp/operations-after.txt; then
+          if grep -F 'menu/menu.e2e.ts' /tmp/operations-after.txt; then
             echo 'Operations Playwright still owns Menu tests.' >&2
             exit 1
           fi
-          grep -F 'e2e/menu/menu.e2e.ts' /tmp/menu-after.txt
+          grep -F 'menu.e2e.ts' /tmp/menu-after.txt
           grep -F 'menu-layout-editor.touch.e2e.ts' /tmp/operations-after.txt
           echo 'PLAYWRIGHT_OWNERSHIP_GREEN_CONFIRMED'
       - name: Run full Operations rendered E2E
