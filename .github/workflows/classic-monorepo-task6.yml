@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 30
     env:
       TARGET_BRANCH: work/monorepo-foundation
-      EXPECTED_SHA: 9e556dc42416d0200359ceba14c2321e3c726f81
+      EXPECTED_SHA: 9b9dba8b14c5198a1854aa6f647c62ca32aff6d0
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +41,10 @@ jobs:
           from pathlib import Path
           request = json.loads(Path('.classic-executor/task6.json').read_text())
           assert request == {
-            'serial': 15,
+            'serial': 18,
             'mode': 'task6-menu-e2e',
             'target_branch': 'work/monorepo-foundation',
-            'expected_target_sha': '9e556dc42416d0200359ceba14c2321e3c726f81',
+            'expected_target_sha': '9b9dba8b14c5198a1854aa6f647c62ca32aff6d0',
           }
           PY
           actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
