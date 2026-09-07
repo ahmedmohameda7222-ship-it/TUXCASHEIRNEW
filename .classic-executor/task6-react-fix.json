@@ -1,0 +1,6 @@
+{
+  "serial": 14,
+  "mode": "task6-react-compatibility-fix",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8"
+}
