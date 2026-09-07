@@ -233,7 +233,7 @@ function MessageBubble({
       : 'whatsapp-message whatsapp-message-inbound';
 
   return (
-    <article className={className} data-message-kind={message.kind}>
+    <article key={message.id} className={className} data-message-kind={message.kind}>
       {message.kind === 'TEXT' ? (
         <p dir="auto" className="whatsapp-message-text">
           {message.text ?? ''}
