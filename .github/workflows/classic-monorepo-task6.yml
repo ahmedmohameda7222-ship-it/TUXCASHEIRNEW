@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 30
     env:
       TARGET_BRANCH: work/monorepo-foundation
-      EXPECTED_SHA: 2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8
+      EXPECTED_SHA: 9e556dc42416d0200359ceba14c2321e3c726f81
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +41,10 @@ jobs:
           from pathlib import Path
           request = json.loads(Path('.classic-executor/task6.json').read_text())
           assert request == {
-            'serial': 12,
+            'serial': 15,
             'mode': 'task6-menu-e2e',
             'target_branch': 'work/monorepo-foundation',
-            'expected_target_sha': '2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8',
+            'expected_target_sha': '9e556dc42416d0200359ceba14c2321e3c726f81',
           }
           PY
           actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
@@ -174,11 +174,7 @@ jobs:
           git diff --exit-code "$EXPECTED_SHA" -- apps packages api server supabase .github package.json package-lock.json
           changed="$(git status --porcelain | awk '{print $2}' | sort)"
           printf 'TASK6_CHANGED_FILES:\n%s\n' "$changed"
-          cat > "$RUNNER_TEMP/task6-expected.txt" <<'EOF'
-          e2e/menu/
-          playwright.menu.config.ts
-          tsconfig.e2e.json
-          EOF
+          printf '%s\n' "$changed" | grep -Fx 'e2e/menu/'
           printf '%s\n' "$changed" | grep -Fx 'playwright.menu.config.ts'
           printf '%s\n' "$changed" | grep -Fx 'tsconfig.e2e.json'
           test -f e2e/menu/menu.e2e.ts
