@@ -38,16 +38,33 @@ jobs:
           git fetch origin "$TARGET_BRANCH"
           git switch -C classic-task6-diagnostic "$EXPECTED_SHA"
           test -z "$(git status --porcelain)"
-      - name: Build Menu and install Chromium
+      - name: Prove installed React resolution and build Menu
         shell: bash
         run: |
           set -euo pipefail
           npm ci
+          echo '--- REACT TREE ---'
+          npm ls react react-dom --all || true
+          echo '--- REACT RESOLUTION ---'
+          node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import path from 'node:path';
+          const rootRequire = createRequire(path.resolve('package.json'));
+          const menuRequire = createRequire(path.resolve('apps/menu/package.json'));
+          const rootReact = rootRequire.resolve('react/package.json');
+          const menuReact = menuRequire.resolve('react/package.json');
+          const rootReactDom = rootRequire.resolve('react-dom/package.json');
+          const menuReactDom = menuRequire.resolve('react-dom/package.json');
+          console.log(`ROOT_REACT=${rootReact}`);
+          console.log(`MENU_REACT=${menuReact}`);
+          console.log(`ROOT_REACT_DOM=${rootReactDom}`);
+          console.log(`MENU_REACT_DOM=${menuReactDom}`);
+          console.log(`REACT_DUPLICATE=${rootReact !== menuReact}`);
+          console.log(`REACT_DOM_DUPLICATE=${rootReactDom !== menuReactDom}`);
+          NODE
           npm run build:menu
           npx playwright install chromium
           test -f apps/menu/dist/index.html
-          echo '--- DIST INDEX ---'
-          sed -n '1,160p' apps/menu/dist/index.html
       - name: Start preview and capture browser runtime evidence
         shell: bash
         run: |
@@ -59,7 +76,6 @@ jobs:
             if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
             sleep 1
           done
-          curl -fsSI http://127.0.0.1:4174/
           node --input-type=module <<'NODE'
           import { chromium } from '@playwright/test';
           const browser = await chromium.launch({ headless: true });
@@ -68,27 +84,14 @@ jobs:
           page.on('console', msg => evidence.push(`CONSOLE ${msg.type()}: ${msg.text()}`));
           page.on('pageerror', err => evidence.push(`PAGEERROR ${err.name}: ${err.message}\n${err.stack || ''}`));
           page.on('requestfailed', req => evidence.push(`REQUESTFAILED ${req.url()} :: ${req.failure()?.errorText}`));
-          page.on('response', res => {
-            if (res.status() >= 400) evidence.push(`HTTP${res.status()} ${res.url()}`);
-          });
           const response = await page.goto('http://127.0.0.1:4174/', { waitUntil: 'networkidle' });
-          await page.waitForTimeout(1000);
+          await page.waitForTimeout(500);
           console.log(`NAV_STATUS=${response?.status()}`);
-          console.log(`TITLE=${await page.title()}`);
           console.log(`BODY_TEXT=${JSON.stringify((await page.locator('body').innerText()).slice(0, 2000))}`);
-          console.log(`BODY_HTML=${JSON.stringify((await page.locator('body').innerHTML()).slice(0, 5000))}`);
-          const scripts = await page.locator('script[src]').evaluateAll(nodes => nodes.map(node => node.src));
-          console.log(`SCRIPTS=${JSON.stringify(scripts)}`);
-          for (const src of scripts) {
-            const r = await page.request.get(src);
-            console.log(`SCRIPT_FETCH status=${r.status()} url=${src} bytes=${(await r.body()).length}`);
-          }
           console.log('--- RUNTIME EVIDENCE ---');
           for (const line of evidence) console.log(line);
           await browser.close();
           NODE
-          echo '--- PREVIEW LOG ---'
-          cat "$RUNNER_TEMP/menu-preview.log"
       - name: Confirm target remains untouched
         shell: bash
         run: |
