@@ -268,9 +268,17 @@ export function mapLegacyCatalog(
   if (new Set(canonicalIds).size !== canonicalIds.length) throw new Error('duplicate canonical mapping detected');
 
   categories.sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
-  products.sort((left, right) =>
-    left.categoryId.localeCompare(right.categoryId) || left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
-  );
+  const categorySortOrderByCanonicalId = new Map(categories.map((category) => [category.id, category.sortOrder]));
+  products.sort((left, right) => {
+    const categoryOrderDifference =
+      categorySortOrderByCanonicalId.get(left.categoryId)! - categorySortOrderByCanonicalId.get(right.categoryId)!;
+    return (
+      categoryOrderDifference ||
+      left.categoryId.localeCompare(right.categoryId) ||
+      left.sortOrder - right.sortOrder ||
+      left.id.localeCompare(right.id)
+    );
+  });
   skipped.sort((left, right) => left.entity.localeCompare(right.entity) || left.legacyId.localeCompare(right.legacyId));
 
   return { manifestVersion: 1, source: manifest.source, categories, products, skipped };
