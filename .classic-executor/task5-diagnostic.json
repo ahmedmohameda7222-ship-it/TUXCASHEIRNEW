@@ -1,0 +1,6 @@
+{
+  "serial": 10,
+  "mode": "task5-diagnostic",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "4d016fc98e1821c70846580628fbbe226c4955c8"
+}
