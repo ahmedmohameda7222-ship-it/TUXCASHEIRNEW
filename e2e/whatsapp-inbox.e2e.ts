@@ -429,7 +429,7 @@ test('Create Order from Chat starts empty customer-prefilled draft', async ({ pa
   expect(drafts[0]).toMatchObject({
     lines: [],
     delivery: {
-      normalizedPhone: '+201001234567',
+      normalizedPhone: '01001234567',
       displayPhone: '01001234567',
       customerName: 'E2E Customer',
     },
