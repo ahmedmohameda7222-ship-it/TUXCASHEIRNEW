@@ -1,3 +1,9 @@
+import tuxLogoPlaceholder from '@assets/tuxlogowithoutbackground.svg';
+import tuxifyDoubleImage from '@assets/tuxify_double.png';
+import tuxifyQuatroImage from '@assets/tuxify_quatro.png';
+import tuxifySingleImage from '@assets/tuxify_single.png';
+import tuxifyTripleImage from '@assets/tuxify_triple.png';
+
 export interface Category {
   id: string;
   name: string;
@@ -26,7 +32,7 @@ export const CATEGORIES: Category[] = [
   { id: 'drinks', name: 'Drinks', slug: 'drinks', sort_order: 6 },
 ];
 
-const TUX_LOGO_PLACEHOLDER = '/src/assets/tuxlogo-transparent.svg';
+const TUX_LOGO_PLACEHOLDER = tuxLogoPlaceholder;
 
 export const PRODUCTS: Product[] = [
   // Tux Burger
@@ -87,7 +93,7 @@ export const PRODUCTS: Product[] = [
     description:
       'High quality single patty with our rich Tuxify sauce, caramelized onions, and high quality cheddar on a soft brioche bun.',
     price: 180,
-    image_url: '/src/assets/tuxify_single.png',
+    image_url: tuxifySingleImage,
     is_best_seller: false,
     is_available: true,
     sort_order: 1,
@@ -99,7 +105,7 @@ export const PRODUCTS: Product[] = [
     description:
       'Double patty goodness with double cheddar, caramelized onions, and our signature Tuxify sauce.',
     price: 240,
-    image_url: '/src/assets/tuxify_double.png',
+    image_url: tuxifyDoubleImage,
     is_best_seller: true,
     is_available: true,
     sort_order: 2,
@@ -111,7 +117,7 @@ export const PRODUCTS: Product[] = [
     description:
       'Three layers of high quality beef, melted cheddar, sweet caramelized onions, and rich Tuxify sauce.',
     price: 300,
-    image_url: '/src/assets/tuxify_triple.png',
+    image_url: tuxifyTripleImage,
     is_best_seller: false,
     is_available: true,
     sort_order: 3,
@@ -123,7 +129,7 @@ export const PRODUCTS: Product[] = [
     description:
       'Four high quality patties, layers of melted cheddar, caramelized onions, and abundant Tuxify sauce.',
     price: 360,
-    image_url: '/src/assets/tuxify_quatro.png',
+    image_url: tuxifyQuatroImage,
     is_best_seller: false,
     is_available: true,
     sort_order: 4,
