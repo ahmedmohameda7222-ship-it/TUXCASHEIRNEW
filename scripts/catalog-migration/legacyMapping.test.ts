@@ -96,7 +96,7 @@ describe('legacy identity mapping', () => {
     )).toThrow(/duplicate legacy product/i);
   });
 
-  it('fails closed for an unknown product category reference without display-name fallback', () => {
+  it('fails closed when source and manifest category references disagree without display-name fallback', () => {
     const broken = {
       ...source,
       products: [
@@ -104,7 +104,29 @@ describe('legacy identity mapping', () => {
         ...source.products.slice(1),
       ],
     };
-    expect(() => mapLegacyCatalog(broken, subsetManifest())).toThrow(/unknown legacy category/i);
+    expect(() => mapLegacyCatalog(broken, subsetManifest())).toThrow(
+      /manifest category reference does not match source category identifier/i,
+    );
+  });
+
+  it('fails closed for an unknown product category reference without display-name fallback', () => {
+    const brokenSource = {
+      ...source,
+      products: [
+        { ...source.products[0]!, categoryId: 'not-a-known-id', name: 'Tux Burger' },
+        ...source.products.slice(1),
+      ],
+    };
+    const baseManifest = subsetManifest();
+    const brokenManifest: LegacyCatalogIdentityManifest = {
+      ...baseManifest,
+      products: baseManifest.products.map((entry) =>
+        entry.legacyId === 'single-tux-burger'
+          ? { ...entry, categoryLegacyId: 'not-a-known-id' }
+          : entry,
+      ),
+    };
+    expect(() => mapLegacyCatalog(brokenSource, brokenManifest)).toThrow(/unknown legacy category/i);
   });
 
   it('fails closed when manifest/source parity is not exact', () => {
