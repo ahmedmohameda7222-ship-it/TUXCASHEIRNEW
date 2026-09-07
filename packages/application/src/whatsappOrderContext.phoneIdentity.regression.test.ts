@@ -17,13 +17,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveWhatsAppCustomerOrderContext } from './whatsappOrderContext';
 
 const shopId = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
-const businessDayId = parseEntityId<BusinessDayId>(
-  '20000000-0000-4000-8000-000000000001',
-);
+const businessDayId = parseEntityId<BusinessDayId>('20000000-0000-4000-8000-000000000001');
 const workerId = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000001');
-const orderTypeId = parseEntityId<OrderTypeId>(
-  '40000000-0000-4000-8000-000000000001',
-);
+const orderTypeId = parseEntityId<OrderTypeId>('40000000-0000-4000-8000-000000000001');
 const zoneId = parseEntityId<DeliveryZoneId>('50000000-0000-4000-8000-000000000001');
 const conversationId = '60000000-0000-4000-8000-000000000001';
 const contactId = parseEntityId('70000000-0000-4000-8000-000000000001');
@@ -107,10 +103,7 @@ function databaseFor(orderPhone: string): OperationsDatabase {
     transaction: async (work) =>
       work({
         customerContacts: {
-          getByNormalizedPhone: async (
-            candidateShopId: ShopId,
-            normalizedPhone: string,
-          ) =>
+          getByNormalizedPhone: async (candidateShopId: ShopId, normalizedPhone: string) =>
             candidateShopId === shopId && normalizedPhone === contact.normalizedPhone
               ? contact
               : null,
