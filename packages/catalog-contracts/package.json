@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./legacy-mapping": "./src/legacyMapping.ts"
+    "./admin-response": "./src/adminResponse.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
