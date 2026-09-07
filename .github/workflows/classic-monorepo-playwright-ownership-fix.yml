@@ -1,0 +1,131 @@
+name: Classic Monorepo Playwright Ownership Fix
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/playwright-ownership-fix.json'
+      - '.github/workflows/classic-monorepo-playwright-ownership-fix.yml'
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: work/monorepo-foundation
+  EXPECTED_TARGET_SHA: ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate request and exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/playwright-ownership-fix.json').read_text())
+          assert request == {
+            'serial': 1,
+            'mode': 'playwright-suite-ownership-fix',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b',
+          }
+          PY
+          actual="$(git ls-remote origin refs/heads/$TARGET_BRANCH | awk '{print $1}')"
+          printf 'REMOTE_TARGET=%s\nEXPECTED_TARGET=%s\n' "$actual" "$EXPECTED_TARGET_SHA"
+          test "$actual" = "$EXPECTED_TARGET_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C playwright-ownership-fix "$EXPECTED_TARGET_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
+          test -z "$(git status --porcelain)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Prove RED ownership collision
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test --list > /tmp/operations-before.txt
+          npx playwright test --config playwright.menu.config.ts --list > /tmp/menu-before.txt
+          grep -F 'e2e/menu/menu.e2e.ts' /tmp/operations-before.txt
+          grep -F 'e2e/menu/menu.e2e.ts' /tmp/menu-before.txt
+          echo 'PLAYWRIGHT_OWNERSHIP_RED_CONFIRMED'
+      - name: Isolate Menu suite from Operations Playwright projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('playwright.config.ts')
+          source = path.read_text()
+          marker = "const menuLayoutTouchSpec = /menu-layout-editor\\.touch\\.e2e\\.ts/;\n"
+          assert source.count(marker) == 1
+          source = source.replace(marker, marker + "const menuSuiteSpec = /(?:^|[\\\\/])menu[\\\\/]/;\n")
+          old = '      testIgnore: menuLayoutTouchSpec,\n'
+          assert source.count(old) == 3
+          source = source.replace(old, '      testIgnore: [menuLayoutTouchSpec, menuSuiteSpec],\n')
+          touch = "      name: 'touch-mobile-browser-fallback',\n      testMatch: menuLayoutTouchSpec,\n"
+          assert source.count(touch) == 1
+          source = source.replace(touch, touch + '      testIgnore: menuSuiteSpec,\n')
+          path.write_text(source)
+          PY
+          npx prettier --write playwright.config.ts
+          git diff -- playwright.config.ts
+      - name: Prove GREEN ownership separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test --list > /tmp/operations-after.txt
+          npx playwright test --config playwright.menu.config.ts --list > /tmp/menu-after.txt
+          if grep -F 'e2e/menu/menu.e2e.ts' /tmp/operations-after.txt; then
+            echo 'Operations Playwright still owns Menu tests.' >&2
+            exit 1
+          fi
+          grep -F 'e2e/menu/menu.e2e.ts' /tmp/menu-after.txt
+          grep -F 'menu-layout-editor.touch.e2e.ts' /tmp/operations-after.txt
+          echo 'PLAYWRIGHT_OWNERSHIP_GREEN_CONFIRMED'
+      - name: Run full Operations rendered E2E
+        run: npm run test:e2e
+      - name: Run full Menu rendered E2E
+        run: npm run test:e2e:menu
+      - name: Run integration verification gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:monorepo-architecture
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Enforce one-file scope and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          changed="$(git diff --name-only)"
+          printf 'CHANGED=%s\n' "$changed"
+          test "$changed" = 'playwright.config.ts'
+          test -z "$(git diff --name-only --cached)"
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add playwright.config.ts
+          git commit -m 'test(monorepo): isolate menu playwright suite'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = 'playwright.config.ts'
+          remote="$(git ls-remote origin refs/heads/$TARGET_BRANCH | awk '{print $1}')"
+          test "$remote" = "$EXPECTED_TARGET_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          printf 'HEAD=%s\nTREE=%s\nPARENT=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)"
