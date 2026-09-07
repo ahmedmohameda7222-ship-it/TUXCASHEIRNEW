@@ -1,0 +1,209 @@
+name: Classic Monorepo Task 6 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task6.json'
+      - '.github/workflows/classic-monorepo-task6.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task6:
+    name: Task 6 independent rendered Menu coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate request and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task6.json').read_text())
+          assert request == {
+            'serial': 12,
+            'mode': 'task6-menu-e2e',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': '2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task6 "$EXPECTED_SHA"
+          test ! -e e2e/menu/menu.e2e.ts
+          test ! -e playwright.menu.config.ts
+          test -z "$(git status --porcelain)"
+          npm ci
+      - name: Write exact browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p e2e/menu
+          cat > e2e/menu/menu.e2e.ts <<'EOF'
+          import { expect, test } from '@playwright/test';
+
+          const routes = [
+            { path: '/', text: /TUX/i },
+            { path: '/order-now', text: /Order\s*Now/i },
+            { path: '/tux-burger', text: /Tux Burger/i },
+            { path: '/admin', text: /Admin Login/i },
+          ] as const;
+
+          for (const route of routes) {
+            test(`direct entry renders ${route.path}`, async ({ page }) => {
+              const failedImages: string[] = [];
+              page.on('response', (response) => {
+                if (response.request().resourceType() === 'image' && response.status() >= 400) {
+                  failedImages.push(`${response.status()} ${response.url()}`);
+                }
+              });
+              const response = await page.goto(route.path, { waitUntil: 'networkidle' });
+              expect(response?.ok()).toBe(true);
+              await expect(page.locator('body')).toContainText(route.text);
+              expect(failedImages).toEqual([]);
+            });
+          }
+
+          test('home images have real dimensions', async ({ page }) => {
+            await page.goto('/', { waitUntil: 'networkidle' });
+            const images = await page.locator('img').evaluateAll((nodes) =>
+              nodes.map((node) => ({
+                src: (node as HTMLImageElement).currentSrc,
+                width: (node as HTMLImageElement).naturalWidth,
+                height: (node as HTMLImageElement).naturalHeight,
+              })),
+            );
+            expect(images.length).toBeGreaterThan(0);
+            expect(images.filter((image) => image.src).every((image) => image.width > 0 && image.height > 0)).toBe(true);
+          });
+
+          test('product deep route survives direct entry', async ({ page }) => {
+            await page.goto('/products/tux-burger', { waitUntil: 'networkidle' });
+            await expect(page).toHaveURL(/\/products\/tux-burger$/);
+            await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+          });
+          EOF
+          npx prettier --write e2e/menu/menu.e2e.ts
+      - name: Prove RED before Menu Playwright config exists
+        shell: bash
+        run: |
+          set +e
+          npm run test:e2e:menu > "$RUNNER_TEMP/task6-red.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/task6-red.log"
+          test "$rc" -ne 0
+          grep -E 'playwright\.menu\.config\.ts|Cannot find|MODULE_NOT_FOUND|does not exist' "$RUNNER_TEMP/task6-red.log"
+          echo 'TASK6_RED_MISSING_CONFIG_CONFIRMED'
+      - name: Create independent Menu Playwright config and E2E typecheck inclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > playwright.menu.config.ts <<'EOF'
+          import { defineConfig } from '@playwright/test';
+
+          export default defineConfig({
+            testDir: './e2e/menu',
+            testMatch: /.*\.e2e\.ts/,
+            timeout: 60_000,
+            expect: { timeout: 10_000 },
+            fullyParallel: false,
+            workers: 1,
+            retries: process.env['CI'] ? 1 : 0,
+            reporter: process.env['CI']
+              ? [['line'], ['html', { outputFolder: 'playwright-report-menu', open: 'never' }]]
+              : 'line',
+            use: {
+              baseURL: 'http://127.0.0.1:4174',
+              headless: true,
+              trace: 'retain-on-failure',
+              screenshot: 'only-on-failure',
+            },
+            webServer: {
+              command: 'npm run build:menu && npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174',
+              url: 'http://127.0.0.1:4174',
+              timeout: 120_000,
+              reuseExistingServer: !process.env['CI'],
+            },
+          });
+          EOF
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('tsconfig.e2e.json')
+          data = json.loads(path.read_text())
+          assert data['include'] == ['playwright.config.ts', 'e2e/**/*.ts']
+          data['include'] = ['playwright.config.ts', 'playwright.menu.config.ts', 'e2e/**/*.ts']
+          path.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          npx prettier --write playwright.menu.config.ts tsconfig.e2e.json
+      - name: Install Chromium and prove rendered tests GREEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          npm run typecheck:e2e
+          npm run test:e2e:menu
+          echo 'TASK6_RENDERED_MENU_GREEN_CONFIRMED'
+      - name: Verify exact Task 6 scope and protected authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$EXPECTED_SHA" -- apps packages api server supabase .github package.json package-lock.json
+          changed="$(git status --porcelain | awk '{print $2}' | sort)"
+          printf 'TASK6_CHANGED_FILES:\n%s\n' "$changed"
+          cat > "$RUNNER_TEMP/task6-expected.txt" <<'EOF'
+          e2e/menu/
+          playwright.menu.config.ts
+          tsconfig.e2e.json
+          EOF
+          printf '%s\n' "$changed" | grep -Fx 'playwright.menu.config.ts'
+          printf '%s\n' "$changed" | grep -Fx 'tsconfig.e2e.json'
+          test -f e2e/menu/menu.e2e.ts
+          test "$(git diff --name-only "$EXPECTED_SHA" -- tsconfig.e2e.json | wc -l | tr -d ' ')" = '1'
+          git diff --check
+      - name: Commit and push Task 6
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add e2e/menu/menu.e2e.ts playwright.menu.config.ts tsconfig.e2e.json
+          staged="$(git diff --cached --name-only | sort)"
+          cat > "$RUNNER_TEMP/task6-staged-expected.txt" <<'EOF'
+          e2e/menu/menu.e2e.ts
+          playwright.menu.config.ts
+          tsconfig.e2e.json
+          EOF
+          diff -u "$RUNNER_TEMP/task6-staged-expected.txt" <(printf '%s\n' "$staged")
+          git commit -m 'test(menu): add rendered route smoke coverage'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK6_HEAD=%s\nTASK6_TREE=%s\nTASK6_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
