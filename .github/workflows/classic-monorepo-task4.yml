@@ -179,7 +179,8 @@ jobs:
         run: |
           set -euo pipefail
           git diff --exit-code "$EXPECTED_SHA" -- apps/operations/package.json apps/operations-desktop/package.json packages/*/package.json
-          git add package.json package-lock.json apps/menu/package.json apps/menu/package-lock.json
+          git add package.json package-lock.json
+          git add -u -- apps/menu
           changed="$(git diff --cached --name-only --no-renames "$EXPECTED_SHA" | sort)"
           printf 'TASK4_STAGED_FILES:\n%s\n' "$changed"
           cat > "$RUNNER_TEMP/task4-expected.txt" <<'EOF'
