@@ -1,0 +1,159 @@
+name: Classic Monorepo React Compatibility Fix
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task6-react-fix.json'
+      - '.github/workflows/classic-monorepo-task6-react-fix.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Align Menu React runtime with workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target SHA and reproduce RED dependency split
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-react-fix "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          npm ci
+          node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import path from 'node:path';
+          const rootRequire = createRequire(path.resolve('package.json'));
+          const menuRequire = createRequire(path.resolve('apps/menu/package.json'));
+          const rootReact = rootRequire.resolve('react/package.json');
+          const menuReact = menuRequire.resolve('react/package.json');
+          const rootReactDom = rootRequire.resolve('react-dom/package.json');
+          const menuReactDom = menuRequire.resolve('react-dom/package.json');
+          if (rootReact === menuReact) throw new Error('expected duplicate React resolution before fix');
+          if (rootReactDom === menuReactDom) throw new Error('expected duplicate ReactDOM resolution before fix');
+          console.log('REACT_RUNTIME_SPLIT_RED_CONFIRMED');
+          NODE
+      - name: Align Menu React and ReactDOM to canonical workspace runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          menu_path = Path('apps/menu/package.json')
+          menu = json.loads(menu_path.read_text())
+          assert menu['devDependencies']['react'] == '19.1.0'
+          assert menu['devDependencies']['react-dom'] == '19.1.0'
+          menu['devDependencies']['react'] = '19.2.8'
+          menu['devDependencies']['react-dom'] = '19.2.8'
+          menu_path.write_text(json.dumps(menu, indent=2) + '\n')
+          PY
+          npm install --package-lock-only --ignore-scripts
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          npm ci
+      - name: Prove single React resolution and quality/build non-regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import path from 'node:path';
+          const rootRequire = createRequire(path.resolve('package.json'));
+          const menuRequire = createRequire(path.resolve('apps/menu/package.json'));
+          const rootReact = rootRequire.resolve('react/package.json');
+          const menuReact = menuRequire.resolve('react/package.json');
+          const rootReactDom = rootRequire.resolve('react-dom/package.json');
+          const menuReactDom = menuRequire.resolve('react-dom/package.json');
+          console.log(`ROOT_REACT=${rootReact}`);
+          console.log(`MENU_REACT=${menuReact}`);
+          console.log(`ROOT_REACT_DOM=${rootReactDom}`);
+          console.log(`MENU_REACT_DOM=${menuReactDom}`);
+          if (rootReact !== menuReact) throw new Error('React still resolves twice after fix');
+          if (rootReactDom !== menuReactDom) throw new Error('ReactDOM still resolves twice after fix');
+          console.log('SINGLE_REACT_RUNTIME_GREEN');
+          NODE
+          npm run typecheck:menu
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          npm run build:menu
+          npm run typecheck -w @tux/operations
+          npm run build -w @tux/operations
+      - name: Prove rendered Menu boot GREEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          const errors = [];
+          page.on('pageerror', err => errors.push(err.message));
+          const response = await page.goto('http://127.0.0.1:4174/', { waitUntil: 'networkidle' });
+          if (!response?.ok()) throw new Error(`navigation status ${response?.status()}`);
+          const body = await page.locator('body').innerText();
+          console.log(`BODY_TEXT=${JSON.stringify(body.slice(0, 2000))}`);
+          if (!/TUX/i.test(body)) throw new Error('rendered Menu body missing TUX');
+          if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`);
+          await browser.close();
+          console.log('RENDERED_MENU_BOOT_GREEN');
+          NODE
+      - name: Verify exact corrective scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          git diff --exit-code "$EXPECTED_SHA" -- apps/operations apps/operations-desktop packages api server supabase package.json
+          changed="$(git diff --name-only "$EXPECTED_SHA" | sort)"
+          printf 'REACT_FIX_CHANGED_FILES:\n%s\n' "$changed"
+          cat > "$RUNNER_TEMP/expected.txt" <<'EOF'
+          apps/menu/package.json
+          package-lock.json
+          EOF
+          diff -u "$RUNNER_TEMP/expected.txt" <(printf '%s\n' "$changed")
+          git diff --check
+      - name: Commit and push corrective compatibility fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/menu/package.json package-lock.json
+          git commit -m 'fix(monorepo): align menu React runtime'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'REACT_FIX_HEAD=%s\nREACT_FIX_TREE=%s\nREACT_FIX_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
