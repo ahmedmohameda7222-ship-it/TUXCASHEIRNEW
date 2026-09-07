@@ -181,7 +181,7 @@ describe('resolveWhatsAppCustomerOrderContext', () => {
       value: {
         kind: 'NO_ACTIVE_ORDER',
         customer: {
-          normalizedPhone: '+201012345678',
+          normalizedPhone: '01012345678',
           displayPhone: '0101 234 5678',
           customerName: 'Saved Customer',
           address: 'Saved Address',
@@ -217,7 +217,7 @@ describe('resolveWhatsAppCustomerOrderContext', () => {
       value: {
         kind: 'ONE_ACTIVE_ORDER',
         customer: {
-          normalizedPhone: '+201012345678',
+          normalizedPhone: '01012345678',
           displayPhone: '+20 10 1234 5678',
           customerName: 'Chat Customer',
           address: null,
