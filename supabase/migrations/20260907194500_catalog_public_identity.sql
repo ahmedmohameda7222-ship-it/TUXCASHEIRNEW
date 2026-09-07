@@ -141,20 +141,51 @@ end $$;
 -- derived image URL is deterministic and therefore safe to include in the
 -- content-hash revision. Writes remain controlled by catalog-admin signed-upload
 -- ownership; no browser receives privileged storage credentials.
+--
+-- The repository migration harness intentionally provides a minimal storage.buckets
+-- compatibility table. Feature-detect Supabase Storage metadata columns so the full
+-- production constraints are configured when they exist without making the root
+-- migration chain depend on a synthetic Storage schema implementation.
 do $$
+declare
+  has_storage_metadata boolean;
 begin
   if to_regclass('storage.buckets') is not null then
-    insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
-    values (
-      'catalog-product-images',
-      'catalog-product-images',
-      true,
-      10485760,
-      array['image/png', 'image/jpeg', 'image/webp', 'image/avif']::text[]
-    )
-    on conflict (id) do update
-      set public = excluded.public,
-          file_size_limit = excluded.file_size_limit,
-          allowed_mime_types = excluded.allowed_mime_types;
+    select
+      exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'storage'
+          and table_name = 'buckets'
+          and column_name = 'file_size_limit'
+      )
+      and exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'storage'
+          and table_name = 'buckets'
+          and column_name = 'allowed_mime_types'
+      )
+    into has_storage_metadata;
+
+    if has_storage_metadata then
+      insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+      values (
+        'catalog-product-images',
+        'catalog-product-images',
+        true,
+        10485760,
+        array['image/png', 'image/jpeg', 'image/webp', 'image/avif']::text[]
+      )
+      on conflict (id) do update
+        set public = excluded.public,
+            file_size_limit = excluded.file_size_limit,
+            allowed_mime_types = excluded.allowed_mime_types;
+    else
+      insert into storage.buckets(id, name, public)
+      values ('catalog-product-images', 'catalog-product-images', true)
+      on conflict (id) do update
+        set public = excluded.public;
+    end if;
   end if;
 end $$;
