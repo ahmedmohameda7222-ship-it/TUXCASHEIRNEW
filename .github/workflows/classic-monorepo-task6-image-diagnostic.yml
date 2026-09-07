@@ -1,0 +1,125 @@
+name: Classic Monorepo Task 6 Image Diagnostic
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task6-image-diagnostic.json'
+      - '.github/workflows/classic-monorepo-task6-image-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Diagnose Menu image loading semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 9e556dc42416d0200359ceba14c2321e3c726f81
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target and prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task6-image-diagnostic.json').read_text())
+          assert request == {
+            'serial': 16,
+            'mode': 'task6-image-diagnostic',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': '9e556dc42416d0200359ceba14c2321e3c726f81',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task6-image-diagnostic "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          npm ci
+          npm run build:menu
+          npx playwright install chromium
+      - name: Capture image inventory before and after viewport traversal
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+          const pageErrors = [];
+          const failedRequests = [];
+          page.on('pageerror', error => pageErrors.push(error.message));
+          page.on('requestfailed', request => failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
+          const response = await page.goto('http://127.0.0.1:4174/', { waitUntil: 'networkidle' });
+          if (!response?.ok()) throw new Error(`navigation status ${response?.status()}`);
+
+          const snapshot = async (label) => {
+            const images = await page.locator('img').evaluateAll((nodes) => nodes.map((node, index) => {
+              const image = node;
+              const rect = image.getBoundingClientRect();
+              return {
+                index,
+                src: image.getAttribute('src'),
+                currentSrc: image.currentSrc,
+                loading: image.loading,
+                complete: image.complete,
+                naturalWidth: image.naturalWidth,
+                naturalHeight: image.naturalHeight,
+                clientWidth: image.clientWidth,
+                clientHeight: image.clientHeight,
+                top: Math.round(rect.top),
+                bottom: Math.round(rect.bottom),
+              };
+            }));
+            console.log(`--- ${label} IMAGE INVENTORY ---`);
+            console.log(JSON.stringify(images, null, 2));
+            console.log(`${label}_ZERO_DIMENSION_COUNT=${images.filter(image => image.currentSrc && (image.naturalWidth === 0 || image.naturalHeight === 0)).length}`);
+            return images;
+          };
+
+          const before = await snapshot('BEFORE_SCROLL');
+          const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+          for (let y = 0; y <= documentHeight; y += 600) {
+            await page.evaluate((scrollY) => window.scrollTo(0, scrollY), y);
+            await page.waitForTimeout(150);
+          }
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          await page.waitForTimeout(1000);
+          const after = await snapshot('AFTER_SCROLL');
+
+          const beforeZero = before.filter(image => image.currentSrc && (image.naturalWidth === 0 || image.naturalHeight === 0));
+          const afterZero = after.filter(image => image.currentSrc && (image.naturalWidth === 0 || image.naturalHeight === 0));
+          console.log(`ZERO_BEFORE=${JSON.stringify(beforeZero)}`);
+          console.log(`ZERO_AFTER=${JSON.stringify(afterZero)}`);
+          console.log(`PAGE_ERRORS=${JSON.stringify(pageErrors)}`);
+          console.log(`FAILED_REQUESTS=${JSON.stringify(failedRequests)}`);
+          await browser.close();
+          NODE
+      - name: Confirm target untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          echo 'TASK6_IMAGE_DIAGNOSTIC_ONLY_TARGET_UNTOUCHED'
