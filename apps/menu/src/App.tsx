@@ -1,20 +1,20 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import { PageTransitionProvider } from "@/components/PageTransition";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { CartProvider } from "@/context/CartContext";
-import { MenuProvider } from "@/context/MenuContext";
-import { CartDrawer } from "@/components/cart/CartDrawer";
-import { StickyCartBar } from "@/components/cart/StickyCartBar";
+import { Switch, Route, Router as WouterRouter } from 'wouter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import NotFound from '@/pages/not-found';
+import { PageTransitionProvider } from '@/components/PageTransition';
+import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
+import { CartProvider } from '@/context/CartContext';
+import { MenuProvider } from '@/context/MenuContext';
+import { CartDrawer } from '@/components/cart/CartDrawer';
+import { StickyCartBar } from '@/components/cart/StickyCartBar';
 
-import Home from "@/pages/Home";
-import OrderNow from "@/pages/OrderNow";
-import Admin from "@/pages/Admin";
-import ProductCategoryPage from "@/pages/ProductCategoryPage";
+import Home from '@/pages/Home';
+import OrderNow from '@/pages/OrderNow';
+import Admin from '@/pages/Admin';
+import ProductCategoryPage from '@/pages/ProductCategoryPage';
 
 const queryClient = new QueryClient();
 
@@ -33,7 +33,7 @@ function Router() {
           <Route path="/fries">{() => <ProductCategoryPage sectionId="fries" />}</Route>
           <Route path="/combos">{() => <ProductCategoryPage sectionId="combos" />}</Route>
           <Route path="/drinks">{() => <ProductCategoryPage sectionId="drinks" />}</Route>
-          <Route path="/products/:slug" component={ProductCategoryPage} />
+          <Route path="/products/:slug">{() => <ProductCategoryPage />}</Route>
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -48,7 +48,7 @@ function App() {
       <TooltipProvider>
         <MenuProvider>
           <CartProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
               <PageTransitionProvider>
                 <Router />
               </PageTransitionProvider>

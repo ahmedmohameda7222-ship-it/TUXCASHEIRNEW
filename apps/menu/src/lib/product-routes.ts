@@ -4,15 +4,15 @@ export type ProductRouteSection = {
 };
 
 export const PRODUCT_SECTION_ROUTES: Record<string, string> = {
-  "tux-burger": "/tux-burger",
-  tuxify: "/tuxify",
-  hawawshi: "/hawawshi",
-  fries: "/fries",
-  combos: "/combos",
-  drinks: "/drinks",
+  'tux-burger': '/tux-burger',
+  tuxify: '/tuxify',
+  hawawshi: '/hawawshi',
+  fries: '/fries',
+  combos: '/combos',
+  drinks: '/drinks',
 };
 
-const ORDER_PRODUCT_ELEMENT_PREFIX = "order-product-";
+const ORDER_PRODUCT_ELEMENT_PREFIX = 'order-product-';
 
 export const getProductSectionHref = (section: ProductRouteSection) => {
   const routeKey = section.slug || section.id;

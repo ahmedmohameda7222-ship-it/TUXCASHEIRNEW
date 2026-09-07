@@ -1,34 +1,33 @@
-import React, { useEffect } from "react";
-import { motion } from "framer-motion";
-import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ProductCategoryNav } from '@/components/ProductCategoryNav';
 
 const products = [
   {
-    id: "01",
-    name: "Classic Fries",
-    description: "Golden, crispy, and perfectly seasoned. The foundation of every great meal.",
-    tag: "Small & Large",
+    id: '01',
+    name: 'Classic Fries',
+    description: 'Golden, crispy, and perfectly seasoned. The foundation of every great meal.',
+    tag: 'Small & Large',
   },
   {
-    id: "02",
-    name: "Cheese Fries",
-    description: "Classic fries drowned in melted cheese sauce. Rich and indulgent.",
+    id: '02',
+    name: 'Cheese Fries',
+    description: 'Classic fries drowned in melted cheese sauce. Rich and indulgent.',
   },
   {
-    id: "03",
-    name: "Chili Fries",
-    description: "Topped with bold chili seasoning and a kick of heat. Not for the faint-hearted.",
+    id: '03',
+    name: 'Chili Fries',
+    description: 'Topped with bold chili seasoning and a kick of heat. Not for the faint-hearted.',
   },
   {
-    id: "04",
-    name: "TUX Fries",
-    description: "Our signature loaded fries. A TUX classic with a secret combination of toppings.",
+    id: '04',
+    name: 'TUX Fries',
+    description: 'Our signature loaded fries. A TUX classic with a secret combination of toppings.',
   },
   {
-    id: "05",
-    name: "Doppy Fries",
-    description: "The ultimate loaded fries experience. Everything you love, piled on.",
+    id: '05',
+    name: 'Doppy Fries',
+    description: 'The ultimate loaded fries experience. Everything you love, piled on.',
   },
 ];
 
@@ -36,11 +35,13 @@ function PlaceholderImage({ id }: { id: string }) {
   return (
     <div
       className="w-full aspect-[4/3] rounded-xl flex items-center justify-center"
-      style={{ background: "radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)" }}
+      style={{ background: 'radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)' }}
     >
       <div className="text-center">
         <span className="text-[#C9A84C]/20 font-serif text-6xl font-bold select-none">{id}</span>
-        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">Photo Coming Soon</p>
+        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">
+          Photo Coming Soon
+        </p>
       </div>
     </div>
   );
@@ -48,7 +49,7 @@ function PlaceholderImage({ id }: { id: string }) {
 
 export default function Fries() {
   useEffect(() => {
-    document.title = "Fries | TUX";
+    document.title = 'Fries | TUX';
   }, []);
 
   return (
@@ -62,7 +63,9 @@ export default function Fries() {
           transition={{ duration: 0.7 }}
           className="mb-14"
         >
-          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">Our Menu</span>
+          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+            Our Menu
+          </span>
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">Fries</h1>
           <p className="text-[#999080] font-sans text-lg max-w-xl">
             From classic to loaded. Every fry earns its place on the plate.
@@ -92,7 +95,9 @@ export default function Fries() {
                     </span>
                   )}
                 </div>
-                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">{product.description}</p>
+                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">
+                  {product.description}
+                </p>
                 <a
                   href="/order-now"
                   className="block w-full text-center py-3 rounded bg-[#8B1A1A] text-white font-sans font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all"

@@ -1,38 +1,70 @@
-import React, { useEffect, useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-import singleImg from "@assets/tuxify_single.png";
-import doubleImg from "@assets/tuxify_double.png";
-import tripleImg from "@assets/tuxify_triple.png";
-import quatroImg from "@assets/tuxify_quatro.png";
+import React, { useEffect, useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { ProductCategoryNav } from '@/components/ProductCategoryNav';
+import singleImg from '@assets/tuxify_single.png';
+import doubleImg from '@assets/tuxify_double.png';
+import tripleImg from '@assets/tuxify_triple.png';
+import quatroImg from '@assets/tuxify_quatro.png';
 
 const tuxifyProducts = [
   {
-    id: "01",
-    name: "Single Tuxify",
-    description: "The one that started it all.",
-    ingredients: ["Brioche bun", "1 beef patty", "American cheese", "Pickles", "Chopped onion", "Ketchup", "TUXIFY sauce"],
+    id: '01',
+    name: 'Single Tuxify',
+    description: 'The one that started it all.',
+    ingredients: [
+      'Brioche bun',
+      '1 beef patty',
+      'American cheese',
+      'Pickles',
+      'Chopped onion',
+      'Ketchup',
+      'TUXIFY sauce',
+    ],
     image: singleImg,
   },
   {
-    id: "02",
-    name: "Double Tuxify",
-    description: "Double the impact. Double the flavor.",
-    ingredients: ["Brioche bun", "2 beef patties", "American cheese", "Pickles", "Chopped onion", "Ketchup", "TUXIFY sauce"],
+    id: '02',
+    name: 'Double Tuxify',
+    description: 'Double the impact. Double the flavor.',
+    ingredients: [
+      'Brioche bun',
+      '2 beef patties',
+      'American cheese',
+      'Pickles',
+      'Chopped onion',
+      'Ketchup',
+      'TUXIFY sauce',
+    ],
     image: doubleImg,
   },
   {
-    id: "03",
-    name: "Triple Tuxify",
-    description: "For the serious. Three stacked, layered flavor.",
-    ingredients: ["Brioche bun", "3 beef patties", "American cheese", "Pickles", "Chopped onion", "Ketchup", "TUXIFY sauce"],
+    id: '03',
+    name: 'Triple Tuxify',
+    description: 'For the serious. Three stacked, layered flavor.',
+    ingredients: [
+      'Brioche bun',
+      '3 beef patties',
+      'American cheese',
+      'Pickles',
+      'Chopped onion',
+      'Ketchup',
+      'TUXIFY sauce',
+    ],
     image: tripleImg,
   },
   {
-    id: "04",
-    name: "Quatro Tuxify",
-    description: "The legend. Four patties. Maximum indulgence.",
-    ingredients: ["Brioche bun", "4 beef patties", "American cheese", "Pickles", "Chopped onion", "Ketchup", "TUXIFY sauce"],
+    id: '04',
+    name: 'Quatro Tuxify',
+    description: 'The legend. Four patties. Maximum indulgence.',
+    ingredients: [
+      'Brioche bun',
+      '4 beef patties',
+      'American cheese',
+      'Pickles',
+      'Chopped onion',
+      'Ketchup',
+      'TUXIFY sauce',
+    ],
     image: quatroImg,
   },
 ];
@@ -41,11 +73,11 @@ export default function Tuxify() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ["start start", "end end"],
+    offset: ['start start', 'end end'],
   });
 
   useEffect(() => {
-    document.title = "Tuxify Burger | TUX";
+    document.title = 'Tuxify Burger | TUX';
   }, []);
 
   // Pre-compute all panel opacity + scale values (hooks must not be in loops)
@@ -86,15 +118,18 @@ export default function Tuxify() {
 
       {/* Page header — sits below both navbars */}
       <div className="pt-6 pb-6 px-6 md:px-16 max-w-7xl mx-auto">
-        <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">Our Menu</span>
+        <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+          Our Menu
+        </span>
         <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2">Tuxify Burger</h1>
         <p className="text-[#999080] mt-3 font-sans text-base max-w-xl">
-          The signature line. Smashed, sauced, and built for people who take their burgers seriously.
+          The signature line. Smashed, sauced, and built for people who take their burgers
+          seriously.
         </p>
       </div>
 
       {/* Scroll container — 320vh → ~220vh of scroll → ~55vh per panel */}
-      <div ref={containerRef} style={{ height: "320vh" }} className="relative">
+      <div ref={containerRef} style={{ height: '320vh' }} className="relative">
         {/* Sticky viewport */}
         <div className="sticky top-0 h-screen overflow-hidden">
           {tuxifyProducts.map((product, i) => (
@@ -103,7 +138,7 @@ export default function Tuxify() {
               style={{
                 opacity: panelMotion[i].opacity,
                 scale: panelMotion[i].scale,
-                position: "absolute",
+                position: 'absolute',
                 inset: 0,
               }}
               className="w-full h-full flex flex-col md:flex-row items-stretch"
@@ -124,7 +159,10 @@ export default function Tuxify() {
                 </p>
                 <ul className="space-y-1.5">
                   {product.ingredients.map((ing) => (
-                    <li key={ing} className="flex items-center gap-3 text-[#F5EDD8]/75 font-sans text-sm">
+                    <li
+                      key={ing}
+                      className="flex items-center gap-3 text-[#F5EDD8]/75 font-sans text-sm"
+                    >
                       <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] flex-shrink-0" />
                       {ing}
                     </li>

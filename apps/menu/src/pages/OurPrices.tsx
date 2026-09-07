@@ -1,85 +1,85 @@
-import React, { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 
 const NAVBAR_OFFSET = 130;
 
 const priceCategories = [
   {
-    id: "tux-burger",
-    label: "Tux Burger",
+    id: 'tux-burger',
+    label: 'Tux Burger',
     items: [
-      { name: "Single Tux Burger", price: 95 },
-      { name: "Double Tux Burger", price: 140 },
-      { name: "Triple Tux Burger", price: 160 },
-      { name: "TUX Quatro", price: 190 },
+      { name: 'Single Tux Burger', price: 95 },
+      { name: 'Double Tux Burger', price: 140 },
+      { name: 'Triple Tux Burger', price: 160 },
+      { name: 'TUX Quatro', price: 190 },
     ],
   },
   {
-    id: "tuxify",
-    label: "Tuxify Burger",
+    id: 'tuxify',
+    label: 'Tuxify Burger',
     items: [
-      { name: "Single Tuxify", price: 120 },
-      { name: "Double Tuxify", price: 160 },
-      { name: "Triple Tuxify", price: 200 },
-      { name: "Quatro Tuxify", price: 240 },
+      { name: 'Single Tuxify', price: 120 },
+      { name: 'Double Tuxify', price: 160 },
+      { name: 'Triple Tuxify', price: 200 },
+      { name: 'Quatro Tuxify', price: 240 },
     ],
   },
   {
-    id: "hawawshi",
-    label: "Hawawshi",
+    id: 'hawawshi',
+    label: 'Hawawshi',
     items: [
-      { name: "Classic Hawawshi", price: 80 },
-      { name: "TUX Hawawshi", price: 100 },
+      { name: 'Classic Hawawshi', price: 80 },
+      { name: 'TUX Hawawshi', price: 100 },
     ],
   },
   {
-    id: "fries",
-    label: "Fries",
+    id: 'fries',
+    label: 'Fries',
     items: [
-      { name: "Classic Fries (Small)", price: 25 },
-      { name: "Classic Fries (Large)", price: 30 },
-      { name: "Cheese Fries", price: 30 },
-      { name: "Chili Fries", price: 40 },
-      { name: "TUX Fries", price: 50 },
-      { name: "Doppy Fries", price: 75 },
+      { name: 'Classic Fries (Small)', price: 25 },
+      { name: 'Classic Fries (Large)', price: 30 },
+      { name: 'Cheese Fries', price: 30 },
+      { name: 'Chili Fries', price: 40 },
+      { name: 'TUX Fries', price: 50 },
+      { name: 'Doppy Fries', price: 75 },
     ],
   },
   {
-    id: "combos",
-    label: "Combos",
+    id: 'combos',
+    label: 'Combos',
     items: [
-      { name: "Single Combo", price: null },
-      { name: "Double Combo", price: null },
-      { name: "Tuxify Combo", price: null },
-      { name: "Family Combo", price: null },
+      { name: 'Single Combo', price: null },
+      { name: 'Double Combo', price: null },
+      { name: 'Tuxify Combo', price: null },
+      { name: 'Family Combo', price: null },
     ],
   },
   {
-    id: "drinks",
-    label: "Drinks",
+    id: 'drinks',
+    label: 'Drinks',
     items: [
-      { name: "Soda", price: 20 },
-      { name: "Water", price: 10 },
+      { name: 'Soda', price: 20 },
+      { name: 'Water', price: 10 },
     ],
   },
   {
-    id: "extras",
-    label: "Extras",
+    id: 'extras',
+    label: 'Extras',
     items: [
-      { name: "Extra Patty", price: 40 },
-      { name: "Bacon", price: 20 },
-      { name: "Cheese", price: 15 },
-      { name: "Ranch", price: 10 },
-      { name: "Mushroom", price: 15 },
-      { name: "Caramelized Onion", price: 10 },
-      { name: "Jalapeño", price: 10 },
-      { name: "TUX Sauce", price: 10 },
-      { name: "Extra Bun", price: 10 },
-      { name: "Pickle", price: 5 },
-      { name: "BBQ Sauce", price: 5 },
-      { name: "Ketchup", price: 5 },
-      { name: "Sweet Chili Sauce", price: 5 },
-      { name: "Hot Sauce", price: 5 },
+      { name: 'Extra Patty', price: 40 },
+      { name: 'Bacon', price: 20 },
+      { name: 'Cheese', price: 15 },
+      { name: 'Ranch', price: 10 },
+      { name: 'Mushroom', price: 15 },
+      { name: 'Caramelized Onion', price: 10 },
+      { name: 'Jalapeño', price: 10 },
+      { name: 'TUX Sauce', price: 10 },
+      { name: 'Extra Bun', price: 10 },
+      { name: 'Pickle', price: 5 },
+      { name: 'BBQ Sauce', price: 5 },
+      { name: 'Ketchup', price: 5 },
+      { name: 'Sweet Chili Sauce', price: 5 },
+      { name: 'Hot Sauce', price: 5 },
     ],
   },
 ];
@@ -88,14 +88,14 @@ export default function OurPrices() {
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
-    document.title = "Our Prices | TUX";
+    document.title = 'Our Prices | TUX';
   }, []);
 
   const scrollToSection = (id: string) => {
     const el = sectionRefs.current[id];
     if (el) {
       const y = el.getBoundingClientRect().top + window.scrollY - NAVBAR_OFFSET;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: 'smooth' });
     }
   };
 
@@ -108,8 +108,12 @@ export default function OurPrices() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
         >
-          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">Full Menu</span>
-          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">Our Prices</h1>
+          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+            Full Menu
+          </span>
+          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">
+            Our Prices
+          </h1>
           <p className="text-[#999080] font-sans text-lg max-w-xl">
             Every item, every price. No surprises — just great food at a fair price.
           </p>
@@ -137,7 +141,9 @@ export default function OurPrices() {
         {priceCategories.map((cat, catIdx) => (
           <motion.section
             key={cat.id}
-            ref={(el) => { sectionRefs.current[cat.id] = el; }}
+            ref={(el) => {
+              sectionRefs.current[cat.id] = el;
+            }}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
@@ -156,13 +162,13 @@ export default function OurPrices() {
                 <div
                   key={item.name}
                   className={`flex items-center justify-between px-6 py-4 ${
-                    i % 2 === 0 ? "bg-transparent" : "bg-white/[0.015]"
+                    i % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.015]'
                   }`}
                   data-testid={`price-row-${cat.id}-${i}`}
                 >
                   <span className="text-[#F5EDD8] font-sans text-sm md:text-base">{item.name}</span>
                   <span className="text-[#C9A84C] font-sans font-bold text-sm md:text-base ml-8 whitespace-nowrap">
-                    {item.price !== null ? `${item.price} EGP` : "Ask us"}
+                    {item.price !== null ? `${item.price} EGP` : 'Ask us'}
                   </span>
                 </div>
               ))}

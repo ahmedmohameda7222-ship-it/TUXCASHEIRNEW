@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { useCart } from "@/context/CartContext";
-import { X, Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
-import { WHATSAPP_NUMBER } from "@/lib/constants";
+import { useState } from 'react';
+import { useLocation } from 'wouter';
+import { useCart } from '@/context/CartContext';
+import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
+import { WHATSAPP_NUMBER } from '@/lib/constants';
 
 const DELIVERY_FEE_MESSAGE =
-  "Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.";
+  'Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.';
 
 const DELIVERY_MIXED_PAYMENT_MESSAGE =
-  "Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.";
+  'Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.';
 
-type OrderType = "Pick up" | "Delivery" | "";
-type PaymentMethod = "Cash" | "InstaPay" | "Mixed Payment" | "";
+type OrderType = 'Pick up' | 'Delivery' | '';
+type PaymentMethod = 'Cash' | 'InstaPay' | 'Mixed Payment' | '';
 
 export function CartDrawer() {
   const {
@@ -25,15 +25,15 @@ export function CartDrawer() {
   } = useCart();
   const [, navigate] = useLocation();
 
-  const [orderType, setOrderType] = useState<OrderType>("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("");
-  const [customerName, setCustomerName] = useState<string>("");
-  const [deliveryAddress, setDeliveryAddress] = useState<string>("");
-  const [cashAmount, setCashAmount] = useState<string>("");
-  const [instaPayAmount, setInstaPayAmount] = useState<string>("");
+  const [orderType, setOrderType] = useState<OrderType>('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('');
+  const [customerName, setCustomerName] = useState<string>('');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [cashAmount, setCashAmount] = useState<string>('');
+  const [instaPayAmount, setInstaPayAmount] = useState<string>('');
 
-  const isDelivery = orderType === "Delivery";
-  const isDeliveryMixedPayment = isDelivery && paymentMethod === "Mixed Payment";
+  const isDelivery = orderType === 'Delivery';
+  const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
   const displayTotal = isDelivery ? `${totalPrice} EGP + Delivery Fee` : `${totalPrice} EGP`;
   const cashValue = parseFloat(cashAmount) || 0;
   const instaPayValue = parseFloat(instaPayAmount) || 0;
@@ -47,34 +47,34 @@ export function CartDrawer() {
     isCustomerNameMissing ||
     !orderType ||
     !paymentMethod ||
-    (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) ||
+    (paymentMethod === 'Mixed Payment' && !isDeliveryMixedPayment && !isMixedValid) ||
     (isDelivery && !deliveryAddress.trim());
 
   const handleStartOrdering = () => {
     setIsCartOpen(false);
-    navigate("/order-now");
+    navigate('/order-now');
   };
 
   const handleCheckout = () => {
     if (items.length === 0) return;
     if (!customerName.trim()) {
-      alert("Please enter your name.");
+      alert('Please enter your name.');
       return;
     }
     if (!orderType) {
-      alert("Please select an order type.");
+      alert('Please select an order type.');
       return;
     }
     if (isDelivery && !deliveryAddress.trim()) {
-      alert("Please enter your delivery address.");
+      alert('Please enter your delivery address.');
       return;
     }
     if (!paymentMethod) {
-      alert("Please select a payment method.");
+      alert('Please select a payment method.');
       return;
     }
-    if (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && !isMixedValid) {
-      alert("The cash amount and InstaPay amount must exactly equal the final total.");
+    if (paymentMethod === 'Mixed Payment' && !isDeliveryMixedPayment && !isMixedValid) {
+      alert('The cash amount and InstaPay amount must exactly equal the final total.');
       return;
     }
 
@@ -89,12 +89,12 @@ export function CartDrawer() {
     items.forEach((item) => {
       message += `• ${item.quantity}x ${item.baseProductName || item.name}\n`;
       if (item.extras && item.extras.length > 0) {
-        message += `  Extras: ${item.extras.map((extra) => extra.name).join(", ")}\n`;
+        message += `  Extras: ${item.extras.map((extra) => extra.name).join(', ')}\n`;
       }
     });
 
     message += `\n*Payment Method:* ${paymentMethod}`;
-    if (paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment) {
+    if (paymentMethod === 'Mixed Payment' && !isDeliveryMixedPayment) {
       message += ` (Cash: ${cashValue} EGP + InstaPay: ${instaPayValue} EGP)`;
     }
 
@@ -107,7 +107,7 @@ export function CartDrawer() {
     }
 
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`, "_blank");
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`, '_blank');
   };
 
   if (!isCartOpen) return null;
@@ -119,7 +119,6 @@ export function CartDrawer() {
         onClick={() => setIsCartOpen(false)}
       />
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#111] shadow-2xl flex flex-col border-l border-white/10 sm:rounded-l-2xl animate-in slide-in-from-right duration-300">
-
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
@@ -138,20 +137,24 @@ export function CartDrawer() {
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
               <ShoppingBag className="w-16 h-16 opacity-20" />
               <p>Your cart is empty.</p>
-              <button
-                onClick={handleStartOrdering}
-                className="text-[#D4AF37] hover:underline"
-              >
+              <button onClick={handleStartOrdering} className="text-[#D4AF37] hover:underline">
                 Start Ordering
               </button>
             </div>
           ) : (
             <>
               {items.map((item) => (
-                <div key={item.id} className="flex gap-4 bg-black/40 p-3 rounded-xl border border-white/5">
+                <div
+                  key={item.id}
+                  className="flex gap-4 bg-black/40 p-3 rounded-xl border border-white/5"
+                >
                   <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-full h-full object-contain p-1" />
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="w-full h-full object-contain p-1"
+                      />
                     ) : (
                       <ShoppingBag className="w-6 h-6 text-gray-600" />
                     )}
@@ -164,7 +167,10 @@ export function CartDrawer() {
                         </h4>
                         {item.extras && item.extras.length > 0 && (
                           <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                            Extras: <span className="text-[#D4AF37]">{item.extras.map((extra) => extra.name).join(", ")}</span>
+                            Extras:{' '}
+                            <span className="text-[#D4AF37]">
+                              {item.extras.map((extra) => extra.name).join(', ')}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -226,15 +232,15 @@ export function CartDrawer() {
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Order Type</label>
               <div className="flex gap-2">
-                {(["Pick up", "Delivery"] as const).map((type) => (
+                {(['Pick up', 'Delivery'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => setOrderType(type)}
                     className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       orderType === type
-                        ? "bg-[#D4AF37] text-black"
-                        : "bg-white/10 text-white border border-white/5 hover:bg-white/20"
+                        ? 'bg-[#D4AF37] text-black'
+                        : 'bg-white/10 text-white border border-white/5 hover:bg-white/20'
                     }`}
                   >
                     {type}
@@ -261,15 +267,15 @@ export function CartDrawer() {
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Payment Method</label>
               <div className="flex gap-2">
-                {(["Cash", "InstaPay", "Mixed Payment"] as const).map((method) => (
+                {(['Cash', 'InstaPay', 'Mixed Payment'] as const).map((method) => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setPaymentMethod(method)}
                     className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                       paymentMethod === method
-                        ? "bg-[#D4AF37] text-black"
-                        : "bg-white/10 text-white border border-white/5 hover:bg-white/20"
+                        ? 'bg-[#D4AF37] text-black'
+                        : 'bg-white/10 text-white border border-white/5 hover:bg-white/20'
                     }`}
                   >
                     {method}
@@ -292,7 +298,7 @@ export function CartDrawer() {
               </div>
             )}
 
-            {paymentMethod === "Mixed Payment" && !isDeliveryMixedPayment && (
+            {paymentMethod === 'Mixed Payment' && !isDeliveryMixedPayment && (
               <div className="bg-white/5 p-3 rounded-lg space-y-3 border border-white/10">
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-1">
@@ -322,7 +328,9 @@ export function CartDrawer() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-400">Remaining:</span>
-                  <span className={`font-bold ${remainingMixed === 0 ? "text-green-500" : remainingMixed < 0 ? "text-red-500" : "text-[#D4AF37]"}`}>
+                  <span
+                    className={`font-bold ${remainingMixed === 0 ? 'text-green-500' : remainingMixed < 0 ? 'text-red-500' : 'text-[#D4AF37]'}`}
+                  >
                     {remainingMixed.toFixed(0)} EGP
                   </span>
                 </div>
@@ -348,8 +356,8 @@ export function CartDrawer() {
               disabled={isCheckoutDisabled}
               className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${
                 isCheckoutDisabled
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                  : "bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-[0_0_15px_rgba(37,211,102,0.3)]"
+                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-[#25D366] hover:bg-[#1EBE5D] text-white shadow-[0_0_15px_rgba(37,211,102,0.3)]'
               }`}
             >
               Order on WhatsApp

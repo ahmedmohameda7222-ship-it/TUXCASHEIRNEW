@@ -1,40 +1,38 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { NavLink } from "@/components/NavLink";
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { NavLink } from '@/components/NavLink';
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import truckImg from "@assets/TUX-Truck.png";
-import singleImg from "@assets/tuxify_single.png";
-import doubleImg from "@assets/tuxify_double.png";
-import tripleImg from "@assets/tuxify_triple.png";
-import quatroImg from "@assets/tuxify_quatro.png";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import truckImg from '@assets/TUX-Truck.png';
 
-import { useMenu, SupabaseProduct } from "@/context/MenuContext";
+import { useMenu, type SupabaseProduct } from '@/context/MenuContext';
 
 function BestSellersCarousel() {
   const { products } = useMenu();
   const bestSellers = products.filter((p) => p.is_best_seller);
   const [current, setCurrent] = useState(0);
-  const [direction, setDirection] = useState<"left" | "right">("left");
+  const [direction, setDirection] = useState<'left' | 'right'>('left');
   const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef<number | null>(null);
   const total = bestSellers.length || 1;
 
   const next = useCallback(() => {
     if (bestSellers.length <= 1) return;
-    setDirection("left");
+    setDirection('left');
     setCurrent((prev) => (prev + 1) % total);
   }, [total, bestSellers.length]);
 
   const prev = useCallback(() => {
     if (bestSellers.length <= 1) return;
-    setDirection("right");
+    setDirection('right');
     setCurrent((prev) => (prev - 1 + total) % total);
   }, [total, bestSellers.length]);
 
   useEffect(() => {
     autoPlayRef.current = setInterval(next, 3800);
-    return () => { if (autoPlayRef.current) clearInterval(autoPlayRef.current); };
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
   }, [next]);
 
   const resetAutoPlay = () => {
@@ -42,10 +40,18 @@ function BestSellersCarousel() {
     autoPlayRef.current = setInterval(next, 3800);
   };
 
-  const handlePrev = () => { prev(); resetAutoPlay(); };
-  const handleNext = () => { next(); resetAutoPlay(); };
+  const handlePrev = () => {
+    prev();
+    resetAutoPlay();
+  };
+  const handleNext = () => {
+    next();
+    resetAutoPlay();
+  };
 
-  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     const delta = touchStartX.current - e.changedTouches[0].clientX;
@@ -63,11 +69,7 @@ function BestSellersCarousel() {
   const visibleItems = getVisibleItems();
 
   if (bestSellers.length === 0) {
-    return (
-      <div className="text-center py-10 text-gray-500">
-        No best sellers found.
-      </div>
-    );
+    return <div className="text-center py-10 text-gray-500">No best sellers found.</div>;
   }
 
   return (
@@ -78,9 +80,9 @@ function BestSellersCarousel() {
           {visibleItems.map((item, i) => (
             <motion.div
               key={`${item.id}-${current}-${i}`}
-              initial={{ opacity: 0, x: direction === "left" ? 60 : -60 }}
+              initial={{ opacity: 0, x: direction === 'left' ? 60 : -60 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: direction === "left" ? -60 : 60 }}
+              exit={{ opacity: 0, x: direction === 'left' ? -60 : 60 }}
               transition={{ duration: 0.4, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             >
               <BestSellerCard item={item} />
@@ -94,9 +96,9 @@ function BestSellersCarousel() {
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={`${bestSellers[current].id}-mobile`}
-            initial={{ opacity: 0, x: direction === "left" ? 60 : -60 }}
+            initial={{ opacity: 0, x: direction === 'left' ? 60 : -60 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction === "left" ? -60 : 60 }}
+            exit={{ opacity: 0, x: direction === 'left' ? -60 : 60 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <BestSellerCard item={bestSellers[current]} />
@@ -106,19 +108,31 @@ function BestSellersCarousel() {
 
       {/* Arrows + dots */}
       <div className="flex items-center justify-center gap-4 mt-8">
-        <button onClick={handlePrev} className="w-10 h-10 rounded-full border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] hover:bg-[#C9A84C]/10 transition-all" data-testid="carousel-prev">
+        <button
+          onClick={handlePrev}
+          className="w-10 h-10 rounded-full border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] hover:bg-[#C9A84C]/10 transition-all"
+          data-testid="carousel-prev"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex gap-2">
           {bestSellers.map((_, i) => (
             <button
               key={i}
-              onClick={() => { setDirection(i > current ? "left" : "right"); setCurrent(i); resetAutoPlay(); }}
-              className={`h-2 rounded-full transition-all ${i === current ? "bg-[#C9A84C] w-6" : "bg-[#C9A84C]/20 w-2"}`}
+              onClick={() => {
+                setDirection(i > current ? 'left' : 'right');
+                setCurrent(i);
+                resetAutoPlay();
+              }}
+              className={`h-2 rounded-full transition-all ${i === current ? 'bg-[#C9A84C] w-6' : 'bg-[#C9A84C]/20 w-2'}`}
             />
           ))}
         </div>
-        <button onClick={handleNext} className="w-10 h-10 rounded-full border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] hover:bg-[#C9A84C]/10 transition-all" data-testid="carousel-next">
+        <button
+          onClick={handleNext}
+          className="w-10 h-10 rounded-full border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] hover:bg-[#C9A84C]/10 transition-all"
+          data-testid="carousel-next"
+        >
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -130,7 +144,10 @@ function BestSellerCard({ item }: { item: SupabaseProduct }) {
   return (
     <div className="group rounded-xl overflow-hidden border border-[#2a2520] bg-[#111009] hover:border-[#C9A84C]/40 hover:scale-[1.02] transition-all duration-300 flex flex-col h-full">
       {/* Full product image — no cropping, object-contain */}
-      <div className="w-full bg-[#0B0900] flex items-center justify-center overflow-hidden" style={{ aspectRatio: "4/3" }}>
+      <div
+        className="w-full bg-[#0B0900] flex items-center justify-center overflow-hidden"
+        style={{ aspectRatio: '4/3' }}
+      >
         <img
           src={item.image_url}
           alt={item.name}
@@ -143,7 +160,9 @@ function BestSellerCard({ item }: { item: SupabaseProduct }) {
           <h3 className="text-white font-serif text-xl mb-1 group-hover:text-[#C9A84C] transition-colors">
             {item.name}
           </h3>
-          <p className="text-[#999080] font-sans text-sm leading-relaxed mb-4">{item.description}</p>
+          <p className="text-[#999080] font-sans text-sm leading-relaxed mb-4">
+            {item.description}
+          </p>
         </div>
         <NavLink
           href="/order-now"
@@ -158,19 +177,19 @@ function BestSellerCard({ item }: { item: SupabaseProduct }) {
 
 export default function Home() {
   useEffect(() => {
-    document.title = "TUX | Burgers Worth The Chase";
+    document.title = 'TUX | Burgers Worth The Chase';
   }, []);
 
   return (
     <div className="w-full bg-[#0D0D0D]">
-
       {/* ── HERO ── */}
       <section className="relative w-full h-[100dvh] flex items-center justify-center overflow-hidden">
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=2000')",
-            backgroundPosition: "center 60%",
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=2000')",
+            backgroundPosition: 'center 60%',
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D0D] via-black/70 to-black/40" />
@@ -192,7 +211,8 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="text-[#F5EDD8]/90 text-lg md:text-xl font-sans max-w-2xl mx-auto mb-10 leading-relaxed"
           >
-            High quality smashed burgers, bold sauces, fresh ingredients, and a burger truck experience built to change the taste of burgers in Egypt.
+            High quality smashed burgers, bold sauces, fresh ingredients, and a burger truck
+            experience built to change the taste of burgers in Egypt.
           </motion.p>
 
           <motion.div
@@ -228,7 +248,7 @@ export default function Home() {
             <motion.div
               className="absolute top-0 left-0 w-full h-1/2 bg-[#C9A84C]"
               animate={{ y: [0, 48] }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+              transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
             />
           </div>
         </motion.div>
@@ -247,7 +267,9 @@ export default function Home() {
             <span className="text-[#C9A84C] font-sans text-xs tracking-[0.35em] uppercase mb-4 block">
               Best Sellers
             </span>
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white">Customers Favorites</h2>
+            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white">
+              Customers Favorites
+            </h2>
             <p className="text-[#999080] mt-4 font-sans text-base max-w-md mx-auto">
               The most-ordered items. Every one a reason to come back.
             </p>
@@ -279,9 +301,12 @@ export default function Home() {
               <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase mb-3 block">
                 What Drives Us
               </span>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">Our Goal</h2>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">
+                Our Goal
+              </h2>
               <p className="text-white text-lg leading-relaxed font-sans font-light">
-                Our goal is to serve clean, fresh, high-quality burgers with bold flavor, high-quality ingredients, and a taste people remember.
+                Our goal is to serve clean, fresh, high-quality burgers with bold flavor,
+                high-quality ingredients, and a taste people remember.
               </p>
             </motion.div>
 
@@ -296,9 +321,13 @@ export default function Home() {
               <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase mb-3 block">
                 Where We're Going
               </span>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">Our Vision</h2>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#C9A84C] mb-6">
+                Our Vision
+              </h2>
               <p className="text-white text-lg leading-relaxed font-sans font-light">
-                At TUX, we want to change the idea of burgers in Egypt. We are not just selling fast food. We are building a high-quality burger truck experience with fresh ingredients, clean preparation, strong branding, and unforgettable taste.
+                At TUX, we want to change the idea of burgers in Egypt. We are not just selling fast
+                food. We are building a high-quality burger truck experience with fresh ingredients,
+                clean preparation, strong branding, and unforgettable taste.
               </p>
             </motion.div>
           </div>

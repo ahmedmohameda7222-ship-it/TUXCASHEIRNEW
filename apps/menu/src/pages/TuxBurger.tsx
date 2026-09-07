@@ -1,28 +1,27 @@
-import React, { useEffect } from "react";
-import { motion } from "framer-motion";
-import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ProductCategoryNav } from '@/components/ProductCategoryNav';
 
 const products = [
   {
-    id: "01",
-    name: "Single Tux Burger",
+    id: '01',
+    name: 'Single Tux Burger',
     description: "One perfectly smashed patty, loaded with TUX's signature flavors.",
   },
   {
-    id: "02",
-    name: "Double Tux Burger",
-    description: "Two smashed patties. Bold, stacked, and built to impress.",
+    id: '02',
+    name: 'Double Tux Burger',
+    description: 'Two smashed patties. Bold, stacked, and built to impress.',
   },
   {
-    id: "03",
-    name: "Triple Tux Burger",
-    description: "Three layers of premium beef. The serious choice.",
+    id: '03',
+    name: 'Triple Tux Burger',
+    description: 'Three layers of premium beef. The serious choice.',
   },
   {
-    id: "04",
-    name: "TUX Quatro",
-    description: "Four patties. The pinnacle of the TUX Burger experience.",
+    id: '04',
+    name: 'TUX Quatro',
+    description: 'Four patties. The pinnacle of the TUX Burger experience.',
   },
 ];
 
@@ -30,11 +29,13 @@ function PlaceholderImage({ id }: { id: string }) {
   return (
     <div
       className="w-full aspect-square rounded-xl flex items-center justify-center"
-      style={{ background: "radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)" }}
+      style={{ background: 'radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)' }}
     >
       <div className="text-center">
         <span className="text-[#C9A84C]/20 font-serif text-7xl font-bold select-none">{id}</span>
-        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">Photo Coming Soon</p>
+        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">
+          Photo Coming Soon
+        </p>
       </div>
     </div>
   );
@@ -42,7 +43,7 @@ function PlaceholderImage({ id }: { id: string }) {
 
 export default function TuxBurger() {
   useEffect(() => {
-    document.title = "Tux Burger | TUX";
+    document.title = 'Tux Burger | TUX';
   }, []);
 
   return (
@@ -56,8 +57,12 @@ export default function TuxBurger() {
           transition={{ duration: 0.7 }}
           className="mb-14"
         >
-          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">Our Menu</span>
-          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">Tux Burger</h1>
+          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+            Our Menu
+          </span>
+          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">
+            Tux Burger
+          </h1>
           <p className="text-[#999080] font-sans text-lg max-w-xl">
             The original. Fresh ingredients, bold flavors, and a patty smashed to perfection.
           </p>
@@ -79,7 +84,9 @@ export default function TuxBurger() {
               </div>
               <div className="px-5 pb-6">
                 <h3 className="text-white font-serif text-xl mb-2">{product.name}</h3>
-                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">{product.description}</p>
+                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">
+                  {product.description}
+                </p>
                 <a
                   href="/order-now"
                   className="block w-full text-center py-3 rounded bg-[#8B1A1A] text-white font-sans font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all"

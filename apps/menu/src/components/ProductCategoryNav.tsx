@@ -1,8 +1,8 @@
-import React from "react";
-import { NavLink } from "@/components/NavLink";
-import { useLocation } from "wouter";
-import { useMenu } from "@/context/MenuContext";
-import { getProductSectionHref } from "@/lib/product-routes";
+import React from 'react';
+import { NavLink } from '@/components/NavLink';
+import { useLocation } from 'wouter';
+import { useMenu } from '@/context/MenuContext';
+import { getProductSectionHref } from '@/lib/product-routes';
 
 export const ProductCategoryNav = () => {
   const [location] = useLocation();
@@ -14,7 +14,10 @@ export const ProductCategoryNav = () => {
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center gap-8 min-w-max h-14">
         {productSections.map((section) => {
           const href = getProductSectionHref(section);
-          const isActive = location === href || location === `/products/${section.slug}` || location === `/products/${section.id}`;
+          const isActive =
+            location === href ||
+            location === `/products/${section.slug}` ||
+            location === `/products/${section.id}`;
           const unavailable = !section.is_active;
           return (
             <NavLink
@@ -23,12 +26,12 @@ export const ProductCategoryNav = () => {
               withPageTransition={false}
               className={`font-sans text-sm tracking-wide transition-all h-full flex items-center border-b-2 ${
                 isActive && !unavailable
-                  ? "text-primary border-primary font-semibold"
+                  ? 'text-primary border-primary font-semibold'
                   : isActive && unavailable
-                  ? "text-gray-300 border-gray-500 font-semibold"
-                  : unavailable
-                  ? "text-gray-600 hover:text-gray-400 border-transparent"
-                  : "text-muted hover:text-foreground border-transparent"
+                    ? 'text-gray-300 border-gray-500 font-semibold'
+                    : unavailable
+                      ? 'text-gray-600 hover:text-gray-400 border-transparent'
+                      : 'text-muted hover:text-foreground border-transparent'
               }`}
             >
               {section.name}

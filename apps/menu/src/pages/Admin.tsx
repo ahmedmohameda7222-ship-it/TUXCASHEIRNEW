@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useMenu, ProductSection, SupabaseProduct } from "@/context/MenuContext";
-import { Trash2, Edit2, Plus, Image as ImageIcon, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { useMenu, type ProductSection, type SupabaseProduct } from '@/context/MenuContext';
+import { Trash2, Edit2, Plus, Image as ImageIcon, X } from 'lucide-react';
 
-const PRODUCT_IMAGES_BUCKET = "product-images";
+const PRODUCT_IMAGES_BUCKET = 'product-images';
 const REQUEST_TIMEOUT_MS = 30000;
 
 type SupabaseErrorLike = {
@@ -27,12 +28,10 @@ const formatAdminError = (fallbackCode: string, fallbackMessage: string, err: un
   if (status) codeParts.push(`HTTP ${status}`);
 
   const message =
-    error?.message ||
-    (err instanceof Error ? err.message : "") ||
-    "No error message was returned.";
-  const extra = [error?.details, error?.hint].filter(Boolean).join(" ");
+    error?.message || (err instanceof Error ? err.message : '') || 'No error message was returned.';
+  const extra = [error?.details, error?.hint].filter(Boolean).join(' ');
 
-  return `[${codeParts.join(" / ")}] ${fallbackMessage}: ${message}${extra ? ` ${extra}` : ""}`;
+  return `[${codeParts.join(' / ')}] ${fallbackMessage}: ${message}${extra ? ` ${extra}` : ''}`;
 };
 
 const withTimeout = <T,>(operation: PromiseLike<T>, timeoutMessage: string) =>
@@ -50,20 +49,20 @@ const toSlug = (value: string) =>
   value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
-const isStoragePath = (path?: string | null) => Boolean(path && !path.startsWith("/src"));
+const isStoragePath = (path?: string | null) => Boolean(path && !path.startsWith('/src'));
 
 export default function Admin() {
   const { sections, products, refreshMenu } = useMenu();
-  const [session, setSession] = useState<any>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [session, setSession] = useState<Session | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"products" | "categories">("products");
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [editingCategory, setEditingCategory] = useState<ProductSection | null>(null);
   const [editingProduct, setEditingProduct] = useState<SupabaseProduct | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -75,7 +74,7 @@ export default function Admin() {
 
   const sortedSections = useMemo(
     () => [...sections].sort((a, b) => a.sort_order - b.sort_order),
-    [sections]
+    [sections],
   );
 
   const groupedProducts = useMemo(
@@ -86,7 +85,7 @@ export default function Admin() {
           .filter((product) => product.section_id === section.id)
           .sort((a, b) => a.sort_order - b.sort_order),
       })),
-    [sortedSections, products]
+    [sortedSections, products],
   );
 
   const uncategorizedProducts = useMemo(
@@ -94,7 +93,7 @@ export default function Admin() {
       products
         .filter((product) => !sections.some((section) => section.id === product.section_id))
         .sort((a, b) => a.sort_order - b.sort_order),
-    [products, sections]
+    [products, sections],
   );
 
   useEffect(() => {
@@ -113,7 +112,7 @@ export default function Admin() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const showMessage = (text: string, type: "success" | "error") => {
+  const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ text, type });
     window.setTimeout(() => setMessage(null), 4000);
   };
@@ -127,7 +126,7 @@ export default function Admin() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) {
-      setAuthError("Supabase is not connected.");
+      setAuthError('Supabase is not connected.');
       return;
     }
 
@@ -146,7 +145,7 @@ export default function Admin() {
     const id = `cat-${Date.now()}`;
     setEditingCategory({
       id,
-      name: "",
+      name: '',
       slug: id,
       sort_order: sections.length + 1,
       is_active: true,
@@ -154,15 +153,15 @@ export default function Admin() {
     setIsCategoryModalOpen(true);
   };
 
-  const openNewProductModal = (sectionId = sortedSections[0]?.id || "") => {
+  const openNewProductModal = (sectionId = sortedSections[0]?.id || '') => {
     resetImageState();
     setEditingProduct({
       id: `prod-${Date.now()}`,
       section_id: sectionId,
-      name: "",
-      description: "",
+      name: '',
+      description: '',
       price: 0,
-      image_url: "",
+      image_url: '',
       image_path: undefined,
       is_best_seller: false,
       is_active: true,
@@ -185,7 +184,7 @@ export default function Admin() {
     setImageFile(null);
     setEditingProduct({
       ...editingProduct,
-      image_url: "",
+      image_url: '',
       image_path: undefined,
     });
     setProductSaveError(null);
@@ -202,50 +201,55 @@ export default function Admin() {
         slug: editingCategory.slug || toSlug(editingCategory.name || editingCategory.id),
       };
       const isExistingDatabaseCategory = sections.some(
-        (section) => section.id === categoryToSave.id && !section.is_fallback
+        (section) => section.id === categoryToSave.id && !section.is_fallback,
       );
 
       if (!isExistingDatabaseCategory) {
-        const { error } = await supabase.from("product_sections").insert([categoryToSave]);
+        const { error } = await supabase.from('product_sections').insert([categoryToSave]);
         if (error) throw error;
-        showMessage("Category added successfully.", "success");
+        showMessage('Category added successfully.', 'success');
       } else {
         const { error } = await supabase
-          .from("product_sections")
+          .from('product_sections')
           .update(categoryToSave)
-          .eq("id", categoryToSave.id);
+          .eq('id', categoryToSave.id);
         if (error) throw error;
-        showMessage("Category updated successfully.", "success");
+        showMessage('Category updated successfully.', 'success');
       }
 
       setIsCategoryModalOpen(false);
       await refreshMenu();
-    } catch (err: any) {
-      showMessage(err.message || "Category save failed.", "error");
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Category save failed.', 'error');
     } finally {
       setLoadingAction(false);
     }
   };
 
   const deleteCategory = async (id: string) => {
-    if (!supabase || !window.confirm("Are you sure? This will delete all products in this category too.")) return;
+    if (
+      !supabase ||
+      !window.confirm('Are you sure? This will delete all products in this category too.')
+    )
+      return;
 
     try {
-      const { error } = await supabase.from("product_sections").delete().eq("id", id);
+      const { error } = await supabase.from('product_sections').delete().eq('id', id);
       if (error) throw error;
-      showMessage("Category deleted.", "success");
+      showMessage('Category deleted.', 'success');
       await refreshMenu();
-    } catch (err: any) {
-      showMessage(err.message || "Category delete failed.", "error");
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Category delete failed.', 'error');
     }
   };
 
   const saveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !editingProduct) {
-      const errorText = "[SAVE-001] Cannot save product: Supabase is not connected or no product is selected.";
+      const errorText =
+        '[SAVE-001] Cannot save product: Supabase is not connected or no product is selected.';
       setProductSaveError(errorText);
-      showMessage(errorText, "error");
+      showMessage(errorText, 'error');
       return;
     }
 
@@ -253,39 +257,41 @@ export default function Admin() {
     setProductSaveError(null);
 
     try {
-      let finalImageUrl = editingProduct.image_url || "";
+      let finalImageUrl = editingProduct.image_url || '';
       let finalImagePath = editingProduct.image_path;
       let imagePathToRemove = deletedImagePath;
 
       if (imageFile) {
-        if (!imageFile.type.startsWith("image/")) {
-          throw new Error("[UPLOAD-001] Image upload failed: Please choose a valid image file.");
+        if (!imageFile.type.startsWith('image/')) {
+          throw new Error('[UPLOAD-001] Image upload failed: Please choose a valid image file.');
         }
 
-        const fileExt = imageFile.name.split(".").pop()?.toLowerCase() || "png";
+        const fileExt = imageFile.name.split('.').pop()?.toLowerCase() || 'png';
         const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
         const filePath = `products/${fileName}`;
 
         const { error: uploadError } = await withTimeout(
           supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(filePath, imageFile, {
-            cacheControl: "3600",
+            cacheControl: '3600',
             contentType: imageFile.type,
             upsert: true,
           }),
-          `[UPLOAD-TIMEOUT] Image upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Check the "${PRODUCT_IMAGES_BUCKET}" bucket and storage policies.`
+          `[UPLOAD-TIMEOUT] Image upload timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Check the "${PRODUCT_IMAGES_BUCKET}" bucket and storage policies.`,
         );
 
         if (uploadError) {
           throw new Error(
             formatAdminError(
-              "UPLOAD-002",
+              'UPLOAD-002',
               `Image upload failed in bucket "${PRODUCT_IMAGES_BUCKET}"`,
-              uploadError
-            )
+              uploadError,
+            ),
           );
         }
 
-        const { data: publicUrlData } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(filePath);
+        const { data: publicUrlData } = supabase.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .getPublicUrl(filePath);
         finalImageUrl = publicUrlData.publicUrl;
         finalImagePath = filePath;
 
@@ -295,7 +301,7 @@ export default function Admin() {
       }
 
       if (deletedImagePath && !imageFile) {
-        finalImageUrl = "";
+        finalImageUrl = '';
         finalImagePath = undefined;
       }
 
@@ -314,53 +320,64 @@ export default function Admin() {
       };
 
       if (!productToSave.section_id) {
-        throw new Error("[PRODUCT-CATEGORY-001] Product save failed: choose a category before saving.");
+        throw new Error(
+          '[PRODUCT-CATEGORY-001] Product save failed: choose a category before saving.',
+        );
       }
 
       const isExistingDatabaseProduct = products.some(
-        (product) => product.id === productToSave.id && !product.is_fallback
+        (product) => product.id === productToSave.id && !product.is_fallback,
       );
 
       if (!isExistingDatabaseProduct) {
-        const { error } = await supabase.from("products").insert([productToSave]);
-        if (error) throw new Error(formatAdminError("DB-INSERT-001", "Product insert failed", error));
-        showMessage("Product added successfully.", "success");
+        const { error } = await supabase.from('products').insert([productToSave]);
+        if (error)
+          throw new Error(formatAdminError('DB-INSERT-001', 'Product insert failed', error));
+        showMessage('Product added successfully.', 'success');
       } else {
-        const { error } = await supabase.from("products").update(productToSave).eq("id", productToSave.id);
-        if (error) throw new Error(formatAdminError("DB-UPDATE-001", "Product update failed", error));
-        showMessage("Product updated successfully.", "success");
+        const { error } = await supabase
+          .from('products')
+          .update(productToSave)
+          .eq('id', productToSave.id);
+        if (error)
+          throw new Error(formatAdminError('DB-UPDATE-001', 'Product update failed', error));
+        showMessage('Product updated successfully.', 'success');
       }
 
-      if (imagePathToRemove && imagePathToRemove !== finalImagePath && isStoragePath(imagePathToRemove)) {
+      if (
+        imagePathToRemove &&
+        imagePathToRemove !== finalImagePath &&
+        isStoragePath(imagePathToRemove)
+      ) {
         await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePathToRemove]);
       }
 
       setIsProductModalOpen(false);
       resetImageState();
       await refreshMenu();
-    } catch (err: any) {
-      const errorText = formatAdminError("SAVE-FAILED", "Product save failed", err);
-      console.error("Product save failed:", err);
+    } catch (err: unknown) {
+      const errorText = formatAdminError('SAVE-FAILED', 'Product save failed', err);
+      console.error('Product save failed:', err);
       setProductSaveError(errorText);
-      showMessage(errorText, "error");
+      showMessage(errorText, 'error');
     } finally {
       setLoadingAction(false);
     }
   };
 
   const deleteProduct = async (id: string, imagePath?: string) => {
-    if (!supabase || !window.confirm("Are you sure you want to delete this product?")) return;
+    if (!supabase || !window.confirm('Are you sure you want to delete this product?')) return;
 
     try {
       if (isStoragePath(imagePath)) {
         await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePath as string]);
       }
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
-      showMessage("Product deleted.", "success");
+      showMessage('Product deleted.', 'success');
       await refreshMenu();
-    } catch (err: any) {
-      showMessage(err.message || "Product delete failed.", "error");
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Product delete failed.', 'error');
     }
   };
 
@@ -405,7 +422,7 @@ export default function Admin() {
                 disabled={authLoading}
                 className="w-full bg-[#D4AF37] text-black font-bold py-3 rounded-lg hover:bg-[#F3D55B] transition-colors disabled:opacity-50"
               >
-                {authLoading ? "Logging in..." : "Login"}
+                {authLoading ? 'Logging in...' : 'Login'}
               </button>
             </form>
           )}
@@ -415,10 +432,17 @@ export default function Admin() {
   }
 
   const renderProductCard = (product: SupabaseProduct) => (
-    <div key={product.id} className="bg-[#111] p-4 rounded-xl border border-white/10 flex flex-col md:flex-row items-center gap-4">
+    <div
+      key={product.id}
+      className="bg-[#111] p-4 rounded-xl border border-white/10 flex flex-col md:flex-row items-center gap-4"
+    >
       <div className="w-20 h-20 bg-black rounded flex items-center justify-center p-2 flex-shrink-0">
         {product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain" />
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="max-w-full max-h-full object-contain"
+          />
         ) : (
           <ImageIcon className="text-gray-600" />
         )}
@@ -427,11 +451,21 @@ export default function Admin() {
         <h3 className="font-bold text-lg">{product.name}</h3>
         <p className="text-sm text-gray-400">{product.description}</p>
         <div className="flex flex-wrap gap-2 justify-center md:justify-start mt-2">
-          <span className="text-xs bg-white/10 px-2 py-1 rounded text-[#D4AF37]">{product.price} EGP</span>
+          <span className="text-xs bg-white/10 px-2 py-1 rounded text-[#D4AF37]">
+            {product.price} EGP
+          </span>
           <span className="text-xs bg-white/10 px-2 py-1 rounded">Order: {product.sort_order}</span>
-          {product.is_best_seller && <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">Best Seller</span>}
-          {!product.is_active && <span className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded">Hidden</span>}
-          {product.is_fallback && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Default</span>}
+          {product.is_best_seller && (
+            <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">
+              Best Seller
+            </span>
+          )}
+          {!product.is_active && (
+            <span className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded">Hidden</span>
+          )}
+          {product.is_fallback && (
+            <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Default</span>
+          )}
         </div>
       </div>
       <div className="flex gap-2">
@@ -459,58 +493,86 @@ export default function Admin() {
             <h1 className="text-4xl font-black uppercase text-[#D4AF37]">Admin Panel</h1>
             <p className="text-gray-400 mt-1">Manage dynamic content on Supabase</p>
           </div>
-          <button onClick={handleLogout} className="text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={handleLogout}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
             Logout
           </button>
         </div>
 
         {message && (
-          <div className={`mb-6 p-4 rounded-lg font-semibold text-center border ${message.type === "success" ? "bg-green-500/20 border-green-500/50 text-green-400" : "bg-red-500/20 border-red-500/50 text-red-400"}`}>
+          <div
+            className={`mb-6 p-4 rounded-lg font-semibold text-center border ${message.type === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-red-500/20 border-red-500/50 text-red-400'}`}
+          >
             {message.text}
           </div>
         )}
 
         <div className="flex gap-4 border-b border-white/10 mb-8">
           <button
-            onClick={() => setActiveTab("products")}
-            className={`pb-4 px-4 font-bold transition-colors ${activeTab === "products" ? "text-[#D4AF37] border-b-2 border-[#D4AF37]" : "text-gray-500 hover:text-white"}`}
+            onClick={() => setActiveTab('products')}
+            className={`pb-4 px-4 font-bold transition-colors ${activeTab === 'products' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}
           >
             Products
           </button>
           <button
-            onClick={() => setActiveTab("categories")}
-            className={`pb-4 px-4 font-bold transition-colors ${activeTab === "categories" ? "text-[#D4AF37] border-b-2 border-[#D4AF37]" : "text-gray-500 hover:text-white"}`}
+            onClick={() => setActiveTab('categories')}
+            className={`pb-4 px-4 font-bold transition-colors ${activeTab === 'categories' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-gray-500 hover:text-white'}`}
           >
             Categories
           </button>
         </div>
 
-        {activeTab === "categories" && (
+        {activeTab === 'categories' && (
           <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Categories</h2>
-              <button onClick={openNewCategoryModal} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2">
+              <button
+                onClick={openNewCategoryModal}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2"
+              >
                 <Plus className="w-4 h-4" /> Add Category
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {sortedSections.map((section) => (
-                <div key={section.id} className="bg-[#111] p-5 rounded-xl border border-white/10 flex justify-between items-center">
+                <div
+                  key={section.id}
+                  className="bg-[#111] p-5 rounded-xl border border-white/10 flex justify-between items-center"
+                >
                   <div>
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       {section.name}
-                      {!section.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Hidden</span>}
-                      {section.is_fallback && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Default</span>}
+                      {!section.is_active && (
+                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
+                          Hidden
+                        </span>
+                      )}
+                      {section.is_fallback && (
+                        <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
                     </h3>
                     <p className="text-xs text-gray-500">ID: {section.id}</p>
                     <p className="text-xs text-gray-500">Order: {section.sort_order}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingCategory(section); setIsCategoryModalOpen(true); }} className="p-2 text-gray-400 hover:text-[#D4AF37]">
+                    <button
+                      onClick={() => {
+                        setEditingCategory(section);
+                        setIsCategoryModalOpen(true);
+                      }}
+                      className="p-2 text-gray-400 hover:text-[#D4AF37]"
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => deleteCategory(section.id)} className="p-2 text-gray-400 hover:text-red-500">
+                    <button
+                      onClick={() => deleteCategory(section.id)}
+                      className="p-2 text-gray-400 hover:text-red-500"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -520,30 +582,48 @@ export default function Admin() {
           </div>
         )}
 
-        {activeTab === "products" && (
+        {activeTab === 'products' && (
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
               <div>
                 <h2 className="text-2xl font-bold">Products</h2>
-                <p className="text-sm text-gray-500">Products are grouped by category. Inactive products stay visible publicly as unavailable.</p>
+                <p className="text-sm text-gray-500">
+                  Products are grouped by category. Inactive products stay visible publicly as
+                  unavailable.
+                </p>
               </div>
-              <button onClick={() => openNewProductModal()} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2">
+              <button
+                onClick={() => openNewProductModal()}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded font-bold flex items-center gap-2"
+              >
                 <Plus className="w-4 h-4" /> Add Product
               </button>
             </div>
 
             <div className="space-y-8">
               {groupedProducts.map(({ section, products: sectionProducts }) => (
-                <section key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+                <section
+                  key={section.id}
+                  className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 md:p-5"
+                >
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4 border-b border-white/10 pb-4">
                     <div>
                       <h3 className="text-xl font-black text-[#D4AF37] uppercase tracking-wide flex items-center gap-2">
                         {section.name}
-                        {!section.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Hidden</span>}
+                        {!section.is_active && (
+                          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
+                            Hidden
+                          </span>
+                        )}
                       </h3>
-                      <p className="text-xs text-gray-500">{sectionProducts.length} product{sectionProducts.length === 1 ? "" : "s"}</p>
+                      <p className="text-xs text-gray-500">
+                        {sectionProducts.length} product{sectionProducts.length === 1 ? '' : 's'}
+                      </p>
                     </div>
-                    <button onClick={() => openNewProductModal(section.id)} className="bg-[#D4AF37] hover:bg-[#F3D55B] text-black px-4 py-2 rounded font-bold flex items-center gap-2 w-fit">
+                    <button
+                      onClick={() => openNewProductModal(section.id)}
+                      className="bg-[#D4AF37] hover:bg-[#F3D55B] text-black px-4 py-2 rounded font-bold flex items-center gap-2 w-fit"
+                    >
                       <Plus className="w-4 h-4" /> Add to {section.name}
                     </button>
                   </div>
@@ -553,16 +633,16 @@ export default function Admin() {
                       No products in this category yet.
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {sectionProducts.map(renderProductCard)}
-                    </div>
+                    <div className="space-y-4">{sectionProducts.map(renderProductCard)}</div>
                   )}
                 </section>
               ))}
 
               {uncategorizedProducts.length > 0 && (
                 <section className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-4 md:p-5">
-                  <h3 className="text-xl font-black text-red-400 uppercase tracking-wide mb-4">Uncategorized Products</h3>
+                  <h3 className="text-xl font-black text-red-400 uppercase tracking-wide mb-4">
+                    Uncategorized Products
+                  </h3>
                   <div className="space-y-4">{uncategorizedProducts.map(renderProductCard)}</div>
                 </section>
               )}
@@ -574,31 +654,95 @@ export default function Admin() {
       {isCategoryModalOpen && editingCategory && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">{sections.some((section) => section.id === editingCategory.id && !section.is_fallback) ? "Edit Category" : "Add Category"}</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {sections.some((section) => section.id === editingCategory.id && !section.is_fallback)
+                ? 'Edit Category'
+                : 'Add Category'}
+            </h2>
             <form onSubmit={saveCategory} className="space-y-4">
               <div>
                 <label className="text-sm text-gray-400">ID</label>
-                <input required type="text" value={editingCategory.id} onChange={(e) => setEditingCategory({ ...editingCategory, id: toSlug(e.target.value), slug: toSlug(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                <input
+                  required
+                  type="text"
+                  value={editingCategory.id}
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      id: toSlug(e.target.value),
+                      slug: toSlug(e.target.value),
+                    })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                />
               </div>
               <div>
                 <label className="text-sm text-gray-400">Name</label>
-                <input required type="text" value={editingCategory.name} onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value, slug: editingCategory.slug || toSlug(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                <input
+                  required
+                  type="text"
+                  value={editingCategory.name}
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      name: e.target.value,
+                      slug: editingCategory.slug || toSlug(e.target.value),
+                    })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                />
               </div>
               <div>
                 <label className="text-sm text-gray-400">Slug</label>
-                <input required type="text" value={editingCategory.slug} onChange={(e) => setEditingCategory({ ...editingCategory, slug: toSlug(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                <input
+                  required
+                  type="text"
+                  value={editingCategory.slug}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, slug: toSlug(e.target.value) })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                />
               </div>
               <div>
                 <label className="text-sm text-gray-400">Sort Order</label>
-                <input required type="number" value={editingCategory.sort_order} onChange={(e) => setEditingCategory({ ...editingCategory, sort_order: Number(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                <input
+                  required
+                  type="number"
+                  value={editingCategory.sort_order}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, sort_order: Number(e.target.value) })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                />
               </div>
               <div className="flex items-center gap-2 mt-4">
-                <input type="checkbox" id="cat-active" checked={editingCategory.is_active} onChange={(e) => setEditingCategory({ ...editingCategory, is_active: e.target.checked })} className="w-4 h-4" />
+                <input
+                  type="checkbox"
+                  id="cat-active"
+                  checked={editingCategory.is_active}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, is_active: e.target.checked })
+                  }
+                  className="w-4 h-4"
+                />
                 <label htmlFor="cat-active">Is Active</label>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="flex-1 py-2 bg-white/10 rounded font-bold">Cancel</button>
-                <button type="submit" disabled={loadingAction} className="flex-1 py-2 bg-[#D4AF37] text-black rounded font-bold disabled:opacity-50">{loadingAction ? "Saving..." : "Save"}</button>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="flex-1 py-2 bg-white/10 rounded font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingAction}
+                  className="flex-1 py-2 bg-[#D4AF37] text-black rounded font-bold disabled:opacity-50"
+                >
+                  {loadingAction ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
@@ -608,7 +752,11 @@ export default function Admin() {
       {isProductModalOpen && editingProduct && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#111] p-6 rounded-2xl border border-white/10 w-full max-w-xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">{products.some((product) => product.id === editingProduct.id && !product.is_fallback) ? "Edit Product" : "Add Product"}</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {products.some((product) => product.id === editingProduct.id && !product.is_fallback)
+                ? 'Edit Product'
+                : 'Add Product'}
+            </h2>
             {productSaveError && (
               <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/15 p-3 text-sm font-semibold text-red-300 break-words">
                 {productSaveError}
@@ -618,35 +766,79 @@ export default function Admin() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-400">ID / Slug</label>
-                  <input required type="text" value={editingProduct.id} onChange={(e) => setEditingProduct({ ...editingProduct, id: toSlug(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                  <input
+                    required
+                    type="text"
+                    value={editingProduct.id}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, id: toSlug(e.target.value) })
+                    }
+                    className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-400">Name</label>
-                  <input required type="text" value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                  <input
+                    required
+                    type="text"
+                    value={editingProduct.name}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                    className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-400">Price (EGP)</label>
-                  <input required type="number" value={editingProduct.price} onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                  <input
+                    required
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, price: Number(e.target.value) })
+                    }
+                    className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-400">Category</label>
-                  <select required value={editingProduct.section_id} onChange={(e) => setEditingProduct({ ...editingProduct, section_id: e.target.value })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1">
-                    {sortedSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
+                  <select
+                    required
+                    value={editingProduct.section_id}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, section_id: e.target.value })
+                    }
+                    className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                  >
+                    {sortedSections.map((section) => (
+                      <option key={section.id} value={section.id}>
+                        {section.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="text-sm text-gray-400">Description</label>
-                <textarea required value={editingProduct.description} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1 h-20" />
+                <textarea
+                  required
+                  value={editingProduct.description}
+                  onChange={(e) =>
+                    setEditingProduct({ ...editingProduct, description: e.target.value })
+                  }
+                  className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1 h-20"
+                />
               </div>
 
               <div>
                 <label className="text-sm text-gray-400 block mb-1">Product Image</label>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-white/10 bg-black/30 p-3">
-                  {(imageFile || editingProduct.image_url) ? (
+                  {imageFile || editingProduct.image_url ? (
                     <div className="w-20 h-20 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
-                      <img src={imageFile ? URL.createObjectURL(imageFile) : editingProduct.image_url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                      <img
+                        src={imageFile ? URL.createObjectURL(imageFile) : editingProduct.image_url}
+                        alt="Preview"
+                        className="max-w-full max-h-full object-contain"
+                      />
                     </div>
                   ) : (
                     <div className="w-20 h-20 bg-black rounded border border-white/10 flex items-center justify-center p-1 overflow-hidden">
@@ -654,14 +846,29 @@ export default function Admin() {
                     </div>
                   )}
                   <div className="flex-1 space-y-3">
-                    <input type="file" accept="image/*" onChange={(e) => { setImageFile(e.target.files?.[0] || null); setDeletedImagePath(null); setProductSaveError(null); }} className="w-full bg-black border border-white/20 rounded px-3 py-2 text-sm" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        setImageFile(e.target.files?.[0] || null);
+                        setDeletedImagePath(null);
+                        setProductSaveError(null);
+                      }}
+                      className="w-full bg-black border border-white/20 rounded px-3 py-2 text-sm"
+                    />
                     {(imageFile || editingProduct.image_url) && (
-                      <button type="button" onClick={handleRemoveProductImage} className="inline-flex items-center gap-2 rounded bg-red-500/15 px-3 py-2 text-sm font-bold text-red-300 hover:bg-red-500/25">
+                      <button
+                        type="button"
+                        onClick={handleRemoveProductImage}
+                        className="inline-flex items-center gap-2 rounded bg-red-500/15 px-3 py-2 text-sm font-bold text-red-300 hover:bg-red-500/25"
+                      >
                         <X className="w-4 h-4" /> Delete Uploaded Picture
                       </button>
                     )}
                     {deletedImagePath && (
-                      <p className="text-xs text-red-300">The current uploaded picture will be deleted after saving.</p>
+                      <p className="text-xs text-red-300">
+                        The current uploaded picture will be deleted after saving.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -670,25 +877,62 @@ export default function Admin() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-400">Sort Order</label>
-                  <input required type="number" value={editingProduct.sort_order} onChange={(e) => setEditingProduct({ ...editingProduct, sort_order: Number(e.target.value) })} className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1" />
+                  <input
+                    required
+                    type="number"
+                    value={editingProduct.sort_order}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, sort_order: Number(e.target.value) })
+                    }
+                    className="w-full bg-black border border-white/20 rounded px-3 py-2 mt-1"
+                  />
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-6 mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" id="prod-active" checked={editingProduct.is_active} onChange={(e) => setEditingProduct({ ...editingProduct, is_active: e.target.checked })} className="w-4 h-4" />
+                  <input
+                    type="checkbox"
+                    id="prod-active"
+                    checked={editingProduct.is_active}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, is_active: e.target.checked })
+                    }
+                    className="w-4 h-4"
+                  />
                   <label htmlFor="prod-active">Is Active</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" id="prod-best" checked={editingProduct.is_best_seller} onChange={(e) => setEditingProduct({ ...editingProduct, is_best_seller: e.target.checked })} className="w-4 h-4" />
+                  <input
+                    type="checkbox"
+                    id="prod-best"
+                    checked={editingProduct.is_best_seller}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, is_best_seller: e.target.checked })
+                    }
+                    className="w-4 h-4"
+                  />
                   <label htmlFor="prod-best">Best Seller</label>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setIsProductModalOpen(false); resetImageState(); }} className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold transition-colors">Cancel</button>
-                <button type="submit" disabled={loadingAction} className="flex-1 py-3 bg-[#D4AF37] hover:bg-[#F3D55B] text-black rounded-lg font-bold disabled:opacity-50 transition-colors">
-                  {loadingAction ? "Saving & Uploading..." : "Save Product"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProductModalOpen(false);
+                    resetImageState();
+                  }}
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingAction}
+                  className="flex-1 py-3 bg-[#D4AF37] hover:bg-[#F3D55B] text-black rounded-lg font-bold disabled:opacity-50 transition-colors"
+                >
+                  {loadingAction ? 'Saving & Uploading...' : 'Save Product'}
                 </button>
               </div>
             </form>

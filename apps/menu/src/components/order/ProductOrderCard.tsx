@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
-import { SupabaseProduct } from "@/context/MenuContext";
-import { CartExtra, useCart } from "@/context/CartContext";
-import { Plus, Minus, ImageOff } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useMemo, useState } from 'react';
+import { type SupabaseProduct } from '@/context/MenuContext';
+import { type CartExtra, useCart } from '@/context/CartContext';
+import { Plus, Minus, ImageOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProductOrderCardProps {
   product: SupabaseProduct;
@@ -13,7 +13,7 @@ interface ProductOrderCardProps {
 }
 
 const buildVariantId = (productId: string, selectedExtraIds: string[]) => {
-  const extrasKey = [...selectedExtraIds].sort().join("__");
+  const extrasKey = [...selectedExtraIds].sort().join('__');
   return extrasKey ? `${productId}__extras__${extrasKey}` : productId;
 };
 
@@ -32,11 +32,11 @@ export function ProductOrderCard({
   const unavailable = categoryUnavailable || !product.is_active;
   const cartItem = items.find((item) => item.id === product.id);
   const quantity = cartItem?.quantity || 0;
-  const canAddExtras = !unavailable && product.section_id !== "extras" && extras.length > 0;
+  const canAddExtras = !unavailable && product.section_id !== 'extras' && extras.length > 0;
 
   const selectedExtras = useMemo(
     () => extras.filter((extra) => selectedExtraIds.includes(extra.id)),
-    [extras, selectedExtraIds]
+    [extras, selectedExtraIds],
   );
 
   const selectedExtrasTotal = selectedExtras.reduce((sum, extra) => sum + extra.price, 0);
@@ -44,9 +44,7 @@ export function ProductOrderCard({
 
   const toggleExtra = (extraId: string) => {
     setSelectedExtraIds((current) =>
-      current.includes(extraId)
-        ? current.filter((id) => id !== extraId)
-        : [...current, extraId]
+      current.includes(extraId) ? current.filter((id) => id !== extraId) : [...current, extraId],
     );
   };
 
@@ -54,7 +52,7 @@ export function ProductOrderCard({
     if (unavailable) return;
     addToCart(product, 1);
     toast({
-      title: "Added to Cart",
+      title: 'Added to Cart',
       description: `${product.name} has been added to your cart.`,
       duration: 2000,
     });
@@ -71,7 +69,10 @@ export function ProductOrderCard({
     }));
 
     const productWithExtras = {
-      id: buildVariantId(product.id, cartExtras.map((extra) => extra.id)),
+      id: buildVariantId(
+        product.id,
+        cartExtras.map((extra) => extra.id),
+      ),
       name: product.name,
       baseProductId: product.id,
       baseProductName: product.name,
@@ -86,8 +87,8 @@ export function ProductOrderCard({
     setSelectedExtraIds([]);
     setIsExtrasOpen(false);
     toast({
-      title: "Added with Extras",
-      description: `${product.name} with ${cartExtras.map((extra) => extra.name).join(", ")} has been added to your cart.`,
+      title: 'Added with Extras',
+      description: `${product.name} with ${cartExtras.map((extra) => extra.name).join(', ')} has been added to your cart.`,
       duration: 2500,
     });
   };
@@ -98,9 +99,9 @@ export function ProductOrderCard({
       tabIndex={-1}
       className={`scroll-mt-36 flex flex-col rounded-xl overflow-hidden border transition-all duration-300 shadow-md outline-none ${
         unavailable
-          ? "bg-gray-900/70 border-gray-700 grayscale opacity-70"
-          : "bg-[#111] border-white/5 hover:border-[#D4AF37]/30"
-      } ${isTargeted ? "ring-2 ring-[#D4AF37] ring-offset-4 ring-offset-black" : ""}`}
+          ? 'bg-gray-900/70 border-gray-700 grayscale opacity-70'
+          : 'bg-[#111] border-white/5 hover:border-[#D4AF37]/30'
+      } ${isTargeted ? 'ring-2 ring-[#D4AF37] ring-offset-4 ring-offset-black' : ''}`}
     >
       <div className="flex">
         <div className="w-1/3 aspect-square max-w-[120px] bg-black/40 flex items-center justify-center p-2 flex-shrink-0">
@@ -111,7 +112,7 @@ export function ProductOrderCard({
               className="w-full h-full object-contain"
               loading="lazy"
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
               }}
             />
           ) : (
@@ -120,7 +121,9 @@ export function ProductOrderCard({
         </div>
         <div className="flex-1 p-4 flex flex-col justify-between">
           <div>
-            <h3 className={`font-bold text-base leading-tight mb-1 ${unavailable ? "text-gray-300" : "text-white"}`}>
+            <h3
+              className={`font-bold text-base leading-tight mb-1 ${unavailable ? 'text-gray-300' : 'text-white'}`}
+            >
               {product.name}
             </h3>
             {product.description && (
@@ -128,7 +131,7 @@ export function ProductOrderCard({
                 {product.description}
               </p>
             )}
-            <p className={`font-semibold ${unavailable ? "text-gray-400" : "text-[#D4AF37]"}`}>
+            <p className={`font-semibold ${unavailable ? 'text-gray-400' : 'text-[#D4AF37]'}`}>
               {product.price} <span className="text-sm text-gray-400">EGP</span>
             </p>
             {unavailable && (
@@ -149,9 +152,7 @@ export function ProductOrderCard({
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-white font-bold w-4 text-center">
-                    {quantity}
-                  </span>
+                  <span className="text-white font-bold w-4 text-center">{quantity}</span>
                   <button
                     onClick={() => updateQuantity(product.id, quantity + 1)}
                     className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black transition-colors"
@@ -201,8 +202,8 @@ export function ProductOrderCard({
                   key={extra.id}
                   className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
                     checked
-                      ? "border-[#D4AF37]/70 bg-[#D4AF37]/15"
-                      : "border-white/10 bg-white/5 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10"
+                      ? 'border-[#D4AF37]/70 bg-[#D4AF37]/15'
+                      : 'border-white/10 bg-white/5 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10'
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -212,9 +213,13 @@ export function ProductOrderCard({
                       onChange={() => toggleExtra(extra.id)}
                       className="h-4 w-4 accent-[#D4AF37]"
                     />
-                    <span className="text-sm font-semibold text-white leading-snug">{extra.name}</span>
+                    <span className="text-sm font-semibold text-white leading-snug">
+                      {extra.name}
+                    </span>
                   </span>
-                  <span className="text-sm font-bold text-[#D4AF37] whitespace-nowrap">+{extra.price} EGP</span>
+                  <span className="text-sm font-bold text-[#D4AF37] whitespace-nowrap">
+                    +{extra.price} EGP
+                  </span>
                 </label>
               );
             })}
@@ -237,8 +242,8 @@ export function ProductOrderCard({
               disabled={selectedExtras.length === 0}
               className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
                 selectedExtras.length === 0
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                  : "bg-[#D4AF37] text-black hover:bg-[#F3D55B]"
+                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-[#D4AF37] text-black hover:bg-[#F3D55B]'
               }`}
             >
               Add with Extras

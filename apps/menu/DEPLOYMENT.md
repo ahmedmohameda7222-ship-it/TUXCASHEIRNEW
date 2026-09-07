@@ -1,154 +1,41 @@
-# Deployment Guide — TUX Burger Website
+# Deployment Guide — TUX Menu (Phase A)
 
-This is a **static frontend application** built with Vite + React. There is no backend server.
-Once built, the output is a folder of HTML/CSS/JS files that can be hosted anywhere.
+TUX Menu is a Vite + React browser application inside the TUX monorepo. During Phase A, its dynamic Menu/Admin data path still uses the legacy Supabase browser client. The fallback catalog can render without Supabase configuration, but dynamic legacy Menu/Admin data requires the browser-visible variables below.
 
----
+## Monorepo commands
 
-## Prerequisites
-
-- Node.js **v18 or higher**
-- npm (comes with Node.js), or pnpm / yarn
-
----
-
-## 1. Local Development
+Run these commands from the repository root:
 
 ```bash
-# Install dependencies
-npm install
-
-# Start the dev server at http://localhost:5173
-npm run dev
+npm ci
+npm run dev:menu
+npm run typecheck:menu
+npm run build:menu
 ```
 
----
+The production build output is `apps/menu/dist/`.
 
-## 2. Production Build
+## Browser-visible legacy Supabase configuration
 
-```bash
-npm run build
+Phase A uses only these Vite browser variables for the legacy Menu/Admin backend:
+
+```dotenv
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
-Output is placed in the `dist/` folder. You can preview it locally:
+Both values are exposed to browser code by Vite. They must therefore contain only the public Supabase project URL and anonymous/public key.
 
-```bash
-npm run preview
-# Opens at http://localhost:4173
-```
+Do **not** place a Supabase service-role key, private server secret, `TUX_SUPABASE_*` private credential, or any other privileged secret in the Menu application or its Vite environment.
 
----
+If the two `VITE_SUPABASE_*` values are omitted, the fallback catalog remains available, while legacy dynamic Supabase-backed Menu/Admin behavior is unavailable.
 
-## 3. Deploy to Vercel (Recommended)
+## WhatsApp ordering
 
-Vercel is the easiest platform for Vite/React apps.
+During Phase A, the WhatsApp order destination remains configured in `src/lib/constants.ts`. It is not a private server credential and is not moved into the Supabase environment variables by this phase.
 
-### Option A — Via GitHub (recommended)
+## Architecture boundary
 
-1. Push this repository to GitHub.
-2. Go to [vercel.com](https://vercel.com) → **Add New Project**.
-3. Import your GitHub repo.
-4. Vercel auto-detects Vite. Leave all settings as default:
-   - **Framework Preset**: Vite
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-5. Click **Deploy**.
+Root `supabase/migrations/` is the only executable database migration authority. The file under `apps/menu/legacy/supabase_setup.sql.reference` is historical reference material only and must never be executed or copied into canonical migrations.
 
-Your site is live on a `*.vercel.app` domain in ~30 seconds.
-
-### Option B — Via Vercel CLI
-
-```bash
-npm install -g vercel
-vercel login
-vercel --prod
-```
-
----
-
-## 4. Deploy to Netlify
-
-1. Push this repository to GitHub.
-2. Go to [netlify.com](https://netlify.com) → **Add new site** → **Import from Git**.
-3. Connect your GitHub repo.
-4. Set build settings:
-   - **Build Command**: `npm run build`
-   - **Publish Directory**: `dist`
-5. Click **Deploy site**.
-
-### Netlify CLI alternative
-
-```bash
-npm install -g netlify-cli
-netlify login
-npm run build
-netlify deploy --prod --dir dist
-```
-
----
-
-## 5. Deploy to GitHub Pages
-
-1. Install the `gh-pages` package:
-   ```bash
-   npm install --save-dev gh-pages
-   ```
-
-2. Add a deploy script to `package.json`:
-   ```json
-   "scripts": {
-     "deploy": "gh-pages -d dist"
-   }
-   ```
-
-3. If your site is hosted at `https://username.github.io/repo-name/` (not the root),
-   update the `base` in `vite.config.ts`:
-   ```ts
-   base: "/repo-name/",
-   ```
-   If it will be at the root domain, leave `base: "/"`.
-
-4. Build and deploy:
-   ```bash
-   npm run build
-   npm run deploy
-   ```
-
----
-
-## 6. Configuring the WhatsApp Button
-
-All **Order Now** buttons link to WhatsApp. To set your number:
-
-Edit `src/lib/constants.ts`:
-
-```ts
-export const WHATSAPP_NUMBER = "201012345678"; // Your number without +
-```
-
-No environment variables are needed — this is a purely frontend app.
-
----
-
-## 7. Custom Domain
-
-All platforms above (Vercel, Netlify, GitHub Pages) support custom domains.
-- On Vercel/Netlify: add your domain in the project's domain settings.
-- On GitHub Pages: add a `CNAME` file in the `public/` folder containing your domain.
-
----
-
-## Environment Variables
-
-This project has **no required environment variables**. The WhatsApp number is configured
-directly in `src/lib/constants.ts`.
-
-If you add any future environment variables, prefix them with `VITE_` so Vite
-exposes them to the browser:
-
-```ts
-// Access in code:
-const myVar = import.meta.env.VITE_MY_VARIABLE;
-```
-
-And add them to `.env.example` so teammates know they exist.
+Canonical catalog/API ownership and standalone Admin extraction belong to later approved phases; Phase A does not perform those cutovers.

@@ -1,6 +1,6 @@
-import { useCart } from "@/context/CartContext";
-import { ShoppingBag } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCart } from '@/context/CartContext';
+import { ShoppingBag } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 export function StickyCartBar() {
   const { totalItems, totalPrice, setIsCartOpen, isCartOpen } = useCart();
@@ -25,15 +25,13 @@ export function StickyCartBar() {
             </div>
             <span>Items</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <span>View Cart</span>
             <ShoppingBag className="w-5 h-5" />
           </div>
 
-          <div className="text-lg">
-            {totalPrice} EGP
-          </div>
+          <div className="text-lg">{totalPrice} EGP</div>
         </button>
       </motion.div>
     </AnimatePresence>

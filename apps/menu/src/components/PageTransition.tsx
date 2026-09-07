@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState } from "react";
-import { useLocation } from "wouter";
-import { AnimatePresence, motion } from "framer-motion";
-import tuxLogo from "@assets/tux-logo-vector.svg";
+import React, { createContext, useContext, useState } from 'react';
+import { useLocation } from 'wouter';
+import { AnimatePresence, motion } from 'framer-motion';
+import tuxLogo from '@assets/tux-logo-vector.svg';
 
 type PageTransitionContextType = {
   triggerTransition: (to: string) => void;
@@ -13,7 +13,7 @@ const PageTransitionContext = createContext<PageTransitionContextType | null>(nu
 export const usePageTransition = () => {
   const context = useContext(PageTransitionContext);
   if (!context) {
-    throw new Error("usePageTransition must be used within a PageTransitionProvider");
+    throw new Error('usePageTransition must be used within a PageTransitionProvider');
   }
   return context;
 };
@@ -49,7 +49,7 @@ export const PageTransitionProvider = ({ children }: { children: React.ReactNode
             <motion.div
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
+              transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }}
               className="relative z-10 flex items-center justify-center"
             >
               <img

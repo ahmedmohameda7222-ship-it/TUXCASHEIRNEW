@@ -1,16 +1,16 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useMenu } from "@/context/MenuContext";
-import { CategoryTabs } from "@/components/order/CategoryTabs";
-import { ProductOrderCard } from "@/components/order/ProductOrderCard";
-import { motion } from "framer-motion";
-import { getOrderProductElementId, isOrderProductElementId } from "@/lib/product-routes";
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useMenu } from '@/context/MenuContext';
+import { CategoryTabs } from '@/components/order/CategoryTabs';
+import { ProductOrderCard } from '@/components/order/ProductOrderCard';
+import { motion } from 'framer-motion';
+import { getOrderProductElementId, isOrderProductElementId } from '@/lib/product-routes';
 
-const EXTRAS_SECTION_ID = "extras";
+const EXTRAS_SECTION_ID = 'extras';
 
 export default function OrderNow() {
   const { sections, products, loading } = useMenu();
-  const [activeCategory, setActiveCategory] = useState<string>("");
-  const [targetProductElementId, setTargetProductElementId] = useState<string>("");
+  const [activeCategory, setActiveCategory] = useState<string>('');
+  const [targetProductElementId, setTargetProductElementId] = useState<string>('');
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const isScrollingProgrammatically = useRef(false);
 
@@ -19,7 +19,7 @@ export default function OrderNow() {
       products
         .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)
         .sort((a, b) => a.sort_order - b.sort_order),
-    [products]
+    [products],
   );
 
   const menuSections = useMemo(
@@ -27,7 +27,7 @@ export default function OrderNow() {
       sections
         .filter((section) => section.id !== EXTRAS_SECTION_ID)
         .sort((a, b) => a.sort_order - b.sort_order),
-    [sections]
+    [sections],
   );
 
   // Set initial active category once sections load.
@@ -43,16 +43,16 @@ export default function OrderNow() {
 
     const elementId = window.location.hash.slice(1);
     if (!elementId || !isOrderProductElementId(elementId)) {
-      setTargetProductElementId("");
+      setTargetProductElementId('');
       return;
     }
 
     const targetProduct = products.find(
-      (product) => getOrderProductElementId(product.id) === elementId
+      (product) => getOrderProductElementId(product.id) === elementId,
     );
 
     if (!targetProduct) {
-      setTargetProductElementId("");
+      setTargetProductElementId('');
       return;
     }
 
@@ -66,7 +66,7 @@ export default function OrderNow() {
 
       isScrollingProgrammatically.current = true;
       const y = targetElement.getBoundingClientRect().top + window.scrollY - 150;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: 'smooth' });
       targetElement.focus({ preventScroll: true });
 
       releaseScrollLockTimer = window.setTimeout(() => {
@@ -90,7 +90,7 @@ export default function OrderNow() {
       (entries) => {
         if (isScrollingProgrammatically.current) return;
         let maxRatio = 0;
-        let topCandidateId = "";
+        let topCandidateId = '';
         entries.forEach((entry) => {
           if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
             maxRatio = entry.intersectionRatio;
@@ -103,9 +103,9 @@ export default function OrderNow() {
       },
       {
         root: null,
-        rootMargin: "-30% 0px -60% 0px",
+        rootMargin: '-30% 0px -60% 0px',
         threshold: [0, 0.25, 0.5, 0.75, 1],
-      }
+      },
     );
 
     Object.values(categoryRefs.current).forEach((el) => {
@@ -117,12 +117,12 @@ export default function OrderNow() {
 
   const scrollToCategory = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
-    setTargetProductElementId("");
+    setTargetProductElementId('');
     const element = categoryRefs.current[categoryId];
     if (element) {
       isScrollingProgrammatically.current = true;
       const y = element.getBoundingClientRect().top + window.scrollY - 130;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: 'smooth' });
       setTimeout(() => {
         isScrollingProgrammatically.current = false;
       }, 800);
@@ -132,7 +132,6 @@ export default function OrderNow() {
   return (
     <div className="min-h-screen bg-black pt-24 pb-32 font-sans text-white relative">
       <div className="container mx-auto px-4 max-w-4xl relative z-10">
-
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -190,9 +189,11 @@ export default function OrderNow() {
                   ref={(el) => {
                     categoryRefs.current[section.id] = el;
                   }}
-                  className={`scroll-mt-32 rounded-2xl ${categoryUnavailable ? "bg-gray-900/40 p-4 border border-gray-700" : ""}`}
+                  className={`scroll-mt-32 rounded-2xl ${categoryUnavailable ? 'bg-gray-900/40 p-4 border border-gray-700' : ''}`}
                 >
-                  <h2 className={`text-2xl font-black uppercase tracking-wide mb-3 border-b pb-2 ${categoryUnavailable ? "text-gray-400 border-gray-700" : "text-[#D4AF37] border-white/10"}`}>
+                  <h2
+                    className={`text-2xl font-black uppercase tracking-wide mb-3 border-b pb-2 ${categoryUnavailable ? 'text-gray-400 border-gray-700' : 'text-[#D4AF37] border-white/10'}`}
+                  >
                     {section.name}
                   </h2>
 
@@ -229,7 +230,6 @@ export default function OrderNow() {
             })}
           </div>
         )}
-
       </div>
     </div>
   );

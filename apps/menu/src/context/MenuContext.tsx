@@ -1,7 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { supabase } from "@/lib/supabase";
-import { PRODUCTS as fallbackProducts, CATEGORIES as fallbackCategories, Product } from "@/lib/menu-data";
-import { EXTRA_CATEGORY, EXTRA_PRODUCTS } from "@/lib/default-extras";
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
+import {
+  PRODUCTS as fallbackProducts,
+  CATEGORIES as fallbackCategories,
+  type Product,
+} from '@/lib/menu-data';
+import { EXTRA_CATEGORY, EXTRA_PRODUCTS } from '@/lib/default-extras';
 
 export interface ProductSection {
   id: string;
@@ -29,9 +33,7 @@ interface MenuContextType {
 }
 
 const normalizeQualityCopy = (value: string) =>
-  value
-    .replace(/\bPremium\b/g, "High quality")
-    .replace(/\bpremium\b/g, "high quality");
+  value.replace(/\bPremium\b/g, 'High quality').replace(/\bpremium\b/g, 'high quality');
 
 const normalizeSectionCopy = (section: ProductSection): ProductSection => ({
   ...section,
@@ -50,16 +52,17 @@ const defaultSections: ProductSection[] = [...fallbackCategories, EXTRA_CATEGORY
     ...category,
     is_active: true,
     is_fallback: true,
-  })
+  }),
 );
 
-const defaultProducts: SupabaseProduct[] = [...fallbackProducts, ...EXTRA_PRODUCTS].map(({ category_id, is_available, ...product }) =>
-  normalizeProductCopy({
-    ...product,
-    section_id: category_id,
-    is_active: is_available,
-    is_fallback: true,
-  })
+const defaultProducts: SupabaseProduct[] = [...fallbackProducts, ...EXTRA_PRODUCTS].map(
+  ({ category_id, is_available, ...product }) =>
+    normalizeProductCopy({
+      ...product,
+      section_id: category_id,
+      is_active: is_available,
+      is_fallback: true,
+    }),
 );
 
 const mergeSections = (remoteSections: ProductSection[] = []) => {
@@ -118,9 +121,9 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
       setSections(mergeSections(sectionsData || []));
       setProducts(mergeProducts(productsData || []));
-    } catch (err: any) {
-      console.error("Error fetching menu data:", err);
-      setError(err.message || "Failed to load menu");
+    } catch (err: unknown) {
+      console.error('Error fetching menu data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load menu');
       setSections(defaultSections);
       setProducts(defaultProducts);
     } finally {
@@ -142,7 +145,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 export function useMenu() {
   const context = useContext(MenuContext);
   if (context === undefined) {
-    throw new Error("useMenu must be used within a MenuProvider");
+    throw new Error('useMenu must be used within a MenuProvider');
   }
   return context;
 }

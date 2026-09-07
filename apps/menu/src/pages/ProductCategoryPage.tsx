@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
-import { motion, useReducedMotion } from "framer-motion";
-import { useLocation } from "wouter";
-import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-import { useMenu, SupabaseProduct } from "@/context/MenuContext";
-import { NavLink } from "@/components/NavLink";
-import { getOrderProductHref } from "@/lib/product-routes";
+import React, { useEffect } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useLocation } from 'wouter';
+import { ProductCategoryNav } from '@/components/ProductCategoryNav';
+import { useMenu, type SupabaseProduct } from '@/context/MenuContext';
+import { NavLink } from '@/components/NavLink';
+import { getOrderProductHref } from '@/lib/product-routes';
 
 function ProductImage({ product, index }: { product: SupabaseProduct; index: number }) {
   if (product.image_url) {
@@ -22,11 +22,11 @@ function ProductImage({ product, index }: { product: SupabaseProduct; index: num
   return (
     <div
       className="w-full aspect-square rounded-2xl flex items-center justify-center"
-      style={{ background: "radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)" }}
+      style={{ background: 'radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)' }}
     >
       <div className="text-center px-4">
         <span className="text-[#C9A84C]/20 font-serif text-7xl md:text-8xl font-bold select-none">
-          {String(index + 1).padStart(2, "0")}
+          {String(index + 1).padStart(2, '0')}
         </span>
         <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">
           Photo Coming Soon
@@ -40,8 +40,8 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
   const [location] = useLocation();
   const { sections, products, loading } = useMenu();
   const shouldReduceMotion = useReducedMotion();
-  const routeSlug = location.startsWith("/products/")
-    ? decodeURIComponent(location.replace("/products/", ""))
+  const routeSlug = location.startsWith('/products/')
+    ? decodeURIComponent(location.replace('/products/', ''))
     : undefined;
 
   const section = sections.find((s) => {
@@ -58,7 +58,7 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
     : [];
 
   useEffect(() => {
-    document.title = section ? `${section.name} | TUX` : "Our Products | TUX";
+    document.title = section ? `${section.name} | TUX` : 'Our Products | TUX';
   }, [section]);
 
   const sectionVariants = shouldReduceMotion
@@ -100,16 +100,22 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: shouldReduceMotion ? 0 : 0.7 }}
-          className={`mb-12 md:mb-16 ${sectionUnavailable ? "grayscale opacity-75" : ""}`}
+          className={`mb-12 md:mb-16 ${sectionUnavailable ? 'grayscale opacity-75' : ''}`}
         >
-          <span className={sectionUnavailable ? "text-gray-500 font-sans text-xs tracking-[0.3em] uppercase" : "text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase"}>
+          <span
+            className={
+              sectionUnavailable
+                ? 'text-gray-500 font-sans text-xs tracking-[0.3em] uppercase'
+                : 'text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase'
+            }
+          >
             Our Products Showroom
           </span>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">
-            {section?.name || "Products"}
+            {section?.name || 'Products'}
           </h1>
           <p className="text-[#999080] font-sans text-base sm:text-lg max-w-2xl leading-relaxed">
-            {section?.description || "A closer look at our products before you order."}
+            {section?.description || 'A closer look at our products before you order.'}
           </p>
           {sectionUnavailable && (
             <p className="mt-5 max-w-xl rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-sm font-semibold text-gray-200">
@@ -162,18 +168,18 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                   initial="hidden"
                   whileInView="visible"
                   viewport={{ once: true, amount: 0.22 }}
-                  transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: "easeOut" }}
+                  transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: 'easeOut' }}
                   className={`group overflow-hidden rounded-[1.75rem] md:rounded-[2.5rem] border shadow-[0_24px_90px_rgba(0,0,0,0.35)] ${
-                    isReversed ? "md:flex-row-reverse" : "md:flex-row"
+                    isReversed ? 'md:flex-row-reverse' : 'md:flex-row'
                   } flex flex-col md:flex ${
                     productUnavailable
-                      ? "border-gray-700 bg-gray-900/70 grayscale opacity-75"
-                      : "border-[#2a2520] bg-[linear-gradient(135deg,#111009_0%,#181108_55%,#0B0900_100%)]"
+                      ? 'border-gray-700 bg-gray-900/70 grayscale opacity-75'
+                      : 'border-[#2a2520] bg-[linear-gradient(135deg,#111009_0%,#181108_55%,#0B0900_100%)]'
                   }`}
                 >
                   <motion.div
                     variants={imageVariants}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.65, ease: "easeOut" }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.65, ease: 'easeOut' }}
                     className="relative flex min-h-[300px] sm:min-h-[380px] md:min-h-[460px] md:w-[54%] items-center justify-center overflow-hidden bg-[#090806] px-5 py-8 sm:px-8 md:px-10"
                   >
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(201,168,76,0.18),transparent_58%)]" />
@@ -185,15 +191,23 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
 
                   <motion.div
                     variants={textVariants}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.55, ease: "easeOut", delay: shouldReduceMotion ? 0 : 0.08 }}
+                    transition={{
+                      duration: shouldReduceMotion ? 0 : 0.55,
+                      ease: 'easeOut',
+                      delay: shouldReduceMotion ? 0 : 0.08,
+                    }}
                     className="flex flex-1 flex-col justify-between px-5 py-8 sm:px-8 md:w-[46%] md:px-10 lg:px-14 md:py-12"
                   >
                     <div>
-                      <span className={`mb-4 block font-sans text-xs font-bold uppercase tracking-[0.28em] ${productUnavailable ? "text-gray-500" : "text-[#C9A84C]"}`}>
-                        {section?.name} • {String(index + 1).padStart(2, "0")}
+                      <span
+                        className={`mb-4 block font-sans text-xs font-bold uppercase tracking-[0.28em] ${productUnavailable ? 'text-gray-500' : 'text-[#C9A84C]'}`}
+                      >
+                        {section?.name} • {String(index + 1).padStart(2, '0')}
                       </span>
 
-                      <h2 className={`font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5 transition-colors duration-300 ${productUnavailable ? "text-gray-300" : "text-white group-hover:text-[#C9A84C]"}`}>
+                      <h2
+                        className={`font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5 transition-colors duration-300 ${productUnavailable ? 'text-gray-300' : 'text-white group-hover:text-[#C9A84C]'}`}
+                      >
                         {product.name}
                       </h2>
 
@@ -224,7 +238,9 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
                         <span className="font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-[#8F877A]">
                           Price
                         </span>
-                        <span className={`whitespace-nowrap font-sans text-sm font-bold ${productUnavailable ? "text-gray-400" : "text-[#C9A84C]"}`}>
+                        <span
+                          className={`whitespace-nowrap font-sans text-sm font-bold ${productUnavailable ? 'text-gray-400' : 'text-[#C9A84C]'}`}
+                        >
                           {product.price} EGP
                         </span>
                       </div>

@@ -1,18 +1,19 @@
-import React, { useEffect } from "react";
-import { motion } from "framer-motion";
-import { ProductCategoryNav } from "@/components/ProductCategoryNav";
-
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ProductCategoryNav } from '@/components/ProductCategoryNav';
 
 const products = [
   {
-    id: "01",
-    name: "Classic Hawawshi",
-    description: "Seasoned minced meat in crispy bread. A Egyptian street-food classic, elevated the TUX way.",
+    id: '01',
+    name: 'Classic Hawawshi',
+    description:
+      'Seasoned minced meat in crispy bread. A Egyptian street-food classic, elevated the TUX way.',
   },
   {
-    id: "02",
-    name: "TUX Hawawshi",
-    description: "Our signature take on hawawshi. Bolder spices, premium meat, and that TUX finishing touch.",
+    id: '02',
+    name: 'TUX Hawawshi',
+    description:
+      'Our signature take on hawawshi. Bolder spices, premium meat, and that TUX finishing touch.',
   },
 ];
 
@@ -20,11 +21,13 @@ function PlaceholderImage({ id }: { id: string }) {
   return (
     <div
       className="w-full aspect-square rounded-xl flex items-center justify-center"
-      style={{ background: "radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)" }}
+      style={{ background: 'radial-gradient(ellipse at center, #1a1200 0%, #0D0D0D 80%)' }}
     >
       <div className="text-center">
         <span className="text-[#C9A84C]/20 font-serif text-7xl font-bold select-none">{id}</span>
-        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">Photo Coming Soon</p>
+        <p className="text-[#C9A84C]/30 font-sans text-xs tracking-widest uppercase mt-2">
+          Photo Coming Soon
+        </p>
       </div>
     </div>
   );
@@ -32,7 +35,7 @@ function PlaceholderImage({ id }: { id: string }) {
 
 export default function Hawawshi() {
   useEffect(() => {
-    document.title = "Hawawshi | TUX";
+    document.title = 'Hawawshi | TUX';
   }, []);
 
   return (
@@ -46,8 +49,12 @@ export default function Hawawshi() {
           transition={{ duration: 0.7 }}
           className="mb-14"
         >
-          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">Our Menu</span>
-          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">Hawawshi</h1>
+          <span className="text-[#C9A84C] font-sans text-xs tracking-[0.3em] uppercase">
+            Our Menu
+          </span>
+          <h1 className="text-5xl md:text-6xl font-serif font-bold text-white mt-2 mb-4">
+            Hawawshi
+          </h1>
           <p className="text-[#999080] font-sans text-lg max-w-xl">
             An Egyptian classic, done the TUX way. Crispy, bold, and packed with flavor.
           </p>
@@ -69,7 +76,9 @@ export default function Hawawshi() {
               </div>
               <div className="px-5 pb-6">
                 <h3 className="text-white font-serif text-xl mb-2">{product.name}</h3>
-                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">{product.description}</p>
+                <p className="text-[#999080] font-sans text-sm mb-5 leading-relaxed">
+                  {product.description}
+                </p>
                 <a
                   href="/order-now"
                   className="block w-full text-center py-3 rounded bg-[#8B1A1A] text-white font-sans font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all"

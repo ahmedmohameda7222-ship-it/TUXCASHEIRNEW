@@ -1,6 +1,6 @@
-import React from "react";
-import { useLocation } from "wouter";
-import { usePageTransition } from "./PageTransition";
+import React from 'react';
+import { useLocation } from 'wouter';
+import { usePageTransition } from './PageTransition';
 
 type NavLinkProps = {
   href: string;
@@ -8,7 +8,7 @@ type NavLinkProps = {
   children: React.ReactNode;
   onClick?: () => void;
   withPageTransition?: boolean;
-  "data-testid"?: string;
+  'data-testid'?: string;
 };
 
 export const NavLink = ({
@@ -17,7 +17,7 @@ export const NavLink = ({
   children,
   onClick,
   withPageTransition = true,
-  "data-testid": dataTestId,
+  'data-testid': dataTestId,
 }: NavLinkProps) => {
   const { triggerTransition } = usePageTransition();
   const [location, setLocation] = useLocation();
