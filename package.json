@@ -24,7 +24,12 @@
     "package:win": "npm run build && electron-builder --win nsis --x64",
     "test:e2e": "playwright test",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "e2e:serve": "npm run build -w @tux/operations && node e2e/whatsappFakeServer.mjs"
+    "e2e:serve": "npm run build -w @tux/operations && node e2e/whatsappFakeServer.mjs",
+    "dev:menu": "npm run dev -w @tux/menu",
+    "build:menu": "npm run build -w @tux/menu",
+    "typecheck:menu": "npm run typecheck -w @tux/menu",
+    "test:e2e:menu": "playwright test --config playwright.menu.config.ts",
+    "test:monorepo-architecture": "node --test scripts/monorepo-architecture-guard.test.mjs && node scripts/test-monorepo-architecture.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
