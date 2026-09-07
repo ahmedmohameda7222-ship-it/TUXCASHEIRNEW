@@ -1,0 +1,6 @@
+{
+  "serial": 17,
+  "mode": "task6-asset-fix",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "9e556dc42416d0200359ceba14c2321e3c726f81"
+}
