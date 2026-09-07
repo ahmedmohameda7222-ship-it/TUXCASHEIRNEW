@@ -18,7 +18,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TARGET_BRANCH: work/monorepo-foundation
-      EXPECTED_SHA: ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b
+      EXPECTED_SHA: 3b5d107ee24b97fd3adf8eb8793e1fc6f0402fe6
     steps:
       - uses: actions/checkout@v4
       - name: Attempt exact-head workflow dispatch and classify result
