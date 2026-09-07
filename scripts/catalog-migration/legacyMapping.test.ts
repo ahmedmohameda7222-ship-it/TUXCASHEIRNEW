@@ -99,7 +99,10 @@ describe('legacy identity mapping', () => {
   it('fails closed for an unknown product category reference without display-name fallback', () => {
     const broken = {
       ...source,
-      products: [{ ...source.products[0]!, categoryId: 'not-a-known-id', name: 'Tux Burger' }],
+      products: [
+        { ...source.products[0]!, categoryId: 'not-a-known-id', name: 'Tux Burger' },
+        ...source.products.slice(1),
+      ],
     };
     expect(() => mapLegacyCatalog(broken, subsetManifest())).toThrow(/unknown legacy category/i);
   });
