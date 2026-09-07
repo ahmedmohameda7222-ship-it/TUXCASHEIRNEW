@@ -1,0 +1,168 @@
+name: Classic Monorepo Task 6 Asset Fix
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task6-asset-fix.json'
+      - '.github/workflows/classic-monorepo-task6-asset-fix.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Fix Menu production asset references
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 9e556dc42416d0200359ceba14c2321e3c726f81
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate request and reproduce exact RED source condition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task6-asset-fix.json').read_text())
+          assert request == {
+            'serial': 17,
+            'mode': 'task6-asset-fix',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': '9e556dc42416d0200359ceba14c2321e3c726f81',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task6-asset-fix "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          grep -R -n --fixed-strings '/src/assets/' apps/menu/src | tee "$RUNNER_TEMP/src-asset-refs.txt"
+          test "$(wc -l < "$RUNNER_TEMP/src-asset-refs.txt" | tr -d ' ')" = '5'
+          test "$(cut -d: -f1 "$RUNNER_TEMP/src-asset-refs.txt" | sort -u)" = 'apps/menu/src/lib/menu-data.ts'
+          echo 'TASK6_ASSET_PATH_RED_CONFIRMED'
+          npm ci
+      - name: Replace legacy source URLs with Vite-managed asset imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/menu/src/lib/menu-data.ts')
+          text = path.read_text()
+          assert text.count('/src/assets/') == 5
+          marker = 'export interface Category {'
+          assert text.count(marker) == 1
+          imports = """import tuxLogoPlaceholder from '@assets/tuxlogowithoutbackground.svg';
+          import tuxifyDoubleImage from '@assets/tuxify_double.png';
+          import tuxifyQuatroImage from '@assets/tuxify_quatro.png';
+          import tuxifySingleImage from '@assets/tuxify_single.png';
+          import tuxifyTripleImage from '@assets/tuxify_triple.png';
+
+          export interface Category {"""
+          text = text.replace(marker, imports)
+          replacements = {
+            "const TUX_LOGO_PLACEHOLDER = '/src/assets/tuxlogo-transparent.svg';": 'const TUX_LOGO_PLACEHOLDER = tuxLogoPlaceholder;',
+            "image_url: '/src/assets/tuxify_single.png',": 'image_url: tuxifySingleImage,',
+            "image_url: '/src/assets/tuxify_double.png',": 'image_url: tuxifyDoubleImage,',
+            "image_url: '/src/assets/tuxify_triple.png',": 'image_url: tuxifyTripleImage,',
+            "image_url: '/src/assets/tuxify_quatro.png',": 'image_url: tuxifyQuatroImage,',
+          }
+          for old, new in replacements.items():
+              assert old in text, old
+              text = text.replace(old, new)
+          assert '/src/assets/' not in text
+          path.write_text(text)
+          PY
+          npx prettier --write apps/menu/src/lib/menu-data.ts
+          test -z "$(grep -R -l --fixed-strings '/src/assets/' apps/menu/src || true)"
+      - name: Prove static quality and builds GREEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format:check
+          npm run lint
+          npm run typecheck:menu
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          npm run build:menu
+          npm run typecheck -w @tux/operations
+          npm run build -w @tux/operations
+      - name: Prove rendered home images resolve to real bundled assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+          const pageErrors = [];
+          page.on('pageerror', error => pageErrors.push(error.message));
+          const response = await page.goto('http://127.0.0.1:4174/', { waitUntil: 'networkidle' });
+          if (!response?.ok()) throw new Error(`navigation status ${response?.status()}`);
+          const images = await page.locator('img').evaluateAll((nodes) => nodes.map((node) => ({
+            currentSrc: node.currentSrc,
+            naturalWidth: node.naturalWidth,
+            naturalHeight: node.naturalHeight,
+            complete: node.complete,
+          })));
+          console.log(JSON.stringify(images, null, 2));
+          if (!images.length) throw new Error('expected rendered images');
+          if (images.some(image => image.currentSrc.includes('/src/assets/'))) throw new Error('legacy /src/assets URL remains in DOM');
+          if (images.filter(image => image.currentSrc).some(image => !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0)) {
+            throw new Error('rendered image has zero intrinsic dimensions');
+          }
+          if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);
+          await browser.close();
+          console.log('TASK6_ASSET_RENDER_GREEN_CONFIRMED');
+          NODE
+      - name: Verify exact corrective scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          git diff --exit-code "$EXPECTED_SHA" -- apps/operations apps/operations-desktop packages api server supabase package.json package-lock.json .github
+          changed="$(git diff --name-only "$EXPECTED_SHA" | sort)"
+          printf 'TASK6_ASSET_FIX_CHANGED_FILES:\n%s\n' "$changed"
+          test "$changed" = 'apps/menu/src/lib/menu-data.ts'
+          git diff --check
+      - name: Commit and push corrective asset fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/menu/src/lib/menu-data.ts
+          test "$(git diff --cached --name-only)" = 'apps/menu/src/lib/menu-data.ts'
+          git commit -m 'fix(menu): bundle fallback product assets'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK6_ASSET_FIX_HEAD=%s\nTASK6_ASSET_FIX_TREE=%s\nTASK6_ASSET_FIX_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
