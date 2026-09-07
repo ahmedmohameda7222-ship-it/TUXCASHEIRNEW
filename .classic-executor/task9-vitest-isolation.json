@@ -1,0 +1,6 @@
+{
+  "serial": 22,
+  "mode": "task9-vitest-node-test-isolation",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "e409cd9b5abba250fc26b92429f47f7c65868d2c"
+}
