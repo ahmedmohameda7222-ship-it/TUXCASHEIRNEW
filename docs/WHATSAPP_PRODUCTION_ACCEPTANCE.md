@@ -2,6 +2,8 @@
 
 Status: **PENDING REAL META ACCEPTANCE**
 
+Repository-side PR #54 governance authority: `docs/superpowers/specs/2026-09-08-whatsapp-pr54-closeout-authority.md`.
+
 This runbook is the production-acceptance authority for the implemented TUX Operations WhatsApp subsystem after repository CI is GREEN. Fake-provider tests, migration smoke, rendered E2E, and package/security gates are necessary but are not sufficient to classify the subsystem as production-ready. A real Meta Business Platform acceptance pass is required.
 
 Do not record access tokens, app secrets, Supabase service-role keys, worker PINs, real customer phone numbers, template secrets, signed media URLs, provider media IDs, or other credentials in this document or its evidence.
