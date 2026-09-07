@@ -1,0 +1,6 @@
+{
+  "serial": 19,
+  "mode": "task7-architecture-guards",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "cdb804f9b47291206c1390af8065ef7acf31d3f9"
+}
