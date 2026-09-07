@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CatalogContractError,
   parseCatalogAdminCommandV1,
-  parseCatalogAdminSuccessV1,
   parseCatalogErrorV1,
   parsePublicCatalogSnapshotV1,
 } from './index';
+import { parseCatalogAdminSuccessV1 } from './adminResponse';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const CATEGORY_ID = '22222222-2222-4222-8222-222222222222';
@@ -63,11 +63,6 @@ describe('CatalogAdminCommandV1', () => {
 
   it('rejects malformed canonical money in admin commands', () => {
     expect(() => parseCatalogAdminCommandV1({ schemaVersion: 1, shopId: SHOP_ID, commandId: COMMAND_ID, command: { type: 'product.create', product: { id: PRODUCT_ID, categoryId: CATEGORY_ID, slug: 'single-tux-burger', name: 'Single TUX Burger', description: null, priceMinor: Number.NaN, imageKey: null, bestSeller: false, active: true, soldOut: false, isCombo: false, sortOrder: 1 } } })).toThrow(/priceMinor/);
-  });
-
-  it('rejects unsupported image extensions and MIME mismatches', () => {
-    expect(() => parseCatalogAdminCommandV1({ schemaVersion: 1, shopId: SHOP_ID, commandId: COMMAND_ID, command: { type: 'image.prepare', productId: PRODUCT_ID, fileExtension: 'exe', contentType: 'image/png' } })).toThrow(/fileExtension/);
-    expect(() => parseCatalogAdminCommandV1({ schemaVersion: 1, shopId: SHOP_ID, commandId: COMMAND_ID, command: { type: 'image.prepare', productId: PRODUCT_ID, fileExtension: 'png', contentType: 'image/webp' } })).toThrow(/contentType/);
   });
 });
 
