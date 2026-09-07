@@ -209,7 +209,11 @@ function asObject(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function exactKeys(object: Record<string, unknown>, allowed: readonly string[], path: string): void {
+function exactKeys(
+  object: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+): void {
   const allowedSet = new Set(allowed);
   for (const key of Object.keys(object)) {
     if (!allowedSet.has(key)) throw new CatalogContractError(`${path} has unexpected field ${key}`);
@@ -267,7 +271,8 @@ function positiveIntegerOrNull(value: unknown, path: string): number | null {
 
 function nullableUrl(value: unknown, path: string): string | null {
   if (value === null) return null;
-  if (typeof value !== 'string') throw new CatalogContractError(`${path} must be URL string or null`);
+  if (typeof value !== 'string')
+    throw new CatalogContractError(`${path} must be URL string or null`);
   let url: URL;
   try {
     url = new URL(value);
@@ -298,8 +303,18 @@ function parseProduct(value: unknown, path: string): PublicCatalogProductV1 {
   exactKeys(
     row,
     [
-      'id', 'slug', 'categoryId', 'name', 'description', 'priceMinor', 'imageUrl',
-      'bestSeller', 'active', 'soldOut', 'isCombo', 'sortOrder',
+      'id',
+      'slug',
+      'categoryId',
+      'name',
+      'description',
+      'priceMinor',
+      'imageUrl',
+      'bestSeller',
+      'active',
+      'soldOut',
+      'isCombo',
+      'sortOrder',
     ],
     path,
   );
@@ -352,7 +367,11 @@ function parseComboOption(value: unknown, path: string): PublicComboBeverageOpti
   };
 }
 
-function parseArray<T>(value: unknown, path: string, parser: (value: unknown, path: string) => T): T[] {
+function parseArray<T>(
+  value: unknown,
+  path: string,
+  parser: (value: unknown, path: string) => T,
+): T[] {
   if (!Array.isArray(value)) throw new CatalogContractError(`${path} must be an array`);
   return value.map((entry, index) => parser(entry, `${path}[${index}]`));
 }
@@ -361,7 +380,16 @@ export function parsePublicCatalogSnapshotV1(value: unknown): PublicCatalogSnaps
   const root = asObject(value, 'snapshot');
   exactKeys(
     root,
-    ['schemaVersion', 'shopId', 'revision', 'categories', 'products', 'modifiers', 'productModifierLinks', 'comboBeverageOptions'],
+    [
+      'schemaVersion',
+      'shopId',
+      'revision',
+      'categories',
+      'products',
+      'modifiers',
+      'productModifierLinks',
+      'comboBeverageOptions',
+    ],
     'snapshot',
   );
   if (root.schemaVersion !== 1) throw new CatalogContractError('snapshot.schemaVersion must be 1');
@@ -375,8 +403,16 @@ export function parsePublicCatalogSnapshotV1(value: unknown): PublicCatalogSnaps
     categories: parseArray(root.categories, 'snapshot.categories', parseCategory),
     products: parseArray(root.products, 'snapshot.products', parseProduct),
     modifiers: parseArray(root.modifiers, 'snapshot.modifiers', parseModifier),
-    productModifierLinks: parseArray(root.productModifierLinks, 'snapshot.productModifierLinks', parseProductModifierLink),
-    comboBeverageOptions: parseArray(root.comboBeverageOptions, 'snapshot.comboBeverageOptions', parseComboOption),
+    productModifierLinks: parseArray(
+      root.productModifierLinks,
+      'snapshot.productModifierLinks',
+      parseProductModifierLink,
+    ),
+    comboBeverageOptions: parseArray(
+      root.comboBeverageOptions,
+      'snapshot.comboBeverageOptions',
+      parseComboOption,
+    ),
   };
 }
 
@@ -386,7 +422,10 @@ export function parseCatalogErrorV1(value: unknown): CatalogErrorV1 {
   if (root.schemaVersion !== 1) throw new CatalogContractError('response.schemaVersion must be 1');
   const error = asObject(root.error, 'response.error');
   exactKeys(error, ['code'], 'response.error');
-  if (typeof error.code !== 'string' || !CATALOG_ERROR_CODES.includes(error.code as CatalogErrorCodeV1)) {
+  if (
+    typeof error.code !== 'string' ||
+    !CATALOG_ERROR_CODES.includes(error.code as CatalogErrorCodeV1)
+  ) {
     throw new CatalogContractError('response.error.code is not a supported catalog error code');
   }
   return { schemaVersion: 1, error: { code: error.code as CatalogErrorCodeV1 } };
@@ -400,11 +439,29 @@ function parseAdminProduct(value: unknown, path: string): AdminProductInputV1 {
   const row = asObject(value, path);
   exactKeys(
     row,
-    ['id', 'categoryId', 'slug', 'name', 'description', 'priceMinor', 'imageKey', 'bestSeller', 'active', 'soldOut', 'isCombo', 'sortOrder'],
+    [
+      'id',
+      'categoryId',
+      'slug',
+      'name',
+      'description',
+      'priceMinor',
+      'imageKey',
+      'bestSeller',
+      'active',
+      'soldOut',
+      'isCombo',
+      'sortOrder',
+    ],
     path,
   );
-  if (row.imageKey !== null && (typeof row.imageKey !== 'string' || !IMAGE_KEY_PATTERN.test(row.imageKey))) {
-    throw new CatalogContractError(`${path}.imageKey must be a canonical shop-scoped image key or null`);
+  if (
+    row.imageKey !== null &&
+    (typeof row.imageKey !== 'string' || !IMAGE_KEY_PATTERN.test(row.imageKey))
+  ) {
+    throw new CatalogContractError(
+      `${path}.imageKey must be a canonical shop-scoped image key or null`,
+    );
   }
   return {
     id: requiredUuid(row.id, `${path}.id`),
@@ -450,7 +507,8 @@ function parsePatch(
 function parseCommand(value: unknown): CatalogAdminCommandPayloadV1 {
   const command = asObject(value, 'request.command');
   const type = command.type;
-  if (typeof type !== 'string') throw new CatalogContractError('request.command.type must be a string');
+  if (typeof type !== 'string')
+    throw new CatalogContractError('request.command.type must be a string');
 
   switch (type) {
     case 'category.create':
@@ -474,7 +532,11 @@ function parseCommand(value: unknown): CatalogAdminCommandPayloadV1 {
       return { type, categoryId: requiredUuid(command.categoryId, 'request.command.categoryId') };
     case 'category.reorder':
       exactKeys(command, ['type', 'categoryId', 'sortOrder'], 'request.command');
-      return { type, categoryId: requiredUuid(command.categoryId, 'request.command.categoryId'), sortOrder: nonNegativeInteger(command.sortOrder, 'request.command.sortOrder') };
+      return {
+        type,
+        categoryId: requiredUuid(command.categoryId, 'request.command.categoryId'),
+        sortOrder: nonNegativeInteger(command.sortOrder, 'request.command.sortOrder'),
+      };
     case 'product.create':
       exactKeys(command, ['type', 'product'], 'request.command');
       return { type, product: parseAdminProduct(command.product, 'request.command.product') };
@@ -500,10 +562,18 @@ function parseCommand(value: unknown): CatalogAdminCommandPayloadV1 {
       return { type, productId: requiredUuid(command.productId, 'request.command.productId') };
     case 'product.move':
       exactKeys(command, ['type', 'productId', 'categoryId'], 'request.command');
-      return { type, productId: requiredUuid(command.productId, 'request.command.productId'), categoryId: requiredUuid(command.categoryId, 'request.command.categoryId') };
+      return {
+        type,
+        productId: requiredUuid(command.productId, 'request.command.productId'),
+        categoryId: requiredUuid(command.categoryId, 'request.command.categoryId'),
+      };
     case 'product.reorder':
       exactKeys(command, ['type', 'productId', 'sortOrder'], 'request.command');
-      return { type, productId: requiredUuid(command.productId, 'request.command.productId'), sortOrder: nonNegativeInteger(command.sortOrder, 'request.command.sortOrder') };
+      return {
+        type,
+        productId: requiredUuid(command.productId, 'request.command.productId'),
+        sortOrder: nonNegativeInteger(command.sortOrder, 'request.command.sortOrder'),
+      };
     case 'modifier.create':
       exactKeys(command, ['type', 'modifier'], 'request.command');
       return { type, modifier: parseAdminModifier(command.modifier, 'request.command.modifier') };
@@ -523,7 +593,11 @@ function parseCommand(value: unknown): CatalogAdminCommandPayloadV1 {
       exactKeys(command, ['type', 'modifierId'], 'request.command');
       return { type, modifierId: requiredUuid(command.modifierId, 'request.command.modifierId') };
     case 'product_modifier_link.set':
-      exactKeys(command, ['type', 'productId', 'modifierId', 'maxQuantity', 'sortOrder'], 'request.command');
+      exactKeys(
+        command,
+        ['type', 'productId', 'modifierId', 'maxQuantity', 'sortOrder'],
+        'request.command',
+      );
       return {
         type,
         productId: requiredUuid(command.productId, 'request.command.productId'),
@@ -533,33 +607,67 @@ function parseCommand(value: unknown): CatalogAdminCommandPayloadV1 {
       };
     case 'product_modifier_link.remove':
       exactKeys(command, ['type', 'productId', 'modifierId'], 'request.command');
-      return { type, productId: requiredUuid(command.productId, 'request.command.productId'), modifierId: requiredUuid(command.modifierId, 'request.command.modifierId') };
+      return {
+        type,
+        productId: requiredUuid(command.productId, 'request.command.productId'),
+        modifierId: requiredUuid(command.modifierId, 'request.command.modifierId'),
+      };
     case 'combo_beverage_option.set':
-      exactKeys(command, ['type', 'comboProductId', 'beverageProductId', 'sortOrder'], 'request.command');
+      exactKeys(
+        command,
+        ['type', 'comboProductId', 'beverageProductId', 'sortOrder'],
+        'request.command',
+      );
       return {
         type,
         comboProductId: requiredUuid(command.comboProductId, 'request.command.comboProductId'),
-        beverageProductId: requiredUuid(command.beverageProductId, 'request.command.beverageProductId'),
+        beverageProductId: requiredUuid(
+          command.beverageProductId,
+          'request.command.beverageProductId',
+        ),
         sortOrder: nonNegativeInteger(command.sortOrder, 'request.command.sortOrder'),
       };
     case 'combo_beverage_option.remove':
       exactKeys(command, ['type', 'comboProductId', 'beverageProductId'], 'request.command');
-      return { type, comboProductId: requiredUuid(command.comboProductId, 'request.command.comboProductId'), beverageProductId: requiredUuid(command.beverageProductId, 'request.command.beverageProductId') };
+      return {
+        type,
+        comboProductId: requiredUuid(command.comboProductId, 'request.command.comboProductId'),
+        beverageProductId: requiredUuid(
+          command.beverageProductId,
+          'request.command.beverageProductId',
+        ),
+      };
     case 'image.prepare': {
       exactKeys(command, ['type', 'productId', 'fileExtension', 'contentType'], 'request.command');
-      const fileExtension = typeof command.fileExtension === 'string' ? command.fileExtension.toLowerCase() : '';
-      if (!FILE_EXTENSION_PATTERN.test(fileExtension)) throw new CatalogContractError('request.command.fileExtension is invalid');
-      if (typeof command.contentType !== 'string' || !CONTENT_TYPE_PATTERN.test(command.contentType)) {
-        throw new CatalogContractError('request.command.contentType must be an approved image MIME type');
+      const fileExtension =
+        typeof command.fileExtension === 'string' ? command.fileExtension.toLowerCase() : '';
+      if (!FILE_EXTENSION_PATTERN.test(fileExtension))
+        throw new CatalogContractError('request.command.fileExtension is invalid');
+      if (
+        typeof command.contentType !== 'string' ||
+        !CONTENT_TYPE_PATTERN.test(command.contentType)
+      ) {
+        throw new CatalogContractError(
+          'request.command.contentType must be an approved image MIME type',
+        );
       }
-      return { type, productId: requiredUuid(command.productId, 'request.command.productId'), fileExtension, contentType: command.contentType };
+      return {
+        type,
+        productId: requiredUuid(command.productId, 'request.command.productId'),
+        fileExtension,
+        contentType: command.contentType,
+      };
     }
     case 'image.replace':
       exactKeys(command, ['type', 'productId', 'imageKey'], 'request.command');
       if (typeof command.imageKey !== 'string' || !IMAGE_KEY_PATTERN.test(command.imageKey)) {
         throw new CatalogContractError('request.command.imageKey must be a canonical image key');
       }
-      return { type, productId: requiredUuid(command.productId, 'request.command.productId'), imageKey: command.imageKey };
+      return {
+        type,
+        productId: requiredUuid(command.productId, 'request.command.productId'),
+        imageKey: command.imageKey,
+      };
     case 'image.remove':
       exactKeys(command, ['type', 'productId'], 'request.command');
       return { type, productId: requiredUuid(command.productId, 'request.command.productId') };
@@ -585,5 +693,9 @@ export function isCanonicalUuid(value: string): boolean {
 }
 
 export function isShopScopedImageKey(shopId: string, imageKey: string): boolean {
-  return UUID_PATTERN.test(shopId) && IMAGE_KEY_PATTERN.test(imageKey) && imageKey.toLowerCase().startsWith(`${shopId.toLowerCase()}/`);
+  return (
+    UUID_PATTERN.test(shopId) &&
+    IMAGE_KEY_PATTERN.test(imageKey) &&
+    imageKey.toLowerCase().startsWith(`${shopId.toLowerCase()}/`)
+  );
 }
