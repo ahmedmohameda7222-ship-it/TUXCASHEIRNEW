@@ -1,0 +1,470 @@
+name: Classic Monorepo Task 8 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task8.json'
+      - '.github/workflows/classic-monorepo-task8.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task8:
+    name: Task 8 permanent CI and Menu deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: fd616e893062edb085d1423a771808d59e54b092
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target and clean state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task8.json').read_text())
+          assert request == {
+            'serial': 20,
+            'mode': 'task8-permanent-ci-deployment',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'fd616e893062edb085d1423a771808d59e54b092',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task8 "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          npm ci
+      - name: Prove Task 8 RED is only missing permanent CI coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          npm run test:monorepo-architecture > "$RUNNER_TEMP/task8-red.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/task8-red.log"
+          test "$rc" -ne 0
+          node --input-type=module <<'NODE'
+          import path from 'node:path';
+          import { collectArchitectureViolations } from './scripts/monorepo-architecture-guard.mjs';
+          const violations = await collectArchitectureViolations(path.resolve('.'));
+          const expected = [
+            'CI coverage missing: npm run build:menu',
+            'CI coverage missing: npm run test:e2e:menu',
+            'CI coverage missing: npm run test:monorepo-architecture',
+            'CI coverage missing: npm run typecheck:menu',
+          ].sort();
+          console.log('TASK8_RED_VIOLATIONS=' + JSON.stringify(violations));
+          if (JSON.stringify(violations) !== JSON.stringify(expected)) {
+            throw new Error(`unexpected Task 8 RED: ${JSON.stringify(violations)}`);
+          }
+          console.log('TASK8_RED_ONLY_CI_COVERAGE_CONFIRMED');
+          NODE
+      - name: Add permanent Menu and architecture CI gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .github/workflows/ci.yml <<'EOF'
+          name: TUX V2 CI
+
+          on:
+            workflow_dispatch:
+              inputs:
+                expected_sha:
+                  description: Exact commit SHA expected after checkout
+                  required: true
+                  type: string
+            pull_request:
+              branches:
+                - main
+                - integration/tux-operations-v2
+            push:
+              branches:
+                - main
+                - integration/tux-operations-v2
+                - work/monorepo-foundation
+                - 'feat/ops-*'
+                - 'fix/operations-*'
+                - 'ui/tux-pos-refinement'
+
+          permissions:
+            contents: read
+
+          jobs:
+            quality:
+              name: quality
+              runs-on: ubuntu-latest
+              timeout-minutes: 35
+              env:
+                ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+                TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+              services:
+                postgres:
+                  image: postgres:17-alpine
+                  env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: postgres
+                  ports:
+                    - 5432:5432
+                  options: >-
+                    --health-cmd "pg_isready -U postgres -d postgres"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+              steps:
+                - uses: actions/checkout@v7
+                - name: Prove dispatched exact HEAD
+                  if: github.event_name == 'workflow_dispatch'
+                  run: test "$(git rev-parse HEAD)" = "${{ inputs.expected_sha }}"
+                - uses: actions/setup-node@v7
+                  with:
+                    node-version: '24'
+                    cache: npm
+                - name: Install locked dependencies
+                  run: npm ci
+                - name: Format check
+                  run: npm run format:check
+                - name: Lint
+                  run: npm run lint
+                - name: Unit and integration tests
+                  run: npm run test
+                - name: WhatsApp architecture gate
+                  run: npm run test:whatsapp-architecture
+                - name: WhatsApp security gate
+                  run: npm run test:whatsapp-security
+                - name: Typecheck
+                  run: npm run typecheck
+                - name: Production builds
+                  run: npm run build
+                - name: Development provisioning safety smoke
+                  shell: bash
+                  run: |
+                    if NODE_ENV=production npm run dev:provision -- --database .tmp/provision-production.sqlite3; then
+                      echo 'Production provisioning unexpectedly succeeded.' >&2
+                      exit 1
+                    fi
+                    npm run dev:provision -- --database .tmp/provision.sqlite3 --pin 2468 --secondary-pin 1357
+                    test -f apps/operations-desktop/.tmp/provision.sqlite3
+                    rm -rf apps/operations-desktop/.tmp
+                - name: Install PostgreSQL client
+                  run: |
+                    sudo apt-get update
+                    sudo apt-get install -y --no-install-recommends postgresql-client
+                - name: Migration-chain smoke
+                  run: npm run test:migrations
+                - uses: denoland/setup-deno@v2
+                  with:
+                    # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
+                    # same resolver semantics so remote import-graph failures are caught before deploy.
+                    deno-version: v1.46.3
+                - name: Supabase function auth deployment contract
+                  run: deno test --allow-read scripts/supabaseFunctionAuthConfig.deno.ts
+                - name: Edge Function typecheck
+                  run: |
+                    deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+                    deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
+                    deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+                    deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
+                    deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
+                - name: Install Playwright Chromium
+                  run: npx playwright install --with-deps chromium
+                - name: Rendered browser E2E
+                  run: npm run test:e2e
+                - name: Upload rendered QA evidence
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: operations-rendered-e2e
+                    path: |
+                      playwright-report
+                      test-results
+                    if-no-files-found: warn
+                    retention-days: 14
+
+            edge-security:
+              name: edge-security
+              runs-on: ubuntu-latest
+              timeout-minutes: 10
+              steps:
+                - uses: actions/checkout@v7
+                - uses: denoland/setup-deno@v2
+                  with:
+                    deno-version: v1.46.3
+                - name: Device bootstrap provenance behavioral tests
+                  run: >-
+                    deno test --allow-env --allow-net --allow-run --allow-read
+                    supabase/functions/device-bootstrap/security.deno.ts
+
+            windows-package:
+              name: windows-package
+              runs-on: windows-latest
+              timeout-minutes: 35
+              env:
+                CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-node@v7
+                  with:
+                    node-version: '24'
+                    cache: npm
+                - name: Install locked dependencies
+                  run: npm ci
+                - name: Build unsigned Windows x64 package
+                  run: npm run package:win -- --publish never
+                - name: Upload unsigned Windows package
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: tux-operations-windows-x64-unsigned
+                    path: release/windows/*.exe
+                    if-no-files-found: error
+                    retention-days: 14
+
+            menu:
+              name: menu
+              runs-on: ubuntu-latest
+              timeout-minutes: 25
+              env:
+                ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-node@v7
+                  with:
+                    node-version: '24'
+                    cache: npm
+                - name: Install locked root dependencies
+                  run: npm ci
+                - name: Menu typecheck
+                  run: npm run typecheck:menu
+                - name: Menu production build
+                  run: npm run build:menu
+                - name: Install Playwright Chromium
+                  run: npx playwright install --with-deps chromium
+                - name: Rendered Menu E2E
+                  run: npm run test:e2e:menu
+                - name: Upload Menu rendered QA evidence
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: menu-rendered-e2e
+                    path: |
+                      playwright-report-menu
+                      test-results
+                    if-no-files-found: warn
+                    retention-days: 14
+
+            architecture:
+              name: monorepo-architecture
+              runs-on: ubuntu-latest
+              timeout-minutes: 10
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-node@v7
+                  with:
+                    node-version: '24'
+                - name: Monorepo architecture guards
+                  run: npm run test:monorepo-architecture
+
+            required-quality-gate:
+              name: Required quality gate
+              if: always()
+              needs:
+                - quality
+                - edge-security
+                - windows-package
+                - menu
+                - architecture
+              runs-on: ubuntu-latest
+              steps:
+                - name: Require every permanent gate
+                  env:
+                    QUALITY_RESULT: ${{ needs.quality.result }}
+                    EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
+                    WINDOWS_RESULT: ${{ needs.windows-package.result }}
+                    MENU_RESULT: ${{ needs.menu.result }}
+                    ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
+                  run: |
+                    test "$QUALITY_RESULT" = "success"
+                    test "$EDGE_SECURITY_RESULT" = "success"
+                    test "$WINDOWS_RESULT" = "success"
+                    test "$MENU_RESULT" = "success"
+                    test "$ARCHITECTURE_RESULT" = "success"
+          EOF
+          npx prettier --write .github/workflows/ci.yml
+      - name: Replace Menu Vercel config and document deployment contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > apps/menu/vercel.json <<'EOF'
+          {
+            "$schema": "https://openapi.vercel.sh/vercel.json",
+            "framework": "vite",
+            "installCommand": "cd ../.. && npm ci",
+            "buildCommand": "cd ../.. && npm run build:menu",
+            "outputDirectory": "dist",
+            "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+          }
+          EOF
+          cat > apps/menu/DEPLOYMENT.md <<'EOF'
+          # Deployment Guide — TUX Menu (Phase A)
+
+          TUX Menu is an independent Vite + React browser application inside the canonical `ahmedmohameda7222-ship-it/TUXCASHEIRNEW` monorepo. The Operations application remains a separate Vercel project and retains authority for Operations, API routes, and cron behavior.
+
+          ## Vercel project contract
+
+          Configure the Menu Vercel project with:
+
+          - Repository: `ahmedmohameda7222-ship-it/TUXCASHEIRNEW`
+          - Root Directory: `apps/menu`
+          - Framework: Vite
+          - Install command: `cd ../.. && npm ci`
+          - Build command: `cd ../.. && npm run build:menu`
+          - Output Directory: `dist`
+          - SPA rewrite: `/(.*)` → `/index.html`
+
+          The repository has one authoritative npm lockfile at the monorepo root. Do not add or restore `apps/menu/package-lock.json`. Menu deployment must install from the root lock and build the `@tux/menu` workspace from the repository root.
+
+          ## Monorepo commands
+
+          Run these commands from the repository root:
+
+          ```bash
+          npm ci
+          npm run dev:menu
+          npm run typecheck:menu
+          npm run build:menu
+          npm run test:e2e:menu
+          ```
+
+          The production build output is `apps/menu/dist/`.
+
+          ## Browser-visible legacy Supabase configuration
+
+          Phase A uses only these Menu-specific Vite browser variables for the legacy Menu/Admin backend:
+
+          ```dotenv
+          VITE_SUPABASE_URL=
+          VITE_SUPABASE_ANON_KEY=
+          ```
+
+          Both values are exposed to browser code by Vite. They must therefore contain only the public Supabase project URL and anonymous/public key.
+
+          Do **not** place a Supabase service-role key, private server secret, `TUX_SUPABASE_*` private credential, or any other privileged secret in the Menu application or its Vite environment.
+
+          If the two `VITE_SUPABASE_*` values are omitted, the fallback catalog remains available, while legacy dynamic Supabase-backed Menu/Admin behavior is unavailable.
+
+          ## WhatsApp ordering
+
+          During Phase A, the WhatsApp order destination remains configured in `src/lib/constants.ts`. It is not a private server credential and is not moved into the Supabase environment variables by this phase.
+
+          ## Architecture boundary
+
+          Root `supabase/migrations/` is the only executable database migration authority. The file under `apps/menu/legacy/supabase_setup.sql.reference` is historical reference material only and must never be executed or copied into canonical migrations.
+
+          Canonical catalog/API ownership and standalone Admin extraction belong to later approved phases; Phase A does not perform those cutovers. The temporary `/admin` route remains inside Menu during Phase A; standalone `apps/admin` is mandatory Phase C work.
+          EOF
+          npx prettier --write apps/menu/vercel.json apps/menu/DEPLOYMENT.md
+      - name: Simulate Menu Vercel root-lock deployment commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf apps/menu/dist
+          (cd apps/menu && cd ../.. && npm ci)
+          (cd apps/menu && cd ../.. && npm run build:menu)
+          test -f apps/menu/dist/index.html
+          test ! -e apps/menu/package-lock.json
+          echo 'TASK8_VERCEL_ROOT_LOCK_SIMULATION_GREEN'
+      - name: Run Task 8 integration GREEN gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          npm run test:monorepo-architecture
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run build
+          npm run test:e2e:menu
+          echo 'TASK8_INTEGRATION_GREEN_CONFIRMED'
+      - name: Verify exact Task 8 scope and protected implementation paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf playwright-report-menu test-results
+          changed="$(git diff --name-only "$EXPECTED_SHA" | sort)"
+          printf 'TASK8_CHANGED_FILES:\n%s\n' "$changed"
+          cat > "$RUNNER_TEMP/task8-expected.txt" <<'EOF'
+          .github/workflows/ci.yml
+          apps/menu/DEPLOYMENT.md
+          apps/menu/vercel.json
+          EOF
+          diff -u "$RUNNER_TEMP/task8-expected.txt" <(printf '%s\n' "$changed")
+          git diff --exit-code "$EXPECTED_SHA" -- apps/operations apps/operations-desktop packages api server supabase package.json package-lock.json e2e scripts playwright.menu.config.ts tsconfig.e2e.json
+          test ! -e apps/menu/package-lock.json
+          grep -F 'workflow_dispatch:' .github/workflows/ci.yml
+          grep -F 'work/monorepo-foundation' .github/workflows/ci.yml
+          grep -F 'npm run test:monorepo-architecture' .github/workflows/ci.yml
+          grep -F 'npm run test:e2e:menu' .github/workflows/ci.yml
+          git diff --check
+      - name: Commit and push Task 8
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/ci.yml apps/menu/vercel.json apps/menu/DEPLOYMENT.md
+          staged="$(git diff --cached --name-only | sort)"
+          cat > "$RUNNER_TEMP/task8-staged-expected.txt" <<'EOF'
+          .github/workflows/ci.yml
+          apps/menu/DEPLOYMENT.md
+          apps/menu/vercel.json
+          EOF
+          diff -u "$RUNNER_TEMP/task8-staged-expected.txt" <(printf '%s\n' "$staged")
+          git commit -m 'ci(monorepo): require menu and architecture gates'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK8_HEAD=%s\nTASK8_TREE=%s\nTASK8_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
+          echo "final_head=$final_head" >> "$GITHUB_OUTPUT"
+      - name: Prove workflow_dispatch accepts exact Task 8 HEAD
+        shell: bash
+        env:
+          FINAL_HEAD: ${{ steps.commit.outputs.final_head }}
+        run: |
+          set -euo pipefail
+          gh workflow run ci.yml --ref "$TARGET_BRANCH" -f expected_sha="$FINAL_HEAD"
+          run_id=''
+          for i in $(seq 1 20); do
+            run_id="$(gh run list --workflow ci.yml --branch "$TARGET_BRANCH" --event workflow_dispatch --limit 20 --json databaseId,headSha --jq ".[] | select(.headSha == \"$FINAL_HEAD\") | .databaseId" | head -1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          printf 'TASK8_DISPATCH_RUN_ID=%s\nTASK8_DISPATCH_HEAD=%s\n' "$run_id" "$FINAL_HEAD"
