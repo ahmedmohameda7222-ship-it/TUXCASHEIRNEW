@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  FINAL_HEAD: e409cd9b5abba250fc26b92429f47f7c65868d2c
+  FINAL_HEAD: ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b
   EXPECTED_OPERATIONS_SHA: 11e3e9a1c64b2725e956647d081891e59ffb75a8
   EXPECTED_MENU_SOURCE_SHA: 285635181a9ee1ec2f760feb38abae8fa19a201d
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -54,10 +54,10 @@ jobs:
           from pathlib import Path
           request = json.loads(Path('.classic-executor/task9.json').read_text())
           assert request == {
-            'serial': 21,
+            'serial': 23,
             'mode': 'task9-final-phase-a-verification',
             'target_branch': 'work/monorepo-foundation',
-            'expected_target_sha': 'e409cd9b5abba250fc26b92429f47f7c65868d2c',
+            'expected_target_sha': 'ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b',
             'expected_operations_sha': '11e3e9a1c64b2725e956647d081891e59ffb75a8',
             'expected_menu_source_sha': '285635181a9ee1ec2f760feb38abae8fa19a201d',
           }
