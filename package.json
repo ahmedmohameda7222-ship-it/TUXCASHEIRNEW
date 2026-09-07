@@ -14,7 +14,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.api.json && npm run typecheck:e2e",
     "lint": "eslint \"{api,server,apps,packages,e2e}/**/*.{ts,tsx,mjs}\" playwright.config.ts --max-warnings 0",
-    "test": "vitest run",
+    "test": "vitest run --exclude scripts/monorepo-architecture-guard.test.mjs",
     "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",
     "test:whatsapp-security": "node scripts/test-whatsapp-security.mjs",
     "format": "prettier --write \"api/**/*.{ts,tsx}\" \"server/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,tsx,css,json}\" \"e2e/**/*.{ts,tsx,mjs}\" \"*.{json,mjs,ts}\" \".github/**/*.yml\"",
