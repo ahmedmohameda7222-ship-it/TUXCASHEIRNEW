@@ -357,6 +357,55 @@ LEFT JOIN category_json USING (shop_id, worker_id)
 LEFT JOIN product_json USING (shop_id, worker_id);
 `,
   },
+  {
+    version: 10,
+    name: 'whatsapp_local_cache',
+    sql: `
+CREATE TABLE whatsapp_cache_conversations (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  last_message_at TEXT,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_conversations_shop_last
+  ON whatsapp_cache_conversations(shop_id, last_message_at, id);
+
+CREATE TABLE whatsapp_cache_messages (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_messages_conversation_created
+  ON whatsapp_cache_messages(shop_id, conversation_id, created_at, id);
+
+CREATE TABLE whatsapp_cache_quick_replies (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+CREATE INDEX idx_whatsapp_cache_quick_replies_shop
+  ON whatsapp_cache_quick_replies(shop_id, id);
+
+CREATE TABLE whatsapp_cache_order_links (
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  order_id TEXT NOT NULL,
+  linked_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  PRIMARY KEY (shop_id, conversation_id, order_id)
+);
+
+CREATE TABLE whatsapp_drafts (
+  shop_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (shop_id, conversation_id)
+);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

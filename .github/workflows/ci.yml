@@ -12,6 +12,7 @@ on:
       - 'feat/ops-*'
       - 'fix/operations-*'
       - 'ui/tux-pos-refinement'
+      - 'work/operations-whatsapp-inbox-live'
 
 permissions:
   contents: read
@@ -40,6 +41,13 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -52,6 +60,10 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: WhatsApp architecture gate
+        run: npm run test:whatsapp-architecture
+      - name: WhatsApp security gate
+        run: npm run test:whatsapp-security
       - name: Typecheck
         run: npm run typecheck
       - name: Production builds

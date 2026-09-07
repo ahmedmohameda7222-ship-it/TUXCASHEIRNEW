@@ -164,6 +164,20 @@ export function EndDayFlow({
           </div>
         ) : null}
 
+        {stage.kind === 'GATE' && stage.gate.kind === 'PARKED_DRAFTS_BLOCKED' ? (
+          <div className="end-day-blocked">
+            <h3>Resolve parked orders first</h3>
+            <p>
+              {stage.gate.parkedDraftCount} parked order
+              {stage.gate.parkedDraftCount === 1 ? '' : 's'} must be restored or explicitly
+              discarded from Orders before End Day can continue.
+            </p>
+            <button type="button" className="primary-action" onClick={onReturnToOrders}>
+              Review Parked Orders
+            </button>
+          </div>
+        ) : null}
+
         {stage.kind === 'GATE' && stage.gate.kind === 'UNFINISHED_DRAFT' ? (
           <div className="end-day-blocked">
             <h3>You have an unfinished order.</h3>

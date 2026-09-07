@@ -282,3 +282,21 @@ describe('worker menu preference presentation', () => {
     });
   });
 });
+
+describe('Task 8E Orders handoff presentation', () => {
+  it('keeps customer-prefill conflict choices and parked draft actions explicit in OrdersWorkspace source', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('./OrdersWorkspace.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('prefillIntent');
+    expect(source).toContain('Keep current order');
+    expect(source).toContain('Start new order for');
+    expect(source).toContain('startOrderFromCustomerPrefill');
+    expect(source).toContain('parkCurrent: true');
+    expect(source).toContain('Parked Orders');
+    expect(source).toContain('restoreParkedDraft');
+    expect(source).toContain('discardParkedDraft');
+    expect(source).toContain('Restore');
+    expect(source).toContain('Discard');
+  });
+});

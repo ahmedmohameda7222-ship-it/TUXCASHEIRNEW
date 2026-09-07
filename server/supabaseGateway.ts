@@ -28,7 +28,7 @@ export type DeviceSessionResolution =
   | { readonly status: 'AUTHORITATIVELY_INVALID' }
   | { readonly status: 'PROTOCOL_ERROR' };
 
-interface SupabaseServerConfig {
+export interface SupabaseServerConfig {
   readonly projectUrl: string;
   readonly publishableKey: string;
 }
@@ -101,7 +101,14 @@ export function requireSameOrigin(request: GatewayRequest, response: GatewayResp
   }
 
   try {
-    if (new URL(origin).host !== host) {
+    const originUrl = new URL(origin);
+    if (originUrl.host !== host) {
+      sendJson(response, 403, { error: 'origin_not_allowed' });
+      return false;
+    }
+    const forwardedProto =
+      firstHeader(request.headers['x-forwarded-proto']).split(',')[0]?.trim().toLowerCase() ?? '';
+    if (forwardedProto.length > 0 && originUrl.protocol !== `${forwardedProto}:`) {
       sendJson(response, 403, { error: 'origin_not_allowed' });
       return false;
     }

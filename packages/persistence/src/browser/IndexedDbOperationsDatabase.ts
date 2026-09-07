@@ -23,12 +23,8 @@ import type {
 import type { Instant } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '../contracts';
 import { createIndexedDbWorkerUiPreferencesRepository } from './IndexedDbWorkerUiPreferencesStore';
-import {
-  applyIndexedDbMigrations,
-  INDEXED_DB_STORES,
-  INDEXED_DB_VERSION,
-  type IndexedDbStoreName,
-} from './indexedDbMigrations';
+import { INDEXED_DB_STORES, type IndexedDbStoreName } from './indexedDbMigrations';
+import { openOperationsIndexedDb } from './openOperationsIndexedDb';
 type StoredOutboxEvent = OutboxEvent & {
   readonly quarantinedAt: Instant | null;
   readonly permanentFailureReason: string | null;
@@ -62,30 +58,6 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
     transaction.addEventListener(
       'error',
       () => reject(transaction.error ?? new Error('IndexedDB transaction failed.')),
-      { once: true },
-    );
-  });
-}
-
-function openDatabase(name: string): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name, INDEXED_DB_VERSION);
-    request.addEventListener('upgradeneeded', (event) => {
-      const transaction = request.transaction;
-      if (transaction === null) {
-        throw new Error('IndexedDB upgrade transaction is unavailable.');
-      }
-      applyIndexedDbMigrations(
-        request.result,
-        transaction,
-        event.oldVersion,
-        event.newVersion ?? INDEXED_DB_VERSION,
-      );
-    });
-    request.addEventListener('success', () => resolve(request.result), { once: true });
-    request.addEventListener(
-      'error',
-      () => reject(request.error ?? new Error('Could not open IndexedDB.')),
       { once: true },
     );
   });
@@ -400,7 +372,7 @@ export class IndexedDbOperationsDatabase implements OperationsDatabase {
 
   async initialize(): Promise<void> {
     if (this.#database !== null) return;
-    this.#database = await openDatabase(this.#name);
+    this.#database = await openOperationsIndexedDb(this.#name);
     if (typeof navigator !== 'undefined' && navigator.storage?.persist !== undefined) {
       await navigator.storage.persist();
     }

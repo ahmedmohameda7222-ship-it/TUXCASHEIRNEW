@@ -1,29 +1,41 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
   OperationsConfigurationSyncService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
+  OperationsWhatsAppService,
   OperationsWorkerAuthenticationService,
+  WhatsAppRemoteError,
   WorkerMenuLayoutRetryController,
   WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
   type OperationsSessionResult,
+  type WhatsAppRemoteGateway,
   type WorkerCredentialStore,
   type WorkerMenuLayoutRemoteGateway,
   type WorkerMenuLayoutSyncIdentity,
   type WorkerUiPreferencesRemoteGateway,
   type WorkerUiPreferencesSyncIdentity,
 } from '@tux/application';
-import { instant, parseEntityId, parseOrderDraft, type OrderId, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  parseOrderDraft,
+  type DeliveryZoneId,
+  type OrderId,
+  type ShopId,
+} from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
+  SqliteWhatsAppStore,
   SqliteWorkerMenuLayoutStore,
 } from '@tux/persistence/sqlite';
 import type { TuxSyncHealthSnapshot } from '@tux/platform-contracts';
@@ -34,7 +46,7 @@ import {
   type AutomaticOutboxScheduler,
   type OutboxSyncSummary,
 } from '@tux/sync';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification } from 'electron';
 import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
@@ -43,6 +55,7 @@ import {
   SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
 import { BulkStockIpcRuntime } from './bulkStockIpc';
+import { DesktopWhatsAppRemote, parseTuxOperationsApiOrigin } from './desktopWhatsAppRemote';
 import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
 import { ElectronOrderPrinter } from './orderPrinter';
@@ -50,8 +63,12 @@ import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
   assertTrustedIpcSender,
   createSecureWebPreferences,
+  installOperationsPermissionHandlers,
   parseLoopbackDevelopmentUrl,
 } from './security';
+import { WhatsAppIpcRuntime } from './whatsappIpc';
+import { WhatsAppNotificationFeed } from './whatsappNotificationFeed';
+import { WhatsAppNotifications } from './whatsappNotifications';
 import { WorkerMenuLayoutIpcRuntime } from './workerMenuLayoutIpc';
 import { WorkerUiPreferencesIpcRuntime } from './workerUiPreferencesIpc';
 
@@ -62,6 +79,9 @@ const IPC_SESSION_SIGN_OUT = 'tux:session:sign-out';
 const IPC_SYNC_GET_STATUS = 'tux:sync:get-status';
 const IPC_SYNC_STATUS_CHANGED = 'tux:sync:status-changed';
 const IPC_ORDERS_LOAD_WORKSPACE = 'tux:orders:load-workspace';
+const IPC_ORDERS_START_FROM_PREFILL = 'tux:orders:start-from-prefill';
+const IPC_ORDERS_RESTORE_PARKED = 'tux:orders:restore-parked';
+const IPC_ORDERS_DISCARD_PARKED = 'tux:orders:discard-parked';
 const IPC_ORDERS_SAVE_DRAFT = 'tux:orders:save-draft';
 const IPC_ORDERS_FIND_CUSTOMER = 'tux:orders:find-customer';
 const IPC_ORDERS_PLACE = 'tux:orders:place';
@@ -71,6 +91,7 @@ const IPC_BOARD_MARK_DONE = 'tux:orders-board:mark-done';
 const IPC_BOARD_UNDO_DONE = 'tux:orders-board:undo-done';
 const IPC_BOARD_CANCEL = 'tux:orders-board:cancel';
 const IPC_BOARD_RETURN = 'tux:orders-board:return';
+const IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE = 'tux:whatsapp:set-notification-view-state';
 
 let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
@@ -83,6 +104,12 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let whatsappStore: SqliteWhatsAppStore | null = null;
+let whatsappIpcRuntime: WhatsAppIpcRuntime | null = null;
+let desktopWhatsAppRemote: DesktopWhatsAppRemote | null = null;
+let whatsappNotificationFeed: WhatsAppNotificationFeed | null = null;
+let whatsappNotificationSessionActive = false;
+let whatsappNotificationFocusedConversationId: string | null = null;
 let workerMenuLayoutIpcRuntime: WorkerMenuLayoutIpcRuntime | null = null;
 let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
 let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
@@ -112,6 +139,8 @@ function updateSyncHealth(input: Parameters<typeof buildSyncHealth>[0]): void {
 }
 
 function trackWorkerPersistenceIdentity(result: OperationsSessionResult): void {
+  whatsappNotificationSessionActive = result.ok && result.value.status === 'ACTIVE';
+  if (!whatsappNotificationSessionActive) whatsappNotificationFocusedConversationId = null;
   if (!result.ok || result.value.status !== 'ACTIVE') {
     activeWorkerMenuLayoutIdentity = null;
     activeWorkerUiPreferencesIdentity = null;
@@ -144,6 +173,26 @@ function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGatew
   return {
     getWorkerUiPreferences: unavailable,
     putWorkerUiPreferences: unavailable,
+  };
+}
+
+function unavailableWhatsAppRemote(): WhatsAppRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new WhatsAppRemoteError('REMOTE_UNAVAILABLE', 'WhatsApp remote is not configured.');
+  };
+  return {
+    loadInbox: unavailable,
+    resolveMessagingTarget: unavailable,
+    sendText: unavailable,
+    sendMedia: unavailable,
+    sendLocation: unavailable,
+    sendTemplate: unavailable,
+    retryFailedMessage: unavailable,
+    getMediaAccess: unavailable,
+    markUnread: unavailable,
+    archive: unavailable,
+    setFollowUp: unavailable,
+    linkOrder: unavailable,
   };
 }
 
@@ -239,6 +288,35 @@ async function initializeOperationsServices(): Promise<void> {
     workerAuthenticator,
     workerCredentialStore,
   );
+
+  whatsappStore = new SqliteWhatsAppStore(databasePath);
+  await whatsappStore.initialize();
+  desktopWhatsAppRemote = null;
+  let whatsappRemote: WhatsAppRemoteGateway = unavailableWhatsAppRemote();
+  const operationsApiOrigin = process.env['TUX_OPERATIONS_API_ORIGIN']?.trim();
+  if (remoteSessionManager !== null && operationsApiOrigin) {
+    try {
+      desktopWhatsAppRemote = new DesktopWhatsAppRemote({
+        apiOrigin: parseTuxOperationsApiOrigin(operationsApiOrigin),
+        sessionManager: remoteSessionManager,
+      });
+      whatsappRemote = desktopWhatsAppRemote;
+    } catch {
+      desktopWhatsAppRemote = null;
+      console.error(
+        'TUX WhatsApp remote configuration is invalid; WhatsApp will remain unavailable.',
+      );
+    }
+  }
+  const whatsappService = new OperationsWhatsAppService(
+    whatsappRemote,
+    whatsappStore,
+    { getState: () => sessionService!.getState() },
+    runtime.now,
+    operationsDatabase,
+  );
+  whatsappIpcRuntime = new WhatsAppIpcRuntime({ service: whatsappService });
+  trackWorkerPersistenceIdentity(await sessionService.getState());
 
   const preferencesRepository: WorkerUiPreferencesRepository = {
     get: (shopId, workerId) =>
@@ -406,6 +484,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_SESSION_SIGN_OUT,
     IPC_SYNC_GET_STATUS,
     IPC_ORDERS_LOAD_WORKSPACE,
+    IPC_ORDERS_START_FROM_PREFILL,
+    IPC_ORDERS_RESTORE_PARKED,
+    IPC_ORDERS_DISCARD_PARKED,
     IPC_ORDERS_SAVE_DRAFT,
     IPC_ORDERS_FIND_CUSTOMER,
     IPC_ORDERS_PLACE,
@@ -415,6 +496,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
     IPC_BOARD_UNDO_DONE,
     IPC_BOARD_CANCEL,
     IPC_BOARD_RETURN,
+    IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE,
   ]) {
     ipcMain.removeHandler(channel);
   }
@@ -446,12 +528,80 @@ function registerIpcHandlers(window: BrowserWindow): void {
     trackWorkerPersistenceIdentity(result);
     return result;
   });
+  ipcMain.handle(IPC_WHATSAPP_SET_NOTIFICATION_VIEW_STATE, (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'WhatsApp notification view state');
+    if (Object.keys(input).some((key) => key !== 'focusedConversationId')) {
+      throw new TypeError('WhatsApp notification view-state IPC payload is invalid.');
+    }
+    const focusedConversationId = input['focusedConversationId'];
+    if (
+      focusedConversationId !== null &&
+      (typeof focusedConversationId !== 'string' || focusedConversationId.trim().length === 0)
+    ) {
+      throw new TypeError('WhatsApp notification view-state IPC payload is invalid.');
+    }
+    whatsappNotificationFocusedConversationId = focusedConversationId as string | null;
+  });
   ipcMain.handle(IPC_ORDERS_LOAD_WORKSPACE, async (event, draftScopeId: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     if (typeof draftScopeId !== 'string') {
       throw new TypeError('Orders draft-scope IPC payload must be a string.');
     }
     return currentOrdersService().loadWorkspace(draftScopeId);
+  });
+  ipcMain.handle(IPC_ORDERS_START_FROM_PREFILL, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders customer prefill');
+    const prefill = input['prefill'];
+    assertObjectPayload(prefill, 'Orders customer prefill values');
+    if (
+      typeof input['draftScopeId'] !== 'string' ||
+      typeof input['parkCurrent'] !== 'boolean' ||
+      typeof prefill['normalizedPhone'] !== 'string' ||
+      typeof prefill['displayPhone'] !== 'string' ||
+      typeof prefill['customerName'] !== 'string' ||
+      (prefill['address'] !== null && typeof prefill['address'] !== 'string') ||
+      (prefill['zoneId'] !== null && typeof prefill['zoneId'] !== 'string')
+    ) {
+      throw new TypeError('Orders customer-prefill IPC payload is invalid.');
+    }
+    return currentOrdersService().startOrderFromCustomerPrefill({
+      draftScopeId: input['draftScopeId'],
+      parkCurrent: input['parkCurrent'],
+      prefill: {
+        normalizedPhone: prefill['normalizedPhone'],
+        displayPhone: prefill['displayPhone'],
+        customerName: prefill['customerName'],
+        address: prefill['address'] as string | null,
+        zoneId:
+          prefill['zoneId'] === null ? null : parseEntityId<DeliveryZoneId>(prefill['zoneId']),
+      },
+    });
+  });
+  ipcMain.handle(IPC_ORDERS_RESTORE_PARKED, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders parked restore');
+    if (
+      typeof input['draftScopeId'] !== 'string' ||
+      typeof input['parkedDraftId'] !== 'string' ||
+      typeof input['parkCurrent'] !== 'boolean'
+    ) {
+      throw new TypeError('Orders parked-restore IPC payload is invalid.');
+    }
+    return currentOrdersService().restoreParkedDraft({
+      draftScopeId: input['draftScopeId'],
+      parkedDraftId: input['parkedDraftId'],
+      parkCurrent: input['parkCurrent'],
+    });
+  });
+  ipcMain.handle(IPC_ORDERS_DISCARD_PARKED, async (event, input: unknown) => {
+    assertTrustedIpcSender(event, window.webContents.id);
+    assertObjectPayload(input, 'Orders parked discard');
+    if (typeof input['parkedDraftId'] !== 'string') {
+      throw new TypeError('Orders parked-discard IPC payload is invalid.');
+    }
+    return currentOrdersService().discardParkedDraft({ parkedDraftId: input['parkedDraftId'] });
   });
   ipcMain.handle(IPC_ORDERS_SAVE_DRAFT, async (event, draft: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
@@ -538,11 +688,15 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  if (whatsappIpcRuntime === null) {
+    throw new Error('Operations WhatsApp IPC runtime has not been initialized.');
+  }
   workerMenuLayoutIpcRuntime.register(window);
   workerUiPreferencesIpcRuntime.register(window);
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
   endDayIpcRuntime.register(window);
+  whatsappIpcRuntime.register(window);
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
@@ -561,11 +715,53 @@ async function createMainWindow(): Promise<BrowserWindow> {
   window.once('ready-to-show', () => window.show());
   registerIpcHandlers(window);
 
+  if (desktopWhatsAppRemote !== null) {
+    const notifications = new WhatsAppNotifications({
+      getContext: () => ({
+        sessionActive: whatsappNotificationSessionActive,
+        focusedConversationId: whatsappNotificationFocusedConversationId,
+        windowFocused: window.isFocused(),
+      }),
+      show: (presentation) => {
+        new Notification({
+          title: presentation.title,
+          body: presentation.body,
+        }).show();
+      },
+      reportError: (error) => console.warn('TUX WhatsApp notification display failed.', error),
+    });
+    whatsappNotificationFeed?.stop();
+    whatsappNotificationFeed = new WhatsAppNotificationFeed({
+      load: (cursor) => desktopWhatsAppRemote!.loadNotificationFeed(cursor),
+      notifications,
+      isSessionActive: () => whatsappNotificationSessionActive,
+      reportError: (error) => console.warn('TUX WhatsApp notification feed failed.', error),
+    });
+    whatsappNotificationFeed.start();
+    window.once('closed', () => {
+      whatsappNotificationFeed?.stop();
+      whatsappNotificationFeed = null;
+      whatsappNotificationFocusedConversationId = null;
+    });
+  }
+
   const developmentUrl = process.env['TUX_OPERATIONS_DEV_URL'];
   if (developmentUrl === undefined || developmentUrl.trim() === '') {
-    await window.loadFile(path.join(__dirname, '../../../operations/dist/index.html'));
+    const rendererPath = path.join(__dirname, '../../../operations/dist/index.html');
+    installOperationsPermissionHandlers(
+      window.webContents.session,
+      window.webContents.id,
+      pathToFileURL(rendererPath).toString(),
+    );
+    await window.loadFile(rendererPath);
   } else {
-    await window.loadURL(parseLoopbackDevelopmentUrl(developmentUrl));
+    const trustedDevelopmentUrl = parseLoopbackDevelopmentUrl(developmentUrl);
+    installOperationsPermissionHandlers(
+      window.webContents.session,
+      window.webContents.id,
+      trustedDevelopmentUrl,
+    );
+    await window.loadURL(trustedDevelopmentUrl);
   }
 
   return window;
@@ -583,6 +779,11 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   if (configurationSyncTimer !== null) clearInterval(configurationSyncTimer);
   configurationSyncTimer = null;
+  whatsappNotificationFeed?.stop();
+  whatsappNotificationFeed = null;
+  whatsappNotificationFocusedConversationId = null;
+  whatsappNotificationSessionActive = false;
+  desktopWhatsAppRemote = null;
   workerMenuLayoutRetry?.stop();
   workerMenuLayoutRetry = null;
   workerUiPreferencesRetry?.stop();
@@ -593,6 +794,8 @@ app.on('before-quit', () => {
   workerMenuLayoutIpcRuntime = null;
   workerUiPreferencesIpcRuntime?.close();
   workerUiPreferencesIpcRuntime = null;
+  whatsappIpcRuntime?.close();
+  void whatsappStore?.close();
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
   void bulkStockIpcRuntime?.close();
@@ -602,6 +805,8 @@ app.on('before-quit', () => {
   void workerMenuLayoutStore?.close();
   void operationsDatabase?.close();
   automaticSyncScheduler = null;
+  whatsappIpcRuntime = null;
+  whatsappStore = null;
   endDayIpcRuntime = null;
   bulkStockIpcRuntime = null;
   expensesIpcRuntime = null;

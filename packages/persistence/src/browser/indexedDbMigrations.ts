@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 4;
+export const INDEXED_DB_VERSION = 5;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -17,6 +17,11 @@ export const INDEXED_DB_STORES = [
   'reconciliations',
   'auditEvents',
   'outboxEvents',
+  'whatsappConversations',
+  'whatsappMessages',
+  'whatsappQuickReplies',
+  'whatsappOrderLinks',
+  'whatsappDrafts',
 ] as const;
 
 export type IndexedDbStoreName = (typeof INDEXED_DB_STORES)[number];
@@ -228,6 +233,34 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
           { once: true },
         );
         cursor.continue();
+      });
+    },
+  },
+  {
+    version: 5,
+    name: 'whatsapp_local_cache',
+    apply(database) {
+      const conversations = database.createObjectStore('whatsappConversations', { keyPath: 'id' });
+      conversations.createIndex('shopLastMessage', ['shopId', 'lastMessageAt', 'id']);
+
+      const messages = database.createObjectStore('whatsappMessages', { keyPath: 'id' });
+      messages.createIndex('shopConversationCreated', [
+        'shopId',
+        'conversationId',
+        'createdAt',
+        'id',
+      ]);
+
+      const quickReplies = database.createObjectStore('whatsappQuickReplies', { keyPath: 'id' });
+      quickReplies.createIndex('shopId', 'shopId');
+
+      const orderLinks = database.createObjectStore('whatsappOrderLinks', {
+        keyPath: ['shopId', 'conversationId', 'orderId'],
+      });
+      orderLinks.createIndex('shopConversation', ['shopId', 'conversationId']);
+
+      database.createObjectStore('whatsappDrafts', {
+        keyPath: ['shopId', 'conversationId'],
       });
     },
   },

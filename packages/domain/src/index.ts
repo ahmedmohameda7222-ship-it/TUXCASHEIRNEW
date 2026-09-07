@@ -83,6 +83,12 @@ export {
   undoOrderDone,
 } from './orderLifecycle';
 export type * from './orderDraft';
+export { hasMeaningfulOrderDraft } from './orderDraft';
+export {
+  assertParkedOrderDraftInvariant,
+  type ParkedOrderDraft,
+  type ParkedOrderDraftState,
+} from './parkedOrderDraft';
 export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
 export {
   parsePoundsToMinor,
@@ -121,6 +127,22 @@ export {
 } from './syncContract';
 export { suggestCashTenders, type TenderSuggestion } from './tender';
 export { instant, type Instant } from './time';
+export {
+  assertWhatsAppMessageInvariant,
+  type WhatsAppConversation,
+  type WhatsAppConversationContext,
+  type WhatsAppLocationPayload,
+  type WhatsAppMediaDescriptor,
+  type WhatsAppMessage,
+  type WhatsAppMessageDirection,
+  type WhatsAppMessageKind,
+  type WhatsAppMessageStatus,
+  type WhatsAppMessagingTarget,
+  type WhatsAppShopMessagingConfig,
+  type WhatsAppStarterTemplate,
+  type WhatsAppQuickReply,
+  type WhatsAppQuickReplyCategory,
+} from './whatsapp';
 export {
   flattenWorkerMenuLayoutProductOrder,
   normalizeWorkerMenuLayoutUpdate,

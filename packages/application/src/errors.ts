@@ -8,7 +8,8 @@ export type ApplicationErrorCode =
   | 'CONFLICT_ERROR'
   | 'NOT_FOUND'
   | 'ALREADY_CLOSED'
-  | 'IDEMPOTENCY_REPLAY';
+  | 'IDEMPOTENCY_REPLAY'
+  | 'WHATSAPP_FREE_FORM_WINDOW_CLOSED';
 
 export interface ApplicationError {
   readonly code: ApplicationErrorCode;

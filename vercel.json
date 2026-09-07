@@ -4,6 +4,12 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build -w @tux/operations",
   "outputDirectory": "apps/operations/dist",
+  "crons": [
+    {
+      "path": "/api/whatsapp-media-retention",
+      "schedule": "17 3 * * *"
+    }
+  ],
   "git": {
     "deploymentEnabled": {
       "**": false,
