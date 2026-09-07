@@ -1,0 +1,98 @@
+name: Classic Monorepo Task 6 Runtime Diagnostic
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task6-diagnostic.json'
+      - '.github/workflows/classic-monorepo-task6-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Task 6 browser runtime diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task6-diagnostic "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Build Menu and install Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:menu
+          npx playwright install chromium
+          test -f apps/menu/dist/index.html
+          echo '--- DIST INDEX ---'
+          sed -n '1,160p' apps/menu/dist/index.html
+      - name: Start preview and capture browser runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174 > "$RUNNER_TEMP/menu-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsSI http://127.0.0.1:4174/
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          const evidence = [];
+          page.on('console', msg => evidence.push(`CONSOLE ${msg.type()}: ${msg.text()}`));
+          page.on('pageerror', err => evidence.push(`PAGEERROR ${err.name}: ${err.message}\n${err.stack || ''}`));
+          page.on('requestfailed', req => evidence.push(`REQUESTFAILED ${req.url()} :: ${req.failure()?.errorText}`));
+          page.on('response', res => {
+            if (res.status() >= 400) evidence.push(`HTTP${res.status()} ${res.url()}`);
+          });
+          const response = await page.goto('http://127.0.0.1:4174/', { waitUntil: 'networkidle' });
+          await page.waitForTimeout(1000);
+          console.log(`NAV_STATUS=${response?.status()}`);
+          console.log(`TITLE=${await page.title()}`);
+          console.log(`BODY_TEXT=${JSON.stringify((await page.locator('body').innerText()).slice(0, 2000))}`);
+          console.log(`BODY_HTML=${JSON.stringify((await page.locator('body').innerHTML()).slice(0, 5000))}`);
+          const scripts = await page.locator('script[src]').evaluateAll(nodes => nodes.map(node => node.src));
+          console.log(`SCRIPTS=${JSON.stringify(scripts)}`);
+          for (const src of scripts) {
+            const r = await page.request.get(src);
+            console.log(`SCRIPT_FETCH status=${r.status()} url=${src} bytes=${(await r.body()).length}`);
+          }
+          console.log('--- RUNTIME EVIDENCE ---');
+          for (const line of evidence) console.log(line);
+          await browser.close();
+          NODE
+          echo '--- PREVIEW LOG ---'
+          cat "$RUNNER_TEMP/menu-preview.log"
+      - name: Confirm target remains untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          echo 'TASK6_DIAGNOSTIC_ONLY_TARGET_UNTOUCHED'
