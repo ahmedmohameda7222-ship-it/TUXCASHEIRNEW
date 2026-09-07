@@ -1,0 +1,153 @@
+name: Classic Monorepo Task 9 Verification
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task9.json'
+      - '.github/workflows/classic-monorepo-task9.yml'
+
+permissions:
+  contents: read
+
+env:
+  FINAL_HEAD: e409cd9b5abba250fc26b92429f47f7c65868d2c
+  EXPECTED_OPERATIONS_SHA: 11e3e9a1c64b2725e956647d081891e59ffb75a8
+  EXPECTED_MENU_SOURCE_SHA: 285635181a9ee1ec2f760feb38abae8fa19a201d
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+
+jobs:
+  verify:
+    name: Final exact-head Phase A Linux verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate Task 9 request and exact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task9.json').read_text())
+          assert request == {
+            'serial': 21,
+            'mode': 'task9-final-phase-a-verification',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'e409cd9b5abba250fc26b92429f47f7c65868d2c',
+            'expected_operations_sha': '11e3e9a1c64b2725e956647d081891e59ffb75a8',
+            'expected_menu_source_sha': '285635181a9ee1ec2f760feb38abae8fa19a201d',
+          }
+          PY
+          actual="$(git ls-remote origin refs/heads/work/monorepo-foundation | awk '{print $1}')"
+          test "$actual" = "$FINAL_HEAD"
+          git fetch origin work/monorepo-foundation work/operations-whatsapp-inbox-live
+          git switch -C classic-task9 "$FINAL_HEAD"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          printf 'HEAD=%s\nTREE=%s\nPARENT=%s\n' "$FINAL_HEAD" "$final_tree" "$final_parent"
+          test -z "$(git status --porcelain)"
+      - name: Prove external authorities remain independent
+        shell: bash
+        run: |
+          set -euo pipefail
+          live="$(git rev-parse origin/work/operations-whatsapp-inbox-live)"
+          menu_source="$(git ls-remote https://github.com/ahmedmohameda7222-ship-it/TUX-MENU.git refs/heads/main | awk '{print $1}')"
+          printf 'LIVE=%s\nTUX_MENU_MAIN=%s\n' "$live" "$menu_source"
+          test "$live" = "$EXPECTED_OPERATIONS_SHA"
+          test "$menu_source" = "$EXPECTED_MENU_SOURCE_SHA"
+      - name: Prove provenance traceability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md
+          cat docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md
+          echo '--- APP HISTORY ---'
+          git log --follow --oneline -- apps/menu/src/App.tsx | head -20
+          grep -F '285635181a9ee1ec2f760feb38abae8fa19a201d' docs/superpowers/provenance/2026-09-06-tux-menu-history-import.md
+      - name: Prove lock migration and legacy SQL invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:monorepo-architecture
+          locks="$(find . \( -path './.git' -o -path './.tmp' -o -path './node_modules' \) -prune -o -name package-lock.json -print | sort)"
+          migrations="$(find . \( -path './.git' -o -path './.tmp' -o -path './node_modules' \) -prune -o -type d -path '*/supabase/migrations' -print | sort)"
+          legacy_sql="$(find . \( -path './.git' -o -path './.tmp' -o -path './node_modules' \) -prune -o -name supabase_setup.sql -print | sort)"
+          printf 'LOCKS:\n%s\nMIGRATION_AUTHORITIES:\n%s\nEXECUTABLE_LEGACY_SQL:\n%s\n' "$locks" "$migrations" "$legacy_sql"
+          test "$locks" = './package-lock.json'
+          test "$migrations" = './supabase/migrations'
+          test -z "$legacy_sql"
+      - name: Prepare complete Linux verification environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run complete Task 9 Linux gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format:check
+          npm run lint
+          npm run test
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+          npm run typecheck
+          npm run build
+          npm run test:migrations
+          npm run test:monorepo-architecture
+          npm run test:e2e
+          npm run test:e2e:menu
+          echo 'TASK9_COMPLETE_LINUX_GATES_GREEN'
+      - name: Prove no Phase A Operations or migration implementation change
+        shell: bash
+        run: |
+          set -euo pipefail
+          live_base="$(git merge-base HEAD origin/work/operations-whatsapp-inbox-live)"
+          migration_diff="$(git diff --name-only "$live_base"..HEAD -- supabase/migrations)"
+          operations_diff="$(git diff --name-only "$live_base"..HEAD -- apps/operations apps/operations-desktop)"
+          printf 'LIVE_BASE=%s\nMIGRATION_DIFF=%s\nOPERATIONS_DIFF=%s\n' "$live_base" "$migration_diff" "$operations_diff"
+          test -z "$migration_diff"
+          test -z "$operations_diff"
+      - name: Final exact-head and clean-tree check
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf playwright-report playwright-report-menu test-results
+          test -z "$(git ls-files '*.tsbuildinfo')"
+          find . -name '*.tsbuildinfo' -type f -delete
+          actual="$(git ls-remote origin refs/heads/work/monorepo-foundation | awk '{print $1}')"
+          test "$actual" = "$FINAL_HEAD"
+          test "$(git rev-parse HEAD)" = "$FINAL_HEAD"
+          status="$(git status --porcelain)"
+          printf 'FINAL_STATUS=%s\n' "$status"
+          test -z "$status"
+          echo '--- PHASE A COMMITS ---'
+          git log --oneline --decorate "$(git merge-base HEAD origin/work/operations-whatsapp-inbox-live)"..HEAD
+          echo 'TASK9_EXACT_HEAD_CLEAN_TREE_GREEN'
