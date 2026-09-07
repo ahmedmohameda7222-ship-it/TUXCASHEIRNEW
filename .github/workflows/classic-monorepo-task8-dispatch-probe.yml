@@ -1,0 +1,44 @@
+name: Classic Monorepo Task 8 Dispatch Probe
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.github/workflows/classic-monorepo-task8-dispatch-probe.yml'
+      - '.classic-executor/task8-dispatch-probe.json'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: e409cd9b5abba250fc26b92429f47f7c65868d2c
+    steps:
+      - uses: actions/checkout@v4
+      - name: Attempt exact-head workflow dispatch and classify result
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(gh workflow run ci.yml --ref "$TARGET_BRANCH" -f expected_sha="$EXPECTED_SHA" 2>&1)"
+          rc=$?
+          set -e
+          printf 'DISPATCH_RC=%s\nDISPATCH_OUTPUT=%s\n' "$rc" "$output"
+          if [ "$rc" -ne 0 ]; then
+            echo 'TASK8_DISPATCH_PLATFORM_REJECTED'
+            exit 0
+          fi
+          run_id=''
+          for i in $(seq 1 20); do
+            run_id="$(gh run list --workflow ci.yml --branch "$TARGET_BRANCH" --event workflow_dispatch --limit 20 --json databaseId,headSha --jq ".[] | select(.headSha == \"$EXPECTED_SHA\") | .databaseId" | head -1)"
+            if [ -n "$run_id" ]; then break; fi
+            sleep 2
+          done
+          test -n "$run_id"
+          printf 'TASK8_DISPATCH_ACCEPTED_RUN_ID=%s\nTASK8_DISPATCH_HEAD=%s\n' "$run_id" "$EXPECTED_SHA"
