@@ -1,0 +1,143 @@
+name: Classic Monorepo Vitest Isolation Fix
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task9-vitest-isolation.json'
+      - '.github/workflows/classic-monorepo-task9-vitest-isolation.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Isolate Node architecture tests from Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: e409cd9b5abba250fc26b92429f47f7c65868d2c
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate exact target and reproduce permanent quality RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task9-vitest-isolation.json').read_text())
+          assert request == {
+            'serial': 22,
+            'mode': 'task9-vitest-node-test-isolation',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': 'e409cd9b5abba250fc26b92429f47f7c65868d2c',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-vitest-isolation "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          npm ci
+          set +e
+          npm run test > "$RUNNER_TEMP/vitest-red.log" 2>&1
+          rc=$?
+          set -e
+          tail -120 "$RUNNER_TEMP/vitest-red.log"
+          test "$rc" -ne 0
+          grep -F 'scripts/monorepo-architecture-guard.test.mjs' "$RUNNER_TEMP/vitest-red.log"
+          grep -F 'No test suite found in file' "$RUNNER_TEMP/vitest-red.log"
+          grep -E '1012 passed|Tests.*1012 passed' "$RUNNER_TEMP/vitest-red.log"
+          echo 'VITEST_NODE_TEST_DISCOVERY_RED_CONFIRMED'
+      - name: Add minimal additive Vitest exclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('package.json')
+          package = json.loads(path.read_text())
+          assert package['scripts']['test'] == 'vitest run'
+          assert package['scripts']['test:monorepo-architecture'] == 'node --test scripts/monorepo-architecture-guard.test.mjs && node scripts/test-monorepo-architecture.mjs'
+          package['scripts']['test'] = 'vitest run --exclude scripts/monorepo-architecture-guard.test.mjs'
+          path.write_text(json.dumps(package, indent=2) + '\n')
+          PY
+          npx prettier --write package.json
+          grep -F 'vitest run --exclude scripts/monorepo-architecture-guard.test.mjs' package.json
+      - name: Prove Node guard fixtures and Vitest suites GREEN independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/monorepo-architecture-guard.test.mjs
+          npm run test:monorepo-architecture
+          npm run test
+          echo 'VITEST_NODE_TEST_ISOLATION_GREEN_CONFIRMED'
+      - name: Prove root quality non-regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format:check
+          npm run lint
+          npm run test:whatsapp-architecture
+          npm run test:whatsapp-security
+          npm run typecheck
+          npm run build
+          echo 'VITEST_ISOLATION_ROOT_QUALITY_GREEN'
+      - name: Verify exact tooling-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -name '*.tsbuildinfo' -type f -delete
+          changed="$(git diff --name-only "$EXPECTED_SHA" | sort)"
+          printf 'VITEST_ISOLATION_CHANGED_FILES:\n%s\n' "$changed"
+          test "$changed" = 'package.json'
+          git diff --exit-code "$EXPECTED_SHA" -- apps packages api server supabase .github package-lock.json e2e scripts playwright.menu.config.ts tsconfig.e2e.json
+          git diff --check
+      - name: Commit and push tooling correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json
+          test "$(git diff --cached --name-only)" = 'package.json'
+          git commit -m 'test(monorepo): isolate architecture node tests'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'VITEST_ISOLATION_HEAD=%s\nVITEST_ISOLATION_TREE=%s\nVITEST_ISOLATION_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
