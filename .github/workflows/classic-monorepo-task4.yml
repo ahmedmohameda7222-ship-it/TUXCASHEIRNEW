@@ -67,7 +67,7 @@ jobs:
           test "$rc" -ne 0
           grep -F 'expected @tux/menu, got tux-burger-website' "$RUNNER_TEMP/task4-red.log"
           echo 'TASK4_WORKSPACE_IDENTITY_RED_CONFIRMED'
-      - name: Rename Menu workspace and add root Menu scripts
+      - name: Rename Menu workspace, align Vite compatibility, and add root Menu scripts
         shell: bash
         run: |
           set -euo pipefail
@@ -75,14 +75,19 @@ jobs:
           import json
           from pathlib import Path
 
+          root_path = Path('package.json')
+          root = json.loads(root_path.read_text())
+          root_vite = root['devDependencies']['vite']
+          assert root_vite == '8.2.0'
+
           menu_path = Path('apps/menu/package.json')
           menu = json.loads(menu_path.read_text())
           assert menu['name'] == 'tux-burger-website'
+          assert menu['devDependencies']['vite'] == '^7.3.2'
           menu['name'] = '@tux/menu'
+          menu['devDependencies']['vite'] = root_vite
           menu_path.write_text(json.dumps(menu, indent=2) + '\n')
 
-          root_path = Path('package.json')
-          root = json.loads(root_path.read_text())
           scripts = root['scripts']
           additions = {
               'dev:menu': 'npm run dev -w @tux/menu',
@@ -99,22 +104,31 @@ jobs:
           PY
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          const root = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const menu = JSON.parse(fs.readFileSync('apps/menu/package.json', 'utf8'));
           if (menu.name !== '@tux/menu') throw new Error('workspace identity missing');
+          if (menu.devDependencies.vite !== root.devDependencies.vite) {
+            throw new Error(`Vite workspace mismatch: menu=${menu.devDependencies.vite} root=${root.devDependencies.vite}`);
+          }
           NODE
           echo 'TASK4_WORKSPACE_IDENTITY_GREEN_CONFIRMED'
+          echo 'TASK4_VITE_WORKSPACE_COMPATIBILITY_ALIGNED'
       - name: Generate canonical root lock without scripts
         shell: bash
         run: |
           set -euo pipefail
           npm install --package-lock-only --ignore-scripts
-          npm ls -w @tux/menu --depth=0
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          const root = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           const menu = lock.packages?.['apps/menu'];
           if (!menu) throw new Error('root lock missing apps/menu workspace entry');
+          if (menu.devDependencies?.vite !== root.devDependencies.vite) {
+            throw new Error(`root lock Menu Vite mismatch: ${menu.devDependencies?.vite}`);
+          }
           console.log('ROOT_LOCK_MENU_ENTRY_OK');
+          console.log(`ROOT_LOCK_MENU_VITE=${menu.devDependencies.vite}`);
           NODE
       - name: Prove clean root install and build before nested-lock deletion
         shell: bash
@@ -122,6 +136,7 @@ jobs:
           set -euo pipefail
           rm -rf node_modules apps/*/node_modules packages/*/node_modules
           npm ci
+          npm exec -w @tux/menu -- vite --version
           npm run build:menu
           test -f apps/menu/dist/index.html
           set +e
@@ -134,6 +149,7 @@ jobs:
           grep -F 'RouteComponentProps' "$RUNNER_TEMP/typecheck-before-delete.log"
           error_count="$(grep -c 'error TS' "$RUNNER_TEMP/typecheck-before-delete.log")"
           test "$error_count" = '1'
+          test "$(grep -c 'vite.config.ts' "$RUNNER_TEMP/typecheck-before-delete.log" || true)" = '0'
           echo 'TASK4_KNOWN_PREEXISTING_TYPECHECK_RED_CARRIED_TO_TASK5'
       - name: Delete nested lock and prove root-only reproducibility
         shell: bash
@@ -142,7 +158,7 @@ jobs:
           git rm apps/menu/package-lock.json
           rm -rf node_modules apps/*/node_modules packages/*/node_modules
           npm ci
-          npm ls -w @tux/menu --depth=0
+          npm exec -w @tux/menu -- vite --version
           npm run build:menu
           test -f apps/menu/dist/index.html
           set +e
@@ -154,6 +170,7 @@ jobs:
           grep -F 'src/App.tsx(36,41): error TS2322' "$RUNNER_TEMP/typecheck-after-delete.log"
           grep -F 'RouteComponentProps' "$RUNNER_TEMP/typecheck-after-delete.log"
           test "$(grep -c 'error TS' "$RUNNER_TEMP/typecheck-after-delete.log")" = '1'
+          test "$(grep -c 'vite.config.ts' "$RUNNER_TEMP/typecheck-after-delete.log" || true)" = '0'
           nested="$(find apps packages -name package-lock.json -print)"
           test -z "$nested"
           echo 'TASK4_ROOT_ONLY_LOCK_REPRODUCIBILITY_GREEN'
