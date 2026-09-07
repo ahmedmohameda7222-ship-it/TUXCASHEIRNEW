@@ -1,8 +1,8 @@
 {
-  "serial": 23,
+  "serial": 24,
   "mode": "task9-final-phase-a-verification",
   "target_branch": "work/monorepo-foundation",
-  "expected_target_sha": "ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b",
+  "expected_target_sha": "3b5d107ee24b97fd3adf8eb8793e1fc6f0402fe6",
   "expected_operations_sha": "11e3e9a1c64b2725e956647d081891e59ffb75a8",
   "expected_menu_source_sha": "285635181a9ee1ec2f760feb38abae8fa19a201d"
 }
