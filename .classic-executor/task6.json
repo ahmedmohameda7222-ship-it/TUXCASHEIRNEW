@@ -1,6 +1,6 @@
 {
-  "serial": 12,
+  "serial": 15,
   "mode": "task6-menu-e2e",
   "target_branch": "work/monorepo-foundation",
-  "expected_target_sha": "2ffdd9059cfb60cb7f9a5aeef16e35478652ebc8"
+  "expected_target_sha": "9e556dc42416d0200359ceba14c2321e3c726f81"
 }
