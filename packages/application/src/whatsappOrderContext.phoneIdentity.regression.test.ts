@@ -4,6 +4,7 @@ import {
   parseEntityId,
   type BusinessDayId,
   type CustomerContact,
+  type CustomerContactId,
   type DeliveryZoneId,
   type OrderId,
   type OrderSnapshot,
@@ -22,7 +23,7 @@ const workerId = parseEntityId<WorkerId>('30000000-0000-4000-8000-000000000001')
 const orderTypeId = parseEntityId<OrderTypeId>('40000000-0000-4000-8000-000000000001');
 const zoneId = parseEntityId<DeliveryZoneId>('50000000-0000-4000-8000-000000000001');
 const conversationId = '60000000-0000-4000-8000-000000000001';
-const contactId = parseEntityId('70000000-0000-4000-8000-000000000001');
+const contactId = parseEntityId<CustomerContactId>('70000000-0000-4000-8000-000000000001');
 const orderId = parseEntityId<OrderId>('80000000-0000-4000-8000-000000000001');
 const at = instant('2026-09-08T00:00:00.000Z');
 const canonicalPhone = '01001234567';
