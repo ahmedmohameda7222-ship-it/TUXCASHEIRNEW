@@ -20,8 +20,8 @@ function conversation(): WhatsAppConversation {
   return {
     id: conversationId,
     shopId,
-    normalizedPhone: '+201001234567',
-    displayPhone: '01001234567',
+    normalizedPhone: '01001234567',
+    displayPhone: '+201001234567',
     customerName: 'E2E Customer',
     context: 'DIRECT',
     linkedOrderId: null,
@@ -33,7 +33,7 @@ function conversation(): WhatsAppConversation {
 }
 
 describe('Task 10A WhatsApp customer order context phone identity', () => {
-  it('preserves canonical normalizedPhone while retaining the local displayPhone', async () => {
+  it('preserves canonical normalizedPhone while retaining the displayPhone', async () => {
     const getByNormalizedPhone = vi.fn().mockResolvedValue(null);
     const database: OperationsDatabase = {
       transaction: async (work) =>
@@ -82,8 +82,8 @@ describe('Task 10A WhatsApp customer order context phone identity', () => {
       value: {
         kind: 'NO_ACTIVE_ORDER',
         customer: {
-          normalizedPhone: '+201001234567',
-          displayPhone: '01001234567',
+          normalizedPhone: '01001234567',
+          displayPhone: '+201001234567',
           customerName: 'E2E Customer',
           address: null,
           zoneId: null,
