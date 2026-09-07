@@ -1,0 +1,100 @@
+name: Classic Monorepo Task 5 Diagnostic
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task5-diagnostic.json'
+      - '.github/workflows/classic-monorepo-task5-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Task 5 RED quality diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 4d016fc98e1821c70846580628fbbe226c4955c8
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate request and exact target SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task5-diagnostic.json').read_text())
+          assert request == {
+            'serial': 10,
+            'mode': 'task5-diagnostic',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': '4d016fc98e1821c70846580628fbbe226c4955c8',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task5-diagnostic "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Clean root install
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+      - name: Capture RED format diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm run format:check > "$RUNNER_TEMP/task5-format.log" 2>&1
+          rc=$?
+          set -e
+          echo "TASK5_FORMAT_RC=$rc"
+          grep -E '^\[warn\]|Code style issues|Formatting issues|apps/menu' "$RUNNER_TEMP/task5-format.log" || true
+          test "$rc" -ne 0
+          echo 'TASK5_FORMAT_RED_CONFIRMED'
+      - name: Capture RED Menu ESLint diagnostics
+        shell: bash
+        run: |
+          set +e
+          npx eslint 'apps/menu/**/*.{ts,tsx,mjs}' --max-warnings 0 > "$RUNNER_TEMP/task5-eslint.log" 2>&1
+          rc=$?
+          set -e
+          echo "TASK5_ESLINT_RC=$rc"
+          cat "$RUNNER_TEMP/task5-eslint.log"
+          test "$rc" -ne 0
+          echo 'TASK5_ESLINT_RED_CONFIRMED'
+      - name: Capture RED Menu typecheck diagnostic
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck:menu > "$RUNNER_TEMP/task5-typecheck.log" 2>&1
+          rc=$?
+          set -e
+          echo "TASK5_TYPECHECK_RC=$rc"
+          cat "$RUNNER_TEMP/task5-typecheck.log"
+          test "$rc" -ne 0
+          grep -F 'src/App.tsx(36,41): error TS2322' "$RUNNER_TEMP/task5-typecheck.log"
+          echo 'TASK5_TYPECHECK_RED_CONFIRMED'
+      - name: Confirm pre-fix build remains GREEN and target untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build:menu
+          test -f apps/menu/dist/index.html
+          test -z "$(git status --porcelain)"
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          echo 'TASK5_DIAGNOSTIC_ONLY_TARGET_UNTOUCHED'
