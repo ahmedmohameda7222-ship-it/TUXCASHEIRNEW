@@ -1,0 +1,6 @@
+{
+  "serial": 20,
+  "mode": "task8-permanent-ci-deployment",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "fd616e893062edb085d1423a771808d59e54b092"
+}
