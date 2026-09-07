@@ -16,6 +16,7 @@ on:
       - main
       - integration/tux-operations-v2
       - work/monorepo-foundation
+      - work/catalog-authority-contracts
       - 'feat/ops-*'
       - 'fix/operations-*'
       - 'ui/tux-pos-refinement'
@@ -100,6 +101,8 @@ jobs:
           deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
           deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
           deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
+          deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
+          deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E
@@ -128,6 +131,11 @@ jobs:
         run: >-
           deno test --allow-env --allow-net --allow-run --allow-read
           supabase/functions/device-bootstrap/security.deno.ts
+      - name: Catalog public/admin boundary behavioral tests
+        run: >-
+          deno test
+          supabase/functions/catalog-public/catalog-public.deno.ts
+          supabase/functions/catalog-admin/catalog-admin.deno.ts
 
   windows-package:
     name: windows-package
@@ -197,6 +205,8 @@ jobs:
           node-version: '24'
       - name: Monorepo architecture guards
         run: npm run test:monorepo-architecture
+      - name: Canonical catalog architecture guards
+        run: npm run test:catalog-architecture
 
   required-quality-gate:
     name: Required quality gate
