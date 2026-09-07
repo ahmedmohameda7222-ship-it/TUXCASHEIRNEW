@@ -17,7 +17,11 @@ import type { Instant } from './time';
 export interface MenuCategory {
   readonly id: MenuCategoryId;
   readonly shopId: ShopId;
+  /** Stable customer route identity. Optional while legacy canonical rows await authorized migration. */
+  readonly slug?: string | null;
   readonly name: string;
+  /** Customer-facing category copy. Optional while legacy Operations snapshots coexist. */
+  readonly description?: string | null;
   readonly sortOrder: number;
   readonly active: boolean;
 }
@@ -26,12 +30,16 @@ export interface Product {
   readonly id: ProductId;
   readonly shopId: ShopId;
   readonly categoryId: MenuCategoryId;
+  /** Stable customer/deep-link identity. Optional while legacy canonical rows await authorized migration. */
+  readonly slug?: string | null;
   readonly name: string;
   readonly description: string | null;
   readonly priceMinor: MoneyMinor;
   readonly imageKey: string | null;
   /** Optional merchandising family inside a top-level category, e.g. TUX / TUXIFY. */
   readonly family?: string | null;
+  /** Canonical merchandising state; optional for compatibility with existing Operations snapshots. */
+  readonly bestSeller?: boolean;
   readonly active: boolean;
   readonly soldOut: boolean;
   readonly isCombo: boolean;
