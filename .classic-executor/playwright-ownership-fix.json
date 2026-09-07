@@ -1,0 +1,6 @@
+{
+  "serial": 1,
+  "mode": "playwright-suite-ownership-fix",
+  "target_branch": "work/monorepo-foundation",
+  "expected_target_sha": "ef9cf4a6030aded70ad27a005ce9c6fb4e7d448b"
+}
