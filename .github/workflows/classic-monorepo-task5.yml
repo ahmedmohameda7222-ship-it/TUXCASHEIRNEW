@@ -1,0 +1,248 @@
+name: Classic Monorepo Task 5 Executor
+
+on:
+  push:
+    branches:
+      - tooling/classic-monorepo-executor
+    paths:
+      - '.classic-executor/task5.json'
+      - '.github/workflows/classic-monorepo-task5.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: classic-monorepo-target-mutation
+  cancel-in-progress: false
+
+jobs:
+  task5:
+    name: Task 5 Menu monorepo quality alignment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_BRANCH: work/monorepo-foundation
+      EXPECTED_SHA: 4d016fc98e1821c70846580628fbbe226c4955c8
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate request and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('.classic-executor/task5.json').read_text())
+          assert request == {
+            'serial': 11,
+            'mode': 'task5-quality',
+            'target_branch': 'work/monorepo-foundation',
+            'expected_target_sha': '4d016fc98e1821c70846580628fbbe226c4955c8',
+          }
+          PY
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          printf 'EXPECTED=%s\nACTUAL=%s\n' "$EXPECTED_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SHA"
+          git fetch origin "$TARGET_BRANCH"
+          git switch -C classic-task5 "$EXPECTED_SHA"
+          test -z "$(git status --porcelain)"
+          npm ci
+      - name: Reconfirm Task 5 RED before production edits
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck:menu > "$RUNNER_TEMP/task5-red-typecheck.log" 2>&1
+          type_rc=$?
+          npx eslint 'apps/menu/**/*.{ts,tsx,mjs}' --max-warnings 0 > "$RUNNER_TEMP/task5-red-eslint.log" 2>&1
+          eslint_rc=$?
+          set -e
+          test "$type_rc" -ne 0
+          test "$eslint_rc" -ne 0
+          grep -F 'src/App.tsx(36,41): error TS2322' "$RUNNER_TEMP/task5-red-typecheck.log"
+          grep -F '23 problems (23 errors, 0 warnings)' "$RUNNER_TEMP/task5-red-eslint.log"
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          echo 'TASK5_RED_RECONFIRMED'
+      - name: Apply minimal behavior-neutral quality fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path('apps/menu/src/App.tsx')
+          text = app.read_text()
+          old = '<Route path="/products/:slug" component={ProductCategoryPage} />'
+          new = '<Route path="/products/:slug">{() => <ProductCategoryPage />}</Route>'
+          assert old in text
+          app.write_text(text.replace(old, new, 1))
+
+          menu = Path('apps/menu/src/context/MenuContext.tsx')
+          text = menu.read_text()
+          assert '} catch (err: any) {' in text
+          text = text.replace('} catch (err: any) {', '} catch (err: unknown) {', 1)
+          old_error = 'setError(err.message || "Failed to load menu");'
+          new_error = 'setError(err instanceof Error ? err.message : "Failed to load menu");'
+          assert old_error in text
+          menu.write_text(text.replace(old_error, new_error, 1))
+
+          admin = Path('apps/menu/src/pages/Admin.tsx')
+          text = admin.read_text()
+          marker = 'import React, { useEffect, useMemo, useState } from "react";\n'
+          assert marker in text
+          text = text.replace(marker, marker + 'import type { Session } from "@supabase/supabase-js";\n', 1)
+          assert 'useState<any>(null)' in text
+          text = text.replace('useState<any>(null)', 'useState<Session | null>(null)', 1)
+          assert text.count('catch (err: any)') == 4
+          text = text.replace('catch (err: any)', 'catch (err: unknown)')
+          replacements = {
+            'showMessage(err.message || "Category save failed.", "error");':
+              'showMessage(err instanceof Error ? err.message : "Category save failed.", "error");',
+            'showMessage(err.message || "Category delete failed.", "error");':
+              'showMessage(err instanceof Error ? err.message : "Category delete failed.", "error");',
+            'showMessage(err.message || "Product delete failed.", "error");':
+              'showMessage(err instanceof Error ? err.message : "Product delete failed.", "error");',
+          }
+          for old_text, new_text in replacements.items():
+            assert old_text in text
+            text = text.replace(old_text, new_text, 1)
+          admin.write_text(text)
+
+          toast = Path('apps/menu/src/hooks/use-toast.ts')
+          text = toast.read_text()
+          old = '''const actionTypes = {\n  ADD_TOAST: "ADD_TOAST",\n  UPDATE_TOAST: "UPDATE_TOAST",\n  DISMISS_TOAST: "DISMISS_TOAST",\n  REMOVE_TOAST: "REMOVE_TOAST",\n} as const\n\n'''
+          assert old in text
+          text = text.replace(old, '', 1)
+          old_type = 'type ActionType = typeof actionTypes\n'
+          new_type = '''type ActionType = {\n  ADD_TOAST: "ADD_TOAST"\n  UPDATE_TOAST: "UPDATE_TOAST"\n  DISMISS_TOAST: "DISMISS_TOAST"\n  REMOVE_TOAST: "REMOVE_TOAST"\n}\n'''
+          assert old_type in text
+          toast.write_text(text.replace(old_type, new_type, 1))
+
+          home = Path('apps/menu/src/pages/Home.tsx')
+          text = home.read_text()
+          for line in [
+            'import singleImg from "@assets/tuxify_single.png";\n',
+            'import doubleImg from "@assets/tuxify_double.png";\n',
+            'import tripleImg from "@assets/tuxify_triple.png";\n',
+            'import quatroImg from "@assets/tuxify_quatro.png";\n',
+          ]:
+            assert line in text
+            text = text.replace(line, '', 1)
+          home.write_text(text)
+          PY
+
+          cat > apps/menu/.env.example <<'EOF'
+          # TUX Menu — browser-visible legacy backend variables used during Phase A.
+          # Never place service-role or private server secrets here.
+          VITE_SUPABASE_URL=
+          VITE_SUPABASE_ANON_KEY=
+
+          # WhatsApp ordering remains configured in src/lib/constants.ts during Phase A.
+          EOF
+
+          cat > apps/menu/DEPLOYMENT.md <<'EOF'
+          # Deployment Guide — TUX Menu (Phase A)
+
+          TUX Menu is a Vite + React browser application inside the TUX monorepo. During Phase A, its dynamic Menu/Admin data path still uses the legacy Supabase browser client. The fallback catalog can render without Supabase configuration, but dynamic legacy Menu/Admin data requires the browser-visible variables below.
+
+          ## Monorepo commands
+
+          Run these commands from the repository root:
+
+          ```bash
+          npm ci
+          npm run dev:menu
+          npm run typecheck:menu
+          npm run build:menu
+          ```
+
+          The production build output is `apps/menu/dist/`.
+
+          ## Browser-visible legacy Supabase configuration
+
+          Phase A uses only these Vite browser variables for the legacy Menu/Admin backend:
+
+          ```dotenv
+          VITE_SUPABASE_URL=
+          VITE_SUPABASE_ANON_KEY=
+          ```
+
+          Both values are exposed to browser code by Vite. They must therefore contain only the public Supabase project URL and anonymous/public key.
+
+          Do **not** place a Supabase service-role key, private server secret, `TUX_SUPABASE_*` private credential, or any other privileged secret in the Menu application or its Vite environment.
+
+          If the two `VITE_SUPABASE_*` values are omitted, the fallback catalog remains available, while legacy dynamic Supabase-backed Menu/Admin behavior is unavailable.
+
+          ## WhatsApp ordering
+
+          During Phase A, the WhatsApp order destination remains configured in `src/lib/constants.ts`. It is not a private server credential and is not moved into the Supabase environment variables by this phase.
+
+          ## Architecture boundary
+
+          Root `supabase/migrations/` is the only executable database migration authority. The file under `apps/menu/legacy/supabase_setup.sql.reference` is historical reference material only and must never be executed or copied into canonical migrations.
+
+          Canonical catalog/API ownership and standalone Admin extraction belong to later approved phases; Phase A does not perform those cutovers.
+          EOF
+
+          npx eslint 'apps/menu/**/*.{ts,tsx,mjs}' --fix
+          npx prettier --write 'apps/menu/**/*.{ts,tsx,css,html,json}'
+          rm -f apps/menu/tsconfig.tsbuildinfo
+      - name: Prove GREEN root quality, Menu typecheck, and Menu build
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run format:check
+          npm run lint
+          npm run typecheck:menu
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          npm run build:menu
+          test -f apps/menu/dist/index.html
+          echo 'TASK5_GREEN_QUALITY_CONFIRMED'
+      - name: Verify Task 5 scope and protected authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f apps/menu/tsconfig.tsbuildinfo
+          git diff --exit-code "$EXPECTED_SHA" -- supabase/migrations apps/operations apps/operations-desktop packages api server
+          changed="$(git diff --name-only "$EXPECTED_SHA" | sort)"
+          printf 'TASK5_CHANGED_FILES:\n%s\n' "$changed"
+          test -n "$changed"
+          while IFS= read -r path; do
+            case "$path" in
+              apps/menu/*) ;;
+              *) echo "unexpected Task 5 path: $path" >&2; exit 1 ;;
+            esac
+          done <<< "$changed"
+          for required in \
+            apps/menu/.env.example \
+            apps/menu/DEPLOYMENT.md \
+            apps/menu/src/App.tsx \
+            apps/menu/src/context/MenuContext.tsx \
+            apps/menu/src/pages/Admin.tsx \
+            apps/menu/src/hooks/use-toast.ts \
+            apps/menu/src/pages/Home.tsx; do
+            grep -Fx "$required" <<< "$changed"
+          done
+          git diff --check
+      - name: Commit and push Task 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- apps/menu
+          git commit -m 'chore(menu): align imported source with monorepo quality'
+          final_head="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse HEAD^{tree})"
+          final_parent="$(git rev-parse HEAD^)"
+          test "$final_parent" = "$EXPECTED_SHA"
+          git push origin HEAD:"$TARGET_BRANCH"
+          printf 'TASK5_HEAD=%s\nTASK5_TREE=%s\nTASK5_PARENT=%s\n' "$final_head" "$final_tree" "$final_parent"
