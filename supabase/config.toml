@@ -36,5 +36,8 @@ verify_jwt = true
 [functions.operations-sync]
 verify_jwt = true
 
+[functions.online-order-operations]
+verify_jwt = true
+
 [functions.worker-auth]
 verify_jwt = true

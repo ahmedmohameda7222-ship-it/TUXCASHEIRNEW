@@ -100,6 +100,7 @@ jobs:
           deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
           deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
           deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+          deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E

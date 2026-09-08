@@ -5,6 +5,7 @@ const EXPECTED_VERIFY_JWT = {
   'catalog-public': false,
   'device-bootstrap': false,
   'device-enroll': false,
+  'online-order-operations': true,
   'operations-config': true,
   'operations-sync': true,
   'order-intake': false,

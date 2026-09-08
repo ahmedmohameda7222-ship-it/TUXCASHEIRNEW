@@ -81,7 +81,7 @@ class MemoryStore implements OnlineOrderOperationsStore {
 function request(
   method: 'GET' | 'POST',
   payload?: unknown,
-  options: { token?: string; deviceId?: string; query?: string } = {},
+  options: { token?: string | null; deviceId?: string; query?: string } = {},
 ): Request {
   return new Request(`https://example.test/online-order-operations${options.query ?? ''}`, {
     method,
