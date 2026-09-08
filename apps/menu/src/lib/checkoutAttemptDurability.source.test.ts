@@ -12,9 +12,9 @@ describe('checkout completion durability', () => {
     const clearCartBody = cartSource.match(/const clearCart = \(\) => \{[\s\S]*?\n  \};/)?.[0];
     expect(clearCartBody).toBeDefined();
     expect(clearCartBody).toContain("localStorage.setItem('tux-cart', JSON.stringify([]))");
-    expect(clearCartBody!.indexOf("localStorage.setItem('tux-cart', JSON.stringify([]))")).toBeLessThan(
-      clearCartBody!.indexOf('setItems([])'),
-    );
+    expect(
+      clearCartBody!.indexOf("localStorage.setItem('tux-cart', JSON.stringify([]))"),
+    ).toBeLessThan(clearCartBody!.indexOf('setItems([])'));
 
     const checkoutSuccess = drawerSource.match(
       /setPendingRequestId\(response\.requestId\);[\s\S]*?clearCart\(\);[\s\S]*?clearPendingCheckoutAttempt\(\);/,
