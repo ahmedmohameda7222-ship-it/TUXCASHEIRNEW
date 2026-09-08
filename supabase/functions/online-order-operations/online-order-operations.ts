@@ -56,6 +56,8 @@ interface PendingRequest {
   readonly processingOrderId: string | null;
   readonly processingStartedAt: string | null;
   readonly processingExpiresAt: string | null;
+  readonly processingDeviceId: string | null;
+  readonly reservationOriginDeviceId: string | null;
 }
 
 function jsonResponse(status: number, body: Readonly<Record<string, unknown>>): Response {
@@ -91,6 +93,12 @@ function nullableString(value: unknown, max: number): string | null | undefined 
   return value;
 }
 
+function nullableUuid(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined;
+  return uuid(value) ?? undefined;
+}
+
 function isoInstant(value: unknown): string | null {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null;
 }
@@ -114,6 +122,8 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     source.processingStartedAt === null ? null : isoInstant(source.processingStartedAt);
   const processingExpiresAt =
     source.processingExpiresAt === null ? null : isoInstant(source.processingExpiresAt);
+  const processingDeviceId = nullableUuid(source.processingDeviceId);
+  const reservationOriginDeviceId = nullableUuid(source.reservationOriginDeviceId);
   const subtotal = source.itemsSubtotalMinor;
   if (
     requestId === null ||
@@ -131,6 +141,8 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     normalizedPhone === undefined ||
     deliveryAddress === undefined ||
     orderNote === undefined ||
+    processingDeviceId === undefined ||
+    reservationOriginDeviceId === undefined ||
     !Array.isArray(source.trustedItems) ||
     typeof subtotal !== 'number' ||
     !Number.isSafeInteger(subtotal) ||
@@ -141,9 +153,16 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
   }
   if (
     (status === 'PENDING' &&
-      (processingOrderId !== null || processingStartedAt !== null || processingExpiresAt !== null)) ||
+      (processingOrderId !== null ||
+        processingStartedAt !== null ||
+        processingExpiresAt !== null ||
+        processingDeviceId !== null)) ||
     (status === 'PROCESSING' &&
-      (processingOrderId === null || processingStartedAt === null || processingExpiresAt === null))
+      (processingOrderId === null ||
+        processingStartedAt === null ||
+        processingExpiresAt === null ||
+        processingDeviceId === null ||
+        reservationOriginDeviceId === null))
   ) {
     return null;
   }
@@ -164,6 +183,8 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     processingOrderId,
     processingStartedAt,
     processingExpiresAt,
+    processingDeviceId,
+    reservationOriginDeviceId,
   };
 }
 
