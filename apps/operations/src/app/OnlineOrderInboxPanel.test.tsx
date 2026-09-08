@@ -53,9 +53,29 @@ function request(status: 'PENDING' | 'PROCESSING'): CachedOnlineOrderRequest {
     customerName: 'Online Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: 'Nasr City, Cairo',
-    trustedItems: [{ productId: '77777777-7777-4777-8777-777777777777', quantity: 2 }],
-    itemsSubtotalMinor: 25000,
-    orderNote: 'No onions',
+    trustedItems: [
+      {
+        productId: '77777777-7777-4777-8777-777777777777',
+        productName: 'Double TUX',
+        unitPriceMinor: 12_500,
+        quantity: 2,
+        modifiers: [
+          {
+            modifierId: '88888888-8888-4888-8888-888888888888',
+            label: 'Extra Cheese',
+            unitPriceMinor: 2_500,
+            quantity: 1,
+          },
+        ],
+        comboBeverage: {
+          productId: '99999999-9999-4999-8999-999999999998',
+          label: 'Cola',
+        },
+        note: 'Cut in half',
+      },
+    ],
+    itemsSubtotalMinor: 30_000,
+    orderNote: 'Call on arrival',
     createdAt: instant('2026-09-08T10:00:00.000Z'),
     processingOrderId: status === 'PROCESSING' ? PROCESSING_ORDER_ID : null,
     processingStartedAt: status === 'PROCESSING' ? instant('2026-09-08T10:05:00.000Z') : null,
@@ -84,7 +104,7 @@ describe('OnlineOrderInboxPanel', () => {
     expect(html).not.toContain('Order #');
   });
 
-  it('shows PROCESSING authority, release/reject controls, an accept affordance, and missing authoritative facts', () => {
+  it('shows PROCESSING authority, requested item details, controls, and missing authoritative facts before acceptance', () => {
     const html = renderToStaticMarkup(
       <OnlineOrderInboxPanel
         snapshot={{ requests: [request('PROCESSING')], syncState: 'SYNCED', errorMessage: null }}
@@ -98,6 +118,13 @@ describe('OnlineOrderInboxPanel', () => {
     );
 
     expect(html).toContain('In review');
+    expect(html).toContain('Requested items');
+    expect(html).toContain('2 × Double TUX');
+    expect(html).toContain('1 × Extra Cheese');
+    expect(html).toContain('Combo drink: Cola');
+    expect(html).toContain('Item note: Cut in half');
+    expect(html.indexOf('Requested items')).toBeLessThan(html.indexOf('Accept in POS'));
+    expect(html.indexOf('Double TUX')).toBeLessThan(html.indexOf('Accept in POS'));
     expect(html).toContain('Release');
     expect(html).toContain('Reject');
     expect(html).toContain('Accept in POS');
