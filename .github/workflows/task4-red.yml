@@ -1,4 +1,4 @@
-name: Task 4 RED
+name: Task 4 Verification
 
 on:
   push:
@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 jobs:
-  targeted-red:
+  targeted:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -34,7 +34,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Format Task 4 RED spec
+      - name: Format Task 4 integration
         run: >-
           npx prettier --write
           packages/application/src/onlineOrderAcceptance.test.ts
@@ -43,6 +43,11 @@ jobs:
           apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
           apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
           apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
+          apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts
+          apps/operations-desktop/src/main/onlineOrderInboxIpc.ts
+          apps/operations/src/app/OnlineOrderInboxPanel.tsx
+          apps/operations/src/app/sessionClient.ts
+          packages/platform-contracts/index.d.ts
           scripts/test-online-order-acceptance-lease.mjs
           package.json
       - name: Commit formatter-only correction
@@ -55,6 +60,11 @@ jobs:
             apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
             apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
             apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
+            apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts
+            apps/operations-desktop/src/main/onlineOrderInboxIpc.ts
+            apps/operations/src/app/OnlineOrderInboxPanel.tsx
+            apps/operations/src/app/sessionClient.ts
+            packages/platform-contracts/index.d.ts
             scripts/test-online-order-acceptance-lease.mjs
             package.json
           )
@@ -62,20 +72,21 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add -- "${files[@]}"
-            git commit -m 'test(orders): format complete online-order acceptance RED'
+            git commit -m 'style(orders): format online-order acceptance integration'
             git push origin HEAD:work/menu-online-orders-integration
           fi
-      - name: Targeted Task 4 RED
+      - name: Targeted Task 4 GREEN
         run: >-
           npx vitest run
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/onlineOrderAcceptance.review.test.ts
           packages/application/src/onlineOrderAcceptance.sqlite.test.ts
           apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
+          apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts
           apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
           apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
 
-  lease-red:
+  lease:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -103,5 +114,5 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Apply repository migration chain
         run: node scripts/test-migrations.mjs
-      - name: Targeted lease-expiry RED
+      - name: Targeted lease-expiry GREEN
         run: node scripts/test-online-order-acceptance-lease.mjs
