@@ -50,7 +50,7 @@ export interface OnlineOrderStoredRequest {
   shopId: string;
   idempotencyKey: string;
   requestSha256: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
 }
 
 export interface OnlineOrderPendingInsert {
@@ -140,7 +140,8 @@ function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string
 }
 
 function canonicalCatalogForRevision(catalog: OnlineOrderCatalogAuthority): unknown {
-  const byId = <T extends { id: string }>(rows: T[]): T[] => [...rows].sort((a, b) => a.id.localeCompare(b.id));
+  const byId = <T extends { id: string }>(rows: T[]): T[] =>
+    [...rows].sort((a, b) => a.id.localeCompare(b.id));
   return {
     shop: catalog.shop,
     products: byId(catalog.products),
@@ -219,17 +220,16 @@ function buildTrustedItems(
     for (const selection of item.modifierSelections) {
       const modifier = modifiers.get(selection.modifierId);
       const link = links.get(`${item.productId}:${selection.modifierId}`);
-      if (
-        !modifier ||
-        !modifier.active ||
-        !link ||
-        (link.maxQuantity !== null && selection.quantity > link.maxQuantity)
-      ) {
+      if (!modifier || !modifier.active || !link) return errorResponse(400, 'invalid_selection');
+      if (link.maxQuantity !== null && selection.quantity > link.maxQuantity) {
         return errorResponse(400, 'invalid_selection');
       }
-      assertTrustedMoney(modifier.priceMinor, 'modifier price');
+      if (selectedModifierIds.has(modifier.id)) return errorResponse(400, 'invalid_selection');
       selectedModifierIds.add(modifier.id);
-      modifiersUnitMinor += modifier.priceMinor * selection.quantity;
+      assertTrustedMoney(modifier.priceMinor, 'modifier price');
+      const modifierMinor = modifier.priceMinor * selection.quantity;
+      if (!Number.isSafeInteger(modifierMinor)) throw new Error('modifier subtotal overflow');
+      modifiersUnitMinor += modifierMinor;
       if (!Number.isSafeInteger(modifiersUnitMinor)) throw new Error('modifier subtotal overflow');
       trustedModifiers.push({
         modifierId: modifier.id,
@@ -240,24 +240,14 @@ function buildTrustedItems(
     }
 
     for (const addonProductId of item.addonProductIds) {
-      const addonProduct = products.get(addonProductId);
       const modifier = standaloneModifiers.get(addonProductId);
-      if (
-        !addonProduct ||
-        !addonProduct.active ||
-        addonProduct.soldOut ||
-        !modifier ||
-        !modifier.active ||
-        selectedModifierIds.has(modifier.id)
-      ) {
-        return errorResponse(400, 'invalid_selection');
-      }
+      if (!modifier || !modifier.active) return errorResponse(400, 'invalid_selection');
       const link = links.get(`${item.productId}:${modifier.id}`);
-      if (!link || (link.maxQuantity !== null && link.maxQuantity < 1)) {
+      if (!link || selectedModifierIds.has(modifier.id)) {
         return errorResponse(400, 'invalid_selection');
       }
-      assertTrustedMoney(modifier.priceMinor, 'addon modifier price');
       selectedModifierIds.add(modifier.id);
+      assertTrustedMoney(modifier.priceMinor, 'addon modifier price');
       modifiersUnitMinor += modifier.priceMinor;
       if (!Number.isSafeInteger(modifiersUnitMinor)) throw new Error('addon subtotal overflow');
       trustedModifiers.push({
@@ -360,7 +350,9 @@ export async function handleOrderIntakeRequest(
       if (existing.requestSha256 !== requestSha256) {
         return errorResponse(409, 'idempotency_conflict');
       }
-      if (existing.status !== 'PENDING') return errorResponse(409, 'request_resolved');
+      if (existing.status === 'ACCEPTED' || existing.status === 'REJECTED') {
+        return errorResponse(409, 'request_resolved');
+      }
       return successResponse(200, existing.id);
     }
 
@@ -393,7 +385,10 @@ export async function handleOrderIntakeRequest(
       await store.insertPending(record);
     } catch {
       const raced = await store.findByIdempotency(parsed.shopId, parsed.idempotencyKey);
-      if (raced?.requestSha256 === requestSha256 && raced.status === 'PENDING') {
+      if (
+        raced?.requestSha256 === requestSha256 &&
+        (raced.status === 'PENDING' || raced.status === 'PROCESSING')
+      ) {
         return successResponse(200, raced.id);
       }
       if (raced) return errorResponse(409, 'idempotency_conflict');
