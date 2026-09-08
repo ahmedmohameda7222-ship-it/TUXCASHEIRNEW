@@ -154,7 +154,8 @@
   font-weight: 800;
 }
 
-.online-order-reject-form input {
+.online-order-reject-form input,
+.online-order-reject-form select {
   min-height: var(--tux-touch-target);
   width: 100%;
   padding: 0 var(--tux-space-3);
@@ -165,6 +166,33 @@
   font: inherit;
 }
 
+.online-order-acceptance-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tux-space-3);
+}
+
+.online-order-confirmed-authority {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--tux-space-1) var(--tux-space-2);
+  padding: var(--tux-space-3);
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--tux-radius-sm);
+  background: var(--tux-surface-raised);
+  font-size: var(--tux-font-size-xs);
+}
+
+.online-order-confirmed-authority span {
+  color: var(--tux-text-secondary);
+  font-weight: 800;
+}
+
+.online-order-confirmed-authority strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .online-order-empty {
   padding: var(--tux-space-5) 0;
   color: var(--tux-text-secondary);
@@ -173,7 +201,8 @@
 
 @media (max-width: 900px) {
   .online-order-grid,
-  .online-order-facts {
+  .online-order-facts,
+  .online-order-acceptance-fields {
     grid-template-columns: 1fr;
   }
 
