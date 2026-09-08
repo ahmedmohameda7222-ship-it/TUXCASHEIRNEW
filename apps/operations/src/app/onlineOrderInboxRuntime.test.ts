@@ -39,6 +39,16 @@ function processingRequest(): CachedOnlineOrderRequest {
   };
 }
 
+function releasedRequest(): CachedOnlineOrderRequest {
+  return {
+    ...processingRequest(),
+    status: 'PENDING',
+    processingOrderId: null,
+    processingStartedAt: null,
+    processingExpiresAt: null,
+  };
+}
+
 class MemoryInboxStore implements OnlineOrderInboxStore {
   readonly rows = new Map<string, CachedOnlineOrderRequest>();
 
@@ -83,6 +93,20 @@ type ReviewRuntimeFactory = (input: {
   store: OnlineOrderInboxStore;
   remote: ReviewRemote;
 }) => ReviewRuntimeClient;
+
+type ReleaseRemote = OnlineOrderOperationsRemote & {
+  release(requestId: string, processingOrderId: string): Promise<unknown>;
+};
+
+type ReleaseRuntimeClient = RuntimeClient & {
+  release(requestId: string, processingOrderId: string): Promise<CachedOnlineOrderRequest>;
+};
+
+type ReleaseRuntimeFactory = (input: {
+  getActiveShopId: () => Promise<ShopId>;
+  store: OnlineOrderInboxStore;
+  remote: ReleaseRemote;
+}) => ReleaseRuntimeClient;
 
 describe('online-order inbox runtime', () => {
   it('derives the active shop and publishes cached state before the synced snapshot', async () => {
@@ -140,5 +164,35 @@ describe('online-order inbox runtime', () => {
     expect(remote.claim).toHaveBeenCalledWith(REQUEST_ID);
     expect(await store.list(SHOP_ID)).toEqual([claimed]);
     expect(published).toEqual([{ requests: [claimed], syncState: 'SYNCED', errorMessage: null }]);
+  });
+
+  it('releases a matching PROCESSING claim back to PENDING and publishes it', async () => {
+    const module = (await import('./onlineOrderInboxClient')) as Record<string, unknown>;
+    const factory = module['createOnlineOrderInboxRuntime'];
+    expect(typeof factory).toBe('function');
+
+    const store = new MemoryInboxStore();
+    await store.upsertMany([processingRequest()]);
+    const released = releasedRequest();
+    const remote: ReleaseRemote = {
+      fetchActiveRequests: vi.fn(),
+      release: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_ID,
+        status: 'PENDING',
+      }),
+    };
+    const getActiveShopId = vi.fn().mockResolvedValue(SHOP_ID);
+    const runtime = (factory as ReleaseRuntimeFactory)({ getActiveShopId, store, remote });
+    expect(typeof runtime.release).toBe('function');
+    const published: OnlineOrderInboxSnapshot[] = [];
+    runtime.subscribe((snapshot) => published.push(snapshot));
+
+    await expect(runtime.release(REQUEST_ID, PROCESSING_ORDER_ID)).resolves.toEqual(released);
+
+    expect(getActiveShopId).toHaveBeenCalledTimes(1);
+    expect(remote.release).toHaveBeenCalledWith(REQUEST_ID, PROCESSING_ORDER_ID);
+    expect(await store.list(SHOP_ID)).toEqual([released]);
+    expect(published).toEqual([{ requests: [released], syncState: 'SYNCED', errorMessage: null }]);
   });
 });
