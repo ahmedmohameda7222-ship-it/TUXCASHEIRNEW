@@ -14,6 +14,10 @@ export default defineConfig({
         __dirname,
         '../../packages/catalog-contracts/src/index.ts',
       ),
+      '@tux/order-intake-contracts': path.resolve(
+        __dirname,
+        '../../packages/order-intake-contracts/src/index.ts',
+      ),
     },
   },
   build: {

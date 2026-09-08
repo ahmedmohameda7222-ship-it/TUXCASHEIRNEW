@@ -20,7 +20,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@assets/*": ["./src/assets/*"],
-      "@tux/catalog-contracts": ["../../packages/catalog-contracts/src/index.ts"]
+      "@tux/catalog-contracts": ["../../packages/catalog-contracts/src/index.ts"],
+      "@tux/order-intake-contracts": ["../../packages/order-intake-contracts/src/index.ts"]
     },
     "types": ["node", "vite/client"]
   },
