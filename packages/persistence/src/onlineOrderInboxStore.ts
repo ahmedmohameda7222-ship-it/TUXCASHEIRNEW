@@ -25,6 +25,8 @@ export interface CachedOnlineOrderRequest {
   readonly processingOrderId: string | null;
   readonly processingStartedAt: Instant | null;
   readonly processingExpiresAt: Instant | null;
+  readonly processingDeviceId?: string | null;
+  readonly reservationOriginDeviceId?: string | null;
 }
 
 export interface OnlineOrderInboxStore {
@@ -49,6 +51,11 @@ function uuid(value: unknown, label: string): string {
     throw new Error(`Cached online-order ${label} must be a UUID.`);
   }
   return value;
+}
+
+function optionalNullableUuid(value: unknown, label: string): string | null | undefined {
+  if (value === undefined) return undefined;
+  return value === null ? null : uuid(value, label);
 }
 
 function nullableString(value: unknown, label: string, max: number): string | null {
@@ -146,10 +153,18 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     source.processingOrderId === null ? null : uuid(source.processingOrderId, 'processingOrderId');
   const processingStartedAt = nullableInstant(source.processingStartedAt, 'processingStartedAt');
   const processingExpiresAt = nullableInstant(source.processingExpiresAt, 'processingExpiresAt');
+  const processingDeviceId = optionalNullableUuid(source.processingDeviceId, 'processingDeviceId');
+  const reservationOriginDeviceId = optionalNullableUuid(
+    source.reservationOriginDeviceId,
+    'reservationOriginDeviceId',
+  );
 
   if (
     status === 'PENDING' &&
-    (processingOrderId !== null || processingStartedAt !== null || processingExpiresAt !== null)
+    (processingOrderId !== null ||
+      processingStartedAt !== null ||
+      processingExpiresAt !== null ||
+      (processingDeviceId !== undefined && processingDeviceId !== null))
   ) {
     throw new Error('Cached PENDING online order cannot contain processing authority.');
   }
@@ -184,5 +199,7 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     processingOrderId,
     processingStartedAt,
     processingExpiresAt,
+    processingDeviceId,
+    reservationOriginDeviceId,
   };
 }
