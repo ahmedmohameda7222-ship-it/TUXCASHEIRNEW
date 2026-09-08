@@ -102,13 +102,13 @@ describe('loadOnlineOrderInbox', () => {
     const remote = { fetchActiveRequests: vi.fn().mockRejectedValue(new Error('offline')) };
     const publish = vi.fn();
 
-    await expect(
-      loadOnlineOrderInbox({ shopId: SHOP_A, store, remote, publish }),
-    ).resolves.toEqual({
-      requests: [cached],
-      syncState: 'REMOTE_UNAVAILABLE',
-      errorMessage: 'Online orders could not refresh. Showing the saved inbox.',
-    });
+    await expect(loadOnlineOrderInbox({ shopId: SHOP_A, store, remote, publish })).resolves.toEqual(
+      {
+        requests: [cached],
+        syncState: 'REMOTE_UNAVAILABLE',
+        errorMessage: 'Online orders could not refresh. Showing the saved inbox.',
+      },
+    );
 
     expect(publish.mock.calls.map((call) => call[0])).toEqual([
       { requests: [cached], syncState: 'CACHED', errorMessage: null },
