@@ -2,6 +2,7 @@ import type { ShopId } from '@tux/domain';
 import type { CachedOnlineOrderRequest, OnlineOrderInboxStore } from '@tux/persistence';
 import {
   claimOnlineOrderForReview,
+  releaseOnlineOrderReview,
   syncOnlineOrderInboxSnapshot,
   type OnlineOrderOperationsRemote,
 } from './onlineOrderInboxSync';
@@ -17,11 +18,13 @@ export interface OnlineOrderInboxSnapshot {
 export interface OnlineOrderInboxRuntimeClient {
   load(): Promise<OnlineOrderInboxSnapshot>;
   claim(requestId: string): Promise<CachedOnlineOrderRequest>;
+  release(requestId: string, processingOrderId: string): Promise<CachedOnlineOrderRequest>;
   subscribe(listener: (snapshot: OnlineOrderInboxSnapshot) => void): () => void;
 }
 
 interface OnlineOrderInboxRuntimeRemote extends OnlineOrderOperationsRemote {
   claim(requestId: string): Promise<unknown>;
+  release(requestId: string, processingOrderId: string): Promise<unknown>;
 }
 
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
@@ -99,6 +102,18 @@ export function createOnlineOrderInboxRuntime(input: {
       });
       await publishSynced(shopId);
       return claimed;
+    },
+    release: async (requestId, processingOrderId) => {
+      const shopId = await input.getActiveShopId();
+      const released = await releaseOnlineOrderReview({
+        shopId,
+        requestId,
+        processingOrderId,
+        store: input.store,
+        remote: input.remote,
+      });
+      await publishSynced(shopId);
+      return released;
     },
     subscribe: (listener) => {
       listeners.add(listener);
