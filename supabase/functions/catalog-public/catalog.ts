@@ -37,6 +37,7 @@ export interface PublicModifierRow extends Row {
   readonly shop_id: string;
   readonly name: string;
   readonly price_minor: number;
+  readonly standalone_product_id: string | null;
   readonly active: boolean;
   readonly sort_order: number;
 }
@@ -57,11 +58,15 @@ export interface PublicComboBeverageRow extends Row {
 }
 
 export interface PublicCatalogStore {
-  readonly getShop: (shopId: string) => Promise<{ readonly id: string; readonly active?: boolean } | null>;
+  readonly getShop: (
+    shopId: string,
+  ) => Promise<{ readonly id: string; readonly active?: boolean } | null>;
   readonly listCategories: (shopId: string) => Promise<readonly PublicCategoryRow[]>;
   readonly listProducts: (shopId: string) => Promise<readonly PublicProductRow[]>;
   readonly listModifiers: (shopId: string) => Promise<readonly PublicModifierRow[]>;
-  readonly listProductModifierLinks: (shopId: string) => Promise<readonly PublicProductModifierRow[]>;
+  readonly listProductModifierLinks: (
+    shopId: string,
+  ) => Promise<readonly PublicProductModifierRow[]>;
   readonly listComboBeverageOptions: (shopId: string) => Promise<readonly PublicComboBeverageRow[]>;
   readonly resolveImageUrl: (imageKey: string | null) => string | null;
 }
@@ -75,13 +80,18 @@ const corsHeaders = {
 
 class CatalogUnavailableError extends Error {}
 
-function jsonResponse(status: number, body: unknown, extraHeaders: Record<string, string> = {}): Response {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       ...corsHeaders,
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': status === 200 ? 'public, max-age=30, stale-while-revalidate=30' : 'no-store',
+      'cache-control':
+        status === 200 ? 'public, max-age=30, stale-while-revalidate=30' : 'no-store',
       ...extraHeaders,
     },
   });
@@ -91,7 +101,10 @@ function errorResponse(status: number, code: string): Response {
   return jsonResponse(status, { schemaVersion: 1, error: { code } });
 }
 
-function sortByOrderThenId<T extends { readonly sortOrder: number; readonly id?: string }>(left: T, right: T): number {
+function sortByOrderThenId<T extends { readonly sortOrder: number; readonly id?: string }>(
+  left: T,
+  right: T,
+): number {
   return left.sortOrder - right.sortOrder || (left.id ?? '').localeCompare(right.id ?? '');
 }
 
@@ -102,17 +115,21 @@ function requireSameShop(shopId: string, rows: readonly Row[]): void {
 }
 
 function requireSlug(slug: string | null, label: string): string {
-  if (slug === null || slug.trim() === '') throw new CatalogUnavailableError(`${label} missing public slug`);
+  if (slug === null || slug.trim() === '')
+    throw new CatalogUnavailableError(`${label} missing public slug`);
   return slug;
 }
 
 function requireMoney(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) throw new CatalogUnavailableError(`${label} has invalid money`);
+  if (!Number.isSafeInteger(value) || value < 0)
+    throw new CatalogUnavailableError(`${label} has invalid money`);
   return value;
 }
 
 async function sha256Hex(value: string): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)),
+  );
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -166,19 +183,26 @@ export async function buildPublicCatalogSnapshot(
         sortOrder: row.sort_order,
       };
     })
-    .sort((left, right) =>
-      left.categoryId.localeCompare(right.categoryId) || sortByOrderThenId(left, right),
+    .sort(
+      (left, right) =>
+        left.categoryId.localeCompare(right.categoryId) || sortByOrderThenId(left, right),
     );
 
   const productIds = new Set(products.map((product) => product.id));
   const modifiers = modifierRows
-    .map((row) => ({
-      id: row.id,
-      name: row.name,
-      priceMinor: requireMoney(row.price_minor, `modifier ${row.id}`),
-      active: row.active,
-      sortOrder: row.sort_order,
-    }))
+    .map((row) => {
+      if (row.standalone_product_id !== null && !productIds.has(row.standalone_product_id)) {
+        throw new CatalogUnavailableError(`modifier ${row.id} has unknown standalone product`);
+      }
+      return {
+        id: row.id,
+        name: row.name,
+        priceMinor: requireMoney(row.price_minor, `modifier ${row.id}`),
+        standaloneProductId: row.standalone_product_id,
+        active: row.active,
+        sortOrder: row.sort_order,
+      };
+    })
     .sort(sortByOrderThenId);
 
   const modifierIds = new Set(modifiers.map((modifier) => modifier.id));
@@ -194,10 +218,11 @@ export async function buildPublicCatalogSnapshot(
         sortOrder: row.sort_order,
       };
     })
-    .sort((left, right) =>
-      left.productId.localeCompare(right.productId) ||
-      left.sortOrder - right.sortOrder ||
-      left.modifierId.localeCompare(right.modifierId),
+    .sort(
+      (left, right) =>
+        left.productId.localeCompare(right.productId) ||
+        left.sortOrder - right.sortOrder ||
+        left.modifierId.localeCompare(right.modifierId),
     );
 
   const comboBeverageOptions = comboRows
@@ -211,10 +236,11 @@ export async function buildPublicCatalogSnapshot(
         sortOrder: row.sort_order,
       };
     })
-    .sort((left, right) =>
-      left.comboProductId.localeCompare(right.comboProductId) ||
-      left.sortOrder - right.sortOrder ||
-      left.beverageProductId.localeCompare(right.beverageProductId),
+    .sort(
+      (left, right) =>
+        left.comboProductId.localeCompare(right.comboProductId) ||
+        left.sortOrder - right.sortOrder ||
+        left.beverageProductId.localeCompare(right.beverageProductId),
     );
 
   const canonicalProjection = {
@@ -234,7 +260,8 @@ export async function handleCatalogPublicRequest(
   request: Request,
   store: PublicCatalogStore,
 ): Promise<Response> {
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+  if (request.method === 'OPTIONS')
+    return new Response(null, { status: 204, headers: corsHeaders });
   if (request.method !== 'GET') return errorResponse(405, 'method_not_allowed');
 
   const shopId = new URL(request.url).searchParams.get('shopId')?.trim() ?? '';

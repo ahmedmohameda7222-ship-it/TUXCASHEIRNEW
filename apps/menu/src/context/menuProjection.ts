@@ -21,6 +21,12 @@ export interface MenuModifier {
   sort_order: number;
 }
 
+export interface MenuExtraOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface SupabaseProduct {
   id: string;
   slug: string;
@@ -42,6 +48,7 @@ export interface MenuProjection {
   readonly sections: readonly SupabaseSection[];
   readonly products: readonly SupabaseProduct[];
   readonly modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
+  readonly extrasByProduct: Readonly<Record<string, readonly MenuExtraOption[]>>;
   readonly comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
 }
 
@@ -98,6 +105,24 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
   }
 
   const productsById = new Map(products.map((product) => [product.id, product] as const));
+  const extrasByProduct: Record<string, MenuExtraOption[]> = {};
+  const sortedLinks = [...snapshot.productModifierLinks].sort(
+    (left, right) =>
+      left.productId.localeCompare(right.productId) ||
+      left.sortOrder - right.sortOrder ||
+      left.modifierId.localeCompare(right.modifierId),
+  );
+  for (const link of sortedLinks) {
+    const modifier = modifiersById.get(link.modifierId);
+    if (!modifier?.active || modifier.standaloneProductId === null) continue;
+    const standaloneProduct = productsById.get(modifier.standaloneProductId);
+    if (!standaloneProduct?.is_active) continue;
+    (extrasByProduct[link.productId] ??= []).push({
+      id: standaloneProduct.id,
+      name: modifier.name,
+      price: modifier.priceMinor / 100,
+    });
+  }
   const comboBeveragesByProduct: Record<string, SupabaseProduct[]> = {};
   for (const option of snapshot.comboBeverageOptions) {
     const beverages = (comboBeveragesByProduct[option.comboProductId] ??= []);
@@ -116,6 +141,7 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
     sections,
     products: customerAvailableProducts,
     modifiersByProduct,
+    extrasByProduct,
     comboBeveragesByProduct,
   };
 }

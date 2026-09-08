@@ -45,7 +45,14 @@ function validSnapshot() {
       },
     ],
     modifiers: [
-      { id: MODIFIER_ID, name: 'Extra cheese', priceMinor: 2000, active: true, sortOrder: 1 },
+      {
+        id: MODIFIER_ID,
+        name: 'Extra cheese',
+        priceMinor: 2000,
+        standaloneProductId: null,
+        active: true,
+        sortOrder: 1,
+      },
     ],
     productModifierLinks: [
       { productId: PRODUCT_ID, modifierId: MODIFIER_ID, maxQuantity: 2, sortOrder: 1 },

@@ -35,6 +35,7 @@ export interface PublicCatalogModifierV1 {
   readonly id: string;
   readonly name: string;
   readonly priceMinor: number;
+  readonly standaloneProductId: string | null;
   readonly active: boolean;
   readonly sortOrder: number;
 }
@@ -227,6 +228,11 @@ function requiredUuid(value: unknown, path: string): string {
   return value.toLowerCase();
 }
 
+function nullableUuid(value: unknown, path: string): string | null {
+  if (value === null) return null;
+  return requiredUuid(value, path);
+}
+
 function requiredSlug(value: unknown, path: string): string {
   if (typeof value !== 'string' || value.length > 120 || !SLUG_PATTERN.test(value)) {
     throw new CatalogContractError(`${path} must be a stable lowercase slug`);
@@ -336,11 +342,12 @@ function parseProduct(value: unknown, path: string): PublicCatalogProductV1 {
 
 function parseModifier(value: unknown, path: string): PublicCatalogModifierV1 {
   const row = asObject(value, path);
-  exactKeys(row, ['id', 'name', 'priceMinor', 'active', 'sortOrder'], path);
+  exactKeys(row, ['id', 'name', 'priceMinor', 'standaloneProductId', 'active', 'sortOrder'], path);
   return {
     id: requiredUuid(row.id, `${path}.id`),
     name: requiredText(row.name, `${path}.name`, 200),
     priceMinor: nonNegativeInteger(row.priceMinor, `${path}.priceMinor`),
+    standaloneProductId: nullableUuid(row.standaloneProductId, `${path}.standaloneProductId`),
     active: requiredBoolean(row.active, `${path}.active`),
     sortOrder: nonNegativeInteger(row.sortOrder, `${path}.sortOrder`),
   };

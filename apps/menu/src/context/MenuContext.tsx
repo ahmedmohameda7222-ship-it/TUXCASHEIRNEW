@@ -2,12 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { fetchPublicCatalog } from '@/lib/catalog-public';
 import {
   projectPublicCatalog,
+  type MenuExtraOption,
   type MenuModifier,
   type SupabaseProduct,
   type SupabaseSection,
 } from './menuProjection';
 
 export type {
+  MenuExtraOption,
   MenuModifier,
   ProductSection,
   SupabaseProduct,
@@ -18,6 +20,7 @@ interface MenuContextValue {
   sections: SupabaseSection[];
   products: SupabaseProduct[];
   modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
+  extrasByProduct: Readonly<Record<string, readonly MenuExtraOption[]>>;
   comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
   loading: boolean;
   error: string | null;
@@ -31,6 +34,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<SupabaseProduct[]>([]);
   const [modifiersByProduct, setModifiersByProduct] = useState<
     Readonly<Record<string, readonly MenuModifier[]>>
+  >({});
+  const [extrasByProduct, setExtrasByProduct] = useState<
+    Readonly<Record<string, readonly MenuExtraOption[]>>
   >({});
   const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<
     Readonly<Record<string, readonly SupabaseProduct[]>>
@@ -47,12 +53,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setSections([...projection.sections]);
       setProducts([...projection.products]);
       setModifiersByProduct(projection.modifiersByProduct);
+      setExtrasByProduct(projection.extrasByProduct);
       setComboBeveragesByProduct(projection.comboBeveragesByProduct);
     } catch (cause) {
       console.error('Failed to load canonical public catalog', cause);
       setSections([]);
       setProducts([]);
       setModifiersByProduct({});
+      setExtrasByProduct({});
       setComboBeveragesByProduct({});
       setError('Menu temporarily unavailable. Please try again.');
     } finally {
@@ -69,12 +77,22 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       sections,
       products,
       modifiersByProduct,
+      extrasByProduct,
       comboBeveragesByProduct,
       loading,
       error,
       refreshMenu,
     }),
-    [sections, products, modifiersByProduct, comboBeveragesByProduct, loading, error, refreshMenu],
+    [
+      sections,
+      products,
+      modifiersByProduct,
+      extrasByProduct,
+      comboBeveragesByProduct,
+      loading,
+      error,
+      refreshMenu,
+    ],
   );
 
   return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;

@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { type SupabaseProduct } from '@/context/MenuContext';
+import { type MenuExtraOption, type SupabaseProduct } from '@/context/MenuContext';
 import { type CartExtra, useCart } from '@/context/CartContext';
 import { Plus, Minus, ImageOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductOrderCardProps {
   product: SupabaseProduct;
-  extras?: SupabaseProduct[];
+  extras?: readonly MenuExtraOption[];
   categoryUnavailable?: boolean;
   elementId?: string;
   isTargeted?: boolean;
@@ -32,7 +32,7 @@ export function ProductOrderCard({
   const unavailable = categoryUnavailable || !product.is_active;
   const cartItem = items.find((item) => item.id === product.id);
   const quantity = cartItem?.quantity || 0;
-  const canAddExtras = !unavailable && product.section_id !== 'extras' && extras.length > 0;
+  const canAddExtras = !unavailable && extras.length > 0;
 
   const selectedExtras = useMemo(
     () => extras.filter((extra) => selectedExtraIds.includes(extra.id)),

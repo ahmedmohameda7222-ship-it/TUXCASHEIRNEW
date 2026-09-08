@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { getOrderProductElementId, isOrderProductElementId } from '@/lib/product-routes';
 
 export default function OrderNow() {
-  const { sections, products, loading } = useMenu();
+  const { sections, products, extrasByProduct, loading } = useMenu();
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [targetProductElementId, setTargetProductElementId] = useState<string>('');
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -15,17 +15,6 @@ export default function OrderNow() {
   const extrasSectionId = useMemo(
     () => sections.find((section) => section.slug === 'extras')?.id ?? null,
     [sections],
-  );
-
-  const extraProducts = useMemo(
-    () =>
-      products
-        .filter(
-          (product) =>
-            extrasSectionId !== null && product.section_id === extrasSectionId && product.is_active,
-        )
-        .sort((a, b) => a.sort_order - b.sort_order),
-    [products, extrasSectionId],
   );
 
   const menuSections = useMemo(
@@ -222,7 +211,7 @@ export default function OrderNow() {
                           <ProductOrderCard
                             key={product.id}
                             product={product}
-                            extras={extraProducts}
+                            extras={extrasByProduct[product.id] ?? []}
                             categoryUnavailable={categoryUnavailable}
                             elementId={elementId}
                             isTargeted={targetProductElementId === elementId}
