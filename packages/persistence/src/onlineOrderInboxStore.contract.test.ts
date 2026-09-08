@@ -89,65 +89,75 @@ afterEach(async () => {
 });
 
 describe('SqliteOnlineOrderInboxStore', () => {
-  it('persists an omission-safe, idempotent, shop-scoped pending request projection across restart', async () => {
-    const path = sqlitePath();
-    const store = new SqliteOnlineOrderInboxStore(path);
-    await store.initialize();
-    await store.upsertMany([pending(), pending(requestId, otherShopId)]);
-    await store.upsertMany([processing()]);
+  it(
+    'persists an omission-safe, idempotent, shop-scoped pending request projection across restart',
+    async () => {
+      const path = sqlitePath();
+      const store = new SqliteOnlineOrderInboxStore(path);
+      await store.initialize();
+      await store.upsertMany([pending(), pending(requestId, otherShopId)]);
+      await store.upsertMany([processing()]);
 
-    expect(await store.list(shopId)).toEqual([processing()]);
-    expect((await store.list(otherShopId)).map((request) => request.shopId)).toEqual([otherShopId]);
-    await store.close();
+      expect(await store.list(shopId)).toEqual([processing()]);
+      expect((await store.list(otherShopId)).map((request) => request.shopId)).toEqual([
+        otherShopId,
+      ]);
+      await store.close();
 
-    const reopened = new SqliteOnlineOrderInboxStore(path);
-    await reopened.initialize();
-    await reopened.upsertMany([
-      pending(secondRequestId, shopId, '2026-09-08T10:10:00.000Z'),
-    ]);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
-      requestId,
-      secondRequestId,
-    ]);
+      const reopened = new SqliteOnlineOrderInboxStore(path);
+      await reopened.initialize();
+      await reopened.upsertMany([
+        pending(secondRequestId, shopId, '2026-09-08T10:10:00.000Z'),
+      ]);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
+        requestId,
+        secondRequestId,
+      ]);
 
-    await reopened.remove(otherShopId, requestId);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toContain(requestId);
-    await reopened.remove(shopId, requestId);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
-      secondRequestId,
-    ]);
-    await reopened.close();
-  });
+      await reopened.remove(otherShopId, requestId);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toContain(requestId);
+      await reopened.remove(shopId, requestId);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
+        secondRequestId,
+      ]);
+      await reopened.close();
+    },
+  );
 });
 
 describe('IndexedDbOnlineOrderInboxStore', () => {
-  it('persists an omission-safe, idempotent, shop-scoped pending request projection across restart', async () => {
-    const name = indexedDbName();
-    const store = new IndexedDbOnlineOrderInboxStore(name);
-    await store.initialize();
-    await store.upsertMany([pending(), pending(requestId, otherShopId)]);
-    await store.upsertMany([processing()]);
+  it(
+    'persists an omission-safe, idempotent, shop-scoped pending request projection across restart',
+    async () => {
+      const name = indexedDbName();
+      const store = new IndexedDbOnlineOrderInboxStore(name);
+      await store.initialize();
+      await store.upsertMany([pending(), pending(requestId, otherShopId)]);
+      await store.upsertMany([processing()]);
 
-    expect(await store.list(shopId)).toEqual([processing()]);
-    expect((await store.list(otherShopId)).map((request) => request.shopId)).toEqual([otherShopId]);
-    await store.close();
+      expect(await store.list(shopId)).toEqual([processing()]);
+      expect((await store.list(otherShopId)).map((request) => request.shopId)).toEqual([
+        otherShopId,
+      ]);
+      await store.close();
 
-    const reopened = new IndexedDbOnlineOrderInboxStore(name);
-    await reopened.initialize();
-    await reopened.upsertMany([
-      pending(secondRequestId, shopId, '2026-09-08T10:10:00.000Z'),
-    ]);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
-      requestId,
-      secondRequestId,
-    ]);
+      const reopened = new IndexedDbOnlineOrderInboxStore(name);
+      await reopened.initialize();
+      await reopened.upsertMany([
+        pending(secondRequestId, shopId, '2026-09-08T10:10:00.000Z'),
+      ]);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
+        requestId,
+        secondRequestId,
+      ]);
 
-    await reopened.remove(otherShopId, requestId);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toContain(requestId);
-    await reopened.remove(shopId, requestId);
-    expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
-      secondRequestId,
-    ]);
-    await reopened.close();
-  });
+      await reopened.remove(otherShopId, requestId);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toContain(requestId);
+      await reopened.remove(shopId, requestId);
+      expect((await reopened.list(shopId)).map((request) => request.requestId)).toEqual([
+        secondRequestId,
+      ]);
+      await reopened.close();
+    },
+  );
 });
