@@ -217,6 +217,67 @@ jobs:
       - name: Canonical catalog architecture guards
         run: npm run test:catalog-architecture
 
+  task-c-fix:
+    name: task-c-fix
+    if: github.event_name == 'push' && github.ref == 'refs/heads/work/menu-online-orders-integration' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/menu-online-orders-integration
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - run: npm ci
+      - name: Apply canonical product-specific extras fix
+        run: python scripts/task-c-green.py
+      - name: Format correction files
+        run: >-
+          npx prettier --write
+          packages/catalog-contracts/src/index.ts
+          packages/catalog-contracts/src/index.test.ts
+          supabase/functions/catalog-public/catalog.ts
+          supabase/functions/catalog-public/catalog-public.deno.ts
+          apps/menu/src/context/menuProjection.ts
+          apps/menu/src/context/MenuContext.tsx
+          apps/menu/src/components/order/ProductOrderCard.tsx
+          apps/menu/src/pages/OrderNow.tsx
+          apps/menu/src/pages/OrderNow.source.test.ts
+      - name: Targeted C GREEN
+        run: >-
+          npx vitest run
+          packages/catalog-contracts/src/index.test.ts
+          apps/menu/src/context/menuProjection.test.ts
+          apps/menu/src/pages/OrderNow.source.test.ts
+      - name: Catalog public Edge behavior
+        run: deno test supabase/functions/catalog-public/catalog-public.deno.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Commit verified correction
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            packages/catalog-contracts/src/index.ts \
+            packages/catalog-contracts/src/index.test.ts \
+            supabase/functions/catalog-public/catalog.ts \
+            supabase/functions/catalog-public/catalog-public.deno.ts \
+            supabase/migrations/20260908051000_catalog_public_modifier_identity.sql \
+            apps/menu/src/context/menuProjection.ts \
+            apps/menu/src/context/MenuContext.tsx \
+            apps/menu/src/components/order/ProductOrderCard.tsx \
+            apps/menu/src/pages/OrderNow.tsx \
+            apps/menu/src/pages/OrderNow.source.test.ts
+          git commit -m "fix(menu): authorize extras by canonical product links"
+          git push origin HEAD:work/menu-online-orders-integration
+
   required-quality-gate:
     name: Required quality gate
     if: always()
