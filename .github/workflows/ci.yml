@@ -55,6 +55,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Online inbox Prettier diagnostic
+        shell: bash
+        run: |
+          cp packages/persistence/src/onlineOrderInboxStore.ts /tmp/onlineOrderInboxStore.ts
+          npx prettier --write packages/persistence/src/onlineOrderInboxStore.ts
+          diff -u /tmp/onlineOrderInboxStore.ts packages/persistence/src/onlineOrderInboxStore.ts || true
+          exit 1
       - name: Format check
         run: npm run format:check
       - name: Lint
