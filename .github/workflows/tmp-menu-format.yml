@@ -1,0 +1,55 @@
+name: Temporary Menu formatter
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+    paths:
+      - .github/workflows/tmp-menu-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-fix-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply exact formatter and disambiguate retry assertion
+        shell: bash
+        run: |
+          npx prettier --write apps/menu/src/components/cart/CartDrawer.tsx
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('e2e/menu/menu.e2e.ts')
+          source = path.read_text()
+          old = """  await expect(page.getByText(/could not place your order/i)).toBeVisible();
+            await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+          """
+          new = """  await expect(page.getByText(/could not place your order/i)).toBeVisible();
+            await expect(page.locator('h4').filter({ hasText: 'Canonical Tux Burger' })).toBeVisible();
+          """
+          if old not in source:
+              raise SystemExit('expected retry assertion snippet not found')
+          if source.count(old) != 1:
+              raise SystemExit('retry assertion snippet was not unique')
+          path.write_text(source.replace(old, new))
+          PY
+          npx prettier --write e2e/menu/menu.e2e.ts
+          git diff --check
+      - name: Commit generated formatting fix
+        shell: bash
+        run: |
+          git config user.name 'tux-ci'
+          git config user.email 'tux-ci@users.noreply.github.com'
+          git add apps/menu/src/components/cart/CartDrawer.tsx e2e/menu/menu.e2e.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore(menu): normalize durable checkout verification'
+          git push origin HEAD:work/menu-online-orders-integration
