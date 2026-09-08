@@ -24,6 +24,8 @@ const CLAIM_ENVELOPE_KEYS = [
   'processingOrderId',
   'processingStartedAt',
   'processingExpiresAt',
+  'processingDeviceId',
+  'reservationOriginDeviceId',
 ] as const;
 const REVIEW_ACK_KEYS = ['schemaVersion', 'requestId', 'status'] as const;
 
@@ -222,6 +224,8 @@ export async function releaseOnlineOrderReview(input: {
     processingOrderId: null,
     processingStartedAt: null,
     processingExpiresAt: null,
+    processingDeviceId: null,
+    reservationOriginDeviceId: null,
   };
   await input.store.upsertMany([released]);
   return released;
