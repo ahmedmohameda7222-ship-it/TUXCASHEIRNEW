@@ -1,0 +1,493 @@
+name: Online Order Codex Fixes
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/menu-online-orders-integration
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Stage RED regressions
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def append(path, text):
+              p = Path(path)
+              p.write_text(p.read_text() + text)
+
+          Path('apps/operations-desktop/src/main/onlineOrderInboxAcceptanceBoundary.source.test.ts').write_text(r'''import { readFileSync } from 'node:fs';
+          import { describe, expect, it } from 'vitest';
+
+          const source = readFileSync(new URL('./onlineOrderInboxIpc.ts', import.meta.url), 'utf8');
+
+          describe('online-order acceptance IPC trust boundary', () => {
+            it('accepts only request identity plus worker confirmation and reloads the trusted cached claim', () => {
+              expect(source).toContain("exactKeys(input, ['requestId', 'confirmation'], 'Online-order acceptance')");
+              expect(source).toContain('this.#acceptanceStore.get(shopId, requestId)');
+              expect(source).not.toContain("parseCachedOnlineOrderRequest(input['request'])");
+            });
+          });
+          '''.replace('          ', ''))
+
+          Path('apps/menu/src/pages/OrderNow.source.test.ts').write_text(r'''import { readFileSync } from 'node:fs';
+          import { describe, expect, it } from 'vitest';
+
+          const source = readFileSync(new URL('./OrderNow.tsx', import.meta.url), 'utf8');
+
+          describe('OrderNow canonical category identity', () => {
+            it('resolves Extras by canonical slug and then uses its UUID id', () => {
+              expect(source).toContain("section.slug === 'extras'");
+              expect(source).not.toContain("const EXTRAS_SECTION_ID = 'extras'");
+            });
+          });
+          '''.replace('          ', ''))
+
+          Path('apps/menu/src/components/cart/CartDrawer.source.test.ts').write_text(r'''import { readFileSync } from 'node:fs';
+          import { describe, expect, it } from 'vitest';
+
+          const source = readFileSync(new URL('./CartDrawer.tsx', import.meta.url), 'utf8');
+
+          describe('CartDrawer canonical combo intent', () => {
+            it('submits the selected canonical combo beverage id', () => {
+              expect(source).toContain('comboBeverageProductId: item.comboBeverage?.id ?? null');
+            });
+          });
+          '''.replace('          ', ''))
+
+          Path('packages/application/src/onlineOrderAcceptanceCombo.source.test.ts').write_text(r'''import { readFileSync } from 'node:fs';
+          import { describe, expect, it } from 'vitest';
+
+          const source = readFileSync(new URL('./onlineOrderAcceptance.ts', import.meta.url), 'utf8');
+
+          describe('online-order combo materialization', () => {
+            it('materializes one beverage selection per combo unit', () => {
+              expect(source).toContain('Array.from({ length: item.quantity }, () => item.comboBeverage!)');
+            });
+          });
+          '''.replace('          ', ''))
+
+          append('packages/persistence/src/onlineOrderInboxStore.contract.test.ts', r'''
+
+          describe('accepted online-order tombstones', () => {
+            it('SQLite keeps a locally accepted request hidden across restart and remote re-upsert', async () => {
+              const path = sqlitePath();
+              const store = new SqliteOnlineOrderInboxStore(path);
+              await store.initialize();
+              await store.upsertMany([processing()]);
+              await store.markAccepted(shopId, requestId, processingOrderId);
+              expect(await store.get(shopId, requestId)).toBeNull();
+              expect(await store.list(shopId)).toEqual([]);
+              await store.close();
+
+              const reopened = new SqliteOnlineOrderInboxStore(path);
+              await reopened.initialize();
+              await reopened.upsertMany([processing()]);
+              expect(await reopened.get(shopId, requestId)).toBeNull();
+              expect(await reopened.list(shopId)).toEqual([]);
+              await reopened.close();
+            });
+
+            it('IndexedDB keeps a locally accepted request hidden across restart and remote re-upsert', async () => {
+              const name = indexedDbName();
+              const store = new IndexedDbOnlineOrderInboxStore(name);
+              await store.initialize();
+              await store.upsertMany([processing()]);
+              await store.markAccepted(shopId, requestId, processingOrderId);
+              expect(await store.get(shopId, requestId)).toBeNull();
+              expect(await store.list(shopId)).toEqual([]);
+              await store.close();
+
+              const reopened = new IndexedDbOnlineOrderInboxStore(name);
+              await reopened.initialize();
+              await reopened.upsertMany([processing()]);
+              expect(await reopened.get(shopId, requestId)).toBeNull();
+              expect(await reopened.list(shopId)).toEqual([]);
+              await reopened.close();
+            });
+          });
+          '''.replace('          ', ''))
+          PY
+
+          set +e
+          npx vitest run \
+            apps/operations-desktop/src/main/onlineOrderInboxAcceptanceBoundary.source.test.ts \
+            apps/menu/src/pages/OrderNow.source.test.ts \
+            apps/menu/src/components/cart/CartDrawer.source.test.ts \
+            packages/application/src/onlineOrderAcceptanceCombo.source.test.ts \
+            packages/persistence/src/onlineOrderInboxStore.contract.test.ts
+          RED=$?
+          set -e
+          if [ "$RED" -eq 0 ]; then
+            echo 'Expected Codex regression tests to be RED before implementation.' >&2
+            exit 1
+          fi
+          echo "Expected RED observed (exit=$RED)."
+
+      - name: Implement Codex fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              source = p.read_text()
+              if old not in source:
+                  raise SystemExit(f'missing patch anchor in {path}: {old[:100]!r}')
+              p.write_text(source.replace(old, new, 1))
+
+          # P2: one combo beverage snapshot per combo unit.
+          replace(
+              'packages/application/src/onlineOrderAcceptance.ts',
+              "comboBeverages: item.comboBeverage === null ? [] : [item.comboBeverage],",
+              "comboBeverages:\n        item.comboBeverage === null\n          ? []\n          : Array.from({ length: item.quantity }, () => item.comboBeverage!),",
+          )
+
+          # P2: Extras is a slug; resolve its canonical UUID before filtering.
+          replace('apps/menu/src/pages/OrderNow.tsx', "const EXTRAS_SECTION_ID = 'extras';\n\n", '')
+          replace(
+              'apps/menu/src/pages/OrderNow.tsx',
+              "const { sections, products, loading } = useMenu();",
+              "const { sections, products, comboBeveragesByProduct, loading } = useMenu();",
+          )
+          replace(
+              'apps/menu/src/pages/OrderNow.tsx',
+              "  const extraProducts = useMemo(\n    () =>\n      products\n        .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)\n        .sort((a, b) => a.sort_order - b.sort_order),\n    [products],\n  );\n\n  const menuSections = useMemo(\n    () =>\n      sections\n        .filter((section) => section.id !== EXTRAS_SECTION_ID)\n        .sort((a, b) => a.sort_order - b.sort_order),\n    [sections],\n  );",
+              "  const extrasSectionId = useMemo(\n    () => sections.find((section) => section.slug === 'extras')?.id ?? null,\n    [sections],\n  );\n\n  const extraProducts = useMemo(\n    () =>\n      products\n        .filter(\n          (product) =>\n            extrasSectionId !== null &&\n            product.section_id === extrasSectionId &&\n            product.is_active,\n        )\n        .sort((a, b) => a.sort_order - b.sort_order),\n    [products, extrasSectionId],\n  );\n\n  const menuSections = useMemo(\n    () =>\n      sections\n        .filter((section) => section.id !== extrasSectionId)\n        .sort((a, b) => a.sort_order - b.sort_order),\n    [sections, extrasSectionId],\n  );",
+          )
+          replace(
+              'apps/menu/src/pages/OrderNow.tsx',
+              "                            extras={extraProducts}\n                            categoryUnavailable={categoryUnavailable}",
+              "                            extras={extraProducts}\n                            comboBeverages={comboBeveragesByProduct[product.id] ?? []}\n                            categoryUnavailable={categoryUnavailable}",
+          )
+
+          # P1: expose canonical combo beverage relationships in Menu context.
+          replace(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  loading: boolean;",
+              "  modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;\n  loading: boolean;",
+          )
+          replace(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  const [loading, setLoading] = useState(true);",
+              "  const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<\n    Readonly<Record<string, readonly SupabaseProduct[]>>\n  >({});\n  const [loading, setLoading] = useState(true);",
+          )
+          replace(
+              'apps/menu/src/context/MenuContext.tsx',
+              "      for (const modifiers of Object.values(nextModifiersByProduct)) {\n        modifiers.sort((left, right) => left.sort_order - right.sort_order);\n      }\n      setSections(nextSections);\n      setProducts(nextProducts);\n      setModifiersByProduct(nextModifiersByProduct);",
+              "      for (const modifiers of Object.values(nextModifiersByProduct)) {\n        modifiers.sort((left, right) => left.sort_order - right.sort_order);\n      }\n      const productsById = new Map(nextProducts.map((product) => [product.id, product] as const));\n      const nextComboBeveragesByProduct: Record<string, SupabaseProduct[]> = {};\n      for (const option of snapshot.comboBeverageOptions) {\n        const beverage = productsById.get(option.beverageProductId);\n        if (!beverage) continue;\n        (nextComboBeveragesByProduct[option.comboProductId] ??= []).push(beverage);\n      }\n      setSections(nextSections);\n      setProducts(nextProducts);\n      setModifiersByProduct(nextModifiersByProduct);\n      setComboBeveragesByProduct(nextComboBeveragesByProduct);",
+          )
+          replace(
+              'apps/menu/src/context/MenuContext.tsx',
+              "      setModifiersByProduct({});\n      setError('Menu temporarily unavailable. Please try again.');",
+              "      setModifiersByProduct({});\n      setComboBeveragesByProduct({});\n      setError('Menu temporarily unavailable. Please try again.');",
+          )
+          replace(
+              'apps/menu/src/context/MenuContext.tsx',
+              "    () => ({ sections, products, modifiersByProduct, loading, error, refreshMenu }),\n    [sections, products, modifiersByProduct, loading, error, refreshMenu],",
+              "    () => ({\n      sections,\n      products,\n      modifiersByProduct,\n      comboBeveragesByProduct,\n      loading,\n      error,\n      refreshMenu,\n    }),\n    [\n      sections,\n      products,\n      modifiersByProduct,\n      comboBeveragesByProduct,\n      loading,\n      error,\n      refreshMenu,\n    ],",
+          )
+
+          # P1: cart preserves and submits the selected canonical beverage.
+          replace(
+              'apps/menu/src/context/CartContext.tsx',
+              "export interface CartProduct {",
+              "export interface CartComboBeverage {\n  id: string;\n  name: string;\n}\n\nexport interface CartProduct {",
+          )
+          replace(
+              'apps/menu/src/context/CartContext.tsx',
+              "  extras?: CartExtra[];\n}",
+              "  extras?: CartExtra[];\n  comboBeverage?: CartComboBeverage;\n}",
+          )
+          replace(
+              'apps/menu/src/components/cart/CartDrawer.tsx',
+              "        comboBeverageProductId: null,",
+              "        comboBeverageProductId: item.comboBeverage?.id ?? null,",
+          )
+          replace(
+              'apps/menu/src/components/cart/CartDrawer.tsx',
+              "                        {item.extras && item.extras.length > 0 && (",
+              "                        {item.comboBeverage && (\n                          <p className=\"mt-1 text-xs leading-relaxed text-gray-400\">\n                            Beverage:{' '}\n                            <span className=\"text-[#D4AF37]\">{item.comboBeverage.name}</span>\n                          </p>\n                        )}\n                        {item.extras && item.extras.length > 0 && (",
+          )
+
+          # Product card combo selector and canonical cart identity.
+          p = Path('apps/menu/src/components/order/ProductOrderCard.tsx')
+          s = p.read_text()
+          s = s.replace(
+              "  extras?: SupabaseProduct[];\n  categoryUnavailable?: boolean;",
+              "  extras?: SupabaseProduct[];\n  comboBeverages?: SupabaseProduct[];\n  categoryUnavailable?: boolean;",
+              1,
+          )
+          s = s.replace(
+              "const buildVariantId = (productId: string, selectedExtraIds: string[]) => {\n  const extrasKey = [...selectedExtraIds].sort().join('__');\n  return extrasKey ? `${productId}__extras__${extrasKey}` : productId;\n};",
+              "const buildVariantId = (\n  productId: string,\n  selectedExtraIds: string[],\n  comboBeverageId?: string,\n) => {\n  const extrasKey = [...selectedExtraIds].sort().join('__');\n  const extrasPart = extrasKey ? `__extras__${extrasKey}` : '';\n  const beveragePart = comboBeverageId ? `__beverage__${comboBeverageId}` : '';\n  return `${productId}${extrasPart}${beveragePart}`;\n};",
+              1,
+          )
+          s = s.replace(
+              "  extras = [],\n  categoryUnavailable = false,",
+              "  extras = [],\n  comboBeverages = [],\n  categoryUnavailable = false,",
+              1,
+          )
+          s = s.replace(
+              "  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);\n\n  const unavailable = categoryUnavailable || !product.is_active;\n  const cartItem = items.find((item) => item.id === product.id);\n  const quantity = cartItem?.quantity || 0;\n  const canAddExtras = !unavailable && product.section_id !== 'extras' && extras.length > 0;",
+              "  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([]);\n  const [selectedComboBeverageId, setSelectedComboBeverageId] = useState('');\n\n  const unavailable = categoryUnavailable || !product.is_active;\n  const cartItem = product.is_combo ? undefined : items.find((item) => item.id === product.id);\n  const quantity = cartItem?.quantity || 0;\n  const canAddExtras = !unavailable && extras.length > 0;\n  const comboRequiresBeverage = product.is_combo && comboBeverages.length > 0;\n  const availableComboBeverages = comboBeverages.filter((beverage) => beverage.is_active);\n  const selectedComboBeverage =\n    availableComboBeverages.find((beverage) => beverage.id === selectedComboBeverageId) ?? null;\n  const comboSelectionReady = !comboRequiresBeverage || selectedComboBeverage !== null;",
+              1,
+          )
+          s = s.replace(
+              "  const handleAdd = () => {\n    if (unavailable) return;\n    addToCart(product, 1);",
+              "  const handleAdd = () => {\n    if (unavailable || !comboSelectionReady) return;\n    const cartProduct =\n      selectedComboBeverage === null\n        ? product\n        : {\n            ...product,\n            id: buildVariantId(product.id, [], selectedComboBeverage.id),\n            baseProductId: product.id,\n            baseProductName: product.name,\n            comboBeverage: {\n              id: selectedComboBeverage.id,\n              name: selectedComboBeverage.name,\n            },\n          };\n    addToCart(cartProduct, 1);",
+              1,
+          )
+          s = s.replace(
+              "    if (unavailable || selectedExtras.length === 0) return;",
+              "    if (unavailable || selectedExtras.length === 0 || !comboSelectionReady) return;",
+              1,
+          )
+          s = s.replace(
+              "      id: buildVariantId(\n        product.id,\n        cartExtras.map((extra) => extra.id),\n      ),",
+              "      id: buildVariantId(\n        product.id,\n        cartExtras.map((extra) => extra.id),\n        selectedComboBeverage?.id,\n      ),",
+              1,
+          )
+          s = s.replace(
+              "      extras: cartExtras,\n    };",
+              "      extras: cartExtras,\n      ...(selectedComboBeverage === null\n        ? {}\n        : {\n            comboBeverage: {\n              id: selectedComboBeverage.id,\n              name: selectedComboBeverage.name,\n            },\n          }),\n    };",
+              1,
+          )
+          s = s.replace(
+              "          {!unavailable && (\n            <div className=\"mt-3 flex flex-wrap items-center justify-end gap-2\">",
+              "          {!unavailable && (\n            <>\n              {comboRequiresBeverage && (\n                <label className=\"mt-3 block text-xs font-semibold text-gray-300\">\n                  Combo beverage\n                  <select\n                    aria-label={`${product.name} beverage`}\n                    value={selectedComboBeverageId}\n                    onChange={(event) => setSelectedComboBeverageId(event.target.value)}\n                    className=\"mt-1 w-full rounded-lg border border-white/20 bg-black px-3 py-2 text-sm text-white\"\n                  >\n                    <option value=\"\">Select beverage</option>\n                    {comboBeverages.map((beverage) => (\n                      <option key={beverage.id} value={beverage.id} disabled={!beverage.is_active}>\n                        {beverage.name}\n                      </option>\n                    ))}\n                  </select>\n                </label>\n              )}\n            <div className=\"mt-3 flex flex-wrap items-center justify-end gap-2\">",
+              1,
+          )
+          s = s.replace(
+              "                <button\n                  onClick={handleAdd}\n                  className=\"bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold text-sm hover:bg-[#F3D55B] transition-colors shadow-[0_0_10px_rgba(212,175,55,0.2)]\"\n                >\n                  Add to Cart\n                </button>",
+              "                <button\n                  onClick={handleAdd}\n                  disabled={!comboSelectionReady}\n                  className=\"bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold text-sm hover:bg-[#F3D55B] transition-colors shadow-[0_0_10px_rgba(212,175,55,0.2)] disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400\"\n                >\n                  {comboSelectionReady ? 'Add to Cart' : 'Select beverage'}\n                </button>",
+              1,
+          )
+          s = s.replace(
+              "            </div>\n          )}\n        </div>",
+              "            </div>\n            </>\n          )}\n        </div>",
+              1,
+          )
+          p.write_text(s)
+
+          # Durable local accepted tombstones: SQLite.
+          p = Path('packages/persistence/src/sqlite/SqliteOnlineOrderInboxStore.ts')
+          s = p.read_text()
+          s = s.replace(
+              "    this.#initialized = true;",
+              "    this.#applyMigration(\n      2,\n      'online_order_acceptance_tombstones',\n      `\nCREATE TABLE IF NOT EXISTS online_order_acceptance_tombstones (\n  shop_id TEXT NOT NULL,\n  request_id TEXT NOT NULL,\n  processing_order_id TEXT NOT NULL,\n  PRIMARY KEY (shop_id, request_id)\n);`,\n    );\n    this.#initialized = true;",
+              1,
+          )
+          s = s.replace(
+              "      for (const request of validated) {\n        statement.run(",
+              "      for (const request of validated) {\n        const accepted = this.#database\n          .prepare(\n            'SELECT 1 FROM online_order_acceptance_tombstones WHERE shop_id = ? AND request_id = ?',\n          )\n          .get(request.shopId, request.requestId);\n        if (accepted !== undefined) continue;\n        statement.run(",
+              1,
+          )
+          s = s.replace(
+              "         WHERE shop_id = ?\n         ORDER BY created_at ASC, request_id ASC`,",
+              "         WHERE shop_id = ?\n           AND NOT EXISTS (\n             SELECT 1 FROM online_order_acceptance_tombstones accepted\n             WHERE accepted.shop_id = online_order_inbox.shop_id\n               AND accepted.request_id = online_order_inbox.request_id\n           )\n         ORDER BY created_at ASC, request_id ASC`,",
+              1,
+          )
+          anchor = "  async remove(shopId: ShopId, requestId: string): Promise<void> {"
+          insert = """  async get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null> {\n    this.#assertInitialized();\n    const row = this.#database\n      .prepare(\n        `SELECT request_id, payload_json\n         FROM online_order_inbox\n         WHERE shop_id = ? AND request_id = ?\n           AND NOT EXISTS (\n             SELECT 1 FROM online_order_acceptance_tombstones accepted\n             WHERE accepted.shop_id = online_order_inbox.shop_id\n               AND accepted.request_id = online_order_inbox.request_id\n           )`,\n      )\n      .get(shopId, requestId) as InboxRow | undefined;\n    return row === undefined ? null : parseRow(row, shopId);\n  }\n\n  async markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void> {\n    this.#assertInitialized();\n    this.#transaction(() => {\n      this.#database\n        .prepare(\n          `INSERT INTO online_order_acceptance_tombstones(shop_id, request_id, processing_order_id)\n           VALUES (?, ?, ?)\n           ON CONFLICT(shop_id, request_id) DO UPDATE SET\n             processing_order_id = excluded.processing_order_id`,\n        )\n        .run(shopId, requestId, processingOrderId);\n      this.#database\n        .prepare('DELETE FROM online_order_inbox WHERE shop_id = ? AND request_id = ?')\n        .run(shopId, requestId);\n    });\n  }\n\n"""
+          if anchor not in s: raise SystemExit('sqlite acceptance anchor missing')
+          s = s.replace(anchor, insert + anchor, 1)
+          p.write_text(s)
+
+          # Durable local accepted tombstones: IndexedDB.
+          p = Path('packages/persistence/src/browser/IndexedDbOnlineOrderInboxStore.ts')
+          s = p.read_text()
+          s = s.replace("const DATABASE_VERSION = 1;\nconst STORE_NAME = 'requests';", "const DATABASE_VERSION = 2;\nconst STORE_NAME = 'requests';\nconst ACCEPTED_STORE_NAME = 'accepted';", 1)
+          s = s.replace(
+              "      if (event.oldVersion < 1) {\n        const store = request.result.createObjectStore(STORE_NAME, {\n          keyPath: ['shopId', 'requestId'],\n        });\n        store.createIndex('shopCreated', ['shopId', 'createdAt', 'requestId']);\n      }",
+              "      if (event.oldVersion < 1) {\n        const store = request.result.createObjectStore(STORE_NAME, {\n          keyPath: ['shopId', 'requestId'],\n        });\n        store.createIndex('shopCreated', ['shopId', 'createdAt', 'requestId']);\n      }\n      if (event.oldVersion < 2) {\n        request.result.createObjectStore(ACCEPTED_STORE_NAME, {\n          keyPath: ['shopId', 'requestId'],\n        });\n      }",
+              1,
+          )
+          s = s.replace(
+              "    const transaction = database.transaction(STORE_NAME, 'readwrite', { durability: 'strict' });\n    const completion = transactionDone(transaction);\n    const store = transaction.objectStore(STORE_NAME);\n    try {\n      const writes = validated.map((request) => requestResult(store.put(request)));\n      await Promise.all(writes);",
+              "    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readwrite', {\n      durability: 'strict',\n    });\n    const completion = transactionDone(transaction);\n    const store = transaction.objectStore(STORE_NAME);\n    const acceptedStore = transaction.objectStore(ACCEPTED_STORE_NAME);\n    try {\n      for (const request of validated) {\n        const accepted = await requestResult(acceptedStore.get([request.shopId, request.requestId]));\n        if (accepted === undefined) await requestResult(store.put(request));\n      }",
+              1,
+          )
+          s = s.replace(
+              "    const transaction = database.transaction(STORE_NAME, 'readonly');\n    const rows = await requestResult(transaction.objectStore(STORE_NAME).getAll());\n    await transactionDone(transaction);\n    return rows\n      .map((row) => parseCachedOnlineOrderRequest(row))\n      .filter((request) => request.shopId === shopId)",
+              "    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readonly');\n    const rows = await requestResult(transaction.objectStore(STORE_NAME).getAll());\n    const acceptedRows = (await requestResult(\n      transaction.objectStore(ACCEPTED_STORE_NAME).getAll(),\n    )) as Array<{ shopId: string; requestId: string }>;\n    await transactionDone(transaction);\n    const accepted = new Set(\n      acceptedRows.map((row) => `${row.shopId}:${row.requestId}`),\n    );\n    return rows\n      .map((row) => parseCachedOnlineOrderRequest(row))\n      .filter(\n        (request) =>\n          request.shopId === shopId && !accepted.has(`${request.shopId}:${request.requestId}`),\n      )",
+              1,
+          )
+          anchor = "  async remove(shopId: ShopId, requestId: string): Promise<void> {"
+          insert = """  async get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null> {\n    const database = this.#requireDatabase();\n    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readonly');\n    const accepted = await requestResult(\n      transaction.objectStore(ACCEPTED_STORE_NAME).get([shopId, requestId]),\n    );\n    const row =\n      accepted === undefined\n        ? await requestResult(transaction.objectStore(STORE_NAME).get([shopId, requestId]))\n        : undefined;\n    await transactionDone(transaction);\n    if (row === undefined) return null;\n    const parsed = parseCachedOnlineOrderRequest(row);\n    return parsed.shopId === shopId ? parsed : null;\n  }\n\n  async markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void> {\n    const database = this.#requireDatabase();\n    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readwrite', {\n      durability: 'strict',\n    });\n    const completion = transactionDone(transaction);\n    try {\n      await requestResult(\n        transaction.objectStore(ACCEPTED_STORE_NAME).put({\n          shopId,\n          requestId,\n          processingOrderId,\n        }),\n      );\n      await requestResult(transaction.objectStore(STORE_NAME).delete([shopId, requestId]));\n      await completion;\n    } catch (error) {\n      try {\n        transaction.abort();\n      } catch {\n        // Preserve the original error.\n      }\n      await completion.catch(() => undefined);\n      throw error;\n    }\n  }\n\n"""
+          if anchor not in s: raise SystemExit('indexeddb acceptance anchor missing')
+          s = s.replace(anchor, insert + anchor, 1)
+          p.write_text(s)
+
+          # P1: renderer may send only requestId + confirmation; main reloads trusted cache and fences success.
+          p = Path('apps/operations-desktop/src/main/onlineOrderInboxIpc.ts')
+          s = p.read_text()
+          s = s.replace("import { parseCachedOnlineOrderRequest } from '@tux/persistence';", "import type { CachedOnlineOrderRequest } from '@tux/persistence';", 1)
+          s = s.replace("  type PaymentMethodId,\n} from '@tux/domain';", "  type PaymentMethodId,\n  type ShopId,\n} from '@tux/domain';", 1)
+          s = s.replace(
+              "type OnlineOrderAcceptanceService = Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;",
+              "type OnlineOrderAcceptanceService = Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;\ntype OnlineOrderAcceptanceStore = {\n  get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;\n  markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;\n};",
+              1,
+          )
+          s = s.replace(
+              "  readonly #acceptance: OnlineOrderAcceptanceService | null;\n  #unsubscribe",
+              "  readonly #acceptance: OnlineOrderAcceptanceService | null;\n  readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;\n  readonly #getActiveShopId: (() => Promise<ShopId>) | null;\n  #unsubscribe",
+              1,
+          )
+          s = s.replace(
+              "    readonly acceptance?: OnlineOrderAcceptanceService;\n  }) {\n    this.#service = input.service;\n    this.#acceptance = input.acceptance ?? null;",
+              "    readonly acceptance?: OnlineOrderAcceptanceService;\n    readonly acceptanceStore?: OnlineOrderAcceptanceStore;\n    readonly getActiveShopId?: () => Promise<ShopId>;\n  }) {\n    this.#service = input.service;\n    this.#acceptance = input.acceptance ?? null;\n    this.#acceptanceStore = input.acceptanceStore ?? null;\n    this.#getActiveShopId = input.getActiveShopId ?? null;",
+              1,
+          )
+          old = """      const input = objectPayload(rawInput, 'Online-order acceptance');\n      exactKeys(input, ['request', 'confirmation'], 'Online-order acceptance');\n      if (this.#acceptance === null) {\n        throw new Error('Online-order acceptance service is not configured.');\n      }\n      return this.#acceptance.accept(\n        parseCachedOnlineOrderRequest(input['request']),\n        acceptanceConfirmation(input['confirmation']),\n      );"""
+          new = """      const input = objectPayload(rawInput, 'Online-order acceptance');\n      exactKeys(input, ['requestId', 'confirmation'], 'Online-order acceptance');\n      if (\n        this.#acceptance === null ||\n        this.#acceptanceStore === null ||\n        this.#getActiveShopId === null\n      ) {\n        throw new Error('Online-order acceptance service is not configured.');\n      }\n      const requestId = uuid(input['requestId'], 'Online-order request ID');\n      const shopId = await this.#getActiveShopId();\n      const request = await this.#acceptanceStore.get(shopId, requestId);\n      if (request === null || request.status !== 'PROCESSING' || request.processingOrderId === null) {\n        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');\n      }\n      const result = await this.#acceptance.accept(\n        request,\n        acceptanceConfirmation(input['confirmation']),\n      );\n      if (result.ok) {\n        await this.#acceptanceStore.markAccepted(shopId, requestId, request.processingOrderId);\n      }\n      return result;"""
+          if old not in s: raise SystemExit('ipc accept anchor missing')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          replace(
+              'apps/operations-desktop/src/main/index.ts',
+              "  onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({\n    service: onlineOrderInboxService,\n    acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime),\n  });",
+              "  onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({\n    service: onlineOrderInboxService,\n    acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime),\n    acceptanceStore: onlineOrderInboxStore,\n    getActiveShopId: resolveOnlineOrderInboxShopId,\n  });",
+          )
+
+          # Narrow platform/preload acceptance contract to request identity.
+          p = Path('packages/platform-contracts/index.d.ts')
+          s = p.read_text()
+          s = s.replace(
+              "export type TuxOnlineOrdersApi = Pick<\n  OperationsOnlineOrderInboxService,\n  'load' | 'claim' | 'release' | 'reject' | 'subscribe'\n> &\n  Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;",
+              "export type TuxOnlineOrdersApi = Pick<\n  OperationsOnlineOrderInboxService,\n  'load' | 'claim' | 'release' | 'reject' | 'subscribe'\n> & {\n  readonly accept: (\n    requestId: string,\n    confirmation: Parameters<OperationsOnlineOrderAcceptanceService['accept']>[1],\n  ) => ReturnType<OperationsOnlineOrderAcceptanceService['accept']>;\n};",
+              1,
+          )
+          p.write_text(s)
+
+          p = Path('apps/operations-desktop/src/preload/index.ts')
+          s = p.read_text()
+          old = """    accept: async (\n      request: Parameters<TuxDesktopApi['onlineOrders']['accept']>[0],\n      confirmation: Parameters<TuxDesktopApi['onlineOrders']['accept']>[1],\n    ) =>\n      assertOrderPlacementResult(\n        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_ACCEPT, { request, confirmation })) as unknown,\n      ),"""
+          new = """    accept: async (\n      requestId: Parameters<TuxDesktopApi['onlineOrders']['accept']>[0],\n      confirmation: Parameters<TuxDesktopApi['onlineOrders']['accept']>[1],\n    ) =>\n      assertOrderPlacementResult(\n        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_ACCEPT, { requestId, confirmation })) as unknown,\n      ),"""
+          if old not in s: raise SystemExit('preload accept anchor missing')
+          p.write_text(s.replace(old, new, 1))
+
+          # Browser fallback also reloads the trusted local claim by requestId and writes tombstone after durable commit.
+          p = Path('apps/operations/src/app/OnlineOrderInboxPanel.tsx')
+          s = p.read_text()
+          s = s.replace(
+              "let browserClientPromise: Promise<OnlineOrderInboxRuntimeClient> | null = null;\nlet browserAcceptanceClient",
+              "let browserStorePromise: Promise<IndexedDbOnlineOrderInboxStore> | null = null;\nlet browserClientPromise: Promise<OnlineOrderInboxRuntimeClient> | null = null;\nlet browserAcceptanceClient",
+              1,
+          )
+          insert_anchor = "async function browserOnlineOrderInboxClient(): Promise<OnlineOrderInboxRuntimeClient> {"
+          helper = """async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInboxStore> {\n  if (browserStorePromise === null) {\n    browserStorePromise = (async () => {\n      const store = new IndexedDbOnlineOrderInboxStore();\n      await store.initialize();\n      return store;\n    })();\n  }\n  return browserStorePromise;\n}\n\n"""
+          if insert_anchor not in s: raise SystemExit('browser store helper anchor missing')
+          s = s.replace(insert_anchor, helper + insert_anchor, 1)
+          s = s.replace(
+              "      const store = new IndexedDbOnlineOrderInboxStore();\n      await store.initialize();",
+              "      const store = await browserOnlineOrderInboxStore();",
+              1,
+          )
+          old = "    accept: async (request, confirmation) => acceptanceClient().accept(request, confirmation),"
+          new = """    accept: async (requestId, confirmation) => {\n      const store = await browserOnlineOrderInboxStore();\n      const state = await createOperationsSessionClient().getState();\n      if (!state.ok || state.value.status !== 'ACTIVE') {\n        throw new Error('Active worker session required for online-order acceptance.');\n      }\n      const request = await store.get(state.value.shopId, requestId);\n      if (request === null || request.status !== 'PROCESSING' || request.processingOrderId === null) {\n        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');\n      }\n      const result = await acceptanceClient().accept(request, confirmation);\n      if (result.ok) {\n        await store.markAccepted(state.value.shopId, requestId, request.processingOrderId);\n      }\n      return result;\n    },"""
+          if old not in s: raise SystemExit('browser accept anchor missing')
+          s = s.replace(old, new, 1)
+          s = s.replace(
+              "    request: CachedOnlineOrderRequest,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ) => void | Promise<void>;",
+              "    requestId: string,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ) => void | Promise<void>;",
+              1,
+          )
+          s = s.replace("    void onAccept(request, confirmation);", "    void onAccept(request.requestId, confirmation);", 1)
+          # Panel prop signature (second occurrence).
+          s = s.replace(
+              "  readonly onAccept?: (\n    request: CachedOnlineOrderRequest,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ) => void | Promise<void>;",
+              "  readonly onAccept?: (\n    requestId: string,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ) => void | Promise<void>;",
+              1,
+          )
+          s = s.replace(
+              "  async function accept(\n    request: CachedOnlineOrderRequest,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ): Promise<void> {\n    await run(request.requestId, async () => {\n      const result = await client.accept(request, confirmation);\n      if (!result.ok) throw new Error(result.error.message);\n      setAcceptedRequestIds((current) => new Set(current).add(request.requestId));",
+              "  async function accept(\n    requestId: string,\n    confirmation: OnlineOrderAcceptanceConfirmation,\n  ): Promise<void> {\n    await run(requestId, async () => {\n      const result = await client.accept(requestId, confirmation);\n      if (!result.ok) throw new Error(result.error.message);\n      setAcceptedRequestIds((current) => new Set(current).add(requestId));",
+              1,
+          )
+          p.write_text(s)
+          PY
+
+          npx prettier --write \
+            packages/application/src/onlineOrderAcceptance.ts \
+            apps/menu/src/pages/OrderNow.tsx \
+            apps/menu/src/context/MenuContext.tsx \
+            apps/menu/src/context/CartContext.tsx \
+            apps/menu/src/components/cart/CartDrawer.tsx \
+            apps/menu/src/components/order/ProductOrderCard.tsx \
+            packages/persistence/src/sqlite/SqliteOnlineOrderInboxStore.ts \
+            packages/persistence/src/browser/IndexedDbOnlineOrderInboxStore.ts \
+            apps/operations-desktop/src/main/onlineOrderInboxIpc.ts \
+            apps/operations-desktop/src/main/index.ts \
+            packages/platform-contracts/index.d.ts \
+            apps/operations-desktop/src/preload/index.ts \
+            apps/operations/src/app/OnlineOrderInboxPanel.tsx \
+            apps/operations-desktop/src/main/onlineOrderInboxAcceptanceBoundary.source.test.ts \
+            apps/menu/src/pages/OrderNow.source.test.ts \
+            apps/menu/src/components/cart/CartDrawer.source.test.ts \
+            packages/application/src/onlineOrderAcceptanceCombo.source.test.ts \
+            packages/persistence/src/onlineOrderInboxStore.contract.test.ts \
+            packages/application/src/menuOperationsWhatsAppJourney.test.ts \
+            e2e/menu/visual-parity.e2e.ts
+
+      - name: Targeted GREEN verification
+        run: |
+          npx vitest run \
+            apps/operations-desktop/src/main/onlineOrderInboxAcceptanceBoundary.source.test.ts \
+            apps/menu/src/pages/OrderNow.source.test.ts \
+            apps/menu/src/components/cart/CartDrawer.source.test.ts \
+            packages/application/src/onlineOrderAcceptanceCombo.source.test.ts \
+            packages/persistence/src/onlineOrderInboxStore.contract.test.ts \
+            apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts \
+            apps/operations-desktop/src/preload/onlineOrderInboxBridge.test.ts \
+            apps/operations/src/app/OnlineOrderInboxPanel.test.tsx \
+            packages/application/src/onlineOrderAcceptance.test.ts
+          npm run typecheck
+
+      - name: Commit verified fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            packages/application/src/onlineOrderAcceptance.ts \
+            apps/menu/src/pages/OrderNow.tsx \
+            apps/menu/src/context/MenuContext.tsx \
+            apps/menu/src/context/CartContext.tsx \
+            apps/menu/src/components/cart/CartDrawer.tsx \
+            apps/menu/src/components/order/ProductOrderCard.tsx \
+            packages/persistence/src/sqlite/SqliteOnlineOrderInboxStore.ts \
+            packages/persistence/src/browser/IndexedDbOnlineOrderInboxStore.ts \
+            apps/operations-desktop/src/main/onlineOrderInboxIpc.ts \
+            apps/operations-desktop/src/main/index.ts \
+            packages/platform-contracts/index.d.ts \
+            apps/operations-desktop/src/preload/index.ts \
+            apps/operations/src/app/OnlineOrderInboxPanel.tsx \
+            apps/operations-desktop/src/main/onlineOrderInboxAcceptanceBoundary.source.test.ts \
+            apps/menu/src/pages/OrderNow.source.test.ts \
+            apps/menu/src/components/cart/CartDrawer.source.test.ts \
+            packages/application/src/onlineOrderAcceptanceCombo.source.test.ts \
+            packages/persistence/src/onlineOrderInboxStore.contract.test.ts \
+            packages/application/src/menuOperationsWhatsAppJourney.test.ts \
+            e2e/menu/visual-parity.e2e.ts
+          git commit -m 'fix(online-orders): address Codex acceptance findings'
+          git push origin HEAD:work/menu-online-orders-integration
