@@ -253,6 +253,29 @@ Deno.test('order-intake accepts addon products only through linked standalone mo
   assert(errorCode(await json(response)) === 'invalid_selection', 'wrong addon mapping code');
 });
 
+Deno.test('order-intake rejects unavailable standalone addon products', async () => {
+  for (const availability of [
+    { label: 'inactive', active: false, soldOut: false },
+    { label: 'sold-out', active: true, soldOut: true },
+  ]) {
+    const unavailableAddon = authority({
+      products: authority().products.map((product) =>
+        product.id === ADDON_PRODUCT_ID
+          ? { ...product, active: availability.active, soldOut: availability.soldOut }
+          : product,
+      ),
+    });
+    const store = new MemoryStore(unavailableAddon);
+    const response = await handleOrderIntakeRequest(request(), store);
+    assert(response.status === 409, `${availability.label} standalone addon must conflict`);
+    assert(
+      errorCode(await json(response)) === 'item_unavailable',
+      `wrong ${availability.label} standalone addon code`,
+    );
+    assert(store.inserted.length === 0, `${availability.label} standalone addon request persisted`);
+  }
+});
+
 Deno.test('order-intake validates combo beverage relationships without charging beverage retail price', async () => {
   const comboPayload = payload({
     items: [
