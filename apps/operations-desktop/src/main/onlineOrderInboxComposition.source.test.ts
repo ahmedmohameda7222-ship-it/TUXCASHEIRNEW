@@ -19,7 +19,9 @@ describe('Electron online-order inbox composition', () => {
 
   it('keeps remote unavailability non-blocking and wires the narrow IPC runtime lifecycle', () => {
     expect(source).toContain('unavailableOnlineOrderInboxRemote');
-    expect(source).toContain('new OnlineOrderInboxIpcRuntime({ service: onlineOrderInboxService })');
+    expect(source).toContain(
+      'new OnlineOrderInboxIpcRuntime({ service: onlineOrderInboxService })',
+    );
     expect(source).toContain('onlineOrderInboxIpcRuntime.register(window)');
     expect(source).toContain('onlineOrderInboxIpcRuntime?.close()');
     expect(source).toContain('void onlineOrderInboxStore?.close()');
