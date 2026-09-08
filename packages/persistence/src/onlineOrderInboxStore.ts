@@ -178,7 +178,9 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
       reservationOriginDeviceId === undefined ||
       reservationOriginDeviceId === null)
   ) {
-    throw new Error('Cached PROCESSING online order requires processing and reservation authority.');
+    throw new Error(
+      'Cached PROCESSING online order requires processing and reservation authority.',
+    );
   }
   if (
     processingStartedAt !== null &&

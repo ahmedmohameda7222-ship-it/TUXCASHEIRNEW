@@ -151,6 +151,8 @@ function onlineRequest(
     processingOrderId: PROCESSING_ORDER_ID,
     processingStartedAt: AT,
     processingExpiresAt: instant('2026-09-08T22:00:00.000Z'),
+    processingDeviceId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    reservationOriginDeviceId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
   };
 }
 

@@ -393,6 +393,8 @@ describe('Menu → Operations → WhatsApp fake-provider journey', () => {
       processingOrderId: RESERVED_ORDER_ID,
       processingStartedAt: AT,
       processingExpiresAt: instant('2026-09-08T23:30:00.000Z'),
+      processingDeviceId: DEVICE_ID,
+      reservationOriginDeviceId: DEVICE_ID,
     };
     const confirmation = {
       orderTypeId: DELIVERY_TYPE_ID,
