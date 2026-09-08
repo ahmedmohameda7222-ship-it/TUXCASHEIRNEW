@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type {
-  OnlineOrderAcceptanceConfirmation,
-  OrdersWorkspace,
-} from '@tux/application';
+import type { OnlineOrderAcceptanceConfirmation, OrdersWorkspace } from '@tux/application';
 import { moneyMinor, type MoneyMinor } from '@tux/domain';
 import type { CachedOnlineOrderRequest } from '@tux/persistence';
 import { IndexedDbOnlineOrderInboxStore } from '@tux/persistence/browser';
@@ -155,16 +152,14 @@ function OnlineOrderAcceptanceForm({
   const paymentMethods = workspace.configuration.paymentMethods.filter((method) => method.active);
   const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;
-  const selectedPayment =
-    paymentMethods.find((method) => method.id === paymentMethodId) ?? null;
+  const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;
   const finalFeeMinor =
     request.fulfillmentPreference === 'DELIVERY' ? parseMinorInput(finalDeliveryFee) : null;
   const cashReceivedMinor =
     selectedPayment?.logicType === 'CASH' ? parseMinorInput(cashReceived) : null;
 
   const deliveryReady =
-    request.fulfillmentPreference === 'PICKUP' ||
-    (selectedZone !== null && finalFeeMinor !== null);
+    request.fulfillmentPreference === 'PICKUP' || (selectedZone !== null && finalFeeMinor !== null);
   const paymentReady =
     selectedPayment !== null &&
     (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null);
@@ -177,13 +172,11 @@ function OnlineOrderAcceptanceForm({
       orderTypeId: selectedOrderType.id,
       deliveryZoneId:
         request.fulfillmentPreference === 'DELIVERY' ? (selectedZone?.id ?? null) : null,
-      finalDeliveryFeeMinor:
-        request.fulfillmentPreference === 'DELIVERY' ? finalFeeMinor : null,
+      finalDeliveryFeeMinor: request.fulfillmentPreference === 'DELIVERY' ? finalFeeMinor : null,
       payment: {
         mode: 'SINGLE',
         methodId: selectedPayment.id,
-        cashReceivedMinor:
-          selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
+        cashReceivedMinor: selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
       },
     };
     void onAccept(request, confirmation);
@@ -370,7 +363,11 @@ export function OnlineOrderInboxPanel({
                 <header>
                   <div>
                     <span className="online-order-status">
-                      {acceptedLocally ? 'Accepted locally' : isProcessing ? 'In review' : 'Pending review'}
+                      {acceptedLocally
+                        ? 'Accepted locally'
+                        : isProcessing
+                          ? 'In review'
+                          : 'Pending review'}
                     </span>
                     <strong>{request.customerName}</strong>
                   </div>
@@ -418,7 +415,8 @@ export function OnlineOrderInboxPanel({
                     <strong>Canonical order placed locally</strong>
                     <p>The remote request will resolve through the existing Operations outbox.</p>
                   </div>
-                ) : rejectingRequestId === request.requestId && request.processingOrderId !== null ? (
+                ) : rejectingRequestId === request.requestId &&
+                  request.processingOrderId !== null ? (
                   <form
                     className="online-order-reject-form"
                     onSubmit={(event) => submitReject(event, request)}
@@ -452,7 +450,9 @@ export function OnlineOrderInboxPanel({
                         className="board-secondary-button"
                         type="button"
                         disabled={isBusy}
-                        onClick={() => void onRelease(request.requestId, request.processingOrderId!)}
+                        onClick={() =>
+                          void onRelease(request.requestId, request.processingOrderId!)
+                        }
                       >
                         Release
                       </button>
@@ -558,7 +558,9 @@ export function OnlineOrderInboxPanelController({
 
   useEffect(() => {
     let active = true;
-    const processingRequests = snapshot.requests.filter((request) => request.status === 'PROCESSING');
+    const processingRequests = snapshot.requests.filter(
+      (request) => request.status === 'PROCESSING',
+    );
     if (processingRequests.length === 0) {
       setAcceptanceWorkspaces({});
       setAcceptanceErrors({});

@@ -123,9 +123,14 @@ describe('OnlineOrderInboxIpcRuntime', () => {
   it('delegates acceptance only after trusted sender and exact payload validation', async () => {
     const inbox = service();
     const acceptance = {
-      accept: vi.fn().mockResolvedValue({ ok: true, value: { order: { id: PROCESSING_ORDER_ID } } }),
+      accept: vi
+        .fn()
+        .mockResolvedValue({ ok: true, value: { order: { id: PROCESSING_ORDER_ID } } }),
     };
-    const runtime = new OnlineOrderInboxIpcRuntime({ service: inbox, acceptance: acceptance as never });
+    const runtime = new OnlineOrderInboxIpcRuntime({
+      service: inbox,
+      acceptance: acceptance as never,
+    });
     runtime.register({ isDestroyed: () => false, webContents: { id: 77, send: vi.fn() } } as never);
     const event = { sender: { id: 77 } };
     const request = {

@@ -604,10 +604,10 @@ export function createOperationsOnlineOrderAcceptanceClient(): Pick<
   return {
     accept: async (request, confirmation) => {
       const runtime = await browserRuntime();
-      return new OperationsOnlineOrderAcceptanceService(
-        runtime.orders,
-        { now: () => instant(new Date()), createUuid: () => crypto.randomUUID() },
-      ).accept(request, confirmation);
+      return new OperationsOnlineOrderAcceptanceService(runtime.orders, {
+        now: () => instant(new Date()),
+        createUuid: () => crypto.randomUUID(),
+      }).accept(request, confirmation);
     },
   };
 }

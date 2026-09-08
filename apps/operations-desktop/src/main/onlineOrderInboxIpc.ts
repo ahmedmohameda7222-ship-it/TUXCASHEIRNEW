@@ -96,10 +96,7 @@ function paymentDraft(value: unknown): PaymentDraft {
       methodId: parseEntityId<PaymentMethodId>(
         uuid(payment['methodId'], 'Online-order payment method ID'),
       ),
-      cashReceivedMinor: nullableMoney(
-        payment['cashReceivedMinor'],
-        'Online-order cash received',
-      ),
+      cashReceivedMinor: nullableMoney(payment['cashReceivedMinor'], 'Online-order cash received'),
     };
   }
   if (mode === 'SPLIT') {
