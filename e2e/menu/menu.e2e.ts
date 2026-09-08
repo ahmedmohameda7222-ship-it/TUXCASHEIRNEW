@@ -309,7 +309,7 @@ test('network retry reuses the same idempotency key and does not clear the cart 
   await page.getByRole('button', { name: 'Place Order' }).click();
 
   await expect(page.getByText(/could not place your order/i)).toBeVisible();
-  await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+  await expect(page.locator('h4').filter({ hasText: 'Canonical Tux Burger' })).toBeVisible();
   await page.getByRole('button', { name: 'Place Order' }).click();
   await expect(page.getByText(/Order received/i)).toBeVisible();
 

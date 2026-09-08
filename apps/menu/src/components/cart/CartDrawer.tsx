@@ -192,8 +192,8 @@ export function CartDrawer() {
               <div>
                 <h3 className="text-2xl font-black text-white">Order received</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-300">
-                  Your order is pending confirmation. TUX will confirm the final order details before
-                  it is processed.
+                  Your order is pending confirmation. TUX will confirm the final order details
+                  before it is processed.
                 </p>
               </div>
               {pendingRequestId && (
