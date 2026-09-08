@@ -12,17 +12,18 @@ export interface ReviewedOnlineOrderItem {
 }
 
 function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function nonEmptyString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  return value;
 }
 
 function positiveInteger(value: unknown): number | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) return null;
+  return value;
 }
 
 function parseModifier(value: unknown): ReviewedModifier | null {
@@ -30,7 +31,8 @@ function parseModifier(value: unknown): ReviewedModifier | null {
   if (source === null) return null;
   const label = nonEmptyString(source.label);
   const quantity = positiveInteger(source.quantity);
-  return label === null || quantity === null ? null : { label, quantity };
+  if (label === null || quantity === null) return null;
+  return { label, quantity };
 }
 
 function parseItem(value: unknown): ReviewedOnlineOrderItem | null {
@@ -68,7 +70,8 @@ export function parseOnlineOrderRequestedItems(
 ): readonly ReviewedOnlineOrderItem[] | null {
   if (trustedItems.length === 0) return null;
   const items = trustedItems.map(parseItem);
-  return items.some((item) => item === null) ? null : (items as ReviewedOnlineOrderItem[]);
+  if (items.some((item) => item === null)) return null;
+  return items as ReviewedOnlineOrderItem[];
 }
 
 export function OnlineOrderRequestedItems({
