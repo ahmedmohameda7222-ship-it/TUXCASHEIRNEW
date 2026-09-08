@@ -94,9 +94,7 @@ export function OnlineOrderRequestedItems({
               {modifier.quantity} × {modifier.label}
             </p>
           ))}
-          {item.comboBeverageLabel === null ? null : (
-            <p>Combo drink: {item.comboBeverageLabel}</p>
-          )}
+          {item.comboBeverageLabel === null ? null : <p>Combo drink: {item.comboBeverageLabel}</p>}
           {item.note === null ? null : <p>Item note: {item.note}</p>}
         </div>
       ))}
