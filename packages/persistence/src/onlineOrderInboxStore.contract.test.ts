@@ -13,6 +13,7 @@ const otherShopId = parseEntityId<ShopId>('22222222-2222-4222-8222-222222222222'
 const requestId = '33333333-3333-4333-8333-333333333333';
 const secondRequestId = '44444444-4444-4444-8444-444444444444';
 const processingOrderId = '55555555-5555-4555-8555-555555555555';
+const processingDeviceId = '77777777-7777-4777-8777-777777777777';
 const directories: string[] = [];
 const indexedDbNames = new Set<string>();
 
@@ -58,6 +59,8 @@ function processing(): CachedOnlineOrderRequest {
     processingOrderId,
     processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
     processingExpiresAt: instant('2026-09-08T22:05:00.000Z'),
+    processingDeviceId,
+    reservationOriginDeviceId: processingDeviceId,
   };
 }
 
