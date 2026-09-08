@@ -116,11 +116,7 @@ function asBoundedString(value: unknown, path: string, maxLength: number): strin
   return value;
 }
 
-function asNullableBoundedString(
-  value: unknown,
-  path: string,
-  maxLength: number,
-): string | null {
+function asNullableBoundedString(value: unknown, path: string, maxLength: number): string | null {
   if (value === null) return null;
   return asBoundedString(value, path, maxLength);
 }
