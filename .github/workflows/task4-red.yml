@@ -1,0 +1,41 @@
+name: Task 4 RED
+
+on:
+  push:
+    branches:
+      - 'work/menu-online-orders-integration'
+    paths:
+      - '.github/workflows/task4-red.yml'
+      - 'packages/application/src/onlineOrderAcceptance.test.ts'
+
+permissions:
+  contents: write
+
+jobs:
+  targeted-red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format Task 4 RED spec
+        run: npx prettier --write packages/application/src/onlineOrderAcceptance.test.ts
+      - name: Commit formatter-only correction
+        shell: bash
+        run: |
+          if ! git diff --quiet -- packages/application/src/onlineOrderAcceptance.test.ts; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add packages/application/src/onlineOrderAcceptance.test.ts
+            git commit -m 'test(orders): format online-order acceptance RED'
+            git push origin HEAD:work/menu-online-orders-integration
+          fi
+      - name: Targeted Task 4 RED
+        run: npx vitest run packages/application/src/onlineOrderAcceptance.test.ts
