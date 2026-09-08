@@ -88,7 +88,8 @@ function parseClaimResponse(input: {
     throw new Error('Online-order claim response is invalid.');
   }
 
-  const { schemaVersion: _schemaVersion, ...cachedValue } = source;
+  const cachedValue = { ...source };
+  delete cachedValue.schemaVersion;
   const parsed = parseCachedOnlineOrderRequest(cachedValue);
   if (parsed.shopId !== input.expectedShopId) {
     throw new Error('Online-order claim response is for another shop.');
