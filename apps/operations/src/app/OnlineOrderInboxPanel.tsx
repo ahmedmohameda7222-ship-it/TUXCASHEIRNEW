@@ -16,6 +16,7 @@ import {
   type OnlineOrderInboxSnapshot,
 } from './onlineOrderInboxClient';
 import { BrowserOnlineOrderOperationsRemote } from './onlineOrderInboxSync';
+import { findBrowserCommittedOnlineOrder } from './browserOnlineOrderAcceptanceRecovery';
 import './OnlineOrderInboxPanel.css';
 
 const EMPTY_SNAPSHOT: OnlineOrderInboxSnapshot = {
@@ -113,6 +114,32 @@ function acceptanceClient(): OnlineOrderAcceptanceClient {
   return browserAcceptanceClient;
 }
 
+async function reconcileBrowserAcceptedOrders(requestId?: string): Promise<boolean> {
+  const store = await browserOnlineOrderInboxStore();
+  const state = await createOperationsSessionClient().getState();
+  if (!state.ok || state.value.status !== 'ACTIVE') {
+    throw new Error('Active worker session required for online-order review.');
+  }
+  const shopId = state.value.shopId;
+  let requests: readonly CachedOnlineOrderRequest[];
+  if (requestId === undefined) {
+    requests = await store.list(shopId);
+  } else {
+    const request = await store.get(shopId, requestId);
+    requests = request === null ? [] : [request];
+  }
+
+  let reconciled = false;
+  for (const request of requests) {
+    if (request.status !== 'PROCESSING' || request.processingOrderId === null) continue;
+    if (await findBrowserCommittedOnlineOrder(shopId, request.processingOrderId)) {
+      await store.markAccepted(shopId, request.requestId, request.processingOrderId);
+      reconciled = true;
+    }
+  }
+  return reconciled;
+}
+
 export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderInboxClient {
   const desktop = window.tuxDesktop?.onlineOrders;
   if (desktop !== undefined) {
@@ -123,13 +150,24 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
   }
 
   return {
-    load: async () => (await browserOnlineOrderInboxClient()).load(),
+    load: async () => {
+      await reconcileBrowserAcceptedOrders();
+      return (await browserOnlineOrderInboxClient()).load();
+    },
     claim: async (requestId) => (await browserOnlineOrderInboxClient()).claim(requestId),
-    release: async (requestId, processingOrderId) =>
-      (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId),
-    reject: async (requestId, processingOrderId, reason) =>
-      (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason),
+    release: async (requestId, processingOrderId) => {
+      const reconciled = await reconcileBrowserAcceptedOrders(requestId);
+      if (reconciled) throw new Error('Online order has already been accepted locally.');
+      return (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId);
+    },
+    reject: async (requestId, processingOrderId, reason) => {
+      const reconciled = await reconcileBrowserAcceptedOrders(requestId);
+      if (reconciled) throw new Error('Online order has already been accepted locally.');
+      return (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason);
+    },
     accept: async (request, confirmation) => {
+      const reconciled = await reconcileBrowserAcceptedOrders(request.requestId);
+      if (reconciled) throw new Error('Online order has already been accepted locally.');
       const store = await browserOnlineOrderInboxStore();
       const state = await createOperationsSessionClient().getState();
       if (!state.ok || state.value.status !== 'ACTIVE') {
