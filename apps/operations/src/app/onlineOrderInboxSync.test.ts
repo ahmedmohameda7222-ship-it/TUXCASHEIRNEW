@@ -15,6 +15,7 @@ const REQUEST_A = '33333333-3333-4333-8333-333333333333';
 const REQUEST_B = '44444444-4444-4444-8444-444444444444';
 const REQUEST_C = '55555555-5555-4555-8555-555555555555';
 const PROCESSING_ORDER = '66666666-6666-4666-8666-666666666666';
+const DEVICE_ID = '88888888-8888-4888-8888-888888888888';
 
 function cachedRequest(
   requestId: string,
@@ -48,6 +49,8 @@ function processingRequest(requestId = REQUEST_A, shopId = SHOP_A): CachedOnline
     processingOrderId: PROCESSING_ORDER,
     processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
     processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+    processingDeviceId: DEVICE_ID,
+    reservationOriginDeviceId: DEVICE_ID,
   });
 }
 
@@ -239,6 +242,8 @@ describe('online order review lifecycle', () => {
       processingOrderId: null,
       processingStartedAt: null,
       processingExpiresAt: null,
+      processingDeviceId: null,
+      reservationOriginDeviceId: null,
     });
     expect((await store.list(SHOP_A))[0]).toEqual(released);
     expect(store.upsertCalls).toBe(1);
