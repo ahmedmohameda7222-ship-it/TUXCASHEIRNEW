@@ -1,18 +1,20 @@
-import { Switch, Route } from 'wouter';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { Switch, Route, Router as WouterRouter } from 'wouter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { queryClient } from './lib/queryClient';
-import { CartProvider } from './context/CartContext';
-import { MenuProvider, useMenu } from './context/MenuContext';
-import Navbar from './components/Navbar';
-import CartDrawer from './components/cart/CartDrawer';
-import Footer from './components/Footer';
-import Home from './pages/Home';
-import About from './pages/About';
-import OrderNow from './pages/OrderNow';
-import ProductCategoryPage from './pages/ProductCategoryPage';
-import NotFound from './pages/not-found';
+import NotFound from '@/pages/not-found';
+import { PageTransitionProvider } from '@/components/PageTransition';
+import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
+import { CartProvider } from '@/context/CartContext';
+import { MenuProvider, useMenu } from '@/context/MenuContext';
+import { CartDrawer } from '@/components/cart/CartDrawer';
+import { StickyCartBar } from '@/components/cart/StickyCartBar';
+import Home from '@/pages/Home';
+import OrderNow from '@/pages/OrderNow';
+import ProductCategoryPage from '@/pages/ProductCategoryPage';
+
+const queryClient = new QueryClient();
 
 function CanonicalCategoryRoute({ slug }: { slug: string }) {
   const { sections } = useMenu();
@@ -23,7 +25,6 @@ function CanonicalCategoryRoute({ slug }: { slug: string }) {
 function CatalogAvailabilityBanner() {
   const { error } = useMenu();
   if (!error) return null;
-
   return (
     <div
       role="alert"
@@ -36,33 +37,27 @@ function CatalogAvailabilityBanner() {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/about" component={About} />
-      <Route path="/order-now" component={OrderNow} />
-      <Route path="/tux-burger">
-        <CanonicalCategoryRoute slug="tux-burger" />
-      </Route>
-      <Route path="/tuxify">
-        <CanonicalCategoryRoute slug="tuxify" />
-      </Route>
-      <Route path="/hawawshi">
-        <CanonicalCategoryRoute slug="hawawshi" />
-      </Route>
-      <Route path="/fries">
-        <CanonicalCategoryRoute slug="fries" />
-      </Route>
-      <Route path="/combos">
-        <CanonicalCategoryRoute slug="combos" />
-      </Route>
-      <Route path="/drinks">
-        <CanonicalCategoryRoute slug="drinks" />
-      </Route>
-      <Route path="/products/:slug">
-        {(params) => <CanonicalCategoryRoute slug={params.slug} />}
-      </Route>
-      <Route component={NotFound} />
-    </Switch>
+    <div className="flex flex-col min-h-screen bg-black text-white selection:bg-[#D4AF37] selection:text-black">
+      <Navbar />
+      <CatalogAvailabilityBanner />
+      <main className="flex-grow">
+        <Switch>
+          <Route path="/" component={Home} />
+          <Route path="/order-now" component={OrderNow} />
+          <Route path="/tux-burger">
+            {() => <CanonicalCategoryRoute slug="tux-burger" />}
+          </Route>
+          <Route path="/tuxify">{() => <CanonicalCategoryRoute slug="tuxify" />}</Route>
+          <Route path="/hawawshi">{() => <CanonicalCategoryRoute slug="hawawshi" />}</Route>
+          <Route path="/fries">{() => <CanonicalCategoryRoute slug="fries" />}</Route>
+          <Route path="/combos">{() => <CanonicalCategoryRoute slug="combos" />}</Route>
+          <Route path="/drinks">{() => <CanonicalCategoryRoute slug="drinks" />}</Route>
+          <Route path="/products/:slug" component={ProductCategoryPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </main>
+      <Footer />
+    </div>
   );
 }
 
@@ -72,15 +67,13 @@ function App() {
       <TooltipProvider>
         <MenuProvider>
           <CartProvider>
-            <div className="min-h-screen bg-black text-white font-sans selection:bg-[#D4AF37] selection:text-black">
-              <Navbar />
-              <CatalogAvailabilityBanner />
-              <main>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+              <PageTransitionProvider>
                 <Router />
-              </main>
-              <Footer />
-              <CartDrawer />
-            </div>
+              </PageTransitionProvider>
+            </WouterRouter>
+            <CartDrawer />
+            <StickyCartBar />
             <Toaster />
           </CartProvider>
         </MenuProvider>
