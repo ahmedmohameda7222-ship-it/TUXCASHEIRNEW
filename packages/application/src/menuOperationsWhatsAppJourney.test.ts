@@ -138,7 +138,13 @@ class MemoryIntakeStore implements OnlineOrderIntakeStore {
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly catalog: OnlineOrderCatalogAuthority = {
     shop: { id: SHOP_ID, active: true },
-    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: true }],
+    categories: [
+      {
+        id: CATEGORY_ID,
+        shopId: SHOP_ID,
+        active: true,
+      },
+    ],
     products: [
       {
         id: PRODUCT_ID,
