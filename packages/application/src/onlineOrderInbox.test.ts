@@ -23,8 +23,10 @@ function request(status: 'PENDING' | 'PROCESSING' = 'PENDING'): CachedOnlineOrde
     orderNote: null,
     createdAt: instant('2026-09-08T10:00:00.000Z'),
     processingOrderId: status === 'PROCESSING' ? PROCESSING_ORDER_ID : null,
-    processingStartedAt: status === 'PROCESSING' ? instant('2026-09-08T10:05:00.000Z') : null,
-    processingExpiresAt: status === 'PROCESSING' ? instant('2026-09-08T10:15:00.000Z') : null,
+    processingStartedAt:
+      status === 'PROCESSING' ? instant('2026-09-08T10:05:00.000Z') : null,
+    processingExpiresAt:
+      status === 'PROCESSING' ? instant('2026-09-08T10:15:00.000Z') : null,
   };
 }
 
@@ -66,7 +68,11 @@ describe('OperationsOnlineOrderInboxService', () => {
       syncState: 'REMOTE_UNAVAILABLE',
     });
     expect(published).toHaveLength(2);
-    expect(published[0]).toEqual({ requests: [request()], syncState: 'CACHED', errorMessage: null });
+    expect(published[0]).toEqual({
+      requests: [request()],
+      syncState: 'CACHED',
+      errorMessage: null,
+    });
   });
 
   it('uses one validated lifecycle for claim, release, and reject', async () => {
