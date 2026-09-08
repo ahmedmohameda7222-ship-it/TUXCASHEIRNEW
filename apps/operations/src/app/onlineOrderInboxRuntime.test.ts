@@ -139,8 +139,6 @@ describe('online-order inbox runtime', () => {
     expect(getActiveShopId).toHaveBeenCalledTimes(1);
     expect(remote.claim).toHaveBeenCalledWith(REQUEST_ID);
     expect(await store.list(SHOP_ID)).toEqual([claimed]);
-    expect(published).toEqual([
-      { requests: [claimed], syncState: 'SYNCED', errorMessage: null },
-    ]);
+    expect(published).toEqual([{ requests: [claimed], syncState: 'SYNCED', errorMessage: null }]);
   });
 });
