@@ -43,6 +43,35 @@ function parseOnlineOrderInboxSnapshot(
   });
 }
 
+async function requestJson(
+  method: 'GET' | 'POST',
+  url: string,
+  body?: Readonly<Record<string, unknown>>,
+): Promise<unknown> {
+  const response = await fetch(url, {
+    method,
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers:
+      body === undefined
+        ? { accept: 'application/json' }
+        : { accept: 'application/json', 'content-type': 'application/json' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error('Online-order Operations remote returned invalid JSON.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Online-order Operations remote failed with HTTP ${response.status}.`);
+  }
+  return payload;
+}
+
 export async function syncOnlineOrderInboxSnapshot(input: {
   readonly shopId: ShopId;
   readonly store: OnlineOrderInboxStore;
@@ -65,24 +94,32 @@ export async function syncOnlineOrderInboxSnapshot(input: {
 
 export class BrowserOnlineOrderOperationsRemote implements OnlineOrderOperationsRemote {
   async fetchActiveRequests(limit: number): Promise<unknown> {
-    const url = `${window.location.origin}/api/online-order-operations?limit=${encodeURIComponent(String(limit))}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: { accept: 'application/json' },
+    return requestJson(
+      'GET',
+      `${window.location.origin}/api/online-order-operations?limit=${encodeURIComponent(String(limit))}`,
+    );
+  }
+
+  async claim(requestId: string): Promise<unknown> {
+    return requestJson('POST', `${window.location.origin}/api/online-order-operations`, {
+      action: 'CLAIM',
+      requestId,
     });
+  }
 
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new Error('Online-order Operations remote returned invalid JSON.');
-    }
+  async release(requestId: string, processingOrderId: string): Promise<unknown> {
+    return requestJson('POST', `${window.location.origin}/api/online-order-operations`, {
+      action: 'RELEASE',
+      requestId,
+      processingOrderId,
+    });
+  }
 
-    if (!response.ok) {
-      throw new Error(`Online-order Operations remote failed with HTTP ${response.status}.`);
-    }
-    return payload;
+  async reject(requestId: string, reason: string): Promise<unknown> {
+    return requestJson('POST', `${window.location.origin}/api/online-order-operations`, {
+      action: 'REJECT',
+      requestId,
+      reason,
+    });
   }
 }
