@@ -59,7 +59,10 @@ function hasExactKeys(
   return Object.keys(source).every((key) => accepted.has(key));
 }
 
-function parseSnapshot(value: unknown, expectedShopId: ShopId): readonly CachedOnlineOrderRequest[] {
+function parseSnapshot(
+  value: unknown,
+  expectedShopId: ShopId,
+): readonly CachedOnlineOrderRequest[] {
   const source = record(value, 'Online-order inbox snapshot');
   if (!hasExactKeys(source, ['schemaVersion', 'requests']) || source.schemaVersion !== 1) {
     throw new Error('Online-order inbox snapshot is invalid.');
