@@ -31,6 +31,7 @@ const ZONE_ID = parseEntityId<DeliveryZoneId>('88888888-8888-4888-8888-888888888
 const CASH_ID = parseEntityId<PaymentMethodId>('99999999-9999-4999-8999-999999999999');
 const REQUEST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PROCESSING_ORDER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const DEVICE_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const AT = instant('2026-09-08T16:00:00.000Z');
 
 const CONFIGURATION: OperationsConfigurationSnapshot = {
@@ -126,6 +127,8 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
     processingOrderId: PROCESSING_ORDER_ID,
     processingStartedAt: AT,
     processingExpiresAt: instant('2026-09-08T22:00:00.000Z'),
+    processingDeviceId: DEVICE_ID,
+    reservationOriginDeviceId: DEVICE_ID,
     ...overrides,
   };
 }
