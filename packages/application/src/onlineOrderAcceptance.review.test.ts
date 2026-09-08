@@ -41,9 +41,7 @@ function configuration(): OperationsConfigurationSnapshot {
     shopId: SHOP_ID,
     version: 12,
     updatedAt: AT,
-    categories: [
-      { id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true },
-    ],
+    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true }],
     products: [
       {
         id: PRODUCT_ID,
