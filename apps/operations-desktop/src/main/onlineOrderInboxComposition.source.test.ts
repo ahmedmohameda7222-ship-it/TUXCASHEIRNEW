@@ -17,10 +17,12 @@ describe('Electron online-order inbox composition', () => {
     expect(source).toContain('getActiveShopId: resolveOnlineOrderInboxShopId');
   });
 
-  it('keeps remote unavailability non-blocking and wires the narrow IPC runtime lifecycle', () => {
+  it('keeps remote unavailability non-blocking and wires inbox plus acceptance through the narrow IPC runtime lifecycle', () => {
     expect(source).toContain('unavailableOnlineOrderInboxRemote');
+    expect(source).toContain('new OnlineOrderInboxIpcRuntime({');
+    expect(source).toContain('service: onlineOrderInboxService');
     expect(source).toContain(
-      'new OnlineOrderInboxIpcRuntime({ service: onlineOrderInboxService })',
+      'acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime)',
     );
     expect(source).toContain('onlineOrderInboxIpcRuntime.register(window)');
     expect(source).toContain('onlineOrderInboxIpcRuntime?.close()');
