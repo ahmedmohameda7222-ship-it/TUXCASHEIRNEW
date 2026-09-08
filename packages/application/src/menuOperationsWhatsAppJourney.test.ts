@@ -65,15 +65,7 @@ const CONFIGURATION: OperationsConfigurationSnapshot = {
   shopId: SHOP_ID,
   version: 1,
   updatedAt: AT,
-  categories: [
-    {
-      id: CATEGORY_ID,
-      shopId: SHOP_ID,
-      name: 'Burgers',
-      sortOrder: 0,
-      active: true,
-    },
-  ],
+  categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true }],
   products: [
     {
       id: PRODUCT_ID,
@@ -138,13 +130,7 @@ class MemoryIntakeStore implements OnlineOrderIntakeStore {
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly catalog: OnlineOrderCatalogAuthority = {
     shop: { id: SHOP_ID, active: true },
-    categories: [
-      {
-        id: CATEGORY_ID,
-        shopId: SHOP_ID,
-        active: true,
-      },
-    ],
+    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: true }],
     products: [
       {
         id: PRODUCT_ID,
