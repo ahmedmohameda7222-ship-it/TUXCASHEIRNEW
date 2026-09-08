@@ -58,9 +58,9 @@ insert into public.online_order_requests(
   fulfillment_preference, payment_preference, customer_name, normalized_phone,
   delivery_address, trusted_items, items_subtotal_minor, order_note
 ) values (
-  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+  '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
   '15111111-1111-4111-8111-111111111111',
-  '15dddddddddd-4ddd-8ddd-dddddddddddd'::uuid,
+  '15dddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid,
   repeat('a', 64),
   repeat('b', 64),
   'PENDING',
@@ -79,8 +79,8 @@ insert into public.online_order_requests(
 insert into private.online_order_processing_reservations(
   processing_order_id, request_id, shop_id, reserved_at
 ) values (
-  '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
-  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+  '15bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
+  '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
   '15111111-1111-4111-8111-111111111111'::uuid,
   '2026-09-08T08:05:00Z'
 );
@@ -96,11 +96,11 @@ insert into public.orders(
   items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
   recognized_revenue_minor, collected_payment_minor
 ) values (
-  '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
+  '15bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
   '15111111-1111-4111-8111-111111111111'::uuid,
   '15333333-3333-4333-8333-333333333333'::uuid,
   1,
-  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'ONLINE',
   'ACTIVE',
   '15222222-2222-4222-8222-222222222222'::uuid,
@@ -134,12 +134,12 @@ begin
   select status, accepted_order_id
   into v_status, v_order_id
   from public.online_order_requests
-  where id = '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+  where id = '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
 
   if v_status <> 'ACCEPTED' then
     raise exception 'historically reserved delayed order did not resolve request: %', v_status;
   end if;
-  if v_order_id is distinct from '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid then
+  if v_order_id is distinct from '15bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid then
     raise exception 'accepted order identity did not preserve historical reservation';
   end if;
 end $$;
