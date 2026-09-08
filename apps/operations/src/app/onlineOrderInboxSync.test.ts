@@ -129,7 +129,9 @@ describe('syncOnlineOrderInboxSnapshot', () => {
     await store.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
     store.upsertCalls = 0;
     const remote = {
-      fetchActiveRequests: vi.fn().mockResolvedValue(remoteSnapshot([cachedRequest(REQUEST_B, SHOP_B)])),
+      fetchActiveRequests: vi
+        .fn()
+        .mockResolvedValue(remoteSnapshot([cachedRequest(REQUEST_B, SHOP_B)])),
     };
 
     await expect(syncOnlineOrderInboxSnapshot({ shopId: SHOP_A, store, remote })).rejects.toThrow(
