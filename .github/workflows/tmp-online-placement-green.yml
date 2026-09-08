@@ -1,0 +1,61 @@
+name: Temporary online placement GREEN
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+    paths:
+      - .github/workflows/tmp-online-placement-green.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement-online-placement:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply narrow placement-origin implementation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/application/src/orders.ts')
+          source = path.read_text()
+          replacements = [
+              (
+                  "  async placeOrder(draft: OrderDraft): Promise<OrderPlacementResult> {",
+                  "  async placeOrder(\n    draft: OrderDraft,\n    placement: { readonly source: 'POS' } | { readonly source: 'ONLINE'; readonly orderId: OrderId } = {\n      source: 'POS',\n    },\n  ): Promise<OrderPlacementResult> {",
+              ),
+              (
+                  "            const orderId = this.#id<OrderId>();",
+                  "            const orderId =\n              placement.source === 'ONLINE' ? placement.orderId : this.#id<OrderId>();",
+              ),
+              ("              source: 'POS',", "              source: placement.source,"),
+          ]
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match for {old!r}, found {count}')
+              source = source.replace(old, new, 1)
+          path.write_text(source)
+          PY
+          npx prettier --write packages/application/src/orders.ts
+          git diff --check
+          git diff -- packages/application/src/orders.ts
+      - name: Commit implementation only
+        shell: bash
+        run: |
+          git config user.name 'tux-ci'
+          git config user.email 'tux-ci@users.noreply.github.com'
+          git add packages/application/src/orders.ts
+          git diff --cached --quiet && exit 1
+          git commit -m 'feat(orders): support reserved ONLINE placement identity'
+          git push origin HEAD:work/menu-online-orders-integration
