@@ -88,7 +88,7 @@ describe('online order intake transport contract', () => {
     ['variantId', 'local-only-variant-id'],
   ])('rejects unexpected line authority field %s', (field, value) => {
     const request = validRequest();
-    request.items = [{ ...request.items[0], [field]: value }];
+    request.items = [{ ...request.items[0]!, [field]: value }];
 
     expect(() => parseOnlineOrderRequestV1(request)).toThrow(OnlineOrderIntakeContractError);
   });
