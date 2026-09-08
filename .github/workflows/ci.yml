@@ -135,6 +135,8 @@ jobs:
           supabase/functions/catalog-admin/catalog-admin.deno.ts
       - name: Public online-order intake behavioral tests
         run: deno test scripts/order-intake.deno.ts
+      - name: Authenticated online-order Operations behavioral tests
+        run: deno test scripts/online-order-operations.deno.ts
 
   windows-package:
     name: windows-package
