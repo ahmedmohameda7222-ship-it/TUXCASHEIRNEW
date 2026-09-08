@@ -17,6 +17,10 @@ import {
 } from './onlineOrderInboxClient';
 import { BrowserOnlineOrderOperationsRemote } from './onlineOrderInboxSync';
 import { findBrowserCommittedOnlineOrder } from './browserOnlineOrderAcceptanceRecovery';
+import {
+  OnlineOrderRequestedItems,
+  parseOnlineOrderRequestedItems,
+} from './OnlineOrderRequestedItems';
 import './OnlineOrderInboxPanel.css';
 
 const EMPTY_SNAPSHOT: OnlineOrderInboxSnapshot = {
@@ -433,6 +437,7 @@ export function OnlineOrderInboxPanel({
             const isBusy = busyRequestId === request.requestId;
             const isProcessing = request.status === 'PROCESSING';
             const facts = missingFacts(request);
+            const requestedItems = parseOnlineOrderRequestedItems(request.trustedItems);
             const acceptanceWorkspace = acceptanceWorkspaces[request.requestId];
             const acceptanceError = acceptanceErrors[request.requestId] ?? null;
             const acceptedLocally = acceptedRequestIds.has(request.requestId);
@@ -474,9 +479,18 @@ export function OnlineOrderInboxPanel({
 
                 {request.normalizedPhone === null ? null : <p>{request.normalizedPhone}</p>}
                 {request.deliveryAddress === null ? null : <p>{request.deliveryAddress}</p>}
-                <p className="online-order-item-count">
-                  {request.trustedItems.length} canonical item line(s) received
-                </p>
+                {requestedItems === null ? (
+                  <div className="online-order-warning" role="alert">
+                    Requested item details are unavailable; this request cannot be accepted yet.
+                  </div>
+                ) : (
+                  <>
+                    <p className="online-order-item-count">
+                      {requestedItems.length} canonical item line(s) received
+                    </p>
+                    <OnlineOrderRequestedItems items={requestedItems} />
+                  </>
+                )}
                 {request.orderNote === null ? null : (
                   <p className="board-note">Customer note: {request.orderNote}</p>
                 )}
@@ -543,7 +557,11 @@ export function OnlineOrderInboxPanel({
                         Reject
                       </button>
                     </div>
-                    {acceptanceError !== null ? (
+                    {requestedItems === null ? (
+                      <p className="online-order-item-count">
+                        Reviewable item details are required before acceptance.
+                      </p>
+                    ) : acceptanceError !== null ? (
                       <div className="board-inline-error" role="alert">
                         {acceptanceError}
                       </div>
