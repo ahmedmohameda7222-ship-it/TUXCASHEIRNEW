@@ -9,7 +9,7 @@ const cartSource = readFileSync(new URL('../context/CartContext.tsx', import.met
 
 describe('checkout completion durability', () => {
   it('durably empties the persisted cart before clearing the checkout idempotency key', () => {
-    const clearCartBody = cartSource.match(/const clearCart = \(\) => \{[\s\S]*?\n  \};/)?.[0];
+    const clearCartBody = cartSource.match(/const clearCart = \(\) => \{[\s\S]*?\n\s{2}\};/)?.[0];
     expect(clearCartBody).toBeDefined();
     expect(clearCartBody).toContain("localStorage.setItem('tux-cart', JSON.stringify([]))");
     expect(
