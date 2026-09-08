@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+const SHOP_ID = '11111111-1111-4111-8111-111111111111';
+const CATALOG_URL = 'https://catalog.test/functions/v1/catalog-public';
+
 export default defineConfig({
   testDir: './e2e/menu',
   testMatch: /.*\.e2e\.ts/,
@@ -22,5 +25,10 @@ export default defineConfig({
     url: 'http://127.0.0.1:4174',
     timeout: 120_000,
     reuseExistingServer: !process.env['CI'],
+    env: {
+      ...process.env,
+      VITE_CATALOG_PUBLIC_URL: CATALOG_URL,
+      VITE_TUX_SHOP_ID: SHOP_ID,
+    },
   },
 });
