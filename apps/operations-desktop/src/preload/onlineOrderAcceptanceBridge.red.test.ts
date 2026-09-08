@@ -30,7 +30,8 @@ beforeEach(async () => {
 
 describe('online-order acceptance preload bridge', () => {
   it('exposes one validated onlineOrders.accept method through Electron IPC', async () => {
-    const onlineOrders = (harness.exposed as { onlineOrders?: Record<string, unknown> }).onlineOrders;
+    const onlineOrders = (harness.exposed as { onlineOrders?: Record<string, unknown> })
+      .onlineOrders;
     expect(typeof onlineOrders?.accept).toBe('function');
   });
 });
