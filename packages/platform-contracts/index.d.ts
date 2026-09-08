@@ -122,8 +122,12 @@ export type TuxEndDayApi = Pick<
 export type TuxOnlineOrdersApi = Pick<
   OperationsOnlineOrderInboxService,
   'load' | 'claim' | 'release' | 'reject' | 'subscribe'
-> &
-  Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;
+> & {
+  readonly accept: (
+    requestId: string,
+    confirmation: Parameters<OperationsOnlineOrderAcceptanceService['accept']>[1],
+  ) => ReturnType<OperationsOnlineOrderAcceptanceService['accept']>;
+};
 
 export type TuxWhatsAppApi = Pick<
   OperationsWhatsAppService,

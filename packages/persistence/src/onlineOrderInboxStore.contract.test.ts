@@ -147,3 +147,41 @@ describe('IndexedDbOnlineOrderInboxStore', () => {
     await reopened.close();
   });
 });
+
+describe('accepted online-order tombstones', () => {
+  it('SQLite keeps a locally accepted request hidden across restart and remote re-upsert', async () => {
+    const path = sqlitePath();
+    const store = new SqliteOnlineOrderInboxStore(path);
+    await store.initialize();
+    await store.upsertMany([processing()]);
+    await store.markAccepted(shopId, requestId, processingOrderId);
+    expect(await store.get(shopId, requestId)).toBeNull();
+    expect(await store.list(shopId)).toEqual([]);
+    await store.close();
+
+    const reopened = new SqliteOnlineOrderInboxStore(path);
+    await reopened.initialize();
+    await reopened.upsertMany([processing()]);
+    expect(await reopened.get(shopId, requestId)).toBeNull();
+    expect(await reopened.list(shopId)).toEqual([]);
+    await reopened.close();
+  });
+
+  it('IndexedDB keeps a locally accepted request hidden across restart and remote re-upsert', async () => {
+    const name = indexedDbName();
+    const store = new IndexedDbOnlineOrderInboxStore(name);
+    await store.initialize();
+    await store.upsertMany([processing()]);
+    await store.markAccepted(shopId, requestId, processingOrderId);
+    expect(await store.get(shopId, requestId)).toBeNull();
+    expect(await store.list(shopId)).toEqual([]);
+    await store.close();
+
+    const reopened = new IndexedDbOnlineOrderInboxStore(name);
+    await reopened.initialize();
+    await reopened.upsertMany([processing()]);
+    expect(await reopened.get(shopId, requestId)).toBeNull();
+    expect(await reopened.list(shopId)).toEqual([]);
+    await reopened.close();
+  });
+});

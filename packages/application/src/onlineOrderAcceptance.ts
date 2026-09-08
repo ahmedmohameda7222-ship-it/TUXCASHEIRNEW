@@ -309,7 +309,10 @@ export function prepareOnlineOrderAcceptanceDraft(
       unitPriceMinor: item.unitPriceMinor,
       quantity: item.quantity,
       modifiers: item.modifiers,
-      comboBeverages: item.comboBeverage === null ? [] : [item.comboBeverage],
+      comboBeverages:
+        item.comboBeverage === null
+          ? []
+          : Array.from({ length: item.quantity }, () => item.comboBeverage!),
       itemNote: item.note,
       addedSequence: index + 1,
     };

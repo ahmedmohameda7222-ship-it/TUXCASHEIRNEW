@@ -24,10 +24,16 @@ const EMPTY_SNAPSHOT: OnlineOrderInboxSnapshot = {
   errorMessage: null,
 };
 
-type OnlineOrderAcceptanceClient = Pick<TuxOnlineOrdersApi, 'accept'>;
+type OnlineOrderAcceptanceClient = {
+  accept(
+    request: CachedOnlineOrderRequest,
+    confirmation: OnlineOrderAcceptanceConfirmation,
+  ): ReturnType<TuxOnlineOrdersApi['accept']>;
+};
 export type OperationsOnlineOrderInboxClient = OnlineOrderInboxRuntimeClient &
   OnlineOrderAcceptanceClient;
 
+let browserStorePromise: Promise<IndexedDbOnlineOrderInboxStore> | null = null;
 let browserClientPromise: Promise<OnlineOrderInboxRuntimeClient> | null = null;
 let browserAcceptanceClient: OnlineOrderAcceptanceClient | null = null;
 
@@ -70,6 +76,16 @@ function missingFacts(request: CachedOnlineOrderRequest): readonly string[] {
   ];
 }
 
+async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInboxStore> {
+  if (browserStorePromise === null) {
+    browserStorePromise = (async () => {
+      const store = await browserOnlineOrderInboxStore();
+      return store;
+    })();
+  }
+  return browserStorePromise;
+}
+
 async function browserOnlineOrderInboxClient(): Promise<OnlineOrderInboxRuntimeClient> {
   if (browserClientPromise === null) {
     browserClientPromise = (async () => {
@@ -99,7 +115,12 @@ function acceptanceClient(): OnlineOrderAcceptanceClient {
 
 export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderInboxClient {
   const desktop = window.tuxDesktop?.onlineOrders;
-  if (desktop !== undefined) return desktop;
+  if (desktop !== undefined) {
+    return {
+      ...desktop,
+      accept: (request, confirmation) => desktop.accept(request.requestId, confirmation),
+    };
+  }
 
   return {
     load: async () => (await browserOnlineOrderInboxClient()).load(),
@@ -108,7 +129,26 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
       (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId),
     reject: async (requestId, processingOrderId, reason) =>
       (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason),
-    accept: async (request, confirmation) => acceptanceClient().accept(request, confirmation),
+    accept: async (request, confirmation) => {
+      const store = await browserOnlineOrderInboxStore();
+      const state = await createOperationsSessionClient().getState();
+      if (!state.ok || state.value.status !== 'ACTIVE') {
+        throw new Error('Active worker session required for online-order acceptance.');
+      }
+      const trusted = await store.get(state.value.shopId, request.requestId);
+      if (
+        trusted === null ||
+        trusted.status !== 'PROCESSING' ||
+        trusted.processingOrderId === null
+      ) {
+        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
+      }
+      const result = await acceptanceClient().accept(trusted, confirmation);
+      if (result.ok) {
+        await store.markAccepted(state.value.shopId, trusted.requestId, trusted.processingOrderId);
+      }
+      return result;
+    },
     subscribe: (listener) => {
       let active = true;
       let unsubscribe = (): void => undefined;

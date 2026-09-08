@@ -430,6 +430,8 @@ async function initializeOperationsServices(): Promise<void> {
   onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({
     service: onlineOrderInboxService,
     acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime),
+    acceptanceStore: onlineOrderInboxStore,
+    getActiveShopId: resolveOnlineOrderInboxShopId,
   });
   ordersBoardService = new OperationsOrdersBoardService(
     operationsDatabase,

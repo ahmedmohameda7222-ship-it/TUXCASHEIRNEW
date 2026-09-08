@@ -12,8 +12,9 @@ import {
   type OrderTypeId,
   type PaymentDraft,
   type PaymentMethodId,
+  type ShopId,
 } from '@tux/domain';
-import { parseCachedOnlineOrderRequest } from '@tux/persistence';
+import type { CachedOnlineOrderRequest } from '@tux/persistence';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { assertTrustedIpcSender } from './security';
@@ -40,6 +41,10 @@ type OnlineOrderInboxService = Pick<
   'load' | 'claim' | 'release' | 'reject' | 'subscribe'
 >;
 type OnlineOrderAcceptanceService = Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;
+type OnlineOrderAcceptanceStore = {
+  get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;
+  markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;
+};
 
 function objectPayload(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -151,14 +156,20 @@ function acceptanceConfirmation(value: unknown): OnlineOrderAcceptanceConfirmati
 export class OnlineOrderInboxIpcRuntime {
   readonly #service: OnlineOrderInboxService;
   readonly #acceptance: OnlineOrderAcceptanceService | null;
+  readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;
+  readonly #getActiveShopId: (() => Promise<ShopId>) | null;
   #unsubscribe: (() => void) | null = null;
 
   constructor(input: {
     readonly service: OnlineOrderInboxService;
     readonly acceptance?: OnlineOrderAcceptanceService;
+    readonly acceptanceStore?: OnlineOrderAcceptanceStore;
+    readonly getActiveShopId?: () => Promise<ShopId>;
   }) {
     this.#service = input.service;
     this.#acceptance = input.acceptance ?? null;
+    this.#acceptanceStore = input.acceptanceStore ?? null;
+    this.#getActiveShopId = input.getActiveShopId ?? null;
   }
 
   register(window: BrowserWindow): void {
@@ -200,14 +211,32 @@ export class OnlineOrderInboxIpcRuntime {
     ipcMain.handle(IPC_ONLINE_ORDERS_ACCEPT, async (event, rawInput: unknown) => {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order acceptance');
-      exactKeys(input, ['request', 'confirmation'], 'Online-order acceptance');
-      if (this.#acceptance === null) {
+      exactKeys(input, ['requestId', 'confirmation'], 'Online-order acceptance');
+      if (
+        this.#acceptance === null ||
+        this.#acceptanceStore === null ||
+        this.#getActiveShopId === null
+      ) {
         throw new Error('Online-order acceptance service is not configured.');
       }
-      return this.#acceptance.accept(
-        parseCachedOnlineOrderRequest(input['request']),
+      const requestId = uuid(input['requestId'], 'Online-order request ID');
+      const shopId = await this.#getActiveShopId();
+      const request = await this.#acceptanceStore.get(shopId, requestId);
+      if (
+        request === null ||
+        request.status !== 'PROCESSING' ||
+        request.processingOrderId === null
+      ) {
+        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
+      }
+      const result = await this.#acceptance.accept(
+        request,
         acceptanceConfirmation(input['confirmation']),
       );
+      if (result.ok) {
+        await this.#acceptanceStore.markAccepted(shopId, requestId, request.processingOrderId);
+      }
+      return result;
     });
 
     this.#unsubscribe = this.#service.subscribe((snapshot: OnlineOrderInboxSnapshot) => {

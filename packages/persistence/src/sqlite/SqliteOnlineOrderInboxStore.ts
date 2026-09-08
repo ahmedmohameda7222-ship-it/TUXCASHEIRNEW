@@ -55,6 +55,17 @@ CREATE TABLE IF NOT EXISTS online_order_inbox (
 CREATE INDEX IF NOT EXISTS idx_online_order_inbox_shop_created
   ON online_order_inbox(shop_id, created_at, request_id);`,
     );
+    this.#applyMigration(
+      2,
+      'online_order_acceptance_tombstones',
+      `
+CREATE TABLE IF NOT EXISTS online_order_acceptance_tombstones (
+  shop_id TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  processing_order_id TEXT NOT NULL,
+  PRIMARY KEY (shop_id, request_id)
+);`,
+    );
     this.#initialized = true;
   }
 
@@ -71,6 +82,12 @@ CREATE INDEX IF NOT EXISTS idx_online_order_inbox_shop_created
     );
     this.#transaction(() => {
       for (const request of validated) {
+        const accepted = this.#database
+          .prepare(
+            'SELECT 1 FROM online_order_acceptance_tombstones WHERE shop_id = ? AND request_id = ?',
+          )
+          .get(request.shopId, request.requestId);
+        if (accepted !== undefined) continue;
         statement.run(
           request.shopId,
           request.requestId,
@@ -88,10 +105,48 @@ CREATE INDEX IF NOT EXISTS idx_online_order_inbox_shop_created
         `SELECT request_id, payload_json
          FROM online_order_inbox
          WHERE shop_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM online_order_acceptance_tombstones accepted
+             WHERE accepted.shop_id = online_order_inbox.shop_id
+               AND accepted.request_id = online_order_inbox.request_id
+           )
          ORDER BY created_at ASC, request_id ASC`,
       )
       .all(shopId) as unknown as InboxRow[];
     return rows.map((row) => parseRow(row, shopId));
+  }
+
+  async get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null> {
+    this.#assertInitialized();
+    const row = this.#database
+      .prepare(
+        `SELECT request_id, payload_json
+         FROM online_order_inbox
+         WHERE shop_id = ? AND request_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM online_order_acceptance_tombstones accepted
+             WHERE accepted.shop_id = online_order_inbox.shop_id
+               AND accepted.request_id = online_order_inbox.request_id
+           )`,
+      )
+      .get(shopId, requestId) as InboxRow | undefined;
+    return row === undefined ? null : parseRow(row, shopId);
+  }
+
+  async markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void> {
+    this.#assertInitialized();
+    this.#transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT INTO online_order_acceptance_tombstones(shop_id, request_id, processing_order_id)
+           VALUES (?, ?, ?)
+           ON CONFLICT(shop_id, request_id) DO UPDATE SET processing_order_id = excluded.processing_order_id`,
+        )
+        .run(shopId, requestId, processingOrderId);
+      this.#database
+        .prepare('DELETE FROM online_order_inbox WHERE shop_id = ? AND request_id = ?')
+        .run(shopId, requestId);
+    });
   }
 
   async remove(shopId: ShopId, requestId: string): Promise<void> {

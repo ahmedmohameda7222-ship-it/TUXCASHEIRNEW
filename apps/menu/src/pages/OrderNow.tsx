@@ -5,8 +5,6 @@ import { ProductOrderCard } from '@/components/order/ProductOrderCard';
 import { motion } from 'framer-motion';
 import { getOrderProductElementId, isOrderProductElementId } from '@/lib/product-routes';
 
-const EXTRAS_SECTION_ID = 'extras';
-
 export default function OrderNow() {
   const { sections, products, loading } = useMenu();
   const [activeCategory, setActiveCategory] = useState<string>('');
@@ -14,20 +12,28 @@ export default function OrderNow() {
   const categoryRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const isScrollingProgrammatically = useRef(false);
 
+  const extrasSectionId = useMemo(
+    () => sections.find((section) => section.slug === 'extras')?.id ?? null,
+    [sections],
+  );
+
   const extraProducts = useMemo(
     () =>
       products
-        .filter((product) => product.section_id === EXTRAS_SECTION_ID && product.is_active)
+        .filter(
+          (product) =>
+            extrasSectionId !== null && product.section_id === extrasSectionId && product.is_active,
+        )
         .sort((a, b) => a.sort_order - b.sort_order),
-    [products],
+    [products, extrasSectionId],
   );
 
   const menuSections = useMemo(
     () =>
       sections
-        .filter((section) => section.id !== EXTRAS_SECTION_ID)
+        .filter((section) => section.id !== extrasSectionId)
         .sort((a, b) => a.sort_order - b.sort_order),
-    [sections],
+    [sections, extrasSectionId],
   );
 
   // Set initial active category once sections load.

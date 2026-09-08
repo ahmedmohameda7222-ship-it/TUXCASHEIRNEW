@@ -320,11 +320,14 @@ const api: TuxDesktopApi = Object.freeze({
         })) as unknown,
       ),
     accept: async (
-      request: Parameters<TuxDesktopApi['onlineOrders']['accept']>[0],
+      requestId: Parameters<TuxDesktopApi['onlineOrders']['accept']>[0],
       confirmation: Parameters<TuxDesktopApi['onlineOrders']['accept']>[1],
     ) =>
       assertOrderPlacementResult(
-        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_ACCEPT, { request, confirmation })) as unknown,
+        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_ACCEPT, {
+          requestId,
+          confirmation,
+        })) as unknown,
       ),
     subscribe: (listener: Parameters<TuxDesktopApi['onlineOrders']['subscribe']>[0]) => {
       const wrapper = (_event: IpcRendererEvent, value: unknown): void => {

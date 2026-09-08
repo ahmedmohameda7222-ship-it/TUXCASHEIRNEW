@@ -77,7 +77,9 @@ const routes = [
   ['/products/tux-burger', 'deep-link-tux-burger'],
 ] as const;
 
-test('captures required Menu visual-parity evidence including cart-open state', async ({ page }, testInfo) => {
+test('captures required Menu visual-parity evidence including cart-open state', async ({
+  page,
+}, testInfo) => {
   await installCatalog(page);
 
   for (const [path, label] of routes) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import type { OnlineOrderRequestV1 } from '@tux/order-intake-contracts';
 import { useCart } from '@/context/CartContext';
+import { useMenu } from '@/context/MenuContext';
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '@/lib/constants';
 import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
@@ -32,6 +33,7 @@ export function CartDrawer() {
     clearCart,
     totalPrice,
   } = useCart();
+  const { comboBeveragesByProduct } = useMenu();
   const [, navigate] = useLocation();
 
   const [orderType, setOrderType] = useState<OrderType>('');
@@ -42,6 +44,9 @@ export function CartDrawer() {
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>('idle');
   const [pendingAttempt, setPendingAttempt] = useState<PendingAttempt | null>(null);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const [comboBeverageSelections, setComboBeverageSelections] = useState<Record<string, string>>(
+    {},
+  );
 
   const isDelivery = orderType === 'Delivery';
   const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
@@ -86,7 +91,7 @@ export function CartDrawer() {
         quantity: item.quantity,
         addonProductIds: item.extras?.map((extra) => extra.id) ?? [],
         modifierSelections: [],
-        comboBeverageProductId: null,
+        comboBeverageProductId: comboBeverageSelections[item.id] ?? null,
         note: null,
       })),
       orderNote: null,
@@ -113,6 +118,15 @@ export function CartDrawer() {
     }
     if (!paymentMethod) {
       alert('Please select a payment method.');
+      return;
+    }
+    const comboSelectionMissing = items.some((item) => {
+      const productId = item.baseProductId ?? item.id;
+      const options = comboBeveragesByProduct[productId] ?? [];
+      return options.length > 0 && !comboBeverageSelections[item.id];
+    });
+    if (comboSelectionMissing) {
+      alert('Please select a beverage for every combo.');
       return;
     }
 
@@ -246,6 +260,32 @@ export function CartDrawer() {
                         <h4 className="text-white font-semibold text-sm line-clamp-2">
                           {item.baseProductName || item.name}
                         </h4>
+                        {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).length >
+                          0 && (
+                          <label className="mt-2 block text-xs text-gray-300">
+                            Combo beverage
+                            <select
+                              aria-label={`${item.baseProductName || item.name} beverage`}
+                              value={comboBeverageSelections[item.id] ?? ''}
+                              onChange={(event) =>
+                                setComboBeverageSelections((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
+                              className="mt-1 w-full rounded-lg border border-white/20 bg-black px-2 py-1 text-xs text-white"
+                            >
+                              <option value="">Select beverage</option>
+                              {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).map(
+                                (beverage) => (
+                                  <option key={beverage.id} value={beverage.id}>
+                                    {beverage.name}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                        )}
                         {item.extras && item.extras.length > 0 && (
                           <p className="mt-1 text-xs leading-relaxed text-gray-400">
                             Extras:{' '}

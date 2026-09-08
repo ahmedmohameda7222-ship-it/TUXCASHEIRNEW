@@ -43,6 +43,7 @@ interface MenuContextValue {
   sections: SupabaseSection[];
   products: SupabaseProduct[];
   modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
+  comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
   loading: boolean;
   error: string | null;
   refreshMenu: () => Promise<void>;
@@ -55,6 +56,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<SupabaseProduct[]>([]);
   const [modifiersByProduct, setModifiersByProduct] = useState<
     Readonly<Record<string, readonly MenuModifier[]>>
+  >({});
+  const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<
+    Readonly<Record<string, readonly SupabaseProduct[]>>
   >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,14 +116,23 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       for (const modifiers of Object.values(nextModifiersByProduct)) {
         modifiers.sort((left, right) => left.sort_order - right.sort_order);
       }
+      const productsById = new Map(nextProducts.map((product) => [product.id, product] as const));
+      const nextComboBeveragesByProduct: Record<string, SupabaseProduct[]> = {};
+      for (const option of snapshot.comboBeverageOptions) {
+        const beverage = productsById.get(option.beverageProductId);
+        if (!beverage) continue;
+        (nextComboBeveragesByProduct[option.comboProductId] ??= []).push(beverage);
+      }
       setSections(nextSections);
       setProducts(nextProducts);
       setModifiersByProduct(nextModifiersByProduct);
+      setComboBeveragesByProduct(nextComboBeveragesByProduct);
     } catch (cause) {
       console.error('Failed to load canonical public catalog', cause);
       setSections([]);
       setProducts([]);
       setModifiersByProduct({});
+      setComboBeveragesByProduct({});
       setError('Menu temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
@@ -131,8 +144,16 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMenu]);
 
   const value = useMemo(
-    () => ({ sections, products, modifiersByProduct, loading, error, refreshMenu }),
-    [sections, products, modifiersByProduct, loading, error, refreshMenu],
+    () => ({
+      sections,
+      products,
+      modifiersByProduct,
+      comboBeveragesByProduct,
+      loading,
+      error,
+      refreshMenu,
+    }),
+    [sections, products, modifiersByProduct, comboBeveragesByProduct, loading, error, refreshMenu],
   );
 
   return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;

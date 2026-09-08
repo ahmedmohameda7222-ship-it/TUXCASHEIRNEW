@@ -31,6 +31,8 @@ export interface OnlineOrderInboxStore {
   initialize(): Promise<void>;
   upsertMany(requests: readonly CachedOnlineOrderRequest[]): Promise<void>;
   list(shopId: ShopId): Promise<readonly CachedOnlineOrderRequest[]>;
+  get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;
+  markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;
   remove(shopId: ShopId, requestId: string): Promise<void>;
   close(): Promise<void>;
 }

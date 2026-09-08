@@ -5,8 +5,9 @@ import {
   type OnlineOrderInboxStore,
 } from '../onlineOrderInboxStore';
 
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = 'requests';
+const ACCEPTED_STORE_NAME = 'accepted';
 
 function requestResult<Result>(request: IDBRequest<Result>): Promise<Result> {
   return new Promise((resolve, reject) => {
@@ -47,6 +48,11 @@ function openDatabase(name: string): Promise<IDBDatabase> {
         });
         store.createIndex('shopCreated', ['shopId', 'createdAt', 'requestId']);
       }
+      if (event.oldVersion < 2) {
+        request.result.createObjectStore(ACCEPTED_STORE_NAME, {
+          keyPath: ['shopId', 'requestId'],
+        });
+      }
     });
     request.addEventListener('success', () => resolve(request.result), { once: true });
     request.addEventListener(
@@ -77,11 +83,21 @@ export class IndexedDbOnlineOrderInboxStore implements OnlineOrderInboxStore {
     const validated = requests.map((request) => parseCachedOnlineOrderRequest(request));
     if (validated.length === 0) return;
     const database = this.#requireDatabase();
+    const acceptedTransaction = database.transaction(ACCEPTED_STORE_NAME, 'readonly');
+    const acceptedRows = (await requestResult(
+      acceptedTransaction.objectStore(ACCEPTED_STORE_NAME).getAll(),
+    )) as Array<{ shopId: string; requestId: string }>;
+    await transactionDone(acceptedTransaction);
+    const accepted = new Set(acceptedRows.map((row) => `${row.shopId}:${row.requestId}`));
+    const pendingWrites = validated.filter(
+      (request) => !accepted.has(`${request.shopId}:${request.requestId}`),
+    );
+    if (pendingWrites.length === 0) return;
     const transaction = database.transaction(STORE_NAME, 'readwrite', { durability: 'strict' });
     const completion = transactionDone(transaction);
     const store = transaction.objectStore(STORE_NAME);
     try {
-      const writes = validated.map((request) => requestResult(store.put(request)));
+      const writes = pendingWrites.map((request) => requestResult(store.put(request)));
       await Promise.all(writes);
       await completion;
     } catch (error) {
@@ -97,17 +113,70 @@ export class IndexedDbOnlineOrderInboxStore implements OnlineOrderInboxStore {
 
   async list(shopId: ShopId): Promise<readonly CachedOnlineOrderRequest[]> {
     const database = this.#requireDatabase();
-    const transaction = database.transaction(STORE_NAME, 'readonly');
-    const rows = await requestResult(transaction.objectStore(STORE_NAME).getAll());
+    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readonly');
+    const rowsRequest = transaction.objectStore(STORE_NAME).getAll();
+    const acceptedRequest = transaction.objectStore(ACCEPTED_STORE_NAME).getAll();
+    const [rows, acceptedRows] = await Promise.all([
+      requestResult(rowsRequest),
+      requestResult(acceptedRequest),
+    ]);
     await transactionDone(transaction);
+    const accepted = new Set(
+      (acceptedRows as Array<{ shopId: string; requestId: string }>).map(
+        (row) => `${row.shopId}:${row.requestId}`,
+      ),
+    );
     return rows
       .map((row) => parseCachedOnlineOrderRequest(row))
-      .filter((request) => request.shopId === shopId)
+      .filter(
+        (request) =>
+          request.shopId === shopId && !accepted.has(`${request.shopId}:${request.requestId}`),
+      )
       .sort(
         (left, right) =>
           left.createdAt.localeCompare(right.createdAt) ||
           left.requestId.localeCompare(right.requestId),
       );
+  }
+
+  async get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null> {
+    const database = this.#requireDatabase();
+    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readonly');
+    const rowRequest = transaction.objectStore(STORE_NAME).get([shopId, requestId]);
+    const acceptedRequest = transaction.objectStore(ACCEPTED_STORE_NAME).get([shopId, requestId]);
+    const [row, accepted] = await Promise.all([
+      requestResult(rowRequest),
+      requestResult(acceptedRequest),
+    ]);
+    await transactionDone(transaction);
+    if (accepted !== undefined || row === undefined) return null;
+    const parsed = parseCachedOnlineOrderRequest(row);
+    return parsed.shopId === shopId ? parsed : null;
+  }
+
+  async markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void> {
+    const database = this.#requireDatabase();
+    const transaction = database.transaction([STORE_NAME, ACCEPTED_STORE_NAME], 'readwrite', {
+      durability: 'strict',
+    });
+    const completion = transactionDone(transaction);
+    try {
+      const acceptedStore = transaction.objectStore(ACCEPTED_STORE_NAME);
+      const requestStore = transaction.objectStore(STORE_NAME);
+      await Promise.all([
+        requestResult(acceptedStore.put({ shopId, requestId, processingOrderId })),
+        requestResult(requestStore.delete([shopId, requestId])),
+      ]);
+      await completion;
+    } catch (error) {
+      try {
+        transaction.abort();
+      } catch {
+        /* preserve original error */
+      }
+      await completion.catch(() => undefined);
+      throw error;
+    }
   }
 
   async remove(shopId: ShopId, requestId: string): Promise<void> {
