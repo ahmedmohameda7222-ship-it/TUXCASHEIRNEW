@@ -72,6 +72,13 @@ function remoteSnapshot(requests: readonly CachedOnlineOrderRequest[]): unknown 
   };
 }
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 describe('syncOnlineOrderInboxSnapshot', () => {
   it('reconciles a successful active snapshot for only the requested shop', async () => {
     const store = new MemoryOnlineOrderInboxStore();
@@ -147,12 +154,7 @@ describe('syncOnlineOrderInboxSnapshot', () => {
 describe('BrowserOnlineOrderOperationsRemote', () => {
   it('reads through the same-origin device-session gateway without browser bearer authority', async () => {
     const responseBody = remoteSnapshot([cachedRequest(REQUEST_A, SHOP_A)]);
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(responseBody), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    );
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(responseBody));
     vi.stubGlobal('window', { location: { origin: 'https://operations.example.test' } });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -168,5 +170,63 @@ describe('BrowserOnlineOrderOperationsRemote', () => {
         headers: { accept: 'application/json' },
       },
     );
+  });
+
+  it('claims, releases, and rejects through the same-origin device-session gateway', async () => {
+    const processing = {
+      schemaVersion: 1,
+      ...cachedRequest(REQUEST_A, SHOP_A, {
+        status: 'PROCESSING',
+        processingOrderId: PROCESSING_ORDER,
+        processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
+        processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+      }),
+    };
+    const released = { schemaVersion: 1, requestId: REQUEST_A, status: 'PENDING' };
+    const rejected = { schemaVersion: 1, requestId: REQUEST_A, status: 'REJECTED' };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(processing))
+      .mockResolvedValueOnce(jsonResponse(released))
+      .mockResolvedValueOnce(jsonResponse(rejected));
+    vi.stubGlobal('window', { location: { origin: 'https://operations.example.test' } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const remote = new BrowserOnlineOrderOperationsRemote();
+    await expect(remote.claim(REQUEST_A)).resolves.toEqual(processing);
+    await expect(remote.release(REQUEST_A, PROCESSING_ORDER)).resolves.toEqual(released);
+    await expect(remote.reject(REQUEST_A, 'Customer requested cancellation')).resolves.toEqual(
+      rejected,
+    );
+
+    const requestOptions = (body: Readonly<Record<string, unknown>>) => ({
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    expect(fetchMock.mock.calls).toEqual([
+      [
+        'https://operations.example.test/api/online-order-operations',
+        requestOptions({ action: 'CLAIM', requestId: REQUEST_A }),
+      ],
+      [
+        'https://operations.example.test/api/online-order-operations',
+        requestOptions({
+          action: 'RELEASE',
+          requestId: REQUEST_A,
+          processingOrderId: PROCESSING_ORDER,
+        }),
+      ],
+      [
+        'https://operations.example.test/api/online-order-operations',
+        requestOptions({
+          action: 'REJECT',
+          requestId: REQUEST_A,
+          reason: 'Customer requested cancellation',
+        }),
+      ],
+    ]);
   });
 });
