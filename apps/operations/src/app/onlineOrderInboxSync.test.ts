@@ -3,6 +3,9 @@ import type { CachedOnlineOrderRequest, OnlineOrderInboxStore } from '@tux/persi
 import { describe, expect, it, vi } from 'vitest';
 import {
   BrowserOnlineOrderOperationsRemote,
+  claimOnlineOrderForReview,
+  rejectOnlineOrderRequest,
+  releaseOnlineOrderReview,
   syncOnlineOrderInboxSnapshot,
 } from './onlineOrderInboxSync';
 
@@ -69,6 +72,21 @@ function remoteSnapshot(requests: readonly CachedOnlineOrderRequest[]): unknown 
   return {
     schemaVersion: 1,
     requests: requests.map((request) => ({ ...request })),
+  };
+}
+
+function processingResponse(
+  requestId = REQUEST_A,
+  shopId = SHOP_A,
+): Readonly<Record<string, unknown>> {
+  return {
+    schemaVersion: 1,
+    ...cachedRequest(requestId, shopId, {
+      status: 'PROCESSING',
+      processingOrderId: PROCESSING_ORDER,
+      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
+      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+    }),
   };
 }
 
@@ -151,6 +169,160 @@ describe('syncOnlineOrderInboxSnapshot', () => {
   });
 });
 
+describe('online order review lifecycle', () => {
+  it('stores a strictly validated PROCESSING claim for the expected shop and request', async () => {
+    const store = new MemoryOnlineOrderInboxStore();
+    await store.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    store.upsertCalls = 0;
+    const remote = { claim: vi.fn().mockResolvedValue(processingResponse()) };
+
+    const claimed = await claimOnlineOrderForReview({
+      shopId: SHOP_A,
+      requestId: REQUEST_A,
+      store,
+      remote,
+    });
+
+    expect(claimed.status).toBe('PROCESSING');
+    expect(claimed.processingOrderId).toBe(PROCESSING_ORDER);
+    expect((await store.list(SHOP_A))[0]).toEqual(claimed);
+    expect(store.upsertCalls).toBe(1);
+    expect(store.removeCalls).toBe(0);
+  });
+
+  it('rejects a cross-shop claim response before mutating the cache', async () => {
+    const store = new MemoryOnlineOrderInboxStore();
+    await store.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    store.upsertCalls = 0;
+    const remote = { claim: vi.fn().mockResolvedValue(processingResponse(REQUEST_A, SHOP_B)) };
+
+    await expect(
+      claimOnlineOrderForReview({ shopId: SHOP_A, requestId: REQUEST_A, store, remote }),
+    ).rejects.toThrow(/shop/i);
+
+    expect((await store.list(SHOP_A))[0]?.status).toBe('PENDING');
+    expect(store.upsertCalls).toBe(0);
+    expect(store.removeCalls).toBe(0);
+  });
+
+  it('returns a matching local PROCESSING claim to PENDING only after remote release succeeds', async () => {
+    const store = new MemoryOnlineOrderInboxStore();
+    const processing = cachedRequest(REQUEST_A, SHOP_A, {
+      status: 'PROCESSING',
+      processingOrderId: PROCESSING_ORDER,
+      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
+      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+    });
+    await store.upsertMany([processing]);
+    store.upsertCalls = 0;
+    const remote = {
+      release: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_A,
+        status: 'PENDING',
+      }),
+    };
+
+    const released = await releaseOnlineOrderReview({
+      shopId: SHOP_A,
+      requestId: REQUEST_A,
+      processingOrderId: PROCESSING_ORDER,
+      store,
+      remote,
+    });
+
+    expect(released).toEqual({
+      ...processing,
+      status: 'PENDING',
+      processingOrderId: null,
+      processingStartedAt: null,
+      processingExpiresAt: null,
+    });
+    expect((await store.list(SHOP_A))[0]).toEqual(released);
+    expect(store.upsertCalls).toBe(1);
+    expect(store.removeCalls).toBe(0);
+  });
+
+  it('removes a request only after a matching REJECTED acknowledgement', async () => {
+    const store = new MemoryOnlineOrderInboxStore();
+    await store.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    store.removeCalls = 0;
+    const remote = {
+      reject: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_A,
+        status: 'REJECTED',
+      }),
+    };
+
+    await rejectOnlineOrderRequest({
+      shopId: SHOP_A,
+      requestId: REQUEST_A,
+      reason: 'Customer requested cancellation',
+      store,
+      remote,
+    });
+
+    expect(await store.list(SHOP_A)).toEqual([]);
+    expect(store.removeCalls).toBe(1);
+  });
+
+  it('does not mutate local state when release/reject acknowledgements target another request', async () => {
+    const processing = cachedRequest(REQUEST_A, SHOP_A, {
+      status: 'PROCESSING',
+      processingOrderId: PROCESSING_ORDER,
+      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
+      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+    });
+
+    const releaseStore = new MemoryOnlineOrderInboxStore();
+    await releaseStore.upsertMany([processing]);
+    releaseStore.upsertCalls = 0;
+    const releaseRemote = {
+      release: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_B,
+        status: 'PENDING',
+      }),
+    };
+    await expect(
+      releaseOnlineOrderReview({
+        shopId: SHOP_A,
+        requestId: REQUEST_A,
+        processingOrderId: PROCESSING_ORDER,
+        store: releaseStore,
+        remote: releaseRemote,
+      }),
+    ).rejects.toThrow(/request/i);
+    expect((await releaseStore.list(SHOP_A))[0]).toEqual(processing);
+    expect(releaseStore.upsertCalls).toBe(0);
+
+    const rejectStore = new MemoryOnlineOrderInboxStore();
+    await rejectStore.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    rejectStore.removeCalls = 0;
+    const rejectRemote = {
+      reject: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_B,
+        status: 'REJECTED',
+      }),
+    };
+    await expect(
+      rejectOnlineOrderRequest({
+        shopId: SHOP_A,
+        requestId: REQUEST_A,
+        reason: 'Customer requested cancellation',
+        store: rejectStore,
+        remote: rejectRemote,
+      }),
+    ).rejects.toThrow(/request/i);
+    expect((await rejectStore.list(SHOP_A)).map((request) => request.requestId)).toEqual([
+      REQUEST_A,
+    ]);
+    expect(rejectStore.removeCalls).toBe(0);
+  });
+});
+
 describe('BrowserOnlineOrderOperationsRemote', () => {
   it('reads through the same-origin device-session gateway without browser bearer authority', async () => {
     const responseBody = remoteSnapshot([cachedRequest(REQUEST_A, SHOP_A)]);
@@ -173,15 +345,7 @@ describe('BrowserOnlineOrderOperationsRemote', () => {
   });
 
   it('claims, releases, and rejects through the same-origin device-session gateway', async () => {
-    const processing = {
-      schemaVersion: 1,
-      ...cachedRequest(REQUEST_A, SHOP_A, {
-        status: 'PROCESSING',
-        processingOrderId: PROCESSING_ORDER,
-        processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
-        processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
-      }),
-    };
+    const processing = processingResponse();
     const released = { schemaVersion: 1, requestId: REQUEST_A, status: 'PENDING' };
     const rejected = { schemaVersion: 1, requestId: REQUEST_A, status: 'REJECTED' };
     const fetchMock = vi
