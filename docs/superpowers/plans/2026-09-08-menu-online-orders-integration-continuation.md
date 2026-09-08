@@ -1,10 +1,10 @@
 # TUX Menu Online Orders Integration Continuation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: COMPLETE.** All implementation, regression, security, migration-chain, rendered browser, Menu, desktop packaging, and repository architecture gates in this plan have been implemented and verified on the branch. PR #55 remains **DRAFT** and no production deployment/migration was performed.
 
-**Goal:** Finish the already-started canonical Menu → online-order intake → Operations → WhatsApp integration on `work/menu-online-orders-integration` without regressing PR #54 WhatsApp behavior or applying external mutations.
+**Goal:** Finish the canonical Menu → online-order intake → Operations → WhatsApp integration on `work/menu-online-orders-integration` without regressing PR #54 WhatsApp behavior or applying external production mutations.
 
-**Architecture:** Keep the browser untrusted. The Menu submits canonical IDs and customer intent through the trusted public order-intake boundary; Supabase stores a PENDING online-order request; Operations receives that request through the authenticated device/server path, caches it locally, explicitly claims/reviews it, and only then converts it through existing Operations order-placement invariants. WhatsApp remains an independent messaging surface that resolves the same normalized Egyptian customer phone and existing order context.
+**Architecture:** The browser remains untrusted. Menu submits canonical IDs and customer intent through the public order-intake boundary; the server validates/re-prices and stores a PENDING request; Operations receives it through the authenticated device/server path, caches it locally, explicitly claims/reviews it, and converts it through existing Operations order-placement invariants. WhatsApp reuses the same normalized Egyptian customer identity and final order context.
 
 **Tech Stack:** TypeScript, React, Electron, Vite, Vitest, Playwright, Supabase Edge Functions/PostgreSQL, repository architecture/security guards, GitHub Actions.
 
@@ -12,147 +12,100 @@
 
 ## Global Constraints
 
-- Branch only: `work/menu-online-orders-integration`; never commit to `main` or frozen historical branches.
+- Branch only: `work/menu-online-orders-integration`; no commit to `main` or frozen historical branches.
 - Current `main` and merged PR #54 remain authoritative for Operations/WhatsApp behavior.
-- No whole-branch Phase B merge, no force-push, no history rewrite.
-- No remote Supabase migration/application, no Vercel deployment, no Meta configuration, no real WhatsApp send.
-- Customer-facing Menu appearance is preserved; no redesign.
-- Browser never inserts canonical order rows directly and never receives service-role credentials.
-- Canonical catalog IDs and `priceMinor` remain authoritative; server re-prices every request.
-- A web request is not a final POS order until Operations establishes missing Business Day/operator/delivery/payment/inventory facts.
-- Delivery customer phone normalization must reuse canonical Egyptian semantics (`01XXXXXXXXX`).
+- No whole-branch Phase B merge, force-push, or history rewrite.
+- No remote Supabase migration/application, Vercel deployment, Meta configuration, or real WhatsApp send.
+- Customer-facing Menu appearance preserved; no redesign.
+- Browser does not insert canonical order rows directly and does not receive service-role credentials.
+- Canonical catalog IDs and `priceMinor` remain authoritative; server re-prices requests.
+- Web intake does not become a final Operations order until Business Day/operator/delivery/payment/inventory facts are established.
+- Delivery customer phone normalization reuses canonical Egyptian semantics (`01XXXXXXXXX`).
 - Existing PR #54 WhatsApp order-context service is reused; no duplicate WhatsApp-owned order persistence.
-- TDD is mandatory for new behavior: RED evidence, minimal GREEN implementation, then refactor.
+- TDD was used for missing behavior, including the final Codex regression round.
 
 ---
 
 ### Task 1: Finish the Electron online-order inbox IPC runtime
 
-**Files:**
-- Existing RED test: `apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts`
-- Create: `apps/operations-desktop/src/main/onlineOrderInboxIpc.ts`
+- [x] **Step 1: Write the failing test.**
+- [x] **Step 2: Verify RED.**
+- [x] **Step 3: Implement the minimal trusted IPC runtime.**
+- [x] **Step 4: Verify GREEN.**
+- [x] **Step 5: Commit the implementation.**
 
-**Interfaces:**
-- Consumes: `OperationsOnlineOrderInboxService` compatible methods `load()`, `claim(requestId)`, `release(requestId, processingOrderId)`, `reject(requestId, processingOrderId, reason)`, `subscribe(listener)`.
-- Produces: trusted Electron IPC channels for load/claim/release/reject and one renderer change notification channel.
-
-- [x] **Step 1: Write the failing test**
-
-The branch already contains the RED contract in `onlineOrderInboxIpc.test.ts` at commit `bd71003b86844af385f7f2b516b224ea94d6ec11`.
-
-- [x] **Step 2: Verify RED**
-
-GitHub Actions run `34234754455` failed at `Unit and integration tests` while formatting/lint, monorepo architecture, Menu, and Windows packaging passed. The missing runtime is the intended failure.
-
-- [ ] **Step 3: Implement the minimal runtime**
-
-Implement four `ipcMain.handle` registrations. Every handler calls `assertTrustedIpcSender` before validating/delegating. Validate UUID-shaped request/processing IDs and a trimmed non-empty rejection reason. Subscribe once per registered BrowserWindow and emit the snapshot only while the window is alive. `close()` removes handlers and unsubscribes.
-
-- [ ] **Step 4: Verify GREEN**
-
-Use the branch push CI `quality` job; require the unit/integration step to pass before proceeding.
-
-- [ ] **Step 5: Commit**
-
-`feat(desktop): add online-order inbox IPC runtime`
+Implemented trusted `load`, `claim`, `release`, `reject`, and change-subscription IPC with sender checks, UUID/reason validation, subscription cleanup, and shutdown cleanup.
 
 ### Task 2: Expose the inbox through the existing desktop preload/platform boundary
 
-**Files:**
-- Test first: `apps/operations-desktop/src/preload/index.test.ts` or the existing preload contract test location discovered in the repository.
-- Modify: `apps/operations-desktop/src/preload/index.ts`
-- Modify the existing platform-contract file that defines `window.tux` / desktop APIs; do not create a renderer-privileged Supabase client.
-- Modify: `apps/operations-desktop/src/main/index.ts` only to instantiate/wire the application service and IPC runtime.
+- [x] **Step 1: Write failing preload/platform contract tests.**
+- [x] **Step 2: Verify RED.**
+- [x] **Step 3: Implement the narrow preload/platform bridge and main-process composition.**
+- [x] **Step 4: Verify GREEN including desktop typecheck/build and WhatsApp gates.**
+- [x] **Step 5: Commit the bridge/composition work.**
 
-**Interfaces:**
-- Consumes: Task 1 IPC channels and `OperationsOnlineOrderInboxService`.
-- Produces: a narrow renderer API with `load`, `claim`, `release`, `reject`, and `subscribe`.
-
-- [ ] **Step 1: Write failing contract tests** proving the preload invokes only the new IPC channels and validates subscription cleanup.
-- [ ] **Step 2: Verify RED** in CI.
-- [ ] **Step 3: Implement minimal preload/platform types and main-process wiring** using the authenticated remote gateway and local inbox store already present on the branch.
-- [ ] **Step 4: Verify GREEN** including desktop typecheck/build and existing WhatsApp architecture/security tests.
-- [ ] **Step 5: Commit** `feat(desktop): expose online-order inbox bridge`.
+Desktop renderer access is limited to the preload contract. No renderer Supabase service-role/admin secret was introduced.
 
 ### Task 3: Add the minimal Operations incoming-web-order review surface
 
-**Files:**
-- Test first in the existing Operations app test structure.
-- Reuse existing `apps/operations/src/app/onlineOrderInboxClient.ts` / runtime state instead of adding another order authority.
-- Modify the smallest existing Orders Board shell/pane necessary; do not redesign Operations.
+- [x] **Step 1: Write failing UI/runtime tests for PENDING/PROCESSING/offline review state.**
+- [x] **Step 2: Verify RED.**
+- [x] **Step 3: Implement the minimal incoming-web-order review surface.**
+- [x] **Step 4: Verify GREEN including Operations build and WhatsApp regressions.**
+- [x] **Step 5: Commit the Operations intake surface.**
 
-**Interfaces:**
-- Consumes: desktop inbox bridge, cached PENDING/PROCESSING requests.
-- Produces: visible ONLINE incoming request state with explicit claim/release/reject/accept affordances and no fabricated payment/delivery facts.
-
-- [ ] **Step 1: Write failing UI/runtime tests** for PENDING vs PROCESSING, remote-unavailable cached state, and worker-visible missing authoritative facts.
-- [ ] **Step 2: Verify RED**.
-- [ ] **Step 3: Implement minimal surface** preserving POS/local behavior and offline-safe cached display.
-- [ ] **Step 4: Verify GREEN** including Operations build and WhatsApp regressions.
-- [ ] **Step 5: Commit** `feat(operations): receive online order intake`.
+The Orders Board shows incoming web requests separately from POS orders, uses cached-first/offline-safe state, exposes review/claim/release/reject flows, and does not fabricate final delivery/payment facts.
 
 ### Task 4: Convert a claimed request through existing Operations order-placement invariants
 
-**Files:**
-- Test first in `packages/application` and Operations integration tests.
-- Reuse `OperationsOrdersService`, existing checkout/payment/business-day/inventory/audit/outbox code.
-- Extend the online-order review service only where needed for acceptance/conversion.
+- [x] **Step 1: Write failing conversion/idempotency/invariant tests.**
+- [x] **Step 2: Verify RED.**
+- [x] **Step 3: Implement conversion through existing application/order services.**
+- [x] **Step 4: Verify GREEN including SQLite/browser persistence and migration-chain smoke.**
+- [x] **Step 5: Commit safe reviewed-web-intake conversion.**
 
-**Interfaces:**
-- Consumes: PROCESSING online request with trusted canonical item snapshots and authenticated current operator context.
-- Produces: one durable final order with `source = ONLINE`, Business Day/display order number/current operator attribution, confirmed delivery/payment facts, inventory effects, audit/outbox, and idempotent request completion.
-
-- [ ] **Step 1: Write failing conversion tests** proving missing zone/fee/payment/operator facts block finalization and retries do not duplicate the order.
-- [ ] **Step 2: Verify RED**.
-- [ ] **Step 3: Implement minimal conversion orchestration** by calling existing application services rather than duplicating accounting in React.
-- [ ] **Step 4: Verify GREEN** including SQLite/browser persistence and migration-chain smoke.
-- [ ] **Step 5: Commit** `feat(orders): convert reviewed web intake safely`.
+Acceptance produces one durable `source = ONLINE` order using the reserved processing order ID and existing Business Day/operator/payment/delivery/inventory/audit/outbox invariants. Final hardening also recovers a committed local ONLINE order if the local accepted tombstone was interrupted.
 
 ### Task 5: Prove canonical customer/WhatsApp context reuse
 
-**Files:**
-- Extend existing WhatsApp order-context integration tests; do not create a second phone normalizer.
-- Add only narrow plumbing required for the final ONLINE order to be discoverable by the PR #54 order-context service.
+- [x] **Step 1: Write integration tests for equivalent Egyptian phone representations.**
+- [x] **Step 2: Verify RED where plumbing was missing.**
+- [x] **Step 3: Reuse the canonical phone normalizer and existing WhatsApp order-context service.**
+- [x] **Step 4: Verify GREEN including WhatsApp architecture/security gates.**
+- [x] **Step 5: Commit the WhatsApp/online-order context regression coverage.**
 
-**Interfaces:**
-- Consumes: final Delivery order phone `01XXXXXXXXX` and equivalent inbound Meta representation (`+20`, `0020`, `20`, or `01`).
-- Produces: the same logical customer/order context, link/unlink, and fake-provider reply path.
-
-- [ ] **Step 1: Write failing integration test** with equivalent phone representations.
-- [ ] **Step 2: Verify RED**.
-- [ ] **Step 3: Implement only missing adapter/query plumbing**; reuse `normalizeEgyptianPhone` and PR #54 context service.
-- [ ] **Step 4: Verify GREEN** including WhatsApp architecture/security gates.
-- [ ] **Step 5: Commit** `feat(whatsapp): resolve online delivery order context` only if code changes are actually required; otherwise commit only the regression test under the integration checkpoint.
+Final ONLINE delivery orders resolve to the same logical customer/order context for canonical and Meta-style Egyptian phone representations.
 
 ### Task 6: Full local/fake-provider E2E and security matrix
 
-**Files:**
-- Extend `e2e/menu/menu.e2e.ts` and/or add a focused cross-app integration test harness under the repository's established E2E location.
-- Add explicit security tests beside order-intake/catalog/desktop boundaries.
+- [x] **Step 1: Add happy-path and adversarial regression coverage.**
+- [x] **Step 2: Verify RED only for genuinely missing behavior.**
+- [x] **Step 3: Implement the narrow missing protections/plumbing.**
+- [x] **Step 4: Verify GREEN across unit/integration, Menu E2E, catalog/order-intake, Operations, WhatsApp, and migration smoke.**
+- [x] **Step 5: Commit the Menu → Operations → WhatsApp journey/security coverage.**
 
-**Interfaces:**
-- Consumes: real Menu renderer, trusted local/fake intake, Operations inbox/conversion, fake Meta provider.
-- Produces: automated proof for one submit, duplicate suppression, Operations visibility/conversion, ONLINE source, same customer phone context, link, and fake reply.
-
-- [ ] **Step 1: Add RED tests** for the complete happy path plus price/total tampering, cross-shop ID, inactive/sold-out product, invalid modifier relation, duplicate idempotency, malformed phone, unsupported order type, oversized fields, unauthorized Operations API, service-role leakage, direct browser order-table mutation, and privileged catalog mutation.
-- [ ] **Step 2: Verify RED only for genuinely missing behavior**.
-- [ ] **Step 3: Implement the narrow missing protections/plumbing**.
-- [ ] **Step 4: Verify GREEN** across unit/integration, Menu E2E, catalog/order-intake tests, Operations, WhatsApp gates, and migration smoke.
-- [ ] **Step 5: Commit** `test(integration): prove menu operations whatsapp journey`.
+Coverage includes canonical server re-pricing/validation, duplicate/idempotent intake, authenticated Operations access, cross-shop isolation, claim/reject token protection, lease-expiry handling, browser privilege boundaries, offline/recovery behavior, final ONLINE-order context reuse, and fake-provider messaging paths.
 
 ### Task 7: Visual parity and repository closeout
 
-**Files:**
-- Keep visual changes inside existing Menu visual language only.
-- Add/update rendered Playwright evidence and closeout documentation.
-- Update permanent CI only if a required gate is not already present; never weaken existing gates.
+- [x] **Step 1: Run rendered desktop/mobile Menu comparison evidence including cart state.**
+- [x] **Step 2: Correct demonstrated visual/accessibility regressions and rerun evidence.**
+- [x] **Step 3: Run the complete permanent CI matrix with exact-head evidence and no weakened gates.**
+- [x] **Step 4: Record deployment prerequisites and external-mutation state.**
+- [x] **Step 5: Open DRAFT PR `work/menu-online-orders-integration` → `main`; do not merge.**
 
-**Interfaces:**
-- Consumes: final functional branch.
-- Produces: rendered desktop/mobile evidence, exact-head push CI, PR integration CI, and a draft PR only.
+## Completion evidence
 
-- [ ] **Step 1: Run/inspect rendered comparison evidence** for `/`, `/order-now`, `/tux-burger`, `/tuxify`, `/hawawshi`, `/fries`, `/combos`, `/drinks`, a representative product/deep link, and cart open at desktop and approximately `390x844`.
-- [ ] **Step 2: Correct only demonstrated regressions** and rerun evidence.
-- [ ] **Step 3: Run the complete permanent CI matrix** with exact-head push evidence and no `continue-on-error`.
-- [ ] **Step 4: Record deployment prerequisites** and explicitly state `REMOTE MIGRATIONS APPLIED: NO` and external mutations `NONE`.
-- [ ] **Step 5: Open DRAFT PR** `work/menu-online-orders-integration` → `main`; do not merge.
+- Draft PR: **#55** (`work/menu-online-orders-integration` → `main`), intentionally not merged.
+- Final Codex regression specification: `2ba00a7511050224c9ebacf3fedad8aa0a30a796`.
+- Final Codex production-race fixes: `f9649fa38d6ea81598bd32c6ab7486c1ab77b6d3`.
+- Acceptance-lease migration fixture alignment: `e69e442840bf814833255679027c014cc5ff8729`.
+- Clean permanent CI run: **34269449250** on `e69e442840bf814833255679027c014cc5ff8729`.
+- Permanent CI result: architecture **GREEN**, edge-security **GREEN**, Menu typecheck/build/rendered E2E **GREEN**, Windows x64 package **GREEN**, quality **GREEN**, Required quality gate **GREEN**.
+- Quality unit/integration suite: **196 files / 1145 tests passed**.
+- Migration-chain smoke, Supabase function auth deployment contract, Edge Function typecheck, and rendered Operations browser E2E: **GREEN**.
+- `REMOTE MIGRATIONS APPLIED: NO`.
+- External deployment/configuration mutations: **NONE**.
+- No Vercel deployment, Supabase remote migration, Meta configuration, production database/bucket mutation, or real WhatsApp send was performed during this repository-only phase.
+
+The remaining repository closeout action after this document update is an exact-head permanent CI run followed by a fresh `@codex review`; any new review finding must be fixed before the PR can be considered review-clean. The PR must remain DRAFT and must not be merged without an explicit user request.
