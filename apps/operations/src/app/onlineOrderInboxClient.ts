@@ -2,6 +2,7 @@ import type { ShopId } from '@tux/domain';
 import type { CachedOnlineOrderRequest, OnlineOrderInboxStore } from '@tux/persistence';
 import {
   claimOnlineOrderForReview,
+  rejectOnlineOrderRequest,
   releaseOnlineOrderReview,
   syncOnlineOrderInboxSnapshot,
   type OnlineOrderOperationsRemote,
@@ -19,12 +20,14 @@ export interface OnlineOrderInboxRuntimeClient {
   load(): Promise<OnlineOrderInboxSnapshot>;
   claim(requestId: string): Promise<CachedOnlineOrderRequest>;
   release(requestId: string, processingOrderId: string): Promise<CachedOnlineOrderRequest>;
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<void>;
   subscribe(listener: (snapshot: OnlineOrderInboxSnapshot) => void): () => void;
 }
 
 interface OnlineOrderInboxRuntimeRemote extends OnlineOrderOperationsRemote {
   claim(requestId: string): Promise<unknown>;
   release(requestId: string, processingOrderId: string): Promise<unknown>;
+  reject(requestId: string, reason: string): Promise<unknown>;
 }
 
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
@@ -114,6 +117,27 @@ export function createOnlineOrderInboxRuntime(input: {
       });
       await publishSynced(shopId);
       return released;
+    },
+    reject: async (requestId, processingOrderId, reason) => {
+      const shopId = await input.getActiveShopId();
+      const cached = (await input.store.list(shopId)).find(
+        (candidate) => candidate.requestId === requestId,
+      );
+      if (
+        cached === undefined ||
+        cached.status !== 'PROCESSING' ||
+        cached.processingOrderId !== processingOrderId
+      ) {
+        throw new Error('Online-order rejection does not match the local processing claim.');
+      }
+      await rejectOnlineOrderRequest({
+        shopId,
+        requestId,
+        reason,
+        store: input.store,
+        remote: input.remote,
+      });
+      await publishSynced(shopId);
     },
     subscribe: (listener) => {
       listeners.add(listener);
