@@ -12,17 +12,22 @@ export interface ReviewedOnlineOrderItem {
 }
 
 function record(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  if (typeof value !== 'object') return null;
+  if (value === null) return null;
+  if (Array.isArray(value)) return null;
   return value as Record<string, unknown>;
 }
 
 function nonEmptyString(value: unknown): string | null {
-  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  if (typeof value !== 'string') return null;
+  if (value.trim().length === 0) return null;
   return value;
 }
 
 function positiveInteger(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) return null;
+  if (typeof value !== 'number') return null;
+  if (!Number.isSafeInteger(value)) return null;
+  if (value <= 0) return null;
   return value;
 }
 
@@ -31,17 +36,20 @@ function parseModifier(value: unknown): ReviewedModifier | null {
   if (source === null) return null;
   const label = nonEmptyString(source.label);
   const quantity = positiveInteger(source.quantity);
-  if (label === null || quantity === null) return null;
+  if (label === null) return null;
+  if (quantity === null) return null;
   return { label, quantity };
 }
 
 function parseItem(value: unknown): ReviewedOnlineOrderItem | null {
   const source = record(value);
-  if (source === null || !Array.isArray(source.modifiers)) return null;
+  if (source === null) return null;
+  if (!Array.isArray(source.modifiers)) return null;
 
   const productName = nonEmptyString(source.productName);
   const quantity = positiveInteger(source.quantity);
-  if (productName === null || quantity === null) return null;
+  if (productName === null) return null;
+  if (quantity === null) return null;
 
   const modifiers = source.modifiers.map(parseModifier);
   if (modifiers.some((modifier) => modifier === null)) return null;
