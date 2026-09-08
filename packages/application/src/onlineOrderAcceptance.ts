@@ -182,7 +182,9 @@ function assertReservationAcceptanceOwnership(request: CachedOnlineOrderRequest)
     fail('Online-order reservation ownership authority is unavailable; reclaim before acceptance.');
   }
   if (request.processingDeviceId !== request.reservationOriginDeviceId) {
-    fail('Online-order takeover claimant cannot accept a reservation owned by another origin device.');
+    fail(
+      'Online-order takeover claimant cannot accept a reservation owned by another origin device.',
+    );
   }
 }
 
