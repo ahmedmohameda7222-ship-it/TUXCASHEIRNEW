@@ -57,6 +57,22 @@ function validSnapshot() {
 describe('PublicCatalogSnapshotV1', () => {
   it('parses a complete V1 customer-safe snapshot', () =>
     expect(parsePublicCatalogSnapshotV1(validSnapshot())).toEqual(validSnapshot()));
+
+  it('preserves canonical standalone product identity for customer-selectable modifiers', () => {
+    const snapshot = validSnapshot();
+    const withStandaloneIdentity = {
+      ...snapshot,
+      modifiers: [
+        {
+          ...snapshot.modifiers[0],
+          standaloneProductId: PRODUCT_ID,
+        },
+      ],
+    };
+
+    expect(parsePublicCatalogSnapshotV1(withStandaloneIdentity)).toEqual(withStandaloneIdentity);
+  });
+
   it('rejects unknown schema versions', () =>
     expect(() => parsePublicCatalogSnapshotV1({ ...validSnapshot(), schemaVersion: 2 })).toThrow(
       CatalogContractError,
