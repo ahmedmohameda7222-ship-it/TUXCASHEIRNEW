@@ -236,7 +236,7 @@ jobs:
           deno-version: v1.46.3
       - run: npm ci
       - name: Apply canonical product-specific extras fix
-        run: python scripts/task-c-green.py
+        run: python scripts/task-c-green-v2.py
       - name: Format correction files
         run: >-
           npx prettier --write
