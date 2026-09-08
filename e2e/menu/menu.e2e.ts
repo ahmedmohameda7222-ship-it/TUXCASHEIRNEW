@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const CATALOG_URL = 'https://catalog.test/functions/v1/catalog-public';
+const ORDER_INTAKE_URL = 'https://orders.test/functions/v1/order-intake';
+const REQUEST_ID = '90000000-0000-4000-8000-000000000001';
 
 const categoryRows = [
   ['20000000-0000-4000-8000-000000000001', 'tux-burger', 'Tux Burger'],
@@ -101,6 +103,45 @@ async function installCatalogFixture(page: Page): Promise<string[]> {
   return requests;
 }
 
+async function openCartWithFirstProduct(page: Page): Promise<void> {
+  await installCatalogFixture(page);
+  await page.goto('/order-now', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Add to Cart' }).first().click();
+  await page.locator('nav button:visible').last().click();
+  await expect(page.getByText('Your Cart', { exact: true })).toBeVisible();
+}
+
+function assertNoBrowserAuthority(payload: Record<string, unknown>): void {
+  const forbidden = new Set([
+    'price',
+    'priceMinor',
+    'subtotalMinor',
+    'totalMinor',
+    'deliveryFeeMinor',
+    'businessDayId',
+    'operator',
+    'cashAmount',
+    'cashReceivedMinor',
+    'changeMinor',
+    'zoneId',
+    'payments',
+  ]);
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== 'object' || value === null) return;
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      expect(forbidden.has(key), `browser payload contained forbidden authority field ${key}`).toBe(
+        false,
+      );
+      visit(nested);
+    }
+  };
+  visit(payload);
+}
+
 const routes = [
   { path: '/', text: /TUX/i },
   { path: '/order-now', text: /Order\s*Now/i },
@@ -183,4 +224,127 @@ test('canonical category slug survives product deep-route entry', async ({ page 
   await expect(page).toHaveURL(/\/products\/tux-burger$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Tux Burger' })).toBeVisible();
   await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+});
+
+test('delivery checkout persists a PENDING canonical order before any WhatsApp continuation', async ({
+  page,
+}) => {
+  await openCartWithFirstProduct(page);
+  let submitted: Record<string, unknown> | null = null;
+  let popupCount = 0;
+  page.on('popup', () => {
+    popupCount += 1;
+  });
+  await page.route(`${ORDER_INTAKE_URL}**`, async (route) => {
+    submitted = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ schemaVersion: 1, requestId: REQUEST_ID, status: 'PENDING' }),
+    });
+  });
+
+  await page.getByPlaceholder('e.g. Ahmed').fill('Ahmed Mohamed');
+  await page.getByRole('button', { name: 'Delivery' }).click();
+  await page.getByPlaceholder('e.g. 01001234567').fill('+20 100 123 4567');
+  await page.getByPlaceholder('Enter your full address').fill('Nasr City, Cairo');
+  await page.getByRole('button', { name: 'Mixed Payment' }).click();
+  await page.getByRole('button', { name: 'Place Order' }).click();
+
+  await expect(page.getByText(/Order received/i)).toBeVisible();
+  await expect(page.getByText(/pending confirmation/i)).toBeVisible();
+  expect(popupCount).toBe(0);
+  expect(submitted).not.toBeNull();
+  const payload = submitted!;
+  expect(payload.schemaVersion).toBe(1);
+  expect(payload.shopId).toBe(SHOP_ID);
+  expect(payload.idempotencyKey).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+  expect(payload.customer).toEqual({
+    name: 'Ahmed Mohamed',
+    phone: '+20 100 123 4567',
+    address: 'Nasr City, Cairo',
+  });
+  expect(payload.fulfillmentPreference).toBe('DELIVERY');
+  expect(payload.paymentPreference).toBe('MIXED');
+  expect(payload.items).toEqual([
+    {
+      productId: productRows[0][0],
+      quantity: 1,
+      addonProductIds: [],
+      modifierSelections: [],
+      comboBeverageProductId: null,
+      note: null,
+    },
+  ]);
+  expect(payload.orderNote).toBeNull();
+  assertNoBrowserAuthority(payload);
+});
+
+test('network retry reuses the same idempotency key and does not clear the cart before success', async ({
+  page,
+}) => {
+  await openCartWithFirstProduct(page);
+  const submittedKeys: string[] = [];
+  let attempt = 0;
+  await page.route(`${ORDER_INTAKE_URL}**`, async (route) => {
+    attempt += 1;
+    const body = route.request().postDataJSON() as { idempotencyKey: string };
+    submittedKeys.push(body.idempotencyKey);
+    if (attempt === 1) {
+      await route.abort('failed');
+      return;
+    }
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ schemaVersion: 1, requestId: REQUEST_ID, status: 'PENDING' }),
+    });
+  });
+
+  await page.getByPlaceholder('e.g. Ahmed').fill('Ahmed Mohamed');
+  await page.getByRole('button', { name: 'Pick up' }).click();
+  await page.getByRole('button', { name: 'Cash' }).click();
+  await page.getByRole('button', { name: 'Place Order' }).click();
+
+  await expect(page.getByText(/could not place your order/i)).toBeVisible();
+  await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Place Order' }).click();
+  await expect(page.getByText(/Order received/i)).toBeVisible();
+
+  expect(submittedKeys).toHaveLength(2);
+  expect(submittedKeys[1]).toBe(submittedKeys[0]);
+});
+
+test('pickup Mixed Payment is preference only and omits delivery identity and settlement amounts', async ({
+  page,
+}) => {
+  await openCartWithFirstProduct(page);
+  let submitted: Record<string, unknown> | null = null;
+  await page.route(`${ORDER_INTAKE_URL}**`, async (route) => {
+    submitted = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ schemaVersion: 1, requestId: REQUEST_ID, status: 'PENDING' }),
+    });
+  });
+
+  await page.getByPlaceholder('e.g. Ahmed').fill('Ahmed Mohamed');
+  await page.getByRole('button', { name: 'Pick up' }).click();
+  await page.getByRole('button', { name: 'Mixed Payment' }).click();
+
+  await expect(page.getByText('Cash Amount', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('InstaPay Amount', { exact: true })).toHaveCount(0);
+  await expect(page.getByPlaceholder('e.g. 01001234567')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Place Order' }).click();
+  await expect(page.getByText(/Order received/i)).toBeVisible();
+
+  expect(submitted).not.toBeNull();
+  const payload = submitted!;
+  expect(payload.customer).toEqual({ name: 'Ahmed Mohamed', phone: null, address: null });
+  expect(payload.fulfillmentPreference).toBe('PICKUP');
+  expect(payload.paymentPreference).toBe('MIXED');
+  assertNoBrowserAuthority(payload);
 });
