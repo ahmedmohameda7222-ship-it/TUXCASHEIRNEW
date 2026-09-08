@@ -8,6 +8,40 @@ const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const PROCESSING_ORDER_ID = '66666666-6666-4666-8666-666666666666';
 
+const acceptanceWorkspace = {
+  businessDayId: '22222222-2222-4222-8222-222222222222',
+  operator: { id: '99999999-9999-4999-8999-999999999999', displayName: 'Current Worker' },
+  configuration: {
+    orderTypes: [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        shopId: SHOP_ID,
+        name: 'Delivery',
+        behavior: 'DELIVERY',
+        active: true,
+      },
+    ],
+    deliveryZones: [
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        shopId: SHOP_ID,
+        name: 'Nasr City',
+        feeMinor: 3_000,
+        active: true,
+      },
+    ],
+    paymentMethods: [
+      {
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        shopId: SHOP_ID,
+        displayName: 'Cash',
+        logicType: 'CASH',
+        active: true,
+      },
+    ],
+  },
+} as never;
+
 function request(status: 'PENDING' | 'PROCESSING'): CachedOnlineOrderRequest {
   return {
     requestId: REQUEST_ID,
@@ -55,9 +89,11 @@ describe('OnlineOrderInboxPanel', () => {
       <OnlineOrderInboxPanel
         snapshot={{ requests: [request('PROCESSING')], syncState: 'SYNCED', errorMessage: null }}
         busyRequestId={null}
+        acceptanceWorkspaces={{ [REQUEST_ID]: acceptanceWorkspace }}
         onClaim={vi.fn()}
         onRelease={vi.fn()}
         onReject={vi.fn()}
+        onAccept={vi.fn()}
       />,
     );
 
