@@ -62,6 +62,14 @@ class MemoryInboxStore implements OnlineOrderInboxStore {
     return [...this.rows.values()].filter((item) => item.shopId === shopId);
   }
 
+  async get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null> {
+    return this.rows.get(`${shopId}:${requestId}`) ?? null;
+  }
+
+  async markAccepted(shopId: ShopId, requestId: string): Promise<void> {
+    this.rows.delete(`${shopId}:${requestId}`);
+  }
+
   async remove(shopId: ShopId, requestId: string): Promise<void> {
     this.rows.delete(`${shopId}:${requestId}`);
   }
