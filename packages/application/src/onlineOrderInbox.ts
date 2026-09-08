@@ -24,6 +24,8 @@ const CLAIM_ENVELOPE_KEYS = [
   'processingOrderId',
   'processingStartedAt',
   'processingExpiresAt',
+  'processingDeviceId',
+  'reservationOriginDeviceId',
 ] as const;
 const REVIEW_ACK_KEYS = ['schemaVersion', 'requestId', 'status'] as const;
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
@@ -95,6 +97,14 @@ function parseClaim(value: unknown, expectedShopId: ShopId, expectedRequestId: s
   }
   if (parsed.status !== 'PROCESSING') {
     throw new Error('Online-order claim response must be PROCESSING.');
+  }
+  if (
+    parsed.processingDeviceId === undefined ||
+    parsed.processingDeviceId === null ||
+    parsed.reservationOriginDeviceId === undefined ||
+    parsed.reservationOriginDeviceId === null
+  ) {
+    throw new Error('Online-order claim response is missing reservation ownership authority.');
   }
   return parsed;
 }
@@ -185,6 +195,7 @@ export class OperationsOnlineOrderInboxService {
       processingOrderId: null,
       processingStartedAt: null,
       processingExpiresAt: null,
+      processingDeviceId: null,
     };
     await this.#store.upsertMany([released]);
     await this.#publishSynced(shopId);
