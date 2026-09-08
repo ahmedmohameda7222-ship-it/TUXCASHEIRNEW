@@ -432,6 +432,13 @@ async function initializeOperationsServices(): Promise<void> {
     acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime),
     acceptanceStore: onlineOrderInboxStore,
     getActiveShopId: resolveOnlineOrderInboxShopId,
+    findCommittedOnlineOrder: async (shopId, processingOrderId) => {
+      const orderId = parseEntityId<OrderId>(processingOrderId);
+      const order = await operationsDatabase!.transaction((transaction) =>
+        transaction.orders.getById(orderId),
+      );
+      return order !== null && order.shopId === shopId && order.source === 'ONLINE';
+    },
   });
   ordersBoardService = new OperationsOrdersBoardService(
     operationsDatabase,

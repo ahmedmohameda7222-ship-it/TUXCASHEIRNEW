@@ -5,6 +5,12 @@ import { useCart } from '@/context/CartContext';
 import { useMenu } from '@/context/MenuContext';
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '@/lib/constants';
+import {
+  clearPendingCheckoutAttempt,
+  loadPendingCheckoutAttempt,
+  persistPendingCheckoutAttempt,
+  type PendingCheckoutAttempt,
+} from '@/lib/checkout-attempt';
 import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
 
 const DELIVERY_FEE_MESSAGE =
@@ -17,11 +23,6 @@ type OrderType = 'Pick up' | 'Delivery' | '';
 type PaymentMethod = 'Cash' | 'InstaPay' | 'Mixed Payment' | '';
 type SubmissionStatus = 'idle' | 'submitting' | 'success' | 'error';
 type OrderIntent = Omit<OnlineOrderRequestV1, 'idempotencyKey'>;
-
-interface PendingAttempt {
-  fingerprint: string;
-  idempotencyKey: string;
-}
 
 export function CartDrawer() {
   const {
@@ -42,7 +43,9 @@ export function CartDrawer() {
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>('idle');
-  const [pendingAttempt, setPendingAttempt] = useState<PendingAttempt | null>(null);
+  const [pendingAttempt, setPendingAttempt] = useState<PendingCheckoutAttempt | null>(() =>
+    loadPendingCheckoutAttempt(),
+  );
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [comboBeverageSelections, setComboBeverageSelections] = useState<Record<string, string>>(
     {},
@@ -141,6 +144,7 @@ export function CartDrawer() {
               idempotencyKey: crypto.randomUUID(),
             };
 
+      persistPendingCheckoutAttempt(attempt);
       if (attempt !== pendingAttempt) {
         setPendingAttempt(attempt);
       }
@@ -153,6 +157,7 @@ export function CartDrawer() {
 
       setPendingRequestId(response.requestId);
       setSubmissionStatus('success');
+      clearPendingCheckoutAttempt();
       setPendingAttempt(null);
       clearCart();
     } catch {
@@ -162,6 +167,7 @@ export function CartDrawer() {
 
   const handleClearCart = () => {
     clearCart();
+    clearPendingCheckoutAttempt();
     setPendingAttempt(null);
     setSubmissionStatus('idle');
     setPendingRequestId(null);

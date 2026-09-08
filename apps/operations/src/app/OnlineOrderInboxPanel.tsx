@@ -79,7 +79,8 @@ function missingFacts(request: CachedOnlineOrderRequest): readonly string[] {
 async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInboxStore> {
   if (browserStorePromise === null) {
     browserStorePromise = (async () => {
-      const store = await browserOnlineOrderInboxStore();
+      const store = new IndexedDbOnlineOrderInboxStore();
+      await store.initialize();
       return store;
     })();
   }
@@ -89,8 +90,7 @@ async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInbox
 async function browserOnlineOrderInboxClient(): Promise<OnlineOrderInboxRuntimeClient> {
   if (browserClientPromise === null) {
     browserClientPromise = (async () => {
-      const store = new IndexedDbOnlineOrderInboxStore();
-      await store.initialize();
+      const store = await browserOnlineOrderInboxStore();
       const sessionClient = createOperationsSessionClient();
       return createOnlineOrderInboxRuntime({
         getActiveShopId: async () => {

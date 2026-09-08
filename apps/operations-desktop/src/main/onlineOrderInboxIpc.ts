@@ -42,9 +42,11 @@ type OnlineOrderInboxService = Pick<
 >;
 type OnlineOrderAcceptanceService = Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;
 type OnlineOrderAcceptanceStore = {
+  list(shopId: ShopId): Promise<readonly CachedOnlineOrderRequest[]>;
   get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;
   markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;
 };
+type FindCommittedOnlineOrder = (shopId: ShopId, processingOrderId: string) => Promise<boolean>;
 
 function objectPayload(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -158,6 +160,7 @@ export class OnlineOrderInboxIpcRuntime {
   readonly #acceptance: OnlineOrderAcceptanceService | null;
   readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;
   readonly #getActiveShopId: (() => Promise<ShopId>) | null;
+  readonly #findCommittedOnlineOrder: FindCommittedOnlineOrder | null;
   #unsubscribe: (() => void) | null = null;
 
   constructor(input: {
@@ -165,11 +168,44 @@ export class OnlineOrderInboxIpcRuntime {
     readonly acceptance?: OnlineOrderAcceptanceService;
     readonly acceptanceStore?: OnlineOrderAcceptanceStore;
     readonly getActiveShopId?: () => Promise<ShopId>;
+    readonly findCommittedOnlineOrder?: FindCommittedOnlineOrder;
   }) {
     this.#service = input.service;
     this.#acceptance = input.acceptance ?? null;
     this.#acceptanceStore = input.acceptanceStore ?? null;
     this.#getActiveShopId = input.getActiveShopId ?? null;
+    this.#findCommittedOnlineOrder = input.findCommittedOnlineOrder ?? null;
+  }
+
+  async #reconcileAcceptedOrders(requestId?: string): Promise<boolean> {
+    if (
+      this.#acceptanceStore === null ||
+      this.#getActiveShopId === null ||
+      this.#findCommittedOnlineOrder === null
+    ) {
+      return false;
+    }
+    const shopId = await this.#getActiveShopId();
+    let requests: readonly CachedOnlineOrderRequest[];
+    if (requestId === undefined) {
+      requests = await this.#acceptanceStore.list(shopId);
+    } else {
+      const request = await this.#acceptanceStore.get(shopId, requestId);
+      requests = request === null ? [] : [request];
+    }
+    let reconciled = false;
+    for (const request of requests) {
+      if (request.status !== 'PROCESSING' || request.processingOrderId === null) continue;
+      if (await this.#findCommittedOnlineOrder(shopId, request.processingOrderId)) {
+        await this.#acceptanceStore.markAccepted(
+          shopId,
+          request.requestId,
+          request.processingOrderId,
+        );
+        reconciled = true;
+      }
+    }
+    return reconciled;
   }
 
   register(window: BrowserWindow): void {
@@ -177,6 +213,7 @@ export class OnlineOrderInboxIpcRuntime {
 
     ipcMain.handle(IPC_ONLINE_ORDERS_LOAD, async (event) => {
       assertTrustedIpcSender(event, window.webContents.id);
+      await this.#reconcileAcceptedOrders();
       return this.#service.load();
     });
 
@@ -191,19 +228,32 @@ export class OnlineOrderInboxIpcRuntime {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order release');
       exactKeys(input, ['requestId', 'processingOrderId'], 'Online-order release');
-      return this.#service.release(
-        uuid(input['requestId'], 'Online-order request ID'),
-        uuid(input['processingOrderId'], 'Online-order processing order ID'),
+      const requestId = uuid(input['requestId'], 'Online-order request ID');
+      const processingOrderId = uuid(
+        input['processingOrderId'],
+        'Online-order processing order ID',
       );
+      if (await this.#reconcileAcceptedOrders(requestId)) {
+        throw new Error('Online order has already been accepted locally.');
+      }
+      return this.#service.release(requestId, processingOrderId);
     });
 
     ipcMain.handle(IPC_ONLINE_ORDERS_REJECT, async (event, rawInput: unknown) => {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order rejection');
       exactKeys(input, ['requestId', 'processingOrderId', 'reason'], 'Online-order rejection');
+      const requestId = uuid(input['requestId'], 'Online-order request ID');
+      const processingOrderId = uuid(
+        input['processingOrderId'],
+        'Online-order processing order ID',
+      );
+      if (await this.#reconcileAcceptedOrders(requestId)) {
+        throw new Error('Online order has already been accepted locally.');
+      }
       return this.#service.reject(
-        uuid(input['requestId'], 'Online-order request ID'),
-        uuid(input['processingOrderId'], 'Online-order processing order ID'),
+        requestId,
+        processingOrderId,
         nonEmpty(input['reason'], 'Online-order rejection reason'),
       );
     });
@@ -220,6 +270,9 @@ export class OnlineOrderInboxIpcRuntime {
         throw new Error('Online-order acceptance service is not configured.');
       }
       const requestId = uuid(input['requestId'], 'Online-order request ID');
+      if (await this.#reconcileAcceptedOrders(requestId)) {
+        throw new Error('Online order has already been accepted locally.');
+      }
       const shopId = await this.#getActiveShopId();
       const request = await this.#acceptanceStore.get(shopId, requestId);
       if (

@@ -16,7 +16,8 @@ function storeError(message: string): OnlineOrderOperationsStoreError {
     message.includes('TUX_ONLINE_ORDER_ALREADY_PROCESSING') ||
     message.includes('TUX_ONLINE_ORDER_ALREADY_RESOLVED') ||
     message.includes('TUX_ONLINE_ORDER_CLAIM_MISMATCH') ||
-    message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT')
+    message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT') ||
+    message.includes('TUX_ONLINE_ORDER_REJECTION_FENCED')
   ) {
     return new OnlineOrderOperationsStoreError('CONFLICT');
   }
