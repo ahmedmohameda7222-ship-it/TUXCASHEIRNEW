@@ -1,0 +1,28 @@
+name: Temporary order intake lock generator
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate workspace lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-intake-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
