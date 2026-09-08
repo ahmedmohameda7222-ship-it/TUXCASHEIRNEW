@@ -57,18 +57,24 @@ function snapshot(requests: readonly CachedOnlineOrderRequest[]): unknown {
   return { schemaVersion: 1, requests };
 }
 
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
 describe('loadOnlineOrderInbox', () => {
   it('publishes the local cache before the remote snapshot resolves, then publishes SYNCED data', async () => {
     const store = new MemoryInboxStore();
     await store.upsertMany([request(REQUEST_A, SHOP_A)]);
-    let resolveRemote: ((value: unknown) => void) | null = null;
+    const pendingRemote = deferred<unknown>();
     const remote = {
-      fetchActiveRequests: vi.fn().mockImplementation(
-        () =>
-          new Promise<unknown>((resolve) => {
-            resolveRemote = resolve;
-          }),
-      ),
+      fetchActiveRequests: vi.fn().mockReturnValue(pendingRemote.promise),
     };
     const publish = vi.fn();
 
@@ -82,7 +88,7 @@ describe('loadOnlineOrderInbox', () => {
     });
 
     const remoteRequest = request(REQUEST_B, SHOP_A, '2026-09-08T10:05:00.000Z');
-    resolveRemote?.(snapshot([remoteRequest]));
+    pendingRemote.resolve(snapshot([remoteRequest]));
     await expect(loading).resolves.toEqual({
       requests: [remoteRequest],
       syncState: 'SYNCED',
