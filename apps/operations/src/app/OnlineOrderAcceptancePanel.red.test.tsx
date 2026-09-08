@@ -16,7 +16,17 @@ const request: CachedOnlineOrderRequest = {
   customerName: 'Online Customer',
   normalizedPhone: '01012345678',
   deliveryAddress: 'Nasr City, Cairo',
-  trustedItems: [{ productId: '77777777-7777-4777-8777-777777777777', quantity: 1 }],
+  trustedItems: [
+    {
+      productId: '77777777-7777-4777-8777-777777777777',
+      productName: 'Online Burger',
+      unitPriceMinor: 19_000,
+      quantity: 1,
+      modifiers: [],
+      comboBeverage: null,
+      note: null,
+    },
+  ],
   itemsSubtotalMinor: 19_000,
   orderNote: null,
   createdAt: instant('2026-09-08T10:00:00.000Z'),
@@ -73,6 +83,8 @@ describe('OnlineOrderInboxPanel Task 4 acceptance affordance', () => {
       />,
     );
 
+    expect(html).toContain('Requested items');
+    expect(html).toContain('1 × Online Burger');
     expect(html).toContain('Current operator');
     expect(html).toContain('Open Business Day');
     expect(html).toContain('Fulfillment type');
