@@ -6,6 +6,7 @@ import { OperationsOnlineOrderInboxService } from './onlineOrderInbox';
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const PROCESSING_ORDER_ID = '66666666-6666-4666-8666-666666666666';
+const DEVICE_ID = '88888888-8888-4888-8888-888888888888';
 
 function request(status: 'PENDING' | 'PROCESSING' = 'PENDING'): CachedOnlineOrderRequest {
   return {
@@ -25,6 +26,8 @@ function request(status: 'PENDING' | 'PROCESSING' = 'PENDING'): CachedOnlineOrde
     processingOrderId: status === 'PROCESSING' ? PROCESSING_ORDER_ID : null,
     processingStartedAt: status === 'PROCESSING' ? instant('2026-09-08T10:05:00.000Z') : null,
     processingExpiresAt: status === 'PROCESSING' ? instant('2026-09-08T10:15:00.000Z') : null,
+    processingDeviceId: status === 'PROCESSING' ? DEVICE_ID : null,
+    reservationOriginDeviceId: status === 'PROCESSING' ? DEVICE_ID : null,
   };
 }
 
