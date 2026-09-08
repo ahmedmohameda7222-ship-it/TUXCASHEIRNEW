@@ -7,6 +7,7 @@ import type { OnlineOrderOperationsRemote } from './onlineOrderInboxSync';
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const PROCESSING_ORDER_ID = '77777777-7777-4777-8777-777777777777';
+const DEVICE_ID = '88888888-8888-4888-8888-888888888888';
 
 function request(createdAt = '2026-09-08T10:00:00.000Z'): CachedOnlineOrderRequest {
   return {
@@ -36,6 +37,8 @@ function processingRequest(): CachedOnlineOrderRequest {
     processingOrderId: PROCESSING_ORDER_ID,
     processingStartedAt: instant('2026-09-08T10:10:00.000Z'),
     processingExpiresAt: instant('2026-09-08T10:20:00.000Z'),
+    processingDeviceId: DEVICE_ID,
+    reservationOriginDeviceId: DEVICE_ID,
   };
 }
 
@@ -46,6 +49,8 @@ function releasedRequest(): CachedOnlineOrderRequest {
     processingOrderId: null,
     processingStartedAt: null,
     processingExpiresAt: null,
+    processingDeviceId: null,
+    reservationOriginDeviceId: null,
   };
 }
 
