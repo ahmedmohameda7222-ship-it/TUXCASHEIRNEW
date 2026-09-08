@@ -1,0 +1,145 @@
+import type { OnlineOrderInboxSnapshot } from '@tux/application';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const electron = vi.hoisted(() => {
+  const handlers = new Map<string, (...args: unknown[]) => unknown>();
+  return {
+    handlers,
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlers.set(channel, handler);
+    }),
+    removeHandler: vi.fn((channel: string) => {
+      handlers.delete(channel);
+    }),
+  };
+});
+
+const security = vi.hoisted(() => ({ assertTrustedIpcSender: vi.fn() }));
+
+vi.mock('electron', () => ({
+  ipcMain: {
+    handle: electron.handle,
+    removeHandler: electron.removeHandler,
+  },
+}));
+vi.mock('./security', () => security);
+
+import {
+  IPC_ONLINE_ORDERS_CHANGED,
+  IPC_ONLINE_ORDERS_CLAIM,
+  IPC_ONLINE_ORDERS_LOAD,
+  IPC_ONLINE_ORDERS_REJECT,
+  IPC_ONLINE_ORDERS_RELEASE,
+  OnlineOrderInboxIpcRuntime,
+} from './onlineOrderInboxIpc';
+
+const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+const PROCESSING_ORDER_ID = '66666666-6666-4666-8666-666666666666';
+const snapshot: OnlineOrderInboxSnapshot = {
+  requests: [],
+  syncState: 'SYNCED',
+  errorMessage: null,
+};
+
+function service() {
+  const listeners = new Set<(value: OnlineOrderInboxSnapshot) => void>();
+  return {
+    load: vi.fn().mockResolvedValue(snapshot),
+    claim: vi.fn().mockResolvedValue({ requestId: REQUEST_ID }),
+    release: vi.fn().mockResolvedValue({ requestId: REQUEST_ID }),
+    reject: vi.fn().mockResolvedValue(undefined),
+    subscribe: vi.fn((listener: (value: OnlineOrderInboxSnapshot) => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }),
+    publish(value: OnlineOrderInboxSnapshot) {
+      for (const listener of listeners) listener(value);
+    },
+  };
+}
+
+function handler(channel: string): (...args: unknown[]) => Promise<unknown> {
+  const value = electron.handlers.get(channel);
+  if (value === undefined) throw new Error(`missing handler ${channel}`);
+  return value as (...args: unknown[]) => Promise<unknown>;
+}
+
+beforeEach(() => {
+  electron.handlers.clear();
+  electron.handle.mockClear();
+  electron.removeHandler.mockClear();
+  security.assertTrustedIpcSender.mockReset();
+});
+
+describe('OnlineOrderInboxIpcRuntime', () => {
+  it('registers load/claim/release/reject and checks the trusted sender before delegation', async () => {
+    const inbox = service();
+    const sent = vi.fn();
+    const window = {
+      isDestroyed: () => false,
+      webContents: { id: 77, send: sent },
+    };
+    const runtime = new OnlineOrderInboxIpcRuntime({ service: inbox });
+    runtime.register(window as never);
+
+    expect([...electron.handlers.keys()]).toEqual([
+      IPC_ONLINE_ORDERS_LOAD,
+      IPC_ONLINE_ORDERS_CLAIM,
+      IPC_ONLINE_ORDERS_RELEASE,
+      IPC_ONLINE_ORDERS_REJECT,
+    ]);
+
+    const event = { sender: { id: 77 } };
+    await handler(IPC_ONLINE_ORDERS_LOAD)(event);
+    await handler(IPC_ONLINE_ORDERS_CLAIM)(event, { requestId: REQUEST_ID });
+    await handler(IPC_ONLINE_ORDERS_RELEASE)(event, {
+      requestId: REQUEST_ID,
+      processingOrderId: PROCESSING_ORDER_ID,
+    });
+    await handler(IPC_ONLINE_ORDERS_REJECT)(event, {
+      requestId: REQUEST_ID,
+      processingOrderId: PROCESSING_ORDER_ID,
+      reason: 'Out of service area',
+    });
+
+    expect(security.assertTrustedIpcSender).toHaveBeenCalledTimes(4);
+    expect(inbox.load).toHaveBeenCalledTimes(1);
+    expect(inbox.claim).toHaveBeenCalledWith(REQUEST_ID);
+    expect(inbox.release).toHaveBeenCalledWith(REQUEST_ID, PROCESSING_ORDER_ID);
+    expect(inbox.reject).toHaveBeenCalledWith(
+      REQUEST_ID,
+      PROCESSING_ORDER_ID,
+      'Out of service area',
+    );
+
+    inbox.publish(snapshot);
+    expect(sent).toHaveBeenCalledWith(IPC_ONLINE_ORDERS_CHANGED, snapshot);
+    runtime.close();
+  });
+
+  it('rejects malformed mutation payloads before calling the service', async () => {
+    const inbox = service();
+    const runtime = new OnlineOrderInboxIpcRuntime({ service: inbox });
+    runtime.register({ isDestroyed: () => false, webContents: { id: 77, send: vi.fn() } } as never);
+    const event = { sender: { id: 77 } };
+
+    await expect(handler(IPC_ONLINE_ORDERS_CLAIM)(event, {})).rejects.toThrow(TypeError);
+    await expect(
+      handler(IPC_ONLINE_ORDERS_RELEASE)(event, {
+        requestId: REQUEST_ID,
+        processingOrderId: 'not-a-uuid',
+      }),
+    ).rejects.toThrow(TypeError);
+    await expect(
+      handler(IPC_ONLINE_ORDERS_REJECT)(event, {
+        requestId: REQUEST_ID,
+        processingOrderId: PROCESSING_ORDER_ID,
+        reason: '',
+      }),
+    ).rejects.toThrow(TypeError);
+
+    expect(inbox.claim).not.toHaveBeenCalled();
+    expect(inbox.release).not.toHaveBeenCalled();
+    expect(inbox.reject).not.toHaveBeenCalled();
+  });
+});
