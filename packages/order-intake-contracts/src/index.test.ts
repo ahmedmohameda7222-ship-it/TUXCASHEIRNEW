@@ -44,25 +44,46 @@ describe('online order intake transport contract', () => {
     expect(parseOnlineOrderRequestV1(validRequest())).toEqual(validRequest());
   });
 
-  it('accepts pickup without an address and preserves raw phone for trusted normalization', () => {
+  it('allows pickup to omit phone and address because delivery identity is not required', () => {
     const request = validRequest();
-    request.customer.address = null as unknown as string;
-    request.fulfillmentPreference = 'PICKUP';
-    request.customer.phone = '01001234567';
+    const parsed = parseOnlineOrderRequestV1({
+      ...request,
+      customer: { ...request.customer, phone: null, address: null },
+      fulfillmentPreference: 'PICKUP',
+    });
 
-    expect(parseOnlineOrderRequestV1(request).customer).toEqual({
+    expect(parsed.customer).toEqual({
       name: 'Ahmed Mohamed',
-      phone: '01001234567',
+      phone: null,
       address: null,
     });
   });
 
-  it('requires a non-empty address for delivery', () => {
+  it('requires both phone and address for delivery', () => {
     const request = validRequest();
-    request.customer.address = null as unknown as string;
 
-    expect(() => parseOnlineOrderRequestV1(request)).toThrow(OnlineOrderIntakeContractError);
+    expect(() =>
+      parseOnlineOrderRequestV1({
+        ...request,
+        customer: { ...request.customer, phone: null },
+      }),
+    ).toThrow(OnlineOrderIntakeContractError);
+    expect(() =>
+      parseOnlineOrderRequestV1({
+        ...request,
+        customer: { ...request.customer, address: null },
+      }),
+    ).toThrow(OnlineOrderIntakeContractError);
   });
+
+  it.each(['CASH', 'INSTAPAY', 'MIXED'] as const)(
+    'accepts %s as payment preference intent without settlement authority',
+    (paymentPreference) => {
+      expect(parseOnlineOrderRequestV1({ ...validRequest(), paymentPreference }).paymentPreference).toBe(
+        paymentPreference,
+      );
+    },
+  );
 
   it.each([
     ['priceMinor', 19050],
