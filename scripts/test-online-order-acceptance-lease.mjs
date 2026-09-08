@@ -20,6 +20,14 @@ end $$;
 insert into public.shops(id, name, active)
 values ('15111111-1111-4111-8111-111111111111', 'Task 4 Lease Shop', true);
 
+insert into public.devices(id, shop_id, label, active)
+values (
+  '15666666-6666-4666-8666-666666666666',
+  '15111111-1111-4111-8111-111111111111',
+  'Task 4 Lease Device',
+  true
+);
+
 insert into public.workers(id, shop_id, display_name, pin_hash, active)
 values (
   '15222222-2222-4222-8222-222222222222',
@@ -77,13 +85,28 @@ insert into public.online_order_requests(
 -- This row represents the durable reservation that was legitimately issued before
 -- the 12-hour PROCESSING lease expired and the request was requeued to PENDING.
 insert into private.online_order_processing_reservations(
-  processing_order_id, request_id, shop_id, reserved_at
+  processing_order_id, request_id, shop_id, origin_device_id, reserved_at
 ) values (
   '15bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
   '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
   '15111111-1111-4111-8111-111111111111'::uuid,
+  '15666666-6666-4666-8666-666666666666'::uuid,
   '2026-09-08T08:05:00Z'
 );
+
+do $$
+declare
+  v_origin_device_id uuid;
+begin
+  select origin_device_id
+  into v_origin_device_id
+  from private.online_order_processing_reservations
+  where request_id = '15aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+
+  if v_origin_device_id is distinct from '15666666-6666-4666-8666-666666666666'::uuid then
+    raise exception 'historical reservation did not preserve its origin device';
+  end if;
+end $$;
 
 -- Simulate the delayed outbox materialization after the local ONLINE order was
 -- committed while offline and the original processing lease has already expired.
