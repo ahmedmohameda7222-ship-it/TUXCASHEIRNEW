@@ -2,6 +2,7 @@ import type {
   OperationsBulkStockService,
   OperationsEndDayService,
   OperationsExpensesService,
+  OperationsOnlineOrderAcceptanceService,
   OperationsOnlineOrderInboxService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -121,7 +122,8 @@ export type TuxEndDayApi = Pick<
 export type TuxOnlineOrdersApi = Pick<
   OperationsOnlineOrderInboxService,
   'load' | 'claim' | 'release' | 'reject' | 'subscribe'
->;
+> &
+  Pick<OperationsOnlineOrderAcceptanceService, 'accept'>;
 
 export type TuxWhatsAppApi = Pick<
   OperationsWhatsAppService,
