@@ -149,7 +149,12 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
     if (!data) return null;
     const row = record(data, 'online order request');
     const status = stringField(row.status, 'online order request.status');
-    if (status !== 'PENDING' && status !== 'ACCEPTED' && status !== 'REJECTED') {
+    if (
+      status !== 'PENDING' &&
+      status !== 'PROCESSING' &&
+      status !== 'ACCEPTED' &&
+      status !== 'REJECTED'
+    ) {
       throw new Error('online order request status is invalid');
     }
     return {
