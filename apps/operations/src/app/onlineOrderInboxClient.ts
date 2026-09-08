@@ -1,6 +1,7 @@
 import type { ShopId } from '@tux/domain';
 import type { CachedOnlineOrderRequest, OnlineOrderInboxStore } from '@tux/persistence';
 import {
+  claimOnlineOrderForReview,
   syncOnlineOrderInboxSnapshot,
   type OnlineOrderOperationsRemote,
 } from './onlineOrderInboxSync';
@@ -15,7 +16,12 @@ export interface OnlineOrderInboxSnapshot {
 
 export interface OnlineOrderInboxRuntimeClient {
   load(): Promise<OnlineOrderInboxSnapshot>;
+  claim(requestId: string): Promise<CachedOnlineOrderRequest>;
   subscribe(listener: (snapshot: OnlineOrderInboxSnapshot) => void): () => void;
+}
+
+interface OnlineOrderInboxRuntimeRemote extends OnlineOrderOperationsRemote {
+  claim(requestId: string): Promise<unknown>;
 }
 
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
@@ -61,11 +67,18 @@ export async function loadOnlineOrderInbox(input: {
 export function createOnlineOrderInboxRuntime(input: {
   readonly getActiveShopId: () => Promise<ShopId>;
   readonly store: OnlineOrderInboxStore;
-  readonly remote: OnlineOrderOperationsRemote;
+  readonly remote: OnlineOrderInboxRuntimeRemote;
 }): OnlineOrderInboxRuntimeClient {
   const listeners = new Set<(snapshot: OnlineOrderInboxSnapshot) => void>();
   const publish = (snapshot: OnlineOrderInboxSnapshot): void => {
     for (const listener of listeners) listener(snapshot);
+  };
+  const publishSynced = async (shopId: ShopId): Promise<void> => {
+    publish({
+      requests: await input.store.list(shopId),
+      syncState: 'SYNCED',
+      errorMessage: null,
+    });
   };
 
   return {
@@ -76,6 +89,17 @@ export function createOnlineOrderInboxRuntime(input: {
         remote: input.remote,
         publish,
       }),
+    claim: async (requestId) => {
+      const shopId = await input.getActiveShopId();
+      const claimed = await claimOnlineOrderForReview({
+        shopId,
+        requestId,
+        store: input.store,
+        remote: input.remote,
+      });
+      await publishSynced(shopId);
+      return claimed;
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
