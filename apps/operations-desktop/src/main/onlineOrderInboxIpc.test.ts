@@ -120,19 +120,8 @@ describe('OnlineOrderInboxIpcRuntime', () => {
     runtime.close();
   });
 
-  it('delegates acceptance only after trusted sender and exact payload validation', async () => {
+  it('delegates acceptance only after trusted sender, request lookup, and exact payload validation', async () => {
     const inbox = service();
-    const acceptance = {
-      accept: vi
-        .fn()
-        .mockResolvedValue({ ok: true, value: { order: { id: PROCESSING_ORDER_ID } } }),
-    };
-    const runtime = new OnlineOrderInboxIpcRuntime({
-      service: inbox,
-      acceptance: acceptance as never,
-    });
-    runtime.register({ isDestroyed: () => false, webContents: { id: 77, send: vi.fn() } } as never);
-    const event = { sender: { id: 77 } };
     const request = {
       requestId: REQUEST_ID,
       shopId: SHOP_ID,
@@ -151,6 +140,24 @@ describe('OnlineOrderInboxIpcRuntime', () => {
       processingStartedAt: '2026-09-08T10:01:00.000Z',
       processingExpiresAt: '2026-09-08T22:01:00.000Z',
     };
+    const acceptance = {
+      accept: vi
+        .fn()
+        .mockResolvedValue({ ok: true, value: { order: { id: PROCESSING_ORDER_ID } } }),
+    };
+    const acceptanceStore = {
+      get: vi.fn().mockResolvedValue(request),
+      markAccepted: vi.fn().mockResolvedValue(undefined),
+    };
+    const getActiveShopId = vi.fn().mockResolvedValue(SHOP_ID);
+    const runtime = new OnlineOrderInboxIpcRuntime({
+      service: inbox,
+      acceptance: acceptance as never,
+      acceptanceStore: acceptanceStore as never,
+      getActiveShopId: getActiveShopId as never,
+    });
+    runtime.register({ isDestroyed: () => false, webContents: { id: 77, send: vi.fn() } } as never);
+    const event = { sender: { id: 77 } };
     const confirmation = {
       orderTypeId: '77777777-7777-4777-8777-777777777777',
       deliveryZoneId: null,
@@ -162,18 +169,21 @@ describe('OnlineOrderInboxIpcRuntime', () => {
       },
     };
 
-    await handler(IPC_ONLINE_ORDERS_ACCEPT)(event, { request, confirmation });
+    await handler(IPC_ONLINE_ORDERS_ACCEPT)(event, { requestId: REQUEST_ID, confirmation });
     expect(security.assertTrustedIpcSender).toHaveBeenCalledWith(event, 77);
+    expect(getActiveShopId).toHaveBeenCalledTimes(1);
+    expect(acceptanceStore.get).toHaveBeenCalledWith(SHOP_ID, REQUEST_ID);
     expect(acceptance.accept).toHaveBeenCalledTimes(1);
-    expect(acceptance.accept.mock.calls[0]?.[0]).toMatchObject({
-      requestId: REQUEST_ID,
-      status: 'PROCESSING',
-      processingOrderId: PROCESSING_ORDER_ID,
-    });
+    expect(acceptance.accept.mock.calls[0]?.[0]).toBe(request);
     expect(acceptance.accept.mock.calls[0]?.[1]).toMatchObject({
       orderTypeId: confirmation.orderTypeId,
       payment: { mode: 'SINGLE', cashReceivedMinor: 20000 },
     });
+    expect(acceptanceStore.markAccepted).toHaveBeenCalledWith(
+      SHOP_ID,
+      REQUEST_ID,
+      PROCESSING_ORDER_ID,
+    );
   });
 
   it('rejects malformed mutation payloads before calling the service', async () => {
