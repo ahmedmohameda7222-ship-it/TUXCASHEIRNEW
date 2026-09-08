@@ -25,8 +25,8 @@ export interface CachedOnlineOrderRequest {
   readonly processingOrderId: string | null;
   readonly processingStartedAt: Instant | null;
   readonly processingExpiresAt: Instant | null;
-  readonly processingDeviceId?: string | null;
-  readonly reservationOriginDeviceId?: string | null;
+  readonly processingDeviceId?: string | null | undefined;
+  readonly reservationOriginDeviceId?: string | null | undefined;
 }
 
 export interface OnlineOrderInboxStore {
@@ -170,9 +170,15 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
   }
   if (
     status === 'PROCESSING' &&
-    (processingOrderId === null || processingStartedAt === null || processingExpiresAt === null)
+    (processingOrderId === null ||
+      processingStartedAt === null ||
+      processingExpiresAt === null ||
+      processingDeviceId === undefined ||
+      processingDeviceId === null ||
+      reservationOriginDeviceId === undefined ||
+      reservationOriginDeviceId === null)
   ) {
-    throw new Error('Cached PROCESSING online order requires processing authority.');
+    throw new Error('Cached PROCESSING online order requires processing and reservation authority.');
   }
   if (
     processingStartedAt !== null &&
