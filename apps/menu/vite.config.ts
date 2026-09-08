@@ -10,6 +10,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@assets': path.resolve(__dirname, 'src/assets'),
+      '@tux/catalog-contracts': path.resolve(
+        __dirname,
+        '../../packages/catalog-contracts/src/index.ts',
+      ),
     },
   },
   build: {

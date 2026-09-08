@@ -1,151 +1,148 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { supabase } from '@/lib/supabase';
-import {
-  PRODUCTS as fallbackProducts,
-  CATEGORIES as fallbackCategories,
-  type Product,
-} from '@/lib/menu-data';
-import { EXTRA_CATEGORY, EXTRA_PRODUCTS } from '@/lib/default-extras';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { fetchPublicCatalog } from '@/lib/catalog-public';
 
-export interface ProductSection {
+export interface SupabaseSection {
   id: string;
-  name: string;
   slug: string;
+  name: string;
   description?: string;
   sort_order: number;
   is_active: boolean;
-  is_fallback?: boolean;
 }
 
-export interface SupabaseProduct extends Omit<Product, 'category_id' | 'is_available'> {
-  section_id: string;
-  image_path?: string;
+export interface MenuModifier {
+  id: string;
+  name: string;
+  price_minor: number;
+  price: number;
   is_active: boolean;
-  is_fallback?: boolean;
+  max_quantity: number | null;
+  sort_order: number;
 }
 
-interface MenuContextType {
-  sections: ProductSection[];
+export interface SupabaseProduct {
+  id: string;
+  slug: string;
+  section_id: string;
+  name: string;
+  description?: string;
+  price_minor: number;
+  price: number;
+  image_url?: string;
+  is_best_seller: boolean;
+  is_active: boolean;
+  is_sold_out: boolean;
+  is_combo: boolean;
+  sort_order: number;
+}
+
+interface MenuContextValue {
+  sections: SupabaseSection[];
   products: SupabaseProduct[];
+  modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
   loading: boolean;
   error: string | null;
-  refreshMenu: () => Promise<void>;
 }
 
-const normalizeQualityCopy = (value: string) =>
-  value.replace(/\bPremium\b/g, 'High quality').replace(/\bpremium\b/g, 'high quality');
+const MenuContext = createContext<MenuContextValue | undefined>(undefined);
 
-const normalizeSectionCopy = (section: ProductSection): ProductSection => ({
-  ...section,
-  description: section.description
-    ? normalizeQualityCopy(section.description)
-    : section.description,
-});
-
-const normalizeProductCopy = (product: SupabaseProduct): SupabaseProduct => ({
-  ...product,
-  description: normalizeQualityCopy(product.description),
-});
-
-const defaultSections: ProductSection[] = [...fallbackCategories, EXTRA_CATEGORY].map((category) =>
-  normalizeSectionCopy({
-    ...category,
-    is_active: true,
-    is_fallback: true,
-  }),
-);
-
-const defaultProducts: SupabaseProduct[] = [...fallbackProducts, ...EXTRA_PRODUCTS].map(
-  ({ category_id, is_available, ...product }) =>
-    normalizeProductCopy({
-      ...product,
-      section_id: category_id,
-      is_active: is_available,
-      is_fallback: true,
-    }),
-);
-
-const mergeSections = (remoteSections: ProductSection[] = []) => {
-  const remoteIds = new Set(remoteSections.map((section) => section.id));
-  return [
-    ...remoteSections.map((section) => ({ ...normalizeSectionCopy(section), is_fallback: false })),
-    ...defaultSections.filter((section) => !remoteIds.has(section.id)),
-  ].sort((a, b) => a.sort_order - b.sort_order);
-};
-
-const mergeProducts = (remoteProducts: SupabaseProduct[] = []) => {
-  const remoteIds = new Set(remoteProducts.map((product) => product.id));
-  return [
-    ...remoteProducts.map((product) => ({ ...normalizeProductCopy(product), is_fallback: false })),
-    ...defaultProducts.filter((product) => !remoteIds.has(product.id)),
-  ].sort((a, b) => a.sort_order - b.sort_order);
-};
-
-const MenuContext = createContext<MenuContextType | undefined>(undefined);
-
-export function MenuProvider({ children }: { children: ReactNode }) {
-  const [sections, setSections] = useState<ProductSection[]>(defaultSections);
-  const [products, setProducts] = useState<SupabaseProduct[]>(defaultProducts);
+export function MenuProvider({ children }: { children: React.ReactNode }) {
+  const [sections, setSections] = useState<SupabaseSection[]>([]);
+  const [products, setProducts] = useState<SupabaseProduct[]>([]);
+  const [modifiersByProduct, setModifiersByProduct] = useState<
+    Readonly<Record<string, readonly MenuModifier[]>>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMenu = async () => {
-    if (!supabase) {
-      setSections(defaultSections);
-      setProducts(defaultProducts);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch all sections, including inactive ones.
-      // Public pages filter by is_active, while the admin panel needs inactive rows to edit/reactivate them.
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('product_sections')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (sectionsError) throw sectionsError;
-
-      // Fetch all products, including inactive ones.
-      // This prevents fallback products from reappearing after a matching database row is set inactive.
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (productsError) throw productsError;
-
-      setSections(mergeSections(sectionsData || []));
-      setProducts(mergeProducts(productsData || []));
-    } catch (err: unknown) {
-      console.error('Error fetching menu data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load menu');
-      setSections(defaultSections);
-      setProducts(defaultProducts);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchMenu();
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const snapshot = await fetchPublicCatalog(controller.signal);
+
+        const nextSections = snapshot.categories
+          .map((category) => ({
+            id: category.id,
+            slug: category.slug,
+            name: category.name,
+            description: category.description ?? undefined,
+            sort_order: category.sortOrder,
+            is_active: category.active,
+          }))
+          .sort((left, right) => left.sort_order - right.sort_order);
+
+        const nextProducts = snapshot.products
+          .map((product) => ({
+            id: product.id,
+            slug: product.slug,
+            section_id: product.categoryId,
+            name: product.name,
+            description: product.description ?? undefined,
+            price_minor: product.priceMinor,
+            price: product.priceMinor / 100,
+            image_url: product.imageUrl ?? undefined,
+            is_best_seller: product.bestSeller,
+            is_active: product.active && !product.soldOut,
+            is_sold_out: product.soldOut,
+            is_combo: product.isCombo,
+            sort_order: product.sortOrder,
+          }))
+          .sort((left, right) => left.sort_order - right.sort_order);
+
+        const modifiersById = new Map(
+          snapshot.modifiers.map((modifier) => [modifier.id, modifier] as const),
+        );
+        const nextModifiersByProduct: Record<string, MenuModifier[]> = {};
+        for (const link of snapshot.productModifierLinks) {
+          const modifier = modifiersById.get(link.modifierId);
+          if (!modifier?.active) continue;
+          const entry: MenuModifier = {
+            id: modifier.id,
+            name: modifier.name,
+            price_minor: modifier.priceMinor,
+            price: modifier.priceMinor / 100,
+            is_active: modifier.active,
+            max_quantity: link.maxQuantity,
+            sort_order: link.sortOrder,
+          };
+          (nextModifiersByProduct[link.productId] ??= []).push(entry);
+        }
+        for (const modifiers of Object.values(nextModifiersByProduct)) {
+          modifiers.sort((left, right) => left.sort_order - right.sort_order);
+        }
+
+        setSections(nextSections);
+        setProducts(nextProducts);
+        setModifiersByProduct(nextModifiersByProduct);
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        console.error('Failed to load canonical public catalog', cause);
+        setSections([]);
+        setProducts([]);
+        setModifiersByProduct({});
+        setError('Menu temporarily unavailable. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
   }, []);
 
-  return (
-    <MenuContext.Provider value={{ sections, products, loading, error, refreshMenu: fetchMenu }}>
-      {children}
-    </MenuContext.Provider>
+  const value = useMemo(
+    () => ({ sections, products, modifiersByProduct, loading, error }),
+    [sections, products, modifiersByProduct, loading, error],
   );
+
+  return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;
 }
 
 export function useMenu() {
   const context = useContext(MenuContext);
-  if (context === undefined) {
-    throw new Error('useMenu must be used within a MenuProvider');
-  }
+  if (!context) throw new Error('useMenu must be used within MenuProvider');
   return context;
 }

@@ -16,7 +16,7 @@ const ORDER_PRODUCT_ELEMENT_PREFIX = 'order-product-';
 
 export const getProductSectionHref = (section: ProductRouteSection) => {
   const routeKey = section.slug || section.id;
-  return PRODUCT_SECTION_ROUTES[section.id] || `/products/${routeKey}`;
+  return PRODUCT_SECTION_ROUTES[routeKey] || `/products/${routeKey}`;
 };
 
 export const getOrderProductElementId = (productId: string) =>

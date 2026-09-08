@@ -19,7 +19,8 @@
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@assets/*": ["./src/assets/*"]
+      "@assets/*": ["./src/assets/*"],
+      "@tux/catalog-contracts": ["../../packages/catalog-contracts/src/index.ts"]
     },
     "types": ["node", "vite/client"]
   },
