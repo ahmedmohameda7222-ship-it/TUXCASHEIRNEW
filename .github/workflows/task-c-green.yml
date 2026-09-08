@@ -1,0 +1,276 @@
+name: Task C Green
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/menu-online-orders-integration
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - name: Apply canonical product-specific extras fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path_str: str, old: str, new: str) -> None:
+              path = Path(path_str)
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'anchor missing in {path_str}: {old[:120]!r}')
+              if text.count(old) != 1:
+                  raise SystemExit(f'anchor not unique in {path_str}: {text.count(old)} matches')
+              path.write_text(text.replace(old, new, 1))
+
+          # Public catalog contract keeps standalone product identity.
+          replace_once(
+              'packages/catalog-contracts/src/index.ts',
+              "export interface PublicCatalogModifierV1 {\n  readonly id: string;\n  readonly name: string;\n  readonly priceMinor: number;\n  readonly active: boolean;\n  readonly sortOrder: number;\n}",
+              "export interface PublicCatalogModifierV1 {\n  readonly id: string;\n  readonly name: string;\n  readonly priceMinor: number;\n  readonly standaloneProductId: string | null;\n  readonly active: boolean;\n  readonly sortOrder: number;\n}",
+          )
+          replace_once(
+              'packages/catalog-contracts/src/index.ts',
+              "function requiredSlug(value: unknown, path: string): string {",
+              "function nullableUuid(value: unknown, path: string): string | null {\n  if (value === null) return null;\n  return requiredUuid(value, path);\n}\n\nfunction requiredSlug(value: unknown, path: string): string {",
+          )
+          replace_once(
+              'packages/catalog-contracts/src/index.ts',
+              "  exactKeys(row, ['id', 'name', 'priceMinor', 'active', 'sortOrder'], path);\n  return {\n    id: requiredUuid(row.id, `${path}.id`),\n    name: requiredText(row.name, `${path}.name`, 200),\n    priceMinor: nonNegativeInteger(row.priceMinor, `${path}.priceMinor`),\n    active: requiredBoolean(row.active, `${path}.active`),\n    sortOrder: nonNegativeInteger(row.sortOrder, `${path}.sortOrder`),\n  };",
+              "  exactKeys(\n    row,\n    ['id', 'name', 'priceMinor', 'standaloneProductId', 'active', 'sortOrder'],\n    path,\n  );\n  return {\n    id: requiredUuid(row.id, `${path}.id`),\n    name: requiredText(row.name, `${path}.name`, 200),\n    priceMinor: nonNegativeInteger(row.priceMinor, `${path}.priceMinor`),\n    standaloneProductId: nullableUuid(row.standaloneProductId, `${path}.standaloneProductId`),\n    active: requiredBoolean(row.active, `${path}.active`),\n    sortOrder: nonNegativeInteger(row.sortOrder, `${path}.sortOrder`),\n  };",
+          )
+          replace_once(
+              'packages/catalog-contracts/src/index.test.ts',
+              "      { id: MODIFIER_ID, name: 'Extra cheese', priceMinor: 2000, active: true, sortOrder: 1 },",
+              "      {\n        id: MODIFIER_ID,\n        name: 'Extra cheese',\n        priceMinor: 2000,\n        standaloneProductId: null,\n        active: true,\n        sortOrder: 1,\n      },",
+          )
+
+          # Public Edge projection exposes only the canonical customer-safe identity.
+          replace_once(
+              'supabase/functions/catalog-public/catalog.ts',
+              "export interface PublicModifierRow extends Row {\n  readonly id: string;\n  readonly shop_id: string;\n  readonly name: string;\n  readonly price_minor: number;\n  readonly active: boolean;\n  readonly sort_order: number;\n}",
+              "export interface PublicModifierRow extends Row {\n  readonly id: string;\n  readonly shop_id: string;\n  readonly name: string;\n  readonly price_minor: number;\n  readonly standalone_product_id: string | null;\n  readonly active: boolean;\n  readonly sort_order: number;\n}",
+          )
+          replace_once(
+              'supabase/functions/catalog-public/catalog.ts',
+              "  const modifiers = modifierRows\n    .map((row) => ({\n      id: row.id,\n      name: row.name,\n      priceMinor: requireMoney(row.price_minor, `modifier ${row.id}`),\n      active: row.active,\n      sortOrder: row.sort_order,\n    }))\n    .sort(sortByOrderThenId);",
+              "  const modifiers = modifierRows\n    .map((row) => {\n      if (row.standalone_product_id !== null && !productIds.has(row.standalone_product_id)) {\n        throw new CatalogUnavailableError(`modifier ${row.id} has unknown standalone product`);\n      }\n      return {\n        id: row.id,\n        name: row.name,\n        priceMinor: requireMoney(row.price_minor, `modifier ${row.id}`),\n        standaloneProductId: row.standalone_product_id,\n        active: row.active,\n        sortOrder: row.sort_order,\n      };\n    })\n    .sort(sortByOrderThenId);",
+          )
+
+          # Edge behavioral fixture proves the field is emitted, not merely typed.
+          replace_once(
+              'supabase/functions/catalog-public/catalog-public.deno.ts',
+              "{ id: MODIFIER_ID, shop_id: SHOP_ID, name: 'Extra cheese', price_minor: 2000, active: true, sort_order: 1, standalone_product_id: null },",
+              "{ id: MODIFIER_ID, shop_id: SHOP_ID, name: 'Extra cheese', price_minor: 2000, active: true, sort_order: 1, standalone_product_id: PRODUCT_B },",
+          )
+          replace_once(
+              'supabase/functions/catalog-public/catalog-public.deno.ts',
+              "  const products = payload.products as Array<Record<string, unknown>>;\n  assert(categories[0]?.id === CATEGORY_A && categories[1]?.id === CATEGORY_B, 'category ordering unstable');",
+              "  const products = payload.products as Array<Record<string, unknown>>;\n  const modifiers = payload.modifiers as Array<Record<string, unknown>>;\n  assert(categories[0]?.id === CATEGORY_A && categories[1]?.id === CATEGORY_B, 'category ordering unstable');",
+          )
+          replace_once(
+              'supabase/functions/catalog-public/catalog-public.deno.ts',
+              "  assert(products[1]?.active === false && products[1]?.soldOut === true, 'availability semantics lost');\n  assert(!('shop_id' in products[0]!) && !('cost_minor' in products[0]!), 'internal fields leaked');",
+              "  assert(products[1]?.active === false && products[1]?.soldOut === true, 'availability semantics lost');\n  assert(modifiers[0]?.standaloneProductId === PRODUCT_B, 'standalone modifier identity lost');\n  assert(!('shop_id' in products[0]!) && !('cost_minor' in products[0]!), 'internal fields leaked');",
+          )
+
+          # Menu projection creates product-specific authorized extra DTOs using modifier price.
+          replace_once(
+              'apps/menu/src/context/menuProjection.ts',
+              "export interface MenuModifier {\n  id: string;\n  name: string;\n  price_minor: number;\n  price: number;\n  is_active: boolean;\n  max_quantity: number | null;\n  sort_order: number;\n}",
+              "export interface MenuModifier {\n  id: string;\n  name: string;\n  price_minor: number;\n  price: number;\n  is_active: boolean;\n  max_quantity: number | null;\n  sort_order: number;\n}\n\nexport interface MenuExtraOption {\n  id: string;\n  name: string;\n  price: number;\n}",
+          )
+          replace_once(
+              'apps/menu/src/context/menuProjection.ts',
+              "  readonly modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  readonly comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;",
+              "  readonly modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  readonly extrasByProduct: Readonly<Record<string, readonly MenuExtraOption[]>>;\n  readonly comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;",
+          )
+          replace_once(
+              'apps/menu/src/context/menuProjection.ts',
+              "  for (const modifiers of Object.values(modifiersByProduct)) {\n    modifiers.sort((left, right) => left.sort_order - right.sort_order);\n  }\n\n  const productsById = new Map(products.map((product) => [product.id, product] as const));",
+              "  for (const modifiers of Object.values(modifiersByProduct)) {\n    modifiers.sort((left, right) => left.sort_order - right.sort_order);\n  }\n\n  const productsById = new Map(products.map((product) => [product.id, product] as const));\n  const extrasByProduct: Record<string, MenuExtraOption[]> = {};\n  const sortedLinks = [...snapshot.productModifierLinks].sort(\n    (left, right) =>\n      left.productId.localeCompare(right.productId) ||\n      left.sortOrder - right.sortOrder ||\n      left.modifierId.localeCompare(right.modifierId),\n  );\n  for (const link of sortedLinks) {\n    const modifier = modifiersById.get(link.modifierId);\n    if (!modifier?.active || modifier.standaloneProductId === null) continue;\n    const standaloneProduct = productsById.get(modifier.standaloneProductId);\n    if (!standaloneProduct?.is_active) continue;\n    (extrasByProduct[link.productId] ??= []).push({\n      id: standaloneProduct.id,\n      name: modifier.name,\n      price: modifier.priceMinor / 100,\n    });\n  }",
+          )
+          replace_once(
+              'apps/menu/src/context/menuProjection.ts',
+              "    modifiersByProduct,\n    comboBeveragesByProduct,",
+              "    modifiersByProduct,\n    extrasByProduct,\n    comboBeveragesByProduct,",
+          )
+
+          # MenuContext publishes the canonical per-product extra map.
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  type MenuModifier,\n  type SupabaseProduct,",
+              "  type MenuExtraOption,\n  type MenuModifier,\n  type SupabaseProduct,",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  MenuModifier,\n  ProductSection,",
+              "  MenuExtraOption,\n  MenuModifier,\n  ProductSection,",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;",
+              "  modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;\n  extrasByProduct: Readonly<Record<string, readonly MenuExtraOption[]>>;\n  comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "  const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<",
+              "  const [extrasByProduct, setExtrasByProduct] = useState<\n    Readonly<Record<string, readonly MenuExtraOption[]>>\n  >({});\n  const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "      setModifiersByProduct(projection.modifiersByProduct);\n      setComboBeveragesByProduct(projection.comboBeveragesByProduct);",
+              "      setModifiersByProduct(projection.modifiersByProduct);\n      setExtrasByProduct(projection.extrasByProduct);\n      setComboBeveragesByProduct(projection.comboBeveragesByProduct);",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "      setModifiersByProduct({});\n      setComboBeveragesByProduct({});",
+              "      setModifiersByProduct({});\n      setExtrasByProduct({});\n      setComboBeveragesByProduct({});",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "      modifiersByProduct,\n      comboBeveragesByProduct,",
+              "      modifiersByProduct,\n      extrasByProduct,\n      comboBeveragesByProduct,",
+          )
+          replace_once(
+              'apps/menu/src/context/MenuContext.tsx',
+              "    [sections, products, modifiersByProduct, comboBeveragesByProduct, loading, error, refreshMenu],",
+              "    [\n      sections,\n      products,\n      modifiersByProduct,\n      extrasByProduct,\n      comboBeveragesByProduct,\n      loading,\n      error,\n      refreshMenu,\n    ],",
+          )
+
+          # ProductOrderCard accepts the minimal authorized extra DTO.
+          replace_once(
+              'apps/menu/src/components/order/ProductOrderCard.tsx',
+              "import { type SupabaseProduct } from '@/context/MenuContext';",
+              "import { type MenuExtraOption, type SupabaseProduct } from '@/context/MenuContext';",
+          )
+          replace_once(
+              'apps/menu/src/components/order/ProductOrderCard.tsx',
+              "  extras?: SupabaseProduct[];",
+              "  extras?: readonly MenuExtraOption[];",
+          )
+          replace_once(
+              'apps/menu/src/components/order/ProductOrderCard.tsx',
+              "  const canAddExtras = !unavailable && product.section_id !== 'extras' && extras.length > 0;",
+              "  const canAddExtras = !unavailable && extras.length > 0;",
+          )
+
+          # OrderNow keeps Extras category as presentation grouping only; authorization is per product.
+          replace_once(
+              'apps/menu/src/pages/OrderNow.tsx',
+              "  const { sections, products, loading } = useMenu();",
+              "  const { sections, products, extrasByProduct, loading } = useMenu();",
+          )
+          old = """  const extraProducts = useMemo(
+    () =>
+      extrasSectionId === null
+        ? []
+        : products.filter(
+            (product) => product.section_id === extrasSectionId && product.is_active,
+          ),
+    [extrasSectionId, products],
+  );
+"""
+          path = Path('apps/menu/src/pages/OrderNow.tsx')
+          text = path.read_text()
+          if old not in text:
+              raise SystemExit('OrderNow extraProducts block anchor missing')
+          path.write_text(text.replace(old, '', 1))
+          replace_once(
+              'apps/menu/src/pages/OrderNow.tsx',
+              "extras={extraProducts}",
+              "extras={extrasByProduct[product.id] ?? []}",
+          )
+
+          # Update source regression so the global authorization path cannot return.
+          Path('apps/menu/src/pages/OrderNow.source.test.ts').write_text("""import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+const source = readFileSync(new URL('./OrderNow.tsx', import.meta.url), 'utf8');
+
+describe('OrderNow canonical category and extra identity', () => {
+  it('keeps Extras category presentation-only and authorizes extras per product', () => {
+    expect(source).toContain(\"section.slug === 'extras'\");
+    expect(source).not.toContain(\"const EXTRAS_SECTION_ID = 'extras'\");
+    expect(source).toContain('extrasByProduct[product.id]');
+    expect(source).not.toContain('extras={extraProducts}');
+  });
+});
+""")
+
+          # Append-only repository migration: expose standalone_product_id in the existing narrow RPC.
+          old_migration = Path('supabase/migrations/20260907194500_catalog_public_identity.sql').read_text()
+          start = old_migration.index('create or replace function public.read_catalog_public_v1')
+          end_marker = "\nrevoke all on function public.read_catalog_public_v1(uuid) from public;"
+          end = old_migration.index(end_marker, start)
+          function_and_grants = old_migration[start:]
+          function_and_grants = function_and_grants.split('\n-- Catalog images are customer-facing.', 1)[0].rstrip() + '\n'
+          modifier_anchor = "            'price_minor', m.price_minor,\n            'active', m.active,"
+          if modifier_anchor not in function_and_grants:
+              raise SystemExit('catalog public RPC modifier anchor missing')
+          function_and_grants = function_and_grants.replace(
+              modifier_anchor,
+              "            'price_minor', m.price_minor,\n            'standalone_product_id', m.standalone_product_id,\n            'active', m.active,",
+              1,
+          )
+          migration = """-- Expose canonical standalone modifier product identity to the public catalog projection.
+-- Repository migration only. Do not apply remotely without explicit production authorization.
+
+""" + function_and_grants
+          Path('supabase/migrations/20260908051000_catalog_public_modifier_identity.sql').write_text(migration)
+          PY
+      - name: Format C changes
+        run: >-
+          npx prettier --write
+          packages/catalog-contracts/src/index.ts
+          packages/catalog-contracts/src/index.test.ts
+          supabase/functions/catalog-public/catalog.ts
+          supabase/functions/catalog-public/catalog-public.deno.ts
+          apps/menu/src/context/menuProjection.ts
+          apps/menu/src/context/MenuContext.tsx
+          apps/menu/src/components/order/ProductOrderCard.tsx
+          apps/menu/src/pages/OrderNow.tsx
+          apps/menu/src/pages/OrderNow.source.test.ts
+      - name: Targeted C GREEN
+        run: >-
+          npx vitest run
+          packages/catalog-contracts/src/index.test.ts
+          apps/menu/src/context/menuProjection.test.ts
+          apps/menu/src/pages/OrderNow.source.test.ts
+      - name: Catalog public Edge behavior
+        run: deno test --allow-env supabase/functions/catalog-public/catalog-public.deno.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Commit verified C fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            packages/catalog-contracts/src/index.ts \
+            packages/catalog-contracts/src/index.test.ts \
+            supabase/functions/catalog-public/catalog.ts \
+            supabase/functions/catalog-public/catalog-public.deno.ts \
+            supabase/migrations/20260908051000_catalog_public_modifier_identity.sql \
+            apps/menu/src/context/menuProjection.ts \
+            apps/menu/src/context/MenuContext.tsx \
+            apps/menu/src/components/order/ProductOrderCard.tsx \
+            apps/menu/src/pages/OrderNow.tsx \
+            apps/menu/src/pages/OrderNow.source.test.ts
+          git commit -m "fix(menu): authorize extras by canonical product links"
+          git push origin HEAD:work/menu-online-orders-integration
