@@ -25,6 +25,7 @@ vi.mock('electron', () => ({
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const PROCESSING_ORDER_ID = '66666666-6666-4666-8666-666666666666';
+const DEVICE_ID = '77777777-7777-4777-8777-777777777777';
 
 const pendingRequest = {
   requestId: REQUEST_ID,
@@ -51,6 +52,8 @@ const processingRequest = {
   processingOrderId: PROCESSING_ORDER_ID,
   processingStartedAt: '2026-09-08T10:01:00.000Z',
   processingExpiresAt: '2026-09-08T10:11:00.000Z',
+  processingDeviceId: DEVICE_ID,
+  reservationOriginDeviceId: DEVICE_ID,
 } as const;
 
 const syncedSnapshot = {
