@@ -40,6 +40,11 @@ export type {
   ExpensesRuntime,
   ManualExpenseInput,
 } from './expenses';
+export { OperationsOnlineOrderAcceptanceService } from './onlineOrderAcceptance';
+export type {
+  OnlineOrderAcceptanceConfirmation,
+  OnlineOrderAcceptanceDraftInput,
+} from './onlineOrderAcceptance';
 export { OperationsOnlineOrderInboxService } from './onlineOrderInbox';
 export type {
   OnlineOrderInboxRemoteGateway,
