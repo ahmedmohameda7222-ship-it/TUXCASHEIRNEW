@@ -1,8 +1,5 @@
 import type { OnlineOrderInboxSnapshot } from '@tux/application';
-import {
-  parseCachedOnlineOrderRequest,
-  type CachedOnlineOrderRequest,
-} from '@tux/persistence';
+import { parseCachedOnlineOrderRequest, type CachedOnlineOrderRequest } from '@tux/persistence';
 
 const SYNC_STATES = new Set<OnlineOrderInboxSnapshot['syncState']>([
   'CACHED',
@@ -17,13 +14,14 @@ function record(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function exactKeys(source: Record<string, unknown>, expected: readonly string[], label: string): void {
+function exactKeys(
+  source: Record<string, unknown>,
+  expected: readonly string[],
+  label: string,
+): void {
   const actual = Object.keys(source).sort();
   const canonical = [...expected].sort();
-  if (
-    actual.length !== canonical.length ||
-    actual.some((key, index) => key !== canonical[index])
-  ) {
+  if (actual.length !== canonical.length || actual.some((key, index) => key !== canonical[index])) {
     throw new TypeError(`${label} contains unexpected fields.`);
   }
 }

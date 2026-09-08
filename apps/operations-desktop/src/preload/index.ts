@@ -29,6 +29,11 @@ import {
   assertSaveDraftResult,
 } from './ordersResult';
 import { assertOrderTransitionResult, assertOrdersBoardResult } from './ordersBoardResult';
+import {
+  assertOnlineOrderInboxRequest,
+  assertOnlineOrderInboxSnapshot,
+  assertOnlineOrderInboxVoidResult,
+} from './onlineOrderInboxResult';
 import { assertSessionResult } from './sessionResult';
 import { assertSyncHealthSnapshot } from './syncStatusResult';
 import { assertWhatsAppMediaAccessResult } from './whatsappMediaAccessResult';
@@ -83,6 +88,11 @@ const IPC_END_DAY_BEGIN = 'tux:end-day:begin';
 const IPC_END_DAY_DISCARD_DRAFT = 'tux:end-day:discard-draft';
 const IPC_END_DAY_PREVIEW = 'tux:end-day:preview';
 const IPC_END_DAY_CLOSE = 'tux:end-day:close';
+const IPC_ONLINE_ORDERS_LOAD = 'tux:online-orders:load';
+const IPC_ONLINE_ORDERS_CLAIM = 'tux:online-orders:claim';
+const IPC_ONLINE_ORDERS_RELEASE = 'tux:online-orders:release';
+const IPC_ONLINE_ORDERS_REJECT = 'tux:online-orders:reject';
+const IPC_ONLINE_ORDERS_CHANGED = 'tux:online-orders:changed';
 const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
 const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
 const IPC_WHATSAPP_SEND_TEXT = 'tux:whatsapp:send-text';
@@ -285,6 +295,36 @@ const api: TuxDesktopApi = Object.freeze({
       assertEndDayPreviewResult((await ipcRenderer.invoke(IPC_END_DAY_PREVIEW, input)) as unknown),
     closeDay: async (input: Parameters<TuxDesktopApi['endDay']['closeDay']>[0]) =>
       assertEndDayCloseResult((await ipcRenderer.invoke(IPC_END_DAY_CLOSE, input)) as unknown),
+  }),
+  onlineOrders: Object.freeze({
+    load: async () =>
+      assertOnlineOrderInboxSnapshot((await ipcRenderer.invoke(IPC_ONLINE_ORDERS_LOAD)) as unknown),
+    claim: async (requestId: string) =>
+      assertOnlineOrderInboxRequest(
+        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_CLAIM, { requestId })) as unknown,
+      ),
+    release: async (requestId: string, processingOrderId: string) =>
+      assertOnlineOrderInboxRequest(
+        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_RELEASE, {
+          requestId,
+          processingOrderId,
+        })) as unknown,
+      ),
+    reject: async (requestId: string, processingOrderId: string, reason: string) =>
+      assertOnlineOrderInboxVoidResult(
+        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_REJECT, {
+          requestId,
+          processingOrderId,
+          reason,
+        })) as unknown,
+      ),
+    subscribe: (listener: Parameters<TuxDesktopApi['onlineOrders']['subscribe']>[0]) => {
+      const wrapper = (_event: IpcRendererEvent, value: unknown): void => {
+        listener(assertOnlineOrderInboxSnapshot(value));
+      };
+      ipcRenderer.on(IPC_ONLINE_ORDERS_CHANGED, wrapper);
+      return () => ipcRenderer.removeListener(IPC_ONLINE_ORDERS_CHANGED, wrapper);
+    },
   }),
   whatsapp: Object.freeze({
     loadInbox: async (cursor?: string) =>
