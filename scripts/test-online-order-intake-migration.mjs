@@ -67,11 +67,28 @@ begin
   ) then raise exception 'online_order_requests.accepted_order_id missing'; end if;
 
   if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'online_order_requests' and column_name = 'processing_device_id'
+  ) then raise exception 'online_order_requests.processing_device_id missing'; end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'online_order_requests' and column_name = 'processing_order_id'
+  ) then raise exception 'online_order_requests.processing_order_id missing'; end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'online_order_requests' and column_name = 'processing_started_at'
+  ) then raise exception 'online_order_requests.processing_started_at missing'; end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'online_order_requests' and column_name = 'processing_expires_at'
+  ) then raise exception 'online_order_requests.processing_expires_at missing'; end if;
+
+  if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.online_order_requests'::regclass
       and contype = 'c'
-      and pg_get_constraintdef(oid) ilike '%PENDING%ACCEPTED%REJECTED%'
-  ) then raise exception 'online order request status constraint missing'; end if;
+      and pg_get_constraintdef(oid) ilike '%PENDING%PROCESSING%ACCEPTED%REJECTED%'
+  ) then raise exception 'online order request processing status constraint missing'; end if;
 
   if not exists (
     select 1 from pg_constraint
@@ -96,6 +113,31 @@ begin
       and indexdef ilike '%accepted_order_id%'
       and indexdef ilike '%unique%'
   ) then raise exception 'accepted order one-to-one uniqueness missing'; end if;
+
+  if to_regprocedure('public.list_tux_online_order_requests_v1(uuid,uuid,integer)') is null then
+    raise exception 'list_tux_online_order_requests_v1 RPC missing';
+  end if;
+  if to_regprocedure('public.claim_tux_online_order_request_v1(uuid,uuid,uuid)') is null then
+    raise exception 'claim_tux_online_order_request_v1 RPC missing';
+  end if;
+  if to_regprocedure('public.release_tux_online_order_request_claim_v1(uuid,uuid,uuid,uuid)') is null then
+    raise exception 'release_tux_online_order_request_claim_v1 RPC missing';
+  end if;
+  if to_regprocedure('public.reject_tux_online_order_request_v1(uuid,uuid,uuid,text)') is null then
+    raise exception 'reject_tux_online_order_request_v1 RPC missing';
+  end if;
+  if to_regprocedure('private.resolve_tux_online_order_request_from_order_v1()') is null then
+    raise exception 'online-order final materialization resolver missing';
+  end if;
+  if not exists (
+    select 1
+    from pg_trigger trigger
+    where trigger.tgrelid = 'public.orders'::regclass
+      and not trigger.tgisinternal
+      and trigger.tgname = 'orders_resolve_online_request_after_materialization'
+  ) then
+    raise exception 'online-order final materialization trigger missing';
+  end if;
 
   select relrowsecurity into v_rls
   from pg_class
