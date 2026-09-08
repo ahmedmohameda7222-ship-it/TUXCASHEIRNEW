@@ -199,8 +199,7 @@ export function OnlineOrderInboxPanel({
                 {request.normalizedPhone === null ? null : <p>{request.normalizedPhone}</p>}
                 {request.deliveryAddress === null ? null : <p>{request.deliveryAddress}</p>}
                 <p className="online-order-item-count">
-                  {request.trustedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) ·
-                  canonical item snapshot received
+                  {request.trustedItems.length} canonical item line(s) received
                 </p>
                 {request.orderNote === null ? null : (
                   <p className="board-note">Customer note: {request.orderNote}</p>
