@@ -1,10 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(
-  new URL('../components/cart/CartDrawer.tsx', import.meta.url),
-  'utf8',
-);
+const source = readFileSync(new URL('../components/cart/CartDrawer.tsx', import.meta.url), 'utf8');
 
 describe('Menu checkout idempotency recovery', () => {
   it('persists the pending checkout attempt across reloads and clears it only after success or intentional cart reset', () => {
