@@ -7,6 +7,7 @@ const EXPECTED_VERIFY_JWT = {
   'device-enroll': false,
   'operations-config': true,
   'operations-sync': true,
+  'order-intake': false,
   'worker-auth': true,
 } as const;
 

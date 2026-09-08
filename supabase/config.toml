@@ -17,6 +17,12 @@ verify_jwt = false
 [functions.catalog-public]
 verify_jwt = false
 
+# Public customer order-intake boundary. No customer JWT exists. The function parses
+# a strict transport contract, re-resolves canonical catalog authority, recomputes
+# trusted pricing, and writes PENDING requests only with the server-side service role.
+[functions.order-intake]
+verify_jwt = false
+
 # Canonical Admin mutation boundary. Supabase verifies the caller JWT at the
 # platform edge, then catalog-admin independently resolves the user and active
 # OWNER/ADMIN membership before any privileged database/storage operation.
