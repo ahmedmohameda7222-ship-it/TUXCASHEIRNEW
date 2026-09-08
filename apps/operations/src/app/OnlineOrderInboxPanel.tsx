@@ -132,10 +132,9 @@ export function OnlineOrderInboxPanel({
   ): void {
     event.preventDefault();
     if (request.processingOrderId === null || rejectReason.trim().length === 0) return;
-    void Promise.resolve(onReject(request.requestId, request.processingOrderId, rejectReason.trim())).then(
-      closeReject,
-      () => undefined,
-    );
+    void Promise.resolve(
+      onReject(request.requestId, request.processingOrderId, rejectReason.trim()),
+    ).then(closeReject, () => undefined);
   }
 
   return (
@@ -174,7 +173,12 @@ export function OnlineOrderInboxPanel({
                     </span>
                     <strong>{request.customerName}</strong>
                   </div>
-                  <time>{new Date(request.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                  <time>
+                    {new Date(request.createdAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </time>
                 </header>
 
                 <dl className="online-order-facts">
@@ -195,7 +199,8 @@ export function OnlineOrderInboxPanel({
                 {request.normalizedPhone === null ? null : <p>{request.normalizedPhone}</p>}
                 {request.deliveryAddress === null ? null : <p>{request.deliveryAddress}</p>}
                 <p className="online-order-item-count">
-                  {request.trustedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) · canonical item snapshot received
+                  {request.trustedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) ·
+                  canonical item snapshot received
                 </p>
                 {request.orderNote === null ? null : (
                   <p className="board-note">Customer note: {request.orderNote}</p>
@@ -209,7 +214,10 @@ export function OnlineOrderInboxPanel({
                 ) : null}
 
                 {rejectingRequestId === request.requestId && request.processingOrderId !== null ? (
-                  <form className="online-order-reject-form" onSubmit={(event) => submitReject(event, request)}>
+                  <form
+                    className="online-order-reject-form"
+                    onSubmit={(event) => submitReject(event, request)}
+                  >
                     <label>
                       Rejection reason
                       <input
@@ -240,7 +248,9 @@ export function OnlineOrderInboxPanel({
                           className="board-secondary-button"
                           type="button"
                           disabled={isBusy}
-                          onClick={() => void onRelease(request.requestId, request.processingOrderId!)}
+                          onClick={() =>
+                            void onRelease(request.requestId, request.processingOrderId!)
+                          }
                         >
                           Release
                         </button>
