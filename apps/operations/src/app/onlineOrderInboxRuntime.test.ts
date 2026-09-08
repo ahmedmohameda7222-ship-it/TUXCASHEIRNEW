@@ -108,6 +108,20 @@ type ReleaseRuntimeFactory = (input: {
   remote: ReleaseRemote;
 }) => ReleaseRuntimeClient;
 
+type RejectRemote = OnlineOrderOperationsRemote & {
+  reject(requestId: string, reason: string): Promise<unknown>;
+};
+
+type RejectRuntimeClient = RuntimeClient & {
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<void>;
+};
+
+type RejectRuntimeFactory = (input: {
+  getActiveShopId: () => Promise<ShopId>;
+  store: OnlineOrderInboxStore;
+  remote: RejectRemote;
+}) => RejectRuntimeClient;
+
 describe('online-order inbox runtime', () => {
   it('derives the active shop and publishes cached state before the synced snapshot', async () => {
     const module = (await import('./onlineOrderInboxClient')) as Record<string, unknown>;
@@ -194,5 +208,36 @@ describe('online-order inbox runtime', () => {
     expect(remote.release).toHaveBeenCalledWith(REQUEST_ID, PROCESSING_ORDER_ID);
     expect(await store.list(SHOP_ID)).toEqual([released]);
     expect(published).toEqual([{ requests: [released], syncState: 'SYNCED', errorMessage: null }]);
+  });
+
+  it('rejects a matching PROCESSING request, removes it locally, and publishes the empty inbox', async () => {
+    const module = (await import('./onlineOrderInboxClient')) as Record<string, unknown>;
+    const factory = module['createOnlineOrderInboxRuntime'];
+    expect(typeof factory).toBe('function');
+
+    const store = new MemoryInboxStore();
+    await store.upsertMany([processingRequest()]);
+    const remote: RejectRemote = {
+      fetchActiveRequests: vi.fn(),
+      reject: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        requestId: REQUEST_ID,
+        status: 'REJECTED',
+      }),
+    };
+    const getActiveShopId = vi.fn().mockResolvedValue(SHOP_ID);
+    const runtime = (factory as RejectRuntimeFactory)({ getActiveShopId, store, remote });
+    expect(typeof runtime.reject).toBe('function');
+    const published: OnlineOrderInboxSnapshot[] = [];
+    runtime.subscribe((snapshot) => published.push(snapshot));
+
+    await expect(
+      runtime.reject(REQUEST_ID, PROCESSING_ORDER_ID, 'Out of service area'),
+    ).resolves.toBeUndefined();
+
+    expect(getActiveShopId).toHaveBeenCalledTimes(1);
+    expect(remote.reject).toHaveBeenCalledWith(REQUEST_ID, 'Out of service area');
+    expect(await store.list(SHOP_ID)).toEqual([]);
+    expect(published).toEqual([{ requests: [], syncState: 'SYNCED', errorMessage: null }]);
   });
 });
