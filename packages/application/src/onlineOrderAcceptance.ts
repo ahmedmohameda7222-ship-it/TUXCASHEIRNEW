@@ -229,6 +229,12 @@ function assertCurrentCatalogItem(
     if (modifier === undefined || !modifier.active || link === undefined) {
       fail('The online-order modifier is unavailable or no longer linked in the current catalog.');
     }
+    if (
+      modifier.standaloneProductId !== null &&
+      currentProductAvailable(modifier.standaloneProductId, workspace) === undefined
+    ) {
+      fail('The online-order standalone add-on product is unavailable in the current catalog.');
+    }
     if (link.maxQuantity !== null && modifierSnapshot.quantity > link.maxQuantity) {
       fail('The online-order modifier quantity is no longer allowed by the current catalog.');
     }
