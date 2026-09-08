@@ -1,0 +1,161 @@
+import { spawnSync } from 'node:child_process';
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+if (!databaseUrl) throw new Error('TEST_DATABASE_URL is required.');
+const url = new URL(databaseUrl);
+if (!new Set(['127.0.0.1', 'localhost', '::1']).has(url.hostname)) {
+  throw new Error('Online-order acceptance lease test refuses a non-loopback PostgreSQL database.');
+}
+
+const sql = `
+begin;
+
+do $$
+begin
+  if to_regclass('private.online_order_processing_reservations') is null then
+    raise exception 'online order processing reservation history missing';
+  end if;
+end $$;
+
+insert into public.shops(id, name, active)
+values ('15111111-1111-4111-8111-111111111111', 'Task 4 Lease Shop', true);
+
+insert into public.workers(id, shop_id, display_name, pin_hash, active)
+values (
+  '15222222-2222-4222-8222-222222222222',
+  '15111111-1111-4111-8111-111111111111',
+  'Task 4 Worker',
+  'test-only',
+  true
+);
+
+insert into public.business_days(
+  id, shop_id, status, started_at, ended_at, started_by_worker_id,
+  ended_by_worker_id, last_allocated_display_order_no
+) values (
+  '15333333-3333-4333-8333-333333333333',
+  '15111111-1111-4111-8111-111111111111',
+  'OPEN',
+  '2026-09-08T08:00:00Z',
+  null,
+  '15222222-2222-4222-8222-222222222222',
+  null,
+  1
+);
+
+insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
+values (
+  '15444444-4444-4444-8444-444444444444',
+  '15111111-1111-4111-8111-111111111111',
+  'Take Away',
+  'TAKE_AWAY',
+  true,
+  0
+);
+
+insert into public.online_order_requests(
+  id, shop_id, idempotency_key, request_sha256, catalog_revision, status,
+  fulfillment_preference, payment_preference, customer_name, normalized_phone,
+  delivery_address, trusted_items, items_subtotal_minor, order_note
+) values (
+  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+  '15111111-1111-4111-8111-111111111111',
+  '15dddddddddd-4ddd-8ddd-dddddddddddd'::uuid,
+  repeat('a', 64),
+  repeat('b', 64),
+  'PENDING',
+  'PICKUP',
+  'CASH',
+  'Lease Customer',
+  null,
+  null,
+  '[{"productId":"15555555-5555-4555-8555-555555555555","quantity":1}]'::jsonb,
+  19000,
+  null
+);
+
+-- This row represents the durable reservation that was legitimately issued before
+-- the 12-hour PROCESSING lease expired and the request was requeued to PENDING.
+insert into private.online_order_processing_reservations(
+  processing_order_id, request_id, shop_id, reserved_at
+) values (
+  '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
+  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+  '15111111-1111-4111-8111-111111111111'::uuid,
+  '2026-09-08T08:05:00Z'
+);
+
+-- Simulate the delayed outbox materialization after the local ONLINE order was
+-- committed while offline and the original processing lease has already expired.
+insert into public.orders(
+  id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
+  operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
+  order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
+  normalized_phone_snapshot, address_snapshot, delivery_zone_id,
+  delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
+  items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
+  recognized_revenue_minor, collected_payment_minor
+) values (
+  '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
+  '15111111-1111-4111-8111-111111111111'::uuid,
+  '15333333-3333-4333-8333-333333333333'::uuid,
+  1,
+  '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'ONLINE',
+  'ACTIVE',
+  '15222222-2222-4222-8222-222222222222'::uuid,
+  'Task 4 Worker',
+  '15444444-4444-4444-8444-444444444444'::uuid,
+  'Take Away',
+  'TAKE_AWAY',
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  0,
+  0,
+  19000,
+  0,
+  19000,
+  null,
+  '2026-09-08T08:06:00Z',
+  '2026-09-08T08:06:00Z',
+  19000,
+  19000
+);
+
+do $$
+declare
+  v_status text;
+  v_order_id uuid;
+begin
+  select status, accepted_order_id
+  into v_status, v_order_id
+  from public.online_order_requests
+  where id = '15aaaaaaaaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+
+  if v_status <> 'ACCEPTED' then
+    raise exception 'historically reserved delayed order did not resolve request: %', v_status;
+  end if;
+  if v_order_id is distinct from '15bbbbbbbbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid then
+    raise exception 'accepted order identity did not preserve historical reservation';
+  end if;
+end $$;
+
+rollback;
+`;
+
+const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-c', sql], {
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+if (result.status !== 0) {
+  process.stderr.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  throw new Error(
+    `Online-order acceptance lease assertions failed with exit code ${result.status ?? 'unknown'}.`,
+  );
+}
+console.log('Online-order acceptance lease assertions passed.');
