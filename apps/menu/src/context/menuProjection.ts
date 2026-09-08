@@ -1,0 +1,114 @@
+import type { PublicCatalogSnapshotV1 } from '@tux/catalog-contracts';
+
+export interface SupabaseSection {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export type ProductSection = SupabaseSection;
+
+export interface MenuModifier {
+  id: string;
+  name: string;
+  price_minor: number;
+  price: number;
+  is_active: boolean;
+  max_quantity: number | null;
+  sort_order: number;
+}
+
+export interface SupabaseProduct {
+  id: string;
+  slug: string;
+  section_id: string;
+  name: string;
+  description?: string;
+  price_minor: number;
+  price: number;
+  image_url?: string;
+  image_path?: string;
+  is_best_seller: boolean;
+  is_active: boolean;
+  is_sold_out: boolean;
+  is_combo: boolean;
+  sort_order: number;
+}
+
+export interface MenuProjection {
+  readonly sections: readonly SupabaseSection[];
+  readonly products: readonly SupabaseProduct[];
+  readonly modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
+  readonly comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
+}
+
+export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuProjection {
+  const sections = snapshot.categories
+    .map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      description: category.description ?? undefined,
+      sort_order: category.sortOrder,
+      is_active: category.active,
+    }))
+    .sort((left, right) => left.sort_order - right.sort_order);
+
+  const products = snapshot.products
+    .map((product) => ({
+      id: product.id,
+      slug: product.slug,
+      section_id: product.categoryId,
+      name: product.name,
+      description: product.description ?? undefined,
+      price_minor: product.priceMinor,
+      price: product.priceMinor / 100,
+      image_url: product.imageUrl ?? undefined,
+      image_path: undefined,
+      is_best_seller: product.bestSeller,
+      is_active: product.active && !product.soldOut,
+      is_sold_out: product.soldOut,
+      is_combo: product.isCombo,
+      sort_order: product.sortOrder,
+    }))
+    .sort((left, right) => left.sort_order - right.sort_order);
+
+  const modifiersById = new Map(
+    snapshot.modifiers.map((modifier) => [modifier.id, modifier] as const),
+  );
+  const modifiersByProduct: Record<string, MenuModifier[]> = {};
+  for (const link of snapshot.productModifierLinks) {
+    const modifier = modifiersById.get(link.modifierId);
+    if (!modifier?.active) continue;
+    (modifiersByProduct[link.productId] ??= []).push({
+      id: modifier.id,
+      name: modifier.name,
+      price_minor: modifier.priceMinor,
+      price: modifier.priceMinor / 100,
+      is_active: modifier.active,
+      max_quantity: link.maxQuantity,
+      sort_order: link.sortOrder,
+    });
+  }
+  for (const modifiers of Object.values(modifiersByProduct)) {
+    modifiers.sort((left, right) => left.sort_order - right.sort_order);
+  }
+
+  const productsById = new Map(products.map((product) => [product.id, product] as const));
+  const comboBeveragesByProduct: Record<string, SupabaseProduct[]> = {};
+  for (const option of snapshot.comboBeverageOptions) {
+    const beverage = productsById.get(option.beverageProductId);
+    if (!beverage) continue;
+    (comboBeveragesByProduct[option.comboProductId] ??= []).push(beverage);
+  }
+
+  return {
+    sections,
+    products,
+    modifiersByProduct,
+    comboBeveragesByProduct,
+  };
+}
