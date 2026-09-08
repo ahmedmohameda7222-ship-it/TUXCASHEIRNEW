@@ -83,6 +83,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearCart = () => {
+    localStorage.setItem('tux-cart', JSON.stringify([]));
     setItems([]);
   };
 
