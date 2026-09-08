@@ -21,6 +21,16 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  projects: [
+    {
+      name: 'desktop-menu',
+      use: { browserName: 'chromium', viewport: { width: 1440, height: 960 } },
+    },
+    {
+      name: 'mobile-menu-390x844',
+      use: { browserName: 'chromium', viewport: { width: 390, height: 844 } },
+    },
+  ],
   webServer: {
     command: 'npm run build:menu && npm run preview -w @tux/menu -- --host 127.0.0.1 --port 4174',
     url: 'http://127.0.0.1:4174',
