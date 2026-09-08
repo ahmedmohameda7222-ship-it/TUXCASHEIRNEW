@@ -44,15 +44,13 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/order-now" component={OrderNow} />
-          <Route path="/tux-burger">
-            {() => <CanonicalCategoryRoute slug="tux-burger" />}
-          </Route>
+          <Route path="/tux-burger">{() => <CanonicalCategoryRoute slug="tux-burger" />}</Route>
           <Route path="/tuxify">{() => <CanonicalCategoryRoute slug="tuxify" />}</Route>
           <Route path="/hawawshi">{() => <CanonicalCategoryRoute slug="hawawshi" />}</Route>
           <Route path="/fries">{() => <CanonicalCategoryRoute slug="fries" />}</Route>
           <Route path="/combos">{() => <CanonicalCategoryRoute slug="combos" />}</Route>
           <Route path="/drinks">{() => <CanonicalCategoryRoute slug="drinks" />}</Route>
-          <Route path="/products/:slug" component={ProductCategoryPage} />
+          <Route path="/products/:slug">{() => <ProductCategoryPage />}</Route>
           <Route component={NotFound} />
         </Switch>
       </main>

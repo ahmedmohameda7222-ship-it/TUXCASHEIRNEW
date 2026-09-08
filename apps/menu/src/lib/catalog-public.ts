@@ -20,9 +20,7 @@ const configuredShopId = (): string => {
   return shopId;
 };
 
-export async function fetchPublicCatalog(
-  signal?: AbortSignal,
-): Promise<PublicCatalogSnapshotV1> {
+export async function fetchPublicCatalog(signal?: AbortSignal): Promise<PublicCatalogSnapshotV1> {
   const shopId = configuredShopId();
   const url = new URL(catalogPublicUrl());
   url.searchParams.set('shopId', shopId);
