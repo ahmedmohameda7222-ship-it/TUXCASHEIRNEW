@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const CATALOG_URL = 'https://catalog.test/functions/v1/catalog-public';
 const ORDER_INTAKE_URL = 'https://orders.test/functions/v1/order-intake';
+const visualParitySpec = /visual-parity\.e2e\.ts/;
 
 export default defineConfig({
   testDir: './e2e/menu',
@@ -28,6 +29,7 @@ export default defineConfig({
     },
     {
       name: 'mobile-menu-390x844',
+      testMatch: visualParitySpec,
       use: { browserName: 'chromium', viewport: { width: 390, height: 844 } },
     },
   ],
