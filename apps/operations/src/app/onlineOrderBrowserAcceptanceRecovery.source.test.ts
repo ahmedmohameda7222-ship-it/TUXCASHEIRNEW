@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const panelSource = readFileSync(new URL('./OnlineOrderInboxPanel.tsx', import.meta.url), 'utf8');
-const sessionSource = readFileSync(new URL('./sessionClient.ts', import.meta.url), 'utf8');
+const recoverySource = readFileSync(
+  new URL('./browserOnlineOrderAcceptanceRecovery.ts', import.meta.url),
+  'utf8',
+);
 
 describe('browser online-order acceptance crash recovery', () => {
   it('reconciles committed ONLINE orders into accepted inbox tombstones before review actions', () => {
@@ -34,9 +37,9 @@ describe('browser online-order acceptance crash recovery', () => {
   });
 
   it('proves committed-order identity through the browser Operations database', () => {
-    expect(sessionSource).toContain('export async function findBrowserCommittedOnlineOrder');
-    expect(sessionSource).toContain('transaction.orders.getById');
-    expect(sessionSource).toContain("order.source === 'ONLINE'");
-    expect(sessionSource).toContain('order.shopId === shopId');
+    expect(recoverySource).toContain('export async function findBrowserCommittedOnlineOrder');
+    expect(recoverySource).toContain('transaction.orders.getById');
+    expect(recoverySource).toContain("order.source === 'ONLINE'");
+    expect(recoverySource).toContain('order.shopId === shopId');
   });
 });
