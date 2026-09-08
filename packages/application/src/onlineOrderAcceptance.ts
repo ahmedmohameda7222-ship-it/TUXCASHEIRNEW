@@ -5,6 +5,7 @@ import {
   preparePaymentParts,
   type DeliveryZoneId,
   type DraftLineId,
+  type EntityId,
   type MoneyMinor,
   type ModifierId,
   type OrderDraft,
@@ -97,7 +98,7 @@ function trustedMoney(value: unknown, label: string): MoneyMinor {
   return moneyMinor(value);
 }
 
-function entityId<Id extends string>(value: unknown, label: string): Id {
+function entityId<Id extends EntityId>(value: unknown, label: string): Id {
   try {
     return parseEntityId<Id>(stringValue(value, label));
   } catch {
