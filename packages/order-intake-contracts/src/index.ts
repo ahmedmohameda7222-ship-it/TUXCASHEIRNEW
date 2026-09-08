@@ -6,7 +6,7 @@ export class OnlineOrderIntakeContractError extends Error {
 }
 
 export type OnlineOrderFulfillmentPreferenceV1 = 'DELIVERY' | 'PICKUP';
-export type OnlineOrderPaymentPreferenceV1 = 'CASH';
+export type OnlineOrderPaymentPreferenceV1 = 'CASH' | 'INSTAPAY' | 'MIXED';
 
 export interface OnlineOrderModifierSelectionV1 {
   modifierId: string;
@@ -24,7 +24,7 @@ export interface OnlineOrderItemV1 {
 
 export interface OnlineOrderCustomerV1 {
   name: string;
-  phone: string;
+  phone: string | null;
   address: string | null;
 }
 
@@ -191,15 +191,24 @@ export function parseOnlineOrderRequestV1(value: unknown): OnlineOrderRequestV1 
   }
   const fulfillmentPreference = record.fulfillmentPreference;
 
-  if (record.paymentPreference !== 'CASH') {
+  if (
+    record.paymentPreference !== 'CASH' &&
+    record.paymentPreference !== 'INSTAPAY' &&
+    record.paymentPreference !== 'MIXED'
+  ) {
     fail('request.paymentPreference is unsupported');
   }
+  const paymentPreference = record.paymentPreference;
 
   if (!Array.isArray(record.items) || record.items.length < 1 || record.items.length > 50) {
     fail('request.items must contain 1-50 entries');
   }
 
+  const phone = asNullableBoundedString(customerRecord.phone, 'request.customer.phone', 50);
   const address = asNullableBoundedString(customerRecord.address, 'request.customer.address', 500);
+  if (fulfillmentPreference === 'DELIVERY' && phone === null) {
+    fail('request.customer.phone is required for delivery');
+  }
   if (fulfillmentPreference === 'DELIVERY' && address === null) {
     fail('request.customer.address is required for delivery');
   }
@@ -210,11 +219,11 @@ export function parseOnlineOrderRequestV1(value: unknown): OnlineOrderRequestV1 
     idempotencyKey: asUuid(record.idempotencyKey, 'request.idempotencyKey'),
     customer: {
       name: asBoundedString(customerRecord.name, 'request.customer.name', 200),
-      phone: asBoundedString(customerRecord.phone, 'request.customer.phone', 50),
+      phone,
       address,
     },
     fulfillmentPreference,
-    paymentPreference: 'CASH',
+    paymentPreference,
     items: record.items.map((entry, index) => parseItem(entry, `request.items[${index}]`)),
     orderNote: asNullableBoundedString(record.orderNote, 'request.orderNote', 1000),
   };
