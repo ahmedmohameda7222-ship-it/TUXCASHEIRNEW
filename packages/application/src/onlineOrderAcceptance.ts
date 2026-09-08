@@ -188,15 +188,27 @@ function assertReservationAcceptanceOwnership(request: CachedOnlineOrderRequest)
   }
 }
 
+function currentProductAvailable(productId: ProductId, workspace: OrdersWorkspace) {
+  const product = workspace.configuration.products.find(
+    (candidate) => candidate.id === productId && candidate.shopId === workspace.shopId,
+  );
+  if (product === undefined || !product.active || product.soldOut) return undefined;
+  const category = workspace.configuration.categories.find(
+    (candidate) =>
+      candidate.id === product.categoryId &&
+      candidate.shopId === workspace.shopId &&
+      candidate.active,
+  );
+  return category === undefined ? undefined : product;
+}
+
 function assertCurrentCatalogItem(
   item: TrustedItem,
   workspace: OrdersWorkspace,
 ): { readonly subtotalMinor: MoneyMinor } {
-  const product = workspace.configuration.products.find(
-    (candidate) => candidate.id === item.productId && candidate.shopId === workspace.shopId,
-  );
-  if (product === undefined || !product.active || product.soldOut) {
-    fail('The online-order product is unavailable in the current catalog.');
+  const product = currentProductAvailable(item.productId, workspace);
+  if (product === undefined) {
+    fail('The online-order product or its category is unavailable in the current catalog.');
   }
   if (product.priceMinor !== item.unitPriceMinor) {
     fail('The online-order product price is stale against the current catalog.');
@@ -233,13 +245,7 @@ function assertCurrentCatalogItem(
     if (!product.isCombo) {
       fail('The online-order combo selection is no longer valid in the current catalog.');
     }
-    const beverage = workspace.configuration.products.find(
-      (candidate) =>
-        candidate.id === item.comboBeverage!.productId &&
-        candidate.shopId === workspace.shopId &&
-        candidate.active &&
-        !candidate.soldOut,
-    );
+    const beverage = currentProductAvailable(item.comboBeverage.productId, workspace);
     const option = workspace.configuration.comboBeverageOptions.find(
       (candidate) =>
         candidate.comboProductId === item.productId &&
