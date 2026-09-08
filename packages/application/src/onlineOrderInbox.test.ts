@@ -107,6 +107,11 @@ describe('OperationsOnlineOrderInboxService', () => {
     await expect(
       service.reject(REQUEST_ID, PROCESSING_ORDER_ID, 'Out of service area'),
     ).resolves.toBeUndefined();
+    expect(remote.reject).toHaveBeenCalledWith(
+      REQUEST_ID,
+      PROCESSING_ORDER_ID,
+      'Out of service area',
+    );
     expect(await store.list(SHOP_ID)).toEqual([]);
   });
 });
