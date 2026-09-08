@@ -83,7 +83,8 @@ type OnlineOrdersApi = {
 };
 
 function onlineOrdersApi(): OnlineOrdersApi {
-  return (harness.exposed as { readonly onlineOrders?: OnlineOrdersApi }).onlineOrders as OnlineOrdersApi;
+  return (harness.exposed as { readonly onlineOrders?: OnlineOrdersApi })
+    .onlineOrders as OnlineOrdersApi;
 }
 
 describe('desktop online-order inbox preload bridge', () => {
@@ -114,10 +115,12 @@ describe('desktop online-order inbox preload bridge', () => {
       requestId: REQUEST_ID,
     });
 
-    await expect(onlineOrdersApi().release(REQUEST_ID, PROCESSING_ORDER_ID)).resolves.toMatchObject({
-      requestId: REQUEST_ID,
-      status: 'PENDING',
-    });
+    await expect(onlineOrdersApi().release(REQUEST_ID, PROCESSING_ORDER_ID)).resolves.toMatchObject(
+      {
+        requestId: REQUEST_ID,
+        status: 'PENDING',
+      },
+    );
     expect(harness.invoke).toHaveBeenCalledWith('tux:online-orders:release', {
       requestId: REQUEST_ID,
       processingOrderId: PROCESSING_ORDER_ID,
