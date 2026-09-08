@@ -240,6 +240,10 @@ function buildTrustedItems(
     }
 
     for (const addonProductId of item.addonProductIds) {
+      const addonProduct = products.get(addonProductId);
+      if (!addonProduct || !addonProduct.active || addonProduct.soldOut) {
+        return errorResponse(409, 'item_unavailable');
+      }
       const modifier = standaloneModifiers.get(addonProductId);
       if (!modifier || !modifier.active) return errorResponse(400, 'invalid_selection');
       const link = links.get(`${item.productId}:${modifier.id}`);
