@@ -88,11 +88,7 @@ export class OnlineOrderInboxIpcRuntime {
     ipcMain.handle(IPC_ONLINE_ORDERS_REJECT, async (event, rawInput: unknown) => {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order rejection');
-      exactKeys(
-        input,
-        ['requestId', 'processingOrderId', 'reason'],
-        'Online-order rejection',
-      );
+      exactKeys(input, ['requestId', 'processingOrderId', 'reason'], 'Online-order rejection');
       return this.#service.reject(
         uuid(input['requestId'], 'Online-order request ID'),
         uuid(input['processingOrderId'], 'Online-order processing order ID'),
