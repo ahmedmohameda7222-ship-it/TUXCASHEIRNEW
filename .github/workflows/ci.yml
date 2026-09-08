@@ -57,13 +57,6 @@ jobs:
         run: npm ci
       - name: Format check
         run: npm run format:check
-      - name: Diagnose order-intake formatting
-        if: failure() && github.ref == 'refs/heads/work/menu-online-orders-integration'
-        shell: bash
-        run: |
-          npx prettier --write packages/order-intake-contracts/src/index.test.ts
-          git diff -- packages/order-intake-contracts/src/index.test.ts
-          exit 1
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests

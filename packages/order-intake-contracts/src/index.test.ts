@@ -96,50 +96,36 @@ describe('online order intake transport contract', () => {
   it('rejects invalid UUID identities and duplicate addon product IDs', () => {
     const invalidProduct = validRequest();
     invalidProduct.items[0]!.productId = 'not-a-uuid';
-    expect(() => parseOnlineOrderRequestV1(invalidProduct)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(invalidProduct)).toThrow(OnlineOrderIntakeContractError);
 
     const duplicateAddon = validRequest();
     duplicateAddon.items[0]!.addonProductIds = [ADDON_ID, ADDON_ID];
-    expect(() => parseOnlineOrderRequestV1(duplicateAddon)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(duplicateAddon)).toThrow(OnlineOrderIntakeContractError);
   });
 
   it('enforces item, selection, quantity, and text bounds', () => {
     const zeroQuantity = validRequest();
     zeroQuantity.items[0]!.quantity = 0;
-    expect(() => parseOnlineOrderRequestV1(zeroQuantity)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(zeroQuantity)).toThrow(OnlineOrderIntakeContractError);
 
     const tooManyItems = validRequest();
     tooManyItems.items = Array.from({ length: 51 }, () => ({ ...validRequest().items[0]! }));
-    expect(() => parseOnlineOrderRequestV1(tooManyItems)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(tooManyItems)).toThrow(OnlineOrderIntakeContractError);
 
     const tooManyAddons = validRequest();
     tooManyAddons.items[0]!.addonProductIds = Array.from(
       { length: 21 },
       (_, index) => `aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, '0')}`,
     );
-    expect(() => parseOnlineOrderRequestV1(tooManyAddons)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(tooManyAddons)).toThrow(OnlineOrderIntakeContractError);
 
     const longName = validRequest();
     longName.customer.name = 'A'.repeat(201);
-    expect(() => parseOnlineOrderRequestV1(longName)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(longName)).toThrow(OnlineOrderIntakeContractError);
 
     const longNote = validRequest();
     longNote.orderNote = 'N'.repeat(1001);
-    expect(() => parseOnlineOrderRequestV1(longNote)).toThrow(
-      OnlineOrderIntakeContractError,
-    );
+    expect(() => parseOnlineOrderRequestV1(longNote)).toThrow(OnlineOrderIntakeContractError);
   });
 
   it('allows only supported fulfillment and payment preference enums', () => {
