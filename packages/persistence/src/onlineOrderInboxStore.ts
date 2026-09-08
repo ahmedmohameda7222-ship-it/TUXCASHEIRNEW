@@ -141,9 +141,7 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
 
   const createdAt = parseInstant(source.createdAt, 'createdAt');
   const processingOrderId =
-    source.processingOrderId === null
-      ? null
-      : uuid(source.processingOrderId, 'processingOrderId');
+    source.processingOrderId === null ? null : uuid(source.processingOrderId, 'processingOrderId');
   const processingStartedAt = nullableInstant(source.processingStartedAt, 'processingStartedAt');
   const processingExpiresAt = nullableInstant(source.processingExpiresAt, 'processingExpiresAt');
 
