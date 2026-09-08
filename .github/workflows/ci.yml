@@ -57,13 +57,6 @@ jobs:
         run: npm ci
       - name: Format check
         run: npm run format:check
-      - name: Diagnose Menu formatting
-        if: failure() && github.ref == 'refs/heads/work/menu-online-orders-integration'
-        shell: bash
-        run: |
-          npx prettier --write e2e/menu/menu.e2e.ts
-          git diff -- e2e/menu/menu.e2e.ts
-          exit 1
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
