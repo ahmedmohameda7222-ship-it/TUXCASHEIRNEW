@@ -109,6 +109,17 @@ begin
     raise exception 'TUX_ONLINE_ORDER_LIMIT_INVALID';
   end if;
 
+  update public.online_order_requests request
+  set status = 'PENDING',
+      processing_device_id = null,
+      processing_order_id = null,
+      processing_started_at = null,
+      processing_expires_at = null,
+      updated_at = now()
+  where request.shop_id = v_shop_id
+    and request.status = 'PROCESSING'
+    and request.processing_expires_at <= now();
+
   select coalesce(jsonb_agg(row_payload order by created_at, request_id), '[]'::jsonb)
   into v_result
   from (
@@ -176,7 +187,18 @@ begin
     raise exception 'TUX_ONLINE_ORDER_NOT_FOUND';
   end if;
 
-  if v_request.status = 'PENDING' then
+  if v_request.status = 'PROCESSING'
+     and v_request.processing_expires_at <= now() then
+    update public.online_order_requests request
+    set status = 'PROCESSING',
+        processing_device_id = p_device_id,
+        processing_order_id = extensions.gen_random_uuid(),
+        processing_started_at = now(),
+        processing_expires_at = now() + interval '12 hours',
+        updated_at = now()
+    where request.id = v_request.id
+    returning * into v_request;
+  elsif v_request.status = 'PENDING' then
     update public.online_order_requests request
     set status = 'PROCESSING',
         processing_device_id = p_device_id,
