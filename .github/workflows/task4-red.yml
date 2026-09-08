@@ -8,6 +8,7 @@ on:
       - '.github/workflows/task4-red.yml'
       - 'packages/application/src/onlineOrderAcceptance.test.ts'
       - 'packages/application/src/onlineOrderAcceptance.review.test.ts'
+      - 'packages/application/src/onlineOrderAcceptance.sqlite.test.ts'
       - 'packages/application/src/onlineOrderAcceptance.ts'
 
 permissions:
@@ -32,14 +33,15 @@ jobs:
           npx prettier --write
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/onlineOrderAcceptance.review.test.ts
+          packages/application/src/onlineOrderAcceptance.sqlite.test.ts
       - name: Commit formatter-only correction
         shell: bash
         run: |
-          if ! git diff --quiet -- packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts; then
+          if ! git diff --quiet -- packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts packages/application/src/onlineOrderAcceptance.sqlite.test.ts; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts
-            git commit -m 'test(orders): format reviewed online-order acceptance RED'
+            git add packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts packages/application/src/onlineOrderAcceptance.sqlite.test.ts
+            git commit -m 'test(orders): format durable online-order acceptance RED'
             git push origin HEAD:work/menu-online-orders-integration
           fi
       - name: Targeted Task 4 RED
@@ -47,3 +49,4 @@ jobs:
           npx vitest run
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/onlineOrderAcceptance.review.test.ts
+          packages/application/src/onlineOrderAcceptance.sqlite.test.ts
