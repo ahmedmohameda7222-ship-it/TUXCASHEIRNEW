@@ -40,6 +40,12 @@ export type {
   ExpensesRuntime,
   ManualExpenseInput,
 } from './expenses';
+export { OperationsOnlineOrderInboxService } from './onlineOrderInbox';
+export type {
+  OnlineOrderInboxRemoteGateway,
+  OnlineOrderInboxSnapshot,
+  OnlineOrderInboxSyncState,
+} from './onlineOrderInbox';
 export { unavailableOrderPrinter } from './orderPrinter';
 export {
   DEFAULT_RECEIPT_PRINTER_CONFIGURATION,
