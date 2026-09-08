@@ -7,7 +7,12 @@ import {
   type SupabaseSection,
 } from './menuProjection';
 
-export type { MenuModifier, ProductSection, SupabaseProduct, SupabaseSection } from './menuProjection';
+export type {
+  MenuModifier,
+  ProductSection,
+  SupabaseProduct,
+  SupabaseSection,
+} from './menuProjection';
 
 interface MenuContextValue {
   sections: SupabaseSection[];
