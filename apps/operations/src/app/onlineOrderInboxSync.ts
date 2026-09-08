@@ -6,9 +6,35 @@ import {
 } from '@tux/persistence';
 
 const SNAPSHOT_LIMIT = 200;
+const CLAIM_ENVELOPE_KEYS = [
+  'schemaVersion',
+  'requestId',
+  'shopId',
+  'status',
+  'catalogRevision',
+  'fulfillmentPreference',
+  'paymentPreference',
+  'customerName',
+  'normalizedPhone',
+  'deliveryAddress',
+  'trustedItems',
+  'itemsSubtotalMinor',
+  'orderNote',
+  'createdAt',
+  'processingOrderId',
+  'processingStartedAt',
+  'processingExpiresAt',
+] as const;
+const REVIEW_ACK_KEYS = ['schemaVersion', 'requestId', 'status'] as const;
 
 export interface OnlineOrderOperationsRemote {
   fetchActiveRequests(limit: number): Promise<unknown>;
+}
+
+interface OnlineOrderReviewRemote {
+  claim(requestId: string): Promise<unknown>;
+  release(requestId: string, processingOrderId: string): Promise<unknown>;
+  reject(requestId: string, reason: string): Promise<unknown>;
 }
 
 function snapshotRecord(value: unknown): Record<string, unknown> {
@@ -16,6 +42,15 @@ function snapshotRecord(value: unknown): Record<string, unknown> {
     throw new Error('Online-order inbox snapshot must be an object.');
   }
   return value as Record<string, unknown>;
+}
+
+function hasExactKeys(
+  source: Readonly<Record<string, unknown>>,
+  expected: readonly string[],
+): boolean {
+  if (Object.keys(source).length !== expected.length) return false;
+  const accepted = new Set(expected);
+  return Object.keys(source).every((key) => accepted.has(key));
 }
 
 function parseOnlineOrderInboxSnapshot(
@@ -41,6 +76,61 @@ function parseOnlineOrderInboxSnapshot(
     }
     return parsed;
   });
+}
+
+function parseClaimResponse(input: {
+  readonly value: unknown;
+  readonly expectedShopId: ShopId;
+  readonly expectedRequestId: string;
+}): CachedOnlineOrderRequest {
+  const source = snapshotRecord(input.value);
+  if (!hasExactKeys(source, CLAIM_ENVELOPE_KEYS) || source.schemaVersion !== 1) {
+    throw new Error('Online-order claim response is invalid.');
+  }
+
+  const { schemaVersion: _schemaVersion, ...cachedValue } = source;
+  const parsed = parseCachedOnlineOrderRequest(cachedValue);
+  if (parsed.shopId !== input.expectedShopId) {
+    throw new Error('Online-order claim response is for another shop.');
+  }
+  if (parsed.requestId !== input.expectedRequestId) {
+    throw new Error('Online-order claim response is for another request.');
+  }
+  if (parsed.status !== 'PROCESSING') {
+    throw new Error('Online-order claim response must be PROCESSING.');
+  }
+  return parsed;
+}
+
+function parseReviewAck(input: {
+  readonly value: unknown;
+  readonly expectedRequestId: string;
+  readonly expectedStatus: 'PENDING' | 'REJECTED';
+}): void {
+  const source = snapshotRecord(input.value);
+  if (!hasExactKeys(source, REVIEW_ACK_KEYS) || source.schemaVersion !== 1) {
+    throw new Error('Online-order review acknowledgement is invalid.');
+  }
+  if (source.requestId !== input.expectedRequestId) {
+    throw new Error('Online-order review acknowledgement is for another request.');
+  }
+  if (source.status !== input.expectedStatus) {
+    throw new Error(`Online-order review acknowledgement must be ${input.expectedStatus}.`);
+  }
+}
+
+async function cachedRequestForReview(input: {
+  readonly shopId: ShopId;
+  readonly requestId: string;
+  readonly store: OnlineOrderInboxStore;
+}): Promise<CachedOnlineOrderRequest> {
+  const request = (await input.store.list(input.shopId)).find(
+    (candidate) => candidate.requestId === input.requestId,
+  );
+  if (request === undefined) {
+    throw new Error('Online-order review request is not present in the local inbox.');
+  }
+  return request;
 }
 
 async function requestJson(
@@ -92,7 +182,69 @@ export async function syncOnlineOrderInboxSnapshot(input: {
   return remoteRequests;
 }
 
-export class BrowserOnlineOrderOperationsRemote implements OnlineOrderOperationsRemote {
+export async function claimOnlineOrderForReview(input: {
+  readonly shopId: ShopId;
+  readonly requestId: string;
+  readonly store: OnlineOrderInboxStore;
+  readonly remote: Pick<OnlineOrderReviewRemote, 'claim'>;
+}): Promise<CachedOnlineOrderRequest> {
+  const claimed = parseClaimResponse({
+    value: await input.remote.claim(input.requestId),
+    expectedShopId: input.shopId,
+    expectedRequestId: input.requestId,
+  });
+  await input.store.upsertMany([claimed]);
+  return claimed;
+}
+
+export async function releaseOnlineOrderReview(input: {
+  readonly shopId: ShopId;
+  readonly requestId: string;
+  readonly processingOrderId: string;
+  readonly store: OnlineOrderInboxStore;
+  readonly remote: Pick<OnlineOrderReviewRemote, 'release'>;
+}): Promise<CachedOnlineOrderRequest> {
+  const cached = await cachedRequestForReview(input);
+  if (cached.status !== 'PROCESSING' || cached.processingOrderId !== input.processingOrderId) {
+    throw new Error('Online-order review release does not match the local processing claim.');
+  }
+
+  parseReviewAck({
+    value: await input.remote.release(input.requestId, input.processingOrderId),
+    expectedRequestId: input.requestId,
+    expectedStatus: 'PENDING',
+  });
+
+  const released: CachedOnlineOrderRequest = {
+    ...cached,
+    status: 'PENDING',
+    processingOrderId: null,
+    processingStartedAt: null,
+    processingExpiresAt: null,
+  };
+  await input.store.upsertMany([released]);
+  return released;
+}
+
+export async function rejectOnlineOrderRequest(input: {
+  readonly shopId: ShopId;
+  readonly requestId: string;
+  readonly reason: string;
+  readonly store: OnlineOrderInboxStore;
+  readonly remote: Pick<OnlineOrderReviewRemote, 'reject'>;
+}): Promise<void> {
+  await cachedRequestForReview(input);
+  parseReviewAck({
+    value: await input.remote.reject(input.requestId, input.reason),
+    expectedRequestId: input.requestId,
+    expectedStatus: 'REJECTED',
+  });
+  await input.store.remove(input.shopId, input.requestId);
+}
+
+export class BrowserOnlineOrderOperationsRemote
+  implements OnlineOrderOperationsRemote, OnlineOrderReviewRemote
+{
   async fetchActiveRequests(limit: number): Promise<unknown> {
     return requestJson(
       'GET',
