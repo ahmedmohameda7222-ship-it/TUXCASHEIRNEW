@@ -92,6 +92,7 @@ const IPC_ONLINE_ORDERS_LOAD = 'tux:online-orders:load';
 const IPC_ONLINE_ORDERS_CLAIM = 'tux:online-orders:claim';
 const IPC_ONLINE_ORDERS_RELEASE = 'tux:online-orders:release';
 const IPC_ONLINE_ORDERS_REJECT = 'tux:online-orders:reject';
+const IPC_ONLINE_ORDERS_ACCEPT = 'tux:online-orders:accept';
 const IPC_ONLINE_ORDERS_CHANGED = 'tux:online-orders:changed';
 const IPC_WHATSAPP_LOAD_INBOX = 'tux:whatsapp:load-inbox';
 const IPC_WHATSAPP_LOAD_CONVERSATION = 'tux:whatsapp:load-conversation';
@@ -317,6 +318,13 @@ const api: TuxDesktopApi = Object.freeze({
           processingOrderId,
           reason,
         })) as unknown,
+      ),
+    accept: async (
+      request: Parameters<TuxDesktopApi['onlineOrders']['accept']>[0],
+      confirmation: Parameters<TuxDesktopApi['onlineOrders']['accept']>[1],
+    ) =>
+      assertOrderPlacementResult(
+        (await ipcRenderer.invoke(IPC_ONLINE_ORDERS_ACCEPT, { request, confirmation })) as unknown,
       ),
     subscribe: (listener: Parameters<TuxDesktopApi['onlineOrders']['subscribe']>[0]) => {
       const wrapper = (_event: IpcRendererEvent, value: unknown): void => {

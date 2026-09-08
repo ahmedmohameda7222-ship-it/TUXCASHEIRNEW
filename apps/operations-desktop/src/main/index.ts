@@ -5,6 +5,7 @@ import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
   OperationsConfigurationSyncService,
+  OperationsOnlineOrderAcceptanceService,
   OperationsOnlineOrderInboxService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
@@ -322,7 +323,6 @@ async function initializeOperationsServices(): Promise<void> {
     store: onlineOrderInboxStore,
     remote: onlineOrderInboxRemote,
   });
-  onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({ service: onlineOrderInboxService });
 
   whatsappStore = new SqliteWhatsAppStore(databasePath);
   await whatsappStore.initialize();
@@ -427,6 +427,10 @@ async function initializeOperationsServices(): Promise<void> {
     coordinator,
     new ElectronOrderPrinter(),
   );
+  onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({
+    service: onlineOrderInboxService,
+    acceptance: new OperationsOnlineOrderAcceptanceService(ordersService, runtime),
+  });
   ordersBoardService = new OperationsOrdersBoardService(
     operationsDatabase,
     operatorReadModel,
