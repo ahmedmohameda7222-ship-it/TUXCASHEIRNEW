@@ -27,10 +27,12 @@ async function json(response: Response): Promise<Record<string, unknown>> {
 function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): OnlineOrderCatalogAuthority {
   return {
     shop: { id: SHOP_ID, active: true },
+    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: true }],
     products: [
       {
         id: PRODUCT_ID,
         shopId: SHOP_ID,
+        categoryId: CATEGORY_ID,
         name: 'Single Burger',
         priceMinor: 19000,
         active: true,
@@ -40,6 +42,7 @@ function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): Online
       {
         id: ADDON_PRODUCT_ID,
         shopId: SHOP_ID,
+        categoryId: CATEGORY_ID,
         name: 'Extra Cheese Product',
         priceMinor: 500,
         active: true,
@@ -49,6 +52,7 @@ function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): Online
       {
         id: COMBO_ID,
         shopId: SHOP_ID,
+        categoryId: CATEGORY_ID,
         name: 'Burger Combo',
         priceMinor: 30000,
         active: true,
@@ -58,6 +62,7 @@ function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): Online
       {
         id: BEVERAGE_ID,
         shopId: SHOP_ID,
+        categoryId: CATEGORY_ID,
         name: 'Cola',
         priceMinor: 4000,
         active: true,
@@ -226,11 +231,9 @@ Deno.test('order-intake rejects inactive or sold-out requested products', async 
 });
 
 Deno.test('order-intake rejects products whose canonical category is inactive', async () => {
-  const inactiveCategoryAuthority = {
-    ...authority(),
-    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: false }],
-    products: authority().products.map((product) => ({ ...product, categoryId: CATEGORY_ID })),
-  } as unknown as OnlineOrderCatalogAuthority;
+  const inactiveCategoryAuthority = authority({
+    categories: authority().categories.map((category) => ({ ...category, active: false })),
+  });
   const store = new MemoryStore(inactiveCategoryAuthority);
   const response = await handleOrderIntakeRequest(request(), store);
   assert(response.status === 409, 'inactive-category product must conflict');
