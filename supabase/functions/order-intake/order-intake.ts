@@ -7,9 +7,16 @@ import { normalizeEgyptianPhone } from '../../../packages/domain/src/phone.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
+export interface OnlineOrderCatalogCategory {
+  id: string;
+  shopId: string;
+  active: boolean;
+}
+
 export interface OnlineOrderCatalogProduct {
   id: string;
   shopId: string;
+  categoryId: string;
   name: string;
   priceMinor: number;
   active: boolean;
@@ -39,6 +46,7 @@ export interface OnlineOrderComboBeverageOption {
 
 export interface OnlineOrderCatalogAuthority {
   shop: { id: string; active: boolean };
+  categories: OnlineOrderCatalogCategory[];
   products: OnlineOrderCatalogProduct[];
   modifiers: OnlineOrderCatalogModifier[];
   productModifierLinks: OnlineOrderProductModifierLink[];
@@ -144,6 +152,7 @@ function canonicalCatalogForRevision(catalog: OnlineOrderCatalogAuthority): unkn
     [...rows].sort((a, b) => a.id.localeCompare(b.id));
   return {
     shop: catalog.shop,
+    categories: byId(catalog.categories),
     products: byId(catalog.products),
     modifiers: byId(catalog.modifiers),
     productModifierLinks: [...catalog.productModifierLinks].sort((a, b) =>
@@ -159,15 +168,20 @@ function canonicalCatalogForRevision(catalog: OnlineOrderCatalogAuthority): unkn
 
 function validateCatalogTenant(catalog: OnlineOrderCatalogAuthority, shopId: string): void {
   if (catalog.shop.id !== shopId || !catalog.shop.active) throw new Error('catalog shop mismatch');
+  if (catalog.categories.some((category) => category.shopId !== shopId)) {
+    throw new Error('cross-shop category authority');
+  }
   if (catalog.products.some((product) => product.shopId !== shopId)) {
     throw new Error('cross-shop product authority');
   }
   if (catalog.modifiers.some((modifier) => modifier.shopId !== shopId)) {
     throw new Error('cross-shop modifier authority');
   }
+  const categoryIds = new Set(catalog.categories.map((category) => category.id));
   const productIds = new Set(catalog.products.map((product) => product.id));
   const modifierIds = new Set(catalog.modifiers.map((modifier) => modifier.id));
   if (
+    catalog.products.some((product) => !categoryIds.has(product.categoryId)) ||
     catalog.productModifierLinks.some(
       (link) => !productIds.has(link.productId) || !modifierIds.has(link.modifierId),
     ) ||
@@ -183,6 +197,7 @@ function buildTrustedItems(
   request: OnlineOrderRequestV1,
   catalog: OnlineOrderCatalogAuthority,
 ): { trustedItems: Array<Record<string, unknown>>; itemsSubtotalMinor: number } | Response {
+  const categories = new Map(catalog.categories.map((category) => [category.id, category]));
   const products = new Map(catalog.products.map((product) => [product.id, product]));
   const modifiers = new Map(catalog.modifiers.map((modifier) => [modifier.id, modifier]));
   const links = new Map(
@@ -203,15 +218,21 @@ function buildTrustedItems(
     }
   }
 
+  const productAvailable = (product: OnlineOrderCatalogProduct | undefined): boolean =>
+    product !== undefined &&
+    product.active &&
+    !product.soldOut &&
+    categories.get(product.categoryId)?.active === true;
+
   let itemsSubtotalMinor = 0;
   const trustedItems: Array<Record<string, unknown>> = [];
 
   for (const item of request.items) {
     const product = products.get(item.productId);
-    if (!product || !product.active || product.soldOut) {
+    if (!productAvailable(product)) {
       return errorResponse(409, 'item_unavailable');
     }
-    assertTrustedMoney(product.priceMinor, 'product price');
+    assertTrustedMoney(product!.priceMinor, 'product price');
 
     const trustedModifiers: Array<Record<string, unknown>> = [];
     const selectedModifierIds = new Set<string>();
@@ -241,7 +262,7 @@ function buildTrustedItems(
 
     for (const addonProductId of item.addonProductIds) {
       const addonProduct = products.get(addonProductId);
-      if (!addonProduct || !addonProduct.active || addonProduct.soldOut) {
+      if (!productAvailable(addonProduct)) {
         return errorResponse(409, 'item_unavailable');
       }
       const modifier = standaloneModifiers.get(addonProductId);
@@ -264,25 +285,23 @@ function buildTrustedItems(
 
     let comboBeverage: Record<string, unknown> | null = null;
     if (item.comboBeverageProductId !== null) {
-      if (!product.isCombo) return errorResponse(400, 'invalid_selection');
+      if (!product!.isCombo) return errorResponse(400, 'invalid_selection');
       const beverage = products.get(item.comboBeverageProductId);
       if (
-        !beverage ||
-        !beverage.active ||
-        beverage.soldOut ||
+        !productAvailable(beverage) ||
         !comboOptions.has(`${item.productId}:${item.comboBeverageProductId}`)
       ) {
         return errorResponse(400, 'invalid_selection');
       }
-      comboBeverage = { productId: beverage.id, label: beverage.name };
+      comboBeverage = { productId: beverage!.id, label: beverage!.name };
     } else if (
-      product.isCombo &&
-      catalog.comboBeverageOptions.some((option) => option.comboProductId === product.id)
+      product!.isCombo &&
+      catalog.comboBeverageOptions.some((option) => option.comboProductId === product!.id)
     ) {
       return errorResponse(400, 'invalid_selection');
     }
 
-    const unitConfiguredMinor = product.priceMinor + modifiersUnitMinor;
+    const unitConfiguredMinor = product!.priceMinor + modifiersUnitMinor;
     const lineMinor = unitConfiguredMinor * item.quantity;
     if (!Number.isSafeInteger(unitConfiguredMinor) || !Number.isSafeInteger(lineMinor)) {
       throw new Error('line subtotal overflow');
@@ -291,9 +310,9 @@ function buildTrustedItems(
     if (!Number.isSafeInteger(itemsSubtotalMinor)) throw new Error('order subtotal overflow');
 
     trustedItems.push({
-      productId: product.id,
-      productName: product.name,
-      unitPriceMinor: product.priceMinor,
+      productId: product!.id,
+      productName: product!.name,
+      unitPriceMinor: product!.priceMinor,
       quantity: item.quantity,
       modifiers: trustedModifiers,
       comboBeverage,
