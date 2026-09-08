@@ -172,6 +172,20 @@ function assertLiveClaim(
   }
 }
 
+function assertReservationAcceptanceOwnership(request: CachedOnlineOrderRequest): void {
+  if (
+    request.processingDeviceId === undefined ||
+    request.processingDeviceId === null ||
+    request.reservationOriginDeviceId === undefined ||
+    request.reservationOriginDeviceId === null
+  ) {
+    fail('Online-order reservation ownership authority is unavailable; reclaim before acceptance.');
+  }
+  if (request.processingDeviceId !== request.reservationOriginDeviceId) {
+    fail('Online-order takeover claimant cannot accept a reservation owned by another origin device.');
+  }
+}
+
 function assertCurrentCatalogItem(
   item: TrustedItem,
   workspace: OrdersWorkspace,
@@ -424,6 +438,7 @@ export class OperationsOnlineOrderAcceptanceService {
       confirmation,
       runtime: this.#runtime,
     });
+    assertReservationAcceptanceOwnership(request);
     const orderId = entityId<OrderId>(request.processingOrderId, 'Reserved processing order id');
     return this.#orders.placeOrder(draft, { source: 'ONLINE', orderId });
   }
