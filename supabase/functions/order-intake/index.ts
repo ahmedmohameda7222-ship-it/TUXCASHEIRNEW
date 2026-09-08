@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   handleOrderIntakeRequest,
   type OnlineOrderCatalogAuthority,
+  type OnlineOrderCatalogCategory,
   type OnlineOrderCatalogModifier,
   type OnlineOrderCatalogProduct,
   type OnlineOrderComboBeverageOption,
@@ -45,37 +46,55 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
   constructor(private readonly client: SupabaseClient) {}
 
   async loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null> {
-    const [shopResult, productsResult, modifiersResult, linksResult, combosResult] = await Promise.all([
-      this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
-      this.client
-        .from('products')
-        .select('id,shop_id,name,price_minor,active,sold_out,is_combo')
-        .eq('shop_id', shopId),
-      this.client
-        .from('modifiers')
-        .select('id,shop_id,name,price_minor,active,standalone_product_id')
-        .eq('shop_id', shopId),
-      this.client
-        .from('product_modifiers')
-        .select('product_id,modifier_id,max_quantity')
-        .eq('shop_id', shopId),
-      this.client
-        .from('combo_beverage_options')
-        .select('combo_product_id,beverage_product_id')
-        .eq('shop_id', shopId),
-    ]);
+    const [shopResult, categoriesResult, productsResult, modifiersResult, linksResult, combosResult] =
+      await Promise.all([
+        this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
+        this.client.from('menu_categories').select('id,shop_id,active').eq('shop_id', shopId),
+        this.client
+          .from('products')
+          .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
+          .eq('shop_id', shopId),
+        this.client
+          .from('modifiers')
+          .select('id,shop_id,name,price_minor,active,standalone_product_id')
+          .eq('shop_id', shopId),
+        this.client
+          .from('product_modifiers')
+          .select('product_id,modifier_id,max_quantity')
+          .eq('shop_id', shopId),
+        this.client
+          .from('combo_beverage_options')
+          .select('combo_product_id,beverage_product_id')
+          .eq('shop_id', shopId),
+      ]);
 
-    for (const result of [shopResult, productsResult, modifiersResult, linksResult, combosResult]) {
+    for (const result of [
+      shopResult,
+      categoriesResult,
+      productsResult,
+      modifiersResult,
+      linksResult,
+      combosResult,
+    ]) {
       if (result.error) throw result.error;
     }
     if (!shopResult.data) return null;
 
     const shop = record(shopResult.data, 'shop');
+    const categories: OnlineOrderCatalogCategory[] = (categoriesResult.data ?? []).map((value) => {
+      const row = record(value, 'category');
+      return {
+        id: stringField(row.id, 'category.id'),
+        shopId: stringField(row.shop_id, 'category.shop_id'),
+        active: booleanField(row.active, 'category.active'),
+      };
+    });
     const products: OnlineOrderCatalogProduct[] = (productsResult.data ?? []).map((value) => {
       const row = record(value, 'product');
       return {
         id: stringField(row.id, 'product.id'),
         shopId: stringField(row.shop_id, 'product.shop_id'),
+        categoryId: stringField(row.category_id, 'product.category_id'),
         name: stringField(row.name, 'product.name'),
         priceMinor: moneyField(row.price_minor, 'product.price_minor'),
         active: booleanField(row.active, 'product.active'),
@@ -128,6 +147,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
         id: stringField(shop.id, 'shop.id'),
         active: booleanField(shop.active, 'shop.active'),
       },
+      categories,
       products,
       modifiers,
       productModifierLinks,
