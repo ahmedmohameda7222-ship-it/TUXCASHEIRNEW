@@ -10,6 +10,9 @@ on:
       - 'packages/application/src/onlineOrderAcceptance.review.test.ts'
       - 'packages/application/src/onlineOrderAcceptance.sqlite.test.ts'
       - 'packages/application/src/onlineOrderAcceptance.ts'
+      - 'apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts'
+      - 'apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts'
+      - 'apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx'
       - 'scripts/test-online-order-acceptance-lease.mjs'
       - 'package.json'
       - 'supabase/migrations/**'
@@ -37,15 +40,28 @@ jobs:
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/onlineOrderAcceptance.review.test.ts
           packages/application/src/onlineOrderAcceptance.sqlite.test.ts
+          apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
+          apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
+          apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
           scripts/test-online-order-acceptance-lease.mjs
           package.json
       - name: Commit formatter-only correction
         shell: bash
         run: |
-          if ! git diff --quiet -- packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts packages/application/src/onlineOrderAcceptance.sqlite.test.ts scripts/test-online-order-acceptance-lease.mjs package.json; then
+          files=(
+            packages/application/src/onlineOrderAcceptance.test.ts
+            packages/application/src/onlineOrderAcceptance.review.test.ts
+            packages/application/src/onlineOrderAcceptance.sqlite.test.ts
+            apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
+            apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
+            apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
+            scripts/test-online-order-acceptance-lease.mjs
+            package.json
+          )
+          if ! git diff --quiet -- "${files[@]}"; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts packages/application/src/onlineOrderAcceptance.sqlite.test.ts scripts/test-online-order-acceptance-lease.mjs package.json
+            git add -- "${files[@]}"
             git commit -m 'test(orders): format complete online-order acceptance RED'
             git push origin HEAD:work/menu-online-orders-integration
           fi
@@ -55,6 +71,9 @@ jobs:
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/onlineOrderAcceptance.review.test.ts
           packages/application/src/onlineOrderAcceptance.sqlite.test.ts
+          apps/operations-desktop/src/main/onlineOrderAcceptanceIpc.red.test.ts
+          apps/operations-desktop/src/preload/onlineOrderAcceptanceBridge.red.test.ts
+          apps/operations/src/app/OnlineOrderAcceptancePanel.red.test.tsx
 
   lease-red:
     runs-on: ubuntu-latest
