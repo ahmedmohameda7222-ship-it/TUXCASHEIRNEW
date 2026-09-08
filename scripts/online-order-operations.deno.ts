@@ -70,6 +70,7 @@ class MemoryStore implements OnlineOrderOperationsStore {
     authUserId: string;
     deviceId: string;
     requestId: string;
+    processingOrderId: string;
     reason: string;
   }): Promise<unknown> {
     this.calls.push({ action: 'REJECT', ...input });
@@ -161,15 +162,27 @@ Deno.test('online-order operations RELEASE requires the exact reserved order ide
   assert(store.calls[0]?.processingOrderId === ORDER_ID, 'release lost processing order identity');
 });
 
-Deno.test('online-order operations REJECT trims a bounded worker reason and never accepts client shop authority', async () => {
+Deno.test('online-order operations REJECT requires the exact processing identity and trims a bounded reason', async () => {
   const store = new MemoryStore();
   const response = await handleOnlineOrderOperationsRequest(
-    request('POST', { action: 'REJECT', requestId: REQUEST_ID, reason: '  Customer unavailable  ' }),
+    request('POST', {
+      action: 'REJECT',
+      requestId: REQUEST_ID,
+      processingOrderId: ORDER_ID,
+      reason: '  Customer unavailable  ',
+    }),
     { authenticate, store },
   );
   const parsed = await body(response);
   assert(response.status === 200 && parsed.status === 'REJECTED', 'reject failed');
+  assert(store.calls[0]?.processingOrderId === ORDER_ID, 'reject lost processing order identity');
   assert(store.calls[0]?.reason === 'Customer unavailable', 'reject reason was not canonicalized');
+
+  const missingClaim = await handleOnlineOrderOperationsRequest(
+    request('POST', { action: 'REJECT', requestId: REQUEST_ID, reason: 'Customer unavailable' }),
+    { authenticate, store },
+  );
+  assert(missingClaim.status === 400, 'reject without processing identity must be rejected');
 
   const forbiddenAuthority = await handleOnlineOrderOperationsRequest(
     request('POST', { action: 'CLAIM', requestId: REQUEST_ID, shopId: SHOP_ID }),

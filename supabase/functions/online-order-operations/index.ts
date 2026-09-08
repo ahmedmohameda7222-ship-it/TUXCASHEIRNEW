@@ -73,11 +73,12 @@ Deno.serve(async (request) => {
         p_request_id: requestId,
         p_processing_order_id: processingOrderId,
       }),
-    reject: ({ authUserId, deviceId, requestId, reason }) =>
+    reject: ({ authUserId, deviceId, requestId, processingOrderId, reason }) =>
       rpc('reject_tux_online_order_request_v1', {
         p_auth_user_id: authUserId,
         p_device_id: deviceId,
         p_request_id: requestId,
+        p_processing_order_id: processingOrderId,
         p_reason: reason,
       }),
   };

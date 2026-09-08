@@ -42,6 +42,15 @@ function cachedRequest(
   };
 }
 
+function processingRequest(requestId = REQUEST_A, shopId = SHOP_A): CachedOnlineOrderRequest {
+  return cachedRequest(requestId, shopId, {
+    status: 'PROCESSING',
+    processingOrderId: PROCESSING_ORDER,
+    processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
+    processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
+  });
+}
+
 class MemoryOnlineOrderInboxStore implements OnlineOrderInboxStore {
   readonly rows = new Map<string, CachedOnlineOrderRequest>();
   upsertCalls = 0;
@@ -81,12 +90,7 @@ function processingResponse(
 ): Readonly<Record<string, unknown>> {
   return {
     schemaVersion: 1,
-    ...cachedRequest(requestId, shopId, {
-      status: 'PROCESSING',
-      processingOrderId: PROCESSING_ORDER,
-      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
-      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
-    }),
+    ...processingRequest(requestId, shopId),
   };
 }
 
@@ -107,12 +111,7 @@ describe('syncOnlineOrderInboxSnapshot', () => {
     ]);
     store.upsertCalls = 0;
 
-    const processing = cachedRequest(REQUEST_B, SHOP_A, {
-      status: 'PROCESSING',
-      processingOrderId: PROCESSING_ORDER,
-      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
-      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
-    });
+    const processing = processingRequest(REQUEST_B, SHOP_A);
     const remote = {
       fetchActiveRequests: vi
         .fn()
@@ -207,12 +206,7 @@ describe('online order review lifecycle', () => {
 
   it('returns a matching local PROCESSING claim to PENDING only after remote release succeeds', async () => {
     const store = new MemoryOnlineOrderInboxStore();
-    const processing = cachedRequest(REQUEST_A, SHOP_A, {
-      status: 'PROCESSING',
-      processingOrderId: PROCESSING_ORDER,
-      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
-      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
-    });
+    const processing = processingRequest();
     await store.upsertMany([processing]);
     store.upsertCalls = 0;
     const remote = {
@@ -243,9 +237,9 @@ describe('online order review lifecycle', () => {
     expect(store.removeCalls).toBe(0);
   });
 
-  it('removes a request only after a matching REJECTED acknowledgement', async () => {
+  it('removes a request only after a matching claim-bound REJECTED acknowledgement', async () => {
     const store = new MemoryOnlineOrderInboxStore();
-    await store.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    await store.upsertMany([processingRequest()]);
     store.removeCalls = 0;
     const remote = {
       reject: vi.fn().mockResolvedValue({
@@ -258,22 +252,23 @@ describe('online order review lifecycle', () => {
     await rejectOnlineOrderRequest({
       shopId: SHOP_A,
       requestId: REQUEST_A,
+      processingOrderId: PROCESSING_ORDER,
       reason: 'Customer requested cancellation',
       store,
       remote,
     });
 
+    expect(remote.reject).toHaveBeenCalledWith(
+      REQUEST_A,
+      PROCESSING_ORDER,
+      'Customer requested cancellation',
+    );
     expect(await store.list(SHOP_A)).toEqual([]);
     expect(store.removeCalls).toBe(1);
   });
 
   it('does not mutate local state when release/reject acknowledgements target another request', async () => {
-    const processing = cachedRequest(REQUEST_A, SHOP_A, {
-      status: 'PROCESSING',
-      processingOrderId: PROCESSING_ORDER,
-      processingStartedAt: instant('2026-09-08T10:05:00.000Z'),
-      processingExpiresAt: instant('2026-09-08T10:10:00.000Z'),
-    });
+    const processing = processingRequest();
 
     const releaseStore = new MemoryOnlineOrderInboxStore();
     await releaseStore.upsertMany([processing]);
@@ -298,7 +293,7 @@ describe('online order review lifecycle', () => {
     expect(releaseStore.upsertCalls).toBe(0);
 
     const rejectStore = new MemoryOnlineOrderInboxStore();
-    await rejectStore.upsertMany([cachedRequest(REQUEST_A, SHOP_A)]);
+    await rejectStore.upsertMany([processing]);
     rejectStore.removeCalls = 0;
     const rejectRemote = {
       reject: vi.fn().mockResolvedValue({
@@ -311,14 +306,13 @@ describe('online order review lifecycle', () => {
       rejectOnlineOrderRequest({
         shopId: SHOP_A,
         requestId: REQUEST_A,
+        processingOrderId: PROCESSING_ORDER,
         reason: 'Customer requested cancellation',
         store: rejectStore,
         remote: rejectRemote,
       }),
     ).rejects.toThrow(/request/i);
-    expect((await rejectStore.list(SHOP_A)).map((request) => request.requestId)).toEqual([
-      REQUEST_A,
-    ]);
+    expect((await rejectStore.list(SHOP_A))[0]).toEqual(processing);
     expect(rejectStore.removeCalls).toBe(0);
   });
 });
@@ -359,9 +353,9 @@ describe('BrowserOnlineOrderOperationsRemote', () => {
     const remote = new BrowserOnlineOrderOperationsRemote();
     await expect(remote.claim(REQUEST_A)).resolves.toEqual(processing);
     await expect(remote.release(REQUEST_A, PROCESSING_ORDER)).resolves.toEqual(released);
-    await expect(remote.reject(REQUEST_A, 'Customer requested cancellation')).resolves.toEqual(
-      rejected,
-    );
+    await expect(
+      remote.reject(REQUEST_A, PROCESSING_ORDER, 'Customer requested cancellation'),
+    ).resolves.toEqual(rejected);
 
     const requestOptions = (body: Readonly<Record<string, unknown>>) => ({
       method: 'POST',
@@ -388,6 +382,7 @@ describe('BrowserOnlineOrderOperationsRemote', () => {
         requestOptions({
           action: 'REJECT',
           requestId: REQUEST_A,
+          processingOrderId: PROCESSING_ORDER,
           reason: 'Customer requested cancellation',
         }),
       ],

@@ -34,7 +34,7 @@ export interface OnlineOrderOperationsRemote {
 interface OnlineOrderReviewRemote {
   claim(requestId: string): Promise<unknown>;
   release(requestId: string, processingOrderId: string): Promise<unknown>;
-  reject(requestId: string, reason: string): Promise<unknown>;
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown>;
 }
 
 function snapshotRecord(value: unknown): Record<string, unknown> {
@@ -230,13 +230,17 @@ export async function releaseOnlineOrderReview(input: {
 export async function rejectOnlineOrderRequest(input: {
   readonly shopId: ShopId;
   readonly requestId: string;
+  readonly processingOrderId: string;
   readonly reason: string;
   readonly store: OnlineOrderInboxStore;
   readonly remote: Pick<OnlineOrderReviewRemote, 'reject'>;
 }): Promise<void> {
-  await cachedRequestForReview(input);
+  const cached = await cachedRequestForReview(input);
+  if (cached.status !== 'PROCESSING' || cached.processingOrderId !== input.processingOrderId) {
+    throw new Error('Online-order rejection does not match the local processing claim.');
+  }
   parseReviewAck({
-    value: await input.remote.reject(input.requestId, input.reason),
+    value: await input.remote.reject(input.requestId, input.processingOrderId, input.reason),
     expectedRequestId: input.requestId,
     expectedStatus: 'REJECTED',
   });
@@ -268,10 +272,11 @@ export class BrowserOnlineOrderOperationsRemote
     });
   }
 
-  async reject(requestId: string, reason: string): Promise<unknown> {
+  async reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown> {
     return requestJson('POST', `${window.location.origin}/api/online-order-operations`, {
       action: 'REJECT',
       requestId,
+      processingOrderId,
       reason,
     });
   }

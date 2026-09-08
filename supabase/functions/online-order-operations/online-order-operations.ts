@@ -29,6 +29,7 @@ export interface OnlineOrderOperationsStore {
     authUserId: string;
     deviceId: string;
     requestId: string;
+    processingOrderId: string;
     reason: string;
   }): Promise<unknown>;
 }
@@ -296,16 +297,28 @@ export async function handleOnlineOrderOperationsRequest(
     }
 
     if (body.action === 'REJECT') {
-      if (!exactKeys(body, ['action', 'requestId', 'reason'])) {
+      if (!exactKeys(body, ['action', 'requestId', 'processingOrderId', 'reason'])) {
         return jsonResponse(400, { error: 'invalid_online_order_operation' });
       }
       const requestId = uuid(body.requestId);
+      const processingOrderId = uuid(body.processingOrderId);
       const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-      if (requestId === null || reason.length === 0 || reason.length > 500) {
+      if (
+        requestId === null ||
+        processingOrderId === null ||
+        reason.length === 0 ||
+        reason.length > 500
+      ) {
         return jsonResponse(400, { error: 'invalid_online_order_operation' });
       }
       const rejected = parseResolution(
-        await dependencies.store.reject({ authUserId, deviceId, requestId, reason }),
+        await dependencies.store.reject({
+          authUserId,
+          deviceId,
+          requestId,
+          processingOrderId,
+          reason,
+        }),
         'REJECTED',
       );
       if (rejected === null) return jsonResponse(502, { error: 'invalid_remote_response' });

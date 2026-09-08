@@ -294,6 +294,7 @@ create or replace function public.reject_tux_online_order_request_v1(
   p_auth_user_id uuid,
   p_device_id uuid,
   p_request_id uuid,
+  p_processing_order_id uuid,
   p_reason text
 )
 returns jsonb
@@ -332,9 +333,11 @@ begin
   if v_request.status = 'ACCEPTED' then
     raise exception 'TUX_ONLINE_ORDER_ALREADY_RESOLVED';
   end if;
-  if v_request.status = 'PROCESSING'
-     and v_request.processing_device_id is distinct from p_device_id then
-    raise exception 'TUX_ONLINE_ORDER_ALREADY_PROCESSING';
+  if v_request.status <> 'PROCESSING'
+     or v_request.processing_device_id is distinct from p_device_id
+     or v_request.processing_order_id is distinct from p_processing_order_id
+     or v_request.processing_expires_at <= now() then
+    raise exception 'TUX_ONLINE_ORDER_CLAIM_MISMATCH';
   end if;
 
   update public.online_order_requests request
@@ -358,7 +361,7 @@ revoke all on function public.claim_tux_online_order_request_v1(uuid, uuid, uuid
   from public, anon, authenticated;
 revoke all on function public.release_tux_online_order_request_claim_v1(uuid, uuid, uuid, uuid)
   from public, anon, authenticated;
-revoke all on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, text)
+revoke all on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, uuid, text)
   from public, anon, authenticated;
 
 grant execute on function public.list_tux_online_order_requests_v1(uuid, uuid, integer)
@@ -367,7 +370,7 @@ grant execute on function public.claim_tux_online_order_request_v1(uuid, uuid, u
   to service_role;
 grant execute on function public.release_tux_online_order_request_claim_v1(uuid, uuid, uuid, uuid)
   to service_role;
-grant execute on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, text)
+grant execute on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, uuid, text)
   to service_role;
 
 create or replace function private.resolve_tux_online_order_request_from_order_v1()

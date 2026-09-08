@@ -123,7 +123,7 @@ begin
   if to_regprocedure('public.release_tux_online_order_request_claim_v1(uuid,uuid,uuid,uuid)') is null then
     raise exception 'release_tux_online_order_request_claim_v1 RPC missing';
   end if;
-  if to_regprocedure('public.reject_tux_online_order_request_v1(uuid,uuid,uuid,text)') is null then
+  if to_regprocedure('public.reject_tux_online_order_request_v1(uuid,uuid,uuid,uuid,text)') is null then
     raise exception 'reject_tux_online_order_request_v1 RPC missing';
   end if;
   if to_regprocedure('private.resolve_tux_online_order_request_from_order_v1()') is null then

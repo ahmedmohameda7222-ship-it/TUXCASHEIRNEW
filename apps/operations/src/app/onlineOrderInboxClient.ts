@@ -27,7 +27,7 @@ export interface OnlineOrderInboxRuntimeClient {
 interface OnlineOrderInboxRuntimeRemote extends OnlineOrderOperationsRemote {
   claim(requestId: string): Promise<unknown>;
   release(requestId: string, processingOrderId: string): Promise<unknown>;
-  reject(requestId: string, reason: string): Promise<unknown>;
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown>;
 }
 
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
@@ -133,6 +133,7 @@ export function createOnlineOrderInboxRuntime(input: {
       await rejectOnlineOrderRequest({
         shopId,
         requestId,
+        processingOrderId,
         reason,
         store: input.store,
         remote: input.remote,

@@ -77,10 +77,11 @@ export class SupabaseDesktopOnlineOrderOperationsRemote {
     });
   }
 
-  async reject(requestId: string, reason: string): Promise<unknown> {
+  async reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown> {
     return this.#request('POST', this.#endpoint, {
       action: 'REJECT',
       requestId,
+      processingOrderId,
       reason,
     });
   }

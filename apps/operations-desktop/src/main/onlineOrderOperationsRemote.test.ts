@@ -33,7 +33,7 @@ describe('SupabaseDesktopOnlineOrderOperationsRemote', () => {
     await remote.fetchActiveRequests(200);
     await remote.claim(REQUEST_ID);
     await remote.release(REQUEST_ID, PROCESSING_ORDER_ID);
-    await remote.reject(REQUEST_ID, 'Out of service area');
+    await remote.reject(REQUEST_ID, PROCESSING_ORDER_ID, 'Out of service area');
 
     expect(authorizationHeaders).toHaveBeenCalledTimes(4);
     expect(fetcher.mock.calls).toEqual([
@@ -98,6 +98,7 @@ describe('SupabaseDesktopOnlineOrderOperationsRemote', () => {
           body: JSON.stringify({
             action: 'REJECT',
             requestId: REQUEST_ID,
+            processingOrderId: PROCESSING_ORDER_ID,
             reason: 'Out of service area',
           }),
           signal: expect.any(AbortSignal),

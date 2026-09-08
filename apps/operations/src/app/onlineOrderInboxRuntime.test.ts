@@ -109,7 +109,7 @@ type ReleaseRuntimeFactory = (input: {
 }) => ReleaseRuntimeClient;
 
 type RejectRemote = OnlineOrderOperationsRemote & {
-  reject(requestId: string, reason: string): Promise<unknown>;
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown>;
 };
 
 type RejectRuntimeClient = RuntimeClient & {
@@ -236,7 +236,11 @@ describe('online-order inbox runtime', () => {
     ).resolves.toBeUndefined();
 
     expect(getActiveShopId).toHaveBeenCalledTimes(1);
-    expect(remote.reject).toHaveBeenCalledWith(REQUEST_ID, 'Out of service area');
+    expect(remote.reject).toHaveBeenCalledWith(
+      REQUEST_ID,
+      PROCESSING_ORDER_ID,
+      'Out of service area',
+    );
     expect(await store.list(SHOP_ID)).toEqual([]);
     expect(published).toEqual([{ requests: [], syncState: 'SYNCED', errorMessage: null }]);
   });
