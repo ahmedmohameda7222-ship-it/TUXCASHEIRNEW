@@ -1,0 +1,44 @@
+name: Format final Codex RED specs
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+    paths:
+      - .github/workflows/format-final-codex-red.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/menu-online-orders-integration
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Format RED specs
+        run: >-
+          npx prettier --write
+          apps/operations/src/app/onlineOrderBrowserStore.source.test.ts
+          packages/application/src/onlineOrderAcceptanceRecovery.source.test.ts
+          packages/application/src/onlineOrderRejectionFence.source.test.ts
+          apps/menu/src/lib/checkoutAttemptPersistence.source.test.ts
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then
+            echo "No formatter changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/onlineOrderBrowserStore.source.test.ts packages/application/src/onlineOrderAcceptanceRecovery.source.test.ts packages/application/src/onlineOrderRejectionFence.source.test.ts apps/menu/src/lib/checkoutAttemptPersistence.source.test.ts
+          git commit -m "style(tests): apply repository formatter"
+          git push origin HEAD:work/menu-online-orders-integration
