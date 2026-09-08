@@ -2,6 +2,7 @@ import type {
   OperationsBulkStockService,
   OperationsEndDayService,
   OperationsExpensesService,
+  OperationsOnlineOrderInboxService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsSessionResult,
@@ -117,6 +118,11 @@ export type TuxEndDayApi = Pick<
   'beginEndDay' | 'discardDraft' | 'previewReconciliation' | 'closeDay'
 >;
 
+export type TuxOnlineOrdersApi = Pick<
+  OperationsOnlineOrderInboxService,
+  'load' | 'claim' | 'release' | 'reject' | 'subscribe'
+>;
+
 export type TuxWhatsAppApi = Pick<
   OperationsWhatsAppService,
   | 'loadInbox'
@@ -154,6 +160,7 @@ export interface TuxDesktopApi {
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
   readonly endDay: TuxEndDayApi;
+  readonly onlineOrders: TuxOnlineOrdersApi;
   readonly whatsapp: TuxWhatsAppApi & {
     readonly setNotificationViewState: (input: {
       readonly focusedConversationId: string | null;
