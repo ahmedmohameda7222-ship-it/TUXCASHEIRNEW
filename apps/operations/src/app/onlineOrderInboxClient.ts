@@ -13,8 +13,7 @@ export interface OnlineOrderInboxSnapshot {
   readonly errorMessage: string | null;
 }
 
-const REMOTE_UNAVAILABLE_MESSAGE =
-  'Online orders could not refresh. Showing the saved inbox.';
+const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
 
 export async function loadOnlineOrderInbox(input: {
   readonly shopId: ShopId;
