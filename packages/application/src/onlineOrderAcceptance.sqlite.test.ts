@@ -347,9 +347,10 @@ describe('OperationsOnlineOrderAcceptanceService durable conversion', () => {
   it('rejects first conversion when no current worker exists and persists nothing', async () => {
     const test = await fixture({ openWorker: false });
 
-    await expect(test.acceptance.accept(onlineRequest(), pickupConfirmation())).rejects.toThrow(
-      /operator|worker|session/i,
-    );
+    const result = await test.acceptance.accept(onlineRequest(), pickupConfirmation());
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.message).toMatch(/operator|worker|session/i);
     const orders = await test.database.transaction((transaction) =>
       transaction.orders.listByBusinessDay(DAY_ID),
     );
@@ -374,9 +375,10 @@ describe('OperationsOnlineOrderAcceptanceService durable conversion', () => {
       }),
     );
 
-    await expect(test.acceptance.accept(onlineRequest(), pickupConfirmation())).rejects.toThrow(
-      /business day|open/i,
-    );
+    const result = await test.acceptance.accept(onlineRequest(), pickupConfirmation());
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.message).toMatch(/business day|open/i);
     await closeFixture(test);
     expect(rawCounts(test.path)).toEqual({ orders: 0, audit: 0, outbox: 0 });
   });
