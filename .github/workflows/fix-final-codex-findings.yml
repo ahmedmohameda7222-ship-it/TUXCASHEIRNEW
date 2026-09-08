@@ -1,0 +1,541 @@
+name: Fix final Codex findings
+
+on:
+  push:
+    branches:
+      - work/menu-online-orders-integration
+    paths:
+      - .github/workflows/fix-final-codex-findings.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/menu-online-orders-integration
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Apply final Codex fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              if old not in text:
+                  raise SystemExit(f'missing replacement anchor in {path}: {old[:120]!r}')
+              target.write_text(text.replace(old, new, 1))
+
+          panel = 'apps/operations/src/app/OnlineOrderInboxPanel.tsx'
+          replace(panel, '''async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInboxStore> {
+            if (browserStorePromise === null) {
+              browserStorePromise = (async () => {
+                const store = await browserOnlineOrderInboxStore();
+                return store;
+              })();
+            }
+            return browserStorePromise;
+          }
+
+          async function browserOnlineOrderInboxClient(): Promise<OnlineOrderInboxRuntimeClient> {
+            if (browserClientPromise === null) {
+              browserClientPromise = (async () => {
+                const store = new IndexedDbOnlineOrderInboxStore();
+                await store.initialize();
+          ''', '''async function browserOnlineOrderInboxStore(): Promise<IndexedDbOnlineOrderInboxStore> {
+            if (browserStorePromise === null) {
+              browserStorePromise = (async () => {
+                const store = new IndexedDbOnlineOrderInboxStore();
+                await store.initialize();
+                return store;
+              })();
+            }
+            return browserStorePromise;
+          }
+
+          async function browserOnlineOrderInboxClient(): Promise<OnlineOrderInboxRuntimeClient> {
+            if (browserClientPromise === null) {
+              browserClientPromise = (async () => {
+                const store = await browserOnlineOrderInboxStore();
+          ''')
+
+          ipc = 'apps/operations-desktop/src/main/onlineOrderInboxIpc.ts'
+          replace(ipc, '''type OnlineOrderAcceptanceStore = {
+            get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;
+            markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;
+          };
+          ''', '''type OnlineOrderAcceptanceStore = {
+            list(shopId: ShopId): Promise<readonly CachedOnlineOrderRequest[]>;
+            get(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest | null>;
+            markAccepted(shopId: ShopId, requestId: string, processingOrderId: string): Promise<void>;
+          };
+          type FindCommittedOnlineOrder = (shopId: ShopId, processingOrderId: string) => Promise<boolean>;
+          ''')
+          replace(ipc, '''  readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;
+            readonly #getActiveShopId: (() => Promise<ShopId>) | null;
+            #unsubscribe: (() => void) | null = null;
+          ''', '''  readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;
+            readonly #getActiveShopId: (() => Promise<ShopId>) | null;
+            readonly #findCommittedOnlineOrder: FindCommittedOnlineOrder | null;
+            #unsubscribe: (() => void) | null = null;
+          ''')
+          replace(ipc, '''    readonly acceptanceStore?: OnlineOrderAcceptanceStore;
+              readonly getActiveShopId?: () => Promise<ShopId>;
+            }) {
+              this.#service = input.service;
+              this.#acceptance = input.acceptance ?? null;
+              this.#acceptanceStore = input.acceptanceStore ?? null;
+              this.#getActiveShopId = input.getActiveShopId ?? null;
+            }
+
+            register(window: BrowserWindow): void {
+          ''', '''    readonly acceptanceStore?: OnlineOrderAcceptanceStore;
+              readonly getActiveShopId?: () => Promise<ShopId>;
+              readonly findCommittedOnlineOrder?: FindCommittedOnlineOrder;
+            }) {
+              this.#service = input.service;
+              this.#acceptance = input.acceptance ?? null;
+              this.#acceptanceStore = input.acceptanceStore ?? null;
+              this.#getActiveShopId = input.getActiveShopId ?? null;
+              this.#findCommittedOnlineOrder = input.findCommittedOnlineOrder ?? null;
+            }
+
+            async #reconcileAcceptedOrders(requestId?: string): Promise<boolean> {
+              if (
+                this.#acceptanceStore === null ||
+                this.#getActiveShopId === null ||
+                this.#findCommittedOnlineOrder === null
+              ) {
+                return false;
+              }
+
+              const shopId = await this.#getActiveShopId();
+              let requests: readonly CachedOnlineOrderRequest[];
+              if (requestId === undefined) {
+                requests = await this.#acceptanceStore.list(shopId);
+              } else {
+                const request = await this.#acceptanceStore.get(shopId, requestId);
+                requests = request === null ? [] : [request];
+              }
+
+              let reconciled = false;
+              for (const request of requests) {
+                if (request.status !== 'PROCESSING' || request.processingOrderId === null) continue;
+                if (await this.#findCommittedOnlineOrder(shopId, request.processingOrderId)) {
+                  await this.#acceptanceStore.markAccepted(
+                    shopId,
+                    request.requestId,
+                    request.processingOrderId,
+                  );
+                  reconciled = true;
+                }
+              }
+              return reconciled;
+            }
+
+            register(window: BrowserWindow): void {
+          ''')
+          replace(ipc, '''    ipcMain.handle(IPC_ONLINE_ORDERS_LOAD, async (event) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                return this.#service.load();
+              });
+          ''', '''    ipcMain.handle(IPC_ONLINE_ORDERS_LOAD, async (event) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                await this.#reconcileAcceptedOrders();
+                return this.#service.load();
+              });
+          ''')
+          replace(ipc, '''    ipcMain.handle(IPC_ONLINE_ORDERS_RELEASE, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'Online-order release');
+                exactKeys(input, ['requestId', 'processingOrderId'], 'Online-order release');
+                return this.#service.release(
+                  uuid(input['requestId'], 'Online-order request ID'),
+                  uuid(input['processingOrderId'], 'Online-order processing order ID'),
+                );
+              });
+          ''', '''    ipcMain.handle(IPC_ONLINE_ORDERS_RELEASE, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'Online-order release');
+                exactKeys(input, ['requestId', 'processingOrderId'], 'Online-order release');
+                const requestId = uuid(input['requestId'], 'Online-order request ID');
+                const processingOrderId = uuid(
+                  input['processingOrderId'],
+                  'Online-order processing order ID',
+                );
+                if (await this.#reconcileAcceptedOrders(requestId)) {
+                  throw new Error('Online order has already been accepted locally.');
+                }
+                return this.#service.release(requestId, processingOrderId);
+              });
+          ''')
+          replace(ipc, '''    ipcMain.handle(IPC_ONLINE_ORDERS_REJECT, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'Online-order rejection');
+                exactKeys(input, ['requestId', 'processingOrderId', 'reason'], 'Online-order rejection');
+                return this.#service.reject(
+                  uuid(input['requestId'], 'Online-order request ID'),
+                  uuid(input['processingOrderId'], 'Online-order processing order ID'),
+                  nonEmpty(input['reason'], 'Online-order rejection reason'),
+                );
+              });
+          ''', '''    ipcMain.handle(IPC_ONLINE_ORDERS_REJECT, async (event, rawInput: unknown) => {
+                assertTrustedIpcSender(event, window.webContents.id);
+                const input = objectPayload(rawInput, 'Online-order rejection');
+                exactKeys(input, ['requestId', 'processingOrderId', 'reason'], 'Online-order rejection');
+                const requestId = uuid(input['requestId'], 'Online-order request ID');
+                const processingOrderId = uuid(
+                  input['processingOrderId'],
+                  'Online-order processing order ID',
+                );
+                if (await this.#reconcileAcceptedOrders(requestId)) {
+                  throw new Error('Online order has already been accepted locally.');
+                }
+                return this.#service.reject(
+                  requestId,
+                  processingOrderId,
+                  nonEmpty(input['reason'], 'Online-order rejection reason'),
+                );
+              });
+          ''')
+          replace(ipc, '''      const requestId = uuid(input['requestId'], 'Online-order request ID');
+                const shopId = await this.#getActiveShopId();
+          ''', '''      const requestId = uuid(input['requestId'], 'Online-order request ID');
+                if (await this.#reconcileAcceptedOrders(requestId)) {
+                  throw new Error('Online order has already been accepted locally.');
+                }
+                const shopId = await this.#getActiveShopId();
+          ''')
+
+          main = 'apps/operations-desktop/src/main/index.ts'
+          replace(main, '''    acceptanceStore: onlineOrderInboxStore,
+                getActiveShopId: resolveOnlineOrderInboxShopId,
+              });
+          ''', '''    acceptanceStore: onlineOrderInboxStore,
+                getActiveShopId: resolveOnlineOrderInboxShopId,
+                findCommittedOnlineOrder: async (shopId, processingOrderId) => {
+                  const orderId = parseEntityId<OrderId>(processingOrderId);
+                  const order = await operationsDatabase!.transaction((transaction) =>
+                    transaction.orders.getById(orderId),
+                  );
+                  return order !== null && order.shopId === shopId && order.source === 'ONLINE';
+                },
+              });
+          ''')
+
+          migration = 'supabase/migrations/20260908040000_online_order_acceptance_reservations.sql'
+          replace(migration, '''  shop_id uuid not null references public.shops(id) on delete cascade,
+            reserved_at timestamptz not null default now()
+          ''', '''  shop_id uuid not null references public.shops(id) on delete cascade,
+            origin_device_id uuid not null references public.devices(id) on delete restrict,
+            reserved_at timestamptz not null default now()
+          ''')
+          replace(migration, '''  processing_order_id,
+            shop_id,
+            reserved_at
+          )
+          select
+            request.id,
+            request.processing_order_id,
+            request.shop_id,
+            coalesce(request.processing_started_at, now())
+          from public.online_order_requests request
+          where request.processing_order_id is not null
+          ''', '''  processing_order_id,
+            shop_id,
+            origin_device_id,
+            reserved_at
+          )
+          select
+            request.id,
+            request.processing_order_id,
+            request.shop_id,
+            request.processing_device_id,
+            coalesce(request.processing_started_at, now())
+          from public.online_order_requests request
+          where request.processing_order_id is not null
+            and request.processing_device_id is not null
+          ''')
+          replace(migration, '''        processing_order_id,
+                  shop_id,
+                  reserved_at
+                ) values (
+                  v_request.id,
+                  v_processing_order_id,
+                  v_shop_id,
+                  now()
+          ''', '''        processing_order_id,
+                  shop_id,
+                  origin_device_id,
+                  reserved_at
+                ) values (
+                  v_request.id,
+                  v_processing_order_id,
+                  v_shop_id,
+                  p_device_id,
+                  now()
+          ''')
+          replace(migration, '''      processing_order_id,
+                shop_id,
+                reserved_at
+              ) values (
+                v_request.id,
+                v_request.processing_order_id,
+                v_shop_id,
+                coalesce(v_request.processing_started_at, now())
+          ''', '''      processing_order_id,
+                shop_id,
+                origin_device_id,
+                reserved_at
+              ) values (
+                v_request.id,
+                v_request.processing_order_id,
+                v_shop_id,
+                p_device_id,
+                coalesce(v_request.processing_started_at, now())
+          ''')
+          marker = '''create or replace function private.resolve_tux_online_order_request_from_order_v1()
+          '''
+          rejection = '''create or replace function public.reject_tux_online_order_request_v1(
+            p_auth_user_id uuid,
+            p_device_id uuid,
+            p_request_id uuid,
+            p_processing_order_id uuid,
+            p_reason text
+          )
+          returns jsonb
+          language plpgsql
+          security definer
+          set search_path = pg_catalog, public, private
+          as $$
+          declare
+            v_shop_id uuid;
+            v_reason text := btrim(coalesce(p_reason, ''));
+            v_request public.online_order_requests%rowtype;
+            v_origin_device_id uuid;
+          begin
+            v_shop_id := private.tux_operations_device_shop_v1(p_auth_user_id, p_device_id);
+            if v_shop_id is null then
+              raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+            end if;
+            if v_reason = '' or length(v_reason) > 500 then
+              raise exception 'TUX_ONLINE_ORDER_REJECTION_REASON_INVALID';
+            end if;
+
+            select * into v_request
+            from public.online_order_requests request
+            where request.id = p_request_id
+              and request.shop_id = v_shop_id
+            for update;
+
+            if not found then
+              raise exception 'TUX_ONLINE_ORDER_NOT_FOUND';
+            end if;
+            if v_request.status = 'REJECTED' then
+              if v_request.rejection_reason is distinct from v_reason then
+                raise exception 'TUX_ONLINE_ORDER_REJECTION_CONFLICT';
+              end if;
+              return jsonb_build_object('requestId', v_request.id, 'status', 'REJECTED');
+            end if;
+            if v_request.status = 'ACCEPTED' then
+              raise exception 'TUX_ONLINE_ORDER_ALREADY_RESOLVED';
+            end if;
+            if v_request.status <> 'PROCESSING'
+               or v_request.processing_device_id is distinct from p_device_id
+               or v_request.processing_order_id is distinct from p_processing_order_id
+               or v_request.processing_expires_at is null
+               or v_request.processing_expires_at <= now() then
+              raise exception 'TUX_ONLINE_ORDER_CLAIM_MISMATCH';
+            end if;
+
+            select reservation.origin_device_id
+              into v_origin_device_id
+            from private.online_order_processing_reservations reservation
+            where reservation.request_id = v_request.id
+              and reservation.shop_id = v_shop_id
+              and reservation.processing_order_id = p_processing_order_id;
+
+            if v_origin_device_id is null then
+              raise exception 'TUX_ONLINE_ORDER_CLAIM_MISMATCH';
+            end if;
+            if v_origin_device_id is distinct from p_device_id then
+              raise exception 'TUX_ONLINE_ORDER_REJECTION_FENCED';
+            end if;
+
+            update public.online_order_requests request
+            set status = 'REJECTED',
+                rejection_reason = v_reason,
+                resolved_at = now(),
+                processing_device_id = null,
+                processing_order_id = null,
+                processing_started_at = null,
+                processing_expires_at = null,
+                updated_at = now()
+            where request.id = v_request.id;
+
+            return jsonb_build_object('requestId', v_request.id, 'status', 'REJECTED');
+          end;
+          $$;
+
+          revoke all on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, uuid, text)
+            from public, anon, authenticated;
+          grant execute on function public.reject_tux_online_order_request_v1(uuid, uuid, uuid, uuid, text)
+            to service_role;
+
+          '''
+          replace(migration, marker, rejection + marker)
+
+          edge = 'supabase/functions/online-order-operations/index.ts'
+          replace(edge, '''    message.includes('TUX_ONLINE_ORDER_CLAIM_MISMATCH') ||
+                message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT')
+          ''', '''    message.includes('TUX_ONLINE_ORDER_CLAIM_MISMATCH') ||
+                message.includes('TUX_ONLINE_ORDER_REJECTION_CONFLICT') ||
+                message.includes('TUX_ONLINE_ORDER_REJECTION_FENCED')
+          ''')
+
+          helper = Path('apps/menu/src/lib/checkout-attempt.ts')
+          helper.write_text('''export interface PendingCheckoutAttempt {
+            readonly fingerprint: string;
+            readonly idempotencyKey: string;
+          }
+
+          const STORAGE_KEY = 'tux:menu:pending-online-order-attempt:v1';
+          const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+          function browserStorage(): Storage {
+            if (typeof window === 'undefined') {
+              throw new Error('checkout_attempt_storage_unavailable');
+            }
+            return window.localStorage;
+          }
+
+          export function loadPendingCheckoutAttempt(): PendingCheckoutAttempt | null {
+            try {
+              const value = browserStorage().getItem(STORAGE_KEY);
+              if (value === null) return null;
+              const parsed = JSON.parse(value) as unknown;
+              if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                clearPendingCheckoutAttempt();
+                return null;
+              }
+              const source = parsed as Record<string, unknown>;
+              if (
+                typeof source.fingerprint !== 'string' ||
+                source.fingerprint.length === 0 ||
+                typeof source.idempotencyKey !== 'string' ||
+                !UUID_PATTERN.test(source.idempotencyKey)
+              ) {
+                clearPendingCheckoutAttempt();
+                return null;
+              }
+              return {
+                fingerprint: source.fingerprint,
+                idempotencyKey: source.idempotencyKey,
+              };
+            } catch {
+              return null;
+            }
+          }
+
+          export function persistPendingCheckoutAttempt(attempt: PendingCheckoutAttempt): void {
+            browserStorage().setItem(STORAGE_KEY, JSON.stringify(attempt));
+          }
+
+          export function clearPendingCheckoutAttempt(): void {
+            try {
+              browserStorage().removeItem(STORAGE_KEY);
+            } catch {
+              // Clearing is best-effort after a successful or intentionally abandoned attempt.
+            }
+          }
+          ''')
+
+          cart = 'apps/menu/src/components/cart/CartDrawer.tsx'
+          replace(cart, '''import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
+          ''', '''import {
+            clearPendingCheckoutAttempt,
+            loadPendingCheckoutAttempt,
+            persistPendingCheckoutAttempt,
+            type PendingCheckoutAttempt,
+          } from '@/lib/checkout-attempt';
+          import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
+          ''')
+          replace(cart, '''interface PendingAttempt {
+            fingerprint: string;
+            idempotencyKey: string;
+          }
+
+          ''', '')
+          replace(cart, '''  const [pendingAttempt, setPendingAttempt] = useState<PendingAttempt | null>(null);
+          ''', '''  const [pendingAttempt, setPendingAttempt] = useState<PendingCheckoutAttempt | null>(() =>
+            loadPendingCheckoutAttempt(),
+          );
+          ''')
+          replace(cart, '''      if (attempt !== pendingAttempt) {
+                setPendingAttempt(attempt);
+              }
+
+              setSubmissionStatus('submitting');
+              const response = await submitOnlineOrder({
+          ''', '''      persistPendingCheckoutAttempt(attempt);
+              if (attempt !== pendingAttempt) {
+                setPendingAttempt(attempt);
+              }
+
+              setSubmissionStatus('submitting');
+              const response = await submitOnlineOrder({
+          ''')
+          replace(cart, '''      setPendingRequestId(response.requestId);
+              setSubmissionStatus('success');
+              setPendingAttempt(null);
+              clearCart();
+          ''', '''      setPendingRequestId(response.requestId);
+              setSubmissionStatus('success');
+              clearPendingCheckoutAttempt();
+              setPendingAttempt(null);
+              clearCart();
+          ''')
+          replace(cart, '''  const handleClearCart = () => {
+              clearCart();
+              setPendingAttempt(null);
+          ''', '''  const handleClearCart = () => {
+              clearCart();
+              clearPendingCheckoutAttempt();
+              setPendingAttempt(null);
+          ''')
+      - name: Format changed TypeScript
+        run: >-
+          npx prettier --write
+          apps/operations/src/app/OnlineOrderInboxPanel.tsx
+          apps/operations-desktop/src/main/onlineOrderInboxIpc.ts
+          apps/operations-desktop/src/main/index.ts
+          supabase/functions/online-order-operations/index.ts
+          apps/menu/src/components/cart/CartDrawer.tsx
+          apps/menu/src/lib/checkout-attempt.ts
+      - name: Targeted GREEN verification
+        run: >-
+          npx vitest run
+          apps/operations/src/app/onlineOrderBrowserStore.source.test.ts
+          packages/application/src/onlineOrderAcceptanceRecovery.source.test.ts
+          packages/application/src/onlineOrderRejectionFence.source.test.ts
+          apps/menu/src/lib/checkoutAttemptPersistence.source.test.ts
+          apps/operations-desktop/src/main/onlineOrderInboxIpc.test.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Commit production fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations/src/app/OnlineOrderInboxPanel.tsx apps/operations-desktop/src/main/onlineOrderInboxIpc.ts apps/operations-desktop/src/main/index.ts supabase/migrations/20260908040000_online_order_acceptance_reservations.sql supabase/functions/online-order-operations/index.ts apps/menu/src/components/cart/CartDrawer.tsx apps/menu/src/lib/checkout-attempt.ts
+          git commit -m "fix(online-orders): close final Codex races"
+          git push origin HEAD:work/menu-online-orders-integration
