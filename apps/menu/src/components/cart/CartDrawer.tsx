@@ -157,9 +157,9 @@ export function CartDrawer() {
 
       setPendingRequestId(response.requestId);
       setSubmissionStatus('success');
+      clearCart();
       clearPendingCheckoutAttempt();
       setPendingAttempt(null);
-      clearCart();
     } catch {
       setSubmissionStatus('error');
     }
