@@ -25,6 +25,7 @@ vi.mock('electron', () => ({
 vi.mock('./security', () => security);
 
 import {
+  IPC_ONLINE_ORDERS_ACCEPT,
   IPC_ONLINE_ORDERS_CHANGED,
   IPC_ONLINE_ORDERS_CLAIM,
   IPC_ONLINE_ORDERS_LOAD,
@@ -34,6 +35,7 @@ import {
 } from './onlineOrderInboxIpc';
 
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const PROCESSING_ORDER_ID = '66666666-6666-4666-8666-666666666666';
 const snapshot: OnlineOrderInboxSnapshot = {
   requests: [],
@@ -72,7 +74,7 @@ beforeEach(() => {
 });
 
 describe('OnlineOrderInboxIpcRuntime', () => {
-  it('registers load/claim/release/reject and checks the trusted sender before delegation', async () => {
+  it('registers inbox and acceptance channels and checks the trusted sender before delegation', async () => {
     const inbox = service();
     const sent = vi.fn();
     const window = {
@@ -87,6 +89,7 @@ describe('OnlineOrderInboxIpcRuntime', () => {
       IPC_ONLINE_ORDERS_CLAIM,
       IPC_ONLINE_ORDERS_RELEASE,
       IPC_ONLINE_ORDERS_REJECT,
+      IPC_ONLINE_ORDERS_ACCEPT,
     ]);
 
     const event = { sender: { id: 77 } };
@@ -115,6 +118,57 @@ describe('OnlineOrderInboxIpcRuntime', () => {
     inbox.publish(snapshot);
     expect(sent).toHaveBeenCalledWith(IPC_ONLINE_ORDERS_CHANGED, snapshot);
     runtime.close();
+  });
+
+  it('delegates acceptance only after trusted sender and exact payload validation', async () => {
+    const inbox = service();
+    const acceptance = {
+      accept: vi.fn().mockResolvedValue({ ok: true, value: { order: { id: PROCESSING_ORDER_ID } } }),
+    };
+    const runtime = new OnlineOrderInboxIpcRuntime({ service: inbox, acceptance: acceptance as never });
+    runtime.register({ isDestroyed: () => false, webContents: { id: 77, send: vi.fn() } } as never);
+    const event = { sender: { id: 77 } };
+    const request = {
+      requestId: REQUEST_ID,
+      shopId: SHOP_ID,
+      status: 'PROCESSING',
+      catalogRevision: 'a'.repeat(64),
+      fulfillmentPreference: 'PICKUP',
+      paymentPreference: 'CASH',
+      customerName: 'Customer',
+      normalizedPhone: null,
+      deliveryAddress: null,
+      trustedItems: [{ productId: '55555555-5555-4555-8555-555555555555', quantity: 1 }],
+      itemsSubtotalMinor: 19000,
+      orderNote: null,
+      createdAt: '2026-09-08T10:00:00.000Z',
+      processingOrderId: PROCESSING_ORDER_ID,
+      processingStartedAt: '2026-09-08T10:01:00.000Z',
+      processingExpiresAt: '2026-09-08T22:01:00.000Z',
+    };
+    const confirmation = {
+      orderTypeId: '77777777-7777-4777-8777-777777777777',
+      deliveryZoneId: null,
+      finalDeliveryFeeMinor: null,
+      payment: {
+        mode: 'SINGLE',
+        methodId: '88888888-8888-4888-8888-888888888888',
+        cashReceivedMinor: 20000,
+      },
+    };
+
+    await handler(IPC_ONLINE_ORDERS_ACCEPT)(event, { request, confirmation });
+    expect(security.assertTrustedIpcSender).toHaveBeenCalledWith(event, 77);
+    expect(acceptance.accept).toHaveBeenCalledTimes(1);
+    expect(acceptance.accept.mock.calls[0]?.[0]).toMatchObject({
+      requestId: REQUEST_ID,
+      status: 'PROCESSING',
+      processingOrderId: PROCESSING_ORDER_ID,
+    });
+    expect(acceptance.accept.mock.calls[0]?.[1]).toMatchObject({
+      orderTypeId: confirmation.orderTypeId,
+      payment: { mode: 'SINGLE', cashReceivedMinor: 20000 },
+    });
   });
 
   it('rejects malformed mutation payloads before calling the service', async () => {
