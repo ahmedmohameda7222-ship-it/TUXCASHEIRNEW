@@ -93,8 +93,7 @@ insert into public.orders(
   order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
   normalized_phone_snapshot, address_snapshot, delivery_zone_id,
   delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
-  items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
-  recognized_revenue_minor, collected_payment_minor
+  items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
 ) values (
   '15bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
   '15111111-1111-4111-8111-111111111111'::uuid,
@@ -121,9 +120,7 @@ insert into public.orders(
   19000,
   null,
   '2026-09-08T08:06:00Z',
-  '2026-09-08T08:06:00Z',
-  19000,
-  19000
+  '2026-09-08T08:06:00Z'
 );
 
 do $$
