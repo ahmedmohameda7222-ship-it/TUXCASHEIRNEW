@@ -14,6 +14,7 @@ const MODIFIER_ID = '55555555-5555-4555-8555-555555555555';
 const ADDON_MODIFIER_ID = '66666666-6666-4666-8666-666666666666';
 const COMBO_ID = '77777777-7777-4777-8777-777777777777';
 const BEVERAGE_ID = '88888888-8888-4888-8888-888888888888';
+const CATEGORY_ID = '99999999-9999-4999-8999-999999999999';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -222,6 +223,19 @@ Deno.test('order-intake rejects inactive or sold-out requested products', async 
   assert(response.status === 409, 'sold-out product must conflict');
   assert(errorCode(await json(response)) === 'item_unavailable', 'wrong sold-out code');
   assert(store.inserted.length === 0, 'sold-out request persisted');
+});
+
+Deno.test('order-intake rejects products whose canonical category is inactive', async () => {
+  const inactiveCategoryAuthority = {
+    ...authority(),
+    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: false }],
+    products: authority().products.map((product) => ({ ...product, categoryId: CATEGORY_ID })),
+  } as unknown as OnlineOrderCatalogAuthority;
+  const store = new MemoryStore(inactiveCategoryAuthority);
+  const response = await handleOrderIntakeRequest(request(), store);
+  assert(response.status === 409, 'inactive-category product must conflict');
+  assert(errorCode(await json(response)) === 'item_unavailable', 'wrong inactive-category code');
+  assert(store.inserted.length === 0, 'inactive-category request persisted');
 });
 
 Deno.test('order-intake validates modifier links and maximum quantities', async () => {
