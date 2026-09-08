@@ -100,9 +100,10 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
   const productsById = new Map(products.map((product) => [product.id, product] as const));
   const comboBeveragesByProduct: Record<string, SupabaseProduct[]> = {};
   for (const option of snapshot.comboBeverageOptions) {
+    const beverages = (comboBeveragesByProduct[option.comboProductId] ??= []);
     const beverage = productsById.get(option.beverageProductId);
     if (!beverage?.is_active) continue;
-    (comboBeveragesByProduct[option.comboProductId] ??= []).push(beverage);
+    beverages.push(beverage);
   }
 
   const customerAvailableProducts = products.map((product) => {
