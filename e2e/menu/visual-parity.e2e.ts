@@ -88,7 +88,7 @@ test('captures required Menu visual-parity evidence including cart-open state', 
 
   await page.goto('/order-now', { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Add to Cart' }).first().click();
-  await page.locator('nav button:visible').last().click();
+  await page.getByRole('button', { name: 'Cart', exact: true }).click();
   await expect(page.getByText('Your Cart', { exact: true })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath(`${testInfo.project.name}-cart-open.png`),

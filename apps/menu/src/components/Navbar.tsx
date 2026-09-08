@@ -104,6 +104,7 @@ export const Navbar = () => {
             </a>
 
             <button
+              aria-label="Cart"
               onClick={() => setIsCartOpen(true)}
               className="relative p-2 text-foreground hover:text-primary transition-colors"
             >
@@ -117,7 +118,11 @@ export const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-4 md:hidden">
-            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-white">
+            <button
+              aria-label="Cart"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 text-white"
+            >
               <ShoppingBag className="w-6 h-6" />
               {totalItems > 0 && (
                 <span className="absolute top-0 right-0 w-4 h-4 bg-[#D4AF37] text-black text-[10px] font-bold rounded-full flex items-center justify-center">
