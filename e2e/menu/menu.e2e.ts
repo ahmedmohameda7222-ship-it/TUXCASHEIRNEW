@@ -122,15 +122,18 @@ for (const route of routes) {
   });
 }
 
-test('uses catalog-public UUID identity and priceMinor without stale fallback', async ({ page }) => {
-  const requests = await installCatalogFixture(page);
-  await page.goto('/tux-burger', { waitUntil: 'networkidle' });
+test(
+  'uses catalog-public UUID identity and priceMinor without stale fallback',
+  async ({ page }) => {
+    const requests = await installCatalogFixture(page);
+    await page.goto('/tux-burger', { waitUntil: 'networkidle' });
 
-  await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
-  await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
-  await expect(page.getByText('Double Tux Burger', { exact: true })).toHaveCount(0);
-  expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}`]);
-});
+    await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+    await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
+    await expect(page.getByText('Double Tux Burger', { exact: true })).toHaveCount(0);
+    expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}`]);
+  },
+);
 
 test('shows explicit unavailable state instead of checked-in catalog data', async ({ page }) => {
   await page.route(`${CATALOG_URL}**`, async (route) => {

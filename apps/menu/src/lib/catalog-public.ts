@@ -1,7 +1,4 @@
-import {
-  parsePublicCatalogSnapshotV1,
-  type PublicCatalogSnapshotV1,
-} from '@tux/catalog-contracts';
+import { parsePublicCatalogSnapshotV1, type PublicCatalogSnapshotV1 } from '@tux/catalog-contracts';
 
 const catalogPublicUrl = (): string => {
   const explicit = import.meta.env.VITE_CATALOG_PUBLIC_URL?.trim();
