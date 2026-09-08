@@ -1,6 +1,13 @@
 export type { BulkStockMovementCommit, BulkStockStore } from './bulkStockStore';
 export type * from './contracts';
 export type { ExpenseLedgerMutation, ExpenseLedgerStore } from './expenseLedgerStore';
+export type {
+  CachedOnlineOrderFulfillmentPreference,
+  CachedOnlineOrderPaymentPreference,
+  CachedOnlineOrderRequest,
+  CachedOnlineOrderStatus,
+  OnlineOrderInboxStore,
+} from './onlineOrderInboxStore';
 export type { OperatorSessionReadModel } from './operatorSessionReadModel';
 export type {
   OrderDraftKey,
