@@ -36,6 +36,8 @@ function pending(status: 'PENDING' | 'PROCESSING' = 'PENDING'): Record<string, u
     processingOrderId: status === 'PROCESSING' ? ORDER_ID : null,
     processingStartedAt: status === 'PROCESSING' ? '2026-09-08T10:05:00.000Z' : null,
     processingExpiresAt: status === 'PROCESSING' ? '2026-09-08T22:05:00.000Z' : null,
+    processingDeviceId: status === 'PROCESSING' ? DEVICE_ID : null,
+    reservationOriginDeviceId: status === 'PROCESSING' ? DEVICE_ID : null,
   };
 }
 
@@ -134,7 +136,7 @@ Deno.test('online-order operations lists only through server-authorized auth-use
   );
 });
 
-Deno.test('online-order operations CLAIM reserves the remote processing order identity', async () => {
+Deno.test('online-order operations CLAIM reserves the remote processing order identity and origin device', async () => {
   const store = new MemoryStore();
   const response = await handleOnlineOrderOperationsRequest(
     request('POST', { action: 'CLAIM', requestId: REQUEST_ID }),
@@ -144,6 +146,8 @@ Deno.test('online-order operations CLAIM reserves the remote processing order id
   assert(response.status === 200, 'claim failed');
   assert(parsed.status === 'PROCESSING', 'claim did not enter PROCESSING');
   assert(parsed.processingOrderId === ORDER_ID, 'claim did not expose reserved final order identity');
+  assert(parsed.processingDeviceId === DEVICE_ID, 'claim lost the current processing device');
+  assert(parsed.reservationOriginDeviceId === DEVICE_ID, 'claim lost the reservation origin device');
   assert(
     JSON.stringify(store.calls[0]) ===
       JSON.stringify({ action: 'CLAIM', authUserId: AUTH_USER_ID, deviceId: DEVICE_ID, requestId: REQUEST_ID }),
