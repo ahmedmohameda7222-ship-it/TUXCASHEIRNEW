@@ -74,9 +74,12 @@ describe('canonical Menu linked-extra availability', () => {
   it.each([
     ['inactive', { active: false, soldOut: false }],
     ['sold out', { active: true, soldOut: true }],
-  ] as const)('does not offer a linked extra whose standalone product is %s', (_label, availability) => {
-    const projection = projectPublicCatalog(snapshot(availability));
+  ] as const)(
+    'does not offer a linked extra whose standalone product is %s',
+    (_label, availability) => {
+      const projection = projectPublicCatalog(snapshot(availability));
 
-    expect(projection.extrasByProduct[PRODUCT_ID] ?? []).toEqual([]);
-  });
+      expect(projection.extrasByProduct[PRODUCT_ID] ?? []).toEqual([]);
+    },
+  );
 });
