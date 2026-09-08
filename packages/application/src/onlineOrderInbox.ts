@@ -40,7 +40,7 @@ export interface OnlineOrderInboxRemoteGateway {
   fetchActiveRequests(limit: number): Promise<unknown>;
   claim(requestId: string): Promise<unknown>;
   release(requestId: string, processingOrderId: string): Promise<unknown>;
-  reject(requestId: string, reason: string): Promise<unknown>;
+  reject(requestId: string, processingOrderId: string, reason: string): Promise<unknown>;
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -197,7 +197,11 @@ export class OperationsOnlineOrderInboxService {
     if (cached.status !== 'PROCESSING' || cached.processingOrderId !== processingOrderId) {
       throw new Error('Online-order rejection does not match the local processing claim.');
     }
-    parseAck(await this.#remote.reject(requestId, reason), requestId, 'REJECTED');
+    parseAck(
+      await this.#remote.reject(requestId, processingOrderId, reason),
+      requestId,
+      'REJECTED',
+    );
     await this.#store.remove(shopId, requestId);
     await this.#publishSynced(shopId);
   }
