@@ -5,6 +5,7 @@ import {
   ApplicationCommandCoordinator,
   CoordinatedOperationsSessionService,
   OperationsConfigurationSyncService,
+  OperationsOnlineOrderInboxService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsWhatsAppService,
@@ -14,6 +15,7 @@ import {
   WorkerMenuLayoutService,
   WorkerUiPreferencesRetryController,
   WorkerUiPreferencesService,
+  type OnlineOrderInboxRemoteGateway,
   type OperationsSessionResult,
   type WhatsAppRemoteGateway,
   type WorkerCredentialStore,
@@ -32,6 +34,7 @@ import {
 } from '@tux/domain';
 import type { WorkerUiPreferencesRepository } from '@tux/persistence';
 import {
+  SqliteOnlineOrderInboxStore,
   SqliteOperationsDatabase,
   SqliteOperatorSessionReadModel,
   SqliteOrderDraftStore,
@@ -58,6 +61,8 @@ import { BulkStockIpcRuntime } from './bulkStockIpc';
 import { DesktopWhatsAppRemote, parseTuxOperationsApiOrigin } from './desktopWhatsAppRemote';
 import { EndDayIpcRuntime } from './endDayIpc';
 import { ExpensesIpcRuntime } from './expensesIpc';
+import { OnlineOrderInboxIpcRuntime } from './onlineOrderInboxIpc';
+import { SupabaseDesktopOnlineOrderOperationsRemote } from './onlineOrderOperationsRemote';
 import { ElectronOrderPrinter } from './orderPrinter';
 import { NodePbkdf2PinVerifier } from './pinVerifier';
 import {
@@ -97,6 +102,7 @@ let operationsDatabase: SqliteOperationsDatabase | null = null;
 let operatorReadModel: SqliteOperatorSessionReadModel | null = null;
 let orderDraftStore: SqliteOrderDraftStore | null = null;
 let workerMenuLayoutStore: SqliteWorkerMenuLayoutStore | null = null;
+let onlineOrderInboxStore: SqliteOnlineOrderInboxStore | null = null;
 let sessionService: CoordinatedOperationsSessionService | null = null;
 let workerAuthenticationService: OperationsWorkerAuthenticationService | null = null;
 let ordersService: OperationsOrdersService | null = null;
@@ -104,6 +110,7 @@ let ordersBoardService: OperationsOrdersBoardService | null = null;
 let expensesIpcRuntime: ExpensesIpcRuntime | null = null;
 let bulkStockIpcRuntime: BulkStockIpcRuntime | null = null;
 let endDayIpcRuntime: EndDayIpcRuntime | null = null;
+let onlineOrderInboxIpcRuntime: OnlineOrderInboxIpcRuntime | null = null;
 let whatsappStore: SqliteWhatsAppStore | null = null;
 let whatsappIpcRuntime: WhatsAppIpcRuntime | null = null;
 let desktopWhatsAppRemote: DesktopWhatsAppRemote | null = null;
@@ -173,6 +180,18 @@ function unavailableWorkerUiPreferencesGateway(): WorkerUiPreferencesRemoteGatew
   return {
     getWorkerUiPreferences: unavailable,
     putWorkerUiPreferences: unavailable,
+  };
+}
+
+function unavailableOnlineOrderInboxRemote(): OnlineOrderInboxRemoteGateway {
+  const unavailable = async (): Promise<never> => {
+    throw new Error('Online-order Operations remote is not configured.');
+  };
+  return {
+    fetchActiveRequests: unavailable,
+    claim: unavailable,
+    release: unavailable,
+    reject: unavailable,
   };
 }
 
@@ -288,6 +307,22 @@ async function initializeOperationsServices(): Promise<void> {
     workerAuthenticator,
     workerCredentialStore,
   );
+
+  onlineOrderInboxStore = new SqliteOnlineOrderInboxStore(databasePath);
+  await onlineOrderInboxStore.initialize();
+  const onlineOrderInboxRemote: OnlineOrderInboxRemoteGateway =
+    remoteSessionManager !== null && supabaseUrl
+      ? new SupabaseDesktopOnlineOrderOperationsRemote({
+          projectUrl: supabaseUrl,
+          sessionManager: remoteSessionManager,
+        })
+      : unavailableOnlineOrderInboxRemote();
+  const onlineOrderInboxService = new OperationsOnlineOrderInboxService({
+    getActiveShopId: resolveOnlineOrderInboxShopId,
+    store: onlineOrderInboxStore,
+    remote: onlineOrderInboxRemote,
+  });
+  onlineOrderInboxIpcRuntime = new OnlineOrderInboxIpcRuntime({ service: onlineOrderInboxService });
 
   whatsappStore = new SqliteWhatsAppStore(databasePath);
   await whatsappStore.initialize();
@@ -453,6 +488,17 @@ function currentSessionService(): CoordinatedOperationsSessionService {
     throw new Error('Operations session service has not been initialized.');
   }
   return sessionService;
+}
+
+async function resolveOnlineOrderInboxShopId(): Promise<ShopId> {
+  const state = await currentSessionService().getState();
+  if (!state.ok) {
+    throw new Error('Could not resolve the active shop for the online-order inbox.');
+  }
+  if (state.value.status === 'CONFIGURATION_REQUIRED') {
+    throw new Error('Online-order inbox requires an activated Operations shop configuration.');
+  }
+  return state.value.shopId;
 }
 
 function currentWorkerAuthenticationService(): OperationsWorkerAuthenticationService {
@@ -688,6 +734,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
   if (endDayIpcRuntime === null) {
     throw new Error('Operations End Day IPC runtime has not been initialized.');
   }
+  if (onlineOrderInboxIpcRuntime === null) {
+    throw new Error('Online-order inbox IPC runtime has not been initialized.');
+  }
   if (whatsappIpcRuntime === null) {
     throw new Error('Operations WhatsApp IPC runtime has not been initialized.');
   }
@@ -696,6 +745,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
   expensesIpcRuntime.register(window);
   bulkStockIpcRuntime.register(window);
   endDayIpcRuntime.register(window);
+  onlineOrderInboxIpcRuntime.register(window);
   whatsappIpcRuntime.register(window);
 }
 
@@ -794,7 +844,9 @@ app.on('before-quit', () => {
   workerMenuLayoutIpcRuntime = null;
   workerUiPreferencesIpcRuntime?.close();
   workerUiPreferencesIpcRuntime = null;
+  onlineOrderInboxIpcRuntime?.close();
   whatsappIpcRuntime?.close();
+  void onlineOrderInboxStore?.close();
   void whatsappStore?.close();
   automaticSyncScheduler?.stop();
   void endDayIpcRuntime?.close();
@@ -805,6 +857,8 @@ app.on('before-quit', () => {
   void workerMenuLayoutStore?.close();
   void operationsDatabase?.close();
   automaticSyncScheduler = null;
+  onlineOrderInboxIpcRuntime = null;
+  onlineOrderInboxStore = null;
   whatsappIpcRuntime = null;
   whatsappStore = null;
   endDayIpcRuntime = null;
