@@ -79,9 +79,9 @@ describe('online order intake transport contract', () => {
   it.each(['CASH', 'INSTAPAY', 'MIXED'] as const)(
     'accepts %s as payment preference intent without settlement authority',
     (paymentPreference) => {
-      expect(parseOnlineOrderRequestV1({ ...validRequest(), paymentPreference }).paymentPreference).toBe(
-        paymentPreference,
-      );
+      expect(
+        parseOnlineOrderRequestV1({ ...validRequest(), paymentPreference }).paymentPreference,
+      ).toBe(paymentPreference);
     },
   );
 
