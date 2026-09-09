@@ -49,19 +49,20 @@ insert into public.devices(id, shop_id, label, active, auth_user_id) values
     '16922222-2222-4222-8222-222222222222'
   );
 
--- An expired lease owned by a still-active origin must remain fenced.
+-- A requeued PENDING request can retain a durable reservation from its previous
+-- origin. While that origin remains authorized, another device must not acquire
+-- an unusable PROCESSING lease against the old origin-owned order identity.
 insert into public.online_order_requests(
   id, shop_id, idempotency_key, request_sha256, catalog_revision, status,
   fulfillment_preference, payment_preference, customer_name, normalized_phone,
-  delivery_address, trusted_items, items_subtotal_minor, order_note,
-  processing_device_id, processing_order_id, processing_started_at, processing_expires_at
+  delivery_address, trusted_items, items_subtotal_minor, order_note
 ) values (
   '16aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
   '16111111-1111-4111-8111-111111111111'::uuid,
   '16dddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid,
   repeat('a', 64),
   repeat('b', 64),
-  'PROCESSING',
+  'PENDING',
   'PICKUP',
   'CASH',
   'Active Origin Customer',
@@ -69,11 +70,7 @@ insert into public.online_order_requests(
   null,
   '[{"productId":"16555555-5555-4555-8555-555555555555","quantity":1}]'::jsonb,
   19000,
-  null,
-  '16666666-6666-4666-8666-666666666666'::uuid,
-  '16bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid,
-  now() - interval '13 hours',
-  now() - interval '1 hour'
+  null
 );
 
 insert into private.online_order_processing_reservations(
@@ -88,19 +85,43 @@ insert into private.online_order_processing_reservations(
 
 do $$
 declare
-  v_claim jsonb;
+  v_status text;
+  v_processing_device_id uuid;
+  v_processing_order_id uuid;
+  v_origin uuid;
+  v_reserved_order_id uuid;
 begin
-  v_claim := public.claim_tux_online_order_request_v1(
-    '16922222-2222-4222-8222-222222222222'::uuid,
-    '16777777-7777-4777-8777-777777777777'::uuid,
-    '16aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid
-  );
+  begin
+    perform public.claim_tux_online_order_request_v1(
+      '16922222-2222-4222-8222-222222222222'::uuid,
+      '16777777-7777-4777-8777-777777777777'::uuid,
+      '16aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid
+    );
+    raise exception 'ACTIVE_ORIGIN_CLAIM_UNEXPECTEDLY_SUCCEEDED';
+  exception
+    when others then
+      if position('TUX_ONLINE_ORDER_RESERVATION_OWNED' in sqlerrm) = 0 then
+        raise;
+      end if;
+  end;
 
-  if v_claim ->> 'processingDeviceId' <> '16777777-7777-4777-8777-777777777777' then
-    raise exception 'recovery device did not receive the expired processing lease';
+  select request.status, request.processing_device_id, request.processing_order_id
+    into v_status, v_processing_device_id, v_processing_order_id
+  from public.online_order_requests request
+  where request.id = '16aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+
+  if v_status <> 'PENDING' or v_processing_device_id is not null or v_processing_order_id is not null then
+    raise exception 'active-origin refused claim mutated the pending request';
   end if;
-  if v_claim ->> 'reservationOriginDeviceId' <> '16666666-6666-4666-8666-666666666666' then
-    raise exception 'active origin reservation ownership transferred unexpectedly';
+
+  select reservation.origin_device_id, reservation.processing_order_id
+    into v_origin, v_reserved_order_id
+  from private.online_order_processing_reservations reservation
+  where reservation.request_id = '16aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+
+  if v_origin is distinct from '16666666-6666-4666-8666-666666666666'::uuid
+     or v_reserved_order_id is distinct from '16bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid then
+    raise exception 'active-origin refused claim changed durable reservation ownership';
   end if;
 end $$;
 
