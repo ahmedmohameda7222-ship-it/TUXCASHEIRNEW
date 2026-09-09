@@ -32,6 +32,27 @@ export const getProductSectionHref = (section: ProductRouteSection) => {
   return PRODUCT_SECTION_ROUTES[routeKey] || `/products/${routeKey}`;
 };
 
+export const isProductSectionRouteActive = (
+  location: string,
+  section: ProductRouteSection,
+): boolean => {
+  const href = getProductSectionHref(section);
+  if (
+    location === href ||
+    location === `/products/${section.slug}` ||
+    location === `/products/${section.id}`
+  ) {
+    return true;
+  }
+
+  const routeSlug = location.startsWith('/') ? location.slice(1) : location;
+  if (!routeSlug || routeSlug.includes('/')) return false;
+
+  const routeTarget = resolveCanonicalCategoryRoute(routeSlug);
+  const sectionSlug = section.slug || section.id;
+  return routeTarget.family !== null && routeTarget.categorySlug === sectionSlug;
+};
+
 export const getOrderProductElementId = (productId: string) =>
   `${ORDER_PRODUCT_ELEMENT_PREFIX}${encodeURIComponent(productId)}`;
 
