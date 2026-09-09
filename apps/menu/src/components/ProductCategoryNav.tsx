@@ -2,10 +2,7 @@ import React from 'react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'wouter';
 import { useMenu } from '@/context/MenuContext';
-import {
-  getProductSectionHref,
-  isProductSectionRouteActive,
-} from '@/lib/product-routes';
+import { getProductSectionHref, isProductSectionRouteActive } from '@/lib/product-routes';
 
 export const ProductCategoryNav = () => {
   const [location] = useLocation();
