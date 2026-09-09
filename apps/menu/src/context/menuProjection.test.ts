@@ -44,6 +44,7 @@ function snapshot(input: {
         description: null,
         priceMinor: 25_000,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -58,6 +59,7 @@ function snapshot(input: {
         description: null,
         priceMinor: 0,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: input.colaActive,
         soldOut: input.colaSoldOut,
@@ -72,6 +74,7 @@ function snapshot(input: {
         description: null,
         priceMinor: 0,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: input.waterActive,
         soldOut: input.waterSoldOut,
@@ -112,6 +115,7 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
         description: null,
         priceMinor: 19_000,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -126,6 +130,7 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
         description: null,
         priceMinor: 22_000,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -140,6 +145,7 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
         description: null,
         priceMinor: 9_999,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -154,6 +160,7 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
         description: null,
         priceMinor: 8_888,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -168,6 +175,7 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
         description: null,
         priceMinor: 777,
         imageUrl: null,
+        family: null,
         bestSeller: false,
         active: true,
         soldOut: false,
@@ -198,8 +206,29 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
       { productId: PRODUCT_B_ID, modifierId: MODIFIER_B_ID, maxQuantity: 1, sortOrder: 0 },
     ],
     comboBeverageOptions: [],
-  } as unknown as PublicCatalogSnapshotV1;
+  };
 }
+
+describe('canonical Menu merchandising family projection', () => {
+  it('preserves product family for customer-facing family routes', () => {
+    const base = snapshot({
+      colaActive: true,
+      colaSoldOut: false,
+      waterActive: true,
+      waterSoldOut: false,
+    });
+    const withFamily: PublicCatalogSnapshotV1 = {
+      ...base,
+      products: base.products.map((product, index) => ({
+        ...product,
+        family: index === 0 ? 'TUX' : null,
+      })),
+    };
+
+    const projection = projectPublicCatalog(withFamily);
+    expect(projection.products[0]?.family).toBe('TUX');
+  });
+});
 
 describe('canonical Menu combo availability projection', () => {
   it('offers only currently customer-available configured beverages', () => {
@@ -236,18 +265,11 @@ describe('canonical Menu combo availability projection', () => {
 describe('canonical Menu product-specific extras projection', () => {
   it('authorizes only linked standalone modifier products and uses modifier pricing', () => {
     const projection = projectPublicCatalog(extrasSnapshot());
-    const extrasByProduct = (
-      projection as unknown as {
-        readonly extrasByProduct: Readonly<
-          Record<string, readonly { id: string; name: string; price: number }[]>
-        >;
-      }
-    ).extrasByProduct;
 
-    expect(extrasByProduct).toEqual({
+    expect(projection.extrasByProduct).toEqual({
       [PRODUCT_A_ID]: [{ id: EXTRA_A_ID, name: 'Extra cheese', price: 25 }],
       [PRODUCT_B_ID]: [{ id: EXTRA_B_ID, name: 'Extra mushroom', price: 30 }],
     });
-    expect(JSON.stringify(extrasByProduct)).not.toContain(UNRELATED_EXTRA_ID);
+    expect(JSON.stringify(projection.extrasByProduct)).not.toContain(UNRELATED_EXTRA_ID);
   });
 });

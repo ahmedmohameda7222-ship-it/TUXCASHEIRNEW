@@ -3,6 +3,11 @@ export type ProductRouteSection = {
   slug?: string;
 };
 
+export interface CanonicalCategoryRouteTarget {
+  readonly categorySlug: string;
+  readonly family: string | null;
+}
+
 export const PRODUCT_SECTION_ROUTES: Record<string, string> = {
   'tux-burger': '/tux-burger',
   tuxify: '/tuxify',
@@ -12,11 +17,40 @@ export const PRODUCT_SECTION_ROUTES: Record<string, string> = {
   drinks: '/drinks',
 };
 
+const FAMILY_CATEGORY_ROUTES: Readonly<Record<string, CanonicalCategoryRouteTarget>> = {
+  'tux-burger': { categorySlug: 'burgers', family: 'TUX' },
+  tuxify: { categorySlug: 'burgers', family: 'TUXIFY' },
+};
+
 const ORDER_PRODUCT_ELEMENT_PREFIX = 'order-product-';
+
+export const resolveCanonicalCategoryRoute = (routeSlug: string): CanonicalCategoryRouteTarget =>
+  FAMILY_CATEGORY_ROUTES[routeSlug] ?? { categorySlug: routeSlug, family: null };
 
 export const getProductSectionHref = (section: ProductRouteSection) => {
   const routeKey = section.slug || section.id;
   return PRODUCT_SECTION_ROUTES[routeKey] || `/products/${routeKey}`;
+};
+
+export const isProductSectionRouteActive = (
+  location: string,
+  section: ProductRouteSection,
+): boolean => {
+  const href = getProductSectionHref(section);
+  if (
+    location === href ||
+    location === `/products/${section.slug}` ||
+    location === `/products/${section.id}`
+  ) {
+    return true;
+  }
+
+  const routeSlug = location.startsWith('/') ? location.slice(1) : location;
+  if (!routeSlug || routeSlug.includes('/')) return false;
+
+  const routeTarget = resolveCanonicalCategoryRoute(routeSlug);
+  const sectionSlug = section.slug || section.id;
+  return routeTarget.family !== null && routeTarget.categorySlug === sectionSlug;
 };
 
 export const getOrderProductElementId = (productId: string) =>

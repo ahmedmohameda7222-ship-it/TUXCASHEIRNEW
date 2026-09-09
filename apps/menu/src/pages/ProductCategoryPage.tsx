@@ -36,7 +36,13 @@ function ProductImage({ product, index }: { product: SupabaseProduct; index: num
   );
 }
 
-export default function ProductCategoryPage({ sectionId }: { sectionId?: string }) {
+export default function ProductCategoryPage({
+  sectionId,
+  family,
+}: {
+  sectionId?: string;
+  family?: string | null;
+}) {
   const [location] = useLocation();
   const { sections, products, loading } = useMenu();
   const shouldReduceMotion = useReducedMotion();
@@ -53,7 +59,10 @@ export default function ProductCategoryPage({ sectionId }: { sectionId?: string 
 
   const sectionProducts = section
     ? products
-        .filter((product) => product.section_id === section.id)
+        .filter(
+          (product) =>
+            product.section_id === section.id && (family == null || product.family === family),
+        )
         .sort((a, b) => a.sort_order - b.sort_order)
     : [];
 

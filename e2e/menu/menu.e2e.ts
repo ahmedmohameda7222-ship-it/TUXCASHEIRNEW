@@ -6,12 +6,11 @@ const ORDER_INTAKE_URL = 'https://orders.test/functions/v1/order-intake';
 const REQUEST_ID = '90000000-0000-4000-8000-000000000001';
 
 const categoryRows = [
-  ['20000000-0000-4000-8000-000000000001', 'tux-burger', 'Tux Burger'],
-  ['20000000-0000-4000-8000-000000000002', 'tuxify', 'Tuxify Burger'],
-  ['20000000-0000-4000-8000-000000000003', 'hawawshi', 'Hawawshi'],
-  ['20000000-0000-4000-8000-000000000004', 'fries', 'Fries'],
-  ['20000000-0000-4000-8000-000000000005', 'combos', 'Combos'],
-  ['20000000-0000-4000-8000-000000000006', 'drinks', 'Drinks'],
+  ['20000000-0000-4000-8000-000000000001', 'burgers', 'Burgers'],
+  ['20000000-0000-4000-8000-000000000002', 'hawawshi', 'Hawawshi'],
+  ['20000000-0000-4000-8000-000000000003', 'fries', 'Fries'],
+  ['20000000-0000-4000-8000-000000000004', 'combos', 'Combos'],
+  ['20000000-0000-4000-8000-000000000005', 'drinks', 'Drinks'],
 ] as const;
 
 const productRows = [
@@ -21,41 +20,47 @@ const productRows = [
     'canonical-tux-burger',
     'Canonical Tux Burger',
     19050,
+    'TUX',
   ],
   [
     '30000000-0000-4000-8000-000000000002',
-    categoryRows[1][0],
+    categoryRows[0][0],
     'canonical-tuxify',
     'Canonical Tuxify',
     18000,
+    'TUXIFY',
   ],
   [
     '30000000-0000-4000-8000-000000000003',
-    categoryRows[2][0],
+    categoryRows[1][0],
     'canonical-hawawshi',
     'Canonical Hawawshi',
     12000,
+    null,
   ],
   [
     '30000000-0000-4000-8000-000000000004',
-    categoryRows[3][0],
+    categoryRows[2][0],
     'canonical-fries',
     'Canonical Fries',
     3000,
+    null,
   ],
   [
     '30000000-0000-4000-8000-000000000005',
-    categoryRows[4][0],
+    categoryRows[3][0],
     'canonical-combo',
     'Canonical Combo',
     6000,
+    null,
   ],
   [
     '30000000-0000-4000-8000-000000000006',
-    categoryRows[5][0],
+    categoryRows[4][0],
     'canonical-drink',
     'Canonical Drink',
     2500,
+    null,
   ],
 ] as const;
 
@@ -71,7 +76,7 @@ const catalogFixture = {
     active: true,
     sortOrder,
   })),
-  products: productRows.map(([id, categoryId, slug, name, priceMinor], sortOrder) => ({
+  products: productRows.map(([id, categoryId, slug, name, priceMinor, family], sortOrder) => ({
     id,
     slug,
     categoryId,
@@ -79,6 +84,7 @@ const catalogFixture = {
     description: `${name} canonical product`,
     priceMinor,
     imageUrl: null,
+    family,
     bestSeller: sortOrder === 0,
     active: true,
     soldOut: false,
@@ -145,8 +151,8 @@ function assertNoBrowserAuthority(payload: Record<string, unknown>): void {
 const routes = [
   { path: '/', text: /TUX/i },
   { path: '/order-now', text: /Order\s*Now/i },
-  { path: '/tux-burger', text: /Tux Burger/i },
-  { path: '/tuxify', text: /Tuxify Burger/i },
+  { path: '/tux-burger', text: /Canonical Tux Burger/i },
+  { path: '/tuxify', text: /Canonical Tuxify/i },
   { path: '/hawawshi', text: /Hawawshi/i },
   { path: '/fries', text: /Fries/i },
   { path: '/combos', text: /Combos/i },
@@ -163,13 +169,14 @@ for (const route of routes) {
   });
 }
 
-test('uses catalog-public UUID identity and priceMinor without stale fallback', async ({
+test('uses catalog-public UUID identity, family, and priceMinor without stale fallback', async ({
   page,
 }) => {
   const requests = await installCatalogFixture(page);
   await page.goto('/tux-burger', { waitUntil: 'networkidle' });
 
   await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+  await expect(page.getByText('Canonical Tuxify', { exact: true })).toHaveCount(0);
   await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
   await expect(page.getByText('Double Tux Burger', { exact: true })).toHaveCount(0);
   expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}`]);
@@ -219,11 +226,12 @@ test('home images have real dimensions', async ({ page }) => {
 
 test('canonical category slug survives product deep-route entry', async ({ page }) => {
   await installCatalogFixture(page);
-  await page.goto('/products/tux-burger', { waitUntil: 'networkidle' });
+  await page.goto('/products/burgers', { waitUntil: 'networkidle' });
 
-  await expect(page).toHaveURL(/\/products\/tux-burger$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Tux Burger' })).toBeVisible();
+  await expect(page).toHaveURL(/\/products\/burgers$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Burgers' })).toBeVisible();
   await expect(page.getByText('Canonical Tux Burger', { exact: true })).toBeVisible();
+  await expect(page.getByText('Canonical Tuxify', { exact: true })).toBeVisible();
 });
 
 test('delivery checkout persists a PENDING canonical order before any WhatsApp continuation', async ({

@@ -37,6 +37,7 @@ function validSnapshot() {
         description: null,
         priceMinor: 19000,
         imageUrl: null,
+        family: 'TUX',
         bestSeller: true,
         active: true,
         soldOut: false,

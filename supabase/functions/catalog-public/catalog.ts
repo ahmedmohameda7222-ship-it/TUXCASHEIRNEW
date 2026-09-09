@@ -25,6 +25,7 @@ export interface PublicProductRow extends Row {
   readonly description: string | null;
   readonly price_minor: number;
   readonly image_key: string | null;
+  readonly family: string | null;
   readonly best_seller: boolean;
   readonly active: boolean;
   readonly sold_out: boolean;
@@ -176,6 +177,7 @@ export async function buildPublicCatalogSnapshot(
         description: row.description,
         priceMinor: requireMoney(row.price_minor, `product ${row.id}`),
         imageUrl: store.resolveImageUrl(row.image_key),
+        family: row.family,
         bestSeller: row.best_seller,
         active: row.active,
         soldOut: row.sold_out,

@@ -37,6 +37,7 @@ export interface SupabaseProduct {
   price: number;
   image_url?: string;
   image_path?: string;
+  family?: string;
   is_best_seller: boolean;
   is_active: boolean;
   is_sold_out: boolean;
@@ -78,6 +79,7 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
       price: product.priceMinor / 100,
       image_url: product.imageUrl ?? undefined,
       image_path: undefined,
+      family: product.family ?? undefined,
       is_best_seller: product.bestSeller,
       is_active: product.active && !product.soldOut && activeCategoryIds.has(product.categoryId),
       is_sold_out: product.soldOut,

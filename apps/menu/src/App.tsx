@@ -13,13 +13,15 @@ import { StickyCartBar } from '@/components/cart/StickyCartBar';
 import Home from '@/pages/Home';
 import OrderNow from '@/pages/OrderNow';
 import ProductCategoryPage from '@/pages/ProductCategoryPage';
+import { resolveCanonicalCategoryRoute } from '@/lib/product-routes';
 
 const queryClient = new QueryClient();
 
 function CanonicalCategoryRoute({ slug }: { slug: string }) {
   const { sections } = useMenu();
-  const sectionId = sections.find((section) => section.slug === slug)?.id;
-  return <ProductCategoryPage sectionId={sectionId} />;
+  const target = resolveCanonicalCategoryRoute(slug);
+  const sectionId = sections.find((section) => section.slug === target.categorySlug)?.id;
+  return <ProductCategoryPage sectionId={sectionId} family={target.family} />;
 }
 
 function CatalogAvailabilityBanner() {
