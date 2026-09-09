@@ -1,0 +1,35 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
+
+export default defineConfig({
+  base: '/',
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@assets': path.resolve(__dirname, 'src/assets'),
+      '@tux/catalog-contracts': path.resolve(
+        __dirname,
+        '../../packages/catalog-contracts/src/index.ts',
+      ),
+      '@tux/order-intake-contracts': path.resolve(
+        __dirname,
+        '../../packages/order-intake-contracts/src/index.ts',
+      ),
+    },
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+  server: {
+    port: 5173,
+    host: '0.0.0.0',
+  },
+  preview: {
+    port: 4173,
+    host: '0.0.0.0',
+  },
+});

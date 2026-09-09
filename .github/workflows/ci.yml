@@ -13,6 +13,7 @@ on:
       - 'fix/operations-*'
       - 'ui/tux-pos-refinement'
       - 'work/operations-whatsapp-inbox-live'
+      - 'work/menu-online-orders-integration'
 
 permissions:
   contents: read
@@ -86,8 +87,6 @@ jobs:
         run: npm run test:migrations
       - uses: denoland/setup-deno@v2
         with:
-          # Supabase Edge Runtime currently tracks the Deno 1.46 family. Keep CI on the
-          # same resolver semantics so remote import-graph failures are caught before deploy.
           deno-version: v1.46.3
       - name: Supabase function auth deployment contract
         run: deno test --allow-read scripts/supabaseFunctionAuthConfig.deno.ts
@@ -98,6 +97,10 @@ jobs:
           deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
           deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
           deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
+          deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
+          deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
+          deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+          deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Rendered browser E2E
@@ -126,6 +129,15 @@ jobs:
         run: >-
           deno test --allow-env --allow-net --allow-run --allow-read
           supabase/functions/device-bootstrap/security.deno.ts
+      - name: Catalog public/admin boundary behavioral tests
+        run: >-
+          deno test
+          supabase/functions/catalog-public/catalog-public.deno.ts
+          supabase/functions/catalog-admin/catalog-admin.deno.ts
+      - name: Public online-order intake behavioral tests
+        run: deno test scripts/order-intake.deno.ts
+      - name: Authenticated online-order Operations behavioral tests
+        run: deno test scripts/online-order-operations.deno.ts
 
   windows-package:
     name: windows-package
@@ -151,6 +163,60 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  menu:
+    name: menu
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked root dependencies
+        run: npm ci
+      - name: Menu typecheck
+        run: npm run typecheck:menu
+      - name: Menu production build
+        run: npm run build:menu
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered Menu E2E
+        run: npm run test:e2e:menu
+      - name: Upload Menu rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-rendered-e2e
+          path: |
+            playwright-report-menu
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  architecture:
+    name: monorepo-architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Monorepo architecture guards
+        run: npm run test:monorepo-architecture
+      - name: Canonical catalog architecture guards
+        run: npm run test:catalog-architecture
+
   required-quality-gate:
     name: Required quality gate
     if: always()
@@ -158,6 +224,8 @@ jobs:
       - quality
       - edge-security
       - windows-package
+      - menu
+      - architecture
     runs-on: ubuntu-latest
     steps:
       - name: Require every permanent gate
@@ -165,7 +233,11 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
+          MENU_RESULT: ${{ needs.menu.result }}
+          ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
           test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
+          test "$MENU_RESULT" = "success"
+          test "$ARCHITECTURE_RESULT" = "success"

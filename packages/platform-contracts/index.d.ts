@@ -2,6 +2,8 @@ import type {
   OperationsBulkStockService,
   OperationsEndDayService,
   OperationsExpensesService,
+  OperationsOnlineOrderAcceptanceService,
+  OperationsOnlineOrderInboxService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsSessionResult,
@@ -117,6 +119,16 @@ export type TuxEndDayApi = Pick<
   'beginEndDay' | 'discardDraft' | 'previewReconciliation' | 'closeDay'
 >;
 
+export type TuxOnlineOrdersApi = Pick<
+  OperationsOnlineOrderInboxService,
+  'load' | 'claim' | 'release' | 'reject' | 'subscribe'
+> & {
+  readonly accept: (
+    requestId: string,
+    confirmation: Parameters<OperationsOnlineOrderAcceptanceService['accept']>[1],
+  ) => ReturnType<OperationsOnlineOrderAcceptanceService['accept']>;
+};
+
 export type TuxWhatsAppApi = Pick<
   OperationsWhatsAppService,
   | 'loadInbox'
@@ -154,6 +166,7 @@ export interface TuxDesktopApi {
   readonly expenses: TuxExpensesApi;
   readonly bulkStock: TuxBulkStockApi;
   readonly endDay: TuxEndDayApi;
+  readonly onlineOrders: TuxOnlineOrdersApi;
   readonly whatsapp: TuxWhatsAppApi & {
     readonly setNotificationViewState: (input: {
       readonly focusedConversationId: string | null;

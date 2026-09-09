@@ -1,10 +1,14 @@
 import { parse } from 'jsr:@std/toml@1.0.11';
 
 const EXPECTED_VERIFY_JWT = {
+  'catalog-admin': true,
+  'catalog-public': false,
   'device-bootstrap': false,
   'device-enroll': false,
+  'online-order-operations': true,
   'operations-config': true,
   'operations-sync': true,
+  'order-intake': false,
   'worker-auth': true,
 } as const;
 

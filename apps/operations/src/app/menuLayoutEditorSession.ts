@@ -6,6 +6,11 @@ import type {
   WorkerId,
   WorkerMenuLayout,
 } from '@tux/domain';
+import {
+  productOrderForPickup,
+  productOrderMutationSource,
+  productOrderPickupToken,
+} from './menuProductOrder';
 
 export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
@@ -67,6 +72,7 @@ interface ProductPickupInteraction {
   readonly type: 'PRODUCT_PICKUP';
   readonly productId: ProductId;
   readonly categoryId: MenuCategoryId;
+  readonly pickupToken: object;
   readonly snapshot: MenuLayoutDraft;
 }
 
@@ -105,6 +111,7 @@ interface SetAlignmentEvent {
 
 interface SetProductOrderEvent {
   readonly type: 'SET_PRODUCT_ORDER';
+  readonly productId?: ProductId;
   readonly productOrder: readonly ProductId[];
 }
 
@@ -312,7 +319,17 @@ function withDraft(
   options: { readonly resetRequested?: boolean } = {},
 ): MenuLayoutEditorSession {
   if (state.base === null) return state;
-  const nextDraft = cloneDraft(draft);
+  const clonedDraft = cloneDraft(draft);
+  const nextDraft =
+    state.interaction.type === 'PRODUCT_PICKUP'
+      ? {
+          ...clonedDraft,
+          productOrder: productOrderForPickup(
+            clonedDraft.productOrder,
+            state.interaction.pickupToken,
+          ),
+        }
+      : clonedDraft;
   return {
     ...state,
     lifecycle: state.lifecycle === 'ERROR' ? 'EDITING' : state.lifecycle,
@@ -389,16 +406,37 @@ export function menuLayoutEditorReducer(
       return openMenuLayoutEditorSession(state, event);
 
     case 'SET_CATEGORY_ORDER':
-      if (!canMutateDraft(state) || state.draft === null) return state;
+      if (
+        !canMutateDraft(state) ||
+        state.draft === null ||
+        state.interaction.type !== 'CATEGORY_PICKUP'
+      ) {
+        return state;
+      }
       return withDraft(state, { ...state.draft, categoryOrder: [...event.categoryOrder] });
 
     case 'SET_ALIGNMENT':
       if (!canMutateDraft(state) || state.draft === null) return state;
       return withDraft(state, { ...state.draft, categoryAlignment: event.categoryAlignment });
 
-    case 'SET_PRODUCT_ORDER':
-      if (!canMutateDraft(state) || state.draft === null) return state;
+    case 'SET_PRODUCT_ORDER': {
+      if (
+        !canMutateDraft(state) ||
+        state.draft === null ||
+        state.interaction.type !== 'PRODUCT_PICKUP'
+      ) {
+        return state;
+      }
+      const mutationPickupToken = productOrderPickupToken(event.productOrder);
+      if (mutationPickupToken !== null && mutationPickupToken !== state.interaction.pickupToken) {
+        return state;
+      }
+      const mutationProductId = event.productId ?? productOrderMutationSource(event.productOrder);
+      if (mutationProductId !== null && mutationProductId !== state.interaction.productId) {
+        return state;
+      }
       return withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
+    }
 
     case 'BEGIN_CATEGORY_PICKUP': {
       if (!canMutateDraft(state)) return state;
@@ -418,13 +456,24 @@ export function menuLayoutEditorReducer(
       if (!canMutateDraft(state)) return state;
       const resolved = rollbackPickup(state);
       if (resolved.draft === null) return state;
+      const pickupToken = {};
+      const pickupDraft = cloneDraft(resolved.draft);
+      const pickupSnapshot = cloneDraft(resolved.draft);
       return {
         ...resolved,
+        draft: {
+          ...pickupDraft,
+          productOrder: productOrderForPickup(pickupDraft.productOrder, pickupToken),
+        },
         interaction: {
           type: 'PRODUCT_PICKUP',
           productId: event.productId,
           categoryId: event.categoryId,
-          snapshot: cloneDraft(resolved.draft),
+          pickupToken,
+          snapshot: {
+            ...pickupSnapshot,
+            productOrder: productOrderForPickup(pickupSnapshot.productOrder, pickupToken),
+          },
         },
       };
     }
@@ -449,6 +498,12 @@ export function menuLayoutEditorReducer(
         state.interaction.productId !== event.productId
       ) {
         return state;
+      }
+      if (event.productOrder !== undefined) {
+        const mutationPickupToken = productOrderPickupToken(event.productOrder);
+        if (mutationPickupToken !== null && mutationPickupToken !== state.interaction.pickupToken) {
+          return state;
+        }
       }
       const dropped =
         event.productOrder === undefined || state.draft === null

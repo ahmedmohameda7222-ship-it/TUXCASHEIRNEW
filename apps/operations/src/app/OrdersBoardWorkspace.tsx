@@ -2,6 +2,7 @@ import { renderOrderReceiptHtml } from '@tux/printing';
 import { orderLifecycle, type OrderId, type OrderSnapshot, type OrderStatus } from '@tux/domain';
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { OperationsOrdersBoardClient, OperationsOrdersClient } from './sessionClient';
+import { OnlineOrderInboxPanelController } from './OnlineOrderInboxPanel';
 
 type BoardTab = OrderStatus;
 
@@ -557,6 +558,8 @@ export function OrdersBoardWorkspace({
           />
         </label>
       </header>
+
+      <OnlineOrderInboxPanelController />
 
       <div className="board-tabs" role="tablist" aria-label="Order status">
         {TABS.map(({ status, label }) => (

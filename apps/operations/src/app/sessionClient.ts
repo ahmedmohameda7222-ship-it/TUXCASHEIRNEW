@@ -5,6 +5,7 @@ import {
   OperationsConfigurationSyncService,
   OperationsEndDayService,
   OperationsExpensesService,
+  OperationsOnlineOrderAcceptanceService,
   OperationsOrdersBoardService,
   OperationsOrdersService,
   OperationsWhatsAppService,
@@ -591,6 +592,27 @@ export function createWorkerUiPreferencesClient(): OperationsWorkerUiPreferences
     updateAccentColor: async (accentColor) =>
       (await browserRuntime()).workerUiPreferences.updateAccentColor(accentColor),
     resetMenuLayout: async () => (await browserRuntime()).workerUiPreferences.resetMenuLayout(),
+  };
+}
+
+export function createOperationsOnlineOrderAcceptanceClient(): Pick<
+  OperationsOnlineOrderAcceptanceService,
+  'accept'
+> {
+  const desktop = window.tuxDesktop?.onlineOrders;
+  if (desktop !== undefined) {
+    return {
+      accept: (request, confirmation) => desktop.accept(request.requestId, confirmation),
+    };
+  }
+  return {
+    accept: async (request, confirmation) => {
+      const runtime = await browserRuntime();
+      return new OperationsOnlineOrderAcceptanceService(runtime.orders, {
+        now: () => instant(new Date()),
+        createUuid: () => crypto.randomUUID(),
+      }).accept(request, confirmation);
+    },
   };
 }
 

@@ -6,6 +6,59 @@ import {
   type WorkerMenuLayout,
 } from '@tux/domain';
 
+interface ProductOrderPickupIdentity extends ReadonlyArray<ProductId> {
+  readonly pickupToken: object;
+}
+
+interface ProductOrderMutation extends ReadonlyArray<ProductId> {
+  readonly sourceProductId: ProductId;
+  readonly pickupToken?: object;
+}
+
+function definePickupToken(order: ProductId[], pickupToken: object): void {
+  Object.defineProperty(order, 'pickupToken', {
+    value: pickupToken,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+}
+
+export function productOrderForPickup(
+  order: readonly ProductId[],
+  pickupToken: object,
+): readonly ProductId[] {
+  const pickupOrder = [...order];
+  definePickupToken(pickupOrder, pickupToken);
+  return pickupOrder as unknown as ProductOrderPickupIdentity;
+}
+
+function productOrderMutation(
+  order: readonly ProductId[],
+  sourceProductId: ProductId,
+  pickupToken: object | null,
+): ProductOrderMutation {
+  const mutation = [...order];
+  Object.defineProperty(mutation, 'sourceProductId', {
+    value: sourceProductId,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  if (pickupToken !== null) definePickupToken(mutation, pickupToken);
+  return mutation as unknown as ProductOrderMutation;
+}
+
+export function productOrderMutationSource(order: readonly ProductId[]): ProductId | null {
+  const sourceProductId = (order as Partial<ProductOrderMutation>).sourceProductId;
+  return sourceProductId ?? null;
+}
+
+export function productOrderPickupToken(order: readonly ProductId[]): object | null {
+  const pickupToken = (order as Partial<ProductOrderPickupIdentity>).pickupToken;
+  return pickupToken ?? null;
+}
+
 export function reconcileProductOrder(
   products: readonly Product[],
   layout: WorkerMenuLayout | null,
@@ -60,12 +113,13 @@ export function moveProductWithinCategory(
   reorderedCategory.splice(targetIndex, 0, moved);
 
   let categoryIndex = 0;
-  return order.map((productId) => {
+  const reordered = order.map((productId) => {
     if (!categorySet.has(productId)) return productId;
     const replacement = reorderedCategory[categoryIndex];
     categoryIndex += 1;
     return replacement ?? productId;
   });
+  return productOrderMutation(reordered, sourceId, productOrderPickupToken(order));
 }
 
 export function swapProductWithinCategory(

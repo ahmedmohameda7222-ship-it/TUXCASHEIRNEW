@@ -545,7 +545,13 @@ export class OperationsOrdersService {
     });
   }
 
-  async placeOrder(draft: OrderDraft): Promise<OrderPlacementResult> {
+  async placeOrder(
+    draft: OrderDraft,
+    placement:
+      { readonly source: 'POS' } | { readonly source: 'ONLINE'; readonly orderId: OrderId } = {
+      source: 'POS',
+    },
+  ): Promise<OrderPlacementResult> {
     const committed = await this.#coordinator.runExclusive(
       async (): Promise<Result<CommittedOrderPlacement, OrderPlacementError>> => {
         try {
@@ -628,7 +634,7 @@ export class OperationsOrdersService {
             }
 
             const allocated = allocateDisplayOrderNo(currentDay);
-            const orderId = this.#id<OrderId>();
+            const orderId = placement.source === 'ONLINE' ? placement.orderId : this.#id<OrderId>();
             let customerContact: CustomerContact | null = null;
             if (
               validation.value.orderType.behavior === 'DELIVERY' &&
@@ -667,7 +673,7 @@ export class OperationsOrdersService {
               idempotencyKey: draft.checkoutIntentKey,
               status: 'ACTIVE',
               lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
-              source: 'POS',
+              source: placement.source,
               operatorWorkerId: currentWorker.id,
               operatorName: currentWorker.displayName,
               createdAt: committedAt,
