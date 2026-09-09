@@ -16,6 +16,7 @@ export interface CatalogAdminStore {
     shopId: string,
   ) => Promise<{ readonly role: CatalogAdminRole; readonly active: boolean } | null>;
   readonly getEntityShop: (entity: CatalogAdminEntity, id: string) => Promise<string | null>;
+  readonly hasComboBeverageOptions: (shopId: string, productId: string) => Promise<boolean>;
   readonly applyAtomicCommand: (
     userId: string,
     request: CatalogAdminCommandV1,
@@ -148,7 +149,17 @@ async function preflightCommand(
       }
       return null;
     }
-    case 'product.update':
+    case 'product.update': {
+      const product = await ensureEntity(store, shopId, 'product', command.productId);
+      if (product) return product;
+      if (
+        command.patch.isCombo === false &&
+        (await store.hasComboBeverageOptions(shopId, command.productId))
+      ) {
+        return 'command_conflict';
+      }
+      return null;
+    }
     case 'product.retire':
     case 'product.reorder':
       return await ensureEntity(store, shopId, 'product', command.productId);
@@ -205,7 +216,10 @@ async function cleanupPreviousImage(
     if (references === 0) await store.removeImageObject(previousImageKey);
     return result;
   } catch (error) {
-    console.error('catalog-admin image cleanup deferred', error instanceof Error ? error.name : 'unknown');
+    console.error(
+      'catalog-admin image cleanup deferred',
+      error instanceof Error ? error.name : 'unknown',
+    );
     return { ...result, cleanupPending: true };
   }
 }
@@ -214,7 +228,8 @@ export async function handleCatalogAdminRequest(
   request: Request,
   dependencies: CatalogAdminDependencies,
 ): Promise<Response> {
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+  if (request.method === 'OPTIONS')
+    return new Response(null, { status: 204, headers: corsHeaders });
   if (request.method !== 'POST') return errorResponse('method_not_allowed');
 
   const token = bearerToken(request);
@@ -224,7 +239,10 @@ export async function handleCatalogAdminRequest(
   try {
     userId = await dependencies.authenticate(token);
   } catch (error) {
-    console.error('catalog-admin identity lookup failed', error instanceof Error ? error.name : 'unknown');
+    console.error(
+      'catalog-admin identity lookup failed',
+      error instanceof Error ? error.name : 'unknown',
+    );
     userId = null;
   }
   if (userId === null || !isCanonicalUuid(userId)) return errorResponse('invalid_identity');
@@ -234,7 +252,10 @@ export async function handleCatalogAdminRequest(
     parsed = parseCatalogAdminCommandV1(await request.json());
   } catch (error) {
     if (!(error instanceof CatalogContractError) && !(error instanceof SyntaxError)) {
-      console.error('catalog-admin request parse failed', error instanceof Error ? error.name : 'unknown');
+      console.error(
+        'catalog-admin request parse failed',
+        error instanceof Error ? error.name : 'unknown',
+      );
     }
     return errorResponse('invalid_request');
   }
@@ -243,12 +264,16 @@ export async function handleCatalogAdminRequest(
   try {
     membership = await dependencies.store.getMembership(userId, parsed.shopId);
   } catch (error) {
-    console.error('catalog-admin membership lookup failed', error instanceof Error ? error.name : 'unknown');
+    console.error(
+      'catalog-admin membership lookup failed',
+      error instanceof Error ? error.name : 'unknown',
+    );
     return errorResponse('command_failed');
   }
   if (membership === null) return errorResponse('membership_required');
   if (!membership.active) return errorResponse('membership_inactive');
-  if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') return errorResponse('role_forbidden');
+  if (membership.role !== 'OWNER' && membership.role !== 'ADMIN')
+    return errorResponse('role_forbidden');
 
   try {
     const preflight = await preflightCommand(parsed, dependencies.store);
@@ -276,7 +301,10 @@ export async function handleCatalogAdminRequest(
         : applied.result;
     return successResponse(parsed.commandId, result);
   } catch (error) {
-    console.error('catalog-admin command failed', error instanceof Error ? error.name : 'unknown');
+    console.error(
+      'catalog-admin command failed',
+      error instanceof Error ? error.name : 'unknown',
+    );
     return errorResponse('command_failed');
   }
 }
