@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve the existing canonical `products.merchandising_family` through the customer-safe catalog boundary and use it to keep `/tux-burger` and `/tuxify` working against the approved single `Burgers` canonical category.
+**Goal:** Preserve the existing canonical `products.family` through the customer-safe catalog boundary and use it to keep `/tux-burger` and `/tuxify` working against the approved single `Burgers` canonical category.
 
-**Architecture:** Extend the existing V1 public catalog product DTO with nullable `family`, expose `products.merchandising_family` from the narrow `read_catalog_public_v1` RPC, pass it through `catalog-public`, and preserve it in the Menu projection. Reconcile only the two legacy family routes to `Burgers + TUX/TUXIFY`; all other category routes keep their canonical slug behavior. No production catalog rows, prices, modifiers, combo links, images, or Admin behavior are invented or changed.
+**Architecture:** Extend the existing V1 public catalog product DTO with nullable `family`, expose `products.family` from the narrow `read_catalog_public_v1` RPC, pass it through `catalog-public`, and preserve it in the Menu projection. Reconcile only the two legacy family routes to `Burgers + TUX/TUXIFY`; all other category routes keep their canonical slug behavior. No production catalog rows, prices, modifiers, combo links, images, or Admin behavior are invented or changed.
 
 **Tech Stack:** TypeScript, React, Vitest, Deno, PostgreSQL/Supabase Edge Functions.
 
@@ -32,7 +32,7 @@
 - Create: `supabase/migrations/20260909193000_catalog_public_merchandising_family.sql`
 
 **Interfaces:**
-- Consumes: canonical `products.merchandising_family text null`.
+- Consumes: canonical `products.family text null`.
 - Produces: `PublicCatalogProductV1.family: string | null` and matching Edge JSON field `family`.
 
 - [x] **Step 1: Write the failing tests**
@@ -43,9 +43,9 @@ Require the contract parser and Edge projection to preserve `family: 'TUX'` / `f
 
 Observed failure: `catalog-public emits deterministic ordering and customer-safe fields only` -> `Error: merchandising family lost`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
-Add nullable `family` to the public DTO/parser, add `merchandising_family` to the RPC product JSON, and map that field to `family` in `catalog-public`.
+Add nullable `family` to the public DTO/parser, add `family` to the RPC product JSON, and map that field to `family` in `catalog-public`.
 
 - [ ] **Step 4: Run CI and verify GREEN**
 
@@ -69,11 +69,11 @@ Expected: catalog contract and Deno catalog-public tests pass, migration smoke p
 
 Require the Menu projection to preserve family and require `tux-burger -> { categorySlug: 'burgers', family: 'TUX' }`, `tuxify -> { categorySlug: 'burgers', family: 'TUXIFY' }`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
-Expected: projection assertion fails before implementation and route helper import/function is absent before implementation.
+The Edge RED run failed on the missing family projection before implementation; the route helper did not exist before its RED test commit.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Carry `family` into `SupabaseProduct`; add the explicit route reconciliation helper; pass optional family to `ProductCategoryPage`; filter only the selected canonical family for the two legacy routes.
 
