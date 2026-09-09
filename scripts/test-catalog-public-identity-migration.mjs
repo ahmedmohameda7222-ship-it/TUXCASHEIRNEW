@@ -53,6 +53,21 @@ assert.match(
   'migration must verify the final bindings',
 );
 
+const normalizedSql = sql.replace(/\s+/g, ' ').toLowerCase();
+const catalogWriteLock = /lock table public\.menu_categories\s*,\s*public\.products in share row exclusive mode\s*;/.exec(
+  normalizedSql,
+);
+assert.ok(
+  catalogWriteLock,
+  'migration must block concurrent catalog INSERT/UPDATE/DELETE while validating and reconciling the 7/49 inventory',
+);
+const firstInventoryRead = normalizedSql.indexOf('select count(*) into v_category_count');
+assert.ok(firstInventoryRead >= 0, 'migration must contain the category inventory precondition');
+assert.ok(
+  catalogWriteLock.index < firstInventoryRead,
+  'catalog write lock must be acquired before the first production inventory read',
+);
+
 const updateStatements = [
   ...sql.matchAll(/update\s+public\.(menu_categories|products)[\s\S]*?;/gi),
 ].map((match) => match[0]);
