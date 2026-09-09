@@ -24,6 +24,7 @@ export interface PublicCatalogProductV1 {
   readonly description: string | null;
   readonly priceMinor: number;
   readonly imageUrl: string | null;
+  readonly family: string | null;
   readonly bestSeller: boolean;
   readonly active: boolean;
   readonly soldOut: boolean;
@@ -316,6 +317,7 @@ function parseProduct(value: unknown, path: string): PublicCatalogProductV1 {
       'description',
       'priceMinor',
       'imageUrl',
+      'family',
       'bestSeller',
       'active',
       'soldOut',
@@ -332,6 +334,7 @@ function parseProduct(value: unknown, path: string): PublicCatalogProductV1 {
     description: nullableText(row.description, `${path}.description`),
     priceMinor: nonNegativeInteger(row.priceMinor, `${path}.priceMinor`),
     imageUrl: nullableUrl(row.imageUrl, `${path}.imageUrl`),
+    family: nullableText(row.family, `${path}.family`, 200),
     bestSeller: requiredBoolean(row.bestSeller, `${path}.bestSeller`),
     active: requiredBoolean(row.active, `${path}.active`),
     soldOut: requiredBoolean(row.soldOut, `${path}.soldOut`),
