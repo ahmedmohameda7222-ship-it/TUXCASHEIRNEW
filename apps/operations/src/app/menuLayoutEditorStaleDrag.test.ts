@@ -12,6 +12,7 @@ import {
   openMenuLayoutEditorSession,
   type MenuLayoutDraft,
 } from './menuLayoutEditorSession';
+import { moveProductWithinCategory } from './menuProductOrder';
 
 const shopId = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const workerId = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
@@ -88,5 +89,50 @@ describe('menu layout stale drag fencing', () => {
       productId: productB,
     });
     expect(afterStaleProductAReorder.dirty).toBe(false);
+  });
+
+  it('ignores a delayed reorder from an older pickup generation of the same product', () => {
+    let state = openMenuLayoutEditorSession(createClosedMenuLayoutEditorSession(), {
+      shopId,
+      workerId,
+      base: persistedBase,
+    });
+    state = menuLayoutEditorReducer(state, {
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: productA,
+      categoryId,
+    });
+    if (state.draft === null) throw new Error('Expected an editable menu draft.');
+    const staleProductAReorder = moveProductWithinCategory(
+      state.draft.productOrder,
+      state.draft.productOrder,
+      productA,
+      productC,
+    );
+
+    state = menuLayoutEditorReducer(state, { type: 'CANCEL_EDITOR' });
+    state = menuLayoutEditorReducer(state, {
+      type: 'OPEN',
+      shopId,
+      workerId,
+      base: persistedBase,
+    });
+    state = menuLayoutEditorReducer(state, {
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: productA,
+      categoryId,
+    });
+
+    const afterStaleSameProductReorder = menuLayoutEditorReducer(state, {
+      type: 'SET_PRODUCT_ORDER',
+      productOrder: staleProductAReorder,
+    });
+
+    expect(afterStaleSameProductReorder.draft?.productOrder).toEqual(persistedBase.productOrder);
+    expect(afterStaleSameProductReorder.interaction).toMatchObject({
+      type: 'PRODUCT_PICKUP',
+      productId: productA,
+    });
+    expect(afterStaleSameProductReorder.dirty).toBe(false);
   });
 });
