@@ -163,24 +163,27 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
       await reconcileBrowserAcceptedOrders();
       return (await browserOnlineOrderInboxClient()).load();
     },
-    claim: async (requestId) =>
-      browserOnlineOrderMutations.run(requestId, async () =>
-        (await browserOnlineOrderInboxClient()).claim(requestId),
-      ),
-    release: async (requestId, processingOrderId) =>
-      browserOnlineOrderMutations.run(requestId, async () => {
+    claim: async (requestId) => {
+      return browserOnlineOrderMutations.run(requestId, async () => {
+        return (await browserOnlineOrderInboxClient()).claim(requestId);
+      });
+    },
+    release: async (requestId, processingOrderId) => {
+      return browserOnlineOrderMutations.run(requestId, async () => {
         const reconciled = await reconcileBrowserAcceptedOrders(requestId);
         if (reconciled) throw new Error('Online order has already been accepted locally.');
         return (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId);
-      }),
-    reject: async (requestId, processingOrderId, reason) =>
-      browserOnlineOrderMutations.run(requestId, async () => {
+      });
+    },
+    reject: async (requestId, processingOrderId, reason) => {
+      return browserOnlineOrderMutations.run(requestId, async () => {
         const reconciled = await reconcileBrowserAcceptedOrders(requestId);
         if (reconciled) throw new Error('Online order has already been accepted locally.');
         return (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason);
-      }),
-    accept: async (request, confirmation) =>
-      browserOnlineOrderMutations.run(request.requestId, async () => {
+      });
+    },
+    accept: async (request, confirmation) => {
+      return browserOnlineOrderMutations.run(request.requestId, async () => {
         const reconciled = await reconcileBrowserAcceptedOrders(request.requestId);
         if (reconciled) throw new Error('Online order has already been accepted locally.');
         const store = await browserOnlineOrderInboxStore();
@@ -201,7 +204,8 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
           await store.markAccepted(state.value.shopId, trusted.requestId, trusted.processingOrderId);
         }
         return result;
-      }),
+      });
+    },
     subscribe: (listener) => {
       let active = true;
       let unsubscribe = (): void => undefined;
