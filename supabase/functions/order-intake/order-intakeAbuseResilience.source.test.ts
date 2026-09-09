@@ -25,4 +25,18 @@ describe('online-order anonymous intake abuse resilience', () => {
     expect(edge).toContain('sourceFingerprint');
     expect(edge).toContain("x-forwarded-for");
   });
+
+  it('never stale-expires a pending request that still has a durable processing reservation', () => {
+    const migration = readFileSync(
+      resolve(
+        process.cwd(),
+        'supabase/migrations/20260908056000_online_order_intake_abuse_resilience.sql',
+      ),
+      'utf8',
+    );
+
+    expect(migration).toMatch(
+      /status\s*=\s*'PENDING'[\s\S]*created_at\s*<[\s\S]*not\s+exists\s*\([\s\S]*private\.online_order_processing_reservations[\s\S]*reservation\.request_id\s*=\s*online_order_requests\.id/i,
+    );
+  });
 });
