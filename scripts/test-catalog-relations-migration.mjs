@@ -36,9 +36,20 @@ for (const id of manifest.beverageProductIds) {
 
 const relationLock = /lock table public\.menu_categories\s*,\s*public\.products\s*,\s*public\.modifiers\s*,\s*public\.product_modifiers\s*,\s*public\.combo_beverage_options in share row exclusive mode\s*;/.exec(normalizedSql);
 assert.ok(relationLock, 'migration must block concurrent catalog and relationship writes');
+const canonicalShopNoop = /if not exists \(\s*select 1\s*from public\.shops\s*where id = v_shop_id\s*\) then/.exec(
+  normalizedSql,
+);
+assert.ok(
+  canonicalShopNoop,
+  'clean-database no-op must be gated by absence of the canonical shop row, not missing catalog rows',
+);
 const firstInventoryRead = normalizedSql.indexOf('select count(*) into v_product_count');
 assert.ok(firstInventoryRead >= 0, 'migration must contain the product inventory precondition');
 assert.ok(relationLock.index < firstInventoryRead, 'relationship write lock must precede the first inventory read');
+assert.ok(
+  canonicalShopNoop.index < firstInventoryRead,
+  'canonical-shop existence check must precede catalog inventory validation',
+);
 
 assert.match(sql, /v_product_count[^;]*<>\s*49/is, 'migration must fence exactly 49 products');
 assert.match(sql, /v_extra_count[^;]*<>\s*13/is, 'migration must fence exactly 13 Extras');
