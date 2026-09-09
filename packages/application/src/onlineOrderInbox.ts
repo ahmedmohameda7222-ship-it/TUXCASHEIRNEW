@@ -82,6 +82,27 @@ function parseSnapshot(
   });
 }
 
+function sameLifecycle(
+  left: CachedOnlineOrderRequest | undefined,
+  right: CachedOnlineOrderRequest | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return (
+    left.status === right.status &&
+    left.processingOrderId === right.processingOrderId &&
+    left.processingStartedAt === right.processingStartedAt &&
+    left.processingExpiresAt === right.processingExpiresAt &&
+    left.processingDeviceId === right.processingDeviceId &&
+    left.reservationOriginDeviceId === right.reservationOriginDeviceId
+  );
+}
+
+function byRequestId(
+  requests: readonly CachedOnlineOrderRequest[],
+): ReadonlyMap<string, CachedOnlineOrderRequest> {
+  return new Map(requests.map((request) => [request.requestId, request] as const));
+}
+
 function parseClaim(value: unknown, expectedShopId: ShopId, expectedRequestId: string) {
   const source = record(value, 'Online-order claim response');
   if (!hasExactKeys(source, CLAIM_ENVELOPE_KEYS) || source.schemaVersion !== 1) {
@@ -150,18 +171,30 @@ export class OperationsOnlineOrderInboxService {
 
   async load(): Promise<OnlineOrderInboxSnapshot> {
     const shopId = await this.#getActiveShopId();
+    const cachedBeforeFetch = await this.#store.list(shopId);
     this.#publish({
-      requests: await this.#store.list(shopId),
+      requests: cachedBeforeFetch,
       syncState: 'CACHED',
       errorMessage: null,
     });
     try {
+      const beforeById = byRequestId(cachedBeforeFetch);
       const remote = parseSnapshot(await this.#remote.fetchActiveRequests(SNAPSHOT_LIMIT), shopId);
-      const cached = await this.#store.list(shopId);
+      const current = await this.#store.list(shopId);
+      const currentById = byRequestId(current);
       const remoteIds = new Set(remote.map((request) => request.requestId));
-      await this.#store.upsertMany(remote);
-      for (const request of cached) {
-        if (!remoteIds.has(request.requestId)) await this.#store.remove(shopId, request.requestId);
+      const safeRemote = remote.filter((request) =>
+        sameLifecycle(beforeById.get(request.requestId), currentById.get(request.requestId)),
+      );
+
+      await this.#store.upsertMany(safeRemote);
+      for (const request of cachedBeforeFetch) {
+        if (
+          !remoteIds.has(request.requestId) &&
+          sameLifecycle(request, currentById.get(request.requestId))
+        ) {
+          await this.#store.remove(shopId, request.requestId);
+        }
       }
       return this.#publishSynced(shopId);
     } catch {
