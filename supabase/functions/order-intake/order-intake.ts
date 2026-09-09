@@ -408,7 +408,10 @@ export async function handleOrderIntakeRequest(
       if (existing.requestSha256 !== requestSha256) {
         return errorResponse(409, 'idempotency_conflict');
       }
-      if (existing.status === 'ACCEPTED' || existing.status === 'REJECTED') {
+      if (existing.status === 'ACCEPTED') {
+        return successResponse(200, existing.id);
+      }
+      if (existing.status === 'REJECTED') {
         return errorResponse(409, 'request_resolved');
       }
       return successResponse(200, existing.id);
@@ -449,9 +452,12 @@ export async function handleOrderIntakeRequest(
       const raced = await store.findByIdempotency(parsed.shopId, parsed.idempotencyKey);
       if (
         raced?.requestSha256 === requestSha256 &&
-        (raced.status === 'PENDING' || raced.status === 'PROCESSING')
+        (raced.status === 'PENDING' || raced.status === 'PROCESSING' || raced.status === 'ACCEPTED')
       ) {
         return successResponse(200, raced.id);
+      }
+      if (raced?.requestSha256 === requestSha256 && raced.status === 'REJECTED') {
+        return errorResponse(409, 'request_resolved');
       }
       if (raced) return errorResponse(409, 'idempotency_conflict');
       throw new Error('pending insert failed');
