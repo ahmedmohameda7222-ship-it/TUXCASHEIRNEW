@@ -6,6 +6,7 @@ import type {
   WorkerId,
   WorkerMenuLayout,
 } from '@tux/domain';
+import { productOrderMutationSource } from './menuProductOrder';
 
 export type MenuLayoutEditorLifecycle = 'CLOSED' | 'EDITING' | 'SAVING' | 'ERROR';
 
@@ -105,6 +106,7 @@ interface SetAlignmentEvent {
 
 interface SetProductOrderEvent {
   readonly type: 'SET_PRODUCT_ORDER';
+  readonly productId?: ProductId;
   readonly productOrder: readonly ProductId[];
 }
 
@@ -402,7 +404,7 @@ export function menuLayoutEditorReducer(
       if (!canMutateDraft(state) || state.draft === null) return state;
       return withDraft(state, { ...state.draft, categoryAlignment: event.categoryAlignment });
 
-    case 'SET_PRODUCT_ORDER':
+    case 'SET_PRODUCT_ORDER': {
       if (
         !canMutateDraft(state) ||
         state.draft === null ||
@@ -410,7 +412,12 @@ export function menuLayoutEditorReducer(
       ) {
         return state;
       }
+      const mutationProductId = event.productId ?? productOrderMutationSource(event.productOrder);
+      if (mutationProductId !== null && mutationProductId !== state.interaction.productId) {
+        return state;
+      }
       return withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
+    }
 
     case 'BEGIN_CATEGORY_PICKUP': {
       if (!canMutateDraft(state)) return state;
