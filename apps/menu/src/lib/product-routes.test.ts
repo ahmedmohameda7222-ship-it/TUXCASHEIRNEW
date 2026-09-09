@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isProductSectionRouteActive,
-  resolveCanonicalCategoryRoute,
-} from './product-routes';
+import { isProductSectionRouteActive, resolveCanonicalCategoryRoute } from './product-routes';
 
 describe('canonical Menu category route reconciliation', () => {
   it('routes the legacy TUX Burger page to the canonical Burgers/TUX family', () => {
