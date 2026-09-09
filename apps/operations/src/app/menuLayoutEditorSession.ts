@@ -428,10 +428,7 @@ export function menuLayoutEditorReducer(
         return state;
       }
       const mutationPickupToken = productOrderPickupToken(event.productOrder);
-      if (
-        mutationPickupToken !== null &&
-        mutationPickupToken !== state.interaction.pickupToken
-      ) {
+      if (mutationPickupToken !== null && mutationPickupToken !== state.interaction.pickupToken) {
         return state;
       }
       const mutationProductId = event.productId ?? productOrderMutationSource(event.productOrder);
@@ -466,10 +463,7 @@ export function menuLayoutEditorReducer(
         ...resolved,
         draft: {
           ...pickupDraft,
-          productOrder: productOrderForPickup(
-            pickupDraft.productOrder,
-            pickupToken,
-          ),
+          productOrder: productOrderForPickup(pickupDraft.productOrder, pickupToken),
         },
         interaction: {
           type: 'PRODUCT_PICKUP',
@@ -478,10 +472,7 @@ export function menuLayoutEditorReducer(
           pickupToken,
           snapshot: {
             ...pickupSnapshot,
-            productOrder: productOrderForPickup(
-              pickupSnapshot.productOrder,
-              pickupToken,
-            ),
+            productOrder: productOrderForPickup(pickupSnapshot.productOrder, pickupToken),
           },
         },
       };
@@ -510,10 +501,7 @@ export function menuLayoutEditorReducer(
       }
       if (event.productOrder !== undefined) {
         const mutationPickupToken = productOrderPickupToken(event.productOrder);
-        if (
-          mutationPickupToken !== null &&
-          mutationPickupToken !== state.interaction.pickupToken
-        ) {
+        if (mutationPickupToken !== null && mutationPickupToken !== state.interaction.pickupToken) {
           return state;
         }
       }
