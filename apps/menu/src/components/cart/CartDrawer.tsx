@@ -127,7 +127,9 @@ export function CartDrawer() {
       const productId = item.baseProductId ?? item.id;
       const currentProduct = products.find((product) => product.id === productId);
       const options = comboBeveragesByProduct[productId] ?? [];
-      return currentProduct?.is_combo === true && (!currentProduct.is_active || options.length === 0);
+      return (
+        currentProduct?.is_combo === true && (!currentProduct.is_active || options.length === 0)
+      );
     });
     if (unavailablePersistedCombo) {
       alert('A combo in your cart is no longer available. Please remove it and choose it again.');
