@@ -25,14 +25,7 @@ type SubmissionStatus = 'idle' | 'submitting' | 'success' | 'error';
 type OrderIntent = Omit<OnlineOrderRequestV1, 'idempotencyKey'>;
 
 export function CartDrawer() {
-  const {
-    items,
-    isCartOpen,
-    setIsCartOpen,
-    updateQuantity,
-    removeFromCart,
-    clearCart,
-  } = useCart();
+  const { items, isCartOpen, setIsCartOpen, updateQuantity, removeFromCart, clearCart } = useCart();
   const { extrasByProduct, comboBeveragesByProduct, products } = useMenu();
   const [, navigate] = useLocation();
 
