@@ -2,7 +2,10 @@ import React from 'react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'wouter';
 import { useMenu } from '@/context/MenuContext';
-import { getProductSectionHref } from '@/lib/product-routes';
+import {
+  getProductSectionHref,
+  isProductSectionRouteActive,
+} from '@/lib/product-routes';
 
 export const ProductCategoryNav = () => {
   const [location] = useLocation();
@@ -14,10 +17,7 @@ export const ProductCategoryNav = () => {
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center gap-8 min-w-max h-14">
         {productSections.map((section) => {
           const href = getProductSectionHref(section);
-          const isActive =
-            location === href ||
-            location === `/products/${section.slug}` ||
-            location === `/products/${section.id}`;
+          const isActive = isProductSectionRouteActive(location, section);
           const unavailable = !section.is_active;
           return (
             <NavLink
