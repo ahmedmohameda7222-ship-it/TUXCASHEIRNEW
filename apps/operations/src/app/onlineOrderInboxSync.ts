@@ -80,6 +80,27 @@ function parseOnlineOrderInboxSnapshot(
   });
 }
 
+function sameLifecycle(
+  left: CachedOnlineOrderRequest | undefined,
+  right: CachedOnlineOrderRequest | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return (
+    left.status === right.status &&
+    left.processingOrderId === right.processingOrderId &&
+    left.processingStartedAt === right.processingStartedAt &&
+    left.processingExpiresAt === right.processingExpiresAt &&
+    left.processingDeviceId === right.processingDeviceId &&
+    left.reservationOriginDeviceId === right.reservationOriginDeviceId
+  );
+}
+
+function byRequestId(
+  requests: readonly CachedOnlineOrderRequest[],
+): ReadonlyMap<string, CachedOnlineOrderRequest> {
+  return new Map(requests.map((request) => [request.requestId, request] as const));
+}
+
 function parseClaimResponse(input: {
   readonly value: unknown;
   readonly expectedShopId: ShopId;
@@ -170,14 +191,24 @@ export async function syncOnlineOrderInboxSnapshot(input: {
   readonly store: OnlineOrderInboxStore;
   readonly remote: OnlineOrderOperationsRemote;
 }): Promise<readonly CachedOnlineOrderRequest[]> {
+  const cachedBeforeFetch = await input.store.list(input.shopId);
+  const beforeById = byRequestId(cachedBeforeFetch);
   const payload = await input.remote.fetchActiveRequests(SNAPSHOT_LIMIT);
   const remoteRequests = parseOnlineOrderInboxSnapshot(payload, input.shopId);
-  const cachedRequests = await input.store.list(input.shopId);
+  const currentRequests = await input.store.list(input.shopId);
+  const currentById = byRequestId(currentRequests);
   const remoteIds = new Set(remoteRequests.map((request) => request.requestId));
 
-  await input.store.upsertMany(remoteRequests);
-  for (const cached of cachedRequests) {
-    if (!remoteIds.has(cached.requestId)) {
+  const safeRemoteRequests = remoteRequests.filter((request) =>
+    sameLifecycle(beforeById.get(request.requestId), currentById.get(request.requestId)),
+  );
+  await input.store.upsertMany(safeRemoteRequests);
+
+  for (const cached of cachedBeforeFetch) {
+    if (
+      !remoteIds.has(cached.requestId) &&
+      sameLifecycle(cached, currentById.get(cached.requestId))
+    ) {
       await input.store.remove(input.shopId, cached.requestId);
     }
   }
