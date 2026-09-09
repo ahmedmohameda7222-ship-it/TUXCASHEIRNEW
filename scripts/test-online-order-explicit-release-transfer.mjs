@@ -29,12 +29,22 @@ insert into public.online_order_requests(
   id, shop_id, idempotency_key, request_sha256, catalog_revision, status,
   fulfillment_preference, payment_preference, customer_name, normalized_phone,
   delivery_address, trusted_items, items_subtotal_minor, order_note
-) values (
+) values
+(
   '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   '17111111-1111-4111-8111-111111111111',
   '17dddddd-dddd-4ddd-8ddd-dddddddddddd',
   repeat('a', 64), repeat('b', 64), 'PENDING', 'PICKUP', 'CASH',
   'Explicit Release Customer', null, null,
+  '[{"productId":"17555555-5555-4555-8555-555555555555","quantity":1}]'::jsonb,
+  19000, null
+),
+(
+  '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  '17111111-1111-4111-8111-111111111111',
+  '18dddddd-dddd-4ddd-8ddd-dddddddddddd',
+  repeat('c', 64), repeat('d', 64), 'PENDING', 'PICKUP', 'CASH',
+  'Expired Lease Release Customer', null, null,
   '[{"productId":"17555555-5555-4555-8555-555555555555","quantity":1}]'::jsonb,
   19000, null
 );
@@ -98,6 +108,81 @@ begin
   end if;
   if v_reserved_processing_order_id is distinct from v_second_processing_order_id then
     raise exception 'new durable reservation does not match the next claimant processing order identity';
+  end if;
+end $$;
+
+do $$
+declare
+  v_first_claim jsonb;
+  v_second_claim jsonb;
+  v_first_processing_order_id uuid;
+  v_second_processing_order_id uuid;
+  v_status text;
+  v_reservation_count bigint;
+begin
+  v_first_claim := public.claim_tux_online_order_request_v1(
+    '17911111-1111-4111-8111-111111111111',
+    '17666666-6666-4666-8666-666666666666',
+    '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  );
+  v_first_processing_order_id := (v_first_claim ->> 'processingOrderId')::uuid;
+
+  update public.online_order_requests
+  set processing_expires_at = now() - interval '1 minute'
+  where id = '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  perform public.list_tux_online_order_requests_v1(
+    '17911111-1111-4111-8111-111111111111',
+    '17666666-6666-4666-8666-666666666666',
+    100
+  );
+
+  select status into v_status
+  from public.online_order_requests
+  where id = '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  if v_status <> 'PENDING' then
+    raise exception 'expired claim was not requeued before explicit release';
+  end if;
+
+  select count(*) into v_reservation_count
+  from private.online_order_processing_reservations
+  where request_id = '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    and processing_order_id = v_first_processing_order_id
+    and origin_device_id = '17666666-6666-4666-8666-666666666666';
+  if v_reservation_count <> 1 then
+    raise exception 'lease requeue unexpectedly removed the durable reservation before explicit release';
+  end if;
+
+  perform public.release_tux_online_order_request_claim_v1(
+    '17911111-1111-4111-8111-111111111111',
+    '17666666-6666-4666-8666-666666666666',
+    '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    v_first_processing_order_id
+  );
+
+  select count(*) into v_reservation_count
+  from private.online_order_processing_reservations
+  where request_id = '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    and processing_order_id = v_first_processing_order_id;
+  if v_reservation_count <> 0 then
+    raise exception 'release after lease requeue left the matching durable reservation behind';
+  end if;
+
+  v_second_claim := public.claim_tux_online_order_request_v1(
+    '17922222-2222-4222-8222-222222222222',
+    '17777777-7777-4777-8777-777777777777',
+    '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  );
+  v_second_processing_order_id := (v_second_claim ->> 'processingOrderId')::uuid;
+
+  if v_second_processing_order_id is null then
+    raise exception 'next claimant after lease-requeue release did not receive a processing identity';
+  end if;
+  if v_second_processing_order_id = v_first_processing_order_id then
+    raise exception 'release after lease requeue reused the relinquished processing identity';
+  end if;
+  if v_second_claim ->> 'reservationOriginDeviceId' <> '17777777-7777-4777-8777-777777777777' then
+    raise exception 'release after lease requeue did not transfer fresh reservation ownership';
   end if;
 end $$;
 
