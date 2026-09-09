@@ -43,41 +43,61 @@ do $$
 declare
   v_first_claim jsonb;
   v_second_claim jsonb;
-  v_processing_order_id uuid;
+  v_first_processing_order_id uuid;
+  v_second_processing_order_id uuid;
   v_origin uuid;
+  v_reserved_processing_order_id uuid;
+  v_old_reservation_count bigint;
 begin
   v_first_claim := public.claim_tux_online_order_request_v1(
     '17911111-1111-4111-8111-111111111111',
     '17666666-6666-4666-8666-666666666666',
     '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   );
-  v_processing_order_id := (v_first_claim ->> 'processingOrderId')::uuid;
+  v_first_processing_order_id := (v_first_claim ->> 'processingOrderId')::uuid;
 
   perform public.release_tux_online_order_request_claim_v1(
     '17911111-1111-4111-8111-111111111111',
     '17666666-6666-4666-8666-666666666666',
     '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    v_processing_order_id
+    v_first_processing_order_id
   );
+
+  select count(*) into v_old_reservation_count
+  from private.online_order_processing_reservations
+  where request_id = '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    and processing_order_id = v_first_processing_order_id;
+  if v_old_reservation_count <> 0 then
+    raise exception 'explicit release left the old durable reservation behind';
+  end if;
 
   v_second_claim := public.claim_tux_online_order_request_v1(
     '17922222-2222-4222-8222-222222222222',
     '17777777-7777-4777-8777-777777777777',
     '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   );
+  v_second_processing_order_id := (v_second_claim ->> 'processingOrderId')::uuid;
 
-  if v_second_claim ->> 'processingOrderId' <> v_processing_order_id::text then
-    raise exception 'explicit release changed the durable processing order identity';
+  if v_second_processing_order_id is null then
+    raise exception 'next claimant did not receive a processing order identity';
+  end if;
+  if v_second_processing_order_id = v_first_processing_order_id then
+    raise exception 'explicit release reused the relinquished processing order identity';
   end if;
   if v_second_claim ->> 'reservationOriginDeviceId' <> '17777777-7777-4777-8777-777777777777' then
-    raise exception 'explicit release did not transfer durable reservation ownership';
+    raise exception 'explicit release did not assign durable reservation ownership to the next claimant';
   end if;
 
-  select origin_device_id into v_origin
+  select origin_device_id, processing_order_id
+    into v_origin, v_reserved_processing_order_id
   from private.online_order_processing_reservations
   where request_id = '17aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
   if v_origin is distinct from '17777777-7777-4777-8777-777777777777'::uuid then
-    raise exception 'explicit release transfer was not durable';
+    raise exception 'explicit release handoff was not durable';
+  end if;
+  if v_reserved_processing_order_id is distinct from v_second_processing_order_id then
+    raise exception 'new durable reservation does not match the next claimant processing order identity';
   end if;
 end $$;
 
