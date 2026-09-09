@@ -182,29 +182,21 @@ begin
   ) then
     raise exception 'conflicting product slug detected; migration refuses to overwrite public identity';
   end if;
-end
-$$;
 
-update public.menu_categories as category
-set slug = identity.slug
-from pg_temp.tux_category_public_identity as identity
-where category.shop_id = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46'::uuid
-  and category.id = identity.id;
+  -- Preconditions, writes, and postconditions share one statement so a psql
+  -- autocommit runner cannot leave a partial public-identity cutover.
+  update public.menu_categories as category
+  set slug = identity.slug
+  from pg_temp.tux_category_public_identity as identity
+  where category.shop_id = v_shop_id
+    and category.id = identity.id;
 
-update public.products as product
-set slug = identity.slug
-from pg_temp.tux_product_public_identity as identity
-where product.shop_id = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46'::uuid
-  and product.id = identity.id
-  and product.category_id = identity.category_id;
-
-do $$
-declare
-  v_shop_id constant uuid := 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
-begin
-  if not exists (select 1 from public.shops where id = v_shop_id) then
-    return;
-  end if;
+  update public.products as product
+  set slug = identity.slug
+  from pg_temp.tux_product_public_identity as identity
+  where product.shop_id = v_shop_id
+    and product.id = identity.id
+    and product.category_id = identity.category_id;
 
   if exists (
     select 1
