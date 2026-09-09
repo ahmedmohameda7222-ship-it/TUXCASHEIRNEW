@@ -233,6 +233,7 @@ export class OperationsOnlineOrderInboxService {
         processingStartedAt: null,
         processingExpiresAt: null,
         processingDeviceId: null,
+        reservationOriginDeviceId: null,
       };
       await this.#store.upsertMany([released]);
       await this.#publishSynced(shopId);
