@@ -6,10 +6,10 @@ on:
       - 'work/menu-online-orders-integration'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  prettier-diff:
+  prettier-fix:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -21,9 +21,13 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: Print canonical Prettier diff
+      - name: Apply canonical Prettier output
         shell: bash
         run: |
           npx prettier --write apps/operations/src/app/menuLayoutEditorSession.ts
-          git --no-pager diff -- apps/operations/src/app/menuLayoutEditorSession.ts
-          test -z "$(git status --short -- apps/operations/src/app/menuLayoutEditorSession.ts)"
+          git diff --exit-code --quiet -- apps/operations/src/app/menuLayoutEditorSession.ts && exit 0
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/operations/src/app/menuLayoutEditorSession.ts
+          git commit -m 'style(menu): apply canonical prettier output'
+          git push origin HEAD:work/menu-online-orders-integration
