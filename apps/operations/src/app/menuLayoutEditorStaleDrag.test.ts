@@ -58,4 +58,38 @@ describe('menu layout stale drag fencing', () => {
     expect(afterLateDragOver.draft?.productOrder).toEqual(persistedBase.productOrder);
     expect(afterLateDragOver.dirty).toBe(false);
   });
+
+  it('ignores a delayed reorder from the previous product after another pickup starts', () => {
+    let state = openMenuLayoutEditorSession(createClosedMenuLayoutEditorSession(), {
+      shopId,
+      workerId,
+      base: persistedBase,
+    });
+    state = menuLayoutEditorReducer(state, {
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: productA,
+      categoryId,
+    });
+    state = menuLayoutEditorReducer(state, {
+      type: 'BEGIN_PRODUCT_PICKUP',
+      productId: productB,
+      categoryId,
+    });
+
+    const afterStaleProductAReorder = menuLayoutEditorReducer(
+      state,
+      {
+        type: 'SET_PRODUCT_ORDER',
+        productId: productA,
+        productOrder: [productA, productB, productC],
+      } as never,
+    );
+
+    expect(afterStaleProductAReorder.draft?.productOrder).toEqual(persistedBase.productOrder);
+    expect(afterStaleProductAReorder.interaction).toMatchObject({
+      type: 'PRODUCT_PICKUP',
+      productId: productB,
+    });
+    expect(afterStaleProductAReorder.dirty).toBe(false);
+  });
 });
