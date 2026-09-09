@@ -121,10 +121,12 @@ describe('canonical Menu inactive-category authority for derived choices', () =>
     const projection = projectPublicCatalog(snapshot());
 
     expect(
-      projection.products.find((product) => product.id === EXTRA_PRODUCT_ID)?.is_active,
+      projection.products.find((product) => product.id === EXTRA_PRODUCT_ID)
+        ?.is_active,
     ).toBe(false);
     expect(
-      projection.products.find((product) => product.id === BEVERAGE_ID)?.is_active,
+      projection.products.find((product) => product.id === BEVERAGE_ID)
+        ?.is_active,
     ).toBe(false);
     expect(projection.extrasByProduct[BASE_PRODUCT_ID] ?? []).toEqual([]);
     expect(projection.comboBeveragesByProduct[COMBO_ID] ?? []).toEqual([]);
