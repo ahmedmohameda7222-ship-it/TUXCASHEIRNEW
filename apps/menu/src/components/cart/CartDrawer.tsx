@@ -32,9 +32,8 @@ export function CartDrawer() {
     updateQuantity,
     removeFromCart,
     clearCart,
-    totalPrice,
   } = useCart();
-  const { comboBeveragesByProduct, products } = useMenu();
+  const { extrasByProduct, comboBeveragesByProduct, products } = useMenu();
   const [, navigate] = useLocation();
 
   const [orderType, setOrderType] = useState<OrderType>('');
@@ -51,14 +50,37 @@ export function CartDrawer() {
     {},
   );
 
+  const canonicalUnitPrice = (item: (typeof items)[number]): number | null => {
+    const productId = item.baseProductId ?? item.id;
+    const currentProduct = products.find((product) => product.id === productId);
+    if (currentProduct === undefined || !currentProduct.is_active) return null;
+
+    let currentPrice = currentProduct.price;
+    const availableExtras = extrasByProduct[productId] ?? [];
+    for (const selectedExtra of item.extras ?? []) {
+      const currentExtra = availableExtras.find((extra) => extra.id === selectedExtra.id);
+      if (currentExtra === undefined) return null;
+      currentPrice += currentExtra.price;
+    }
+    return currentPrice;
+  };
+
+  const hasUnpriceableCartItem = items.some((item) => canonicalUnitPrice(item) === null);
+  const canonicalCartTotal = items.reduce((total, item) => {
+    const unitPrice = canonicalUnitPrice(item);
+    return total + (unitPrice ?? 0) * item.quantity;
+  }, 0);
   const isDelivery = orderType === 'Delivery';
   const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
-  const displayTotal = isDelivery ? `${totalPrice} EGP + Delivery Fee` : `${totalPrice} EGP`;
+  const displayTotal = isDelivery
+    ? `${canonicalCartTotal} EGP + Delivery Fee`
+    : `${canonicalCartTotal} EGP`;
   const isCustomerNameMissing = !customerName.trim();
 
   const isCheckoutDisabled =
     submissionStatus === 'submitting' ||
     items.length === 0 ||
+    hasUnpriceableCartItem ||
     isCustomerNameMissing ||
     !orderType ||
     !paymentMethod ||
@@ -121,6 +143,12 @@ export function CartDrawer() {
     }
     if (!paymentMethod) {
       alert('Please select a payment method.');
+      return;
+    }
+    if (hasUnpriceableCartItem) {
+      alert(
+        'A product or extra in your cart is no longer available. Please remove it and choose it again.',
+      );
       return;
     }
     const unavailablePersistedCombo = items.some((item) => {
@@ -261,95 +289,100 @@ export function CartDrawer() {
             </div>
           ) : (
             <>
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-4 bg-black/40 p-3 rounded-xl border border-white/5"
-                >
-                  <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-full object-contain p-1"
-                      />
-                    ) : (
-                      <ShoppingBag className="w-6 h-6 text-gray-600" />
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div className="flex justify-between items-start gap-3">
-                      <div>
-                        <h4 className="text-white font-semibold text-sm line-clamp-2">
-                          {item.baseProductName || item.name}
-                        </h4>
-                        {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).length >
-                          0 && (
-                          <label className="mt-2 block text-xs text-gray-300">
-                            Combo beverage
-                            <select
-                              aria-label={`${item.baseProductName || item.name} beverage`}
-                              value={comboBeverageSelections[item.id] ?? ''}
-                              onChange={(event) =>
-                                setComboBeverageSelections((current) => ({
-                                  ...current,
-                                  [item.id]: event.target.value,
-                                }))
-                              }
-                              className="mt-1 w-full rounded-lg border border-white/20 bg-black px-2 py-1 text-xs text-white"
-                            >
-                              <option value="">Select beverage</option>
-                              {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).map(
-                                (beverage) => (
-                                  <option key={beverage.id} value={beverage.id}>
-                                    {beverage.name}
-                                  </option>
-                                ),
-                              )}
-                            </select>
-                          </label>
-                        )}
-                        {item.extras && item.extras.length > 0 && (
-                          <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                            Extras:{' '}
-                            <span className="text-[#D4AF37]">
-                              {item.extras.map((extra) => extra.name).join(', ')}
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-gray-500 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+              {items.map((item) => {
+                const unitPrice = canonicalUnitPrice(item);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 bg-black/40 p-3 rounded-xl border border-white/5"
+                  >
+                    <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <ShoppingBag className="w-6 h-6 text-gray-600" />
+                      )}
                     </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <p className="text-[#D4AF37] font-bold text-sm">
-                        {item.price * item.quantity} EGP
-                      </p>
-                      <div className="flex items-center gap-2 bg-white/10 rounded-full px-1 py-1">
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="flex justify-between items-start gap-3">
+                        <div>
+                          <h4 className="text-white font-semibold text-sm line-clamp-2">
+                            {item.baseProductName || item.name}
+                          </h4>
+                          {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).length >
+                            0 && (
+                            <label className="mt-2 block text-xs text-gray-300">
+                              Combo beverage
+                              <select
+                                aria-label={`${item.baseProductName || item.name} beverage`}
+                                value={comboBeverageSelections[item.id] ?? ''}
+                                onChange={(event) =>
+                                  setComboBeverageSelections((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value,
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-lg border border-white/20 bg-black px-2 py-1 text-xs text-white"
+                              >
+                                <option value="">Select beverage</option>
+                                {(comboBeveragesByProduct[item.baseProductId ?? item.id] ?? []).map(
+                                  (beverage) => (
+                                    <option key={beverage.id} value={beverage.id}>
+                                      {beverage.name}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </label>
+                          )}
+                          {item.extras && item.extras.length > 0 && (
+                            <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                              Extras:{' '}
+                              <span className="text-[#D4AF37]">
+                                {item.extras.map((extra) => extra.name).join(', ')}
+                              </span>
+                            </p>
+                          )}
+                        </div>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white"
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-gray-500 hover:text-red-500 transition-colors"
                         >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-white text-xs font-bold w-4 text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white"
-                        >
-                          <Plus className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <p className="text-[#D4AF37] font-bold text-sm">
+                          {unitPrice === null
+                            ? 'Price unavailable'
+                            : `${unitPrice * item.quantity} EGP`}
+                        </p>
+                        <div className="flex items-center gap-2 bg-white/10 rounded-full px-1 py-1">
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-white text-xs font-bold w-4 text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>
@@ -456,6 +489,16 @@ export function CartDrawer() {
               <div className="rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3 text-sm leading-relaxed text-[#F5EDD8]">
                 <p className="font-bold text-[#D4AF37] mb-1">Mixed Payment for Delivery</p>
                 <p>{DELIVERY_MIXED_PAYMENT_MESSAGE}</p>
+              </div>
+            )}
+
+            {hasUnpriceableCartItem && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300"
+              >
+                A product or extra in your cart is no longer available. Remove it and choose it
+                again before checkout.
               </div>
             )}
 
