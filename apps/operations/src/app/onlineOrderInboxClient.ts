@@ -31,6 +31,7 @@ interface OnlineOrderInboxRuntimeRemote extends OnlineOrderOperationsRemote {
 }
 
 const REMOTE_UNAVAILABLE_MESSAGE = 'Online orders could not refresh. Showing the saved inbox.';
+const OPEN_INBOX_REFRESH_INTERVAL_MS = 15_000;
 
 export async function loadOnlineOrderInbox(input: {
   readonly shopId: ShopId;
@@ -76,6 +77,9 @@ export function createOnlineOrderInboxRuntime(input: {
   readonly remote: OnlineOrderInboxRuntimeRemote;
 }): OnlineOrderInboxRuntimeClient {
   const listeners = new Set<(snapshot: OnlineOrderInboxSnapshot) => void>();
+  let refreshTimer: number | null = null;
+  let onlineListener: (() => void) | null = null;
+
   const publish = (snapshot: OnlineOrderInboxSnapshot): void => {
     for (const listener of listeners) listener(snapshot);
   };
@@ -86,15 +90,36 @@ export function createOnlineOrderInboxRuntime(input: {
       errorMessage: null,
     });
   };
+  const load = async (): Promise<OnlineOrderInboxSnapshot> =>
+    loadOnlineOrderInbox({
+      shopId: await input.getActiveShopId(),
+      store: input.store,
+      remote: input.remote,
+      publish,
+    });
+  const refresh = (): void => {
+    void load().catch(() => undefined);
+  };
+  const startRefreshLifecycle = (): void => {
+    if (typeof window === 'undefined' || refreshTimer !== null) return;
+    refreshTimer = window.setInterval(refresh, OPEN_INBOX_REFRESH_INTERVAL_MS);
+    onlineListener = refresh;
+    window.addEventListener('online', onlineListener);
+  };
+  const stopRefreshLifecycle = (): void => {
+    if (typeof window === 'undefined') return;
+    if (refreshTimer !== null) {
+      window.clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+    if (onlineListener !== null) {
+      window.removeEventListener('online', onlineListener);
+      onlineListener = null;
+    }
+  };
 
   return {
-    load: async () =>
-      loadOnlineOrderInbox({
-        shopId: await input.getActiveShopId(),
-        store: input.store,
-        remote: input.remote,
-        publish,
-      }),
+    load,
     claim: async (requestId) => {
       const shopId = await input.getActiveShopId();
       const claimed = await claimOnlineOrderForReview({
@@ -142,7 +167,11 @@ export function createOnlineOrderInboxRuntime(input: {
     },
     subscribe: (listener) => {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      if (listeners.size === 1) startRefreshLifecycle();
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) stopRefreshLifecycle();
+      };
     },
   };
 }
