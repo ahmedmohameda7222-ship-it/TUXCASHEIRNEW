@@ -128,7 +128,8 @@ begin
   v_first_processing_order_id := (v_first_claim ->> 'processingOrderId')::uuid;
 
   update public.online_order_requests
-  set processing_expires_at = now() - interval '1 minute'
+  set processing_started_at = now() - interval '2 minutes',
+      processing_expires_at = now() - interval '1 minute'
   where id = '18aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
   perform public.list_tux_online_order_requests_v1(
