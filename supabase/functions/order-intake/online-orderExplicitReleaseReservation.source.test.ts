@@ -13,7 +13,7 @@ describe('online-order explicit release after lease requeue', () => {
     );
 
     const pendingBranch = source.match(
-      /if\s+v_request\.status\s*=\s*'PENDING'\s+then([\s\S]*?)end\s+if;/i,
+      /if\s+v_request\.status\s*=\s*'PENDING'\s+then([\s\S]*?)if\s+v_request\.status\s+<>\s*'PROCESSING'/i,
     )?.[1];
 
     expect(pendingBranch).toBeDefined();
