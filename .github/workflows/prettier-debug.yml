@@ -1,0 +1,29 @@
+name: Prettier diagnostic
+
+on:
+  push:
+    branches:
+      - 'work/menu-online-orders-integration'
+
+permissions:
+  contents: read
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Print canonical Prettier diff
+        shell: bash
+        run: |
+          npx prettier --write apps/operations/src/app/menuLayoutEditorSession.ts
+          git --no-pager diff -- apps/operations/src/app/menuLayoutEditorSession.ts
+          test -z "$(git status --short -- apps/operations/src/app/menuLayoutEditorSession.ts)"
