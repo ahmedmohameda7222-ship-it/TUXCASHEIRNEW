@@ -33,9 +33,37 @@ begin
   if not found then
     raise exception 'TUX_ONLINE_ORDER_NOT_FOUND';
   end if;
+
   if v_request.status = 'PENDING' then
+    v_origin_device_id := null;
+
+    select reservation.origin_device_id
+      into v_origin_device_id
+    from private.online_order_processing_reservations reservation
+    where reservation.request_id = v_request.id
+      and reservation.shop_id = v_shop_id
+      and reservation.processing_order_id = p_processing_order_id
+    for update;
+
+    if found then
+      if v_origin_device_id is distinct from p_device_id then
+        raise exception 'TUX_ONLINE_ORDER_CLAIM_MISMATCH';
+      end if;
+
+      delete from private.online_order_processing_reservations reservation
+      where reservation.request_id = v_request.id
+        and reservation.shop_id = v_shop_id
+        and reservation.processing_order_id = p_processing_order_id
+        and reservation.origin_device_id = p_device_id;
+
+      if not found then
+        raise exception 'TUX_ONLINE_ORDER_RESERVATION_RELEASE_CONFLICT';
+      end if;
+    end if;
+
     return jsonb_build_object('requestId', v_request.id, 'status', 'PENDING');
   end if;
+
   if v_request.status <> 'PROCESSING' then
     raise exception 'TUX_ONLINE_ORDER_ALREADY_RESOLVED';
   end if;
