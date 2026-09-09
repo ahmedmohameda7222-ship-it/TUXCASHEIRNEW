@@ -108,7 +108,9 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
   }
 
   const productsById = new Map(products.map((product) => [product.id, product] as const));
-  const customerProductAvailable = (product: SupabaseProduct | undefined): boolean =>
+  const customerProductAvailable = (
+    product: SupabaseProduct | undefined,
+  ): product is SupabaseProduct =>
     product !== undefined && product.is_active && activeCategoryIds.has(product.section_id);
   const extrasByProduct: Record<string, MenuExtraOption[]> = {};
   const sortedLinks = [...snapshot.productModifierLinks].sort(
