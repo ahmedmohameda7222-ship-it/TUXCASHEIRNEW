@@ -6,6 +6,7 @@ import {
 import { normalizeEgyptianPhone } from '../../../packages/domain/src/phone.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
+const INTAKE_CAPACITY_ERROR = 'TUX_ONLINE_ORDER_INTAKE_CAPACITY_EXCEEDED';
 
 export interface OnlineOrderCatalogCategory {
   id: string;
@@ -106,6 +107,19 @@ function errorResponse(status: number, code: string): Response {
 
 function successResponse(status: number, requestId: string): Response {
   return jsonResponse(status, { schemaVersion: 1, requestId, status: 'PENDING' });
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const message = Reflect.get(error, 'message');
+    if (typeof message === 'string') return message;
+  }
+  return '';
+}
+
+function isIntakeCapacityError(error: unknown): boolean {
+  return errorMessage(error).includes(INTAKE_CAPACITY_ERROR);
 }
 
 async function sha256Hex(value: unknown): Promise<string> {
@@ -403,7 +417,10 @@ export async function handleOrderIntakeRequest(
 
     try {
       await store.insertPending(record);
-    } catch {
+    } catch (error) {
+      if (isIntakeCapacityError(error)) {
+        return errorResponse(429, 'intake_rate_limited');
+      }
       const raced = await store.findByIdempotency(parsed.shopId, parsed.idempotencyKey);
       if (
         raced?.requestSha256 === requestSha256 &&

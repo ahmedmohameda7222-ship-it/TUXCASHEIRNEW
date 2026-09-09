@@ -15,6 +15,7 @@ import {
   type ProductId,
 } from '@tux/domain';
 import type { CachedOnlineOrderRequest } from '@tux/persistence';
+import { onlineOrderMutationLock } from './onlineOrderMutationLock';
 import type {
   OperationsOrdersService,
   OrdersRuntime,
@@ -429,31 +430,33 @@ export class OperationsOnlineOrderAcceptanceService {
     request: CachedOnlineOrderRequest,
     confirmation: OnlineOrderAcceptanceConfirmation,
   ): Promise<OrderPlacementResult> {
-    if (
-      request.status !== 'PROCESSING' ||
-      request.processingOrderId === null ||
-      request.processingStartedAt === null ||
-      request.processingExpiresAt === null
-    ) {
-      fail('A live PROCESSING online-order claim is required before acceptance.');
-    }
-    if (request.processingExpiresAt <= this.#runtime.now()) {
-      fail('The online-order PROCESSING claim has expired and must be reclaimed.');
-    }
+    return onlineOrderMutationLock.run(request.requestId, async () => {
+      if (
+        request.status !== 'PROCESSING' ||
+        request.processingOrderId === null ||
+        request.processingStartedAt === null ||
+        request.processingExpiresAt === null
+      ) {
+        fail('A live PROCESSING online-order claim is required before acceptance.');
+      }
+      if (request.processingExpiresAt <= this.#runtime.now()) {
+        fail('The online-order PROCESSING claim has expired and must be reclaimed.');
+      }
 
-    const workspaceResult: OrdersWorkspaceResult = await this.#orders.loadWorkspace(
-      `online-order:${request.requestId}`,
-    );
-    if (!workspaceResult.ok) return workspaceResult;
+      const workspaceResult: OrdersWorkspaceResult = await this.#orders.loadWorkspace(
+        `online-order:${request.requestId}`,
+      );
+      if (!workspaceResult.ok) return workspaceResult;
 
-    const draft = prepareOnlineOrderAcceptanceDraft({
-      request,
-      workspace: workspaceResult.value,
-      confirmation,
-      runtime: this.#runtime,
+      const draft = prepareOnlineOrderAcceptanceDraft({
+        request,
+        workspace: workspaceResult.value,
+        confirmation,
+        runtime: this.#runtime,
+      });
+      assertReservationAcceptanceOwnership(request);
+      const orderId = entityId<OrderId>(request.processingOrderId, 'Reserved processing order id');
+      return this.#orders.placeOrder(draft, { source: 'ONLINE', orderId });
     });
-    assertReservationAcceptanceOwnership(request);
-    const orderId = entityId<OrderId>(request.processingOrderId, 'Reserved processing order id');
-    return this.#orders.placeOrder(draft, { source: 'ONLINE', orderId });
   }
 }

@@ -34,7 +34,7 @@ export function CartDrawer() {
     clearCart,
     totalPrice,
   } = useCart();
-  const { comboBeveragesByProduct } = useMenu();
+  const { comboBeveragesByProduct, products } = useMenu();
   const [, navigate] = useLocation();
 
   const [orderType, setOrderType] = useState<OrderType>('');
@@ -123,10 +123,25 @@ export function CartDrawer() {
       alert('Please select a payment method.');
       return;
     }
+    const unavailablePersistedCombo = items.some((item) => {
+      const productId = item.baseProductId ?? item.id;
+      const currentProduct = products.find((product) => product.id === productId);
+      const options = comboBeveragesByProduct[productId] ?? [];
+      return currentProduct?.is_combo === true && (!currentProduct.is_active || options.length === 0);
+    });
+    if (unavailablePersistedCombo) {
+      alert('A combo in your cart is no longer available. Please remove it and choose it again.');
+      return;
+    }
     const comboSelectionMissing = items.some((item) => {
       const productId = item.baseProductId ?? item.id;
+      const currentProduct = products.find((product) => product.id === productId);
       const options = comboBeveragesByProduct[productId] ?? [];
-      return options.length > 0 && !comboBeverageSelections[item.id];
+      const selected = comboBeverageSelections[item.id];
+      return (
+        currentProduct?.is_combo === true &&
+        (selected === undefined || !options.some((option) => option.id === selected))
+      );
     });
     if (comboSelectionMissing) {
       alert('Please select a beverage for every combo.');

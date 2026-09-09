@@ -4,6 +4,7 @@ import {
   type CachedOnlineOrderRequest,
   type OnlineOrderInboxStore,
 } from '@tux/persistence';
+import { onlineOrderMutationLock } from './onlineOrderMutationLock';
 
 const SNAPSHOT_LIMIT = 200;
 const CLAIM_ENVELOPE_KEYS = [
@@ -175,46 +176,52 @@ export class OperationsOnlineOrderInboxService {
   }
 
   async claim(requestId: string): Promise<CachedOnlineOrderRequest> {
-    const shopId = await this.#getActiveShopId();
-    const claimed = parseClaim(await this.#remote.claim(requestId), shopId, requestId);
-    await this.#store.upsertMany([claimed]);
-    await this.#publishSynced(shopId);
-    return claimed;
+    return onlineOrderMutationLock.run(requestId, async () => {
+      const shopId = await this.#getActiveShopId();
+      const claimed = parseClaim(await this.#remote.claim(requestId), shopId, requestId);
+      await this.#store.upsertMany([claimed]);
+      await this.#publishSynced(shopId);
+      return claimed;
+    });
   }
 
   async release(requestId: string, processingOrderId: string): Promise<CachedOnlineOrderRequest> {
-    const shopId = await this.#getActiveShopId();
-    const cached = await this.#cachedRequest(shopId, requestId);
-    if (cached.status !== 'PROCESSING' || cached.processingOrderId !== processingOrderId) {
-      throw new Error('Online-order review release does not match the local processing claim.');
-    }
-    parseAck(await this.#remote.release(requestId, processingOrderId), requestId, 'PENDING');
-    const released: CachedOnlineOrderRequest = {
-      ...cached,
-      status: 'PENDING',
-      processingOrderId: null,
-      processingStartedAt: null,
-      processingExpiresAt: null,
-      processingDeviceId: null,
-    };
-    await this.#store.upsertMany([released]);
-    await this.#publishSynced(shopId);
-    return released;
+    return onlineOrderMutationLock.run(requestId, async () => {
+      const shopId = await this.#getActiveShopId();
+      const cached = await this.#cachedRequest(shopId, requestId);
+      if (cached.status !== 'PROCESSING' || cached.processingOrderId !== processingOrderId) {
+        throw new Error('Online-order review release does not match the local processing claim.');
+      }
+      parseAck(await this.#remote.release(requestId, processingOrderId), requestId, 'PENDING');
+      const released: CachedOnlineOrderRequest = {
+        ...cached,
+        status: 'PENDING',
+        processingOrderId: null,
+        processingStartedAt: null,
+        processingExpiresAt: null,
+        processingDeviceId: null,
+      };
+      await this.#store.upsertMany([released]);
+      await this.#publishSynced(shopId);
+      return released;
+    });
   }
 
   async reject(requestId: string, processingOrderId: string, reason: string): Promise<void> {
-    const shopId = await this.#getActiveShopId();
-    const cached = await this.#cachedRequest(shopId, requestId);
-    if (cached.status !== 'PROCESSING' || cached.processingOrderId !== processingOrderId) {
-      throw new Error('Online-order rejection does not match the local processing claim.');
-    }
-    parseAck(
-      await this.#remote.reject(requestId, processingOrderId, reason),
-      requestId,
-      'REJECTED',
-    );
-    await this.#store.remove(shopId, requestId);
-    await this.#publishSynced(shopId);
+    return onlineOrderMutationLock.run(requestId, async () => {
+      const shopId = await this.#getActiveShopId();
+      const cached = await this.#cachedRequest(shopId, requestId);
+      if (cached.status !== 'PROCESSING' || cached.processingOrderId !== processingOrderId) {
+        throw new Error('Online-order rejection does not match the local processing claim.');
+      }
+      parseAck(
+        await this.#remote.reject(requestId, processingOrderId, reason),
+        requestId,
+        'REJECTED',
+      );
+      await this.#store.remove(shopId, requestId);
+      await this.#publishSynced(shopId);
+    });
   }
 
   async #cachedRequest(shopId: ShopId, requestId: string): Promise<CachedOnlineOrderRequest> {

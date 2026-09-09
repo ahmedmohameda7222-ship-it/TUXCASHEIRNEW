@@ -51,6 +51,7 @@ export type {
   OnlineOrderInboxSnapshot,
   OnlineOrderInboxSyncState,
 } from './onlineOrderInbox';
+export { OnlineOrderMutationLock, onlineOrderMutationLock } from './onlineOrderMutationLock';
 export { unavailableOrderPrinter } from './orderPrinter';
 export {
   DEFAULT_RECEIPT_PRINTER_CONFIGURATION,

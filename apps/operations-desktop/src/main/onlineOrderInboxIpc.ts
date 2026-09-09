@@ -1,3 +1,4 @@
+import { OnlineOrderMutationLock } from '@tux/application';
 import type {
   OnlineOrderAcceptanceConfirmation,
   OnlineOrderInboxSnapshot,
@@ -161,6 +162,7 @@ export class OnlineOrderInboxIpcRuntime {
   readonly #acceptanceStore: OnlineOrderAcceptanceStore | null;
   readonly #getActiveShopId: (() => Promise<ShopId>) | null;
   readonly #findCommittedOnlineOrder: FindCommittedOnlineOrder | null;
+  readonly #mutations = new OnlineOrderMutationLock();
   #unsubscribe: (() => void) | null = null;
 
   constructor(input: {
@@ -221,7 +223,8 @@ export class OnlineOrderInboxIpcRuntime {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order claim');
       exactKeys(input, ['requestId'], 'Online-order claim');
-      return this.#service.claim(uuid(input['requestId'], 'Online-order request ID'));
+      const requestId = uuid(input['requestId'], 'Online-order request ID');
+      return this.#mutations.run(requestId, () => this.#service.claim(requestId));
     });
 
     ipcMain.handle(IPC_ONLINE_ORDERS_RELEASE, async (event, rawInput: unknown) => {
@@ -233,10 +236,12 @@ export class OnlineOrderInboxIpcRuntime {
         input['processingOrderId'],
         'Online-order processing order ID',
       );
-      if (await this.#reconcileAcceptedOrders(requestId)) {
-        throw new Error('Online order has already been accepted locally.');
-      }
-      return this.#service.release(requestId, processingOrderId);
+      return this.#mutations.run(requestId, async () => {
+        if (await this.#reconcileAcceptedOrders(requestId)) {
+          throw new Error('Online order has already been accepted locally.');
+        }
+        return this.#service.release(requestId, processingOrderId);
+      });
     });
 
     ipcMain.handle(IPC_ONLINE_ORDERS_REJECT, async (event, rawInput: unknown) => {
@@ -248,14 +253,13 @@ export class OnlineOrderInboxIpcRuntime {
         input['processingOrderId'],
         'Online-order processing order ID',
       );
-      if (await this.#reconcileAcceptedOrders(requestId)) {
-        throw new Error('Online order has already been accepted locally.');
-      }
-      return this.#service.reject(
-        requestId,
-        processingOrderId,
-        nonEmpty(input['reason'], 'Online-order rejection reason'),
-      );
+      const reason = nonEmpty(input['reason'], 'Online-order rejection reason');
+      return this.#mutations.run(requestId, async () => {
+        if (await this.#reconcileAcceptedOrders(requestId)) {
+          throw new Error('Online order has already been accepted locally.');
+        }
+        return this.#service.reject(requestId, processingOrderId, reason);
+      });
     });
 
     ipcMain.handle(IPC_ONLINE_ORDERS_ACCEPT, async (event, rawInput: unknown) => {
@@ -270,26 +274,30 @@ export class OnlineOrderInboxIpcRuntime {
         throw new Error('Online-order acceptance service is not configured.');
       }
       const requestId = uuid(input['requestId'], 'Online-order request ID');
-      if (await this.#reconcileAcceptedOrders(requestId)) {
-        throw new Error('Online order has already been accepted locally.');
-      }
-      const shopId = await this.#getActiveShopId();
-      const request = await this.#acceptanceStore.get(shopId, requestId);
-      if (
-        request === null ||
-        request.status !== 'PROCESSING' ||
-        request.processingOrderId === null
-      ) {
-        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
-      }
-      const result = await this.#acceptance.accept(
-        request,
-        acceptanceConfirmation(input['confirmation']),
-      );
-      if (result.ok) {
-        await this.#acceptanceStore.markAccepted(shopId, requestId, request.processingOrderId);
-      }
-      return result;
+      const confirmation = acceptanceConfirmation(input['confirmation']);
+      return this.#mutations.run(requestId, async () => {
+        if (await this.#reconcileAcceptedOrders(requestId)) {
+          throw new Error('Online order has already been accepted locally.');
+        }
+        const shopId = await this.#getActiveShopId!();
+        const request = await this.#acceptanceStore!.get(shopId, requestId);
+        if (
+          request === null ||
+          request.status !== 'PROCESSING' ||
+          request.processingOrderId === null
+        ) {
+          throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
+        }
+        const result = await this.#acceptance!.accept(request, confirmation);
+        if (result.ok) {
+          await this.#acceptanceStore!.markAccepted(
+            shopId,
+            requestId,
+            request.processingOrderId,
+          );
+        }
+        return result;
+      });
     });
 
     this.#unsubscribe = this.#service.subscribe((snapshot: OnlineOrderInboxSnapshot) => {
