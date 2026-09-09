@@ -294,10 +294,7 @@ function buildTrustedItems(
         return errorResponse(400, 'invalid_selection');
       }
       comboBeverage = { productId: beverage!.id, label: beverage!.name };
-    } else if (
-      product!.isCombo &&
-      catalog.comboBeverageOptions.some((option) => option.comboProductId === product!.id)
-    ) {
+    } else if (product!.isCombo) {
       return errorResponse(400, 'invalid_selection');
     }
 

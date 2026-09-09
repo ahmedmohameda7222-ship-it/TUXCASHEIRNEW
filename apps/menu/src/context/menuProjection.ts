@@ -53,6 +53,9 @@ export interface MenuProjection {
 }
 
 export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuProjection {
+  const activeCategoryIds = new Set(
+    snapshot.categories.filter((category) => category.active).map((category) => category.id),
+  );
   const sections = snapshot.categories
     .map((category) => ({
       id: category.id,
@@ -105,6 +108,8 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
   }
 
   const productsById = new Map(products.map((product) => [product.id, product] as const));
+  const customerProductAvailable = (product: SupabaseProduct | undefined): boolean =>
+    product !== undefined && product.is_active && activeCategoryIds.has(product.section_id);
   const extrasByProduct: Record<string, MenuExtraOption[]> = {};
   const sortedLinks = [...snapshot.productModifierLinks].sort(
     (left, right) =>
@@ -116,7 +121,7 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
     const modifier = modifiersById.get(link.modifierId);
     if (!modifier?.active || modifier.standaloneProductId === null) continue;
     const standaloneProduct = productsById.get(modifier.standaloneProductId);
-    if (!standaloneProduct?.is_active) continue;
+    if (!customerProductAvailable(standaloneProduct)) continue;
     (extrasByProduct[link.productId] ??= []).push({
       id: standaloneProduct.id,
       name: modifier.name,
@@ -127,7 +132,7 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
   for (const option of snapshot.comboBeverageOptions) {
     const beverages = (comboBeveragesByProduct[option.comboProductId] ??= []);
     const beverage = productsById.get(option.beverageProductId);
-    if (!beverage?.is_active) continue;
+    if (!customerProductAvailable(beverage)) continue;
     beverages.push(beverage);
   }
 

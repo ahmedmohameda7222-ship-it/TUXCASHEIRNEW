@@ -182,7 +182,7 @@ export async function syncOnlineOrderInboxSnapshot(input: {
     }
   }
 
-  return remoteRequests;
+  return await input.store.list(input.shopId);
 }
 
 export async function claimOnlineOrderForReview(input: {
