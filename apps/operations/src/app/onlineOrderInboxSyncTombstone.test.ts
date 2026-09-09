@@ -31,6 +31,18 @@ function processingRequest(): CachedOnlineOrderRequest {
   };
 }
 
+function releasedRequest(): CachedOnlineOrderRequest {
+  return {
+    ...processingRequest(),
+    status: 'PENDING',
+    processingOrderId: null,
+    processingStartedAt: null,
+    processingExpiresAt: null,
+    processingDeviceId: null,
+    reservationOriginDeviceId: null,
+  };
+}
+
 class TombstoneFilteringStore implements OnlineOrderInboxStore {
   readonly #rows = new Map<string, CachedOnlineOrderRequest>();
   readonly #accepted = new Set<string>();
@@ -84,5 +96,31 @@ describe('browser online-order inbox snapshot reconciliation', () => {
 
     expect(result).toEqual([]);
     expect(await store.list(SHOP_ID)).toEqual([]);
+  });
+
+  it('does not overwrite a local release with a PROCESSING snapshot fetched before the release', async () => {
+    const store = new TombstoneFilteringStore();
+    const processing = processingRequest();
+    const released = releasedRequest();
+    await store.upsertMany([processing]);
+
+    let resolveFetch!: (value: unknown) => void;
+    const remote = {
+      fetchActiveRequests: vi.fn().mockImplementation(
+        () =>
+          new Promise<unknown>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    };
+
+    const synchronization = syncOnlineOrderInboxSnapshot({ shopId: SHOP_ID, store, remote });
+    expect(remote.fetchActiveRequests).toHaveBeenCalledOnce();
+
+    await store.upsertMany([released]);
+    resolveFetch({ schemaVersion: 1, requests: [processing] });
+
+    await expect(synchronization).resolves.toEqual([released]);
+    expect(await store.list(SHOP_ID)).toEqual([released]);
   });
 });
