@@ -389,7 +389,13 @@ export function menuLayoutEditorReducer(
       return openMenuLayoutEditorSession(state, event);
 
     case 'SET_CATEGORY_ORDER':
-      if (!canMutateDraft(state) || state.draft === null) return state;
+      if (
+        !canMutateDraft(state) ||
+        state.draft === null ||
+        state.interaction.type !== 'CATEGORY_PICKUP'
+      ) {
+        return state;
+      }
       return withDraft(state, { ...state.draft, categoryOrder: [...event.categoryOrder] });
 
     case 'SET_ALIGNMENT':
@@ -397,7 +403,13 @@ export function menuLayoutEditorReducer(
       return withDraft(state, { ...state.draft, categoryAlignment: event.categoryAlignment });
 
     case 'SET_PRODUCT_ORDER':
-      if (!canMutateDraft(state) || state.draft === null) return state;
+      if (
+        !canMutateDraft(state) ||
+        state.draft === null ||
+        state.interaction.type !== 'PRODUCT_PICKUP'
+      ) {
+        return state;
+      }
       return withDraft(state, { ...state.draft, productOrder: [...event.productOrder] });
 
     case 'BEGIN_CATEGORY_PICKUP': {
