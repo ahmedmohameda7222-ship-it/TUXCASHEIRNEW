@@ -3,6 +3,11 @@ export type ProductRouteSection = {
   slug?: string;
 };
 
+export interface CanonicalCategoryRouteTarget {
+  readonly categorySlug: string;
+  readonly family: string | null;
+}
+
 export const PRODUCT_SECTION_ROUTES: Record<string, string> = {
   'tux-burger': '/tux-burger',
   tuxify: '/tuxify',
@@ -12,7 +17,15 @@ export const PRODUCT_SECTION_ROUTES: Record<string, string> = {
   drinks: '/drinks',
 };
 
+const FAMILY_CATEGORY_ROUTES: Readonly<Record<string, CanonicalCategoryRouteTarget>> = {
+  'tux-burger': { categorySlug: 'burgers', family: 'TUX' },
+  tuxify: { categorySlug: 'burgers', family: 'TUXIFY' },
+};
+
 const ORDER_PRODUCT_ELEMENT_PREFIX = 'order-product-';
+
+export const resolveCanonicalCategoryRoute = (routeSlug: string): CanonicalCategoryRouteTarget =>
+  FAMILY_CATEGORY_ROUTES[routeSlug] ?? { categorySlug: routeSlug, family: null };
 
 export const getProductSectionHref = (section: ProductRouteSection) => {
   const routeKey = section.slug || section.id;
