@@ -6,7 +6,9 @@ describe('browser online-order mutation serialization source', () => {
     const panel = readFileSync(new URL('./OnlineOrderInboxPanel.tsx', import.meta.url), 'utf8');
 
     expect(panel).toContain('const browserOnlineOrderMutations = new OnlineOrderMutationLock()');
-    expect(panel.match(/browserOnlineOrderMutations\.run\(/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(
+      panel.match(/browserOnlineOrderMutations\.run\(/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(4);
 
     const acceptStart = panel.indexOf('accept: async (request, confirmation) =>');
     const subscribeStart = panel.indexOf('subscribe:', acceptStart);
