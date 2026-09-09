@@ -1,0 +1,142 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import {
+  assertPublicIdentityInventory,
+  validatePublicIdentityManifest,
+  type PublicCatalogIdentityManifest,
+  type PublicIdentityInventory,
+} from './publicIdentity';
+
+const manifest = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL('./public-catalog-identity-manifest.json', import.meta.url)),
+    'utf8',
+  ),
+) as PublicCatalogIdentityManifest;
+
+const approvedInventory: PublicIdentityInventory = {
+  categoryIds: [
+    'dac1ac74-aa52-5804-966c-cef65d196fd4',
+    '89346cad-bf3a-5682-a426-292d6e2017e4',
+    '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4',
+    '05a318bf-cefa-5149-aae6-fd5d94138943',
+    'a0263027-0afa-52bf-9f34-e27ec77136b8',
+    'c55b48e4-4dec-5cfc-a179-ab93a911542b',
+    '26ecbec9-0883-5acf-a413-4ccdce760bd8',
+  ],
+  products: [
+    { id: '19964d60-21a0-5fb3-8e2d-c4ff1b104367', categoryId: '05a318bf-cefa-5149-aae6-fd5d94138943' },
+    { id: '91cc63aa-d5f5-5c96-a2c6-3fb31d27d6a8', categoryId: '05a318bf-cefa-5149-aae6-fd5d94138943' },
+    { id: 'd9c72a5a-c9b5-52c7-99d5-43a0c62b5bad', categoryId: '26ecbec9-0883-5acf-a413-4ccdce760bd8' },
+    { id: '1d272aee-3b94-5e0a-898a-007a60121f60', categoryId: '26ecbec9-0883-5acf-a413-4ccdce760bd8' },
+    { id: 'e9f5e8f1-b4a2-54db-b3ca-b9b2609f0299', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: '3eb059e6-fc37-5307-9958-ae2f96fe87a1', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: '6dd049b4-adb6-575d-a14d-fab6e2fb9a33', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: '6f7f8eb9-bdfa-586e-8858-9fc414900186', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: '02a78302-1db6-5a6b-a1f8-29143d4f95e6', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: 'e1a78050-eb0d-5ea7-bd3e-6a659e3a5421', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: 'fdb4cc09-a960-5ed1-8374-3e37a0e01857', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: 'a9ec16ef-1b5f-52fa-8062-c21742ede016', categoryId: '677f5b6a-1be0-5345-8afa-cfd8e0eec7e4' },
+    { id: '67318a26-759b-5f8e-be0a-2ab3e75b0714', categoryId: '89346cad-bf3a-5682-a426-292d6e2017e4' },
+    { id: 'fd4800d7-e195-5e64-aa0a-02a5163ea057', categoryId: '89346cad-bf3a-5682-a426-292d6e2017e4' },
+    { id: '91a48376-82fa-5369-9f78-988aff038b62', categoryId: '89346cad-bf3a-5682-a426-292d6e2017e4' },
+    { id: '96f7b140-2b20-54bd-96f4-f7e7eecc8a95', categoryId: '89346cad-bf3a-5682-a426-292d6e2017e4' },
+    { id: '042312ad-c335-52b4-ad55-3d34dce27dcc', categoryId: '89346cad-bf3a-5682-a426-292d6e2017e4' },
+    { id: '08736363-f9e7-5f95-9060-2622e725452e', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: 'e2962ee4-cc06-59a5-95f0-999da6dcbdcc', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: '96d23d74-dc5d-5783-8795-1752608b8710', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: 'b3770ece-f855-5575-b913-22d8a1ba788c', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: '6c5ae9a0-b2b0-5f29-a39c-59f4bb44bb28', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: 'ec90971b-8ed5-58c1-a1f5-69cda223c22a', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: 'ff3f4f4b-44f8-5b32-b2da-23f9b2dc0ad6', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: '5f13ba23-50f0-5f15-801d-b52163c7a1fa', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: '97551ad6-03ea-56b8-96d5-b2be291e758f', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: 'fb3bdb64-efdb-51a4-9ac4-fdd327295615', categoryId: 'a0263027-0afa-52bf-9f34-e27ec77136b8' },
+    { id: '71712668-776b-5abc-a067-23581a97b46a', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: 'ea9e484b-b601-5906-94b6-0bb1b45891b9', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '6141f564-c0cb-584c-bcdd-e1fead46f71c', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: 'bc692aea-e690-53e5-844b-acf727c40d0f', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '2d0ee6eb-9503-525f-80fd-557049be6d74', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: 'a0f45823-99c2-5271-995b-79aac2599365', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '87ce3859-f50c-514a-96cb-510c729a1b46', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '152586f0-728a-54cc-a451-e5e993be14f6', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: 'af02f2b2-dd38-5ee7-bffd-f35fa3dec1ba', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '78a0c8e5-8ef5-5c3e-8c40-8c4934880680', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '2b492ea7-7faf-55be-829f-7a75393344d5', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '23639a0a-3cf6-5dc3-8964-5d5817663b7d', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '82192675-56a7-5dbe-a955-d33983ef87ea', categoryId: 'c55b48e4-4dec-5cfc-a179-ab93a911542b' },
+    { id: '91a8852a-1481-5a9c-a507-0b4f43ce8142', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: '105132ac-a954-5eb6-88cd-48638f660b37', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: 'e3ab3789-689f-597c-8e91-da968509d97e', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: 'd577eb43-16f7-595a-ac06-9d3c86a8f7e8', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: '55405c76-658a-5122-b8c4-e1d43dc3a201', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: 'cd450b18-1e33-53ad-8c03-aa60ac6a4b2b', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: '352b11c1-16be-5ef3-99fc-f7f4e597d75d', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: '09c91a57-67d5-5f9b-9770-fdd90b2739a9', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+    { id: 'c768950a-607f-56e4-8736-d20ff191b807', categoryId: 'dac1ac74-aa52-5804-966c-cef65d196fd4' },
+  ],
+};
+
+function cloneManifest(): PublicCatalogIdentityManifest {
+  return structuredClone(manifest);
+}
+
+describe('production public catalog identity manifest', () => {
+  it('is explicit, complete, UUID-keyed, and matches the approved 7/49 inventory', () => {
+    expect(() => validatePublicIdentityManifest(manifest)).not.toThrow();
+    expect(manifest.categoryCount).toBe(7);
+    expect(manifest.productCount).toBe(49);
+    expect(manifest.categories).toHaveLength(7);
+    expect(manifest.products).toHaveLength(49);
+    expect(manifest.categories.every((row) => !('name' in row))).toBe(true);
+    expect(manifest.products.every((row) => !('name' in row))).toBe(true);
+    expect(() => assertPublicIdentityInventory(manifest, approvedInventory)).not.toThrow();
+  });
+
+  it('fails closed for duplicate category slugs', () => {
+    const broken = cloneManifest();
+    broken.categories[1]!.slug = broken.categories[0]!.slug;
+    expect(() => validatePublicIdentityManifest(broken)).toThrow(/duplicate category slug/i);
+  });
+
+  it('fails closed for duplicate product slugs', () => {
+    const broken = cloneManifest();
+    broken.products[1]!.slug = broken.products[0]!.slug;
+    expect(() => validatePublicIdentityManifest(broken)).toThrow(/duplicate product slug/i);
+  });
+
+  it('fails closed for malformed UUIDs and slugs', () => {
+    const invalidUuid = cloneManifest();
+    invalidUuid.products[0]!.id = 'not-a-uuid';
+    expect(() => validatePublicIdentityManifest(invalidUuid)).toThrow(/uuid/i);
+
+    const invalidSlug = cloneManifest();
+    invalidSlug.products[0]!.slug = 'Not Valid';
+    expect(() => validatePublicIdentityManifest(invalidSlug)).toThrow(/slug/i);
+  });
+
+  it('fails closed when a product references an unknown category UUID', () => {
+    const broken = cloneManifest();
+    broken.products[0]!.categoryId = '00000000-0000-5000-8000-000000000000';
+    expect(() => validatePublicIdentityManifest(broken)).toThrow(/category/i);
+  });
+
+  it('fails closed when approved inventory gains, loses, or recategorizes a row', () => {
+    expect(() =>
+      assertPublicIdentityInventory(manifest, {
+        ...approvedInventory,
+        products: approvedInventory.products.slice(1),
+      }),
+    ).toThrow(/inventory/i);
+
+    expect(() =>
+      assertPublicIdentityInventory(manifest, {
+        ...approvedInventory,
+        products: approvedInventory.products.map((row, index) =>
+          index === 0 ? { ...row, categoryId: approvedInventory.categoryIds[1]! } : row,
+        ),
+      }),
+    ).toThrow(/inventory/i);
+  });
+});
