@@ -1,23 +1,34 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(
+const migrationSource = readFileSync(
   new URL(
-    '../../../../supabase/migrations/20260907202000_catalog_admin_commands.sql',
+    '../../../../supabase/migrations/20260908058000_catalog_combo_mode_invariant.sql',
     import.meta.url,
   ),
   'utf8',
 );
+const adminSource = readFileSync(
+  new URL('../../../../supabase/functions/catalog-admin/catalogAdmin.ts', import.meta.url),
+  'utf8',
+);
+const storeSource = readFileSync(
+  new URL('../../../../supabase/functions/catalog-admin/index.ts', import.meta.url),
+  'utf8',
+);
 
 describe('catalog combo admin invariant', () => {
-  it('refuses disabling combo mode while beverage-option rows still exist', () => {
-    const productUpdateStart = source.indexOf("elsif v_type = 'product.update' then");
-    const productRetireStart = source.indexOf("elsif v_type = 'product.retire' then");
-    expect(productUpdateStart).toBeGreaterThanOrEqual(0);
-    expect(productRetireStart).toBeGreaterThan(productUpdateStart);
+  it('blocks disabling combo mode while beverage-option rows still exist', () => {
+    expect(migrationSource).toContain('before update of is_combo on public.products');
+    expect(migrationSource).toContain('public.combo_beverage_options');
+    expect(migrationSource).toContain('TUX_COMBO_BEVERAGE_OPTIONS_REQUIRE_COMBO_PRODUCT');
+  });
 
-    const productUpdateBranch = source.slice(productUpdateStart, productRetireStart);
-    expect(productUpdateBranch).toContain('combo_beverage_options');
-    expect(productUpdateBranch).toContain("jsonb_build_object('errorCode', 'command_conflict')");
+  it('reports the blocked admin transition as a command conflict', () => {
+    expect(adminSource).toContain('command.patch.isCombo === false');
+    expect(adminSource).toContain('store.hasComboBeverageOptions');
+    expect(adminSource).toContain("return 'command_conflict'");
+    expect(storeSource).toContain(".from('combo_beverage_options')");
+    expect(storeSource).toContain(".eq('combo_product_id', productId)");
   });
 });
