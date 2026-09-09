@@ -171,6 +171,97 @@ begin
   end if;
 end $$;
 
+-- An explicit Release by an active device must relinquish the durable reservation too.
+-- The next active device then receives a fresh reserved order identity that it owns.
+update public.devices
+set active = true
+where id = '16666666-6666-4666-8666-666666666666'::uuid;
+
+insert into public.online_order_requests(
+  id, shop_id, idempotency_key, request_sha256, catalog_revision, status,
+  fulfillment_preference, payment_preference, customer_name, normalized_phone,
+  delivery_address, trusted_items, items_subtotal_minor, order_note
+) values (
+  '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+  '16111111-1111-4111-8111-111111111111'::uuid,
+  '16dddddf-dddd-4ddd-8ddd-dddddddddddd'::uuid,
+  repeat('e', 64),
+  repeat('f', 64),
+  'PENDING',
+  'PICKUP',
+  'CASH',
+  'Explicit Release Customer',
+  null,
+  null,
+  '[{"productId":"16555555-5555-4555-8555-555555555555","quantity":1}]'::jsonb,
+  19000,
+  null
+);
+
+do $$
+declare
+  v_first_claim jsonb;
+  v_second_claim jsonb;
+  v_first_order_id uuid;
+  v_second_order_id uuid;
+  v_release jsonb;
+  v_reservation_count bigint;
+  v_origin uuid;
+begin
+  v_first_claim := public.claim_tux_online_order_request_v1(
+    '16911111-1111-4111-8111-111111111111'::uuid,
+    '16666666-6666-4666-8666-666666666666'::uuid,
+    '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid
+  );
+  v_first_order_id := (v_first_claim ->> 'processingOrderId')::uuid;
+
+  if v_first_claim ->> 'reservationOriginDeviceId' <> '16666666-6666-4666-8666-666666666666' then
+    raise exception 'initial explicit-release reservation owner is incorrect';
+  end if;
+
+  v_release := public.release_tux_online_order_request_claim_v1(
+    '16911111-1111-4111-8111-111111111111'::uuid,
+    '16666666-6666-4666-8666-666666666666'::uuid,
+    '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid,
+    v_first_order_id
+  );
+  if v_release ->> 'status' <> 'PENDING' then
+    raise exception 'explicit release did not return request to pending';
+  end if;
+
+  select count(*) into v_reservation_count
+  from private.online_order_processing_reservations
+  where request_id = '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid;
+  if v_reservation_count <> 0 then
+    raise exception 'explicit release left a stale durable reservation';
+  end if;
+
+  v_second_claim := public.claim_tux_online_order_request_v1(
+    '16922222-2222-4222-8222-222222222222'::uuid,
+    '16777777-7777-4777-8777-777777777777'::uuid,
+    '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid
+  );
+  v_second_order_id := (v_second_claim ->> 'processingOrderId')::uuid;
+
+  if v_second_claim ->> 'processingDeviceId' <> '16777777-7777-4777-8777-777777777777' then
+    raise exception 'next claimant did not receive the released processing lease';
+  end if;
+  if v_second_claim ->> 'reservationOriginDeviceId' <> '16777777-7777-4777-8777-777777777777' then
+    raise exception 'next claimant did not own the fresh reservation';
+  end if;
+  if v_second_order_id = v_first_order_id then
+    raise exception 'explicit release reused the relinquished order identity';
+  end if;
+
+  select origin_device_id into v_origin
+  from private.online_order_processing_reservations
+  where request_id = '16aaaaac-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid
+    and processing_order_id = v_second_order_id;
+  if v_origin is distinct from '16777777-7777-4777-8777-777777777777'::uuid then
+    raise exception 'fresh reservation ownership was not durable';
+  end if;
+end $$;
+
 rollback;
 `;
 
