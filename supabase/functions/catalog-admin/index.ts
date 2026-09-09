@@ -1,5 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { CATALOG_ERROR_CODES, type CatalogAdminCommandV1, type CatalogErrorCodeV1 } from '../../../packages/catalog-contracts/src/index.ts';
+import {
+  CATALOG_ERROR_CODES,
+  type CatalogAdminCommandV1,
+  type CatalogErrorCodeV1,
+} from '../../../packages/catalog-contracts/src/index.ts';
 import {
   handleCatalogAdminRequest,
   type CatalogAdminDependencies,
@@ -10,15 +14,18 @@ import {
 const IMAGE_BUCKET = 'catalog-product-images';
 
 function unavailable(): Response {
-  return new Response(JSON.stringify({ schemaVersion: 1, error: { code: 'catalog_unavailable' } }), {
-    status: 503,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-      'access-control-allow-origin': '*',
-      'x-content-type-options': 'nosniff',
+  return new Response(
+    JSON.stringify({ schemaVersion: 1, error: { code: 'catalog_unavailable' } }),
+    {
+      status: 503,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'access-control-allow-origin': '*',
+        'x-content-type-options': 'nosniff',
+      },
     },
-  });
+  );
 }
 
 function tableForEntity(entity: CatalogAdminEntity): 'menu_categories' | 'products' | 'modifiers' {
@@ -54,6 +61,16 @@ function createStore(service: SupabaseClient): CatalogAdminStore {
       return data?.shop_id ?? null;
     },
 
+    hasComboBeverageOptions: async (shopId, productId) => {
+      const { count, error } = await service
+        .from('combo_beverage_options')
+        .select('combo_product_id', { count: 'exact', head: true })
+        .eq('shop_id', shopId)
+        .eq('combo_product_id', productId);
+      if (error) throw new Error('combo beverage option lookup failed');
+      return (count ?? 0) > 0;
+    },
+
     applyAtomicCommand: async (userId: string, request: CatalogAdminCommandV1) => {
       const { data, error } = await service.rpc('apply_catalog_admin_command_v1', {
         p_auth_user_id: userId,
@@ -75,10 +92,13 @@ function createStore(service: SupabaseClient): CatalogAdminStore {
     },
 
     createSignedImageUpload: async (imageKey) => {
-      const { data, error } = await service.storage.from(IMAGE_BUCKET).createSignedUploadUrl(imageKey, {
-        upsert: false,
-      });
-      if (error || !data?.signedUrl || !data?.token) throw new Error('signed image upload creation failed');
+      const { data, error } = await service.storage
+        .from(IMAGE_BUCKET)
+        .createSignedUploadUrl(imageKey, {
+          upsert: false,
+        });
+      if (error || !data?.signedUrl || !data?.token)
+        throw new Error('signed image upload creation failed');
       return { signedUrl: data.signedUrl, token: data.token };
     },
 
