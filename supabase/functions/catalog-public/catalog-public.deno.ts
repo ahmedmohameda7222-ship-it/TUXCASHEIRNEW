@@ -50,6 +50,7 @@ function store(overrides: Partial<PublicCatalogStore> = {}): PublicCatalogStore 
         description: null,
         price_minor: 24000,
         image_key: null,
+        merchandising_family: 'TUXIFY',
         best_seller: false,
         active: false,
         sold_out: true,
@@ -66,6 +67,7 @@ function store(overrides: Partial<PublicCatalogStore> = {}): PublicCatalogStore 
         description: 'Single burger',
         price_minor: 19000,
         image_key: `${SHOP_ID}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`,
+        merchandising_family: 'TUX',
         best_seller: true,
         active: true,
         sold_out: false,
@@ -168,6 +170,7 @@ Deno.test('catalog-public fails closed if a store returns a cross-shop row', asy
           description: null,
           price_minor: 19000,
           image_key: null,
+          merchandising_family: 'TUX',
           best_seller: false,
           active: true,
           sold_out: false,
@@ -195,6 +198,8 @@ Deno.test('catalog-public emits deterministic ordering and customer-safe fields 
     products[0]?.id === PRODUCT_A && products[1]?.id === PRODUCT_B,
     'product ordering unstable',
   );
+  assert(products[0]?.family === 'TUX', 'merchandising family lost');
+  assert(products[1]?.family === 'TUXIFY', 'second merchandising family lost');
   assert(
     products[1]?.active === false && products[1]?.soldOut === true,
     'availability semantics lost',
@@ -225,6 +230,7 @@ Deno.test(
               description: 'Single burger',
               price_minor: 19000,
               image_key: null,
+              merchandising_family: 'TUX',
               best_seller: true,
               active: true,
               sold_out: false,
