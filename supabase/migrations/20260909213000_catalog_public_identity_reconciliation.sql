@@ -98,6 +98,12 @@ begin
     return;
   end if;
 
+  -- Freeze both catalog relations so the 7/49 snapshot cannot drift between
+  -- validation and the slug writes. SHARE ROW EXCLUSIVE conflicts with the
+  -- ROW EXCLUSIVE lock taken by ordinary INSERT/UPDATE/DELETE writers while
+  -- still allowing ordinary reads.
+  lock table public.menu_categories, public.products in share row exclusive mode;
+
   select count(*) into v_category_count
   from public.menu_categories
   where shop_id = v_shop_id;
