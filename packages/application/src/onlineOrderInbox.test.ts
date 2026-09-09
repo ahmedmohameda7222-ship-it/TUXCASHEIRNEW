@@ -125,4 +125,37 @@ describe('OperationsOnlineOrderInboxService', () => {
     );
     expect(await store.list(SHOP_ID)).toEqual([]);
   });
+
+  it('does not overwrite a local release with a PROCESSING snapshot fetched before the release', async () => {
+    const store = new MemoryStore();
+    const processing = request('PROCESSING');
+    const released = request('PENDING');
+    await store.upsertMany([processing]);
+
+    let resolveFetch!: (value: unknown) => void;
+    const remote = {
+      fetchActiveRequests: vi.fn().mockImplementation(
+        () =>
+          new Promise<unknown>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+      claim: vi.fn(),
+      release: vi.fn(),
+      reject: vi.fn(),
+    };
+    const service = new OperationsOnlineOrderInboxService({
+      getActiveShopId: vi.fn().mockResolvedValue(SHOP_ID),
+      store,
+      remote,
+    });
+
+    const load = service.load();
+    await vi.waitFor(() => expect(remote.fetchActiveRequests).toHaveBeenCalledOnce());
+    await store.upsertMany([released]);
+    resolveFetch({ schemaVersion: 1, requests: [processing] });
+
+    await expect(load).resolves.toMatchObject({ requests: [released], syncState: 'SYNCED' });
+    expect(await store.list(SHOP_ID)).toEqual([released]);
+  });
 });
