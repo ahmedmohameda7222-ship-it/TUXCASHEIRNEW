@@ -10,4 +10,15 @@ describe('persisted combo checkout authority', () => {
     expect(source).toContain('currentProduct?.is_combo');
     expect(source).toContain('options.length === 0');
   });
+
+  it('reprices persisted cart lines from current canonical product and extra prices before display', () => {
+    const source = readFileSync(new URL('./CartDrawer.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('extrasByProduct');
+    expect(source).toContain('canonicalUnitPrice');
+    expect(source).toContain('canonicalCartTotal');
+    expect(source).toContain('currentProduct.price');
+    expect(source).toContain('currentExtra.price');
+    expect(source).not.toContain('totalPrice,');
+  });
 });
