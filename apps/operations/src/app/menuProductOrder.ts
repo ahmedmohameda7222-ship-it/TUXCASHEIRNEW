@@ -21,7 +21,7 @@ function productOrderMutation(
     configurable: false,
     writable: false,
   });
-  return mutation as ProductOrderMutation;
+  return mutation as unknown as ProductOrderMutation;
 }
 
 export function productOrderMutationSource(order: readonly ProductId[]): ProductId | null {
