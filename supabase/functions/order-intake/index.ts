@@ -192,6 +192,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       shop_id: recordToInsert.shopId,
       idempotency_key: recordToInsert.idempotencyKey,
       request_sha256: recordToInsert.requestSha256,
+      source_fingerprint: recordToInsert.sourceFingerprint,
       catalog_revision: recordToInsert.catalogRevision,
       status: recordToInsert.status,
       fulfillment_preference: recordToInsert.fulfillmentPreference,
