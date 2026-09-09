@@ -115,7 +115,7 @@ describe('browser online-order inbox snapshot reconciliation', () => {
     };
 
     const synchronization = syncOnlineOrderInboxSnapshot({ shopId: SHOP_ID, store, remote });
-    expect(remote.fetchActiveRequests).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(remote.fetchActiveRequests).toHaveBeenCalledOnce());
 
     await store.upsertMany([released]);
     resolveFetch({ schemaVersion: 1, requests: [processing] });
