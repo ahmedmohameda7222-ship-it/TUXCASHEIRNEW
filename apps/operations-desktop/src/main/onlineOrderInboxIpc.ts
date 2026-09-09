@@ -266,11 +266,10 @@ export class OnlineOrderInboxIpcRuntime {
       assertTrustedIpcSender(event, window.webContents.id);
       const input = objectPayload(rawInput, 'Online-order acceptance');
       exactKeys(input, ['requestId', 'confirmation'], 'Online-order acceptance');
-      if (
-        this.#acceptance === null ||
-        this.#acceptanceStore === null ||
-        this.#getActiveShopId === null
-      ) {
+      const acceptance = this.#acceptance;
+      const acceptanceStore = this.#acceptanceStore;
+      const getActiveShopId = this.#getActiveShopId;
+      if (acceptance === null || acceptanceStore === null || getActiveShopId === null) {
         throw new Error('Online-order acceptance service is not configured.');
       }
       const requestId = uuid(input['requestId'], 'Online-order request ID');
@@ -279,8 +278,8 @@ export class OnlineOrderInboxIpcRuntime {
         if (await this.#reconcileAcceptedOrders(requestId)) {
           throw new Error('Online order has already been accepted locally.');
         }
-        const shopId = await this.#getActiveShopId!();
-        const request = await this.#acceptanceStore!.get(shopId, requestId);
+        const shopId = await getActiveShopId();
+        const request = await acceptanceStore.get(shopId, requestId);
         if (
           request === null ||
           request.status !== 'PROCESSING' ||
@@ -288,13 +287,9 @@ export class OnlineOrderInboxIpcRuntime {
         ) {
           throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
         }
-        const result = await this.#acceptance!.accept(request, confirmation);
+        const result = await acceptance.accept(request, confirmation);
         if (result.ok) {
-          await this.#acceptanceStore!.markAccepted(
-            shopId,
-            requestId,
-            request.processingOrderId,
-          );
+          await acceptanceStore.markAccepted(shopId, requestId, request.processingOrderId);
         }
         return result;
       });
