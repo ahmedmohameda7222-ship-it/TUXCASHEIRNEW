@@ -33,16 +33,22 @@ begin
     return new;
   end if;
 
-  -- Unreviewed anonymous requests cannot consume intake capacity forever. Claimed
-  -- PROCESSING requests are intentionally excluded because Operations owns that lifecycle.
-  update public.online_order_requests
+  -- Unreviewed anonymous requests cannot consume intake capacity forever. A durable
+  -- processing reservation means Operations may already have committed acceptance locally,
+  -- so that request must remain available for delayed materialization even after lease expiry.
+  update public.online_order_requests as online_order_requests
   set status = 'REJECTED',
       rejection_reason = 'INTAKE_EXPIRED_UNREVIEWED',
       resolved_at = v_now,
       updated_at = v_now
   where shop_id = new.shop_id
     and status = 'PENDING'
-    and created_at < v_now - interval '6 hours';
+    and created_at < v_now - interval '6 hours'
+    and not exists (
+      select 1
+      from private.online_order_processing_reservations reservation
+      where reservation.request_id = online_order_requests.id
+    );
 
   -- Public intake always supplies a gateway-derived fingerprint. Null remains tolerated
   -- for privileged migration/test/backfill paths that are not reachable by anonymous callers.
