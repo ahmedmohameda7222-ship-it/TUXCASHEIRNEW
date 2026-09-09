@@ -16,7 +16,10 @@ describe('canonical Menu category route reconciliation', () => {
     });
   });
 
-  it.each(['hawawshi', 'fries', 'combos', 'drinks'])('keeps %s as a normal canonical category route', (slug) => {
-    expect(resolveCanonicalCategoryRoute(slug)).toEqual({ categorySlug: slug, family: null });
-  });
+  it.each(['hawawshi', 'fries', 'combos', 'drinks'])(
+    'keeps %s as a normal canonical category route',
+    (slug) => {
+      expect(resolveCanonicalCategoryRoute(slug)).toEqual({ categorySlug: slug, family: null });
+    },
+  );
 });
