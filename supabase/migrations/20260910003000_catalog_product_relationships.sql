@@ -83,13 +83,13 @@ BEGIN
   -- The validation snapshot and the inserts must see one stable catalog state.
   LOCK TABLE public.menu_categories, public.products, public.modifiers, public.product_modifiers, public.combo_beverage_options IN SHARE ROW EXCLUSIVE MODE;
 
-  -- Clean migration-chain databases do not contain the production shop. The
-  -- data reconciliation is intentionally a no-op there while the schema chain
-  -- still validates the SQL.
+  -- This is production data, not schema seed data. Clean/local databases that
+  -- do not contain the canonical production shop intentionally no-op. If the
+  -- shop exists, every catalog and relationship fence below must run.
   IF NOT EXISTS (
     SELECT 1
-    FROM public.menu_categories
-    WHERE shop_id = v_shop_id
+    FROM public.shops
+    WHERE id = v_shop_id
   ) THEN
     RETURN;
   END IF;
