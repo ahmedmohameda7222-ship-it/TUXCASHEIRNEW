@@ -19,7 +19,6 @@ as $$
 declare
   v_now timestamptz := now();
   v_source_recent_count bigint;
-  v_shop_recent_count bigint;
 begin
   perform pg_advisory_xact_lock(
     hashtext('tux-online-order-intake:' || new.shop_id::text)
@@ -45,28 +44,19 @@ begin
     and status = 'PENDING'
     and created_at < v_now - interval '6 hours';
 
-  if new.source_fingerprint is null then
-    raise exception 'TUX_ONLINE_ORDER_INTAKE_SOURCE_RATE_LIMITED';
-  end if;
+  -- Public intake always supplies a gateway-derived fingerprint. Null remains tolerated
+  -- for privileged migration/test/backfill paths that are not reachable by anonymous callers.
+  if new.source_fingerprint is not null then
+    select count(*)
+    into v_source_recent_count
+    from public.online_order_requests
+    where shop_id = new.shop_id
+      and source_fingerprint = new.source_fingerprint
+      and created_at >= v_now - interval '5 minutes';
 
-  select count(*)
-  into v_source_recent_count
-  from public.online_order_requests
-  where shop_id = new.shop_id
-    and source_fingerprint = new.source_fingerprint
-    and created_at >= v_now - interval '5 minutes';
-
-  select count(*)
-  into v_shop_recent_count
-  from public.online_order_requests
-  where shop_id = new.shop_id
-    and created_at >= v_now - interval '1 minute';
-
-  if v_source_recent_count >= 20 then
-    raise exception 'TUX_ONLINE_ORDER_INTAKE_SOURCE_RATE_LIMITED';
-  end if;
-  if v_shop_recent_count >= 60 then
-    raise exception 'TUX_ONLINE_ORDER_INTAKE_CAPACITY_EXCEEDED';
+    if v_source_recent_count >= 20 then
+      raise exception 'TUX_ONLINE_ORDER_INTAKE_SOURCE_RATE_LIMITED';
+    end if;
   end if;
 
   return new;
