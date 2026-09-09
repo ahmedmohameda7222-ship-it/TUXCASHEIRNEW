@@ -201,6 +201,27 @@ function extrasSnapshot(): PublicCatalogSnapshotV1 {
   } as unknown as PublicCatalogSnapshotV1;
 }
 
+describe('canonical Menu merchandising family projection', () => {
+  it('preserves product family for customer-facing family routes', () => {
+    const base = snapshot({
+      colaActive: true,
+      colaSoldOut: false,
+      waterActive: true,
+      waterSoldOut: false,
+    });
+    const withFamily = {
+      ...base,
+      products: base.products.map((product, index) => ({
+        ...product,
+        family: index === 0 ? 'TUX' : null,
+      })),
+    } as unknown as PublicCatalogSnapshotV1;
+
+    const projection = projectPublicCatalog(withFamily);
+    expect((projection.products[0] as unknown as { family?: string | null }).family).toBe('TUX');
+  });
+});
+
 describe('canonical Menu combo availability projection', () => {
   it('offers only currently customer-available configured beverages', () => {
     const projection = projectPublicCatalog(
