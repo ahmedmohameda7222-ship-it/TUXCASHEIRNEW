@@ -36,6 +36,7 @@ const MUTATION_CHANNELS = [
 ] as const;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OPEN_INBOX_REFRESH_INTERVAL_MS = 15_000;
 
 type OnlineOrderInboxService = Pick<
   OperationsOnlineOrderInboxService,
@@ -164,6 +165,8 @@ export class OnlineOrderInboxIpcRuntime {
   readonly #findCommittedOnlineOrder: FindCommittedOnlineOrder | null;
   readonly #mutations = new OnlineOrderMutationLock();
   #unsubscribe: (() => void) | null = null;
+  #refreshTimer: ReturnType<typeof setInterval> | null = null;
+  #refreshInFlight = false;
 
   constructor(input: {
     readonly service: OnlineOrderInboxService;
@@ -208,6 +211,20 @@ export class OnlineOrderInboxIpcRuntime {
       }
     }
     return reconciled;
+  }
+
+  async #refresh(window: BrowserWindow): Promise<void> {
+    if (window.isDestroyed() || this.#refreshInFlight) return;
+    this.#refreshInFlight = true;
+    try {
+      await this.#reconcileAcceptedOrders();
+      await this.#service.load();
+    } catch {
+      // The inbox service publishes its cached/unavailable state for remote failures.
+      // Session teardown or window shutdown can still reject before that boundary.
+    } finally {
+      this.#refreshInFlight = false;
+    }
   }
 
   register(window: BrowserWindow): void {
@@ -299,11 +316,19 @@ export class OnlineOrderInboxIpcRuntime {
       if (window.isDestroyed()) return;
       window.webContents.send(IPC_ONLINE_ORDERS_CHANGED, snapshot);
     });
+    this.#refreshTimer = setInterval(() => {
+      void this.#refresh(window);
+    }, OPEN_INBOX_REFRESH_INTERVAL_MS);
   }
 
   close(): void {
     for (const channel of MUTATION_CHANNELS) ipcMain.removeHandler(channel);
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    if (this.#refreshTimer !== null) {
+      clearInterval(this.#refreshTimer);
+      this.#refreshTimer = null;
+    }
+    this.#refreshInFlight = false;
   }
 }
