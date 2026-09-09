@@ -1,5 +1,6 @@
 -- Preserve existing canonical product family metadata through the customer-safe public catalog read.
 -- This changes transport projection only; it does not mutate catalog rows or create a second authority.
+-- Keep the standalone modifier identity introduced by 20260908051000 intact.
 
 create or replace function public.read_catalog_public_v1(p_shop_id uuid)
 returns jsonb
@@ -56,6 +57,7 @@ as $$
             'shop_id', m.shop_id,
             'name', m.name,
             'price_minor', m.price_minor,
+            'standalone_product_id', m.standalone_product_id,
             'active', m.active,
             'sort_order', m.sort_order
           ) order by m.sort_order, m.id
