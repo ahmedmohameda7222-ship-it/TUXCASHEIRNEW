@@ -201,7 +201,11 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
         }
         const result = await acceptanceClient().accept(trusted, confirmation);
         if (result.ok) {
-          await store.markAccepted(state.value.shopId, trusted.requestId, trusted.processingOrderId);
+          await store.markAccepted(
+            state.value.shopId,
+            trusted.requestId,
+            trusted.processingOrderId,
+          );
         }
         return result;
       });
