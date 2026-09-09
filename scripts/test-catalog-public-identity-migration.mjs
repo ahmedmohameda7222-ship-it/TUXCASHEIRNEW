@@ -62,7 +62,7 @@ for (const statement of updateStatements) {
   assert.match(setClause, /\bslug\s*=/i, 'catalog UPDATE must assign slug');
   assert.doesNotMatch(
     setClause,
-    /\b(?:name|description|price_minor|category_id|sort_order|active|sold_out|family|is_combo|best_seller|image_key)\s*=/i,
+    /\b(?:name|description|price_minor|category_id|sort_order|active|sold_out|family|is_combo|best_seller|image_key|updated_at)\s*=/i,
     'migration must not mutate protected business fields',
   );
 }
