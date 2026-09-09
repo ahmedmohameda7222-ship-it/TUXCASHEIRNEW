@@ -79,7 +79,7 @@ export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuPro
       image_url: product.imageUrl ?? undefined,
       image_path: undefined,
       is_best_seller: product.bestSeller,
-      is_active: product.active && !product.soldOut,
+      is_active: product.active && !product.soldOut && activeCategoryIds.has(product.categoryId),
       is_sold_out: product.soldOut,
       is_combo: product.isCombo,
       sort_order: product.sortOrder,
