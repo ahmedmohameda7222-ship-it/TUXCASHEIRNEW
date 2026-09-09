@@ -119,15 +119,11 @@ function snapshot(): PublicCatalogSnapshotV1 {
 describe('canonical Menu inactive-category authority for derived choices', () => {
   it('does not expose products, extras, or combo beverages whose category is inactive', () => {
     const projection = projectPublicCatalog(snapshot());
+    const hiddenExtra = projection.products.find((product) => product.id === EXTRA_PRODUCT_ID);
+    const hiddenBeverage = projection.products.find((product) => product.id === BEVERAGE_ID);
 
-    expect(
-      projection.products.find((product) => product.id === EXTRA_PRODUCT_ID)
-        ?.is_active,
-    ).toBe(false);
-    expect(
-      projection.products.find((product) => product.id === BEVERAGE_ID)
-        ?.is_active,
-    ).toBe(false);
+    expect(hiddenExtra?.is_active).toBe(false);
+    expect(hiddenBeverage?.is_active).toBe(false);
     expect(projection.extrasByProduct[BASE_PRODUCT_ID] ?? []).toEqual([]);
     expect(projection.comboBeveragesByProduct[COMBO_ID] ?? []).toEqual([]);
     expect(projection.products.find((product) => product.id === COMBO_ID)?.is_active).toBe(false);
