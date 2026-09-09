@@ -6,6 +6,29 @@ import {
   type WorkerMenuLayout,
 } from '@tux/domain';
 
+interface ProductOrderMutation extends ReadonlyArray<ProductId> {
+  readonly sourceProductId: ProductId;
+}
+
+function productOrderMutation(
+  order: readonly ProductId[],
+  sourceProductId: ProductId,
+): ProductOrderMutation {
+  const mutation = [...order];
+  Object.defineProperty(mutation, 'sourceProductId', {
+    value: sourceProductId,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  return mutation as ProductOrderMutation;
+}
+
+export function productOrderMutationSource(order: readonly ProductId[]): ProductId | null {
+  const sourceProductId = (order as Partial<ProductOrderMutation>).sourceProductId;
+  return sourceProductId ?? null;
+}
+
 export function reconcileProductOrder(
   products: readonly Product[],
   layout: WorkerMenuLayout | null,
@@ -60,12 +83,13 @@ export function moveProductWithinCategory(
   reorderedCategory.splice(targetIndex, 0, moved);
 
   let categoryIndex = 0;
-  return order.map((productId) => {
+  const reordered = order.map((productId) => {
     if (!categorySet.has(productId)) return productId;
     const replacement = reorderedCategory[categoryIndex];
     categoryIndex += 1;
     return replacement ?? productId;
   });
+  return productOrderMutation(reordered, sourceId);
 }
 
 export function swapProductWithinCategory(
