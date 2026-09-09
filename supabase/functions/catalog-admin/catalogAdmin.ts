@@ -16,7 +16,7 @@ export interface CatalogAdminStore {
     shopId: string,
   ) => Promise<{ readonly role: CatalogAdminRole; readonly active: boolean } | null>;
   readonly getEntityShop: (entity: CatalogAdminEntity, id: string) => Promise<string | null>;
-  readonly hasComboBeverageOptions: (shopId: string, productId: string) => Promise<boolean>;
+  readonly hasComboBeverageOptions?: (shopId: string, productId: string) => Promise<boolean>;
   readonly applyAtomicCommand: (
     userId: string,
     request: CatalogAdminCommandV1,
@@ -154,6 +154,7 @@ async function preflightCommand(
       if (product) return product;
       if (
         command.patch.isCombo === false &&
+        store.hasComboBeverageOptions !== undefined &&
         (await store.hasComboBeverageOptions(shopId, command.productId))
       ) {
         return 'command_conflict';
