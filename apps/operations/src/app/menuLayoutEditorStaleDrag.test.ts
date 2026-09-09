@@ -76,14 +76,11 @@ describe('menu layout stale drag fencing', () => {
       categoryId,
     });
 
-    const afterStaleProductAReorder = menuLayoutEditorReducer(
-      state,
-      {
-        type: 'SET_PRODUCT_ORDER',
-        productId: productA,
-        productOrder: [productA, productB, productC],
-      } as never,
-    );
+    const afterStaleProductAReorder = menuLayoutEditorReducer(state, {
+      type: 'SET_PRODUCT_ORDER',
+      productId: productA,
+      productOrder: [productA, productB, productC],
+    } as never);
 
     expect(afterStaleProductAReorder.draft?.productOrder).toEqual(persistedBase.productOrder);
     expect(afterStaleProductAReorder.interaction).toMatchObject({
