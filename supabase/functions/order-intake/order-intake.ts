@@ -7,6 +7,7 @@ import { normalizeEgyptianPhone } from '../../../packages/domain/src/phone.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const INTAKE_CAPACITY_ERROR = 'TUX_ONLINE_ORDER_INTAKE_CAPACITY_EXCEEDED';
+const INTAKE_SOURCE_RATE_ERROR = 'TUX_ONLINE_ORDER_INTAKE_SOURCE_RATE_LIMITED';
 
 export interface OnlineOrderCatalogCategory {
   id: string;
@@ -67,6 +68,7 @@ export interface OnlineOrderPendingInsert {
   shopId: string;
   idempotencyKey: string;
   requestSha256: string;
+  sourceFingerprint: string;
   catalogRevision: string;
   status: 'PENDING';
   fulfillmentPreference: 'DELIVERY' | 'PICKUP';
@@ -118,14 +120,29 @@ function errorMessage(error: unknown): string {
   return '';
 }
 
-function isIntakeCapacityError(error: unknown): boolean {
-  return errorMessage(error).includes(INTAKE_CAPACITY_ERROR);
+function isIntakeRateLimitError(error: unknown): boolean {
+  const message = errorMessage(error);
+  return message.includes(INTAKE_CAPACITY_ERROR) || message.includes(INTAKE_SOURCE_RATE_ERROR);
 }
 
 async function sha256Hex(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sourceFingerprint(httpRequest: Request): Promise<string> {
+  const forwardedFor = httpRequest.headers.get('x-forwarded-for');
+  const forwardedChain = (forwardedFor ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const gatewayAddress =
+    forwardedChain.at(-1) ??
+    httpRequest.headers.get('cf-connecting-ip')?.trim() ??
+    httpRequest.headers.get('x-real-ip')?.trim() ??
+    'gateway-address-unavailable';
+  return sha256Hex({ gatewayAddress });
 }
 
 function assertTrustedMoney(value: number, label: string): void {
@@ -256,6 +273,12 @@ function buildTrustedItems(
       const modifier = modifiers.get(selection.modifierId);
       const link = links.get(`${item.productId}:${selection.modifierId}`);
       if (!modifier || !modifier.active || !link) return errorResponse(400, 'invalid_selection');
+      if (
+        modifier.standaloneProductId !== null &&
+        !productAvailable(products.get(modifier.standaloneProductId))
+      ) {
+        return errorResponse(409, 'item_unavailable');
+      }
       if (link.maxQuantity !== null && selection.quantity > link.maxQuantity) {
         return errorResponse(400, 'invalid_selection');
       }
@@ -378,6 +401,7 @@ export async function handleOrderIntakeRequest(
   }
 
   const requestSha256 = await sha256Hex(canonicalRequest(parsed, normalizedPhone));
+  const requestSourceFingerprint = await sourceFingerprint(httpRequest);
   try {
     const existing = await store.findByIdempotency(parsed.shopId, parsed.idempotencyKey);
     if (existing) {
@@ -402,6 +426,7 @@ export async function handleOrderIntakeRequest(
       shopId: parsed.shopId,
       idempotencyKey: parsed.idempotencyKey,
       requestSha256,
+      sourceFingerprint: requestSourceFingerprint,
       catalogRevision,
       status: 'PENDING',
       fulfillmentPreference: parsed.fulfillmentPreference,
@@ -418,7 +443,7 @@ export async function handleOrderIntakeRequest(
     try {
       await store.insertPending(record);
     } catch (error) {
-      if (isIntakeCapacityError(error)) {
+      if (isIntakeRateLimitError(error)) {
         return errorResponse(429, 'intake_rate_limited');
       }
       const raced = await store.findByIdempotency(parsed.shopId, parsed.idempotencyKey);
