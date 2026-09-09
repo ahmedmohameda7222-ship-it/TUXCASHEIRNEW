@@ -466,7 +466,10 @@ export function menuLayoutEditorReducer(
         ...resolved,
         draft: {
           ...pickupDraft,
-          productOrder: productOrderForPickup(pickupDraft.productOrder, pickupToken),
+          productOrder: productOrderForPickup(
+            pickupDraft.productOrder,
+            pickupToken,
+          ),
         },
         interaction: {
           type: 'PRODUCT_PICKUP',
@@ -475,7 +478,10 @@ export function menuLayoutEditorReducer(
           pickupToken,
           snapshot: {
             ...pickupSnapshot,
-            productOrder: productOrderForPickup(pickupSnapshot.productOrder, pickupToken),
+            productOrder: productOrderForPickup(
+              pickupSnapshot.productOrder,
+              pickupToken,
+            ),
           },
         },
       };
