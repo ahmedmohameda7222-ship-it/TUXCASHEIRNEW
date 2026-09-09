@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { OnlineOrderAcceptanceConfirmation, OrdersWorkspace } from '@tux/application';
+import {
+  OnlineOrderMutationLock,
+  type OnlineOrderAcceptanceConfirmation,
+  type OrdersWorkspace,
+} from '@tux/application';
 import { moneyMinor, type MoneyMinor } from '@tux/domain';
 import type { CachedOnlineOrderRequest } from '@tux/persistence';
 import { IndexedDbOnlineOrderInboxStore } from '@tux/persistence/browser';
@@ -41,6 +45,7 @@ export type OperationsOnlineOrderInboxClient = OnlineOrderInboxRuntimeClient &
 let browserStorePromise: Promise<IndexedDbOnlineOrderInboxStore> | null = null;
 let browserClientPromise: Promise<OnlineOrderInboxRuntimeClient> | null = null;
 let browserAcceptanceClient: OnlineOrderAcceptanceClient | null = null;
+const browserOnlineOrderMutations = new OnlineOrderMutationLock();
 
 function money(minor: number): string {
   const value = Math.abs(minor);
@@ -158,39 +163,45 @@ export function createOperationsOnlineOrderInboxClient(): OperationsOnlineOrderI
       await reconcileBrowserAcceptedOrders();
       return (await browserOnlineOrderInboxClient()).load();
     },
-    claim: async (requestId) => (await browserOnlineOrderInboxClient()).claim(requestId),
-    release: async (requestId, processingOrderId) => {
-      const reconciled = await reconcileBrowserAcceptedOrders(requestId);
-      if (reconciled) throw new Error('Online order has already been accepted locally.');
-      return (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId);
-    },
-    reject: async (requestId, processingOrderId, reason) => {
-      const reconciled = await reconcileBrowserAcceptedOrders(requestId);
-      if (reconciled) throw new Error('Online order has already been accepted locally.');
-      return (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason);
-    },
-    accept: async (request, confirmation) => {
-      const reconciled = await reconcileBrowserAcceptedOrders(request.requestId);
-      if (reconciled) throw new Error('Online order has already been accepted locally.');
-      const store = await browserOnlineOrderInboxStore();
-      const state = await createOperationsSessionClient().getState();
-      if (!state.ok || state.value.status !== 'ACTIVE') {
-        throw new Error('Active worker session required for online-order acceptance.');
-      }
-      const trusted = await store.get(state.value.shopId, request.requestId);
-      if (
-        trusted === null ||
-        trusted.status !== 'PROCESSING' ||
-        trusted.processingOrderId === null
-      ) {
-        throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
-      }
-      const result = await acceptanceClient().accept(trusted, confirmation);
-      if (result.ok) {
-        await store.markAccepted(state.value.shopId, trusted.requestId, trusted.processingOrderId);
-      }
-      return result;
-    },
+    claim: async (requestId) =>
+      browserOnlineOrderMutations.run(requestId, async () =>
+        (await browserOnlineOrderInboxClient()).claim(requestId),
+      ),
+    release: async (requestId, processingOrderId) =>
+      browserOnlineOrderMutations.run(requestId, async () => {
+        const reconciled = await reconcileBrowserAcceptedOrders(requestId);
+        if (reconciled) throw new Error('Online order has already been accepted locally.');
+        return (await browserOnlineOrderInboxClient()).release(requestId, processingOrderId);
+      }),
+    reject: async (requestId, processingOrderId, reason) =>
+      browserOnlineOrderMutations.run(requestId, async () => {
+        const reconciled = await reconcileBrowserAcceptedOrders(requestId);
+        if (reconciled) throw new Error('Online order has already been accepted locally.');
+        return (await browserOnlineOrderInboxClient()).reject(requestId, processingOrderId, reason);
+      }),
+    accept: async (request, confirmation) =>
+      browserOnlineOrderMutations.run(request.requestId, async () => {
+        const reconciled = await reconcileBrowserAcceptedOrders(request.requestId);
+        if (reconciled) throw new Error('Online order has already been accepted locally.');
+        const store = await browserOnlineOrderInboxStore();
+        const state = await createOperationsSessionClient().getState();
+        if (!state.ok || state.value.status !== 'ACTIVE') {
+          throw new Error('Active worker session required for online-order acceptance.');
+        }
+        const trusted = await store.get(state.value.shopId, request.requestId);
+        if (
+          trusted === null ||
+          trusted.status !== 'PROCESSING' ||
+          trusted.processingOrderId === null
+        ) {
+          throw new Error('A trusted PROCESSING online-order claim is required before acceptance.');
+        }
+        const result = await acceptanceClient().accept(trusted, confirmation);
+        if (result.ok) {
+          await store.markAccepted(state.value.shopId, trusted.requestId, trusted.processingOrderId);
+        }
+        return result;
+      }),
     subscribe: (listener) => {
       let active = true;
       let unsubscribe = (): void => undefined;
