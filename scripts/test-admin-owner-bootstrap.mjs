@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const cliPath = 'scripts/bootstrap-admin-owner.mjs';
+const businessMigrationPath = 'supabase/migrations/20260910100000_admin_business_auth.sql';
 const migrationPath = 'supabase/migrations/20260910100100_admin_owner_bootstrap.sql';
 const cli = readFileSync(cliPath, 'utf8');
 const sql = readFileSync(migrationPath, 'utf8').toLowerCase();
@@ -43,11 +44,30 @@ if (/\b(?:pin|defaultPin|ownerPin)\s*=\s*['"]\d{4,12}['"]/i.test(cli)) {
   throw new Error('bootstrap CLI must not contain a literal/default production PIN');
 }
 
+function runPsql(databaseUrl, args, failureMessage) {
+  const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout ?? '');
+    process.stderr.write(result.stderr ?? '');
+    throw new Error(`${failureMessage} with exit code ${result.status ?? 'unknown'}.`);
+  }
+}
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) {
   const url = new URL(databaseUrl);
   if (!new Set(['127.0.0.1', 'localhost', '::1']).has(url.hostname)) {
     throw new Error('OWNER bootstrap DB test refuses non-loopback PostgreSQL.');
+  }
+
+  // Keep this behavioral test independent from earlier migration tests. Some repository
+  // migration fixtures intentionally rebuild the database only through their own target
+  // migration, so the Admin bootstrap prerequisites must be established here explicitly.
+  for (const requiredMigration of [businessMigrationPath, migrationPath]) {
+    runPsql(databaseUrl, ['-f', requiredMigration], `Failed applying ${requiredMigration}`);
   }
 
   const lookupOne = '1'.repeat(64);
@@ -113,16 +133,7 @@ if (databaseUrl) {
     end $$;
   `;
 
-  const result = spawnSync(
-    'psql',
-    [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-c', statement],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
-  if (result.status !== 0) {
-    process.stderr.write(result.stdout ?? '');
-    process.stderr.write(result.stderr ?? '');
-    throw new Error(`OWNER bootstrap DB assertions failed with exit code ${result.status ?? 'unknown'}.`);
-  }
+  runPsql(databaseUrl, ['-c', statement], 'OWNER bootstrap DB assertions failed');
 }
 
 console.log('Admin OWNER bootstrap invariants passed.');
