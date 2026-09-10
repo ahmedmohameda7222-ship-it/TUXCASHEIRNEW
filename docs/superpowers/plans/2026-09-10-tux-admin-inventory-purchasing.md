@@ -4,7 +4,7 @@
 
 **Goal:** Extend the current inventory foundation into a trustworthy stock ledger, recipe/cost engine, stocktake/transfer/waste workflow, par/reorder intelligence, and complete supplier/purchasing/receiving flow.
 
-**Architecture:** Preserve `inventory_items` and `recipe_lines`, then add ledger/reservation/cost projections around them. All stock-affecting commands execute through transactional RPCs and create immutable movements; current quantity is a projection, not manually rewritten history. Purchasing feeds weighted-average cost and inventory value without immediately becoming COGS.
+**Architecture:** Preserve `inventory_items`, `recipe_lines`, and the existing `inventory_movements` ledger, then extend the current ledger additively and add reservation/cost projections around it. All stock-affecting commands execute through transactional RPCs and create immutable movements; current quantity is a projection, not manually rewritten history. Purchasing feeds weighted-average cost and inventory value without immediately becoming COGS.
 
 **Tech Stack:** PostgreSQL/Supabase RPCs, TypeScript Admin BFF, React/TanStack Query, Vitest, migration tests, Playwright.
 
@@ -18,6 +18,7 @@
 - ACTIVE accepted orders reserve; DONE consumes; CANCELLED releases; RETURNED never automatically restores consumed food stock.
 - Existing Operations currently posts `ORDER_CONSUMPTION` during `OperationsOrdersService.placeOrder`; this plan deliberately migrates that behavior to reservation-at-ACTIVE and consumption-at-DONE while preserving idempotency and existing order history.
 - Existing Operations `undoDone` remains supported: undoing DONE back to ACTIVE must reverse the new consumption event and restore the reservation atomically rather than creating free stock.
+- The existing `public.inventory_movements` table is authoritative history. Never recreate, drop, rename, truncate, or rewrite it; preserve all existing rows, legacy columns, legacy movement types, tenant constraints, indexes, idempotency behavior, and Operations/sync compatibility while extending it additively.
 - Weighted-average cost is shop-specific and historical order cost basis remains stable.
 - Transfers preserve source cost and require send/receive state transitions.
 - Stocktake posts auditable adjustment movements against a consistent snapshot.
@@ -25,7 +26,7 @@
 
 ---
 
-### Task 1: Add inventory ledger, reservations, units, costing, stocktake, and transfer schema
+### Task 1: Extend inventory ledger and add reservations, units, costing, stocktake, and transfer schema
 
 **Files:**
 - Create: `supabase/migrations/20260910130000_admin_inventory_ledger.sql`
@@ -33,7 +34,8 @@
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces tables: `inventory_unit_conversions`, `inventory_movements`, `inventory_reservations`, `inventory_cost_state`, `stocktakes`, `stocktake_lines`, `stock_transfers`, `stock_transfer_lines`.
+- Extends existing table: `inventory_movements`.
+- Produces tables: `inventory_unit_conversions`, `inventory_reservations`, `inventory_cost_state`, `stocktakes`, `stocktake_lines`, `stock_transfers`, `stock_transfer_lines`.
 - Produces RPCs: `reserve_inventory_for_order_v1`, `consume_inventory_for_order_v1`, `restore_order_reservation_v1`, `release_inventory_for_order_v1`, `post_inventory_adjustment_v1`, `post_stocktake_v1`, `send_stock_transfer_v1`, `receive_stock_transfer_v1`.
 
 - [ ] **Step 1: Write the failing migration invariant test**
@@ -44,7 +46,26 @@ const sql = fs.readFileSync('supabase/migrations/20260910130000_admin_inventory_
 for (const name of ['inventory_movements','inventory_reservations','inventory_cost_state','stocktakes','stock_transfers','reserve_inventory_for_order_v1']) {
   if (!sql.includes(name)) throw new Error(`missing ${name}`);
 }
+if (/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.inventory_movements\b/.test(sql)) {
+  throw new Error('existing inventory_movements must be extended, not recreated');
+}
+for (const legacy of [
+  'order_consumption',
+  'cancel_restock',
+  'bulk_unit_finished',
+  'bulk_stock_received',
+  'undo_bulk_unit_finished',
+  'undo_bulk_stock_received',
+  'admin_adjustment',
+]) {
+  if (!sql.includes(legacy)) throw new Error(`legacy movement type must remain valid: ${legacy}`);
+}
+if (!sql.includes('alter table public.inventory_movements')) {
+  throw new Error('migration must alter the existing inventory ledger additively');
+}
 ```
+
+Extend the executable migration-chain test to seed at least one legacy `inventory_movements` row before this migration, apply the migration, and prove that the row, its identifiers, quantity, worker/order linkage, and legacy `movement_type` survive unchanged. The same test must prove the new movement types/RPCs work without changing the canonical shop or breaking existing Operations reads.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -54,27 +75,13 @@ node scripts/test-admin-inventory-ledger-migration.mjs
 
 Expected: ENOENT before migration creation.
 
-- [ ] **Step 3: Implement ledger-first schema and transactional RPCs**
+- [ ] **Step 3: Extend the existing ledger in place and implement transactional RPCs**
 
-```sql
-create table public.inventory_movements (
-  id uuid primary key default gen_random_uuid(),
-  shop_id uuid not null references public.shops(id),
-  inventory_item_id uuid not null references public.inventory_items(id),
-  movement_type text not null check (movement_type in ('OPENING','RECEIVING','RESERVE','RELEASE','CONSUME','CONSUME_REVERSED','WASTE','ADJUSTMENT','TRANSFER_OUT','TRANSFER_IN','STOCKTAKE','PURCHASE_RETURN')),
-  quantity_base numeric not null,
-  unit_cost_minor numeric,
-  source_type text not null,
-  source_id uuid,
-  command_id uuid not null,
-  actor_employee_id uuid references public.business_employees(id),
-  reason_code text,
-  created_at timestamptz not null default now(),
-  unique (shop_id, command_id, inventory_item_id, movement_type)
-);
-```
+Do **not** create a second `inventory_movements` table and do not replace the existing table definition. Inspect the live repository schema first. The current ledger already contains `shop_id`, `business_day_id`, `inventory_item_id`, legacy `movement_type`, `quantity_delta_micros`, `worker_id`, `order_id`, `compensates_movement_id`, `idempotency_key`, and `created_at`. Evolve that table with additive/compatible metadata needed by Admin inventory commands, such as nullable Admin actor/cost/source/command metadata, while retaining the canonical quantity-delta representation and all historical rows.
 
-Each RPC must lock affected inventory state rows, enforce shop identity, write movements, update the current projection/cost state, and return one deterministic result for repeated `command_id` values.
+If the existing movement-type CHECK must be widened, replace only that constraint with a superset that includes **all** legacy values plus the new reservation/consumption/receiving/waste/transfer/stocktake/purchase-return values. Never rewrite old rows to new labels. If actor nullability or a new actor discriminator is required for Admin-origin movements, prove with regression tests that Operations-created movements keep their existing worker semantics and that the Operations sync/parser remains compatible. Prefer additive actor/source columns and compatibility checks over repurposing legacy columns.
+
+Each RPC must lock affected inventory state rows, enforce shop identity, write immutable movements into the existing ledger, update the current projection/cost state, and return one deterministic result for repeated command/idempotency values. Reservation rows may represent held stock, but historical movement rows are never deleted to represent state changes.
 
 - [ ] **Step 4: Verify migration and existing order/migration suites**
 
@@ -84,13 +91,13 @@ npm run test:migrations
 npm test
 ```
 
-Expected: exit `0`.
+Expected: exit `0`; legacy inventory rows/types remain valid and byte-for-byte business history is preserved, new ledger capabilities work, and existing Operations/order/sync tests remain green.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/20260910130000_admin_inventory_ledger.sql scripts/test-admin-inventory-ledger-migration.mjs package.json
-git commit -m "feat(admin): add inventory ledger and reservation model"
+git commit -m "feat(admin): extend inventory ledger and add reservation model"
 ```
 
 ### Task 2: Add recipe costing and migrate the existing Operations order inventory lifecycle
