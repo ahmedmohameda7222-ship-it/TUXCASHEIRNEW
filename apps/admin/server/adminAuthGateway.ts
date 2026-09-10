@@ -16,8 +16,14 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from './http';
-import { AdminRateLimitError } from './loginRateLimit';
-import { reauthenticateAdminSession } from './reauth';
+import {
+  AdminRateLimitError,
+  claimAdminPinAttempt,
+  clearAdminPinAttempts,
+  createAdminPinRateLimitRpc,
+  deriveAdminRateKey,
+} from './loginRateLimit';
+import { AdminReauthError, reauthenticateAdminSession } from './reauth';
 import {
   ADMIN_SESSION_TTL_SECONDS,
   adminSessionCookie,
@@ -44,7 +50,7 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     sendJson(response, 429, { error: error.code });
     return;
   }
-  if (error instanceof AdminAuthError) {
+  if (error instanceof AdminAuthError || error instanceof AdminReauthError) {
     sendJson(response, error.status, { error: error.code });
     return;
   }
@@ -157,10 +163,15 @@ export async function handleAdminReauth(
       sendJson(response, 400, { error: 'invalid_reauth_request' });
       return;
     }
-    const { client } = serverContext();
+    const { env, client } = serverContext();
     const { context } = await loadRequestSession(request, client);
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
     if (!context.employee.pin_hash) throw new AdminAuthError('employee_inactive', 403);
+
+    const rateKey = await deriveAdminRateKey(clientFingerprint(request), env.rateLimitSecret);
+    const limiter = createAdminPinRateLimitRpc(client);
+    await claimAdminPinAttempt(rateKey, limiter);
+
     const at = await reauthenticateAdminSession(
       {
         sessionId: context.session.id,
@@ -179,6 +190,7 @@ export async function handleAdminReauth(
         },
       },
     );
+    await clearAdminPinAttempts(rateKey, limiter);
     sendJson(response, 200, { ok: true, reauthenticatedAt: at.toISOString() });
   } catch (error) {
     handleFailure(response, error);
