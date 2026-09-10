@@ -42,10 +42,7 @@ export function parseEgpToMinor(value: string): number {
   return minor;
 }
 
-function changedPathsFor(
-  original: CatalogProductDetail,
-  next: CatalogProductDetail,
-): string[] {
+function changedPathsFor(original: CatalogProductDetail, next: CatalogProductDetail): string[] {
   const paths: string[] = [];
   if (original.name !== next.name) paths.push('products[].name');
   if (original.description !== next.description) paths.push('products[].description');
@@ -157,7 +154,10 @@ export function ProductEditor({
           </div>
           <span className="admin-catalog-editor__currency">EGP</span>
         </div>
-        <label className="admin-field" data-catalog-price-readonly={priceReadOnly ? 'true' : 'false'}>
+        <label
+          className="admin-field"
+          data-catalog-price-readonly={priceReadOnly ? 'true' : 'false'}
+        >
           <span>Price</span>
           <div className="admin-money-field">
             <span>EGP</span>
@@ -178,7 +178,10 @@ export function ProductEditor({
         ) : null}
       </section>
 
-      <section className="admin-catalog-editor__section" aria-labelledby="catalog-availability-heading">
+      <section
+        className="admin-catalog-editor__section"
+        aria-labelledby="catalog-availability-heading"
+      >
         <div className="admin-catalog-editor__section-heading">
           <div>
             <p className="admin-catalog-editor__eyebrow">Availability</p>
