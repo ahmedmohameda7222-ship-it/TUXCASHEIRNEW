@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  ADMIN_PERMISSIONS,
-  ADMIN_ROLES,
-  isAdminPermission,
-  isAdminRole,
-} from './auth';
+import { ADMIN_PERMISSIONS, ADMIN_ROLES, isAdminPermission, isAdminRole } from './auth';
 
 describe('Admin auth contracts', () => {
   it('accepts only human Admin roles', () => {
