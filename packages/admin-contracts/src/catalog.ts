@@ -117,7 +117,11 @@ export type CatalogDraftSaveResult =
     }
   | {
       ok: false;
-      code: 'draft_not_found' | 'draft_not_editable' | 'stale_draft_revision' | 'invalid_change';
+      code:
+        | 'draft_not_found'
+        | 'draft_not_editable'
+        | 'stale_draft_revision'
+        | 'invalid_change';
       currentDraftRevision?: number;
     };
 
