@@ -1,6 +1,8 @@
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { useLocation } from 'wouter';
 
+import { PageScaffold } from '../components/layout/PageScaffold';
+
 export type AdminRouteDefinition = {
   path: string;
   label: string;
@@ -23,6 +25,7 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
   { path: '/whatsapp', label: 'WhatsApp', permission: 'whatsapp.view' },
   { path: '/settings', label: 'Settings', permission: 'settings.manage' },
   { path: '/audit', label: 'Audit Log', permission: 'audit.view' },
+  { path: '/more', label: 'More' },
 ] as const;
 
 function routeForLocation(location: string): AdminRouteDefinition | undefined {
@@ -46,26 +49,44 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   const route = routeForLocation(location);
   if (!route || !routeIsPermitted(principal, location)) {
     return (
-      <main className="admin-entry">
-        <section className="admin-entry__card">
-          <p className="admin-entry__eyebrow">Access unavailable</p>
-          <h1>Not available</h1>
-          <p className="admin-entry__copy">This area is not included in your current Admin access.</p>
-          <button className="admin-login__submit" type="button" onClick={() => navigate('/')}>
+      <PageScaffold
+        eyebrow="Access unavailable"
+        title="Not available"
+        description="This area is not included in your current Admin access."
+        primaryAction={
+          <button className="admin-primary-button" type="button" onClick={() => navigate('/')}>
             Go home
           </button>
-        </section>
-      </main>
+        }
+      />
+    );
+  }
+
+  if (route.path === '/more') {
+    const secondary = ADMIN_ROUTES.filter(
+      (candidate) =>
+        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(candidate.path) &&
+        routeIsPermitted(principal, candidate.path),
+    );
+    return (
+      <PageScaffold eyebrow="TUX Admin" title="More" description="Additional management areas available to your role.">
+        <div className="admin-more-grid">
+          {secondary.map((candidate) => (
+            <a className="admin-more-card" href={candidate.path} key={candidate.path}>
+              <strong>{candidate.label}</strong>
+              <span>Open</span>
+            </a>
+          ))}
+        </div>
+      </PageScaffold>
     );
   }
 
   return (
-    <main className="admin-entry" aria-labelledby="admin-route-title">
-      <section className="admin-entry__card">
-        <p className="admin-entry__eyebrow">TUX Admin</p>
-        <h1 id="admin-route-title">{route.label}</h1>
-        <p className="admin-entry__copy">Authenticated management workspace.</p>
-      </section>
-    </main>
+    <PageScaffold
+      eyebrow="TUX Admin"
+      title={route.label}
+      description="Authenticated management workspace."
+    />
   );
 }

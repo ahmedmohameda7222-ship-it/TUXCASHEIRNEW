@@ -1,6 +1,7 @@
 import { LoginPage } from '../auth/LoginPage';
 import { AdminSessionProvider } from '../auth/AdminSessionProvider';
 import { useAdminSession } from '../auth/useAdminSession';
+import { AdminShell } from '../components/shell/AdminShell';
 import { ShopScopeProvider } from '../shops/ShopScopeProvider';
 import { ShopSwitcher } from '../shops/ShopSwitcher';
 import { AdminRoutes } from './routes';
@@ -22,14 +23,13 @@ function AdminAppContent() {
   const principal = session.state.session.principal;
   return (
     <ShopScopeProvider principal={principal}>
-      <div className="admin-authenticated">
-        <header className="admin-context-bar">
-          <strong>TUX Admin</strong>
-          <ShopSwitcher />
-          <button type="button" onClick={() => void session.logout()}>Log out</button>
-        </header>
+      <AdminShell
+        principal={principal}
+        shopControl={<ShopSwitcher />}
+        onLogout={() => void session.logout()}
+      >
         <AdminRoutes principal={principal} />
-      </div>
+      </AdminShell>
     </ShopScopeProvider>
   );
 }
