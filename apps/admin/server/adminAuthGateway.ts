@@ -26,6 +26,8 @@ import {
 } from './session';
 import { AdminSupabaseClient, AdminSupabaseError } from './supabaseAdmin';
 
+export type { AdminRequest, AdminResponse } from './http';
+
 const PIN_PATTERN = /^\d{4,12}$/;
 
 function serverContext(): { env: ReturnType<typeof getAdminServerEnv>; client: AdminSupabaseClient } {
