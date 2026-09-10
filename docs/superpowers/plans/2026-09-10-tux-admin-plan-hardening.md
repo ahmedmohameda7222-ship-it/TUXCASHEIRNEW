@@ -97,8 +97,9 @@ git commit -m "feat(admin): add one-time owner bootstrap"
 **Interfaces:**
 - Produces `setEmployeePin(employeeId, newPin, principal)`.
 - Uses one entered numeric PIN for the person, while preserving the two authentication boundaries: Admin authenticates the business employee; Operations authenticates a shop-scoped linked worker on an enrolled Operations device.
+- Produces `assertPinAvailableForLinkedWorkers(employeeId, candidatePin)` that rejects a candidate matching another active worker in any target shop.
 
-- [ ] **Step 1: Write failing coherence/compatibility tests**
+- [ ] **Step 1: Write failing coherence/collision/compatibility tests**
 
 ```ts
 it('updates the employee and every linked active worker atomically', async () => {
@@ -106,6 +107,13 @@ it('updates the employee and every linked active worker atomically', async () =>
   expect(deps.employeePinWrites).toBe(1);
   expect(deps.workerPinWrites).toBe(2);
   expect(deps.committedTransactions).toBe(1);
+});
+
+it('rejects a PIN already used by another active worker in an assigned shop', async () => {
+  deps.seedWorker({ workerId: 'other-worker', shopId: 'shop-1', pin: '482731' });
+  await expect(setEmployeePin('employee-1', '482731', owner, deps))
+    .rejects.toMatchObject({ code: 'pin_already_in_use' });
+  expect(deps.committedTransactions).toBe(0);
 });
 ```
 
@@ -120,11 +128,13 @@ node scripts/test-admin-worker-pin-compatibility.mjs
 
 Expected: fail before the canonical employee-PIN command exists.
 
-- [ ] **Step 3: Implement transactional PIN propagation**
+- [ ] **Step 3: Implement transactional PIN propagation and collision checking**
 
-Use the same `pbkdf2-sha256$iterations$salt$digest` verifier format already accepted by `supabase/functions/worker-auth/index.ts`. A PIN reset computes one new verifier hash plus the Admin-only HMAC lookup hash, rejects an exact active Admin-PIN duplicate, and updates `business_employees.pin_hash`, `business_employees.pin_lookup_hash`, and all linked active `workers.pin_hash` in one trusted transaction.
+Use the same `pbkdf2-sha256$iterations$salt$digest` verifier format already accepted by `supabase/functions/worker-auth/index.ts`. Before writing, the trusted server checks the Admin HMAC lookup hash for an exact active business-employee duplicate and verifies the candidate PIN against every other active worker hash in each assigned/target shop, excluding worker rows already linked to this employee. Any match returns `pin_already_in_use` before mutation.
 
-Do not try to reverse/decrypt existing worker hashes during backfill. When an existing worker is first linked to a business employee and no Admin credential can be derived, mark Admin credential setup as required. An authorized PIN reset establishes the new canonical PIN and then propagates it to all linked worker identities. Suspending the employee continues to revoke Admin access and linked operational access as defined by the Workforce plan without deleting history.
+A successful PIN reset computes one new verifier hash plus the Admin-only HMAC lookup hash and updates `business_employees.pin_hash`, `business_employees.pin_lookup_hash`, and all linked active `workers.pin_hash` in one transaction. Because PBKDF2 hashes are salted, collision checking against legacy worker rows must call the verifier; equality of stored hashes is not a valid duplicate test.
+
+Do not try to reverse/decrypt existing worker hashes during backfill. When an existing worker is first linked to a business employee and no Admin credential can be derived, mark Admin credential setup as required. An authorized PIN reset establishes the canonical PIN and propagates it to all linked worker identities. If legacy active workers in a shop already share an exact PIN, surface a remediation conflict rather than silently selecting one. Suspending the employee continues to revoke Admin access and linked operational access as defined by the Workforce plan without deleting history.
 
 - [ ] **Step 4: Verify Admin/Operations authentication regression**
 
@@ -135,7 +145,7 @@ node scripts/test-worker-pin-rate-limit.mjs
 npm test
 ```
 
-Expected: Admin and linked Operations worker authentication accept the newly set PIN, the old PIN stops authenticating after reset, and device-bound Operations authentication remains required.
+Expected: Admin and linked Operations worker authentication accept the newly set PIN, the old PIN stops authenticating after reset, duplicate worker-shop PINs are rejected, and device-bound Operations authentication remains required.
 
 - [ ] **Step 5: Commit**
 
@@ -160,6 +170,7 @@ git commit -m "feat(admin): keep employee PINs coherent with Operations"
 **Interfaces:**
 - Produces shop/item `inventory_replenishment_settings` with `par_level_base`, `reorder_point_base`, preferred supplier, preferred purchase unit, `lead_time_days`, minimum order quantity, and order multiple.
 - Produces an editable expected-delivery date/reference on purchase orders.
+- Final canonical signature supersedes the simpler Inventory-plan example: `suggestOrderQuantity({ available, par, incoming, minimumOrder, orderMultiple }): number`; `minimumOrder` and `orderMultiple` are optional/nullable configuration so the simple par behavior remains valid when absent.
 
 - [ ] **Step 1: Write failing replenishment tests**
 
@@ -187,7 +198,7 @@ Expected: current simple par formula does not yet support supplier constraints.
 
 - [ ] **Step 3: Implement deterministic supplier-aware suggestions**
 
-Calculate the raw shortage from available/reserved/incoming/target state, then apply configured minimum order and order-multiple rounding. Preferred supplier and lead time inform the suggestion and expected-arrival UI; they do not create or transmit a purchase order automatically. When no supplier rule exists, retain the simple par calculation.
+Calculate the raw shortage from available/incoming/target state; `available` already represents on-hand minus reservations, so reservations must not be subtracted twice. Then apply configured minimum order and order-multiple rounding. Preferred supplier and lead time inform the suggestion and expected-arrival UI; they do not create or transmit a purchase order automatically. When no supplier rule exists, retain the simple `max(0, par - available - incoming)` behavior.
 
 Overdue-PO alerts use the PO expected-delivery date, not a guessed provider state. Supplier invoice/payment/attachment handling remains in the purchasing scope-completion task.
 
@@ -228,6 +239,7 @@ git commit -m "feat(admin): add supplier-aware replenishment settings"
 - A manual order reduction is classified as `DISCOUNT` or `COMP` and references a central `discount/comp` reason code.
 - Canonical `CANCELLED` remains the order status; the reporting label `Void / Cancelled` is a presentation/reporting concept, not a new persisted order status.
 - Cancellation reason references the central order-cancellation reason family.
+- Produces `AdjustmentReport` and `reportService.adjustments(filters, principal): Promise<AdjustmentReport>`; this becomes part of the Reports service contract.
 
 - [ ] **Step 1: Write failing reason-capture/report tests**
 
@@ -280,7 +292,7 @@ git commit -m "feat(admin): add reason-coded discount and cancellation reporting
 
 ### Task 5: Lock the exact Admin Vercel monorepo deployment contract
 
-**Insertion point:** Replace/expand Reliability/Production Plan Task 6 before any Admin production deployment.
+**Insertion point:** Execute as the authoritative deployment detail for Reliability/Production Plan Task 6 before any Admin production deployment.
 
 **Files:**
 - Create/verify: `apps/admin/vercel.json`
@@ -355,7 +367,7 @@ git commit -m "docs(admin): lock monorepo Vercel deployment contract"
 Before calling implementation planning complete, verify these five points are explicitly represented in executable plans:
 
 - [ ] A first OWNER can be created securely without a pre-existing Admin session and without a default plaintext PIN.
-- [ ] One employee PIN reset can coherently update the Admin credential and every linked shop worker credential without bypassing Operations device authentication.
+- [ ] One employee PIN reset can coherently update the Admin credential and every linked shop worker credential, reject collisions with other active workers, and preserve Operations device authentication.
 - [ ] Reorder suggestions have concrete supplier/lead-time/minimum/order-multiple metadata and remain recommendations only.
 - [ ] Manual discount, comp, promotion discount, and cancelled/void reporting have immutable source data and legacy-unclassified behavior.
 - [ ] Admin has an exact separate-Vercel monorepo contract matching the existing root-workspace deployment pattern while preserving `/api/*` Functions.
