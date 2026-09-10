@@ -55,7 +55,7 @@ test('requires PIN login and preserves staff shop isolation', async ({ page }) =
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Enter PIN' })).toBeVisible();
-  const pin = page.getByLabel('PIN');
+  const pin = page.getByRole('textbox', { name: 'PIN' });
   await expect(pin).toHaveAttribute('type', 'password');
   await expect(pin).toHaveAttribute('autocomplete', 'off');
   await pin.fill('2468');

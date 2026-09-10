@@ -45,7 +45,7 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await mockSession(page);
     await page.goto('/');
-    await expect(page.getByText('TUX Admin').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     const mobile = page.locator('[data-admin-mobile-nav]');
     const desktop = page.locator('[data-admin-desktop-nav]');
     if (viewport.mobile) {
