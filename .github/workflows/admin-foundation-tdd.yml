@@ -84,6 +84,7 @@ jobs:
           packages/admin-contracts/src/auth.test.ts
           apps/admin/server/pin.test.ts
           apps/admin/server/session.test.ts
+          apps/admin/server/http.test.ts
           apps/admin/server/loginRateLimit.test.ts
           apps/admin/server/authorization.test.ts
           apps/admin/server/reauth.test.ts
