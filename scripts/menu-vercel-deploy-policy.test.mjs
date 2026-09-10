@@ -10,9 +10,9 @@ const config = JSON.parse(
 );
 
 describe('Menu Vercel Git deployment policy', () => {
-  it('allows Git deployments from main and disables every other branch', () => {
+  it('allows Git deployments from main and disables every other branch, including slash-named branches', () => {
     expect(config.git?.deploymentEnabled).toEqual({
-      '*': false,
+      '**': false,
       main: true,
     });
   });
