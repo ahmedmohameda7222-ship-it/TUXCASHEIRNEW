@@ -1,9 +1,9 @@
 # TUX Admin Execution Ledger
 
-**Program:** TUX Admin control plane
-**Execution start:** 2026-09-10
-**Active plan:** Plan 1 — Foundation/Auth/Shell
-**Active branch:** `feat/admin-01-foundation`
+**Program:** TUX Admin control plane  
+**Execution start:** 2026-09-10  
+**Active plan:** Plan 1 — Foundation/Auth/Shell  
+**Active branch:** `feat/admin-01-foundation`  
 **Base main commit:** `3c19f13ae1f7adca69de0b5a511c99f534908824`
 
 ## Authority and execution rules
@@ -14,30 +14,30 @@ Operations remains live execution authority, Menu remains customer-facing author
 
 ## Planning preflight
 
-Planning branch: `docs/tux-admin-design-spec-2026-09-10`
-Planning PR: #60 — `docs(admin): add approved TUX Admin specification and implementation plans`
-Final planning head: `d6c422a0f6f925e1a90595a01f6b0679d40240c1`
+Planning branch: `docs/tux-admin-design-spec-2026-09-10`  
+Planning PR: #60 — `docs(admin): add approved TUX Admin specification and implementation plans`  
+Final planning head: `d6c422a0f6f925e1a90595a01f6b0679d40240c1`  
 Merged to main as: `3c19f13ae1f7adca69de0b5a511c99f534908824`
 
-Exact-head CI history used during planning included successful runs at `74d0adaf...`, `ae080500...`, and final `d6c422a0...`; final exact-head Actions run `34525750839` passed Menu rendered E2E, root rendered browser E2E, migration-chain smoke, edge/security checks, Windows packaging, typecheck/builds, and `Required quality gate`.
+Final planning exact-head Actions run `34525750839` passed Menu rendered E2E, root rendered browser E2E, migration-chain smoke, edge/security checks, Windows packaging, typecheck/builds, and `Required quality gate`.
 
-The final Codex review request for `d6c422a0...` had entered processing when the latest user instruction explicitly required implementation to begin immediately. PR #60 was merged only after final exact-head CI was fully green and every then-known Codex review thread was resolved. The in-progress Codex result remains review evidence to monitor; any subsequent concrete valid finding must be folded into the applicable implementation gate before the affected feature is accepted.
+The final Codex review request for planning had entered processing when implementation was explicitly requested. All then-known Codex findings were already resolved before merge and are preserved below as implementation constraints.
 
 ## Local execution limitation
 
-Direct local GitHub clone was unavailable because the execution container could not resolve `github.com`. GitHub connector writes are therefore the repository mutation path and GitHub Actions is the executable CI authority for RED/GREEN evidence when a local checkout cannot be used. Do not claim tests passed without Actions or another executable result.
+Direct local GitHub clone was unavailable because the execution container could not resolve `github.com`. GitHub connector writes are therefore the repository mutation path and GitHub Actions is the executable CI authority for RED/GREEN evidence. No task is accepted from static inspection alone.
 
 ## Repository rulings established before Plan 1
 
-1. Root `tsconfig.api.json` currently includes only root `api/**/*.ts` and `server/**/*.ts`; Admin API/server TypeScript must be included explicitly, either by extending the root API project or by adding an Admin API/server tsconfig invoked from root `typecheck`.
-2. Root npm workspaces already include `packages/*`; `packages/admin-contracts` is a normal workspace and must follow existing source-export package conventions.
-3. Existing canonical `public.shops`, `shop_memberships`, `workers`, `business_days`, devices, orders/payments, inventory ledger, Menu, and Operations contracts must be extended additively; they are not replaced by Admin models.
-4. Thin route files should follow the repository's existing `IncomingMessage`/`ServerResponse` gateway convention, with shared same-origin/body/response helpers rather than introducing an unnecessary framework-specific request abstraction.
-5. Foundation Task 1 must define the stable permission union immediately; `AdminPermission = string` from the older numbered-plan example is superseded.
+1. Root `tsconfig.api.json` originally included only root `api/**/*.ts` and `server/**/*.ts`; Plan 1 explicitly added `apps/admin/api/**/*.ts` and `apps/admin/server/**/*.ts` to the API/server typecheck authority.
+2. Root npm workspaces include `packages/*`; `packages/admin-contracts` follows the existing source-export package convention.
+3. Existing canonical `public.shops`, `shop_memberships`, `workers`, `business_days`, devices, orders/payments, inventory ledger, Menu, and Operations contracts are extended additively; they are not replaced by Admin models.
+4. Thin Admin route files follow the repository's existing `IncomingMessage`/`ServerResponse` gateway convention.
+5. Foundation Task 1 defines the stable reviewed permission union immediately; open-ended permission strings are not accepted.
 
 ## Codex planning findings and corrective rulings
 
-All findings below were classified VALID and fixed in planning before the affected implementation gate, unless noted as later exact-head review evidence.
+All findings below were classified VALID and fixed in planning before the affected implementation gate.
 
 1. Existing `inventory_movements` must be ALTERed additively, never recreated.
 2. Every Admin credential/session/control table and RPC is browser-deny-by-default through RLS, privilege revocation, and service-role-only trusted RPC execution.
@@ -62,17 +62,69 @@ All findings below were classified VALID and fixed in planning before the affect
 21. Admin cancellations require proactive Operations lifecycle pull/reconciliation on startup/reconnect/periodic online sync, not only conflict receipts after a local write.
 22. Loyalty redemption and promotions consuming globally scarce state require idempotent canonical online reservation before local POS finalization; unavailable offline rather than oversubscribed.
 
-## Plan 1 active checklist
+## Plan 1 completion checklist
 
-- [ ] Task 1 — create `@tux/admin-contracts` with stable roles, stable permission union, session/shop/command contracts.
-- [ ] Task 2 — add business identity, Admin auth/permission/session schema with deny-by-default RLS/grants and trusted RPCs.
-- [ ] Task 3 — implement secure PIN-only Admin BFF/session, eight-failures/15-minute throttle, generic `/api/admin/reauth`, explicit API/server typecheck inclusion.
-- [ ] Hardening insertion immediately after Task 3 — one-time service-role-only OWNER bootstrap with no default/source-stored production PIN.
-- [ ] Task 4 — scaffold `apps/admin` PWA workspace using existing Menu-compatible dependency versions.
-- [ ] Task 5 — session bootstrap, permission-aware routes, and shop context.
-- [ ] Task 6 — adaptive mobile-first Admin shell.
-- [ ] Task 7 — Foundation security/regression CI gate.
+- [x] Task 1 — `@tux/admin-contracts` with stable roles, permission union, session/shop/command contracts.
+- [x] Task 2 — business identity, Admin auth/permission/session schema with deny-by-default RLS/grants and trusted RPCs.
+- [x] Task 3 — secure PIN-only Admin BFF/session, 8-failures/15-minute throttle, `/api/admin/reauth`, explicit API/server typecheck inclusion.
+- [x] Hardening insertion after Task 3 — one-time service-role-only OWNER bootstrap with no default/source-stored production PIN.
+- [x] Task 4 — `apps/admin` PWA workspace using existing Menu-compatible dependency versions.
+- [x] Task 5 — session bootstrap, permission-aware routes, and shop context.
+- [x] Task 6 — adaptive mobile-first Admin shell.
+- [x] Task 7 — Foundation security/regression CI gate with dedicated Admin rendered E2E.
 
-## TDD evidence log
+## Plan 1 TDD and verification evidence
 
-Plan 1 starts with tests/contracts before implementation. Because the current execution environment has no working repository clone, RED evidence will be established by committing failing tests to the Plan 1 branch and observing the corresponding GitHub Actions failure. GREEN implementation will then be committed and the same focused checks rerun through Actions. No task is marked complete from static inspection alone.
+### Task 1 — contracts
+
+A failing contract import test was introduced first. RED run `34526962979` failed only because `packages/admin-contracts/src/auth.ts` did not yet exist. GREEN root CI run `34527851570` passed the new contracts together with the pre-existing suite.
+
+### Task 2 — business/auth schema
+
+RED run `34528308921` failed on the intentionally missing Admin auth migration. The implementation added `20260910100000_admin_business_auth.sql`, stable role/permission seeds, business/shop mapping, PIN/session tables, private throttle state, RLS/revokes, and service-role-only authorization/throttle RPCs. Focused run `34528647188` passed both static invariants and a fresh PostgreSQL migration-chain smoke.
+
+### Task 3 — PIN-only BFF and sessions
+
+RED suites covered PIN hashing/lookup, opaque sessions, CSRF, rate limiting, shop-safe authorization, and re-PIN. GREEN run `34530253246` passed all Admin security unit suites, contracts typecheck, Admin server/API typecheck, static migration invariants, and PostgreSQL migration-chain smoke.
+
+Implementation uses PBKDF2-SHA256 with at least 210,000 iterations, HMAC-SHA256 lookup/rate keys, hash-only persisted session/CSRF material, HttpOnly SameSite=Lax cookies, same-origin mutation checks, service-role-only server access, and five-minute reauthentication freshness.
+
+### Mandatory OWNER bootstrap
+
+RED run `34530445981` failed specifically at the missing OWNER bootstrap invariant. The implementation added `20260910100100_admin_owner_bootstrap.sql`, `bootstrap_tux_admin_owner_v1`, `bootstrapOwner.ts`, and a hidden-input CLI that never accepts or prints a plaintext PIN. Exact-head run `34530691051` passed one-time database semantics, browser EXECUTE denial, service-role grant, migration smoke, unit tests, and API/server typecheck.
+
+### Task 4 — Admin PWA
+
+RED run `34530885164` had 21 existing/new Foundation tests passing and failed only because `App.tsx` did not yet exist. GREEN implementation added the `@tux/admin` React/Vite/Tailwind workspace, manifest, query client, base application surface, separate Vercel project config, and synchronized workspace lockfile. Subsequent focused gates passed `npm ci`, unit tests, frontend/server typechecks, production build, and PostgreSQL migration smoke.
+
+### Task 5 — session routing and shop context
+
+RED run `34531398304` failed only because `AdminSessionProvider` and `ShopScopeProvider` were absent while prior tests stayed green. GREEN implementation added same-origin `adminFetch`, in-memory CSRF session state, PIN login flow, permission-aware routing, one-shop automatic scope, OWNER-only `All Shops`, and a concrete-shop requirement for mutations. Focused run `34531599492` passed behavior tests, typechecks, and Admin production build.
+
+### Task 6 — adaptive shell
+
+RED run `34531750024` had 29 tests passing and failed only on the intentionally missing shell implementation. GREEN added phone bottom tabs, tablet compact sidebar, desktop full sidebar, permission-filtered navigation, top bar/shop context, responsive page/detail primitives, shared 44px touch-target tokens, and 390/768/1440 browser coverage. A readonly test-fixture type mismatch was corrected without runtime behavior changes.
+
+### Task 7 — security and rendered browser gates
+
+RED run `34532936623` passed the 32 Foundation tests and failed only because `test:admin-security` was intentionally not defined yet. Focused GREEN run `34533592025` passed unit tests, the Admin browser/BFF/RLS/RPC security guard, contracts/BFF/frontend typechecks, production build, migration smoke, and OWNER invariants.
+
+The canonical catalog architecture guard was hardened so service-role use is permitted only inside the trusted `apps/admin/server/**` boundary and explicitly remains forbidden in `apps/admin/src/**`. The updated architecture suite passes.
+
+The permanent Admin CI job now runs security checks, typecheck, production build, Chromium, PIN-login/shop-isolation browser tests, and responsive-shell browser tests. Full CI run `34534384841` demonstrated the dedicated Admin job GREEN, including all five Admin Playwright tests. That run also exposed two CI-discovery issues subsequently fixed: strict type-import lint and Vitest unintentionally discovering Playwright `e2e/admin-*.spec.ts` files. Playwright specs remain covered by the independent Admin browser job; root Vitest now excludes `e2e/**`.
+
+### Deployment-boundary self-review
+
+The initial Admin Vercel config was too thin for a workspace-based monorepo. It was hardened before Plan 1 acceptance to install and build from the repository root, preserve filesystem/API functions before the SPA fallback, and set `git.deploymentEnabled: false`. The Admin security gate now enforces those deployment invariants. Automatic Admin production deployment remains disabled until the Plan 10 release gate.
+
+### Formatting and tooling evidence
+
+Repository-format drift was corrected by running the repository's canonical `npm run format` through a temporary GitHub Actions formatter; the temporary workflow was deleted immediately afterward. The resulting exact-head `format:check` and strict ESLint gate subsequently passed.
+
+### Codex availability
+
+A review was requested on PR #61. The Codex bot reported that a Codex environment must first be created for this repository, so no executable Codex review was available for Plan 1. This is recorded as tool unavailability, not treated as a passing review. Plan 1 therefore relies on TDD, static security/architecture guards, PostgreSQL migration execution, rendered browser tests, full repository CI, and manual/self-review evidence.
+
+## Final Plan 1 acceptance gate
+
+The final acceptance head is the commit containing this ledger update together with all Plan 1 implementation and self-review fixes. Acceptance requires one exact-head `TUX V2 CI` run with all permanent jobs green, including `quality`, `admin`, `edge-security`, `windows-package`, `menu`, `monorepo-architecture`, and `Required quality gate`. The exact run is recorded in the PR checks; Plan 1 must not merge until that gate is green.
