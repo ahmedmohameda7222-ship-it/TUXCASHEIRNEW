@@ -88,6 +88,7 @@ jobs:
           apps/admin/server/loginRateLimit.test.ts
           apps/admin/server/authorization.test.ts
           apps/admin/server/reauth.test.ts
+          apps/admin/server/adminAuthGateway.test.ts
           apps/admin/server/bootstrapOwner.test.ts
           apps/admin/src/app/App.test.tsx
           apps/admin/src/auth/AdminSessionProvider.test.tsx
