@@ -179,10 +179,10 @@ function singleBundleChange(input: CatalogSaveDraftInput): CatalogJsonObject {
   };
 }
 
-function staleVersion(currentVersion: number): CatalogPublishResult & CatalogDraftCreateResult {
+function staleVersion(currentVersion: number) {
   return {
-    ok: false,
-    code: 'stale_version',
+    ok: false as const,
+    code: 'stale_version' as const,
     message: 'Catalog changed since this version was loaded. Refresh before continuing.',
     currentVersion,
   };
@@ -211,7 +211,7 @@ export function createCatalogService(store: CatalogStore) {
         expectedVersion: input.expectedVersion,
         ...(input.title === undefined ? {} : { title: input.title }),
       });
-      if (!result.ok && result.code === 'stale_version') return staleVersion(result.currentVersion);
+      if (!result.ok) return staleVersion(result.currentVersion);
       return result;
     },
 
