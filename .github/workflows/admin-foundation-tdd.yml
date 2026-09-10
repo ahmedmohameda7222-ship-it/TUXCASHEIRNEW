@@ -1,0 +1,106 @@
+name: Admin Foundation TDD
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-foundation-tdd.yml'
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - 'packages/ui/src/tokens.css'
+      - 'scripts/bootstrap-admin-owner.mjs'
+      - 'scripts/test-admin-*.mjs'
+      - 'supabase/migrations/*admin*.sql'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-invariant:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Admin business/auth migration invariant
+        run: node scripts/test-admin-business-auth-migration.mjs
+      - name: Admin OWNER bootstrap invariant
+        run: node scripts/test-admin-owner-bootstrap.mjs
+
+  migration-smoke:
+    runs-on: ubuntu-24.04
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Migration-chain smoke
+        run: node scripts/test-migrations.mjs
+      - name: Admin business/auth migration invariant
+        run: node scripts/test-admin-business-auth-migration.mjs
+      - name: Admin OWNER bootstrap invariant
+        run: node scripts/test-admin-owner-bootstrap.mjs
+
+  contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Admin Foundation unit tests
+        run: >-
+          npx vitest run
+          packages/admin-contracts/src/auth.test.ts
+          apps/admin/server/pin.test.ts
+          apps/admin/server/session.test.ts
+          apps/admin/server/http.test.ts
+          apps/admin/server/loginRateLimit.test.ts
+          apps/admin/server/authorization.test.ts
+          apps/admin/server/reauth.test.ts
+          apps/admin/server/adminAuthGateway.test.ts
+          apps/admin/server/bootstrapOwner.test.ts
+          apps/admin/src/app/App.test.tsx
+          apps/admin/src/auth/AdminSessionProvider.test.tsx
+          apps/admin/src/shops/ShopScopeProvider.test.tsx
+          apps/admin/src/components/shell/AdminShell.test.tsx
+      - name: Admin security RED/GREEN gate
+        run: npm run test:admin-security
+      - name: Admin contracts typecheck
+        run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
+      - name: Admin server and API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Admin app typecheck
+        run: npm run typecheck -w @tux/admin
+      - name: Admin app build
+        run: npm run build -w @tux/admin

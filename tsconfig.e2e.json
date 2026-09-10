@@ -8,5 +8,10 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["playwright.config.ts", "playwright.menu.config.ts", "e2e/**/*.ts"]
+  "include": [
+    "playwright.config.ts",
+    "playwright.menu.config.ts",
+    "playwright.admin.config.ts",
+    "e2e/**/*.ts"
+  ]
 }

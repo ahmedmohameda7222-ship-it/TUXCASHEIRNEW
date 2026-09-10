@@ -18,6 +18,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tux-v2-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quality:
     name: quality
@@ -61,6 +65,8 @@ jobs:
         run: npm run lint
       - name: Unit and integration tests
         run: npm run test
+      - name: Admin security gate
+        run: npm run test:admin-security
       - name: WhatsApp architecture gate
         run: npm run test:whatsapp-architecture
       - name: WhatsApp security gate
@@ -112,6 +118,48 @@ jobs:
           name: operations-rendered-e2e
           path: |
             playwright-report
+            test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  admin:
+    name: admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify checkout commit identity
+        shell: bash
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "github_sha=$GITHUB_SHA"
+          echo "git_head=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked root dependencies
+        run: npm ci
+      - name: Admin security boundary
+        run: npm run test:admin-security
+      - name: Admin typecheck
+        run: npm run typecheck:admin
+      - name: Admin production build
+        run: npm run build:admin
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Admin auth, shop isolation, and responsive shell E2E
+        run: npm run test:e2e:admin
+      - name: Upload Admin rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-rendered-e2e
+          path: |
+            playwright-report-admin
             test-results
           if-no-files-found: warn
           retention-days: 14
@@ -222,6 +270,7 @@ jobs:
     if: always()
     needs:
       - quality
+      - admin
       - edge-security
       - windows-package
       - menu
@@ -231,12 +280,14 @@ jobs:
       - name: Require every permanent gate
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          ADMIN_RESULT: ${{ needs.admin.result }}
           EDGE_SECURITY_RESULT: ${{ needs.edge-security.result }}
           WINDOWS_RESULT: ${{ needs.windows-package.result }}
           MENU_RESULT: ${{ needs.menu.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
         run: |
           test "$QUALITY_RESULT" = "success"
+          test "$ADMIN_RESULT" = "success"
           test "$EDGE_SECURITY_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
           test "$MENU_RESULT" = "success"
