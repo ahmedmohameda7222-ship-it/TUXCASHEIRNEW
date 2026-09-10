@@ -6,6 +6,7 @@ on:
       - '.github/workflows/admin-foundation-tdd.yml'
       - 'apps/admin/**'
       - 'packages/admin-contracts/**'
+      - 'packages/ui/src/tokens.css'
       - 'scripts/bootstrap-admin-owner.mjs'
       - 'scripts/test-admin-*.mjs'
       - 'supabase/migrations/*admin*.sql'
@@ -90,6 +91,7 @@ jobs:
           apps/admin/src/app/App.test.tsx
           apps/admin/src/auth/AdminSessionProvider.test.tsx
           apps/admin/src/shops/ShopScopeProvider.test.tsx
+          apps/admin/src/components/shell/AdminShell.test.tsx
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
