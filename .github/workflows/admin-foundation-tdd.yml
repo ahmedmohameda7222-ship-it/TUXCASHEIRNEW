@@ -92,3 +92,7 @@ jobs:
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Admin app typecheck
+        run: npm run typecheck -w @tux/admin
+      - name: Admin app build
+        run: npm run build -w @tux/admin

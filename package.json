@@ -11,8 +11,11 @@
   },
   "scripts": {
     "dev:operations": "npm run dev -w @tux/operations",
+    "dev:admin": "npm run dev -w @tux/admin",
     "build": "npm run build --workspaces --if-present",
+    "build:admin": "npm run build -w @tux/admin",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.api.json && npm run typecheck:e2e",
+    "typecheck:admin": "npm run typecheck -w @tux/admin",
     "lint": "eslint \"{api,server,apps,packages,e2e}/**/*.{ts,tsx,mjs}\" playwright.config.ts --max-warnings 0",
     "test": "vitest run --exclude scripts/monorepo-architecture-guard.test.mjs --exclude scripts/catalog-architecture-guard.test.mjs",
     "test:whatsapp-architecture": "node scripts/test-whatsapp-package-layering.mjs",
