@@ -92,6 +92,8 @@ jobs:
           apps/admin/src/auth/AdminSessionProvider.test.tsx
           apps/admin/src/shops/ShopScopeProvider.test.tsx
           apps/admin/src/components/shell/AdminShell.test.tsx
+      - name: Admin security RED/GREEN gate
+        run: npm run test:admin-security
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
