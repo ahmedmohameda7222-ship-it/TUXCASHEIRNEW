@@ -4,7 +4,7 @@
 
 **Goal:** Deliver expenses, bank/cash money position, settlements, X/Z/end-day history, cashier reconciliation, owner capital movements, profit/COGS calculations, advanced reports, saved views, targets, and daily owner summaries.
 
-**Architecture:** Preserve canonical orders/payments/expenses/business days and add explicit finance-event tables around them. Profit and money position are separate models: profit is earned performance, while bank/cash/wallet/pending-settlement balances change only from real money movements. End Day produces an immutable snapshot plus reconciliation; later corrections append adjustment events. Reports aggregate server-side from canonical events and drill down to their source records.
+**Architecture:** Preserve canonical orders/payments/expenses/business days and the minimal `finance_accounts`/`finance_movements` core established before Workforce staff-payment acceptance. Extend that shared finance core additively with explicit settlement/end-day/adjustment events and trusted services. Profit and money position are separate models: profit is earned performance, while bank/cash/wallet/pending-settlement balances change only from real money movements. End Day produces an immutable snapshot plus reconciliation; later corrections append adjustment events. Reports aggregate server-side from canonical events and drill down to their source records.
 
 **Tech Stack:** PostgreSQL/Supabase RPCs and reporting views, TypeScript Admin BFF, React/TanStack Query, Recharts, Vitest, Playwright.
 
@@ -18,11 +18,12 @@
 - Owner contribution increases tracked funds but is not sales/profit; owner withdrawal reduces tracked funds but is not an operating expense.
 - Historical payment/order/end-day snapshots are immutable; corrections are explicit adjustment records.
 - Purchases increase inventory/cost basis and become COGS when consumed, not when purchased.
+- `finance_accounts` and `finance_movements` already exist when this plan begins. They are the canonical finance core: do not recreate, replace, truncate, or fork them. Preserve pre-existing `STAFF_PAYMENT` rows and all account identifiers while extending behavior additively.
 - Reports stay inside Admin; there is no import/export.
 
 ---
 
-### Task 1: Add finance accounts, money movements, settlements, end-day snapshots, and recurring-expense schema
+### Task 1: Extend finance core with settlements, end-day snapshots, recurring-expense support, and adjustment schema
 
 **Files:**
 - Create: `supabase/migrations/20260910210000_admin_finance.sql`
@@ -30,18 +31,26 @@
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces tables: `finance_accounts`, `finance_movements`, `payment_settlements`, `expense_categories`, `recurring_expense_rules`, `end_day_snapshots`, `cashier_reconciliations`, `financial_adjustments`.
-- Produces RPCs: `post_finance_movement_v1`, `transfer_finance_account_v1`, `close_business_day_finance_v1`, `post_financial_adjustment_v1`.
+- Consumes and extends existing tables: `finance_accounts`, `finance_movements`.
+- Produces tables: `payment_settlements`, `expense_categories`, `recurring_expense_rules`, `end_day_snapshots`, `cashier_reconciliations`, `financial_adjustments`.
+- Extends trusted RPC: `post_finance_movement_v1` where required without changing its existing idempotent contract.
+- Produces RPCs: `transfer_finance_account_v1`, `close_business_day_finance_v1`, `post_financial_adjustment_v1`.
 
 - [ ] **Step 1: Write the failing migration test**
 
 ```js
 import fs from 'node:fs';
 const sql = fs.readFileSync('supabase/migrations/20260910210000_admin_finance.sql', 'utf8').toLowerCase();
-for (const name of ['finance_accounts','finance_movements','payment_settlements','end_day_snapshots','cashier_reconciliations','financial_adjustments']) {
+for (const name of ['finance_accounts','finance_movements','payment_settlements','end_day_snapshots','cashier_reconciliations','financial_adjustments','transfer_finance_account_v1']) {
   if (!sql.includes(name)) throw new Error(`missing ${name}`);
 }
+for (const existing of ['finance_accounts', 'finance_movements']) {
+  const recreate = new RegExp(`create\\s+table(?:\\s+if\\s+not\\s+exists)?\\s+public\\.${existing}\\b`);
+  if (recreate.test(sql)) throw new Error(`${existing} must be extended, not recreated`);
+}
 ```
+
+Extend the executable migration-chain test to create an account and one `STAFF_PAYMENT` movement through the pre-Workforce finance core, apply this migration, and prove both rows and identifiers survive unchanged. The test must then exercise the new transfer/end-day primitives against that same account model.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -51,37 +60,39 @@ node scripts/test-admin-finance-migration.mjs
 
 Expected: ENOENT before migration creation.
 
-- [ ] **Step 3: Implement event-based finance schema**
+- [ ] **Step 3: Extend the existing event-based finance core**
+
+Do not define `finance_accounts` or `finance_movements` again. Inspect the finance-core migration from the Workforce plan and use those exact existing columns, account types, movement types, tenant constraints, RLS posture, and idempotency keys. Add only compatible indexes/constraints/metadata when actually required, and keep any `create or replace function public.post_finance_movement_v1(...)` signature backward-compatible with the Workforce caller.
 
 ```sql
-create table public.finance_accounts (
+create table if not exists public.payment_settlements (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id),
   shop_id uuid references public.shops(id),
-  account_type text not null check (account_type in ('CASH','BANK','WALLET','PENDING_SETTLEMENT')),
-  name text not null,
-  active boolean not null default true,
-  opening_balance_minor bigint not null default 0,
-  created_at timestamptz not null default now()
+  source_account_id uuid not null references public.finance_accounts(id),
+  destination_account_id uuid not null references public.finance_accounts(id),
+  gross_minor bigint not null,
+  fee_minor bigint not null default 0,
+  net_minor bigint not null,
+  command_id uuid not null,
+  created_at timestamptz not null default now(),
+  unique (business_id, command_id),
+  check (gross_minor >= 0 and fee_minor >= 0 and net_minor = gross_minor - fee_minor)
 );
 
-create table public.finance_movements (
+create table if not exists public.end_day_snapshots (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id),
-  shop_id uuid references public.shops(id),
-  account_id uuid not null references public.finance_accounts(id),
-  movement_type text not null check (movement_type in ('OPENING_FLOAT','SALE','REFUND','PAY_IN','PAY_OUT','EXPENSE','BANK_DEPOSIT','TRANSFER_IN','TRANSFER_OUT','SETTLEMENT','BANK_FEE','OWNER_CONTRIBUTION','OWNER_WITHDRAWAL','STAFF_PAYMENT','ADJUSTMENT')),
-  amount_minor bigint not null,
-  command_id uuid not null,
-  source_type text,
-  source_id text,
-  actor_employee_id uuid references public.business_employees(id),
+  shop_id uuid not null references public.shops(id),
+  business_day_id uuid not null references public.business_days(id),
+  snapshot jsonb not null,
+  closed_by_employee_id uuid not null references public.business_employees(id),
   created_at timestamptz not null default now(),
-  unique (account_id, command_id, movement_type)
+  unique (shop_id, business_day_id)
 );
 ```
 
-The account-transfer RPC must create equal/opposite transfer movements in one transaction. End Day must lock the open business day, snapshot sales/payments/COGS/expenses/profit, record cashier/shop cash reconciliation, and close once.
+Create the remaining approved tables with the same business/shop foreign-key discipline and Admin deny-by-default RLS/privilege model. The account-transfer RPC must create equal/opposite transfer movements against the **existing** `finance_movements` table in one transaction. End Day must lock the open business day, snapshot sales/payments/COGS/expenses/profit, record cashier/shop cash reconciliation, and close once. Existing staff-payment movements must remain valid and visible in account history/reconciliation without being rewritten.
 
 - [ ] **Step 4: Verify migration suite**
 
@@ -90,13 +101,13 @@ node scripts/test-admin-finance-migration.mjs
 npm run test:migrations
 ```
 
-Expected: exit `0`.
+Expected: exit `0`; pre-existing finance accounts and `STAFF_PAYMENT` movements survive unchanged, the new tables/RPCs use the same finance core, and no duplicate finance source of truth is created.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/20260910210000_admin_finance.sql scripts/test-admin-finance-migration.mjs package.json
-git commit -m "feat(admin): add finance accounts and end-day model"
+git commit -m "feat(admin): extend finance core with end-day model"
 ```
 
 ### Task 2: Implement finance calculations and Bank & Cash service
@@ -120,6 +131,11 @@ it('separates operating profit from account balances', () => {
   expect(profit).toBe(1_630_000);
   expect(calculateTrackedFunds([{ balanceMinor: 18_540_000 }, { balanceMinor: 1_425_000 }, { balanceMinor: 2_260_000 }])).toBe(22_225_000);
 });
+
+it('keeps pre-existing staff payments in finance account history', async () => {
+  const history = await service.accountHistory('cash-1', owner);
+  expect(history.some((movement) => movement.type === 'STAFF_PAYMENT')).toBe(true);
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -139,7 +155,7 @@ export const calculateTrackedFunds = (accounts: { balanceMinor: number }[]) =>
   accounts.reduce((sum, account) => sum + account.balanceMinor, 0);
 ```
 
-A settlement moves value from `PENDING_SETTLEMENT` to BANK/WALLET and may post a separate BANK_FEE expense/movement for the difference. Expense posting must identify the payment account only when the expense is actually paid from a tracked account.
+A settlement moves value from `PENDING_SETTLEMENT` to BANK/WALLET and may post a separate BANK_FEE expense/movement for the difference. Expense posting must identify the payment account only when the expense is actually paid from a tracked account. Services read/write the finance core created before Workforce; they must not introduce a second account or movement store.
 
 - [ ] **Step 4: Verify finance tests/typecheck**
 
@@ -193,7 +209,7 @@ Expected: fail before screens exist.
 
 - [ ] **Step 3: Implement finance screens with explicit movement semantics**
 
-Transfer UI must show From, To, Amount, Reason and explain that transfer does not change profit. Owner Contribution/Withdrawal must be separate actions from Expense. Account detail shows opening/current balance plus money-in/out history and source links.
+Transfer UI must show From, To, Amount, Reason and explain that transfer does not change profit. Owner Contribution/Withdrawal must be separate actions from Expense. Account detail shows opening/current balance plus money-in/out history and source links, including Workforce-origin `STAFF_PAYMENT` movements from the shared ledger.
 
 - [ ] **Step 4: Verify E2E**
 
