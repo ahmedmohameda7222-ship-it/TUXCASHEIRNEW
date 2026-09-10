@@ -39,7 +39,7 @@
 
 ```ts
 it('rejects direct edits to a DONE order and exposes refund instead', async () => {
-  const result = await service.cancelOrder({ orderId: 'o1', reasonCode: 'CUSTOMER_REQUEST' }, principal);
+  const result = await service.cancelActiveOrder({ orderId: 'o1', reasonCode: 'CUSTOMER_REQUEST' }, principal);
   expect(result).toMatchObject({ ok: false, code: 'order_not_active' });
 });
 ```
