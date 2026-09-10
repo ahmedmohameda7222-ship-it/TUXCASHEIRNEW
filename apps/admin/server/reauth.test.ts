@@ -24,7 +24,7 @@ describe('Admin sensitive reauthentication', () => {
     expect(updates).toEqual([now]);
   });
 
-  it('rejects a wrong PIN without touching session reauthentication state', async () => {
+  it('rejects a wrong PIN as an authentication failure without touching session state', async () => {
     const pinHash = await hashPin('482731');
     let updated = false;
 
@@ -39,7 +39,7 @@ describe('Admin sensitive reauthentication', () => {
           },
         },
       ),
-    ).rejects.toThrow(/invalid_pin/);
+    ).rejects.toMatchObject({ code: 'invalid_pin', status: 401 });
 
     expect(updated).toBe(false);
   });
