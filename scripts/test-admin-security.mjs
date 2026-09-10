@@ -52,6 +52,27 @@ if (!/credentials:\s*['"]same-origin['"]/.test(apiClient)) {
   throw new Error('Admin API client must send credentials only to the same origin');
 }
 
+const vercelConfig = JSON.parse(readFileSync('apps/admin/vercel.json', 'utf8'));
+if (vercelConfig.installCommand !== 'cd ../.. && npm ci') {
+  throw new Error('Admin Vercel install must resolve the monorepo lockfile from the repository root');
+}
+if (vercelConfig.buildCommand !== 'cd ../.. && npm run build:admin') {
+  throw new Error('Admin Vercel build must use the canonical root Admin workspace command');
+}
+if (vercelConfig.git?.deploymentEnabled !== false) {
+  throw new Error('Automatic Admin Vercel deployments must remain disabled before the Plan 10 release gate');
+}
+if (!Array.isArray(vercelConfig.routes) || vercelConfig.routes.length < 2) {
+  throw new Error('Admin Vercel routing must preserve filesystem routes before the SPA fallback');
+}
+if (vercelConfig.routes[0]?.handle !== 'filesystem') {
+  throw new Error('Admin Vercel routing must resolve API/static filesystem resources before SPA fallback');
+}
+const lastAdminRoute = vercelConfig.routes.at(-1);
+if (lastAdminRoute?.src !== '/(.*)' || lastAdminRoute?.dest !== '/index.html') {
+  throw new Error('Admin Vercel routing must end with the Vite SPA deep-link fallback');
+}
+
 const adminMigrationPaths = readdirSync(migrationsRoot)
   .filter((name) => /admin.*\.sql$/i.test(name))
   .sort()
@@ -113,5 +134,5 @@ for (const rpc of trustedRpcs) {
 }
 
 console.log(
-  `Admin client/BFF/RLS/RPC security invariants passed across ${adminMigrationPaths.length} canonical Admin migrations.`,
+  `Admin client/BFF/Vercel/RLS/RPC security invariants passed across ${adminMigrationPaths.length} canonical Admin migrations.`,
 );
