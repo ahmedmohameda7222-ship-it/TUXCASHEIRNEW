@@ -1,0 +1,54 @@
+name: Admin Format Fix
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-format-fix.yml'
+      - 'apps/admin/**'
+      - 'e2e/admin-*.spec.ts'
+      - 'scripts/test-admin-security.mjs'
+      - 'playwright.admin.config.ts'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-format-fix-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format Admin implementation and tests
+        run: >-
+          npx prettier --write
+          apps/admin/**/*.{ts,tsx,css,html,json}
+          e2e/admin-auth.spec.ts
+          e2e/admin-shell.spec.ts
+          scripts/test-admin-security.mjs
+          playwright.admin.config.ts
+          .github/workflows/admin-foundation-tdd.yml
+          .github/workflows/ci.yml
+      - name: Commit formatting changes
+        shell: bash
+        run: |
+          git add apps/admin e2e/admin-auth.spec.ts e2e/admin-shell.spec.ts scripts/test-admin-security.mjs playwright.admin.config.ts .github/workflows/admin-foundation-tdd.yml .github/workflows/ci.yml
+          if git diff --cached --quiet; then
+            echo 'Admin files already formatted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style(admin): apply repository formatting'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
