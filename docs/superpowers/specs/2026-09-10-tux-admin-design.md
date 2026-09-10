@@ -1,7 +1,7 @@
 # TUX Admin — Full Business Admin Design Specification
 
 **Date:** 2026-09-10  
-**Status:** Approved design captured for user review before implementation planning  
+**Status:** Approved product design, awaiting written-spec review before implementation planning  
 **Repository:** `ahmedmohameda7222-ship-it/TUXCASHEIRNEW`  
 **Target application:** `apps/admin`  
 **Design authority:** TUX product requirements + Apple Human Interface Guidelines adapted for web  
@@ -13,15 +13,15 @@
 
 ## 1. Purpose
 
-TUX Admin is the management and control plane for the TUX restaurant platform. It must give owners, admins, managers, and permitted staff a simple mobile-first interface for managing the business while preserving the authority and reliability of the existing Menu and Operations applications.
+TUX Admin is the management and control plane for the TUX restaurant platform. It gives owners, admins, managers, and permitted staff a simple mobile-first interface for managing the business while preserving the authority and reliability of the existing Menu and Operations applications.
 
 The governing product principle is:
 
 > Complex business logic underneath. Very simple decisions on the screen.
 
-The Admin is not another POS. It configures, supervises, reports, approves, and manages. TUX Operations remains responsible for live operational execution; TUX Menu remains responsible for the customer ordering experience.
+TUX Admin is not another POS. It configures, supervises, reports, approves, and manages. TUX Operations remains responsible for live operational execution. TUX Menu remains responsible for the customer ordering experience.
 
-This is a full business Admin design. Everything explicitly approved in this specification is in scope for the implementation effort. Features explicitly excluded in this document are out of scope. There is no import functionality and no export functionality.
+This is the full approved Admin scope. Everything explicitly included in this specification is part of the implementation effort. Explicit exclusions are out of scope. There is no import functionality and no export functionality.
 
 ---
 
@@ -58,11 +58,13 @@ Existing production concepts must be preserved and extended, including shops, sh
 
 Existing Menu and Operations contracts must continue to work. Admin changes shared behavior only through compatible published configuration and trusted server commands.
 
+The canonical current shop remains the existing TUX shop. Multi-shop support is introduced compatibly rather than by replacing existing shop-scoped operational contracts.
+
 ---
 
 ## 3. Product Ownership Boundaries
 
-### TUX Admin
+### 3.1 TUX Admin
 
 Admin owns management and control workflows:
 
@@ -70,175 +72,169 @@ Admin owns management and control workflows:
 - catalog management and publishing;
 - inventory supervision and adjustment;
 - purchasing and suppliers;
-- customer management, loyalty, and promotions;
-- staff, permissions, shifts, attendance, and wage estimates;
+- customer management, loyalty, promotions, and customer segments;
+- staff, permissions, shifts, attendance, wage estimates, and staff payment records;
 - delivery and checkout configuration;
-- finance reporting, expenses, and reconciliation;
-- approvals and audit;
-- device and shop health supervision;
-- reports and alerts.
+- finance reporting, expenses, cash/bank management, reconciliation, and end-day history;
+- approvals and immutable audit;
+- device, printer, shop-health, opening/closing, and manager-log supervision;
+- reports, alerts, targets, and owner summaries;
+- WhatsApp business integration configuration and message-control surfaces.
 
-### TUX Operations
+### 3.2 TUX Operations
 
-Operations remains the authority for:
+Operations remains authoritative for live store execution:
 
-- live POS/order execution;
-- operational worker activity;
-- business-day execution;
-- live payment execution;
-- accepted online-order execution;
-- operational device behavior.
+- live POS order creation and execution;
+- live payment capture/recording;
+- live business-day and worker-session execution;
+- active order progression;
+- device-bound operational behavior;
+- live receipt/kitchen printing commands;
+- online-order acceptance into the canonical operational order model.
 
-### TUX Menu
+Admin may supervise or issue controlled management commands, but it must not silently bypass Operations business rules.
 
-Menu remains the authority for:
+### 3.3 TUX Menu
 
-- customer-facing catalog rendering;
-- cart and checkout interaction;
-- online-order intake.
-
-### Canonical Supabase
-
-Supabase remains the canonical data authority. Frontend state is never business authority.
+Menu remains authoritative for the customer-facing ordering experience. It consumes published catalog, pricing, availability, delivery, payment, and checkout configuration. It must never read Admin drafts.
 
 ---
 
-## 4. Deployment Architecture
+## 4. Approved Technical Architecture
 
-`apps/admin` stays in the same GitHub monorepo but receives its own Vercel project.
+The approved architecture is a modular Admin application backed by trusted Admin APIs and the existing canonical Supabase:
 
 ```text
-GitHub monorepo
-    ├── Operations Vercel project
-    ├── Menu Vercel project
-    └── Admin Vercel project
+apps/admin
+        ↓
+Admin application contracts
+        ↓
+Trusted Admin APIs / Edge Functions / RPC commands
+        ↓
+Canonical Supabase
+        ↓
+Published configuration
+   ↙                ↘
+Menu             Operations
 ```
 
-All applications use the same canonical Supabase/backend authority.
+`apps/admin` stays in the same GitHub monorepo but is deployed as a separate Vercel project. The existing Operations deployment remains the Operations/backend surface. Menu remains its own deployment. All three share canonical backend authority.
 
-Admin production deployment must come from `main`. Browser-safe configuration only may be exposed to the Admin client. Service-role keys, payment-provider secrets, Meta/WhatsApp secrets, webhook secrets, and similar privileged credentials remain server-side.
+Sensitive business logic must run server-side, including:
 
-WhatsApp provider setup is not required for Admin completion. Admin may show WhatsApp integration status as `Not Configured` until real Meta setup is completed.
+- Admin PIN verification and session creation;
+- role, permission, and shop authorization;
+- catalog validation and publishing;
+- scheduled configuration activation;
+- inventory reservations, adjustments, and stocktake posting;
+- purchasing and receiving;
+- refund/return approvals;
+- financial adjustments and cash/bank movements;
+- staff payment posting;
+- audit creation;
+- approval state transitions.
+
+The browser may query through explicit read contracts and submit commands, but it must not possess service-role credentials or direct unrestricted database write access.
+
+The Admin codebase should be modular by business domain, with shared contracts in packages. Expected domains are `auth`, `dashboard`, `orders`, `catalog`, `inventory`, `purchasing`, `customers`, `staff`, `delivery`, `finance`, `reports`, `alerts`, `operations-devices`, `settings`, `whatsapp`, and `audit`.
 
 ---
 
-## 5. Multi-Shop Business Model
+## 5. Business and Multi-Shop Model
 
-TUX Admin is multi-shop ready from the first implementation.
+TUX Admin is multi-shop ready from day one.
 
-The approved model is **Global Business Identity + Per-Shop Operational Data**.
+A business-level parent identity should group shops and hold global entities. Existing shop-scoped operational tables remain valid and are not replaced destructively.
 
-### Business-level data
+### 5.1 Global business-level data
 
-Business-level entities include:
+The business level owns:
 
-- master product identity and definition;
+- business identity and branding;
+- master catalog definitions and images;
 - canonical customer identity;
-- loyalty account and business loyalty rules;
-- employee identity;
-- role and permission presets;
-- supplier identity;
+- canonical employee identity;
+- supplier directory;
+- role/permission presets;
 - promotion definitions;
-- business settings and defaults.
+- default settings;
+- global reason-code definitions;
+- reusable report views/targets where appropriate.
 
-### Shop-level data
+### 5.2 Per-shop operational data
 
-Shop-scoped operational data includes:
+Each shop owns or overrides:
 
-- prices and branch overrides;
-- availability and stock;
+- prices and product availability;
+- stock and stock movements;
 - orders and payments;
 - expenses;
 - purchasing and receiving;
-- delivery zones;
-- shifts and attendance context;
-- cash and business days;
-- devices;
-- branch-specific settings and rules.
+- delivery zones and routing;
+- shifts and attendance;
+- business days and cash reconciliation;
+- receipt/order-number settings;
+- payment methods and checkout rules;
+- printers/devices;
+- shop-specific rules and overrides.
 
-Business defaults are inherited by shops unless a permitted branch override exists. The UI must clearly show whether a value is inherited or overridden and allow a one-action return to the business default.
+Organization defaults are inherited until a shop overrides them. Admin must show whether a value is inherited or overridden and allow an authorized user to restore the inherited value.
 
-Used business records are archived, not hard-deleted. Unused drafts may be deleted.
-
----
-
-## 6. Admin Authentication, Roles, Permissions, and Shop Access
-
-### PIN-only login
-
-The approved login experience is:
-
-```text
-Open TUX Admin
-→ enter personal PIN
-→ server identifies user
-→ server loads role, permissions, assigned shops
-→ secure Admin session
-→ dashboard
-```
-
-There is no email, username, user code, OTP, or Operations device-enrollment requirement in the normal Admin login flow.
-
-Each active Admin-capable person has a personal numeric PIN. Exact duplicate active PINs must be rejected as a technical invariant because PIN alone identifies the user. PINs are stored only as secure hashes. The server performs verification, rate limiting, temporary lock behavior, session issuance, session expiry, and audit attribution.
-
-Admin authentication must use its own trusted server boundary. Existing Operations worker-auth patterns for secure hashing and rate limiting may be reused conceptually, but Admin authentication must not depend on an Operations device identity.
-
-### Roles
-
-Approved role presets:
-
-- `OWNER`
-- `ADMIN`
-- `MANAGER`
-- `STAFF`
-
-Existing `OPERATIONS_DEVICE` semantics must remain intact in the current system and must not be conflated with human Admin roles.
-
-`OWNER` has all shops and all permissions. Other users may be assigned selected shops and may receive a role preset plus custom per-user permission overrides.
-
-### Permission model
-
-Permissions are deny-by-default and enforced on the server. Hiding UI controls is only a usability feature, never the security boundary.
-
-Stable permission families should cover at least:
-
-```text
-orders.*
-catalog.*
-inventory.*
-purchasing.*
-customers.*
-loyalty.*
-promotions.*
-staff.*
-finance.*
-delivery.*
-devices.*
-settings.*
-audit.*
-approvals.*
-reports.*
-```
-
-The implementation plan may refine the exact permission identifiers, but the taxonomy must remain stable and domain-based rather than ad hoc per screen.
-
-### Shop selection
-
-If a user has one shop, Admin opens directly into that shop. If the user has multiple shops, the current shop is always visible and switchable. Owners may select `All Shops` for aggregate reporting.
-
-When `All Shops` is selected, any mutation that requires a specific shop must first require an explicit shop choice.
-
-### Sensitive actions
-
-Sensitive actions may require re-entry of the user PIN. Threshold-based actions may require a second authorized approval.
+Shop lifecycle is `ACTIVE → SUSPENDED → ARCHIVED`. Used shops are archived, never hard-deleted.
 
 ---
 
-## 7. Admin Shell and Navigation
+## 6. Design System and Adaptive UX
 
-### Phone
+Apple Human Interface Guidelines are the design authority, adapted to the TUX brand and the constraints of a web/PWA business application. The Admin is not a literal macOS clone.
 
-The mobile-first bottom navigation is:
+The interface must prioritize clarity, hierarchy, predictable navigation, accessibility, contrast, readable typography, and touch ergonomics. Material/Liquid-Glass treatment should be restrained to navigation, toolbars, popovers, modals, and control layers rather than applied to every content surface.
+
+Both light and dark appearance are supported.
+
+### 6.1 Mobile-first requirement
+
+The phone experience is the primary design target because most admins are expected to use phones. Business capability must not be removed from mobile merely because desktop offers denser layouts.
+
+Phone behavior:
+
+- bottom navigation;
+- full-screen task/detail flows;
+- cards and lists rather than wide desktop tables;
+- large touch targets following the approximate 44-point principle;
+- bottom action areas for primary actions;
+- short forms with progressive disclosure;
+- critical state and action text visible without hover.
+
+Tablet behavior:
+
+- adaptive sidebar where useful;
+- split list/detail views where space permits;
+- touch-friendly controls.
+
+Desktop behavior:
+
+- full sidebar;
+- denser tables/lists;
+- right-side inspector/detail surfaces;
+- keyboard productivity and search.
+
+### 6.2 Simplicity rules
+
+The interface must use progressive disclosure, smart defaults, one obvious primary action per screen, plain English, inline validation, search-first discovery, human-readable statuses, automatic calculations, and minimal data entry.
+
+Role-based simplification is mandatory: users should not see irrelevant areas or actions.
+
+Destructive and sensitive actions must be explicit and safe. Undo/reversal should be offered where the underlying business event is safely reversible. Critical actions must never be hidden only behind a gesture.
+
+---
+
+## 7. Navigation and Application Shell
+
+### 7.1 Phone
+
+Bottom navigation:
 
 ```text
 Home
@@ -248,96 +244,214 @@ Inventory
 More
 ```
 
-`More` contains, according to permission:
+`More` contains permission-dependent access to:
 
-```text
-Customers
-Purchasing
-Staff
-Delivery
-Finance
-Reports
-Alerts
-Devices
-Settings
-Audit Log
-```
+- Customers;
+- Purchasing;
+- Staff;
+- Delivery;
+- Finance;
+- Reports;
+- Alerts;
+- Devices / Operations;
+- WhatsApp;
+- Settings;
+- Audit Log.
 
-### Tablet
+The top area includes TUX Admin identity, current shop, alerts, and the current page title.
 
-Tablet uses an adaptive sidebar and split-view list/detail layouts where useful.
+### 7.2 Tablet and desktop
 
-### Desktop
+Tablet uses an adaptive sidebar. Desktop uses a full persistent sidebar when space permits.
 
-Desktop uses a full sidebar, tables/lists, right-side inspector/detail views, toolbar search, shop context, alerts, and user controls.
+The repeated management pattern is:
 
-The same routes, permissions, domain logic, and APIs power all breakpoints. This is one adaptive application, not separate phone/tablet/desktop products.
+- phone: list → full-screen detail;
+- tablet: list/detail split where useful;
+- desktop: table/list → inspector or detail panel.
+
+This pattern applies to Catalog, Customers, Staff, Suppliers, Inventory, Orders, and other entity-heavy modules.
+
+### 7.3 Shop context
+
+If the user has one authorized shop, Admin opens directly in that shop. With multiple shops, a current/default shop is shown with a shop switcher. OWNER may choose `All Shops` for supported views.
+
+If an action requires a single shop while `All Shops` is selected, Admin must require the user to choose the target shop before the action can continue.
+
+Public Admin routes should be clean application routes such as `/orders`, `/catalog/products`, and `/inventory`, rather than requiring an `/admin` URL prefix.
 
 ---
 
-## 8. Dashboard, Reports, and Alerts
+## 8. Admin Authentication, Sessions, Roles, and Permissions
 
-The dashboard is role-adaptive.
+### 8.1 PIN-only login
 
-### Owner/Admin dashboard
+The approved login experience is:
 
-Typical primary metrics:
+```text
+Open TUX Admin
+→ Enter PIN
+→ server identifies the person
+→ server loads role, custom permissions, and assigned shops
+→ secure Admin session
+→ Dashboard
+```
+
+There is no email, username, user code, OTP, or Operations-device enrollment step in the normal Admin login flow.
+
+Each active Admin-capable person has an individual numeric PIN. Exact duplicate active PINs must be rejected as a server-side invariant because PIN alone identifies the user. This uniqueness rule must not complicate the UI.
+
+PINs are never stored in plaintext. Verification, rate limiting, temporary lock behavior, session creation, expiry, revocation, and logout are server-controlled. Browser sessions should use secure mechanisms appropriate for web/PWA use; credentials or privileged secrets must not be stored in ordinary client state.
+
+Existing device-bound `worker-auth` must not be reused directly as the Admin login boundary. Admin needs a dedicated trusted `admin-auth` boundary, although proven hashing/rate-limit patterns may be reused internally.
+
+### 8.2 Roles
+
+Built-in role presets:
+
+```text
+OWNER
+ADMIN
+MANAGER
+STAFF
+```
+
+OWNER has all shops and all permissions. Other users may be assigned selected shops and may have custom permission overrides.
+
+The existing `OPERATIONS_DEVICE` membership concept remains operational infrastructure and must not be broken by the Admin role migration.
+
+### 8.3 Permission model
+
+Authorization is deny-by-default and enforced server-side for every protected read and command. Hiding a button is only a UX aid, never the authorization boundary.
+
+The permission taxonomy should remain stable and grouped by domain, for example:
+
+```text
+orders.view
+orders.manage
+orders.cancel
+orders.refund.request
+orders.refund.approve
+catalog.view
+catalog.edit
+catalog.publish
+catalog.pricing
+inventory.view
+inventory.adjust
+inventory.stocktake
+purchasing.view
+purchasing.manage
+customers.view
+customers.manage
+staff.view
+staff.manage
+staff.payments
+finance.view
+finance.adjust
+settings.manage
+devices.manage
+approvals.review
+audit.view
+```
+
+Implementation may refine names, but the principles are domain-scoped permissions, server enforcement, and straightforward role presets with an optional `Advanced Permissions` editor.
+
+### 8.4 Sensitive re-authentication and approval
+
+Sensitive actions can require the acting user to re-enter their PIN. High-risk actions may also require second-person approval based on configurable thresholds.
+
+Approved request flow:
+
+```text
+User starts sensitive action
+→ reason is collected when required
+→ request is created
+→ authorized approver sees Approve / Reject
+→ approver confirms with PIN
+→ command executes once
+→ immutable audit is recorded
+```
+
+---
+
+## 9. Dashboard, Reports, Alerts, Targets, and Owner Summary
+
+The dashboard adapts to role and shop scope rather than showing the same widgets to everyone.
+
+### 9.1 OWNER / ADMIN dashboard
+
+Primary business information includes:
 
 - net sales;
-- order count;
+- orders;
 - estimated operating profit;
 - average order value;
-- low-stock count;
-- cash variance;
+- low/out-of-stock status;
+- cash difference;
 - failed online orders;
-- pending approvals.
+- approvals requiring attention;
+- sales trend;
+- top products;
+- POS vs ONLINE mix;
+- shop comparison for `All Shops`.
 
-Useful analytical blocks include sales trend, top products, POS vs ONLINE mix, and shop comparison.
+### 9.2 MANAGER dashboard
 
-### Manager dashboard
+Manager emphasis includes:
 
-Focuses on the selected shop and operational responsibility:
-
-- sales and orders;
-- active orders;
+- current sales and orders;
+- active operational issues;
 - average order value;
 - low stock;
 - staff on shift;
 - delivery status;
 - cash reconciliation;
-- pending approvals within authority.
+- approvals assigned to the manager.
 
-### Staff dashboard
+STAFF sees only permitted operational/management information.
 
-Shows only widgets permitted by that user's role and permissions.
+### 9.3 Reports
 
-### All Shops view
+Reports remain inside Admin; there is no export functionality.
 
-Owner aggregate mode shows total sales, total orders, estimated profit, shop ranking, cash variances, critical stock, purchasing concerns, and online-order failures.
-
-### Reports
-
-Reports remain inside Admin. No import or export functionality is included.
-
-Reporting domains:
+Supported reporting areas include:
 
 - sales;
-- profit and COGS;
-- product performance;
-- inventory and waste;
+- estimated profit and COGS;
+- product/category performance;
+- inventory consumption, waste, and variance;
 - purchasing and suppliers;
-- customers, loyalty, and promotions;
-- payment and cash reconciliation;
+- customers, loyalty, promotions, and segments;
+- payments, bank/cash, and cash reconciliation;
 - staff and attendance;
 - delivery;
-- refunds/returns;
-- expenses.
+- returns/refunds;
+- expenses;
+- shop comparison.
 
-Reports support date and shop filters and use server-side aggregation.
+Reports support date/shop filters, comparison periods, saved views, drill-down from summary to underlying records, and role-based access. Report calculations must be authoritative server-side calculations rather than fragile client-only math.
 
-### Alerts
+### 9.4 Targets
 
-Alerts must be actionable and low-noise. Priority labels are:
+Authorized users can define practical business targets such as sales, order count, food-cost percentage, waste, or other approved operating targets. Progress should be visible in dashboards/reports without turning Admin into a separate performance-management product.
+
+### 9.5 Alerts
+
+Alerts must be actionable and low-noise. Examples include:
+
+- low or out-of-stock inventory;
+- significant stock variance;
+- cash variance;
+- failed online order;
+- large refund awaiting approval;
+- overdue purchase order;
+- critical device offline;
+- attendance issue;
+- scheduled publish failure;
+- promotion activation failure;
+- margin deterioration where configured.
+
+Priority is deliberately simple:
 
 ```text
 Critical
@@ -345,98 +459,108 @@ Needs Attention
 Info
 ```
 
-Examples include low/out-of-stock items, large stock variances, cash variances, failed online orders, approval requests, overdue purchase orders, critical device outages, attendance issues, and scheduled publish failures.
+Users may reorder, resize, or hide noncritical dashboard widgets. Critical alerts cannot be hidden.
 
-Users may reorder, hide noncritical widgets, resize where useful, and reset layouts. Critical alerts cannot be silently hidden from roles responsible for them.
+### 9.6 Daily owner summary
+
+The system generates a concise daily owner summary server-side using the canonical business data. It should summarize key sales, orders, estimated profit, cash variance, stock issues, major refunds, online-order failures, and important operational exceptions. It is available inside Admin and may use enabled Admin notifications; it must not depend on WhatsApp production setup to exist.
 
 ---
 
-## 9. Catalog, Pricing, Availability, and Publishing
+## 10. Catalog, Pricing, Availability, and Publishing
 
-### Master Catalog + shop overrides
+### 10.1 Master catalog with shop overrides
 
-Each product has one business-level identity and definition:
+Business-level catalog definitions include:
 
-- name;
+- product identity and name;
 - description;
 - image;
 - category;
-- type;
-- modifiers/extras;
-- combo structure;
-- recipe association;
-- active/archive status.
+- modifier/extra structure;
+- combo and drink-option structure;
+- base recipe association.
 
-Shop-specific overrides may include:
+Shop-level overrides include:
 
 - price;
 - availability;
-- Sold Out state;
-- visibility;
-- permitted branch-specific settings;
-- recipe override only where intentionally supported.
+- sold-out state;
+- shop visibility;
+- shop-specific recipe/availability behavior where explicitly supported;
+- branch-specific catalog settings.
 
-Because the current canonical catalog is physically shop-scoped, the implementation must introduce a compatibility/control layer that can represent master identity while publishing safe shop-specific canonical projections. It must not replace working Menu/Operations contracts with an incompatible model.
+The current production catalog is shop-scoped. Therefore, the business-level master catalog must be introduced as a compatibility/control layer and safely projected/published into the existing shop-specific canonical catalog contracts used by Menu and Operations. Existing operational tables must not be abruptly replaced.
 
-### Product types
+### 10.2 Catalog UX
 
-UI may expose simple types such as:
+Desktop uses a table/list plus a right-side inspector. Phone opens the product editor as a focused full-screen task. Tablet uses adaptive split view.
+
+A product detail surface contains clearly grouped sections:
 
 ```text
-Standard Product
-Combo
-Direct-Stock Product
+General
+Pricing
+Availability
+Images
+Extras / Modifiers
+Combo Options
+Recipe / Inventory
+Shop Overrides
+History
 ```
 
-Irrelevant fields are hidden through progressive disclosure.
+High-impact bulk actions are supported where they reduce repetitive work, such as price changes, availability, category assignment, shop assignment, and publish selection. Bulk actions are not import/export.
 
-### Pricing
+Used catalog entities are archived/restored rather than hard deleted. An unused draft may be hard deleted before it has business history.
 
-Pricing supports:
+### 10.3 Availability model
 
-- business default/base price;
-- per-shop override;
-- scheduled future price;
-- high-impact bulk actions such as percentage/absolute price changes, category reassignment, availability changes, shop assignment, and publish.
+Availability can be affected by:
 
-There is no import/export workflow.
+- automatic stock-derived availability;
+- manual `Sold Out` override;
+- shop-level disabled/hidden status;
+- scheduled visibility/availability rules.
 
-### Availability
+The UI must show the human-readable reason a product is unavailable.
 
-Final availability is derived from independent business facts:
+If an item is unavailable only because stock is insufficient, normal availability may return automatically when stock becomes available. A manual sold-out override remains active until explicitly removed or its approved schedule changes it.
 
-```text
-manual override
-+ stock-based availability
-+ shop-enabled state
-```
+### 10.4 Immediate controls vs draft publishing
 
-Admin must show a human-readable reason such as `Out of Beef` or `Manually marked Sold Out`.
+Immediate operational controls include:
 
-Automatic stock unavailability may clear when stock returns. Manual Sold Out remains until explicitly removed.
+- Sold Out / Available;
+- pause/resume online ordering;
+- urgent stock adjustment;
+- employee disable;
+- delivery pause.
 
-### Images
-
-Admins may take/select/upload an image, crop/preview it, and save the draft. Image optimization and storage details are automatic and hidden.
-
-### Draft and publish model
-
-Structural/business catalog changes use:
+Catalog/configuration edits use:
 
 ```text
-Edit
-→ Save Draft
+Draft
+→ Validate
 → Preview
-→ Publish
+→ Publish atomically
+→ Version history
+→ controlled rollback
 ```
 
-Publish is atomic. Menu and Operations must never observe a partially updated configuration.
+Draft-published content includes product names/descriptions, prices, categories, modifiers/extras, combos, images, menu structure, and checkout configuration.
 
-Immediate operational actions may bypass draft/publish when intentional, including Sold Out/Available, urgent item pause, and emergency hide.
+A publish must never leave Menu and Operations on partially applied relationships. The server validates required references and writes/publishes one coherent version. If validation or persistence fails, no partial publish becomes active.
 
-### Scheduled publishing
+### 10.5 Versioning and historical correctness
 
-Scheduled activation is allowed for high-value business configuration:
+Important business configuration is versioned. Historical orders preserve the values effective when the order was created, including applicable price, discount, recipe/cost snapshot, tax/service-charge, delivery fee, payment configuration, modifier/combo selections, and promotion effects.
+
+Rollback creates a new active version based on a prior valid configuration; it does not erase historical versions.
+
+### 10.6 Scheduled publishing
+
+Authorized users may schedule high-value business changes for Egypt local time, including:
 
 - prices;
 - availability;
@@ -446,126 +570,138 @@ Scheduled activation is allowed for high-value business configuration:
 - opening/delivery hours;
 - online-order pause/resume.
 
-Schedules are entered and interpreted in `Africa/Cairo`; server activation is atomic and audited.
+The server validates the proposed change before accepting the schedule. Activation happens server-side and atomically. Refunds, stock corrections, permissions, and historical financial corrections are not scheduled actions.
 
-### Version history and rollback
+### 10.7 Concurrency
 
-Published catalog/configuration versions are retained. Rollback creates a new published version based on a previous one; it never erases history.
-
-A stale draft cannot silently overwrite a newer live version. Conflict review is required.
+Catalog edits use version/concurrency fences. If another user changes an item after the current user opened it, Admin must not silently overwrite the newer state. The user is shown that the data changed and must reload/review before saving or publishing.
 
 ---
 
-## 10. Inventory, Recipes, Costing, and Stock Lifecycle
+## 11. Inventory and Recipe Management
 
-TUX must extend the existing inventory foundation rather than create a parallel inventory system.
+TUX already has `inventory_items` and `recipe_lines`. Admin extends this foundation; it must not create a second parallel inventory source of truth.
 
-### Inventory item model
+### 11.1 Hybrid inventory
 
-Each item has:
+Inventory supports both:
 
-- name;
-- base unit;
-- purchase-unit conversions;
-- tracking behavior;
-- low-stock threshold;
-- on-hand quantity;
-- reserved quantity;
-- available quantity;
-- weighted-average unit cost;
-- inventory value.
+- recipe-tracked ingredients/raw materials;
+- direct-stock products or packaged items.
 
-Human-facing item types remain simple, such as Ingredient and Direct-stock item.
+Examples include ingredients measured by mass/volume and sellable bottles/packages counted directly.
 
-### Units and conversion
+### 11.2 Units and conversions
 
-Each item has one canonical base unit such as gram, milliliter, or piece. Purchase units such as kg, liter, case, box, bag, or bottle map through configured conversions.
+Each inventory item has a base unit suitable for accurate consumption, such as gram, milliliter, or piece. Purchasing may use kg, liter, case, box, bag, bottle, or other approved units.
 
-### Recipes
+Each item may define explicit purchase-to-base conversion, for example:
 
-Recipes define ingredient consumption per product. Admin automatically calculates estimated product cost, food cost percentage, and gross margin estimates.
+```text
+1 case = 24 pieces
+1 kg = 1000 grams
+```
 
-Recipe changes are versioned so historical orders keep their historical cost basis.
+Conversions are validated server-side and used consistently in purchasing, receiving, recipe consumption, valuation, and stocktake.
 
-### Reservation lifecycle
+### 11.3 Stock ledger
+
+Inventory is event/ledger based. Relevant movement types include:
+
+- purchase receipt;
+- sale consumption;
+- waste;
+- manual adjustment;
+- stocktake adjustment;
+- branch transfer out/in;
+- purchase return;
+- reservation/release lifecycle where represented separately from physical movements.
+
+The UI exposes understandable balances such as:
+
+```text
+On Hand
+Reserved
+Available
+Consumed
+Waste
+Adjustments
+Incoming
+```
+
+Historical ledger events are not rewritten to make current stock match. Corrections create new auditable movements.
+
+### 11.4 Reservation lifecycle
 
 Approved order/inventory behavior:
 
-```text
-Online request before accepted order → no stock movement
-Accepted ONLINE order              → reserve stock
-POS order created                  → reserve stock immediately
-DONE                               → reserved becomes consumed
-CANCELLED                          → release reservation
-RETURNED                           → financial reversal; no automatic food-stock restoration
-```
+- online request before operational acceptance: no stock movement/reservation;
+- accepted ONLINE order becomes a canonical operational order: reserve required stock;
+- POS order creation: reserve required stock immediately;
+- order `DONE`: reserved quantity becomes consumed;
+- order `CANCELLED`: reservation is released;
+- order `RETURNED`: financial return does not automatically put prepared ingredients back into stock.
 
-Reusable returned stock requires a separate authorized inventory adjustment.
+Reusable returned stock may be corrected separately by an authorized manager through an audited adjustment.
 
-### Negative stock
+Negative available stock is blocked by default. An OWNER-only emergency override may allow an exceptional negative movement with explicit reason and audit.
 
-Negative available stock is disallowed by default. An authorized owner may perform an explicit audited emergency correction when the recorded inventory itself is wrong.
+### 11.5 Costing
 
-### Inventory ledger
+Inventory valuation uses weighted average cost per shop. Receiving updates weighted average unit cost using the accepted received quantity/cost. Transfers preserve the source cost so moving stock between branches does not create artificial profit or loss.
 
-Admins do not directly overwrite stock quantities as historical truth. Quantity changes create ledger movements such as:
+The system maintains enough information to calculate:
 
-- receiving;
-- sale consumption;
-- reservation;
-- reservation release;
-- waste;
-- manual adjustment;
-- transfer;
-- stocktake adjustment;
-- purchase return.
+- on-hand inventory value;
+- reserved value where useful;
+- consumed COGS;
+- waste cost;
+- adjustment cost;
+- recipe/product estimated cost;
+- food-cost percentage;
+- gross margin.
 
-A performant current-stock projection may be maintained, but the ledger remains the historical explanation of stock state.
+### 11.6 Par levels and reorder suggestions
 
-### Waste
+Inventory items may have shop-specific par/reorder levels and practical supplier/replenishment settings. Admin can identify items below the configured level and calculate reorder suggestions from current stock, reservations, incoming stock, and target level.
 
-Waste entry captures item, quantity, reason, shop, actor, and cost impact. Reports may show waste quantity/value by item/shop/time.
+Reorder suggestions remain recommendations; they do not automatically send supplier orders.
 
-### Stocktake
+### 11.7 Actual vs theoretical usage
 
-Formal physical stock count supports:
+Admin compares theoretical inventory consumption derived from completed orders/recipes against actual ledger/stocktake results. This supports identifying waste, over-portioning, recording mistakes, or unexplained shrinkage.
 
-- full shop count;
-- category/partial count;
-- blind count where configured;
+### 11.8 Stocktake / physical count
+
+Formal stocktake supports:
+
+- shop selection;
+- full or partial/category count;
+- stable count snapshot/boundary;
+- optional blind count;
+- entered physical quantity;
+- system quantity;
+- quantity and value variance;
 - recount;
-- system-vs-actual variance quantity and value;
 - reason for significant differences;
 - approval where required;
-- audited ledger adjustment.
+- posting one audited adjustment to reconcile the ledger.
 
-Stocktake uses a stable inventory boundary/snapshot so concurrent sales or receiving do not corrupt the comparison.
+Concurrent sales/receipts must not corrupt the comparison. Implementation must use a stable stocktake boundary/snapshot and account for movements occurring after that boundary.
 
-### Transfers
+Lot/batch/expiry tracking is not part of this restaurant-focused Admin unless a future separate requirement explicitly introduces it.
 
-Branch transfer lifecycle:
+### 11.9 Start-of-day and end-day inventory controls
 
-```text
-REQUESTED
-→ SENT
-→ RECEIVED
-```
-
-Destination stock appears only after receipt confirmation. Variances are recorded with reason. Transfer cost preserves source inventory cost so inter-branch movement does not generate artificial profit/loss.
-
-### Costing
-
-Weighted Average Cost is the approved costing method. It powers inventory valuation, recipe cost, COGS, and waste/adjustment cost reporting.
-
-Batch/lot tracking, expiry-per-batch tracking, warehouse bin locations, barcode warehouse picking, and automated supplier replenishment are excluded.
+Where configured for a shop, Admin/Operations management views may expose opening inventory reference/snapshot information and end-day inventory usage/reconciliation. These controls use the canonical ledger; they do not create a second inventory balance or destructive daily reset.
 
 ---
 
-## 11. Suppliers and Purchasing
+## 12. Purchasing and Suppliers
 
-Supplier identity is business-level; purchasing and receiving are shop-specific.
+Supplier identity is business-level. Purchase orders and receiving are shop-specific.
 
-Supplier profiles contain practical contact information, supplied items, notes, and active/archive state.
+Supplier information includes name, contact details, notes, status, and relevant commercial references.
 
 Purchase order lifecycle:
 
@@ -574,41 +710,51 @@ DRAFT
 → ORDERED
 → PARTIALLY_RECEIVED
 → RECEIVED
+
+or → CANCELLED
 ```
-
-or `CANCELLED`.
-
-Receiving is distinct from ordering. A receipt updates inventory only for quantities actually received, updates weighted average cost, updates purchase-order status, and creates audit records in one transaction.
 
 Purchasing supports:
 
+- supplier selection;
+- shop selection;
+- line items and purchase units;
+- expected quantities/costs;
 - partial receiving;
-- unit cost;
+- receiving discrepancies;
+- stock posting from accepted received quantity;
+- supplier invoice/reference/attachment;
 - last purchase price;
 - cost history;
-- supplier invoice/reference/attachment;
-- simple supplier payment status;
-- purchase returns.
+- weighted average cost update;
+- payment status;
+- supplier balance/status;
+- purchase return;
+- overdue PO visibility.
 
-Supplier payment state may be Unpaid, Partially Paid, or Paid with basic amount/date/method/reference tracking. TUX does not become a full accounts-payable or accounting platform.
+Receiving is authoritative only after the server validates units, quantities, shop, permissions, and PO state.
+
+Purchasing contributes to product/recipe cost and estimated margin reporting but does not become a full ERP or general ledger.
 
 ---
 
-## 12. Orders
+## 13. Orders and Operational History
 
-Admin is a supervisory/control interface over canonical POS and ONLINE orders.
+Admin can view canonical POS and ONLINE orders together.
 
-Admin may:
+Search/filter dimensions include:
 
-- view/search/filter all authorized orders;
-- inspect items/modifiers/discounts/payments/customer/delivery/inventory effects/history;
-- cancel ACTIVE orders with permission and reason;
-- initiate controlled refund/return workflows;
-- inspect audit history.
+- shop;
+- date/time;
+- worker;
+- customer;
+- status;
+- source;
+- order/reference number.
 
-Search/filter dimensions include shop, date, worker, customer, status, source, payment method, and order number.
+Order details include items, modifiers, combos, discounts, promotions, payments, customer context, audit/status events, applicable inventory effects, and return/refund history.
 
-Order status remains compatible with the current canonical model:
+Order status model remains compatible with the existing canonical values:
 
 ```text
 ACTIVE
@@ -617,851 +763,838 @@ CANCELLED
 RETURNED
 ```
 
-Completed, cancelled, and returned business history is immutable. Admin does not directly edit a completed order.
+Rules:
 
-Cancelling an ACTIVE order releases its inventory reservation. A refund/return creates a new financial/business event rather than rewriting the original payment or order history.
+- ACTIVE orders may be viewed and, with permission, controlled through explicit cancellation/management commands;
+- DONE orders are immutable as historical sales; corrections use refund/return flows rather than editing the sale;
+- CANCELLED and RETURNED historical states are immutable;
+- canonical orders are never hard-deleted;
+- every sensitive management action records actor, shop, reason, time, and resulting state.
+
+Admin is not used to manually edit finalized order line prices or settled payment history.
 
 ---
 
-## 13. Customers, Canonical Identity, Loyalty, and Promotions
+## 14. Customers, CRM, Loyalty, Promotions, and Segments
 
-### Canonical customer identity
+### 14.1 Canonical customer identity
 
-The existing shop-scoped `customer_contacts` model must be extended with a business-level customer identity layer without breaking existing order references.
+Customer identity is business-level rather than duplicated per shop.
 
-Normalized Egyptian phone number is the primary identity key. Equivalent forms such as `010...`, `+20...`, `0020...`, and `20...` must canonicalize consistently.
+Normalized Egyptian phone number is the primary identity key. Equivalent forms such as `010...`, `+20...`, `0020...`, and `20...` must canonicalize consistently. Name similarity alone never merges customers.
 
-Same phone means same customer. Same name alone does not.
+The current `customer_contacts` model is shop-scoped. The Admin architecture therefore adds a business-level canonical customer layer with a safe mapping to existing shop-scoped/order references rather than breaking historical orders.
 
-Customer profile supports:
+Customer profile includes:
 
-- name;
-- canonical phone;
+- normalized phone;
+- display name;
 - multiple addresses;
+- notes and tags;
 - order history across shops;
 - total spend;
 - order count;
 - average order value;
 - last order;
-- notes/tags;
-- loyalty balance/history;
-- branch activity.
+- branch history;
+- derived favorites where useful;
+- loyalty state.
 
-Changing the canonical phone is sensitive and must check for an existing identity.
+Duplicate merge is a sensitive confirmed action. It combines identities, addresses, loyalty, and future profile references while preserving original order/audit history.
 
-### Duplicate merge
-
-Duplicate merge is a confirmed, audited operation. It combines orders, addresses, loyalty, and identity links safely without deleting historical order snapshots.
-
-### Loyalty
+### 14.2 Loyalty
 
 Loyalty supports:
 
-- configurable earn rules;
-- redemption rules;
-- minimum redemption;
-- optional expiry;
-- shop applicability;
-- manual adjustments with reason and audit.
+- points earning;
+- points redemption;
+- configurable earning/redemption rules;
+- minimum redemption threshold;
+- optional expiry policy;
+- manual adjustment with permission, reason, and audit.
 
-### Promotions
+Historical loyalty events remain auditable.
 
-Promotion types:
+### 14.3 Promotions
 
-- percentage discount;
+Promotion definitions can be business-level and assigned to selected shops/channels.
+
+Supported promotion behavior includes:
+
+- code-based promotions;
 - fixed discount;
-- free product.
+- percentage discount;
+- free item;
+- minimum order;
+- shop/all-shop scope;
+- start/end time;
+- usage limit;
+- per-customer usage limit;
+- POS / ONLINE / BOTH applicability;
+- interaction with checkout discount-stacking rules.
 
-Promotion rules may include code, start/end, minimum order, total usage limit, per-customer limit, selected/all shops, POS/ONLINE/BOTH, and selected products/categories.
+Promotion activation can be scheduled through the canonical publishing/scheduling mechanism.
 
-The UI must show a plain-English summary of the resulting rule.
+### 14.4 Customer segments
 
-Default stacking behavior: only one order-level promotion applies to an order. Product-specific pricing/discount rules may remain independent where explicitly modeled.
-
-Server validation prevents expired use, usage-limit violations, invalid shop/channel use, and negative totals.
-
-A complex CRM sales pipeline is excluded.
+Admin may define practical customer segments using canonical data, such as recent/frequent/high-value/lapsed customers or other approved rule-based groups. Segments support reporting and promotion targeting. They must not create destructive customer duplication or depend on external marketing automation.
 
 ---
 
-## 14. Staff, Shifts, Attendance, and Wage Estimates
+## 15. Staff, Shifts, Attendance, and Staff Payments
 
-### Employee identity
+Employee identity is business-level with shop assignments. Existing shop/worker operational identities remain compatible with Operations execution.
 
-One business-level employee identity represents one person even when assigned to multiple shops.
-
-Employee data includes:
+Staff profile supports:
 
 - name;
-- personal PIN;
-- role;
-- custom permissions;
+- individual Admin/worker PIN as appropriate;
+- role and custom permissions;
 - assigned shops;
-- phone;
-- active/suspended/archived state;
+- active/suspended state;
 - hire date;
-- pay type/rate;
+- phone;
 - notes.
 
-The design must reconcile this business identity with existing Operations worker/session authority rather than create unrelated duplicate people.
+Workforce features include:
 
-### Scheduling
+- weekly schedule;
+- shop assignment;
+- shift start/end;
+- breaks;
+- clock-in/clock-out records;
+- worked time;
+- late/absent indicators;
+- overtime estimate;
+- leave types such as vacation, sick, and other;
+- leave approve/reject;
+- worker activity/log history where operationally available.
 
-Shift scheduling supports employee, shop, day/date, start/end, breaks, and repeated weekly planning. `Copy Previous Week` is included because it materially reduces repeated manager work.
+### 15.1 Wage tracking
 
-Each shift is explicitly shop-specific.
+Admin supports practical wage estimation for hourly and monthly staff:
 
-### Attendance
+- expected hours;
+- worked hours;
+- overtime;
+- hourly/monthly basis;
+- estimated payable amount.
 
-Attendance states may represent Clocked In, On Break, and Clocked Out. Admin may derive lateness, possible absence, early departure, and overtime from scheduled-vs-actual timing.
+It does not become a statutory payroll/tax engine.
 
-Manual corrections preserve original values and create audited corrective history rather than rewriting the evidence.
+### 15.2 Staff payment records
 
-### Leave
+Authorized users can record a staff payment with:
 
-Simple leave types include Vacation, Sick, Unpaid, and Other with Approve/Reject behavior.
+- employee;
+- period;
+- expected amount;
+- paid amount;
+- payment account/method, such as cash or a configured bank account;
+- payment date;
+- note/reference where useful.
 
-### Wage estimates
+Posting the payment reduces the selected cash/bank balance through an auditable finance event and contributes to wage/salary expense reporting without pretending to perform full payroll accounting.
 
-Supported pay styles:
-
-- hourly;
-- monthly.
-
-Admin may calculate worked hours, overtime, expected wage, and configured attendance adjustments. This remains operational wage estimation, not statutory payroll/tax processing.
-
-No arbitrary employee score/ranking is included. Factual performance metrics such as orders handled, sales handled, cancellations/refunds initiated, AOV, attendance, and late shifts may be shown where permitted.
-
-Recruitment, CV management, LMS/training, formal performance-review workflows, tax payroll filing, bank salary transfer, and biometric hardware integration are excluded.
+Disabling an employee, resetting a PIN, changing role/permissions, or moving shop assignments is audited and may require sensitive re-authentication/approval.
 
 ---
 
-## 15. Delivery, Opening Hours, Checkout, and Payment Methods
+## 16. Delivery Management
 
-### Delivery zones
+Delivery is shop-aware and configuration-driven.
 
-Each shop may define delivery zones with:
+Delivery-zone configuration includes:
 
-- name;
-- supported geography/boundary;
+- zone name;
+- area/map definition;
 - fee;
 - minimum order;
-- estimated delivery time;
+- ETA;
 - enabled state;
-- service hours;
-- assigned shop.
-
-Address → zone → shop routing is authoritative. If overlapping shops exist, priority/fallback behavior must be explicitly configured rather than silently rerouting orders.
-
-### Online operational controls
-
-Admins with permission may immediately control:
-
-- online ordering on/off;
-- delivery on/off;
-- pickup on/off;
+- shop assignment;
+- zone priority if areas overlap;
+- delivery hours;
 - temporary pause;
-- temporary shop closure.
+- maximum distance where used.
 
-### Hours
+Online address handling follows:
 
-Weekly opening hours and delivery hours are shop-specific. Special-date hours override normal schedules. Business interpretation is always `Africa/Cairo`.
+```text
+Customer address
+→ resolve delivery zone
+→ resolve/route to correct shop
+→ calculate delivery fee + rules
+→ submit order to that shop
+```
 
-### Riders
+Rider management supports name, phone, assigned shop, active status, and delivery assignment.
 
-Simple rider management supports name, phone, shop, active state, assignment, and delivery lifecycle:
+Delivery status flow:
 
 ```text
 UNASSIGNED
 → ASSIGNED
 → OUT_FOR_DELIVERY
 → DELIVERED
+
+or → FAILED / RETURNED
 ```
 
-with `FAILED` and `RETURNED` exception states.
-
-Live rider GPS tracking is excluded.
-
-### Payment methods
-
-Payment methods are fully editable per shop and may be enabled for POS, ONLINE, or BOTH. Configuration includes display name, sort order, reference requirement, manual confirmation behavior, and whether refund is supported.
-
-A small stable technical classification should exist underneath custom display names, such as Cash, Card, Digital, and Other.
-
-Historical settled payment snapshots are immutable. Renaming or changing a payment method affects future behavior only.
-
-### Checkout rules
-
-Per-shop checkout configuration may include:
-
-- minimum order;
-- service charge;
-- tax/VAT configuration;
-- delivery fee behavior;
-- available payment methods;
-- discount compatibility;
-- payment restrictions by shop/zone;
-- online-order availability.
-
-The trusted server revalidates prices, discounts, minimums, payment method eligibility, delivery zone, service charge, and tax. Browser-provided totals are never final authority.
+Live GPS tracking is not included.
 
 ---
 
-## 16. Finance, Expenses, COGS, and Cash Reconciliation
+## 17. Finance, Bank/Cash, Expenses, Reconciliation, and Profit
 
-Operations continues to own live payment and business-day execution. Admin supervises and reports.
+Operations owns live transactional payment execution and business-day cash activity. Admin supervises, reports, reconciles, and performs controlled management adjustments.
 
-### Profit model
+### 17.1 Financial dashboard/reporting
 
-Admin calculates:
+Admin reports:
+
+- sales today/week/month/custom period;
+- cash/card/other payment methods;
+- POS vs ONLINE;
+- refunds/returns/discounts;
+- purchases;
+- gross and net sales;
+- COGS;
+- gross profit;
+- food-cost percentage;
+- expenses;
+- estimated operating profit;
+- shop/worker/payment/product/category/time comparisons.
+
+Estimated operating profit is defined clearly as:
 
 ```text
-Gross Sales
-- Discounts
-- Refunds / Returns
-= Net Sales
-
-Net Sales
-- COGS
-= Gross Profit
-
-Gross Profit
-- Operating Expenses
-= Estimated Operating Profit
+Net Sales - COGS - Expenses = Estimated Operating Profit
 ```
 
-The UI must call the final number `Estimated Operating Profit`, not accounting net profit.
+It is an operating estimate, not statutory accounting profit.
 
-### COGS
+### 17.2 Expenses
 
-COGS derives from completed-order recipe consumption and the historical weighted-average cost basis used at that point in time. Future supplier-price changes must not rewrite historical order profitability.
-
-### Expenses
-
-Expense management captures:
+Expense management supports:
 
 - amount;
 - date;
 - shop;
 - category;
-- note/description;
+- note;
 - optional receipt attachment;
-- one-time or recurring behavior.
+- one-time or recurring definition.
 
-Default practical categories may include Rent, Salaries/Wages, Utilities, Marketing, Maintenance, Supplies, Delivery, Fees, and Other. Custom categories are allowed.
+Core categories include rent, salaries/wages, utilities, maintenance, marketing, delivery, supplies, and other. Authorized configuration may add useful categories without turning the feature into a chart-of-accounts system.
 
-Recurring expense rules may create expected recurring expense occurrences for fixed costs such as rent, internet, cleaning, or subscriptions.
+Recurring expenses generate expected/recordable business expense events according to the configured schedule; they are auditable and editable prospectively rather than rewriting historical posted expenses.
 
-Purchasing is not immediately counted as full COGS: purchased inventory first affects stock valuation and becomes COGS when consumed.
+### 17.3 Bank and cash accounts
 
-### Cash reconciliation
+Admin maintains simple money-position accounts such as shop cash and named bank accounts. It supports auditable balance-affecting events, including:
 
-At business-day close, Admin compares expected cash with actual counted cash and records the variance, reason, actor, shop, and timestamp.
+- operational cash movement summaries;
+- bank deposit;
+- bank withdrawal;
+- transfer between configured internal money accounts where allowed;
+- staff payment;
+- expense payment;
+- approved financial correction.
 
-Expected cash is never silently edited to match the physical count. Corrections create adjustment events.
+Every manual movement requires permission and appropriate reason/reference. Historical movements are not silently overwritten.
 
-### Financial adjustments
+This feature is business cash/bank tracking, not bank-feed reconciliation and not double-entry accounting.
 
-Historical finance records are immutable. Legitimate correction creates a new adjustment with reason, permission checks, possible approval, and audit.
+### 17.4 Cash reconciliation
 
-### Supplier payment state
+Admin shows expected vs actual cash for the business day/shop and calculates over/short variance. A manager/owner may review, enter actual count, provide a reason for material variance, and approve/post the reconciliation.
 
-Basic payment state for purchase orders is supported without building full accounting.
+Historical reconciliation is immutable. Corrections use an explicit adjustment event.
 
-Excluded finance scope includes double-entry accounting, tax filing, VAT return submission, bank-feed reconciliation, balance sheet, depreciation, accounting-year close, and statutory payroll.
+### 17.5 Opening, X, and End-Day Z history
+
+Admin provides management visibility over opening/closing history and X/Z-style summaries without taking live Operations authority away from the POS flow.
+
+- opening reference/status shows the active business-day context;
+- X report is a non-closing current-period snapshot;
+- End-Day Z history shows finalized business-day totals and reconciliation results;
+- previous days remain immutable;
+- corrections occur through authorized adjustment events, not report resets.
+
+No destructive report reset/purge is allowed for canonical business history.
 
 ---
 
-## 17. Shops, Business Settings, Devices, and Shop Health
+## 18. Payments, Checkout, Order Types, Receipts, and Reason Codes
 
-### Business defaults
+### 18.1 Payment methods
 
-Business-level settings may include:
+Payment methods are fully editable per shop and may include Cash, Card, Online, Wallet, and Custom methods.
 
-- business name;
-- logo/branding;
-- EGP default currency;
-- `Africa/Cairo` timezone;
-- global catalog defaults;
-- payment defaults;
-- checkout defaults;
-- role presets;
-- inventory defaults;
-- business contact information.
+Configuration includes:
 
-### Shop settings
+- enabled/disabled;
+- POS / ONLINE / BOTH;
+- display name;
+- sort order;
+- reference requirement;
+- manual confirmation requirement;
+- refund allowed;
+- shop assignment.
 
-A shop includes:
+Provider secrets stay server-side and are never displayed to ordinary Admin/browser code.
 
-- name;
-- address;
-- phone;
-- canonical coordinates where useful;
-- status;
-- opening/delivery hours;
-- order types;
-- payment methods;
-- delivery zones;
-- tax/service-charge rules;
-- online ordering;
-- catalog overrides;
-- inventory rules;
-- staff assignment;
-- devices;
-- receipt/customer-facing information.
+Historical settled payments preserve their original method/value even if the method configuration changes later.
 
-New shop setup may copy suitable configuration from an existing shop, but never copies operational history such as orders, inventory quantities, business days, cash records, attendance, or expenses.
+### 18.2 Checkout rules
 
-Shop lifecycle:
+Shop-level checkout rules include:
+
+- minimum order;
+- service charge;
+- tax/VAT configuration;
+- delivery-fee behavior;
+- discount-stacking rules;
+- payment restrictions by shop/zone/channel.
+
+Sensitive payment/tax configuration changes require appropriate permission and audit and use draft/publish semantics where they affect future order pricing.
+
+### 18.3 Order types
+
+Admin explicitly manages canonical order types such as:
 
 ```text
-ACTIVE
-→ SUSPENDED
-→ ARCHIVED
+Dine In
+Take Away
+Delivery
+Pickup
 ```
 
-No hard delete after business history exists.
+Order types may be enabled/disabled and scoped by shop/channel according to supported business rules. Historical orders retain the order type recorded at sale time.
 
-### Devices
+### 18.4 Receipt and order-number settings
 
-Admin manages existing Operations device authority with practical data such as:
+Each shop has one controlled receipt/order settings area containing:
 
-- label;
+- receipt business/shop name;
+- address;
+- phone;
+- tax information where applicable;
+- footer text;
+- order-number sequence/prefix rules;
+- printer assignment/routing reference.
+
+Changes affect future receipts/orders only. Historical receipts/orders keep their original transaction data.
+
+### 18.5 Central reason codes
+
+Reason codes are centrally managed so reporting does not fragment equivalent reasons into free-text variants.
+
+Reason families include:
+
+- order cancellation;
+- refund/return;
+- discount/comp;
+- waste;
+- stock adjustment;
+- cash variance;
+- pay-in/pay-out;
+- other approved sensitive adjustments.
+
+The system provides sensible defaults and allows authorized custom reasons. A note may still be required for exceptional cases, but canonical reason codes are used for reporting and audit.
+
+---
+
+## 19. Shops, Devices, Printers, Shop Health, and Operations Management
+
+### 19.1 Shop settings
+
+Shop settings include:
+
+- name;
+- canonical address;
+- phone;
+- geographic coordinates/location where configured;
+- opening hours;
+- delivery hours;
+- receipt info;
+- order numbering;
+- payment methods;
+- checkout/tax/service-charge rules;
+- delivery configuration;
+- menu visibility;
+- stock rules;
+- printer/device settings;
+- temporary close;
+- pause online orders.
+
+Business time is always `Africa/Cairo`; shop/business timestamps are rendered and scheduled in Egypt local time while database timestamps remain proper absolute timestamps.
+
+### 19.2 One canonical shop contact/location authority
+
+Shop identity data is stored once and reused consistently by:
+
+- Menu;
+- Delivery;
+- Receipts;
+- WhatsApp store-location messages;
+- Shop Settings;
+- other integrations that need the official shop contact/location.
+
+Individual modules must not maintain conflicting copies of the shop address/phone/location.
+
+### 19.3 Shop management
+
+Authorized users can create/edit shops, temporarily suspend them, archive them, assign users, copy selected settings/catalog configuration, manage overrides, and inspect health.
+
+Used shops are never hard deleted.
+
+### 19.4 Operations devices
+
+Admin can view and manage Operations devices with:
+
+- device label;
 - assigned shop;
 - active/disabled state;
 - last seen;
-- configuration version;
-- application/build version;
-- online/offline status.
+- current configuration version;
+- application/build information where available;
+- online/offline health.
 
-Permitted actions include configuration refresh, rename, shop reassignment, disable/revoke, and enrollment workflow where supported. Dangerous remote-control actions such as remote cash drawer operation are excluded.
+Authorized actions include force configuration refresh, revoke/deactivate device, and enrollment management.
 
-### Printers
+### 19.5 Printers
 
-Admin may configure required receipt/kitchen printers, enable/disable them, assign them to shop/device, configure supported routing, and trigger test print where Operations supports the contract.
+Printer management covers receipt/kitchen printers, routing, enable/disable, and safe test print. Admin does not expose dangerous remote control such as opening cash drawers remotely or creating live orders on behalf of Operations.
 
-### Shop Health
+### 19.6 Shop Health
 
-Shop Health gives an actionable summary of:
+Shop Health provides a concise operational view such as:
 
-- Operations device status;
-- current business-day status;
+- Operations device online/offline;
+- last sync;
+- active business-day status;
+- active worker where applicable;
+- configuration version current/stale;
 - online-order health;
-- current config version;
-- low-stock state;
-- unresolved cash variance;
-- active worker context where useful;
-- WhatsApp status if configured.
+- printer health where available;
+- WhatsApp integration status if configured.
 
-Technical error codes are translated into plain-English actions.
+### 19.7 Opening/closing and Manager Log
+
+Admin provides management visibility over opening/closing records and a concise Manager Log for significant operational events, handover notes, exceptions, and review items. It complements, rather than replaces, canonical business-day/order/audit events.
 
 ---
 
-## 18. Audit, Sensitive Approval, and Activity History
+## 20. WhatsApp Control Center
 
-Important business mutations generate immutable audit events.
+WhatsApp is represented in Admin as an integration/control surface but actual Meta provider connection and production acceptance are not blockers for Admin implementation.
 
-Audit includes:
+The Admin may provide:
 
-- actor;
-- role;
-- shop;
-- action;
-- entity;
-- old value;
-- new value;
-- reason where required;
+- configured/unconfigured connection state;
+- server-side integration settings/status;
+- message template/configuration controls that are safe for Admin users;
+- automatic order-event message enable/disable rules;
+- shop/contact/location information sourced from the canonical shop profile;
+- operational health/error visibility;
+- message history/status where supported by the backend.
+
+Automatic order-event messages may cover approved customer events such as order acceptance/status changes when the provider is connected and the underlying production workflow supports them.
+
+Meta access tokens, app secrets, webhook secrets, or provider credentials are server-only and must never be returned to the browser.
+
+The existing WhatsApp implementation can remain `PENDING REAL META ACCEPTANCE` until a separate real-provider setup/acceptance exercise is completed. Admin must behave safely when WhatsApp is not configured.
+
+---
+
+## 21. Audit, Approvals, and Historical Immutability
+
+### 21.1 Audit log
+
+Sensitive and meaningful management actions produce immutable audit entries containing enough context to answer:
+
+- who acted;
+- their role/session;
+- which shop/business scope;
+- what entity/action;
+- old value/state where relevant;
+- new value/state;
+- reason code/note where required;
 - timestamp;
-- session/device context;
-- approval state.
+- device/session metadata where useful;
+- approval request/result where applicable.
 
-Do not log low-value noise such as merely opening a page.
+Audit records cannot be edited by normal Admin users.
 
-### Approval flow
+### 21.2 Approval thresholds
 
-Approved simple flow:
+Approval rules are configurable for high-risk actions such as:
 
-```text
-user requests sensitive action
-→ server determines approval requirement
-→ authorized approver receives request
-→ approver sees action/value/reason/shop/requester
-→ Approve or Reject
-→ approver confirms PIN
-→ action executes once if approved
-→ audit event written
-```
+- large refunds;
+- large stock adjustments;
+- large cash/financial corrections;
+- permission/PIN reset changes;
+- shop archive/suspension;
+- sensitive payment/tax configuration;
+- large price change;
+- other explicitly configured risk thresholds.
 
-Configurable threshold examples include large refunds and high-value stock adjustments. Permission changes, PIN reset, shop archive, important financial adjustments, and similarly sensitive configuration may always require elevated authority.
+The UI stays simple: request, one-tap approve/reject, PIN confirm, result.
 
-Approval execution must be idempotent. Rejection never executes the original action. Approved actions execute once.
+### 21.3 Immutable history
 
-Audit events are immutable. Correcting a mistake creates a new corrective event.
+Canonical historical business events are never silently edited or deleted. This includes finalized orders, payments, stock ledger movements, stocktakes, reconciliations, posted expenses, staff payments, published versions, and audit records.
 
----
-
-## 19. Drafting, Versioning, Scheduling, and Historical Immutability
-
-TUX uses a hybrid configuration model.
-
-### Immediate operational actions
-
-Examples:
-
-- Sold Out / Available;
-- pause Online Orders;
-- stock adjustment;
-- employee suspension;
-- delivery pause;
-- urgent operational shop controls.
-
-### Draft → Preview → Publish
-
-Used for configuration with broader consequences:
-
-- product identity/content;
-- prices;
-- categories;
-- modifiers/extras;
-- combos;
-- images;
-- menu structure;
-- recipes;
-- checkout configuration;
-- other publishable business rules.
-
-Publish is atomic and produces a consistent version consumed by Menu and Operations.
-
-### Versioning
-
-Important business rules retain versioned history. Historical orders retain the actual values used at the time of execution, including price, modifiers, recipe/cost basis, delivery fees, tax/service charge, discount values, payment display values, and promotion effects where applicable.
-
-### Scheduled changes
-
-Only appropriate configuration is schedulable. Refunds, stock adjustments, permission changes, and financial corrections are not scheduled mutations.
-
-### Concurrency
-
-All important editable records carry a version/revision fence. A stale client cannot silently overwrite a newer server value. Conflicts are shown in plain English and require reload/review or safe field-level resolution.
+Corrections are represented as new compensating/adjustment events.
 
 ---
 
-## 20. PWA, Sessions, Connectivity, and Reliability
+## 22. Scheduling and Time Semantics
 
-### PWA
+The business timezone is always `Africa/Cairo` and Admin is English-only.
 
-Admin is an installable mobile-first Progressive Web App with app icon, standalone shell, safe shell caching, update notification, and optional push notifications for important alerts.
+Database timestamps remain absolute `timestamptz`-style values. Admin renders user-visible date/time in Egypt local time. Business-day boundaries and scheduled activation rules use `Africa/Cairo` semantics.
 
-There is one web application, not separate native iOS/Android applications.
+Scheduled changes are stored with validated intended local activation time plus an unambiguous canonical instant. The server scheduler activates due changes and records success/failure in audit/alerts.
 
-### Sessions
+Schedules may be used for approved configuration/promotion/hour changes and recurring operational/expense definitions, not for destructive historical rewrites.
 
-Normal use requires PIN login once per valid session. Sensitive actions may require re-PIN. Session expiry returns the user to PIN entry and should preserve safe navigation context where practical.
+---
 
-### Offline behavior
+## 23. PWA, Connectivity, and Offline Behavior
+
+Admin is an installable mobile-first PWA.
+
+Supported behavior includes:
+
+- Add to Home Screen / installable shell;
+- standalone display shell;
+- app icon/splash metadata;
+- secure remembered session behavior;
+- cached application shell;
+- update-available notification;
+- optional web push for important Admin alerts where supported.
 
 Admin writes are online-only.
 
-When offline, the app may continue showing safe cached/current information with a clear `Offline` or `May be outdated` indication. Mutating actions such as Save, Publish, Refund, stock adjustment, permissions change, receiving, or approval execution are disabled.
+If connectivity is lost, Admin may display a safe cached/current read view with a clear `OFFLINE` or `STALE` indication, but it must not queue sensitive mutations such as:
 
-No offline queue exists for financial, inventory, permission, or publishing mutations.
+- stock changes;
+- price changes;
+- refunds;
+- permission changes;
+- publish operations;
+- cash/financial adjustments.
 
-### Idempotency
-
-Critical server commands are idempotent so duplicate taps/retries cannot create duplicate refunds, receives, publishes, adjustments, or equivalent side effects.
-
-### Atomicity
-
-Multi-write business actions execute transactionally. Examples include receiving, stocktake, transfer, publish, customer merge, refund, approval execution, and permission changes. Either the complete valid change commits or nothing commits.
-
-### Error handling
-
-User-facing errors are plain English and state whether anything changed and what the user can do next. Technical diagnostics remain in server logs/monitoring.
-
-### Background refresh
-
-While Admin is open, important data such as orders, alerts, shop health, inventory availability, and approvals may refresh efficiently without reloading the whole application.
+This prevents replay, conflict, and double-posting problems in finance/inventory.
 
 ---
 
-## 21. Apple-HIG-Informed Design System
+## 24. Data Contracts, Commands, and Server Boundaries
 
-Apple Human Interface Guidelines are the design authority, adapted to TUX branding and web platform constraints. The Admin must not become a literal macOS/iOS clone.
+Admin should use explicit application contracts rather than component-specific database assumptions.
 
-### Mobile-first principles
-
-- phone is the primary design target;
-- one obvious primary action per screen;
-- large, comfortable touch targets following the approximately 44-point interaction principle;
-- lists/cards rather than dense tables;
-- full-screen detail/edit flows;
-- bottom sheets for quick actions;
-- bottom action areas for important form actions;
-- progressive disclosure;
-- minimal typing;
-- smart defaults;
-- inline validation;
-- role-based simplification;
-- search-first management experiences;
-- clear current-shop context;
-- useful empty/loading/error states;
-- no critical feature available only through an undiscoverable gesture.
-
-### Adaptive layouts
-
-Phone uses bottom navigation, lists/cards, full-screen detail and quick sheets. Tablet uses adaptive sidebar and optional split views. Desktop adds tables, right inspectors, bulk actions, and keyboard productivity.
-
-### Visual system
-
-TUX branding remains identifiable but restrained. Semantic color is reserved for success/warning/critical/information and is never the only status signal.
-
-Subtle material/glass effects may be used for navigation, toolbars, popovers, sheets, and control layers. Core content such as forms, financial data, tables, and inventory details remains clean and highly readable.
-
-Light and dark modes are supported with System, Light, and Dark preferences.
-
-### Language
-
-UI language is plain English. Internal enum/database terminology is not shown to normal admins.
-
-### Confirmation and undo
-
-Routine actions do not receive repetitive confirmation dialogs. Confirmation is reserved for consequential actions such as refund, archive, large adjustment, permission change, publish, and customer merge.
-
-Safe reversible actions may expose Undo. Financial and inventory transactions use corrective events rather than casual Undo.
-
----
-
-## 22. Search and Management Interaction Pattern
-
-Search is first-class for products, orders, customers, staff, inventory, and suppliers.
-
-Consistent responsive management pattern:
+A useful contract pattern is:
 
 ```text
-Phone   → list → full-screen detail
-Tablet  → list/detail split where useful
-Desktop → table/list → right inspector/detail
+Query DTO / View Model
+Command Request
+Server authorization
+Server validation
+Transactional domain change
+Audit event
+Updated authoritative view/version
 ```
 
-Navigation state should preserve useful context such as current filters, search, and scroll position when returning from detail screens.
+Commands that can create financial, inventory, publishing, approval, or identity side effects require server-generated idempotency handling where duplicate browser retries could otherwise double-apply an action.
 
-Current shop must always be visible on operational screens and repeated inside sensitive action flows.
+Business commands must receive explicit shop/business context. The server validates that the session may act on that scope; it must never trust a browser-supplied `shop_id` solely because it exists in the request.
+
+Server/RPC transactions should group logically atomic changes. Examples include:
+
+- publish catalog version + active projection pointer/config snapshot;
+- receive PO + inventory ledger movements + cost update;
+- approve stocktake + adjustment posting;
+- post staff payment + money-account movement + expense/reporting event;
+- approve refund + financial event + order return/refund history.
 
 ---
 
-## 23. Data Model Strategy
+## 25. Data-Model Evolution and Compatibility Strategy
 
-Exact table names are implementation details, but the following domain boundaries are required.
+The implementation plan should introduce schema changes incrementally and preserve production contracts.
 
-Likely new/extended areas include:
+### 25.1 Business-level layer
+
+Add a business/organization parent concept and shop membership relation without removing existing `shops` or shop-scoped operational references.
+
+Business-level entities should include or support:
+
+- master catalog identity;
+- canonical customers;
+- canonical employees;
+- suppliers;
+- promotion definitions;
+- role/permission presets;
+- reason codes.
+
+### 25.2 Catalog compatibility
+
+Existing shop-scoped product/category/modifier/combo structures remain the published operational representation. The Admin master model publishes compatible shop-specific projections/snapshots.
+
+### 25.3 Customer compatibility
+
+A canonical business-level customer identity maps safely to existing shop-scoped customer contact/order references. Historical order foreign keys are not rewritten unnecessarily.
+
+### 25.4 Staff compatibility
+
+A business-level employee/person identity maps to shop assignments and any existing Operations worker identity needed for device/POS execution. Admin permissions are distinct from Operations-device membership.
+
+### 25.5 Inventory extension
+
+Extend existing inventory items/recipes with ledger, reservation, costing, purchasing, transfer, par-level, and stocktake structures. Do not duplicate inventory balances in a competing table model.
+
+### 25.6 Roles
+
+Extend current membership/authorization structures to support `MANAGER` and `STAFF` plus explicit permissions while preserving `OWNER`, `ADMIN`, and `OPERATIONS_DEVICE` behavior where already relied upon.
+
+---
+
+## 26. Concurrency, Idempotency, and Error Handling
+
+### 26.1 Concurrency
+
+Mutable configuration entities use version checks. A stale user cannot overwrite a newer edit without reviewing it.
+
+Financial/inventory commands run transactionally and use appropriate locking/version rules so two admins cannot accidentally post incompatible changes to the same logical state.
+
+### 26.2 Idempotency
+
+Commands vulnerable to duplicate submission use idempotency keys or equivalent server-side uniqueness so browser retries, double taps, or network retries do not create duplicate receipts, stock movements, refunds, or financial adjustments.
+
+### 26.3 Error UX
+
+Errors must be written in plain English and tell the user what happened and what to do next.
+
+Examples:
+
+- `This product changed while you were editing it. Review the latest version before saving.`
+- `The stock count could not be posted because another stocktake was finalized first.`
+- `This refund was already processed.`
+- `You no longer have permission for this shop.`
+- `You are offline. Changes cannot be saved until the connection returns.`
+
+Partial business changes must not be exposed as successful. If an atomic command fails, the UI remains on the prior authoritative state and may safely retry after the server confirms the failure.
+
+---
+
+## 27. Security Requirements
+
+Security is primarily enforced in the trusted backend.
+
+Required principles:
+
+- no service-role/provider secrets in browser bundles;
+- PINs stored only as secure hashes, never plaintext;
+- rate-limited PIN verification and temporary abuse protection;
+- secure session cookies/tokens and explicit revocation;
+- server-side role/permission/shop authorization;
+- deny-by-default access;
+- re-PIN for configured sensitive actions;
+- immutable audit for meaningful changes;
+- attachment access controlled by authorization and signed/limited URLs where applicable;
+- no user-supplied shop scope trusted without membership validation;
+- input/schema validation on every command;
+- server enforcement of allowed state transitions;
+- secrets redacted from logs and API responses.
+
+Public Menu access remains separate from authenticated Admin authority.
+
+---
+
+## 28. Testing Strategy
+
+Implementation must use automated tests at contract/domain boundaries and critical UI flows.
+
+### 28.1 Domain/contract tests
+
+Cover at minimum:
+
+- PIN login success/failure/rate limit/session expiry;
+- role/shop authorization and deny-by-default behavior;
+- catalog validation, draft/publish, rollback, schedule activation, and stale-version conflicts;
+- master-to-shop catalog projection compatibility;
+- order immutability/refund-return commands;
+- inventory reservation lifecycle;
+- weighted-average cost calculations;
+- unit conversions;
+- stocktake boundary/variance/posting;
+- purchase partial receiving and returns;
+- par/reorder calculations;
+- actual-vs-theoretical inventory reporting;
+- customer phone normalization and duplicate merge;
+- loyalty/promotions;
+- staff attendance/wage estimates/staff payment posting;
+- cash/bank movements and reconciliation;
+- recurring expenses;
+- audit/approval thresholds;
+- payment/order-type/receipt/reason configuration;
+- shop/device authorization and health data;
+- WhatsApp-safe behavior when unconfigured;
+- scheduled actions across Cairo local-time transitions.
+
+### 28.2 Integration tests
+
+Critical integration flows include:
 
 ```text
-business employee identity
-admin sessions / Admin PIN auth
-role presets + permissions + shop assignment
-master catalog identity / shop projections
-catalog drafts / published versions
-inventory ledger / reservations
-stocktakes / stocktake lines
-stock transfers
-suppliers
-purchase orders / lines / receiving
-business-level customer identity
-loyalty accounts / loyalty movements
-promotions
-expense categories / recurring expense rules
-approval requests
-audit events
-scheduled changes
-reporting projections
+Admin publish
+→ canonical Supabase
+→ Menu reads new published catalog
+→ Operations receives matching config/version
 ```
-
-Existing canonical entities are reused where they are already correct. Do not create `admin_products`, `admin_orders`, or similarly duplicated canonical business tables merely because the Admin needs an interface.
-
-### Multi-shop integrity
-
-Every shop-scoped record must be protected against accidental cross-shop references through server validation and database constraints where practical.
-
-Example: a Nasr City order cannot reference a New Cairo delivery zone. A branch transfer explicitly identifies both source and destination shops as part of its own domain model.
-
-### Timestamps
-
-Database timestamps remain absolute (`timestamptz`-equivalent semantics). User-facing business interpretation, business days, schedules, promotions, shifts, and special hours use `Africa/Cairo` rather than hardcoded UTC offsets.
-
-### Reporting
-
-Large reports use indexed queries, server-side aggregation, views, or reporting projections/materialization where justified. Optimization must not create a second source of transactional truth.
-
----
-
-## 24. Trusted Server Modules
-
-Admin browser mutations flow through trusted domain commands/APIs rather than arbitrary direct table writes.
-
-Recommended server/domain boundaries:
 
 ```text
-Admin Auth
-Catalog
-Orders
-Inventory
-Purchasing
-Customers
-Loyalty / Promotions
-Staff
-Delivery / Checkout
-Finance
-Reporting
-Approvals
-Audit
-Shop Configuration
-Operations Devices
-Scheduling
+POS/accepted online order
+→ reservation
+→ DONE
+→ consumption/COGS
+→ dashboard/report update
 ```
-
-These modules may share infrastructure and deployment, but each owns a coherent business responsibility.
-
-Shared types/contracts used across Menu, Operations, and Admin belong in `packages/*` rather than being independently duplicated in each app.
-
----
-
-## 25. Critical Server Validation Pattern
-
-For every sensitive command, the server determines:
 
 ```text
-Who is requesting?
-Which business/shop is in scope?
-Does the actor have permission?
-Is the current record version still valid?
-Is approval required?
-Are business invariants satisfied?
-Has the idempotency key already executed?
-What audit entry must be created?
+Purchase receipt
+→ stock increase
+→ weighted average cost update
+→ recipe/product margin update
 ```
 
-Only after those checks does the server commit the complete transaction.
+```text
+Stocktake
+→ stable comparison
+→ approval if required
+→ adjustment ledger
+→ variance report/audit
+```
 
-The browser may display a proposed total, stock amount, role, price, or availability state, but the server remains the final authority.
+```text
+Staff payment
+→ finance movement
+→ salary/wage expense/reporting
+→ audit
+```
 
----
+### 28.3 UI/end-to-end tests
 
-## 26. Testing Strategy
-
-Admin acceptance is based on business correctness, not only visual completion.
-
-### Command tests
-
-Trusted Admin commands need coverage for:
-
-- authorized actor;
-- unauthorized actor;
-- wrong shop;
-- missing permission;
-- stale version;
-- duplicate/idempotent request;
-- invalid input;
-- approval-required path;
-- successful transaction;
-- transaction rollback/failure.
-
-### High-risk end-to-end flows
-
-Strong integration/E2E coverage is required for:
+Test priority paths on phone viewport first, then tablet/desktop:
 
 - PIN login;
-- role and permission enforcement;
-- shop isolation;
-- catalog draft/preview/publish;
-- scheduled publish;
-- Menu/Operations receiving the same published version;
-- stock reservation/consumption/release;
-- receiving;
-- stock transfer;
+- shop switch;
+- sold-out toggle;
+- edit/preview/publish product;
+- stock adjustment;
 - stocktake;
-- customer merge;
-- refund;
+- receive purchase order;
+- search/view/refund order;
+- customer lookup/merge protection;
+- staff/permission change;
 - cash reconciliation;
-- employee suspension/PIN/permission changes;
-- approval execution;
-- shop archive.
+- bank/cash movement;
+- approval request/review;
+- schedule a price/promotion/hour change;
+- offline read + blocked mutation;
+- installable PWA shell.
 
-### Regression protection
+Accessibility tests cover keyboard behavior on desktop, focus order, labels, touch target sizing, contrast, and screen-reader semantics for primary workflows.
 
-Changes to shared contracts/configuration must continue to run relevant Menu, Operations, Online Order, shared contract, and Admin tests.
+---
 
-A critical cross-app acceptance flow is:
+## 29. Deployment and Operational Safety
+
+`apps/admin` is deployed as a separate Vercel project from the same monorepo.
+
+Deployment must not require moving Operations or Menu to a new repository. Environment variables are scoped to the Admin Vercel project and backend environment as appropriate.
+
+Schema migrations must be backwards compatible with currently deployed Menu/Operations during rollout. New data structures should be additive first; destructive migrations are not acceptable while old production clients depend on existing contracts.
+
+Feature/config rollout must preserve one canonical Supabase source of truth.
+
+Admin production acceptance requires confirming:
+
+- authentication and permission boundaries;
+- shop scoping;
+- catalog publish compatibility with Menu/Operations;
+- inventory and financial atomicity;
+- mobile workflows;
+- audit creation;
+- schedule activation;
+- device/shop-health reads;
+- PWA behavior;
+- no browser exposure of server/provider secrets.
+
+WhatsApp real Meta provider acceptance is a separate external integration acceptance item and is not required to consider Admin itself implemented correctly when the integration is configured as unavailable/pending.
+
+---
+
+## 30. Archive and Delete Policy
+
+Deletion policy is consistent across the Admin:
 
 ```text
-Admin publishes price/configuration
-→ Menu observes the new valid version
-→ Operations observes the same valid version
-→ online-order validation uses the same authority
+Unused draft with no business history → hard delete may be allowed
+Used business entity               → archive / restore
+Historical transaction/audit       → immutable; never delete through normal Admin
 ```
 
----
-
-## 27. Mobile and Accessibility Acceptance
-
-Production acceptance must include real mobile browser/device testing where practical, particularly iPhone/Safari and Android/Chrome.
-
-Critical mobile acceptance flows include PIN login, shop switching, dashboard, product edit, Sold Out, price change, inventory adjustment, receiving, purchase order, refund approval, expense entry, staff edit, reports, PWA install/use, and push notification behavior.
-
-Accessibility checks include readable contrast in light/dark mode, large touch targets, keyboard navigation on desktop, visible focus, accessible labels, status not represented by color alone, and usable browser text scaling.
-
-A technically functional but confusing flow is not accepted.
+This applies to products, employees, suppliers, shops, promotions, configuration versions, and comparable entities according to their business history.
 
 ---
 
-## 28. Migration Strategy
-
-Admin migrations must preserve real production data and historical references.
-
-The implementation should use domain-oriented migrations rather than one giant migration. Areas should be sequenced so dependencies are explicit, for example:
-
-```text
-Admin auth / permissions
-business-level identities
-catalog master + drafts/versioning
-inventory ledger/reservations
-purchasing
-customers/loyalty/promotions
-staff scheduling/attendance
-checkout/delivery extensions
-finance/expenses
-approvals/audit
-scheduling/reporting projections
-```
-
-Each migration must be tested both on a clean database and as an upgrade from the existing TUX schema.
-
-Existing production products, orders, customers, workers, inventory foundation, and related identities must be adopted/reconciled. No destructive recreation of working catalog or order history is acceptable.
-
----
-
-## 29. Production Rollout and Acceptance
-
-Recommended controlled rollout:
-
-```text
-1. Deploy backend contracts and migrations
-2. Verify existing Menu + Operations remain healthy
-3. Deploy apps/admin to its separate Vercel project
-4. Create the first OWNER PIN/account
-5. Verify role/shop access and isolation
-6. Run read-only production checks
-7. Test a safe catalog draft + atomic publish
-8. Test an inventory workflow
-9. Test an expense
-10. Test a staff/permission workflow
-11. Test an approval workflow
-12. Verify multi-shop isolation
-13. Complete real mobile/PWA acceptance
-14. Run final engineering review
-```
-
-Production acceptance cannot be replaced by mocks alone. Real deployment must prove Vercel configuration, Supabase migrations, data preservation, PWA/mobile behavior, and actual Menu/Operations consumption of Admin-published configuration.
-
----
-
-## 30. Explicitly Excluded Scope
+## 31. Explicitly Excluded Scope
 
 The following are intentionally not part of this Admin design:
 
 - import functionality;
 - export functionality;
-- full accounting / general ledger / double-entry bookkeeping;
-- tax filing or VAT return submission;
-- bank-feed reconciliation;
-- statutory payroll/tax processing;
-- recruitment/applicant tracking;
-- employee CV management;
-- LMS/training workflows;
-- formal corporate performance-review workflows;
-- biometric staff hardware integration;
-- live rider GPS tracking;
-- batch/lot tracking;
-- per-batch expiry tracking;
-- warehouse bin management;
-- barcode warehouse picking;
-- complex procurement approval chains;
-- supplier portal;
-- automated supplier ordering;
-- complex multi-level corporate approval workflow;
-- dangerous remote POS/device control such as opening a cash drawer;
-- offline queued financial/inventory/configuration mutations;
-- separate native iOS and Android Admin apps;
-- actual Meta/WhatsApp production setup as an Admin completion blocker.
+- restaurant reservations/table map;
+- tip pooling;
+- gift cards/store credit/customer debt;
+- full accounting/general ledger/tax filing;
+- statutory payroll/tax engine;
+- direct bank feeds;
+- automatic supplier ordering;
+- live GPS rider tracking;
+- AI marketing/generative campaign tooling;
+- inventory lot/batch/expiry tracking;
+- dangerous remote POS actions such as remote cash-drawer opening;
+- actual Meta/WhatsApp provider setup as a blocker for Admin completion.
 
 ---
 
-## 31. Completion Criteria
+## 32. Completeness and Implementation Boundary
 
-TUX Admin is complete only when the approved business scope is implemented and production-verified.
+This written design captures the approved full TUX Admin product scope, including the previously discussed capabilities that could otherwise be missed:
 
-### Architecture
+- explicit Order Types management;
+- receipt and order-number settings;
+- central reason codes;
+- one canonical shop contact/location authority;
+- staff payment records tied to cash/bank and expenses;
+- opening/closing, X/Z history, manager log, and non-destructive inventory/end-day reconciliation;
+- par levels and reorder suggestions;
+- actual-vs-theoretical inventory usage;
+- margin/food-cost visibility and alerts;
+- advanced report filters/comparison/saved views/drill-down;
+- daily owner summary;
+- recurring schedules where approved;
+- customer segments;
+- targets;
+- Bank & Cash money-position management;
+- WhatsApp control and automatic order-event message configuration;
+- devices, printing, shop health, and online-order health controls.
 
-- one canonical Supabase remains the business truth;
-- no duplicate Admin-specific canonical order/product/payment system exists;
-- multi-shop isolation is proven;
-- Menu and Operations contracts remain compatible.
+There are no product-discovery placeholders in this specification. Implementation details that do not alter approved user-visible behavior may be selected during implementation planning, but they must respect the architecture, security, compatibility, mobile-first UX, historical immutability, and scope boundaries defined here.
 
-### Security
-
-- PIN-only Admin authentication works;
-- PIN hashes and sessions are server-controlled;
-- role/custom permission enforcement is server-side;
-- shop boundaries are enforced;
-- sensitive re-PIN/approval paths work;
-- privileged secrets remain server-only.
-
-### Business capabilities
-
-- dashboard/reports/alerts;
-- catalog/pricing/publishing;
-- inventory/recipes/stocktake/transfers;
-- suppliers/purchasing/receiving;
-- orders/refund controls;
-- customers/loyalty/promotions;
-- staff/shifts/attendance/wage estimates;
-- delivery/checkout/payment configuration;
-- finance/expenses/reconciliation;
-- shops/settings/devices/shop health;
-- approvals/audit/version history.
-
-### Integration
-
-- Admin publication reaches Menu and Operations consistently;
-- online ordering remains valid;
-- order inventory lifecycle is correct;
-- historical snapshots remain immutable.
-
-### UX
-
-- mobile-first flows pass real-device acceptance;
-- tablet and desktop layouts adapt correctly;
-- Apple-HIG-informed design is consistent;
-- critical workflows are understandable without specialist training.
-
-### Reliability
-
-- concurrency protection works;
-- critical commands are idempotent;
-- complex writes are atomic;
-- production failures are observable;
-- failed actions never masquerade as successful changes.
-
-### Production
-
-- Admin Vercel project is production-ready;
-- migrations are verified against the canonical Supabase;
-- production smoke tests pass;
-- no unresolved serious engineering-review finding remains.
-
----
-
-## 32. Implementation Planning Gate
-
-This design document is the approved product/architecture basis for `apps/admin`.
-
-No implementation should start from this document until the user reviews the written specification and explicitly approves it. After that approval, the next step is to create the implementation plan using the Superpowers writing-plans workflow, then execute through the normal branch/TDD/review/CI process.
+The next process step after written-spec approval is to create the implementation plan. No implementation/scaffolding should begin before that plan is reviewed through the agreed Superpowers workflow.
