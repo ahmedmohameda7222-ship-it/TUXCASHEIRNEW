@@ -28,7 +28,11 @@ const ownerSession = {
 
 async function mockSession(page: import('@playwright/test').Page) {
   await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ownerSession) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ownerSession),
+    });
   });
 }
 

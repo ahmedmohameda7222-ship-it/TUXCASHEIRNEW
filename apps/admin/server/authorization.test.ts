@@ -23,9 +23,7 @@ describe('Admin authorization', () => {
   });
 
   it('denies a shop outside the principal scope', () => {
-    expect(() => requirePermission(principal, 'orders.view', 'shop-b')).toThrow(
-      /shop_forbidden/,
-    );
+    expect(() => requirePermission(principal, 'orders.view', 'shop-b')).toThrow(/shop_forbidden/);
   });
 
   it('allows OWNER all mapped shops only through resolved principal scope', () => {

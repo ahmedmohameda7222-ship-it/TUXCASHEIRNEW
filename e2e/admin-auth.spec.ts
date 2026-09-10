@@ -28,17 +28,29 @@ test('requires PIN login and preserves staff shop isolation', async ({ page }) =
 
   await page.route('**/api/admin/session', async (route) => {
     if (!authenticated) {
-      await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'session_required' }) });
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'session_required' }),
+      });
       return;
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(staffSession) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(staffSession),
+    });
   });
   await page.route('**/api/admin/login', async (route) => {
     expect(route.request().method()).toBe('POST');
     const body = route.request().postDataJSON() as { pin?: string };
     submittedPin = body.pin ?? '';
     authenticated = true;
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(staffSession) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(staffSession),
+    });
   });
 
   await page.goto('/');
@@ -63,7 +75,11 @@ test('requires PIN login and preserves staff shop isolation', async ({ page }) =
 
 test('allows All Shops only for an OWNER with mapped shops', async ({ page }) => {
   await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ownerSession) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ownerSession),
+    });
   });
 
   await page.goto('/');

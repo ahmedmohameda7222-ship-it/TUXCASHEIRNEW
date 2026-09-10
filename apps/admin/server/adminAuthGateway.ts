@@ -30,7 +30,10 @@ export type { AdminRequest, AdminResponse } from './http';
 
 const PIN_PATTERN = /^\d{4,12}$/;
 
-function serverContext(): { env: ReturnType<typeof getAdminServerEnv>; client: AdminSupabaseClient } {
+function serverContext(): {
+  env: ReturnType<typeof getAdminServerEnv>;
+  client: AdminSupabaseClient;
+} {
   const env = getAdminServerEnv();
   return { env, client: new AdminSupabaseClient(env) };
 }

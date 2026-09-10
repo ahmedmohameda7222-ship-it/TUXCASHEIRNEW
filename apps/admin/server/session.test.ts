@@ -1,11 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import {
-  adminSessionCookie,
-  createSessionMaterial,
-  requireRecentReauth,
-} from './session';
+import { adminSessionCookie, createSessionMaterial, requireRecentReauth } from './session';
 
 describe('Admin session security', () => {
   it('creates opaque session and CSRF tokens while persisting only hashes', () => {
@@ -44,22 +40,14 @@ describe('Admin session security', () => {
 
   it('requires reauthentication no older than the configured sensitive-action age', () => {
     const now = new Date('2026-09-10T20:10:00.000Z');
+    expect(() => requireRecentReauth({ reauthenticatedAt: null }, 300, now)).toThrow(
+      /reauthentication_required/,
+    );
     expect(() =>
-      requireRecentReauth({ reauthenticatedAt: null }, 300, now),
+      requireRecentReauth({ reauthenticatedAt: new Date('2026-09-10T20:04:59.000Z') }, 300, now),
     ).toThrow(/reauthentication_required/);
     expect(() =>
-      requireRecentReauth(
-        { reauthenticatedAt: new Date('2026-09-10T20:04:59.000Z') },
-        300,
-        now,
-      ),
-    ).toThrow(/reauthentication_required/);
-    expect(() =>
-      requireRecentReauth(
-        { reauthenticatedAt: new Date('2026-09-10T20:05:01.000Z') },
-        300,
-        now,
-      ),
+      requireRecentReauth({ reauthenticatedAt: new Date('2026-09-10T20:05:01.000Z') }, 300, now),
     ).not.toThrow();
   });
 });

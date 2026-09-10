@@ -29,8 +29,12 @@ for (const path of walk(clientRoot)) {
   for (const token of forbiddenClientTokens) {
     if (body.includes(token)) throw new Error(`${token} leaked into client source: ${display}`);
   }
-  if (/from\s+['"]@supabase\/supabase-js['"]|require\(['"]@supabase\/supabase-js['"]\)/.test(body)) {
-    throw new Error(`Admin browser source must use the same-origin BFF, not Supabase directly: ${display}`);
+  if (
+    /from\s+['"]@supabase\/supabase-js['"]|require\(['"]@supabase\/supabase-js['"]\)/.test(body)
+  ) {
+    throw new Error(
+      `Admin browser source must use the same-origin BFF, not Supabase directly: ${display}`,
+    );
   }
   if (/https?:\/\/[^'"\s]+(?:supabase|functions\/v1|rest\/v1)/i.test(body)) {
     throw new Error(`Admin browser source contains a direct backend URL: ${display}`);
@@ -67,7 +71,10 @@ const browserTables = [
 ];
 
 for (const table of browserTables) {
-  const rls = new RegExp(`alter\\s+table\\s+public\\.${table}\\s+enable\\s+row\\s+level\\s+security`, 'i');
+  const rls = new RegExp(
+    `alter\\s+table\\s+public\\.${table}\\s+enable\\s+row\\s+level\\s+security`,
+    'i',
+  );
   const revoke = new RegExp(
     `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`,
     'i',
@@ -79,7 +86,9 @@ for (const table of browserTables) {
 if (!/create\s+table\s+if\s+not\s+exists\s+private\.admin_pin_rate_limits/i.test(sql)) {
   throw new Error('PIN throttle state must remain in the private schema');
 }
-if (!/revoke\s+all\s+on\s+schema\s+private\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i.test(sql)) {
+if (
+  !/revoke\s+all\s+on\s+schema\s+private\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i.test(sql)
+) {
   throw new Error('Private Admin schema must be revoked from browser roles');
 }
 
@@ -103,4 +112,6 @@ for (const rpc of trustedRpcs) {
   if (!grant.test(sql)) throw new Error(`Admin RPC is not explicitly service-role-only: ${rpc}`);
 }
 
-console.log(`Admin client/BFF/RLS/RPC security invariants passed across ${adminMigrationPaths.length} canonical Admin migrations.`);
+console.log(
+  `Admin client/BFF/RLS/RPC security invariants passed across ${adminMigrationPaths.length} canonical Admin migrations.`,
+);

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  AdminRateLimitError,
-  claimAdminPinAttempt,
-  deriveAdminRateKey,
-} from './loginRateLimit';
+import { AdminRateLimitError, claimAdminPinAttempt, deriveAdminRateKey } from './loginRateLimit';
 
 describe('Admin login rate limiting', () => {
   it('derives a privacy-safe HMAC client key instead of persisting raw client metadata', async () => {

@@ -209,8 +209,7 @@ export async function loadAdminSession(
   const sessions = await client.select<AdminSessionRow[]>(
     'admin_sessions',
     query({
-      select:
-        'id,business_id,employee_id,csrf_token_hash,expires_at,revoked_at,reauthenticated_at',
+      select: 'id,business_id,employee_id,csrf_token_hash,expires_at,revoked_at,reauthenticated_at',
       token_hash: `eq.${tokenHash}`,
       limit: '1',
     }),

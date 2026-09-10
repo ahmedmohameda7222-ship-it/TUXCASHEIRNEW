@@ -1,9 +1,4 @@
-import {
-  createHmac,
-  pbkdf2 as pbkdf2Callback,
-  randomBytes,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHmac, pbkdf2 as pbkdf2Callback, randomBytes, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const pbkdf2 = promisify(pbkdf2Callback);
