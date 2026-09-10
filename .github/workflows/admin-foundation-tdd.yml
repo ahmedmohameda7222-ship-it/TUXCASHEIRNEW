@@ -88,6 +88,8 @@ jobs:
           apps/admin/server/reauth.test.ts
           apps/admin/server/bootstrapOwner.test.ts
           apps/admin/src/app/App.test.tsx
+          apps/admin/src/auth/AdminSessionProvider.test.tsx
+          apps/admin/src/shops/ShopScopeProvider.test.tsx
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
