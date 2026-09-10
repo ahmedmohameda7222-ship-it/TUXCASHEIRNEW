@@ -16,6 +16,8 @@
 - Base units are canonical; purchase-unit conversions are configured per inventory item.
 - `On Hand - Reserved = Available`; negative available stock is blocked by default.
 - ACTIVE accepted orders reserve; DONE consumes; CANCELLED releases; RETURNED never automatically restores consumed food stock.
+- Existing Operations currently posts `ORDER_CONSUMPTION` during `OperationsOrdersService.placeOrder`; this plan deliberately migrates that behavior to reservation-at-ACTIVE and consumption-at-DONE while preserving idempotency and existing order history.
+- Existing Operations `undoDone` remains supported: undoing DONE back to ACTIVE must reverse the new consumption event and restore the reservation atomically rather than creating free stock.
 - Weighted-average cost is shop-specific and historical order cost basis remains stable.
 - Transfers preserve source cost and require send/receive state transitions.
 - Stocktake posts auditable adjustment movements against a consistent snapshot.
@@ -32,7 +34,7 @@
 
 **Interfaces:**
 - Produces tables: `inventory_unit_conversions`, `inventory_movements`, `inventory_reservations`, `inventory_cost_state`, `stocktakes`, `stocktake_lines`, `stock_transfers`, `stock_transfer_lines`.
-- Produces RPCs: `reserve_inventory_for_order_v1`, `consume_inventory_for_order_v1`, `release_inventory_for_order_v1`, `post_inventory_adjustment_v1`, `post_stocktake_v1`, `send_stock_transfer_v1`, `receive_stock_transfer_v1`.
+- Produces RPCs: `reserve_inventory_for_order_v1`, `consume_inventory_for_order_v1`, `restore_order_reservation_v1`, `release_inventory_for_order_v1`, `post_inventory_adjustment_v1`, `post_stocktake_v1`, `send_stock_transfer_v1`, `receive_stock_transfer_v1`.
 
 - [ ] **Step 1: Write the failing migration invariant test**
 
@@ -59,7 +61,7 @@ create table public.inventory_movements (
   id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.shops(id),
   inventory_item_id uuid not null references public.inventory_items(id),
-  movement_type text not null check (movement_type in ('OPENING','RECEIVING','RESERVE','RELEASE','CONSUME','WASTE','ADJUSTMENT','TRANSFER_OUT','TRANSFER_IN','STOCKTAKE','PURCHASE_RETURN')),
+  movement_type text not null check (movement_type in ('OPENING','RECEIVING','RESERVE','RELEASE','CONSUME','CONSUME_REVERSED','WASTE','ADJUSTMENT','TRANSFER_OUT','TRANSFER_IN','STOCKTAKE','PURCHASE_RETURN')),
   quantity_base numeric not null,
   unit_cost_minor numeric,
   source_type text not null,
@@ -91,16 +93,25 @@ git add supabase/migrations/20260910130000_admin_inventory_ledger.sql scripts/te
 git commit -m "feat(admin): add inventory ledger and reservation model"
 ```
 
-### Task 2: Add recipe costing and order inventory lifecycle integration
+### Task 2: Add recipe costing and migrate the existing Operations order inventory lifecycle
 
 **Files:**
 - Create: `packages/admin-contracts/src/inventory.ts`
 - Create: `apps/admin/server/inventory/inventoryService.ts`
 - Create: `apps/admin/server/inventory/costing.ts`
-- Modify: `supabase/functions/online-order-operations/index.ts`
-- Modify: Operations order-completion/cancellation server path discovered during execution
+- Modify: `packages/application/src/orders.ts`
+- Modify: `packages/application/src/orders.test.ts`
+- Modify: `packages/application/src/ordersBoard.ts`
+- Modify: `packages/application/src/ordersBoard.test.ts`
+- Modify: `packages/application/src/onlineOrderAcceptance.test.ts`
+- Modify: `supabase/functions/online-order-operations/index.ts` only if its persistence adapter needs the new reservation RPC/fields; do not duplicate lifecycle logic there.
 - Test: `apps/admin/server/inventory/costing.test.ts`
-- Test: `scripts/test-admin-order-inventory-lifecycle.mjs`
+- Create: `scripts/test-admin-order-inventory-lifecycle.mjs`
+
+**Existing integration points:**
+- `packages/application/src/orders.ts`: `OperationsOrdersService.placeOrder()` currently calculates recipe usage and appends `ORDER_CONSUMPTION` movements inside the order commit. Replace that side effect with one reservation per required inventory item when the order becomes ACTIVE.
+- `packages/application/src/ordersBoard.ts`: `OperationsOrdersBoardService.markDone()`, `undoDone()`, `cancelOrder()`, and `returnDelivery()` are the canonical Operations lifecycle transitions. `markDone()` must convert reservation to consumption; `undoDone()` must reverse consumption and recreate the reservation; `cancelOrder()` must release reservation rather than compensating placement-time consumption; `returnDelivery()` must keep inventory consumed.
+- `packages/application/src/onlineOrderAcceptance.ts`: `OperationsOnlineOrderAcceptanceService.accept()` delegates accepted ONLINE orders to `OperationsOrdersService.placeOrder()`, so it inherits the same reservation semantics and must not create a second reservation path.
 
 **Interfaces:**
 - Produces: `InventoryBalance`, `RecipeCost`, `calculateWeightedAverageCost`, `calculateRecipeCost`.
@@ -113,14 +124,16 @@ it('calculates weighted average cost', () => {
 });
 ```
 
+Add application tests that prove an ACTIVE order creates reservation only, `markDone()` consumes exactly once, `undoDone()` returns the order to reserved ACTIVE stock, cancellation releases reservation, returned delivery does not restore stock, and accepted ONLINE orders reuse the same placement reservation path.
+
 - [ ] **Step 2: Run and verify RED**
 
 ```bash
-npx vitest run apps/admin/server/inventory/costing.test.ts
+npx vitest run apps/admin/server/inventory/costing.test.ts packages/application/src/orders.test.ts packages/application/src/ordersBoard.test.ts packages/application/src/onlineOrderAcceptance.test.ts
 node scripts/test-admin-order-inventory-lifecycle.mjs
 ```
 
-Expected: failure until costing/lifecycle integration exists.
+Expected: new lifecycle assertions fail because current `placeOrder()` consumes immediately.
 
 - [ ] **Step 3: Implement costing and lifecycle hooks**
 
@@ -135,24 +148,24 @@ export function calculateWeightedAverageCost(
 }
 ```
 
-Accepted POS/canonical ONLINE orders must call reservation exactly once; DONE posts consumption and releases reservation atomically; CANCELLED releases; RETURNED records financial reversal without inventory restoration.
+In `OperationsOrdersService.placeOrder()`, retain recipe-consumption calculation but persist reservation intent/movements instead of decrementing on-hand as consumed. In `OperationsOrdersBoardService.markDone()`, consume the exact reservation atomically with the status transition and outbox/audit event. In `undoDone()`, append a compensating consumption-reversal movement and restore the reservation atomically. In `cancelOrder()`, release the existing reservation regardless of `foodPrepared`; if food preparation itself must be represented as waste/consumption, that is an explicit separate movement, not an implicit cancellation hack. `returnDelivery()` records the financial return while leaving consumed inventory unchanged.
 
 - [ ] **Step 4: Verify order/inventory regression tests**
 
 ```bash
-npx vitest run apps/admin/server/inventory/costing.test.ts
+npx vitest run apps/admin/server/inventory/costing.test.ts packages/application/src/orders.test.ts packages/application/src/ordersBoard.test.ts packages/application/src/onlineOrderAcceptance.test.ts
 node scripts/test-admin-order-inventory-lifecycle.mjs
 npm run test:migrations
 npm test
 ```
 
-Expected: exit `0`.
+Expected: ACTIVE/reserve, DONE/consume, undo-DONE/re-reserve, CANCELLED/release, RETURNED/no-restore, and ONLINE acceptance assertions all pass; existing Operations order tests remain green.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/admin-contracts/src/inventory.ts apps/admin/server/inventory supabase/functions/online-order-operations scripts/test-admin-order-inventory-lifecycle.mjs
-git commit -m "feat(inventory): connect orders to stock reservation and costing"
+git add packages/admin-contracts/src/inventory.ts apps/admin/server/inventory packages/application/src/orders.ts packages/application/src/orders.test.ts packages/application/src/ordersBoard.ts packages/application/src/ordersBoard.test.ts packages/application/src/onlineOrderAcceptance.test.ts supabase/functions/online-order-operations/index.ts scripts/test-admin-order-inventory-lifecycle.mjs
+git commit -m "feat(inventory): migrate orders to reserve then consume stock"
 ```
 
 ### Task 3: Build Inventory, Waste, Stocktake, and Transfer UI
