@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import { adminSessionCookie, createSessionMaterial, requireRecentReauth } from './session';
+import {
+  adminSessionCookie,
+  createSessionMaterial,
+  deriveAdminCsrfToken,
+  requireRecentReauth,
+} from './session';
 
 describe('Admin session security', () => {
   it('creates opaque session and CSRF tokens while persisting only hashes', () => {
@@ -18,6 +23,16 @@ describe('Admin session security', () => {
     expect(material.expiresAt.getTime()).toBeGreaterThan(
       new Date('2026-09-10T20:00:00.000Z').getTime(),
     );
+  });
+
+  it('reconstructs one domain-separated CSRF token from the opaque session token', () => {
+    const sessionToken = 'ab'.repeat(32);
+    const csrf = deriveAdminCsrfToken(sessionToken);
+
+    expect(csrf).toMatch(/^[0-9a-f]{64}$/);
+    expect(csrf).toBe(deriveAdminCsrfToken(sessionToken));
+    expect(csrf).not.toBe(sessionToken);
+    expect(deriveAdminCsrfToken('cd'.repeat(32))).not.toBe(csrf);
   });
 
   it('uses an HttpOnly SameSite=Lax cookie and Secure outside local development', () => {
