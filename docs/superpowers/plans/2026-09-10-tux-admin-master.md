@@ -42,7 +42,8 @@ The approved spec is too broad for one safe execution checklist. Execute these p
 6. `2026-09-10-tux-admin-workforce.md` — employee identity, shop assignments, shifts, attendance, leave, wage estimates, staff payment records.
 7. `2026-09-10-tux-admin-finance-reports.md` — expenses, Bank & Cash, money movements, settlements, X/Z end-day history, cashier reconciliation, owner contributions/withdrawals, profit/COGS reporting, advanced report filters/drill-down/saved views/targets/owner summary.
 8. `2026-09-10-tux-admin-whatsapp-operations.md` — WhatsApp control center, templates, quick replies, automatic order messages, analytics, health, plus opening/closing checklists, manager log, devices/printers/shop health.
-9. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, idempotency audits, offline behavior, notification delivery, cross-app regression gates, real-mobile acceptance, Vercel production rollout and production smoke tests.
+9. `2026-09-10-tux-admin-approved-scope-completion.md` — role-adaptive Dashboard, dashboard customization, product image/bulk/archive completion, purchasing documents/payment state, recurring expenses, CRM detail, special hours, appearance, reusable UX states, and privacy-safe web push.
+10. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, durable idempotency, offline behavior, observability, cross-app regression gates, real-mobile acceptance, Vercel production rollout, and production smoke tests.
 
 ## Cross-Plan Interfaces
 
@@ -78,9 +79,10 @@ Every Admin BFF mutation uses a session principal resolved from the secure cooki
 - [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, and receiving tests pass without negative-stock leakage.
 - [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, and delivery routing is shop-safe.
 - [ ] **Gate 6: Workforce** — PIN/role changes, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
-- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, and all report drill-downs reconcile to source records.
+- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, and report summaries reconcile to drill-down source records.
 - [ ] **Gate 8: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, and device/shop health is actionable without dangerous remote POS commands.
-- [ ] **Gate 9: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, and real production smoke checks pass with no unresolved serious review finding.
+- [ ] **Gate 9: Approved-scope completion** — role-based Dashboard, catalog-image/bulk/archive workflows, recurring expenses, supplier payment state/attachments, CRM detail, special hours, appearance, and privacy-safe push are all covered by automated acceptance tests.
+- [ ] **Gate 10: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, and real production smoke checks pass with no unresolved serious review finding.
 
 ## Completion Command Set
 
