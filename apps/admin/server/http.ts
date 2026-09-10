@@ -82,10 +82,10 @@ export function clientFingerprint(request: AdminRequest): { ip: string; userAgen
 }
 
 export function shouldUseSecureCookie(request: AdminRequest): boolean {
+  if (process.env['NODE_ENV'] === 'production') return true;
   const proto = firstHeader(request.headers['x-forwarded-proto'])
     .split(',')[0]
     ?.trim()
     .toLowerCase();
-  if (proto) return proto === 'https';
-  return process.env['NODE_ENV'] === 'production';
+  return proto === 'https';
 }
