@@ -13,13 +13,22 @@ for (const required of [
   "role = 'owner'",
   'to service_role',
 ]) {
-  if (!sql.includes(required)) throw new Error(`missing bootstrap migration invariant: ${required}`);
+  if (!sql.includes(required))
+    throw new Error(`missing bootstrap migration invariant: ${required}`);
 }
 
-if (!/revoke\s+(?:all|execute)\s+on\s+function\s+public\.bootstrap_tux_admin_owner_v1[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated/i.test(sql)) {
+if (
+  !/revoke\s+(?:all|execute)\s+on\s+function\s+public\.bootstrap_tux_admin_owner_v1[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated/i.test(
+    sql,
+  )
+) {
   throw new Error('OWNER bootstrap RPC must revoke browser/public execution');
 }
-if (!/grant\s+execute\s+on\s+function\s+public\.bootstrap_tux_admin_owner_v1[\s\S]*?to\s+service_role/i.test(sql)) {
+if (
+  !/grant\s+execute\s+on\s+function\s+public\.bootstrap_tux_admin_owner_v1[\s\S]*?to\s+service_role/i.test(
+    sql,
+  )
+) {
   throw new Error('OWNER bootstrap RPC must be service-role only');
 }
 
@@ -30,10 +39,12 @@ for (const required of [
   'bootstrap_tux_admin_owner_v1',
   'TUX_ADMIN_PIN_LOOKUP_SECRET',
 ]) {
-  if (!cli.includes(required)) throw new Error(`missing secure bootstrap CLI behavior: ${required}`);
+  if (!cli.includes(required))
+    throw new Error(`missing secure bootstrap CLI behavior: ${required}`);
 }
 
-if (/--pin(?:\s|=)/i.test(cli)) throw new Error('bootstrap CLI must never accept the PIN as a command argument');
+if (/--pin(?:\s|=)/i.test(cli))
+  throw new Error('bootstrap CLI must never accept the PIN as a command argument');
 if (/console\.(?:log|error|warn)\s*\(\s*(?:entered)?pin\b/i.test(cli)) {
   throw new Error('bootstrap CLI must never print the entered PIN');
 }

@@ -153,9 +153,13 @@ describe('Admin reauthentication HTTP boundary', () => {
 
     expect(capture.status()).toBe(401);
     expect(capture.body()).toEqual({ error: 'invalid_pin' });
-    expect(state.calls.some((call) => call.path.includes('claim_tux_admin_pin_attempt'))).toBe(true);
+    expect(state.calls.some((call) => call.path.includes('claim_tux_admin_pin_attempt'))).toBe(
+      true,
+    );
     expect(state.calls.some((call) => call.method === 'PATCH')).toBe(false);
-    expect(state.calls.some((call) => call.path.includes('clear_tux_admin_pin_attempts'))).toBe(false);
+    expect(state.calls.some((call) => call.path.includes('clear_tux_admin_pin_attempts'))).toBe(
+      false,
+    );
   });
 
   it('returns 429 with Retry-After before PIN verification when the shared throttle denies', async () => {
@@ -181,6 +185,8 @@ describe('Admin reauthentication HTTP boundary', () => {
     expect(capture.status()).toBe(200);
     expect(capture.body()['ok']).toBe(true);
     expect(state.calls.some((call) => call.method === 'PATCH')).toBe(true);
-    expect(state.calls.some((call) => call.path.includes('clear_tux_admin_pin_attempts'))).toBe(true);
+    expect(state.calls.some((call) => call.path.includes('clear_tux_admin_pin_attempts'))).toBe(
+      true,
+    );
   });
 });
