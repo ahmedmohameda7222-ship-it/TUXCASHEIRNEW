@@ -85,9 +85,11 @@ const extraRows = manifest.modifiers.map((modifier) =>
   `(${sqlText(modifier.standaloneProductId)}::uuid, ${sqlText(shopId)}::uuid, ${sqlText(extrasCategoryId)}::uuid, ${sqlText(modifier.name)}, null, ${modifier.priceMinor}, null, ${modifier.active}, false, false, ${modifier.sortOrder}, null, null, false)`,
 );
 const eligibleRows = manifest.eligibleProductIds.map((id, index) => {
-  const categoryId = beverageIds.has(id) ? drinksCategoryId : mainCategoryId;
+  const beverageSortOrder = manifest.beverageProductIds.indexOf(id);
+  const categoryId = beverageSortOrder >= 0 ? drinksCategoryId : mainCategoryId;
+  const sortOrder = beverageSortOrder >= 0 ? beverageSortOrder : index;
   const family = id === familyProductId ? sqlText('Runtime Family') : 'null';
-  return `(${sqlText(id)}::uuid, ${sqlText(shopId)}::uuid, ${sqlText(categoryId)}::uuid, ${sqlText(`Runtime Product ${index + 1}`)}, null, ${1000 + index}, null, true, false, ${comboIds.has(id)}, ${index}, ${family}, null, false)`;
+  return `(${sqlText(id)}::uuid, ${sqlText(shopId)}::uuid, ${sqlText(categoryId)}::uuid, ${sqlText(`Runtime Product ${index + 1}`)}, null, ${1000 + index}, null, true, false, ${comboIds.has(id)}, ${sortOrder}, ${family}, null, false)`;
 });
 
 psql(
