@@ -17,6 +17,7 @@
 - PIN values never persist in plaintext; session cookies are HttpOnly, Secure in production, SameSite=Lax, and store an opaque random token whose database representation is a SHA-256 digest.
 - `OWNER | ADMIN | MANAGER | STAFF` are human Admin roles; existing `OPERATIONS_DEVICE` semantics remain intact.
 - Every protected server read/write requires a resolved Admin principal and explicit shop/permission authorization.
+- All Admin-owned Supabase tables and RPCs are deny-by-default to direct browser roles. Enable RLS on every new Admin table, revoke direct `anon`/`authenticated` access, revoke PUBLIC function execution where applicable, and grant trusted Admin RPC execution only to the server/service-role boundary.
 - UI language is English; timezone is `Africa/Cairo`; currency defaults to EGP.
 - Phone shell uses Home, Orders, Catalog, Inventory, More; permissions hide irrelevant destinations but never replace server authorization.
 
@@ -125,6 +126,7 @@ git commit -m "feat(admin): add shared Admin contracts"
 // scripts/test-admin-business-auth-migration.mjs
 import fs from 'node:fs';
 const sql = fs.readFileSync('supabase/migrations/20260910100000_admin_business_auth.sql', 'utf8');
+const lower = sql.toLowerCase();
 for (const required of [
   'create table if not exists public.businesses',
   'create table if not exists public.business_employees',
@@ -135,7 +137,32 @@ for (const required of [
   "'MANAGER'",
   "'STAFF'",
 ]) {
-  if (!sql.toLowerCase().includes(required.toLowerCase())) throw new Error(`missing ${required}`);
+  if (!lower.includes(required.toLowerCase())) throw new Error(`missing ${required}`);
+}
+for (const table of [
+  'businesses',
+  'business_shops',
+  'business_employees',
+  'employee_shop_assignments',
+  'admin_permissions',
+  'admin_role_permissions',
+  'admin_employee_permissions',
+  'admin_sessions',
+]) {
+  if (!lower.includes(`alter table public.${table} enable row level security`)) {
+    throw new Error(`missing RLS for ${table}`);
+  }
+}
+for (const role of ['anon', 'authenticated']) {
+  if (!lower.includes(`revoke all on` ) || !lower.includes(`from ${role}`)) {
+    throw new Error(`missing direct-browser revoke for ${role}`);
+  }
+}
+if (!lower.includes('revoke execute on function public.resolve_admin_authorization_v1')) {
+  throw new Error('authorization RPC must revoke direct execution');
+}
+if (!lower.includes('grant execute on function public.resolve_admin_authorization_v1') || !lower.includes('to service_role')) {
+  throw new Error('authorization RPC must be service-role only');
 }
 if (sql.includes("OPERATIONS_DEVICE'::text check")) throw new Error('must not replace device role semantics');
 ```
@@ -196,6 +223,8 @@ create table if not exists public.admin_sessions (
 
 Also seed one `businesses` row and map the existing canonical TUX shop idempotently; do not recreate or rename the existing shop.
 
+For every Admin-owned table introduced by this migration (including hardening tables added at this same insertion point), explicitly `ENABLE ROW LEVEL SECURITY` and expose no permissive browser policy. Revoke direct table privileges from `anon` and `authenticated`. Revoke EXECUTE on every Admin RPC from `PUBLIC`, `anon`, and `authenticated`, then grant only the exact trusted RPCs to `service_role`. `resolve_admin_authorization_v1`, login-rate-limit RPCs, owner-bootstrap RPCs, and any credential/session helper in this migration must be callable only through the trusted Admin server boundary. Add migration assertions that fail if any new Admin table or RPC is left browser-accessible.
+
 - [ ] **Step 4: Add the migration test to `test:migrations` and verify**
 
 ```bash
@@ -203,7 +232,7 @@ node scripts/test-admin-business-auth-migration.mjs
 npm run test:migrations
 ```
 
-Expected: both exit `0` and existing migration suites remain green.
+Expected: both exit `0`, direct browser roles cannot read/write Admin credential/session/control tables or execute Admin RPCs, and existing migration suites remain green.
 
 - [ ] **Step 5: Commit**
 
@@ -526,7 +555,7 @@ Expected: fail because the script is not defined yet.
 
 - [ ] **Step 3: Wire CI and Admin E2E login coverage**
 
-Add scripts that run the architecture check and Playwright Admin suite; CI must build/typecheck Admin and run the Admin auth/shop-isolation tests on every PR.
+Add scripts that run the architecture check and Playwright Admin suite; CI must build/typecheck Admin and run the Admin auth/shop-isolation tests on every PR. The security gate must also verify the Foundation migration keeps every Admin-owned table under RLS, revokes direct `anon`/`authenticated` data privileges, and exposes Admin RPC execution only to trusted server roles.
 
 - [ ] **Step 4: Run the complete foundation gate**
 
