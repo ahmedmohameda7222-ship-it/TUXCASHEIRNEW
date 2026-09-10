@@ -112,9 +112,9 @@ git commit -m "feat(admin): add catalog control and publish schema"
 
 ```ts
 it('returns stale_version without calling publish when the base version changed', async () => {
-  const result = await service.publish({ draftId: 'd1', expectedVersion: 48 }, principal);
+  const result = await service.publishCatalogDraft({ draftId: 'd1', expectedVersion: 48 }, principal);
   expect(result).toEqual({ ok: false, code: 'stale_version', message: expect.any(String), currentVersion: 49 });
-  expect(rpc.publish).not.toHaveBeenCalled();
+  expect(rpc.publishCatalogDraft).not.toHaveBeenCalled();
 });
 ```
 
