@@ -1,6 +1,7 @@
 -- Canonical production relationship reconciliation for the TUX Menu.
--- Supabase remains the product/category business authority. This migration only
--- materializes the user-approved modifier and combo-beverage relationships.
+-- Supabase remains the product/category business authority. This migration
+-- materializes the user-approved modifier/combo-beverage relationships and
+-- publishes the same relationship state through the existing Operations snapshot.
 create extension if not exists "uuid-ossp" with schema extensions;
 
 DO $$
@@ -17,6 +18,15 @@ DECLARE
   v_product_modifier_count integer;
   v_combo_option_count integer;
   v_actual_ids uuid[];
+  v_snapshot_version integer;
+  v_snapshot_bundle jsonb;
+  v_snapshot_product_ids uuid[];
+  v_snapshot_products jsonb;
+  v_snapshot_modifiers jsonb;
+  v_snapshot_product_modifier_links jsonb;
+  v_snapshot_combo_beverage_options jsonb;
+  v_snapshot_previous_updated_at timestamptz;
+  v_snapshot_published_at timestamptz;
   v_expected_extra_ids uuid[] := ARRAY[
     '71712668-776b-5abc-a067-23581a97b46a'::uuid,
     'ea9e484b-b601-5906-94b6-0bb1b45891b9'::uuid,
@@ -264,6 +274,93 @@ BEGIN
     RAISE EXCEPTION 'catalog relationship prestate mismatch: expected 0 combo beverage options, found %', v_combo_option_count;
   END IF;
 
+  -- Operations devices consume complete immutable configuration snapshots, not
+  -- the live relationship tables. Preserve the current published bundle and
+  -- fail closed if it is not a complete baseline that can be safely patched.
+  SELECT version, bundle_json
+  INTO v_snapshot_version, v_snapshot_bundle
+  FROM public.operations_configuration_snapshots
+  WHERE shop_id = v_shop_id
+  ORDER BY version DESC
+  LIMIT 1;
+
+  IF v_snapshot_version IS NULL OR v_snapshot_bundle IS NULL THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot missing';
+  END IF;
+  IF v_snapshot_version >= 2147483647 THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot version exhausted';
+  END IF;
+
+  IF jsonb_typeof(v_snapshot_bundle) IS DISTINCT FROM 'object'
+     OR jsonb_typeof(v_snapshot_bundle -> 'inventoryItems') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle -> 'snapshot') IS DISTINCT FROM 'object'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,categories}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,products}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,modifiers}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,productModifierLinks}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,comboBeverageOptions}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,recipeLines}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,orderTypes}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,paymentMethods}') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_snapshot_bundle #> '{snapshot,deliveryZones}') IS DISTINCT FROM 'array'
+  THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot bundle shape mismatch';
+  END IF;
+
+  IF v_snapshot_bundle #>> '{snapshot,shopId}' IS DISTINCT FROM v_shop_id::text
+     OR v_snapshot_bundle #>> '{snapshot,version}' IS DISTINCT FROM v_snapshot_version::text
+  THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot identity mismatch';
+  END IF;
+
+  v_snapshot_previous_updated_at := (v_snapshot_bundle #>> '{snapshot,updatedAt}')::timestamptz;
+  IF v_snapshot_previous_updated_at IS NULL THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot updatedAt missing';
+  END IF;
+
+  IF jsonb_array_length(v_snapshot_bundle #> '{snapshot,modifiers}') <> 0
+     OR jsonb_array_length(v_snapshot_bundle #> '{snapshot,productModifierLinks}') <> 0
+     OR jsonb_array_length(v_snapshot_bundle #> '{snapshot,comboBeverageOptions}') <> 0
+  THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot relationship prestate mismatch';
+  END IF;
+
+  SELECT array_agg((item ->> 'id')::uuid ORDER BY (item ->> 'id')::uuid)
+  INTO v_snapshot_product_ids
+  FROM jsonb_array_elements(v_snapshot_bundle #> '{snapshot,products}') AS source(item);
+
+  IF jsonb_array_length(v_snapshot_bundle #> '{snapshot,products}') <> 49
+     OR v_snapshot_product_ids IS DISTINCT FROM (
+       SELECT array_agg(id ORDER BY id)
+       FROM unnest(v_expected_extra_ids || v_expected_eligible_ids) AS expected(id)
+     )
+  THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot product inventory mismatch';
+  END IF;
+
+  -- Snapshot insertion runs the existing product-family materializer trigger.
+  -- Patch only family metadata from the locked live product rows so publication
+  -- cannot clear or regress family values while all other product JSON is kept.
+  SELECT jsonb_agg(
+    jsonb_set(
+      source.item,
+      '{family}',
+      COALESCE(to_jsonb(product.family), 'null'::jsonb),
+      true
+    )
+    ORDER BY source.ordinality
+  )
+  INTO v_snapshot_products
+  FROM jsonb_array_elements(v_snapshot_bundle #> '{snapshot,products}')
+    WITH ORDINALITY AS source(item, ordinality)
+  JOIN public.products AS product
+    ON product.shop_id = v_shop_id
+   AND product.id = (source.item ->> 'id')::uuid;
+
+  IF jsonb_array_length(v_snapshot_products) <> 49 THEN
+    RAISE EXCEPTION 'catalog relationship Operations snapshot product family reconciliation mismatch';
+  END IF;
+
   INSERT INTO public.modifiers (
     id,
     shop_id,
@@ -419,6 +516,135 @@ BEGIN
     )
   ) THEN
     RAISE EXCEPTION 'post-migration verification failed: missing approved combo beverage relationship';
+  END IF;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'id', modifier.id,
+        'shopId', modifier.shop_id,
+        'name', modifier.name,
+        'priceMinor', modifier.price_minor,
+        'standaloneProductId', modifier.standalone_product_id,
+        'active', modifier.active,
+        'sortOrder', modifier.sort_order
+      )
+      ORDER BY modifier.sort_order, modifier.id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_snapshot_modifiers
+  FROM public.modifiers AS modifier
+  WHERE modifier.shop_id = v_shop_id;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'shopId', link.shop_id,
+        'productId', link.product_id,
+        'modifierId', link.modifier_id,
+        'maxQuantity', link.max_quantity,
+        'sortOrder', link.sort_order
+      )
+      ORDER BY link.product_id, link.sort_order, link.modifier_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_snapshot_product_modifier_links
+  FROM public.product_modifiers AS link
+  WHERE link.shop_id = v_shop_id;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'shopId', option.shop_id,
+        'comboProductId', option.combo_product_id,
+        'beverageProductId', option.beverage_product_id,
+        'sortOrder', option.sort_order
+      )
+      ORDER BY option.combo_product_id, option.sort_order, option.beverage_product_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_snapshot_combo_beverage_options
+  FROM public.combo_beverage_options AS option
+  WHERE option.shop_id = v_shop_id;
+
+  IF jsonb_array_length(v_snapshot_modifiers) <> 13
+     OR jsonb_array_length(v_snapshot_product_modifier_links) <> 468
+     OR jsonb_array_length(v_snapshot_combo_beverage_options) <> 10
+  THEN
+    RAISE EXCEPTION 'post-migration verification failed: Operations relationship projection mismatch';
+  END IF;
+
+  v_snapshot_published_at := GREATEST(
+    clock_timestamp(),
+    v_snapshot_previous_updated_at + interval '1 microsecond'
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,products}',
+    v_snapshot_products,
+    false
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,modifiers}',
+    v_snapshot_modifiers,
+    false
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,productModifierLinks}',
+    v_snapshot_product_modifier_links,
+    false
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,comboBeverageOptions}',
+    v_snapshot_combo_beverage_options,
+    false
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,version}',
+    to_jsonb(v_snapshot_version + 1),
+    false
+  );
+  v_snapshot_bundle := jsonb_set(
+    v_snapshot_bundle,
+    '{snapshot,updatedAt}',
+    to_jsonb(v_snapshot_published_at),
+    false
+  );
+
+  INSERT INTO public.operations_configuration_snapshots (
+    shop_id,
+    version,
+    bundle_json,
+    published_at,
+    published_by_auth_user_id
+  )
+  VALUES (
+    v_shop_id,
+    v_snapshot_version + 1,
+    v_snapshot_bundle,
+    v_snapshot_published_at,
+    null
+  );
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.operations_configuration_snapshots AS snapshot
+    WHERE snapshot.shop_id = v_shop_id
+      AND snapshot.version = v_snapshot_version + 1
+      AND snapshot.bundle_json #>> '{snapshot,shopId}' = v_shop_id::text
+      AND snapshot.bundle_json #>> '{snapshot,version}' = (v_snapshot_version + 1)::text
+      AND jsonb_array_length(snapshot.bundle_json #> '{snapshot,modifiers}') = 13
+      AND jsonb_array_length(snapshot.bundle_json #> '{snapshot,productModifierLinks}') = 468
+      AND jsonb_array_length(snapshot.bundle_json #> '{snapshot,comboBeverageOptions}') = 10
+  ) THEN
+    RAISE EXCEPTION 'post-migration verification failed: Operations snapshot publication mismatch';
   END IF;
 END
 $$;
