@@ -6,6 +6,7 @@ on:
       - '.github/workflows/admin-foundation-tdd.yml'
       - 'apps/admin/**'
       - 'packages/admin-contracts/**'
+      - 'scripts/bootstrap-admin-owner.mjs'
       - 'scripts/test-admin-*.mjs'
       - 'supabase/migrations/*admin*.sql'
       - 'package.json'
@@ -29,6 +30,8 @@ jobs:
           node-version: 24
       - name: Admin business/auth migration invariant
         run: node scripts/test-admin-business-auth-migration.mjs
+      - name: Admin OWNER bootstrap invariant
+        run: node scripts/test-admin-owner-bootstrap.mjs
 
   migration-smoke:
     runs-on: ubuntu-24.04
@@ -61,6 +64,8 @@ jobs:
         run: node scripts/test-migrations.mjs
       - name: Admin business/auth migration invariant
         run: node scripts/test-admin-business-auth-migration.mjs
+      - name: Admin OWNER bootstrap invariant
+        run: node scripts/test-admin-owner-bootstrap.mjs
 
   contracts:
     runs-on: ubuntu-24.04
@@ -81,6 +86,7 @@ jobs:
           apps/admin/server/loginRateLimit.test.ts
           apps/admin/server/authorization.test.ts
           apps/admin/server/reauth.test.ts
+          apps/admin/server/bootstrapOwner.test.ts
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
       - name: Admin server and API typecheck
