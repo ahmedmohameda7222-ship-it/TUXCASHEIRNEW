@@ -20,13 +20,14 @@ const valid = {
   'packages/catalog-contracts/src/index.ts': "export interface Product { readonly priceMinor: number }\n",
   'apps/menu/src/context/MenuContext.tsx': "const value = client.from('products').select('*');\n",
   'apps/menu/src/pages/Admin.tsx': "client.from('products').update({ active: false });\n",
+  'apps/admin/server/env.ts': "const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];\n",
   'apps/menu/legacy/supabase_setup.sql.reference': '-- reference only',
   'supabase/migrations/001.sql': '-- canonical root migration',
   'supabase/functions/catalog-public/index.ts': "const key = Deno.env.get('SUPABASE_ANON_KEY');\n",
   'supabase/functions/catalog-admin/index.ts': "const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');\n",
 };
 
-test('accepts the canonical Phase B dependency/security shape and grandfathered legacy Admin only', async () => {
+test('accepts the canonical Phase B dependency/security shape and trusted Admin server boundary', async () => {
   const root = await fixture(valid);
   try {
     assert.deepEqual(await collectCatalogArchitectureViolations(root), []);
@@ -35,13 +36,14 @@ test('accepts the canonical Phase B dependency/security shape and grandfathered 
   }
 });
 
-test('rejects Operations coupling, public service-role access, persistence-shaped transport contracts, and second migration authority', async () => {
+test('rejects Operations coupling, browser service-role access, persistence-shaped transport contracts, and second migration authority', async () => {
   const root = await fixture({
     ...valid,
     'packages/catalog-contracts/src/index.ts':
       "import '@tux/operations'; export interface Row { price_minor: number }\n",
     'apps/menu/src/newClient.ts':
       "import '@tux/operations';\nclient.from('products').update({ active: false });\n",
+    'apps/admin/src/leak.ts': "const key = 'SUPABASE_SERVICE_ROLE_KEY';\n",
     'supabase/functions/catalog-public/index.ts': "Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');\n",
     'apps/menu/supabase/migrations/001.sql': '-- forbidden',
   });
@@ -49,7 +51,10 @@ test('rejects Operations coupling, public service-role access, persistence-shape
     const violations = await collectCatalogArchitectureViolations(root);
     assert.equal(violations.some((value) => value.includes('transport contract')), true);
     assert.equal(violations.some((value) => value.includes('Operations implementation')), true);
-    assert.equal(violations.some((value) => value.includes('service-role')), true);
+    assert.equal(
+      violations.some((value) => value.includes('service-role') && value.includes('apps/admin/src/leak.ts')),
+      true,
+    );
     assert.equal(
       violations.some((value) => value.includes('direct browser catalog mutation')),
       true,

@@ -78,8 +78,10 @@ export async function collectCatalogArchitectureViolations(root) {
       violations.push(`Menu/Admin imports Operations implementation: ${rel}`);
     }
 
+    const trustedAdminServerBoundary = rel.startsWith('apps/admin/server/');
     if (
       (rel.startsWith('apps/') || rel.startsWith('supabase/functions/catalog-public/')) &&
+      !trustedAdminServerBoundary &&
       source.includes('SUPABASE_SERVICE_ROLE_KEY')
     ) {
       violations.push(
