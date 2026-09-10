@@ -306,51 +306,76 @@ git add scripts/test-admin-architecture.mjs scripts/test-admin-cross-app-publish
 git commit -m "test(admin): add production regression gates"
 ```
 
-### Task 6: Add deployment/runbook and execute production acceptance
+### Task 6: Lock deployment contract and execute production acceptance
 
 **Files:**
+- Create/verify: `apps/admin/vercel.json`
 - Create: `apps/admin/DEPLOYMENT.md`
 - Create: `docs/ADMIN_PRODUCTION_ACCEPTANCE.md`
+- Create: `scripts/test-admin-deployment-contract.mjs`
 - Modify: `README.md`
+- Modify: `package.json`
 
 **Interfaces:**
-- Produces exact separate-Vercel-project deployment settings and a checked production acceptance record.
+- Produces exact separate-Vercel-project deployment settings, route-isolation checks, and a checked production acceptance record.
 
-- [ ] **Step 1: Write the deployment contract before deploying**
+- [ ] **Step 1: Encode the exact separate-project deployment contract**
 
 ```text
-Project: TUX Admin
+Vercel project: tux-admin
 Repository: ahmedmohameda7222-ship-it/TUXCASHEIRNEW
 Production branch: main
-Build command: npm run build -w @tux/admin
-Output directory: apps/admin/dist
-Node: >=20.19.0 <27
-Browser env: only non-secret public configuration
-Server env: Supabase URL plus server-only privileged values required by Admin BFF
+Root Directory: apps/admin
+Framework: Vite
+Install command: cd ../.. && npm ci
+Build command: cd ../.. && npm run build:admin
+Output Directory: dist
+Node engine: repository engine >=20.19.0 <27
+Include source files outside Root Directory: enabled
 ```
 
-- [ ] **Step 2: Verify production build artifact**
+The Admin deployment is separate from the existing Operations and Menu Vercel projects. The Root Directory is `apps/admin`, matching the repository's established workspace deployment pattern. Shared workspace packages are consumed from the monorepo root.
+
+- [ ] **Step 2: Write and run the deployment-contract invariant test to verify RED before wiring**
+
+`scripts/test-admin-deployment-contract.mjs` must assert the root Admin scripts exist, `apps/admin/vercel.json` preserves `/api/*` Functions before SPA fallback, no rewrite captures `/api/admin/*` into `index.html`, and browser source/config contains no privileged environment variable names.
+
+```bash
+node scripts/test-admin-deployment-contract.mjs
+```
+
+Expected: fail until the Admin workspace/deployment files and scripts are wired.
+
+- [ ] **Step 3: Implement build, routing, and environment boundaries**
+
+Root `package.json` exposes `dev:admin`, `build:admin`, `typecheck:admin`, and `test:e2e:admin`. `apps/admin/vercel.json` must use filesystem/function precedence before the SPA fallback so clean client routes resolve to `index.html` while `/api/admin/*` remains serverless.
+
+The browser should not need direct Supabase mutation credentials because it uses the same-origin Admin BFF. Any optional browser-visible values must be explicitly public. Server-only Admin Vercel variables include the canonical Supabase URL/service credential and Admin PIN lookup secret under the names finalized by `apps/admin/server/env.ts`; push/provider/storage secrets, when configured, remain server-only. Privileged values must never use a `VITE_` prefix.
+
+- [ ] **Step 4: Verify production build artifact and route isolation**
 
 ```bash
 npm ci
-npm run build -w @tux/admin
-npm run typecheck -w @tux/admin
+npm run build:admin
+npm run typecheck:admin
+node scripts/test-admin-deployment-contract.mjs
+npx playwright test e2e/admin-pwa.spec.ts e2e/admin-auth.spec.ts
 ```
 
-Expected: exit `0`, `apps/admin/dist` exists.
+Expected: all commands exit `0`, `apps/admin/dist` exists, clean client routes use the SPA fallback, `/api/admin/*` resolves to Functions, and no privileged variable is present in the browser bundle.
 
-- [ ] **Step 3: Execute real mobile/browser acceptance**
+- [ ] **Step 5: Execute real mobile/browser acceptance**
 
-Run the acceptance document on real iPhone/Safari and Android/Chrome where available. Verify PIN login, shop switch, dashboard, product edit/publish, Sold Out, inventory adjustment, receiving, PO, order/refund approval, expense, Bank & Cash, End Day, staff edit, reports, WhatsApp not-configured/connected surfaces, PWA install, and notification behavior. Record pass/fail evidence in `docs/ADMIN_PRODUCTION_ACCEPTANCE.md`.
+Create/link the separate `tux-admin` Vercel project with the exact contract above, configure server variables in that project, and deploy `main`. Run the acceptance document on real iPhone/Safari and Android/Chrome where available. Verify PIN login, shop switch, dashboard, product edit/publish, Sold Out, inventory adjustment, receiving, PO, order/refund approval, expense, Bank & Cash, End Day, staff edit, reports, WhatsApp not-configured/connected surfaces, PWA install, and notification behavior. Record pass/fail evidence in `docs/ADMIN_PRODUCTION_ACCEPTANCE.md`.
 
-- [ ] **Step 4: Execute real production cross-app smoke flow**
+- [ ] **Step 6: Execute real production cross-app smoke flow**
 
 Publish one safe catalog change through production Admin, verify production Menu reads the new published version, verify production Operations reads the same configuration version, execute one safe inventory/expense/staff/approval flow, and confirm no cross-shop data leak. Any failed check blocks acceptance and is corrected before repeating the affected check.
 
-- [ ] **Step 5: Run final reviewer gate and commit acceptance documentation**
+- [ ] **Step 7: Run final reviewer gate and commit acceptance documentation**
 
 ```bash
-git add apps/admin/DEPLOYMENT.md docs/ADMIN_PRODUCTION_ACCEPTANCE.md README.md
+git add apps/admin/vercel.json apps/admin/DEPLOYMENT.md docs/ADMIN_PRODUCTION_ACCEPTANCE.md scripts/test-admin-deployment-contract.mjs README.md package.json
 git commit -m "docs(admin): record deployment and production acceptance"
 ```
 
