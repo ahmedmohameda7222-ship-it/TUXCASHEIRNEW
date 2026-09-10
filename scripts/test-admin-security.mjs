@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const clientRoot = 'apps/admin/src';
-const migrationPath = 'supabase/migrations/20260910100000_admin_business_auth.sql';
+const migrationsRoot = 'supabase/migrations';
 
 function walk(dir) {
   const files = [];
@@ -48,7 +48,13 @@ if (!/credentials:\s*['"]same-origin['"]/.test(apiClient)) {
   throw new Error('Admin API client must send credentials only to the same origin');
 }
 
-const sql = readFileSync(migrationPath, 'utf8');
+const adminMigrationPaths = readdirSync(migrationsRoot)
+  .filter((name) => /admin.*\.sql$/i.test(name))
+  .sort()
+  .map((name) => join(migrationsRoot, name));
+if (adminMigrationPaths.length === 0) throw new Error('No canonical Admin migrations found');
+const sql = adminMigrationPaths.map((path) => readFileSync(path, 'utf8')).join('\n\n');
+
 const browserTables = [
   'businesses',
   'business_shops',
@@ -86,15 +92,15 @@ const trustedRpcs = [
 for (const rpc of trustedRpcs) {
   const escaped = rpc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const revoke = new RegExp(
-    `revoke\\s+(?:all|execute)\\s+on\\s+function\\s+public\\.${escaped}[\\s\\S]{0,500}?from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`,
+    `revoke\\s+(?:all|execute)\\s+on\\s+function\\s+public\\.${escaped}\\s*\\([^;]*?\\)\\s*from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated\\s*;`,
     'i',
   );
   const grant = new RegExp(
-    `grant\\s+execute\\s+on\\s+function\\s+public\\.${escaped}[\\s\\S]{0,500}?to\\s+service_role`,
+    `grant\\s+execute\\s+on\\s+function\\s+public\\.${escaped}\\s*\\([^;]*?\\)\\s*to\\s+service_role\\s*;`,
     'i',
   );
   if (!revoke.test(sql)) throw new Error(`Admin RPC is executable by browser roles: ${rpc}`);
   if (!grant.test(sql)) throw new Error(`Admin RPC is not explicitly service-role-only: ${rpc}`);
 }
 
-console.log('Admin client/BFF/RLS/RPC security invariants passed.');
+console.log(`Admin client/BFF/RLS/RPC security invariants passed across ${adminMigrationPaths.length} canonical Admin migrations.`);
