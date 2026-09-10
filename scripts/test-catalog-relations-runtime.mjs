@@ -42,6 +42,7 @@ psql(
     '-c',
     `drop schema if exists public cascade;
      create schema public;
+     drop schema if exists private cascade;
      drop schema if exists auth cascade;
      create schema auth;
      drop schema if exists storage cascade;
