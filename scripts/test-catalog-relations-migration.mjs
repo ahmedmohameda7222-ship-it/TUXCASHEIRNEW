@@ -60,6 +60,11 @@ assert.match(sql, /v_modifier_count[^;]*<>\s*0/is, 'migration must require an em
 assert.match(sql, /v_product_modifier_count[^;]*<>\s*0/is, 'migration must require an empty product-modifier prestate');
 assert.match(sql, /v_combo_option_count[^;]*<>\s*0/is, 'migration must require an empty combo-option prestate');
 
+const uuidOsspInstall = /create extension if not exists "uuid-ossp" with schema extensions\s*;/.exec(normalizedSql);
+assert.ok(uuidOsspInstall, 'migration must install uuid-ossp before using uuid_generate_v5');
+const firstUuidV5 = normalizedSql.indexOf('uuid_generate_v5');
+assert.ok(firstUuidV5 >= 0, 'migration must generate deterministic modifier UUIDs');
+assert.ok(uuidOsspInstall.index < firstUuidV5, 'uuid-ossp installation must precede uuid_generate_v5 usage');
 assert.match(
   sql,
   /uuid_generate_v5\s*\([^,]+,\s*'standalone-modifier:'\s*\|\|/is,
