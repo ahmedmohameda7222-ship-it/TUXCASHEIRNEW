@@ -1,0 +1,33 @@
+name: Admin Catalog Settings TDD
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - 'packages/application/**'
+      - 'packages/domain/**'
+      - 'packages/sync/**'
+      - 'apps/menu/**'
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-catalog-control-migration.mjs'
+      - '.github/workflows/admin-catalog-settings-tdd.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: admin-catalog-settings-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-control-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Catalog control migration invariant
+        run: node scripts/test-admin-catalog-control-migration.mjs
