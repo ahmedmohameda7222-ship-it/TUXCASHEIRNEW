@@ -76,7 +76,10 @@ export function ProductList({
           </label>
           <label className="admin-select-field">
             <span>Category</span>
-            <select value={categoryId} onChange={(event) => onCategoryChange(event.currentTarget.value)}>
+            <select
+              value={categoryId}
+              onChange={(event) => onCategoryChange(event.currentTarget.value)}
+            >
               <option value="">All categories</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
