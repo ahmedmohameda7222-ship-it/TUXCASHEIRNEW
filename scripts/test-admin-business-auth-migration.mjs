@@ -36,11 +36,11 @@ for (const table of [
   if (!lower.includes(`alter table public.${table} enable row level security`)) {
     throw new Error(`missing RLS for ${table}`);
   }
-}
-
-for (const role of ['public', 'anon', 'authenticated']) {
-  if (!new RegExp(`revoke\\s+all\\s+on\\s+(?:table\\s+)?public\\.[a-z0-9_]+[\\s\\S]*?from\\s+${role}`).test(lower)) {
-    throw new Error(`missing direct-browser revoke for ${role}`);
+  const directBrowserRevoke = new RegExp(
+    `revoke\\s+all\\s+on\\s+table\\s+public\\.${table}\\s+from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated\\s*;`,
+  );
+  if (!directBrowserRevoke.test(lower)) {
+    throw new Error(`missing direct-browser revoke for ${table}`);
   }
 }
 
@@ -52,10 +52,18 @@ for (const functionName of [
   if (!lower.includes(`function public.${functionName}`)) {
     throw new Error(`missing ${functionName}`);
   }
-  if (!new RegExp(`revoke\\s+(?:all|execute)\\s+on\\s+function\\s+public\\.${functionName}[\\s\\S]*?from\\s+public`).test(lower)) {
-    throw new Error(`${functionName} must revoke PUBLIC execution`);
+  if (
+    !new RegExp(
+      `revoke\\s+(?:all|execute)\\s+on\\s+function\\s+public\\.${functionName}[\\s\\S]*?from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`,
+    ).test(lower)
+  ) {
+    throw new Error(`${functionName} must revoke browser/PUBLIC execution`);
   }
-  if (!new RegExp(`grant\\s+execute\\s+on\\s+function\\s+public\\.${functionName}[\\s\\S]*?to\\s+service_role`).test(lower)) {
+  if (
+    !new RegExp(
+      `grant\\s+execute\\s+on\\s+function\\s+public\\.${functionName}[\\s\\S]*?to\\s+service_role`,
+    ).test(lower)
+  ) {
     throw new Error(`${functionName} must be service-role only`);
   }
 }
@@ -76,10 +84,16 @@ if (!lower.includes('p_window_seconds integer default 900')) {
 if (lower.includes("operations_device'::text check")) {
   throw new Error('Admin schema must not replace Operations device role semantics');
 }
-if (lower.includes('create table public.shops') || lower.includes('create table if not exists public.shops')) {
+if (
+  lower.includes('create table public.shops') ||
+  lower.includes('create table if not exists public.shops')
+) {
   throw new Error('Admin schema must map the canonical shops table, not recreate it');
 }
-if (lower.includes('create table public.workers') || lower.includes('create table if not exists public.workers')) {
+if (
+  lower.includes('create table public.workers') ||
+  lower.includes('create table if not exists public.workers')
+) {
   throw new Error('Admin schema must not recreate canonical Operations workers');
 }
 
