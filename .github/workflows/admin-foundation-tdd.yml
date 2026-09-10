@@ -68,7 +68,14 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Admin contract tests
-        run: npx vitest run packages/admin-contracts/src/auth.test.ts
+      - name: Admin Foundation unit tests
+        run: >-
+          npx vitest run
+          packages/admin-contracts/src/auth.test.ts
+          apps/admin/server/pin.test.ts
+          apps/admin/server/session.test.ts
+          apps/admin/server/loginRateLimit.test.ts
+          apps/admin/server/authorization.test.ts
+          apps/admin/server/reauth.test.ts
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
