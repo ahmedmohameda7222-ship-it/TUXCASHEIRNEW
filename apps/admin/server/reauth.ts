@@ -11,12 +11,22 @@ export type AdminReauthDependencies = {
   markReauthenticated(sessionId: string, at: Date): Promise<void>;
 };
 
+export class AdminReauthError extends Error {
+  readonly code = 'invalid_pin';
+  readonly status = 401;
+
+  constructor() {
+    super('invalid_pin');
+    this.name = 'AdminReauthError';
+  }
+}
+
 export async function reauthenticateAdminSession(
   session: ReauthenticatableSession,
   pin: string,
   deps: AdminReauthDependencies,
 ): Promise<Date> {
-  if (!(await verifyPin(pin, session.pinHash))) throw new Error('invalid_pin');
+  if (!(await verifyPin(pin, session.pinHash))) throw new AdminReauthError();
   const at = deps.now();
   await deps.markReauthenticated(session.sessionId, at);
   return at;
