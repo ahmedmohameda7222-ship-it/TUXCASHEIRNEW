@@ -1,11 +1,5 @@
 import type { AdminSessionPrincipal, ShopScope } from '@tux/admin-contracts';
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 
 export function initialShopScope(principal: AdminSessionPrincipal): ShopScope {
   const firstShop = principal.shopIds[0];
@@ -16,10 +10,7 @@ export function initialShopScope(principal: AdminSessionPrincipal): ShopScope {
   return { kind: 'shop', shopId: firstShop };
 }
 
-export function validateShopScope(
-  principal: AdminSessionPrincipal,
-  scope: ShopScope,
-): ShopScope {
+export function validateShopScope(principal: AdminSessionPrincipal, scope: ShopScope): ShopScope {
   if (scope.kind === 'all-shops') {
     if (principal.role !== 'OWNER') throw new Error('all_shops_forbidden');
     return scope;

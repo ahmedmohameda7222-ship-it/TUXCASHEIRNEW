@@ -65,11 +65,16 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
       (candidate) =>
-        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(candidate.path) &&
-        routeIsPermitted(principal, candidate.path),
+        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
+          candidate.path,
+        ) && routeIsPermitted(principal, candidate.path),
     );
     return (
-      <PageScaffold eyebrow="TUX Admin" title="More" description="Additional management areas available to your role.">
+      <PageScaffold
+        eyebrow="TUX Admin"
+        title="More"
+        description="Additional management areas available to your role."
+      >
         <div className="admin-more-grid">
           {secondary.map((candidate) => (
             <a className="admin-more-card" href={candidate.path} key={candidate.path}>

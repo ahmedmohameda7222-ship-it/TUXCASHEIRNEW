@@ -25,7 +25,9 @@ export function ShopSwitcher() {
       >
         {principal.role === 'OWNER' ? <option value="__all__">All Shops</option> : null}
         {principal.shopIds.map((shopId, index) => (
-          <option key={shopId} value={shopId}>Shop {index + 1}</option>
+          <option key={shopId} value={shopId}>
+            Shop {index + 1}
+          </option>
         ))}
       </select>
     </label>

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AdminSessionPrincipal, ShopScope } from '@tux/admin-contracts';
-import {
-  initialShopScope,
-  requireConcreteShop,
-  validateShopScope,
-} from './ShopScopeProvider';
+import { initialShopScope, requireConcreteShop, validateShopScope } from './ShopScopeProvider';
 
 const manager: AdminSessionPrincipal = {
   employeeId: 'employee-1',
@@ -39,6 +35,8 @@ describe('Admin shop scope', () => {
   });
 
   it('rejects a selected shop outside the resolved principal scope', () => {
-    expect(() => validateShopScope(manager, { kind: 'shop', shopId: 'shop-z' })).toThrow(/shop_forbidden/);
+    expect(() => validateShopScope(manager, { kind: 'shop', shopId: 'shop-z' })).toThrow(
+      /shop_forbidden/,
+    );
   });
 });

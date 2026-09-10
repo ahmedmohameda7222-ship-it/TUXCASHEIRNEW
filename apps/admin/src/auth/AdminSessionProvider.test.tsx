@@ -21,23 +21,32 @@ afterEach(() => {
 
 describe('Admin session bootstrap', () => {
   it('classifies a 401 session response as unauthenticated', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'session_required' }), { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ error: 'session_required' }), { status: 401 }),
+      ),
+    );
     await expect(loadAdminSessionBootstrap()).resolves.toEqual({ status: 'unauthenticated' });
   });
 
   it('loads the server session exactly once and keeps CSRF in memory state', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(managerSession), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(managerSession), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
     const state = await loadAdminSessionBootstrap();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/session', expect.objectContaining({ credentials: 'same-origin' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/session',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    );
     expect(state).toEqual({ status: 'authenticated', session: managerSession });
   });
 

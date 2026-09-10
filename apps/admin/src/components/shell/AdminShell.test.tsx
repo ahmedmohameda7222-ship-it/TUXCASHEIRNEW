@@ -9,13 +9,7 @@ const owner: AdminSessionPrincipal = {
   employeeId: 'employee-1',
   businessId: 'business-1',
   role: 'OWNER',
-  permissions: [
-    'orders.view',
-    'catalog.view',
-    'inventory.view',
-    'customers.view',
-    'finance.view',
-  ],
+  permissions: ['orders.view', 'catalog.view', 'inventory.view', 'customers.view', 'finance.view'],
   shopIds: ['shop-a'],
 };
 

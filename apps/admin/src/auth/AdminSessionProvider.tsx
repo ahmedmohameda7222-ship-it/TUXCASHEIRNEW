@@ -32,7 +32,8 @@ export async function loadAdminSessionBootstrap(): Promise<
     const session = await adminFetch<AdminSessionResponse>('/api/admin/session');
     return { status: 'authenticated', session };
   } catch (error) {
-    if (error instanceof AdminApiError && error.status === 401) return { status: 'unauthenticated' };
+    if (error instanceof AdminApiError && error.status === 401)
+      return { status: 'unauthenticated' };
     throw error;
   }
 }

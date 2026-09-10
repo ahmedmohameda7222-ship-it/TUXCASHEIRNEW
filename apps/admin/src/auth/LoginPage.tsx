@@ -26,11 +26,15 @@ export function LoginPage({ login }: { login(pin: string): Promise<void> }) {
   return (
     <main className="admin-entry" aria-labelledby="login-title">
       <form className="admin-entry__card admin-login" onSubmit={submit}>
-        <div className="admin-entry__mark" aria-hidden="true">T</div>
+        <div className="admin-entry__mark" aria-hidden="true">
+          T
+        </div>
         <p className="admin-entry__eyebrow">Secure access</p>
         <h1 id="login-title">Enter PIN</h1>
         <p className="admin-entry__copy">Use your individual TUX Admin PIN.</p>
-        <label className="admin-login__label" htmlFor="admin-pin">PIN</label>
+        <label className="admin-login__label" htmlFor="admin-pin">
+          PIN
+        </label>
         <input
           id="admin-pin"
           className="admin-login__input"
@@ -43,7 +47,11 @@ export function LoginPage({ login }: { login(pin: string): Promise<void> }) {
           maxLength={12}
           autoFocus
         />
-        {error ? <p className="admin-login__error" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="admin-login__error" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="admin-login__submit" type="submit" disabled={submitting}>
           {submitting ? 'Checking…' : 'Continue'}
         </button>
