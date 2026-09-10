@@ -4,7 +4,7 @@
 
 **Goal:** Add a WhatsApp management/control center and operational-health surfaces without duplicating Operations live customer messaging, while also delivering shop health, device/printer management, opening/closing checklists, and manager logs.
 
-**Architecture:** Reuse the existing TUX WhatsApp implementation and its shop/device/worker/message authority. Operations remains the live reply surface; Admin provides configuration, read-only oversight/history by default, templates, quick replies, event-message rules, analytics, channel assignment, health, and alerts. Operational-health reads aggregate existing device/config/business-day/online-order state into actionable Admin summaries; remote controls remain deliberately limited.
+**Architecture:** Reuse the existing TUX WhatsApp implementation and its shop/device/worker/message authority. Operations remains the live reply surface; Admin provides configuration, read-only oversight/history by default, templates, quick replies, event-message rules, analytics, channel assignment, health, and alerts. Automatic messages are driven by canonical server-side order/delivery events and a durable send-intent queue, never by the Admin browser or a second chat composer. Operational-health reads aggregate existing device/config/business-day/online-order state into actionable Admin summaries; remote controls remain deliberately limited.
 
 **Tech Stack:** Existing WhatsApp server/Edge-function contracts, TypeScript Admin BFF, React/TanStack Query, Supabase/PostgreSQL, Vitest, Playwright.
 
@@ -12,16 +12,17 @@
 
 ## Global Constraints
 
-- Operations owns live customer conversations and sending authority; Admin does not become a second worker inbox.
+- Operations owns live customer conversations and worker sending authority; Admin does not become a second worker inbox.
 - Existing message status/retry rules remain: only explicit FAILED retry; no blind PENDING resend.
 - Existing private media and 30-day binary-retention policy remains authoritative.
+- Automatic order-event messages are system-originated and must be distinguishable from worker-originated messages in history/audit.
 - Meta/provider secrets stay server-side.
 - Real Meta provider acceptance does not block Admin application completion.
 - No dangerous remote POS actions such as remote cash-drawer opening or remote order injection.
 
 ---
 
-### Task 1: Add WhatsApp Admin configuration, quick-reply, event-message, and analytics schema
+### Task 1: Add WhatsApp Admin configuration, system-message authority, quick replies, event rules, and durable event-send intents
 
 **Files:**
 - Create: `supabase/migrations/20260910230000_admin_whatsapp_control.sql`
@@ -29,15 +30,24 @@
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces tables: `whatsapp_admin_quick_replies`, `whatsapp_event_message_rules`, `whatsapp_admin_preferences` and reporting views/materialized projections as justified by query cost.
-- Existing WhatsApp channel/message/media tables remain canonical and are extended rather than replaced.
+- Produces tables: `whatsapp_admin_quick_replies`, `whatsapp_event_message_rules`, `whatsapp_admin_preferences`, `whatsapp_event_send_intents` and reporting views/materialized projections only where justified by query cost.
+- Extends canonical `whatsapp_messages` to represent `WORKER` versus `SYSTEM` outbound origin without fabricating a worker/device identity.
+- Existing WhatsApp channel/message/media/conversation tables remain canonical and are extended rather than replaced.
+- Installs canonical event-to-intent functions/triggers for eligible order and delivery events.
 
 - [ ] **Step 1: Write the failing migration invariant test**
 
 ```js
 import fs from 'node:fs';
 const sql = fs.readFileSync('supabase/migrations/20260910230000_admin_whatsapp_control.sql', 'utf8').toLowerCase();
-for (const name of ['whatsapp_admin_quick_replies','whatsapp_event_message_rules','whatsapp_admin_preferences']) {
+for (const name of [
+  'whatsapp_admin_quick_replies',
+  'whatsapp_event_message_rules',
+  'whatsapp_admin_preferences',
+  'whatsapp_event_send_intents',
+  'sender_kind',
+  'enqueue_whatsapp_order_event_intent',
+]) {
   if (!sql.includes(name)) throw new Error(`missing ${name}`);
 }
 ```
@@ -50,9 +60,15 @@ node scripts/test-admin-whatsapp-control-migration.mjs
 
 Expected: ENOENT before migration creation.
 
-- [ ] **Step 3: Implement shop-safe control schema**
+- [ ] **Step 3: Implement shop-safe control and system-message schema**
 
-Quick replies support business default plus optional shop override. Event-message rules map canonical order events such as Accepted, Out for Delivery, and Delivered to an approved Meta template and explicit shop/channel scope. Do not duplicate WhatsApp messages/conversations into Admin-specific history tables.
+Quick replies support a business default plus optional shop override. Event-message rules map canonical business events to an approved Meta template and explicit shop/channel scope. At minimum support `ORDER_ACCEPTED`, `DELIVERY_OUT_FOR_DELIVERY`, and `DELIVERY_DELIVERED` when the corresponding canonical source event exists.
+
+The migration must alter `whatsapp_messages` so an OUTBOUND row has an explicit `sender_kind in ('WORKER','SYSTEM')`. Existing rows backfill as `WORKER`. `WORKER` messages retain the current requirement for `sent_by_worker_id`, `initiated_by_device_id`, and `initiated_at`; `SYSTEM` messages require both worker/device ids to be null and retain a non-empty deterministic `outbound_intent_key` plus `initiated_at`. Do not fake a worker or device to satisfy the old constraint.
+
+`whatsapp_event_send_intents` stores the canonical source event id/type, shop/order/customer target, rule version, status, deterministic idempotency key, attempts/status metadata, and timestamps. A trigger/function on `public.order_status_events` creates `ORDER_ACCEPTED` intent candidates from canonical `PLACED` events for ONLINE orders. The delivery plan must expose canonical delivery state events; triggers/functions enqueue `DELIVERY_OUT_FOR_DELIVERY` and `DELIVERY_DELIVERED` from those events. Trigger logic only creates a durable candidate; it does not call Meta from PostgreSQL.
+
+Do not duplicate WhatsApp conversations/messages into Admin-specific history tables.
 
 - [ ] **Step 4: Verify WhatsApp migration/security regression suite**
 
@@ -63,13 +79,13 @@ npm run test:whatsapp-architecture
 npm run test:whatsapp-security
 ```
 
-Expected: exit `0`.
+Expected: exit `0`, including tests proving legacy WORKER messages remain valid and SYSTEM messages cannot impersonate worker/device attribution.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/20260910230000_admin_whatsapp_control.sql scripts/test-admin-whatsapp-control-migration.mjs package.json
-git commit -m "feat(admin): add WhatsApp management schema"
+git commit -m "feat(admin): add WhatsApp management and system-message authority"
 ```
 
 ### Task 2: Implement WhatsApp Admin read/configuration service
@@ -102,7 +118,7 @@ Expected: fail before service exists.
 
 - [ ] **Step 3: Implement oversight/configuration APIs**
 
-Conversation history joins canonical customer/order/worker/shop context and is read-only by default. Template state maps provider statuses to plain English (`Draft`, `Pending Meta Approval`, `Approved`, `Rejected`, `Paused/Disabled`). Safe variables are represented as typed tokens such as `customerFirstName`, `orderNumber`, `orderTotal`, `orderStatus`, `shopName`, `shopPhone`, `storeLocation`; the server renders them from canonical data rather than accepting arbitrary template expressions.
+Conversation history joins canonical customer/order/worker/shop context and is read-only by default. System messages display as `TUX Automatic`, never as an invented employee. Template state maps provider statuses to plain English (`Draft`, `Pending Meta Approval`, `Approved`, `Rejected`, `Paused/Disabled`). Safe variables are represented as typed tokens such as `customerFirstName`, `orderNumber`, `orderTotal`, `orderStatus`, `shopName`, `shopPhone`, `storeLocation`; the server renders them from canonical data rather than accepting arbitrary template expressions.
 
 - [ ] **Step 4: Verify type/security tests**
 
@@ -159,7 +175,7 @@ Expected: fail before screens exist.
 
 - [ ] **Step 3: Implement mobile-first WhatsApp management screens**
 
-Overview shows connection, business number, conversations, unread, failed messages, attention count, response time, template states, and health. Conversation detail links Customer and Order, shows worker attribution and delivery/read/failure status, and does not provide a generic Admin reply composer. Quick Reply editor uses buttons for safe variables. Failed-message UI links back to the conversation and respects explicit FAILED-only retry authority.
+Overview shows connection, business number, conversations, unread, failed messages, attention count, response time, template states, and health. Conversation detail links Customer and Order, shows worker or `TUX Automatic` attribution and delivery/read/failure status, and does not provide a generic Admin reply composer. Quick Reply editor uses buttons for safe variables. Failed-message UI links back to the conversation and respects explicit FAILED-only retry authority.
 
 - [ ] **Step 4: Verify WhatsApp UI/E2E and existing architecture tests**
 
@@ -179,57 +195,77 @@ git add apps/admin/src/whatsapp e2e/admin-whatsapp.spec.ts
 git commit -m "feat(admin): add WhatsApp control center UI"
 ```
 
-### Task 4: Connect automatic order-event WhatsApp rules without duplicate sends
+### Task 4: Dispatch automatic order/delivery WhatsApp intents without duplicate sends
 
 **Files:**
-- Create: `apps/admin/server/whatsapp/eventMessaging.ts`
-- Modify: canonical order status transition server path discovered during execution
-- Test: `apps/admin/server/whatsapp/eventMessaging.test.ts`
-- Test: `scripts/test-whatsapp-admin-event-idempotency.mjs`
+- Create: `server/whatsappEventMessaging.ts`
+- Create: `server/whatsappEventMessaging.test.ts`
+- Create: `api/whatsapp-event-dispatch.ts`
+- Modify: `server/whatsappOutboundRepository.ts`
+- Modify: `server/whatsappOutboundRepository.test.ts`
+- Modify: `server/whatsappOutboundProviderGateway.ts` only to expose/reuse the existing approved-template provider call if the current export surface is insufficient; do not duplicate provider logic.
+- Create: `scripts/test-whatsapp-admin-event-idempotency.mjs`
+- Modify: `vercel.json` only if the existing Operations/backend Vercel cron configuration needs the dispatcher route scheduled.
+
+**Existing canonical event sources:**
+- `public.order_status_events` already materializes `PLACED`, `MARKED_DONE`, `DONE_UNDONE`, `CANCELLED`, and `DELIVERY_RETURNED` through the trusted Operations sync gateway.
+- `supabase/functions/operations-sync/index.ts` already applies the canonical materialization plan through `ingest_tux_operations_materialization_v1`; do not add direct Meta side effects to this sync request.
+- The delivery-domain plan runs before this plan and must materialize durable delivery state events for `OUT_FOR_DELIVERY` and `DELIVERED`.
 
 **Interfaces:**
-- Produces `handleOrderCommunicationEvent(event)` that resolves shop rule/template/channel/customer and creates one permitted send intent.
+- Produces `dispatchPendingWhatsAppEventMessages()` that claims durable `whatsapp_event_send_intents`, resolves the current enabled rule/template/channel/customer, renders safe variables, claims one canonical SYSTEM outbound WhatsApp intent, and sends through the existing provider gateway.
 
-- [ ] **Step 1: Write failing duplicate-event test**
+- [ ] **Step 1: Write failing duplicate/replay tests**
 
 ```ts
-it('creates one outbound intent for duplicate delivery events', async () => {
-  await handleOrderCommunicationEvent(event, deps);
-  await handleOrderCommunicationEvent(event, deps);
-  expect(deps.createOutboundIntent).toHaveBeenCalledTimes(1);
+it('sends one automatic message for repeated dispatch of the same canonical event', async () => {
+  await dispatchPendingWhatsAppEventMessages(deps);
+  await dispatchPendingWhatsAppEventMessages(deps);
+  expect(deps.provider.sendTemplate).toHaveBeenCalledTimes(1);
+});
+
+it('does not blindly resend a claimed PENDING outbound message after provider uncertainty', async () => {
+  deps.repository.seedPendingUncertainIntent();
+  await dispatchPendingWhatsAppEventMessages(deps);
+  expect(deps.provider.sendTemplate).not.toHaveBeenCalled();
 });
 ```
 
 - [ ] **Step 2: Run and verify RED**
 
 ```bash
-npx vitest run apps/admin/server/whatsapp/eventMessaging.test.ts
+npx vitest run server/whatsappEventMessaging.test.ts server/whatsappOutboundRepository.test.ts
 node scripts/test-whatsapp-admin-event-idempotency.mjs
 ```
 
-Expected: fail before integration exists.
+Expected: fail before the system-message dispatcher/repository methods exist.
 
-- [ ] **Step 3: Implement policy-safe event messaging**
+- [ ] **Step 3: Implement policy-safe server dispatcher**
 
-The handler must require an enabled shop rule, approved template, eligible customer/channel, canonical order event, and deterministic idempotency key derived from order/event/rule version. It must never convert provider uncertainty into a blind duplicate send.
+The dispatcher must run in the existing Operations/backend server environment, not in the Admin browser. Claim due event-intent rows with row locking/lease semantics so concurrent cron invocations cannot send twice. Require an enabled shop rule, approved template, eligible customer phone, valid canonical channel, and deterministic outbound intent key derived from source-event id + rule version. Resolve variables from canonical order/customer/shop data. Create/claim a `SYSTEM` outbound message through the existing repository authority, call the existing approved-template provider gateway, and attach provider message id/status using the same uncertainty rules as worker-originated WhatsApp.
 
-- [ ] **Step 4: Verify full WhatsApp regression gate**
+If the provider deterministically rejects the send, mark the outbound message/event intent FAILED and expose it to Admin alerts/history. If the provider outcome is uncertain, leave the outbound message PENDING/uncertain and do not blindly call Meta again. A repeated source event, Operations sync replay, dispatcher retry, or concurrent dispatcher must never create a second customer message for the same event/rule version.
+
+Do not modify `packages/application/src/ordersBoard.ts` to send WhatsApp directly. Its canonical transitions continue to emit/materialize order-status events; the database event-intent boundary keeps customer communication independent from local POS execution and offline sync.
+
+- [ ] **Step 4: Verify full WhatsApp/Operations regression gate**
 
 ```bash
-npx vitest run apps/admin/server/whatsapp/eventMessaging.test.ts
+npx vitest run server/whatsappEventMessaging.test.ts server/whatsappOutboundRepository.test.ts
 node scripts/test-whatsapp-admin-event-idempotency.mjs
 npm run test:whatsapp-architecture
 npm run test:whatsapp-security
 npm run test:migrations
+npm test
 ```
 
-Expected: exit `0`.
+Expected: exit `0`; sync replay and duplicate cron cases produce one send, uncertainty produces no blind resend, and ordinary Operations worker messaging remains unchanged.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/admin/server/whatsapp/eventMessaging.ts scripts/test-whatsapp-admin-event-idempotency.mjs
-git commit -m "feat(whatsapp): add idempotent order-event messaging rules"
+git add server/whatsappEventMessaging.ts server/whatsappEventMessaging.test.ts api/whatsapp-event-dispatch.ts server/whatsappOutboundRepository.ts server/whatsappOutboundRepository.test.ts server/whatsappOutboundProviderGateway.ts scripts/test-whatsapp-admin-event-idempotency.mjs vercel.json
+git commit -m "feat(whatsapp): add idempotent system event messaging"
 ```
 
 ### Task 5: Add shop health, device/printer management, opening/closing checklists, and manager log
