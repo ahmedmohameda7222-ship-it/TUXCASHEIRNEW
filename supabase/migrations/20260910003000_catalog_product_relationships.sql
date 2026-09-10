@@ -1,6 +1,8 @@
 -- Canonical production relationship reconciliation for the TUX Menu.
 -- Supabase remains the product/category business authority. This migration only
 -- materializes the user-approved modifier and combo-beverage relationships.
+create extension if not exists "uuid-ossp" with schema extensions;
+
 DO $$
 DECLARE
   v_shop_id uuid := 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
