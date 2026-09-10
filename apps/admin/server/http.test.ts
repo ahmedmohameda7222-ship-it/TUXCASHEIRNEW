@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { requireSameOrigin, type AdminRequest, type AdminResponse } from './http';
+import {
+  requireSameOrigin,
+  shouldUseSecureCookie,
+  type AdminRequest,
+  type AdminResponse,
+} from './http';
 
 function request(headers: Record<string, string>): AdminRequest {
   return { headers } as unknown as AdminRequest;
@@ -78,5 +83,16 @@ describe('Admin mutation origin validation', () => {
       ),
     ).toBe(false);
     expect(wrongProtocol.status()).toBe(403);
+  });
+
+  it('forces Secure cookies in production even if forwarded protocol metadata is wrong', () => {
+    const previous = process.env['NODE_ENV'];
+    try {
+      process.env['NODE_ENV'] = 'production';
+      expect(shouldUseSecureCookie(request({ 'x-forwarded-proto': 'http' }))).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env['NODE_ENV'];
+      else process.env['NODE_ENV'] = previous;
+    }
   });
 });
