@@ -3,7 +3,7 @@ import {
   loadAdminSession,
   loginAdmin,
   requireSessionCsrf,
-  rotateSessionCsrf,
+  restoreSessionCsrf,
 } from './adminAuthService';
 import { getAdminServerEnv } from './env';
 import {
@@ -116,8 +116,8 @@ export async function handleAdminSession(
   if (!requireMethod(request, response, 'GET')) return;
   try {
     const { client } = serverContext();
-    const { context } = await loadRequestSession(request, client);
-    const csrfToken = await rotateSessionCsrf(context, client);
+    const { token, context } = await loadRequestSession(request, client);
+    const csrfToken = await restoreSessionCsrf(context, token, client);
     sendJson(response, 200, { principal: context.principal, csrfToken });
   } catch (error) {
     handleFailure(response, error);
