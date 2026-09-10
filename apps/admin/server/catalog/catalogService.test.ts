@@ -17,6 +17,7 @@ function store(overrides: Partial<CatalogStore> = {}): CatalogStore {
     loadWorkspace: vi.fn().mockResolvedValue({
       shopId: 'shop-a',
       currentPublishVersion: 48,
+      categories: [],
       products: [],
       drafts: [],
     }),

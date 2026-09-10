@@ -18,6 +18,16 @@ export type CatalogDraftSummary = {
   updatedAt: string;
 };
 
+export type CatalogCategorySummary = {
+  id: string;
+  shopId: string;
+  slug: string | null;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  active: boolean;
+};
+
 export type CatalogProductDetail = {
   id: string;
   shopId: string;
@@ -38,6 +48,7 @@ export type CatalogProductDetail = {
 export type CatalogWorkspace = {
   shopId: string;
   currentPublishVersion: number;
+  categories: CatalogCategorySummary[];
   products: CatalogProductDetail[];
   drafts: CatalogDraftSummary[];
 };

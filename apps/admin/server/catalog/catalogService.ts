@@ -1,5 +1,6 @@
 import type {
   AdminSessionPrincipal,
+  CatalogCategorySummary,
   CatalogCreateDraftInput,
   CatalogDraftCreateResult,
   CatalogDraftSaveResult,
@@ -61,6 +62,16 @@ export interface CatalogStore {
   }): Promise<CatalogImmediateAvailabilityResult>;
 }
 
+type CategoryRow = {
+  id: string;
+  shop_id: string;
+  slug: string | null;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  active: boolean;
+};
+
 type ProductRow = {
   id: string;
   shop_id: string;
@@ -111,6 +122,18 @@ function readVersion(value: unknown): number {
 function readDraftStatus(value: string): CatalogDraftStatus {
   if (value === 'DRAFT' || value === 'PUBLISHED' || value === 'DISCARDED') return value;
   throw new CatalogServiceError('backend_contract_invalid');
+}
+
+function mapCategory(row: CategoryRow): CatalogCategorySummary {
+  return {
+    id: row.id,
+    shopId: row.shop_id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    sortOrder: row.sort_order,
+    active: row.active,
+  };
 }
 
 function mapProduct(row: ProductRow): CatalogProductDetail {
@@ -290,8 +313,16 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
     },
 
     async loadWorkspace(shopId, businessId) {
-      const [currentPublishVersion, products, drafts] = await Promise.all([
+      const [currentPublishVersion, categories, products, drafts] = await Promise.all([
         loadCurrentPublishVersion(client, shopId),
+        client.select<CategoryRow[]>(
+          'menu_categories',
+          new URLSearchParams({
+            select: 'id,shop_id,slug,name,description,sort_order,active',
+            shop_id: `eq.${shopId}`,
+            order: 'sort_order.asc,id.asc',
+          }),
+        ),
         client.select<ProductRow[]>(
           'products',
           new URLSearchParams({
@@ -317,6 +348,7 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
       return {
         shopId,
         currentPublishVersion,
+        categories: categories.map(mapCategory),
         products: products.map(mapProduct),
         drafts: drafts.map(mapDraft),
       };

@@ -1,6 +1,7 @@
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { useLocation } from 'wouter';
 
+import { CatalogPage } from '../catalog/CatalogPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
 
 export type AdminRouteDefinition = {
@@ -61,6 +62,8 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
       />
     );
   }
+
+  if (route.path === '/catalog/products') return <CatalogPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
