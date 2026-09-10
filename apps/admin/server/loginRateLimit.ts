@@ -10,6 +10,10 @@ export type AdminPinRateLimitRpc = {
   clear?(rateKey: string): Promise<void>;
 };
 
+type AdminPinRateLimitClient = {
+  rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T>;
+};
+
 export class AdminRateLimitError extends Error {
   readonly code = 'too_many_pin_attempts';
   readonly retryAfterSeconds: number;
@@ -31,6 +35,23 @@ export async function deriveAdminRateKey(
   return createHmac('sha256', secret)
     .update(`tux-admin-rate-v1:${normalizedIp}\n${normalizedAgent}`)
     .digest('hex');
+}
+
+export function createAdminPinRateLimitRpc(client: AdminPinRateLimitClient): AdminPinRateLimitRpc {
+  return {
+    async claim(rateKey) {
+      const rows = await client.rpc<Array<{ allowed: boolean; retry_after_seconds: number }>>(
+        'claim_tux_admin_pin_attempt',
+        { p_rate_key: rateKey, p_max_attempts: 8, p_window_seconds: 900 },
+      );
+      const row = rows[0];
+      if (!row) throw new Error('admin_rate_limit_protocol_error');
+      return { allowed: row.allowed === true, retryAfterSeconds: row.retry_after_seconds };
+    },
+    async clear(rateKey) {
+      await client.rpc<unknown>('clear_tux_admin_pin_attempts', { p_rate_key: rateKey });
+    },
+  };
 }
 
 export async function claimAdminPinAttempt(
