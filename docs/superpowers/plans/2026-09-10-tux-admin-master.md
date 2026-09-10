@@ -43,15 +43,19 @@ The approved spec is too broad for one safe execution checklist. Execute these p
 7. `2026-09-10-tux-admin-finance-reports.md` — expenses, Bank & Cash, money movements, settlements, X/Z end-day history, cashier reconciliation, owner contributions/withdrawals, profit/COGS reporting, advanced report filters/drill-down/saved views/targets/owner summary.
 8. `2026-09-10-tux-admin-whatsapp-operations.md` — WhatsApp control center, templates, quick replies, automatic order messages, analytics, health, plus opening/closing checklists, manager log, devices/printers/shop health.
 9. `2026-09-10-tux-admin-approved-scope-completion.md` — role-adaptive Dashboard, dashboard customization, product image/bulk/archive completion, purchasing documents/payment state, recurring expenses, CRM detail, special hours, appearance, reusable UX states, and privacy-safe web push.
-10. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, durable idempotency, offline behavior, observability, cross-app regression gates, real-mobile acceptance, Vercel production rollout, and production smoke tests.
+10. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, durable idempotency, offline behavior, observability, cross-app regression gates, real-mobile acceptance, exact Vercel production contract, and production smoke tests.
 
-### Cross-plan hardening addendum
+### Mandatory cross-plan hardening
 
-`2026-09-10-tux-admin-plan-hardening.md` is mandatory and is executed at the insertion points named inside that document rather than as a separate product phase. It closes five implementation ambiguities discovered during self-review: one-time first-OWNER bootstrap, canonical employee/linked-worker PIN coherence, supplier-aware replenishment metadata, reason-coded discount/comp/cancellation reporting, and the exact Admin Vercel monorepo contract. No implementation checkpoint is accepted if its applicable hardening task is still unresolved.
+`2026-09-10-tux-admin-plan-hardening.md` is executed at the insertion points named inside it. It closes one-time first-OWNER bootstrap, canonical employee/linked-worker PIN coherence, supplier-aware replenishment metadata, reason-coded discount/comp/cancellation reporting, and the exact Admin Vercel monorepo contract.
+
+`2026-09-10-tux-admin-spec-coverage-hardening.md` is also mandatory and is executed at its named insertion points. It makes the remaining approved spec requirements explicit: stable permission taxonomy, PIN throttling and generic sensitive re-PIN, OWNER-only emergency negative-stock adjustment, complete loyalty/promotion rules, private expense receipts, complete shop/payment/checkout lifecycle settings, deduplicated domain alerts, shared archive/delete enforcement, and accessibility acceptance.
+
+These hardening files do not create separate product phases. Their tasks are folded into the numbered domain plans at the specified insertion points. No implementation checkpoint is accepted if its applicable hardening task remains unresolved.
 
 ## Cross-Plan Interfaces
 
-All plans depend on these stable interfaces established by Plan 1:
+All plans depend on these stable interfaces established by Foundation/Auth and finalized by the spec-coverage hardening plan:
 
 ```ts
 export type AdminRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF';
@@ -59,7 +63,7 @@ export type ShopScope = { kind: 'shop'; shopId: string } | { kind: 'all-shops' }
 export type AdminSessionPrincipal = {
   employeeId: string;
   role: AdminRole;
-  permissions: string[];
+  permissions: AdminPermission[];
   shopIds: string[];
 };
 export type CommandEnvelope<T> = {
@@ -73,20 +77,20 @@ export type CommandResult<T> =
   | { ok: false; code: string; message: string; currentVersion?: number };
 ```
 
-Every Admin BFF mutation uses a session principal resolved from the secure cookie and passes an explicit permission and shop requirement into the shared authorization helper before invoking an RPC or service operation.
+`AdminPermission` is the stable union exported from `packages/admin-contracts/src/auth.ts`; arbitrary permission strings are rejected at the contract boundary. Every Admin BFF mutation resolves the secure-cookie principal and passes an explicit permission and shop requirement into the shared authorization helper before invoking an RPC or service operation.
 
 ## Master Verification Gates
 
-- [ ] **Gate 1: Foundation** — `npm run build -w @tux/admin`, Admin typecheck/tests, PIN auth integration tests, shop-isolation tests, and the one-time OWNER-bootstrap tests pass.
-- [ ] **Gate 2: Catalog/config** — Admin publish updates canonical Menu catalog and Operations configuration in one accepted version; existing catalog and Menu tests remain green.
-- [ ] **Gate 3: Approval/audit** — sensitive commands can be held for approval, approved/rejected with approver PIN, execute at most once, and append immutable audit history.
-- [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, receiving, and supplier-aware reorder calculations pass without negative-stock leakage.
-- [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, delivery routing is shop-safe, and manual discount/comp/cancellation reason data is captured for reporting without inventing legacy reasons.
-- [ ] **Gate 6: Workforce** — PIN/role changes, linked Operations-worker PIN coherence, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
-- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, reason-coded adjustment reports reconcile to source records, and report summaries reconcile to drill-down source records.
-- [ ] **Gate 8: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, and device/shop health is actionable without dangerous remote POS commands.
-- [ ] **Gate 9: Approved-scope completion** — role-based Dashboard, catalog-image/bulk/archive workflows, recurring expenses, supplier payment state/attachments, CRM detail, special hours, appearance, and privacy-safe push are all covered by automated acceptance tests.
-- [ ] **Gate 10: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, exact separate-Vercel deployment-contract checks, and real production smoke checks pass with no unresolved serious review finding.
+- [ ] **Gate 1: Foundation** — Admin build/typecheck/tests, PIN login/session, stable permission taxonomy, login throttling, generic sensitive re-PIN, shop isolation, and one-time OWNER-bootstrap tests pass.
+- [ ] **Gate 2: Catalog/config** — Admin publish updates canonical Menu catalog and Operations configuration in one accepted version; full shop/payment/checkout/receipt/reason settings and existing catalog/Menu tests remain green.
+- [ ] **Gate 3: Approval/audit** — sensitive commands can require recent acting-user re-PIN and/or be held for approval; approval/rejection with approver PIN executes at most once and appends immutable audit history.
+- [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, receiving, OWNER-only audited emergency negative adjustment, and supplier-aware reorder calculations pass without ordinary negative-stock leakage.
+- [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, delivery routing is shop-safe, full loyalty/promotion rules pass, and manual discount/comp/cancellation reason data is captured without inventing legacy reasons.
+- [ ] **Gate 6: Workforce** — PIN/role changes, linked Operations-worker PIN coherence/collision checks, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
+- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, optional private expense receipts remain access-controlled, reason-coded adjustment reports reconcile to source records, and report summaries reconcile to drill-down records.
+- [ ] **Gate 8: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, system-event messages are idempotent, domain alerts are deduplicated/actionable, and device/shop health exposes no dangerous remote POS commands.
+- [ ] **Gate 9: Approved-scope completion** — role-based Dashboard, catalog-image/bulk/archive workflows, recurring expenses, supplier payment state/attachments, CRM detail, special hours, appearance, privacy-safe push, and shared archive/delete behavior are covered by automated acceptance tests.
+- [ ] **Gate 10: Production** — root CI, migration tests, Menu/Operations/Admin E2E, accessibility gate, mobile Safari/Chrome acceptance, PWA install, exact separate-Vercel deployment-contract checks, and real production smoke checks pass with no unresolved serious review finding.
 
 ## Completion Command Set
 
@@ -101,8 +105,11 @@ npm run test:migrations
 npm run test:catalog-architecture
 npm run test:whatsapp-architecture
 npm run test:whatsapp-security
+npm run test:admin-security
 npm run test:e2e
 npm run build
 ```
 
-Expected result: every command exits `0`; any failure blocks the checkpoint until corrected.
+At the final production gate also run the Admin-specific architecture, cross-app, deployment-contract, and accessibility checks introduced by the reliability/hardening plans.
+
+Expected result: every applicable command exits `0`; any failure blocks the checkpoint until corrected.
