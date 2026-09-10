@@ -1,8 +1,6 @@
 export type CatalogJsonPrimitive = string | number | boolean | null;
 export type CatalogJsonValue =
-  | CatalogJsonPrimitive
-  | CatalogJsonValue[]
-  | { [key: string]: CatalogJsonValue };
+  CatalogJsonPrimitive | CatalogJsonValue[] | { [key: string]: CatalogJsonValue };
 export type CatalogJsonObject = { [key: string]: CatalogJsonValue };
 
 export type CatalogDraftStatus = 'DRAFT' | 'PUBLISHED' | 'DISCARDED';
@@ -128,11 +126,7 @@ export type CatalogDraftSaveResult =
     }
   | {
       ok: false;
-      code:
-        | 'draft_not_found'
-        | 'draft_not_editable'
-        | 'stale_draft_revision'
-        | 'invalid_change';
+      code: 'draft_not_found' | 'draft_not_editable' | 'stale_draft_revision' | 'invalid_change';
       currentDraftRevision?: number;
     };
 
