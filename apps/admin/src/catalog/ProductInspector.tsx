@@ -1,9 +1,6 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
 
-import {
-  ProductEditor,
-  type ProductEditorDraft,
-} from './ProductEditor';
+import { ProductEditor, type ProductEditorDraft } from './ProductEditor';
 
 export function ProductInspector({
   product,
