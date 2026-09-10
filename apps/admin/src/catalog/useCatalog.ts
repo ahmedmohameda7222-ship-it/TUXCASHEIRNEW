@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   CatalogDraftCreateResult,
   CatalogDraftSaveResult,
@@ -120,7 +115,9 @@ export function useCatalog(shopId: string | undefined) {
     enabled: Boolean(shopId),
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
-      return adminFetch<CatalogWorkspace>(`/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`);
+      return adminFetch<CatalogWorkspace>(
+        `/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`,
+      );
     },
   });
 
