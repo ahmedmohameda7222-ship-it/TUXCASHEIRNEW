@@ -23,7 +23,10 @@ export function sendJson(
 
 export function requireSameOrigin(request: AdminRequest, response: AdminResponse): boolean {
   const origin = firstHeader(request.headers.origin).trim();
-  if (!origin) return true;
+  if (!origin) {
+    sendJson(response, 403, { error: 'origin_not_allowed' });
+    return false;
+  }
   const forwardedHost = firstHeader(request.headers['x-forwarded-host']);
   const host = (forwardedHost || firstHeader(request.headers.host)).split(',')[0]?.trim() ?? '';
   if (!host) {
