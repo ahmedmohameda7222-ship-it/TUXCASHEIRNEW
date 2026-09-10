@@ -250,39 +250,103 @@ git commit -m "feat(admin): add observability and actionable alerts"
 ### Task 5: Add cross-app regression and Admin production CI gates
 
 **Files:**
-- Create: `scripts/test-admin-architecture.mjs`
-- Create: `scripts/test-admin-cross-app-publish.mjs`
+- Create: `apps/admin/server/catalog/crossAppPublishConsistency.ts`
+- Test: `apps/admin/server/catalog/crossAppPublishConsistency.test.ts`
 - Create: `e2e/admin-cross-app.spec.ts`
 - Modify: `.github/workflows/ci.yml`
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces `test:admin-architecture`, `test:admin-cross-app`, `test:e2e:admin` scripts and CI jobs.
+- Produces `PublishedSurfaceSnapshot` and `assertCrossAppPublishConsistency(admin, menu, operations)`.
+- Produces `test:admin-architecture`, `test:admin-cross-app`, and `test:e2e:admin` scripts/CI jobs.
 
-- [ ] **Step 1: Write failing cross-app assertions**
+- [ ] **Step 1: Write the failing cross-app consistency test**
 
-```js
-// scripts/test-admin-cross-app-publish.mjs
-// Seed a product at published version N, publish a changed draft through the Admin command path,
-// then assert the Menu public-catalog query and Operations configuration query both expose version N+1 and the same price/modifier/combo identifiers.
-throw new Error('cross-app publish harness not implemented');
+```ts
+import { describe, expect, it } from 'vitest';
+import { assertCrossAppPublishConsistency } from './crossAppPublishConsistency';
+
+const admin = {
+  version: 49,
+  products: [{ id: 'p1', priceMinor: 17500, modifierIds: ['m1'], comboBeverageIds: ['p2'] }],
+};
+
+describe('cross-app publish consistency', () => {
+  it('rejects Menu or Operations version skew', () => {
+    expect(() => assertCrossAppPublishConsistency(
+      admin,
+      { ...admin, version: 48 },
+      admin,
+    )).toThrow('publish_version_mismatch');
+  });
+
+  it('rejects relationship/price skew at the same version', () => {
+    expect(() => assertCrossAppPublishConsistency(
+      admin,
+      { ...admin, products: [{ ...admin.products[0]!, priceMinor: 18000 }] },
+      admin,
+    )).toThrow('publish_payload_mismatch');
+  });
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
 
 ```bash
-npm run test:admin-cross-app
+npx vitest run apps/admin/server/catalog/crossAppPublishConsistency.test.ts
 ```
 
-Expected: fail until the harness/script is wired and implemented.
+Expected: fail because `crossAppPublishConsistency.ts` does not exist.
 
-- [ ] **Step 3: Implement CI matrix and regression harness**
+- [ ] **Step 3: Implement canonical snapshot comparison**
 
-CI must run Admin typecheck/build/unit/E2E, migration tests, catalog architecture, WhatsApp architecture/security, existing Menu/Operations tests, and cross-app publish consistency. Architecture check rejects privileged env names in `apps/admin/src` and unrestricted direct browser Supabase mutation clients.
+```ts
+export type PublishedSurfaceSnapshot = {
+  readonly version: number;
+  readonly products: readonly {
+    readonly id: string;
+    readonly priceMinor: number;
+    readonly modifierIds: readonly string[];
+    readonly comboBeverageIds: readonly string[];
+  }[];
+};
 
-- [ ] **Step 4: Run full CI-equivalent commands locally**
+function normalized(snapshot: PublishedSurfaceSnapshot): string {
+  return JSON.stringify({
+    version: snapshot.version,
+    products: [...snapshot.products]
+      .map((product) => ({
+        ...product,
+        modifierIds: [...product.modifierIds].sort(),
+        comboBeverageIds: [...product.comboBeverageIds].sort(),
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  });
+}
+
+export function assertCrossAppPublishConsistency(
+  admin: PublishedSurfaceSnapshot,
+  menu: PublishedSurfaceSnapshot,
+  operations: PublishedSurfaceSnapshot,
+): void {
+  if (admin.version !== menu.version || admin.version !== operations.version) {
+    throw new Error('publish_version_mismatch');
+  }
+  if (normalized(admin) !== normalized(menu) || normalized(admin) !== normalized(operations)) {
+    throw new Error('publish_payload_mismatch');
+  }
+}
+```
+
+`e2e/admin-cross-app.spec.ts` then publishes a seeded test product through the real Admin catalog command path and adapts the resulting Admin published view, Menu public-catalog response, and Operations configuration response into `PublishedSurfaceSnapshot` before calling this assertion. The fixture must authenticate each surface through its normal test authority; it must not add a production-only bypass.
+
+- [ ] **Step 4: Wire and run the cross-app/CI gate**
 
 ```bash
+npx vitest run apps/admin/server/catalog/crossAppPublishConsistency.test.ts
+npm run test:admin-architecture
+npm run test:admin-cross-app
+npm run test:e2e:admin
 npm run format:check
 npm run lint
 npm run typecheck
@@ -291,18 +355,16 @@ npm run test:migrations
 npm run test:catalog-architecture
 npm run test:whatsapp-architecture
 npm run test:whatsapp-security
-npm run test:admin-architecture
-npm run test:admin-cross-app
 npm run test:e2e
 npm run build
 ```
 
-Expected: every command exits `0`.
+Expected: every command exits `0`; Admin/Menu/Operations expose the same accepted publish version and product price/modifier/combo identities.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/test-admin-architecture.mjs scripts/test-admin-cross-app-publish.mjs e2e/admin-cross-app.spec.ts .github/workflows/ci.yml package.json
+git add apps/admin/server/catalog/crossAppPublishConsistency.ts apps/admin/server/catalog/crossAppPublishConsistency.test.ts e2e/admin-cross-app.spec.ts .github/workflows/ci.yml package.json
 git commit -m "test(admin): add production regression gates"
 ```
 
