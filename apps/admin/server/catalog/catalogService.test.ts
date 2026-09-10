@@ -14,6 +14,19 @@ const owner: AdminSessionPrincipal = {
 function store(overrides: Partial<CatalogStore> = {}): CatalogStore {
   return {
     getCurrentPublishVersion: vi.fn().mockResolvedValue(48),
+    loadWorkspace: vi.fn().mockResolvedValue({
+      shopId: 'shop-a',
+      currentPublishVersion: 48,
+      products: [],
+      drafts: [],
+    }),
+    createDraft: vi.fn().mockResolvedValue({
+      ok: true,
+      draftId: 'draft-new',
+      draftRevision: 1,
+      basePublishVersion: 48,
+      bundleJson: { snapshot: { products: [] } },
+    }),
     saveDraftChange: vi.fn().mockResolvedValue({
       ok: true,
       draftId: 'draft-1',
@@ -38,6 +51,43 @@ function store(overrides: Partial<CatalogStore> = {}): CatalogStore {
 }
 
 describe('Admin catalog service', () => {
+  it('loads a shop workspace only with catalog.view and explicit shop scope', async () => {
+    const catalogStore = store();
+    const service = createCatalogService(catalogStore);
+
+    await expect(service.loadCatalogWorkspace('shop-a', owner)).resolves.toMatchObject({
+      shopId: 'shop-a',
+      currentPublishVersion: 48,
+    });
+    expect(catalogStore.loadWorkspace).toHaveBeenCalledWith('shop-a', 'business-1');
+
+    await expect(service.loadCatalogWorkspace('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
+  });
+
+  it('creates a draft from the authenticated employee at the expected live version', async () => {
+    const catalogStore = store();
+    const service = createCatalogService(catalogStore);
+
+    await expect(
+      service.createCatalogDraft(
+        { shopId: 'shop-a', expectedVersion: 48, title: 'Edit Fixture Burger' },
+        owner,
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      draftId: 'draft-new',
+      draftRevision: 1,
+      basePublishVersion: 48,
+    });
+
+    expect(catalogStore.createDraft).toHaveBeenCalledWith({
+      employeeId: 'employee-1',
+      shopId: 'shop-a',
+      expectedVersion: 48,
+      title: 'Edit Fixture Burger',
+    });
+  });
+
   it('returns stale_version without calling publish when the base version changed', async () => {
     const catalogStore = store({
       getCurrentPublishVersion: vi.fn().mockResolvedValue(49),
