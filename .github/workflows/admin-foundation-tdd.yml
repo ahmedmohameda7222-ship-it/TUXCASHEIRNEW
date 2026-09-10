@@ -79,3 +79,5 @@ jobs:
           apps/admin/server/reauth.test.ts
       - name: Admin contracts typecheck
         run: npx tsc --noEmit -p packages/admin-contracts/tsconfig.json
+      - name: Admin server and API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
