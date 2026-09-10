@@ -17,7 +17,7 @@ import type {
 } from '@tux/admin-contracts';
 
 import { requirePermission } from '../authorization';
-import { AdminSupabaseClient } from '../supabaseAdmin';
+import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 export class CatalogServiceError extends Error {
   constructor(readonly code: 'invalid_change_set' | 'backend_contract_invalid') {
@@ -178,12 +178,19 @@ function deepContainsPriceField(value: unknown): boolean {
   return false;
 }
 
+function pathTouchesPricing(path: string): boolean {
+  return path
+    .replaceAll('[', '.')
+    .replaceAll(']', '.')
+    .replaceAll('/', '.')
+    .split('.')
+    .some((segment) => segment === 'priceMinor' || segment === 'price_minor');
+}
+
 function changeTouchesPricing(input: CatalogSaveDraftInput): boolean {
   return input.changes.some((change) => {
     if (change.changedPaths !== undefined) {
-      return change.changedPaths.some((path) =>
-        /(^|[.\[/])(priceMinor|price_minor)([.\]/]|$)/.test(path),
-      );
+      return change.changedPaths.some(pathTouchesPricing);
     }
     // Conservative fallback for older clients. The database independently compares prices
     // against the locked draft/canonical rows, so changedPaths never grants authority.
