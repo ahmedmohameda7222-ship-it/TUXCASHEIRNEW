@@ -1,7 +1,8 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const SESSION_COOKIE = 'tux_admin_session';
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const CSRF_DERIVATION_CONTEXT = 'tux-admin-csrf-v1';
 
 export type AdminSessionMaterial = {
   token: string;
@@ -15,6 +16,13 @@ export function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+export function deriveAdminCsrfToken(sessionToken: string): string {
+  if (!/^[0-9a-f]{64}$/.test(sessionToken)) throw new Error('invalid_session_token');
+  return createHmac('sha256', Buffer.from(sessionToken, 'hex'))
+    .update(CSRF_DERIVATION_CONTEXT)
+    .digest('hex');
+}
+
 export function createSessionMaterial(
   now = new Date(),
   ttlSeconds = DEFAULT_SESSION_TTL_SECONDS,
@@ -23,7 +31,7 @@ export function createSessionMaterial(
     throw new Error('invalid_session_ttl');
   }
   const token = randomBytes(32).toString('hex');
-  const csrfToken = randomBytes(32).toString('hex');
+  const csrfToken = deriveAdminCsrfToken(token);
   return {
     token,
     tokenHash: sha256Hex(token),
