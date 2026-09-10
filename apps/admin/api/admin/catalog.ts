@@ -1,7 +1,11 @@
 import type { AdminSessionPrincipal, CatalogCommand } from '@tux/admin-contracts';
 import { z } from 'zod';
 
-import { AdminAuthError, loadAdminSession, requireSessionCsrf } from '../../server/adminAuthService';
+import {
+  AdminAuthError,
+  loadAdminSession,
+  requireSessionCsrf,
+} from '../../server/adminAuthService';
 import { AdminAuthorizationError } from '../../server/authorization';
 import {
   CatalogServiceError,
