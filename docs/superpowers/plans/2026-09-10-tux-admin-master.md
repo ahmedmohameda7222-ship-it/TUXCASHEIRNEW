@@ -45,6 +45,10 @@ The approved spec is too broad for one safe execution checklist. Execute these p
 9. `2026-09-10-tux-admin-approved-scope-completion.md` — role-adaptive Dashboard, dashboard customization, product image/bulk/archive completion, purchasing documents/payment state, recurring expenses, CRM detail, special hours, appearance, reusable UX states, and privacy-safe web push.
 10. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, durable idempotency, offline behavior, observability, cross-app regression gates, real-mobile acceptance, Vercel production rollout, and production smoke tests.
 
+### Cross-plan hardening addendum
+
+`2026-09-10-tux-admin-plan-hardening.md` is mandatory and is executed at the insertion points named inside that document rather than as a separate product phase. It closes five implementation ambiguities discovered during self-review: one-time first-OWNER bootstrap, canonical employee/linked-worker PIN coherence, supplier-aware replenishment metadata, reason-coded discount/comp/cancellation reporting, and the exact Admin Vercel monorepo contract. No implementation checkpoint is accepted if its applicable hardening task is still unresolved.
+
 ## Cross-Plan Interfaces
 
 All plans depend on these stable interfaces established by Plan 1:
@@ -73,16 +77,16 @@ Every Admin BFF mutation uses a session principal resolved from the secure cooki
 
 ## Master Verification Gates
 
-- [ ] **Gate 1: Foundation** — `npm run build -w @tux/admin`, Admin typecheck/tests, PIN auth integration tests, and shop-isolation tests pass.
+- [ ] **Gate 1: Foundation** — `npm run build -w @tux/admin`, Admin typecheck/tests, PIN auth integration tests, shop-isolation tests, and the one-time OWNER-bootstrap tests pass.
 - [ ] **Gate 2: Catalog/config** — Admin publish updates canonical Menu catalog and Operations configuration in one accepted version; existing catalog and Menu tests remain green.
 - [ ] **Gate 3: Approval/audit** — sensitive commands can be held for approval, approved/rejected with approver PIN, execute at most once, and append immutable audit history.
-- [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, and receiving tests pass without negative-stock leakage.
-- [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, and delivery routing is shop-safe.
-- [ ] **Gate 6: Workforce** — PIN/role changes, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
-- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, and report summaries reconcile to drill-down source records.
+- [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, receiving, and supplier-aware reorder calculations pass without negative-stock leakage.
+- [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, delivery routing is shop-safe, and manual discount/comp/cancellation reason data is captured for reporting without inventing legacy reasons.
+- [ ] **Gate 6: Workforce** — PIN/role changes, linked Operations-worker PIN coherence, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
+- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, reason-coded adjustment reports reconcile to source records, and report summaries reconcile to drill-down source records.
 - [ ] **Gate 8: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, and device/shop health is actionable without dangerous remote POS commands.
 - [ ] **Gate 9: Approved-scope completion** — role-based Dashboard, catalog-image/bulk/archive workflows, recurring expenses, supplier payment state/attachments, CRM detail, special hours, appearance, and privacy-safe push are all covered by automated acceptance tests.
-- [ ] **Gate 10: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, and real production smoke checks pass with no unresolved serious review finding.
+- [ ] **Gate 10: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, exact separate-Vercel deployment-contract checks, and real production smoke checks pass with no unresolved serious review finding.
 
 ## Completion Command Set
 
