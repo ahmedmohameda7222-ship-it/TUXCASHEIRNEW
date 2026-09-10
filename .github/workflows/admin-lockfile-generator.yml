@@ -1,0 +1,29 @@
+name: Admin Lockfile Generator
+
+on:
+  pull_request:
+    paths:
+      - packages/admin-contracts/package.json
+      - .github/workflows/admin-lockfile-generator.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Regenerate lockfile only
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-generated-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
