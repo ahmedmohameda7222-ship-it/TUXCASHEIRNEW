@@ -36,12 +36,13 @@ The approved spec is too broad for one safe execution checklist. Execute these p
 
 1. `2026-09-10-tux-admin-foundation-auth-shell.md` — app scaffold, Admin contracts, business identity, PIN auth/session, RBAC/shop scope, adaptive shell, PWA base.
 2. `2026-09-10-tux-admin-catalog-settings.md` — master catalog compatibility layer, shop overrides, drafts, atomic publish, scheduled/recurring availability, shops/order types/payments/checkout/receipts/reason codes.
-3. `2026-09-10-tux-admin-inventory-purchasing.md` — stock ledger, reservation lifecycle, recipes/costing, stocktake, waste, transfers, par levels, actual-vs-theoretical, suppliers, purchase orders/receiving/returns.
-4. `2026-09-10-tux-admin-orders-customers-delivery.md` — order supervision/refunds, canonical customer identity, loyalty, promotions, segments, customer merge, delivery zones/routing/riders.
-5. `2026-09-10-tux-admin-workforce.md` — employee identity, shop assignments, shifts, attendance, leave, wage estimates, staff payment records.
-6. `2026-09-10-tux-admin-finance-reports.md` — expenses, Bank & Cash, money movements, settlements, X/Z end-day history, cashier reconciliation, owner contributions/withdrawals, profit/COGS reporting, advanced report filters/drill-down/saved views/targets/owner summary.
-7. `2026-09-10-tux-admin-whatsapp-operations.md` — WhatsApp control center, templates, quick replies, automatic order messages, analytics, health, plus opening/closing checklists, manager log, devices/printers/shop health.
-8. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, idempotency audits, offline behavior, notification delivery, cross-app regression gates, real-mobile acceptance, Vercel production rollout and production smoke tests.
+3. `2026-09-10-tux-admin-approvals-audit.md` — immutable audit ledger, approval thresholds, one-time approval execution, PIN-confirmed Approve/Reject UI.
+4. `2026-09-10-tux-admin-inventory-purchasing.md` — stock ledger, reservation lifecycle, recipes/costing, stocktake, waste, transfers, par levels, actual-vs-theoretical, suppliers, purchase orders/receiving/returns.
+5. `2026-09-10-tux-admin-orders-customers-delivery.md` — order supervision/refunds, canonical customer identity, loyalty, promotions, segments, customer merge, delivery zones/routing/riders.
+6. `2026-09-10-tux-admin-workforce.md` — employee identity, shop assignments, shifts, attendance, leave, wage estimates, staff payment records.
+7. `2026-09-10-tux-admin-finance-reports.md` — expenses, Bank & Cash, money movements, settlements, X/Z end-day history, cashier reconciliation, owner contributions/withdrawals, profit/COGS reporting, advanced report filters/drill-down/saved views/targets/owner summary.
+8. `2026-09-10-tux-admin-whatsapp-operations.md` — WhatsApp control center, templates, quick replies, automatic order messages, analytics, health, plus opening/closing checklists, manager log, devices/printers/shop health.
+9. `2026-09-10-tux-admin-reliability-production.md` — concurrency hardening, idempotency audits, offline behavior, notification delivery, cross-app regression gates, real-mobile acceptance, Vercel production rollout and production smoke tests.
 
 ## Cross-Plan Interfaces
 
@@ -73,12 +74,13 @@ Every Admin BFF mutation uses a session principal resolved from the secure cooki
 
 - [ ] **Gate 1: Foundation** — `npm run build -w @tux/admin`, Admin typecheck/tests, PIN auth integration tests, and shop-isolation tests pass.
 - [ ] **Gate 2: Catalog/config** — Admin publish updates canonical Menu catalog and Operations configuration in one accepted version; existing catalog and Menu tests remain green.
-- [ ] **Gate 3: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, and receiving tests pass without negative-stock leakage.
-- [ ] **Gate 4: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, and delivery routing is shop-safe.
-- [ ] **Gate 5: Workforce** — PIN/role changes, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
-- [ ] **Gate 6: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, and all report drill-downs reconcile to source records.
-- [ ] **Gate 7: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, and device/shop health is actionable without dangerous remote POS commands.
-- [ ] **Gate 8: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, and real production smoke checks pass with no unresolved serious review finding.
+- [ ] **Gate 3: Approval/audit** — sensitive commands can be held for approval, approved/rejected with approver PIN, execute at most once, and append immutable audit history.
+- [ ] **Gate 4: Inventory/purchasing** — stock ledger balances, reservation lifecycle, weighted-average cost, stocktake, transfer, and receiving tests pass without negative-stock leakage.
+- [ ] **Gate 5: Orders/CRM/delivery** — order history remains immutable, refund events are separate, canonical phone identity and merge preserve history, and delivery routing is shop-safe.
+- [ ] **Gate 6: Workforce** — PIN/role changes, shop assignments, attendance corrections, leave, and staff-payment records are audited and permission-safe.
+- [ ] **Gate 7: Finance/reports** — profit and money position are separately correct, End Day snapshots are immutable, bank/cash transfers do not become expenses, and all report drill-downs reconcile to source records.
+- [ ] **Gate 8: WhatsApp/operations health** — WhatsApp control surfaces use the existing WhatsApp authority, live replies remain Operations-owned, and device/shop health is actionable without dangerous remote POS commands.
+- [ ] **Gate 9: Production** — root CI, migration tests, Menu/Operations/Admin E2E, mobile Safari/Chrome acceptance, PWA install, and real production smoke checks pass with no unresolved serious review finding.
 
 ## Completion Command Set
 
