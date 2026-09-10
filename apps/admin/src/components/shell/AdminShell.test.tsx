@@ -30,7 +30,7 @@ describe('adaptive Admin shell', () => {
   });
 
   it('removes a primary destination when the principal lacks its permission', () => {
-    const limited = { ...owner, permissions: ['orders.view'] as const };
+    const limited: AdminSessionPrincipal = { ...owner, permissions: ['orders.view'] };
     expect(primaryDestinationsFor(limited)).toEqual(['home', 'orders', 'more']);
   });
 
