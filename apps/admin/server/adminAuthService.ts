@@ -19,6 +19,7 @@ import { pinLookupHash, verifyPin } from './pin';
 import {
   createSessionMaterial,
   csrfMatches,
+  deriveAdminCsrfToken,
   sha256Hex,
   type AdminSessionMaterial,
 } from './session';
@@ -241,15 +242,20 @@ export function requireSessionCsrf(context: AdminSessionContext, csrfToken: stri
   }
 }
 
-export async function rotateSessionCsrf(
+export async function restoreSessionCsrf(
   context: AdminSessionContext,
+  sessionToken: string,
   client: AdminSupabaseClient,
+  now = new Date(),
 ): Promise<string> {
-  const next = createSessionMaterial(new Date(), 60).csrfToken;
+  const csrfToken = deriveAdminCsrfToken(sessionToken);
+  if (!csrfMatches(csrfToken, context.session.csrf_token_hash)) {
+    throw new AdminAuthError('csrf_invalid', 403);
+  }
   await client.update<unknown>(
     'admin_sessions',
     query({ id: `eq.${context.session.id}`, revoked_at: 'is.null' }),
-    { csrf_token_hash: sha256Hex(next), last_seen_at: new Date().toISOString() },
+    { last_seen_at: now.toISOString() },
   );
-  return next;
+  return csrfToken;
 }
