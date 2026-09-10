@@ -59,6 +59,11 @@
 
   --tux-breakpoint-mobile: 48rem;
   --tux-breakpoint-laptop: 80rem;
+
+  --admin-touch-min: 44px;
+  --admin-radius-card: 16px;
+  --admin-content-max: 1440px;
+  --admin-nav-blur: 20px;
 }
 
 @media (prefers-color-scheme: dark) {
