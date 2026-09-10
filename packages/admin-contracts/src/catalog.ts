@@ -35,6 +35,13 @@ export type CatalogProductDetail = {
   sortOrder: number;
 };
 
+export type CatalogWorkspace = {
+  shopId: string;
+  currentPublishVersion: number;
+  products: CatalogProductDetail[];
+  drafts: CatalogDraftSummary[];
+};
+
 export type CatalogPublishPreview = {
   draftId: string;
   shopId: string;
@@ -56,6 +63,12 @@ export type CatalogDraftChange = {
   kind: 'bundle.replace';
   bundleJson: CatalogJsonObject;
   changedPaths?: string[];
+};
+
+export type CatalogCreateDraftInput = {
+  shopId: string;
+  expectedVersion: number;
+  title?: string;
 };
 
 export type CatalogSaveDraftInput = {
@@ -84,6 +97,16 @@ export type CatalogStaleVersionResult = {
   message: string;
   currentVersion: number;
 };
+
+export type CatalogDraftCreateResult =
+  | {
+      ok: true;
+      draftId: string;
+      draftRevision: number;
+      basePublishVersion: number;
+      bundleJson: CatalogJsonObject;
+    }
+  | CatalogStaleVersionResult;
 
 export type CatalogDraftSaveResult =
   | {
@@ -124,6 +147,7 @@ export type CatalogImmediateAvailabilityResult =
   | { ok: false; code: 'invalid_request' | 'product_not_found' };
 
 export type CatalogCommand =
+  | ({ type: 'draft.create' } & CatalogCreateDraftInput)
   | ({ type: 'draft.save' } & CatalogSaveDraftInput)
   | ({ type: 'draft.publish' } & CatalogPublishDraftInput)
   | ({ type: 'availability.set' } & CatalogImmediateAvailabilityInput);
