@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const ownerSession = {
   principal: {
@@ -26,7 +26,7 @@ const ownerSession = {
   csrfToken: 'a'.repeat(64),
 };
 
-async function mockSession(page: import('@playwright/test').Page) {
+async function mockSession(page: Page) {
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,

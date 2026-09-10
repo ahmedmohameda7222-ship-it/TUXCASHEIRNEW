@@ -22,7 +22,7 @@ import {
   sha256Hex,
   type AdminSessionMaterial,
 } from './session';
-import { AdminSupabaseClient } from './supabaseAdmin';
+import type { AdminSupabaseClient } from './supabaseAdmin';
 
 export type AdminEmployeeRow = {
   id: string;
