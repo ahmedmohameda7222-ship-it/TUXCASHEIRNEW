@@ -1,0 +1,104 @@
+name: Admin Receipt Snapshot Green
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-receipt-snapshot-green.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    if: github.event.head_commit.message == 'chore(settings): run receipt snapshot green patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Add typed durable receipt snapshot to placed orders
+        shell: python
+        run: |
+          from pathlib import Path
+
+          models = Path('packages/domain/src/models.ts')
+          models_text = models.read_text()
+          old_models = """export interface OrderSnapshot {\n  readonly id: OrderId;\n  readonly shopId: ShopId;\n  readonly businessDayId: BusinessDayId;\n  readonly displayOrderNo: number;\n  readonly idempotencyKey: string;\n"""
+          new_models = """export interface OrderReceiptSnapshot {\n  readonly configurationVersion: number;\n  readonly shopDisplayName: string;\n  readonly address: string | null;\n  readonly contactPhone: string | null;\n  readonly footer: string | null;\n  readonly orderNumberPrefix: string;\n}\n\nexport interface OrderSnapshot {\n  readonly id: OrderId;\n  readonly shopId: ShopId;\n  readonly businessDayId: BusinessDayId;\n  readonly displayOrderNo: number;\n  /** Immutable configured identity for orders created after receipt settings adoption. */\n  readonly displayOrderLabel?: string;\n  /** Optional for backwards compatibility with legacy persisted orders. */\n  readonly receiptSnapshot?: OrderReceiptSnapshot;\n  readonly idempotencyKey: string;\n"""
+          if old_models not in models_text:
+              raise SystemExit('OrderSnapshot anchor not found or already changed unexpectedly')
+          models.write_text(models_text.replace(old_models, new_models, 1))
+
+          orders = Path('packages/application/src/orders.ts')
+          orders_text = orders.read_text()
+          helper_anchor = """function firstActiveOrderTypeId(\n  configuration: OperationsConfigurationSnapshot,\n): OrderDraft['orderTypeId'] {\n  const ordered = configuration.orderTypes\n    .filter((orderType) => orderType.active)\n    .sort((left, right) => left.sortOrder - right.sortOrder);\n  return ordered[0]?.id ?? null;\n}\n\n"""
+          helper = helper_anchor + """function receiptIdentityForOrder(\n  configuration: OperationsConfigurationSnapshot,\n  displayOrderNo: number,\n): Pick<OrderSnapshot, 'displayOrderLabel' | 'receiptSnapshot'> {\n  const settings = configuration.settings;\n  if (settings === undefined || settings === null) return {};\n\n  const configuredPrefix = settings.values['receipt.orderPrefix'];\n  const configuredFooter = settings.values['receipt.footer'];\n  const orderNumberPrefix = typeof configuredPrefix === 'string' ? configuredPrefix : '#';\n\n  return {\n    displayOrderLabel: `${orderNumberPrefix}${displayOrderNo}`,\n    receiptSnapshot: {\n      configurationVersion: configuration.version,\n      shopDisplayName: settings.shopIdentity.displayName,\n      address: settings.shopIdentity.address,\n      contactPhone: settings.shopIdentity.phone,\n      footer: typeof configuredFooter === 'string' ? configuredFooter : null,\n      orderNumberPrefix,\n    },\n  };\n}\n\n"""
+          if helper_anchor not in orders_text:
+              raise SystemExit('firstActiveOrderTypeId anchor not found or already changed unexpectedly')
+          orders_text = orders_text.replace(helper_anchor, helper, 1)
+
+          allocation_anchor = """            const allocated = allocateDisplayOrderNo(currentDay);\n            const orderId = placement.source === 'ONLINE' ? placement.orderId : this.#id<OrderId>();\n"""
+          allocation_new = """            const allocated = allocateDisplayOrderNo(currentDay);\n            const receiptIdentity = receiptIdentityForOrder(\n              currentConfiguration,\n              allocated.displayOrderNo,\n            );\n            const orderId = placement.source === 'ONLINE' ? placement.orderId : this.#id<OrderId>();\n"""
+          if allocation_anchor not in orders_text:
+              raise SystemExit('display order allocation anchor not found')
+          orders_text = orders_text.replace(allocation_anchor, allocation_new, 1)
+
+          order_anchor = """              businessDayId: currentDay.id,\n              displayOrderNo: allocated.displayOrderNo,\n              idempotencyKey: draft.checkoutIntentKey,\n"""
+          order_new = """              businessDayId: currentDay.id,\n              displayOrderNo: allocated.displayOrderNo,\n              ...receiptIdentity,\n              idempotencyKey: draft.checkoutIntentKey,\n"""
+          if order_anchor not in orders_text:
+              raise SystemExit('OrderSnapshot construction anchor not found')
+          orders.write_text(orders_text.replace(order_anchor, order_new, 1))
+
+          receipt = Path('packages/printing/src/receipt.ts')
+          receipt_text = receipt.read_text()
+          compatibility_types = """interface ReceiptSnapshotView {\n  readonly configurationVersion: number;\n  readonly shopDisplayName: string;\n  readonly address: string | null;\n  readonly contactPhone: string | null;\n  readonly footer: string | null;\n  readonly orderNumberPrefix: string;\n}\n\ntype ReceiptAwareOrder = OrderSnapshot & {\n  readonly displayOrderLabel?: string;\n  readonly receiptSnapshot?: ReceiptSnapshotView;\n};\n\n"""
+          if compatibility_types not in receipt_text:
+              raise SystemExit('receipt compatibility type anchor not found')
+          receipt_text = receipt_text.replace(compatibility_types, '', 1)
+          receipt_text = receipt_text.replace(
+              """  const receiptAwareOrder = order as ReceiptAwareOrder;\n  const receiptSnapshot = receiptAwareOrder.receiptSnapshot;\n  const orderLabel = receiptAwareOrder.displayOrderLabel ?? `#${order.displayOrderNo}`;\n""",
+              """  const receiptSnapshot = order.receiptSnapshot;\n  const orderLabel = order.displayOrderLabel ?? `#${order.displayOrderNo}`;\n""",
+              1,
+          )
+          receipt.write_text(receipt_text)
+      - name: Format changed runtime files
+        run: >-
+          npx prettier --write
+          packages/domain/src/models.ts
+          packages/application/src/orders.ts
+          packages/printing/src/receipt.ts
+          packages/application/src/ordersAtomicDelivery.sqlite.test.ts
+          .github/workflows/admin-catalog-settings-tdd.yml
+      - name: Verify focused green contracts
+        run: >-
+          npx vitest run
+          packages/application/src/ordersAtomicDelivery.sqlite.test.ts
+          packages/printing/src/receipt.settings.test.ts
+      - name: Verify affected package typechecks
+        run: |
+          npm run typecheck -w @tux/domain
+          npm run typecheck -w @tux/application
+          npm run typecheck -w @tux/printing
+      - name: Commit green implementation
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            packages/domain/src/models.ts \
+            packages/application/src/orders.ts \
+            packages/printing/src/receipt.ts \
+            packages/application/src/ordersAtomicDelivery.sqlite.test.ts \
+            .github/workflows/admin-catalog-settings-tdd.yml
+          git commit -m 'feat(settings): snapshot receipt identity at checkout'
+          git push origin HEAD:feat/admin-02-catalog-settings
