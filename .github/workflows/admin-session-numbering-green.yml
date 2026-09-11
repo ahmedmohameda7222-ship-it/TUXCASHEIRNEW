@@ -1,5 +1,6 @@
 name: Admin Session Numbering Green
 
+# One-shot executor retriggered after the test fixture was brought back into the read-model contract.
 on:
   pull_request:
     paths:
