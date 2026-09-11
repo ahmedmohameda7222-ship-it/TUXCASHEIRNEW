@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  allocateDisplayOrderNo,
-  createOpenBusinessDay,
-  type OpenBusinessDay,
-} from './businessDay';
+import { allocateDisplayOrderNo, createOpenBusinessDay, type OpenBusinessDay } from './businessDay';
 import { parseEntityId, type BusinessDayId, type ShopId, type WorkerId } from './ids';
 import { instant } from './time';
 

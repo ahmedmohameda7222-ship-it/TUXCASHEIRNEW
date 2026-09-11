@@ -34,7 +34,9 @@ export function createOpenBusinessDay(
   options: { readonly sequenceStart: number } = { sequenceStart: 1 },
 ): OpenBusinessDay {
   if (!Number.isSafeInteger(options.sequenceStart) || options.sequenceStart <= 0) {
-    throw new RangeError('Business Day display order sequence start must be a positive safe integer.');
+    throw new RangeError(
+      'Business Day display order sequence start must be a positive safe integer.',
+    );
   }
 
   return {
