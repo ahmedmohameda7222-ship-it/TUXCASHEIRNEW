@@ -11,7 +11,30 @@ const owner: AdminSessionPrincipal = {
   shopIds: ['shop-a'],
 };
 
-function store(overrides: Partial<CatalogStore> = {}): CatalogStore {
+type PublishControlStore = CatalogStore & {
+  loadPublishing(shopId: string, businessId: string): Promise<unknown>;
+  restoreVersion(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+  scheduleDraft(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+  cancelSchedule(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+};
+
+type PublishControlService = ReturnType<typeof createCatalogService> & {
+  loadCatalogPublishing(shopId: string, principal: AdminSessionPrincipal): Promise<unknown>;
+  restoreCatalogVersion(
+    input: Readonly<Record<string, unknown>>,
+    principal: AdminSessionPrincipal,
+  ): Promise<unknown>;
+  scheduleCatalogDraft(
+    input: Readonly<Record<string, unknown>>,
+    principal: AdminSessionPrincipal,
+  ): Promise<unknown>;
+  cancelScheduledCatalogChange(
+    input: Readonly<Record<string, unknown>>,
+    principal: AdminSessionPrincipal,
+  ): Promise<unknown>;
+};
+
+function store(overrides: Partial<PublishControlStore> = {}): PublishControlStore {
   return {
     getCurrentPublishVersion: vi.fn().mockResolvedValue(48),
     loadWorkspace: vi.fn().mockResolvedValue({
@@ -47,8 +70,39 @@ function store(overrides: Partial<CatalogStore> = {}): CatalogStore {
       publishVersion: 49,
       operationsConfigurationVersion: 49,
     }),
+    loadPublishing: vi.fn().mockResolvedValue({
+      shopId: 'shop-a',
+      currentPublishVersion: 48,
+      versions: [],
+      schedules: [],
+    }),
+    restoreVersion: vi.fn().mockResolvedValue({
+      ok: true,
+      sourcePublishVersion: 47,
+      publishVersion: 49,
+      operationsConfigurationVersion: 49,
+    }),
+    scheduleDraft: vi.fn().mockResolvedValue({
+      ok: true,
+      scheduleId: 'schedule-1',
+      status: 'PENDING',
+      localScheduledAt: '2099-09-11T08:00:00',
+      scheduledFor: '2099-09-11T05:00:00.000Z',
+      timezone: 'Africa/Cairo',
+      idempotentReplay: false,
+    }),
+    cancelSchedule: vi.fn().mockResolvedValue({
+      ok: true,
+      scheduleId: 'schedule-1',
+      status: 'CANCELLED',
+      idempotentReplay: false,
+    }),
     ...overrides,
-  };
+  } as PublishControlStore;
+}
+
+function publishingService(catalogStore: PublishControlStore): PublishControlService {
+  return createCatalogService(catalogStore) as PublishControlService;
 }
 
 describe('Admin catalog service', () => {
@@ -181,5 +235,80 @@ describe('Admin catalog service', () => {
       expectedDraftRevision: 2,
       expectedVersion: 48,
     });
+  });
+
+  it('loads publish history only with catalog.view and explicit shop scope', async () => {
+    const catalogStore = store();
+    const service = publishingService(catalogStore);
+
+    await expect(service.loadCatalogPublishing('shop-a', owner)).resolves.toMatchObject({
+      shopId: 'shop-a',
+      currentPublishVersion: 48,
+    });
+    expect(catalogStore.loadPublishing).toHaveBeenCalledWith('shop-a', 'business-1');
+
+    await expect(service.loadCatalogPublishing('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
+  });
+
+  it('fences a stale restore before calling the trusted restore RPC', async () => {
+    const catalogStore = store({
+      getCurrentPublishVersion: vi.fn().mockResolvedValue(49),
+      restoreVersion: vi.fn(),
+    });
+    const service = publishingService(catalogStore);
+
+    await expect(
+      service.restoreCatalogVersion(
+        { shopId: 'shop-a', sourcePublishVersion: 47, expectedVersion: 48 },
+        owner,
+      ),
+    ).resolves.toMatchObject({ ok: false, code: 'stale_version', currentVersion: 49 });
+    expect(catalogStore.restoreVersion).not.toHaveBeenCalled();
+  });
+
+  it('schedules a draft with the authenticated employee and Cairo-local intent', async () => {
+    const catalogStore = store();
+    const service = publishingService(catalogStore);
+
+    await expect(
+      service.scheduleCatalogDraft(
+        {
+          draftId: 'draft-1',
+          shopId: 'shop-a',
+          expectedDraftRevision: 2,
+          expectedVersion: 48,
+          localScheduledAt: '2099-09-11T08:00:00',
+        },
+        owner,
+      ),
+    ).resolves.toMatchObject({ ok: true, scheduleId: 'schedule-1', status: 'PENDING' });
+
+    expect(catalogStore.scheduleDraft).toHaveBeenCalledWith({
+      employeeId: 'employee-1',
+      draftId: 'draft-1',
+      expectedDraftRevision: 2,
+      expectedVersion: 48,
+      localScheduledAt: '2099-09-11T08:00:00',
+    });
+  });
+
+  it('requires catalog.publish and concrete shop scope before cancelling a schedule', async () => {
+    const catalogStore = store();
+    const service = publishingService(catalogStore);
+    const editorOnly: AdminSessionPrincipal = { ...owner, permissions: ['catalog.edit'] };
+
+    await expect(
+      service.cancelScheduledCatalogChange(
+        { shopId: 'shop-a', scheduleId: 'schedule-1' },
+        editorOnly,
+      ),
+    ).rejects.toThrow(/permission_forbidden/);
+    await expect(
+      service.cancelScheduledCatalogChange(
+        { shopId: 'shop-b', scheduleId: 'schedule-1' },
+        owner,
+      ),
+    ).rejects.toThrow(/shop_forbidden/);
+    expect(catalogStore.cancelSchedule).not.toHaveBeenCalled();
   });
 });
