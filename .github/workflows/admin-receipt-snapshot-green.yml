@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   green:
-    if: github.event.head_commit.message == 'chore(settings): run receipt snapshot green patch'
+    if: "${{ github.event.head_commit.message == 'chore(settings): run receipt snapshot green patch' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
