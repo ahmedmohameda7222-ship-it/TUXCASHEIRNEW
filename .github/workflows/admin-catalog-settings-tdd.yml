@@ -49,6 +49,7 @@ jobs:
           apps/admin/server/catalog/catalogPublishHistory.test.ts
           apps/admin/server/settings/settingsService.test.ts
           apps/admin/api/admin/catalogRecurring.test.ts
+          apps/admin/api/admin/settings.test.ts
       - name: Admin contracts typecheck
         run: npm run typecheck -w @tux/admin-contracts
       - name: Admin API and server typecheck
