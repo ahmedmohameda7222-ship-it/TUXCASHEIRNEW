@@ -14,9 +14,7 @@ import { ApplicationCommandCoordinator } from './commandCoordinator';
 import { OperationsConfigurationSyncService } from './configurationSync';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
-const paymentMethodId = parseEntityId<PaymentMethodId>(
-  '22222222-2222-4222-8222-222222222222',
-);
+const paymentMethodId = parseEntityId<PaymentMethodId>('22222222-2222-4222-8222-222222222222');
 const deliveryZoneId = parseEntityId<DeliveryZoneId>('33333333-3333-4333-8333-333333333333');
 const tempDirectories: string[] = [];
 
@@ -86,9 +84,7 @@ function publishedBundle() {
         },
         weeklyHours: [],
         specialHours: [],
-        paymentMethodZoneRules: [
-          { paymentMethodId, deliveryZoneId, allowed: false },
-        ],
+        paymentMethodZoneRules: [{ paymentMethodId, deliveryZoneId, allowed: false }],
       },
       reasonCodes: [
         {

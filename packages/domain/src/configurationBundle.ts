@@ -106,7 +106,9 @@ function nullableFiniteNumber(
 ): number | null {
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
-    throw new TypeError(`${label} must be null or a finite number between ${minimum} and ${maximum}.`);
+    throw new TypeError(
+      `${label} must be null or a finite number between ${minimum} and ${maximum}.`,
+    );
   }
   return value;
 }
@@ -149,7 +151,8 @@ function jsonValue(value: unknown, label: string): JsonValue {
     if (!Number.isFinite(value)) throw new TypeError(`${label} contains a non-finite number.`);
     return value;
   }
-  if (Array.isArray(value)) return value.map((entry, index) => jsonValue(entry, `${label}[${index}]`));
+  if (Array.isArray(value))
+    return value.map((entry, index) => jsonValue(entry, `${label}[${index}]`));
   const source = record(value, label);
   const result: Record<string, JsonValue> = {};
   for (const [key, child] of Object.entries(source)) {
@@ -162,7 +165,8 @@ function settingsValues(value: unknown): Readonly<Record<string, JsonValue>> {
   const source = record(value, 'configuration settings values');
   const result: Record<string, JsonValue> = {};
   for (const [key, child] of Object.entries(source)) {
-    if (!SETTING_KEY_PATTERN.test(key)) throw new TypeError(`configuration setting key ${key} is invalid.`);
+    if (!SETTING_KEY_PATTERN.test(key))
+      throw new TypeError(`configuration setting key ${key} is invalid.`);
     result[key] = jsonValue(child, `configuration setting ${key}`);
   }
   return result;
@@ -273,7 +277,8 @@ function parseOrderType(value: unknown, shopId: ShopId, seen: Set<string>): Orde
 }
 
 function paymentLogicType(value: unknown): PaymentLogicType {
-  if (value === 'CASH' || value === 'CARD' || value === 'DIGITAL' || value === 'OTHER') return value;
+  if (value === 'CASH' || value === 'CARD' || value === 'DIGITAL' || value === 'OTHER')
+    return value;
   throw new TypeError('payment method logicType is invalid.');
 }
 
@@ -442,7 +447,10 @@ function parseSpecialHours(value: unknown): OperationsSpecialHoursSetting {
     source['closesLocal'] === null
       ? null
       : localTime(source['closesLocal'], 'configuration special hours closesLocal');
-  if ((closed && (opensLocal !== null || closesLocal !== null)) || (!closed && (!opensLocal || !closesLocal))) {
+  if (
+    (closed && (opensLocal !== null || closesLocal !== null)) ||
+    (!closed && (!opensLocal || !closesLocal))
+  ) {
     throw new TypeError('configuration special hours open/closed shape is invalid.');
   }
   return {
@@ -472,19 +480,27 @@ function parsePaymentMethodZoneRule(value: unknown): PaymentMethodZoneRuleSettin
   };
 }
 
-function parsePublishedSettings(value: unknown, shopId: ShopId): OperationsPublishedSettings | null {
+function parsePublishedSettings(
+  value: unknown,
+  shopId: ShopId,
+): OperationsPublishedSettings | null {
   if (value === undefined || value === null) return null;
   const source = record(value, 'configuration settings');
-  const weeklyHours = array(source['weeklyHours'], 'configuration weeklyHours').map(parseWeeklyHours);
+  const weeklyHours = array(source['weeklyHours'], 'configuration weeklyHours').map(
+    parseWeeklyHours,
+  );
   for (const hours of weeklyHours) {
-    if (hours.dayOfWeek > 6) throw new TypeError('configuration weekly hours dayOfWeek must be <= 6.');
+    if (hours.dayOfWeek > 6)
+      throw new TypeError('configuration weekly hours dayOfWeek must be <= 6.');
   }
   return {
     version: safeInteger(source['version'], 'configuration settings version', 1),
     values: settingsValues(source['values']),
     shopIdentity: parseShopIdentity(source['shopIdentity'], shopId),
     weeklyHours,
-    specialHours: array(source['specialHours'], 'configuration specialHours').map(parseSpecialHours),
+    specialHours: array(source['specialHours'], 'configuration specialHours').map(
+      parseSpecialHours,
+    ),
     paymentMethodZoneRules: array(
       source['paymentMethodZoneRules'],
       'configuration paymentMethodZoneRules',
@@ -579,9 +595,12 @@ export function parseOperationsConfigurationBundle(
   const reasonCodes =
     snapshotSource['reasonCodes'] === undefined
       ? []
-      : array(snapshotSource['reasonCodes'], 'configuration reasonCodes').map(parseConfiguredReasonCode);
+      : array(snapshotSource['reasonCodes'], 'configuration reasonCodes').map(
+          parseConfiguredReasonCode,
+        );
 
-  for (const product of products) assertReference(categoryIds, product.categoryId, 'product category');
+  for (const product of products)
+    assertReference(categoryIds, product.categoryId, 'product category');
   for (const modifier of modifiers) {
     if (modifier.standaloneProductId !== null) {
       assertReference(productIds, modifier.standaloneProductId, 'modifier standalone product');
@@ -592,7 +611,12 @@ export function parseOperationsConfigurationBundle(
   for (const link of productModifierLinks) {
     assertReference(productIds, link.productId, 'product modifier link product');
     assertReference(modifierIds, link.modifierId, 'product modifier link modifier');
-    assertUniquePair(productModifierPairs, link.productId, link.modifierId, 'product modifier link');
+    assertUniquePair(
+      productModifierPairs,
+      link.productId,
+      link.modifierId,
+      'product modifier link',
+    );
   }
 
   const comboPairs = new Set<string>();
@@ -605,7 +629,12 @@ export function parseOperationsConfigurationBundle(
         `Combo beverage option references non-combo product ${option.comboProductId}.`,
       );
     }
-    assertUniquePair(comboPairs, option.comboProductId, option.beverageProductId, 'combo beverage option');
+    assertUniquePair(
+      comboPairs,
+      option.comboProductId,
+      option.beverageProductId,
+      'combo beverage option',
+    );
   }
 
   const recipePairs = new Set<string>();
@@ -618,8 +647,16 @@ export function parseOperationsConfigurationBundle(
   if (settings !== null) {
     const zoneRulePairs = new Set<string>();
     for (const rule of settings.paymentMethodZoneRules) {
-      assertReference(paymentMethodIds, rule.paymentMethodId, 'payment method zone rule payment method');
-      assertReference(deliveryZoneIds, rule.deliveryZoneId, 'payment method zone rule delivery zone');
+      assertReference(
+        paymentMethodIds,
+        rule.paymentMethodId,
+        'payment method zone rule payment method',
+      );
+      assertReference(
+        deliveryZoneIds,
+        rule.deliveryZoneId,
+        'payment method zone rule delivery zone',
+      );
       assertUniquePair(
         zoneRulePairs,
         rule.paymentMethodId,

@@ -48,7 +48,9 @@ describe('Admin settings API contract', () => {
   });
 
   it('rejects unreviewed commands, unsafe setting keys, and malformed versions', () => {
-    expect(settingsCommandSchema.safeParse({ type: 'settings.anything', shopId }).success).toBe(false);
+    expect(settingsCommandSchema.safeParse({ type: 'settings.anything', shopId }).success).toBe(
+      false,
+    );
     expect(
       settingsCommandSchema.safeParse({
         type: 'setting.override.upsert',

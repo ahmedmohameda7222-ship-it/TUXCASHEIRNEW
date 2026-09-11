@@ -376,8 +376,7 @@ export function resolveAllowedPaymentMethods<T extends AdminPaymentMethodConfigu
   context: SettingsChannelContext,
 ): T[] {
   return methods.filter(
-    (method) =>
-      method.active && (method.channel === 'BOTH' || method.channel === context.channel),
+    (method) => method.active && (method.channel === 'BOTH' || method.channel === context.channel),
   );
 }
 
@@ -567,8 +566,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         client.select<SpecialHoursRow[]>(
           'shop_special_hours',
           new URLSearchParams({
-            select:
-              'id,service_date,service_kind,timezone,closed,opens_local,closes_local,note',
+            select: 'id,service_date,service_kind,timezone,closed,opens_local,closes_local,note',
             business_id: `eq.${businessId}`,
             shop_id: `eq.${shopId}`,
             order: 'service_date.asc,service_kind.asc',
@@ -579,7 +577,8 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
       if (shops.length !== 1 || !shops[0]) {
         throw new SettingsServiceError('backend_contract_invalid');
       }
-      const settingsVersion = versions.length === 0 ? 0 : safeInteger(versions[0]?.settings_version, 1);
+      const settingsVersion =
+        versions.length === 0 ? 0 : safeInteger(versions[0]?.settings_version, 1);
 
       return {
         shop: mapShop(shops[0]),

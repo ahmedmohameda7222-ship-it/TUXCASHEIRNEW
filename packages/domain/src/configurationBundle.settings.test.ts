@@ -7,7 +7,9 @@ const paymentMethodId = '22222222-2222-4222-8222-222222222222';
 const deliveryZoneId = '33333333-3333-4333-8333-333333333333';
 const reasonCodeId = '44444444-4444-4444-8444-444444444444';
 
-function bundle(options: { readonly withSettings?: boolean; readonly paymentChannel?: string } = {}) {
+function bundle(
+  options: { readonly withSettings?: boolean; readonly paymentChannel?: string } = {},
+) {
   const withSettings = options.withSettings ?? true;
   return {
     snapshot: {
