@@ -1,4 +1,4 @@
-name: Temporary Domain Deno Import Compatibility
+name: Temporary Apply Domain Deno Import Repair
 
 on:
   push:
@@ -9,13 +9,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  prove-explicit-ts-imports:
+  apply-proven-repair:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -25,7 +27,7 @@ jobs:
           deno-version: v1.46.3
       - name: Install locked dependencies
         run: npm ci
-      - name: Rewrite only the Deno-reachable Domain graph in runner
+      - name: Apply proven Deno-resolvable Domain graph
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -77,19 +79,17 @@ jobs:
           tsconfig_path.write_text(json.dumps(tsconfig, indent=2) + '\n')
 
           if 'packages/domain/src/configurationBundle.ts' not in changed:
-              raise SystemExit('configurationBundle.ts was not rewritten; hypothesis fixture is invalid.')
-          print('Rewritten Deno-reachable Domain files:')
+              raise SystemExit('configurationBundle.ts was not rewritten; refusing source commit.')
+          print('Changed Domain files:')
           print('\n'.join(changed))
           PY
           git diff --check
-          git diff -- packages/domain/src packages/domain/tsconfig.json
+      - name: Domain formatting check
+        run: npx prettier --check packages/domain/src/configurationBundle.ts packages/domain/src/catalog.ts packages/domain/src/ids.ts packages/domain/src/json.ts packages/domain/src/money.ts packages/domain/src/models.ts packages/domain/src/quantity.ts packages/domain/src/settings.ts packages/domain/src/time.ts packages/domain/src/businessDay.ts packages/domain/src/brand.ts packages/domain/src/errors.ts packages/domain/tsconfig.json
       - name: Domain typecheck
         run: npm run typecheck -w @tux/domain
-      - name: Published settings parser regression
-        run: >-
-          npx vitest run
-          packages/domain/src/configurationBundle.settings.test.ts
-          packages/domain/src/configurationBundle.family.test.ts
+      - name: Domain regression tests
+        run: npx vitest run packages/domain/src
       - name: Exact root Edge Function typechecks
         run: |
           deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
@@ -101,3 +101,37 @@ jobs:
           deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
           deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
           deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
+      - name: Commit verified repair and remove temporary workflow
+        run: |
+          rm .github/workflows/tmp-domain-deno-import-compat.yml
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          allowed = {
+              '.github/workflows/tmp-domain-deno-import-compat.yml',
+              'packages/domain/tsconfig.json',
+              'packages/domain/src/configurationBundle.ts',
+              'packages/domain/src/catalog.ts',
+              'packages/domain/src/ids.ts',
+              'packages/domain/src/json.ts',
+              'packages/domain/src/money.ts',
+              'packages/domain/src/models.ts',
+              'packages/domain/src/quantity.ts',
+              'packages/domain/src/settings.ts',
+              'packages/domain/src/time.ts',
+              'packages/domain/src/businessDay.ts',
+              'packages/domain/src/brand.ts',
+              'packages/domain/src/errors.ts',
+          }
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          unexpected = changed - allowed
+          if unexpected:
+              raise SystemExit(f'Unexpected changed paths: {sorted(unexpected)}')
+          if 'packages/domain/src/configurationBundle.ts' not in changed:
+              raise SystemExit('Expected Domain repair is absent.')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/domain/src packages/domain/tsconfig.json .github/workflows/tmp-domain-deno-import-compat.yml
+          git commit -m 'fix(domain): make config parser Deno-resolvable'
+          git push origin HEAD:feat/admin-02-catalog-settings
