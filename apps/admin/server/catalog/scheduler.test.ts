@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createSupabaseCatalogSchedulerStore,
+  handleCatalogSchedulerRequest,
   runCatalogScheduler,
   type CatalogScheduledChange,
   type CatalogSchedulerStore,
@@ -13,6 +15,7 @@ function createStore(): CatalogSchedulerStore {
     id: 'schedule-1',
     businessId: 'business-1',
     shopId: 'shop-a',
+    createdByEmployeeId: 'employee-1',
     changeKind: 'CATALOG_PUBLISH',
     payload: { draftId: 'draft-1', expectedDraftRevision: 3 },
     scheduledFor: '2026-09-11T05:00:00.000Z',
@@ -54,5 +57,87 @@ describe('catalog scheduler', () => {
     expect(publish).toHaveBeenCalledTimes(1);
     expect(store.markApplied).toHaveBeenCalledTimes(1);
     expect(store.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('maps durable scheduler claims and terminal transitions through trusted RPCs', async () => {
+    const rpc = vi.fn(async (name: string) => {
+      if (name === 'claim_due_admin_config_changes_v1') {
+        return [
+          {
+            id: 'schedule-1',
+            business_id: 'business-1',
+            shop_id: 'shop-a',
+            created_by_employee_id: 'employee-1',
+            change_kind: 'CATALOG_PUBLISH',
+            payload_json: { draftId: 'draft-1', expectedDraftRevision: 3 },
+            scheduled_for: '2026-09-11T05:00:00.000Z',
+            target_base_publish_version: '48',
+            idempotency_key: 'publish:draft-1:48',
+            attempt_count: 1,
+          },
+        ];
+      }
+      return true;
+    });
+    const store = createSupabaseCatalogSchedulerStore({ rpc });
+
+    const claimed = await store.claimDue({
+      now: '2026-09-11T05:00:00.000Z',
+      limit: 25,
+    });
+    expect(claimed).toEqual([
+      {
+        id: 'schedule-1',
+        businessId: 'business-1',
+        shopId: 'shop-a',
+        createdByEmployeeId: 'employee-1',
+        changeKind: 'CATALOG_PUBLISH',
+        payload: { draftId: 'draft-1', expectedDraftRevision: 3 },
+        scheduledFor: '2026-09-11T05:00:00.000Z',
+        targetBasePublishVersion: 48,
+        idempotencyKey: 'publish:draft-1:48',
+        attemptCount: 1,
+      },
+    ]);
+    expect(rpc).toHaveBeenNthCalledWith(1, 'claim_due_admin_config_changes_v1', {
+      p_now: '2026-09-11T05:00:00.000Z',
+      p_limit: 25,
+      p_lease_seconds: 300,
+    });
+
+    await store.markApplied({
+      id: 'schedule-1',
+      idempotencyKey: 'publish:draft-1:48',
+      result: { ok: true, publishVersion: 49 },
+    });
+    expect(rpc).toHaveBeenNthCalledWith(2, 'mark_admin_config_change_applied_v1', {
+      p_id: 'schedule-1',
+      p_idempotency_key: 'publish:draft-1:48',
+      p_result: { ok: true, publishVersion: 49 },
+    });
+  });
+
+  it('fails closed when the cron secret is missing or invalid', async () => {
+    const runScheduler = vi.fn().mockResolvedValue({ claimed: 0, applied: 0, failed: 0 });
+
+    await expect(
+      handleCatalogSchedulerRequest({
+        method: 'GET',
+        authorization: 'Bearer configured',
+        cronSecret: undefined,
+        runScheduler,
+      }),
+    ).resolves.toEqual({ statusCode: 503, body: { error: 'cron_secret_not_configured' } });
+
+    await expect(
+      handleCatalogSchedulerRequest({
+        method: 'GET',
+        authorization: 'Bearer wrong',
+        cronSecret: 'configured',
+        runScheduler,
+      }),
+    ).resolves.toEqual({ statusCode: 401, body: { error: 'unauthorized' } });
+
+    expect(runScheduler).not.toHaveBeenCalled();
   });
 });

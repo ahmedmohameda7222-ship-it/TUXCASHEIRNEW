@@ -11,6 +11,7 @@ on:
       - 'apps/menu/**'
       - 'supabase/migrations/**'
       - 'scripts/test-admin-catalog-control-migration.mjs'
+      - 'scripts/test-admin-catalog-scheduler-migration.mjs'
       - '.github/workflows/admin-catalog-settings-tdd.yml'
   workflow_dispatch:
 
@@ -78,6 +79,8 @@ jobs:
           node-version: 24
       - name: Catalog control migration invariant
         run: node scripts/test-admin-catalog-control-migration.mjs
+      - name: Catalog scheduler migration invariant
+        run: node scripts/test-admin-catalog-scheduler-migration.mjs
 
   catalog-control-postgres:
     runs-on: ubuntu-latest
@@ -110,5 +113,7 @@ jobs:
         run: node scripts/test-migrations.mjs
       - name: Catalog control PostgreSQL behavior
         run: node scripts/test-admin-catalog-control-migration.mjs
+      - name: Catalog scheduler PostgreSQL behavior
+        run: node scripts/test-admin-catalog-scheduler-migration.mjs
       - name: Canonical catalog architecture regression
         run: npm run test:catalog-architecture
