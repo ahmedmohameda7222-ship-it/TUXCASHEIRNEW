@@ -50,6 +50,7 @@ describe('catalog scheduler', () => {
       store,
       publish,
       setAvailability: vi.fn(),
+      materializeRecurring: vi.fn().mockResolvedValue({ ok: true, materialized: 0 }),
       now: () => new Date('2026-09-11T05:00:00.000Z'),
     };
 
