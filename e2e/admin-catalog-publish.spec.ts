@@ -97,6 +97,15 @@ async function mockPublishing(page: Page) {
       return;
     }
 
+    if (request.method() === 'GET' && url.searchParams.get('view') === 'recurring-availability') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ shopId, products: [], rules: [] }),
+      });
+      return;
+    }
+
     if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
