@@ -1,0 +1,83 @@
+name: Temporary Domain Deno Import Compatibility
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/tmp-domain-deno-import-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove-explicit-ts-imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Rewrite resolvable Domain relative imports in runner only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('packages/domain/src')
+          pattern = re.compile(r"(?P<prefix>\bfrom\s+|\bimport\s+)(?P<quote>['\"])(?P<spec>\.\.?/[^'\"]+)(?P=quote)")
+          changed = []
+
+          for path in sorted(root.rglob('*.ts')):
+              text = path.read_text()
+
+              def replace(match):
+                  spec = match.group('spec')
+                  if spec.endswith(('.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json')):
+                      return match.group(0)
+                  candidate = path.parent / spec
+                  if Path(str(candidate) + '.ts').is_file():
+                      resolved = spec + '.ts'
+                  elif (candidate / 'index.ts').is_file():
+                      resolved = spec.rstrip('/') + '/index.ts'
+                  else:
+                      return match.group(0)
+                  return f"{match.group('prefix')}{match.group('quote')}{resolved}{match.group('quote')}"
+
+              updated = pattern.sub(replace, text)
+              if updated != text:
+                  path.write_text(updated)
+                  changed.append(str(path))
+
+          if not changed:
+              raise SystemExit('No Domain imports were rewritten; hypothesis fixture is invalid.')
+          print('Rewritten Domain files:')
+          print('\n'.join(changed))
+          PY
+          git diff --check
+          git diff -- packages/domain/src
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+      - name: Published settings parser regression
+        run: >-
+          npx vitest run
+          packages/domain/src/configurationBundle.settings.test.ts
+          packages/domain/src/configurationBundle.family.test.ts
+      - name: Exact root Edge Function typechecks
+        run: |
+          deno check --config supabase/functions/device-enroll/deno.json supabase/functions/device-enroll/index.ts
+          deno check --config supabase/functions/device-bootstrap/deno.json supabase/functions/device-bootstrap/index.ts
+          deno check --config supabase/functions/operations-config/deno.json supabase/functions/operations-config/index.ts
+          deno check --config supabase/functions/operations-sync/deno.json supabase/functions/operations-sync/index.ts
+          deno check --config supabase/functions/worker-auth/deno.json supabase/functions/worker-auth/index.ts
+          deno check --config supabase/functions/catalog-public/deno.json supabase/functions/catalog-public/index.ts
+          deno check --config supabase/functions/catalog-admin/deno.json supabase/functions/catalog-admin/index.ts
+          deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+          deno check --config supabase/functions/online-order-operations/deno.json supabase/functions/online-order-operations/index.ts
