@@ -12,6 +12,11 @@ import {
   createCatalogService,
   createSupabaseCatalogStore,
 } from '../../server/catalog/catalogService';
+import {
+  createRecurringAvailabilityService,
+  createSupabaseRecurringAvailabilityStore,
+  RecurringAvailabilityServiceError,
+} from '../../server/catalog/recurringAvailabilityService';
 import { getAdminServerEnv } from '../../server/env';
 import {
   firstHeader,
@@ -28,6 +33,7 @@ const uuidSchema = z.string().uuid();
 const cairoLocalTimestampSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/);
+const localTimeSchema = z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/);
 const bundleChangeSchema = z
   .object({
     kind: z.literal('bundle.replace'),
@@ -73,6 +79,20 @@ const catalogCommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('availability.recurring.save'),
+      shopId: uuidSchema,
+      ruleId: uuidSchema.nullable(),
+      masterProductId: uuidSchema,
+      daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+      startLocal: localTimeSchema,
+      endLocal: localTimeSchema,
+      available: z.boolean(),
+      active: z.boolean(),
+      expectedVersion: z.number().int().positive().nullable(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('version.restore'),
       shopId: uuidSchema,
       sourcePublishVersion: z.number().int().positive(),
@@ -110,6 +130,10 @@ function handleFailure(response: AdminResponse, error: unknown): void {
   if (error instanceof CatalogServiceError) {
     const badRequest = error.code === 'invalid_change_set' || error.code === 'invalid_scheduled_time';
     sendJson(response, badRequest ? 400 : 502, { error: error.code });
+    return;
+  }
+  if (error instanceof RecurringAvailabilityServiceError) {
+    sendJson(response, 502, { error: error.code });
     return;
   }
   if (error instanceof AdminSupabaseError) {
@@ -156,6 +180,9 @@ export default async function handler(
     const env = getAdminServerEnv();
     const client = new AdminSupabaseClient(env);
     const service = createCatalogService(createSupabaseCatalogStore(client));
+    const recurringService = createRecurringAvailabilityService(
+      createSupabaseRecurringAvailabilityStore(client),
+    );
 
     if (request.method === 'GET') {
       const requestUrl = new URL(request.url ?? '/', 'http://admin.local');
@@ -165,9 +192,15 @@ export default async function handler(
         return;
       }
       const principal = await loadPrincipal(request, client, false);
-      if (requestUrl.searchParams.get('view') === 'publishing') {
+      const view = requestUrl.searchParams.get('view');
+      if (view === 'publishing') {
         const publishing = await service.loadCatalogPublishing(shopId.data, principal);
         sendJson(response, 200, { ...publishing });
+        return;
+      }
+      if (view === 'recurring-availability') {
+        const recurring = await recurringService.loadRecurringAvailability(shopId.data, principal);
+        sendJson(response, 200, { ...recurring });
         return;
       }
       const workspace = await service.loadCatalogWorkspace(shopId.data, principal);
@@ -197,6 +230,11 @@ export default async function handler(
         return;
       case 'availability.set':
         sendJson(response, 200, { ...(await service.setImmediateAvailability(command, principal)) });
+        return;
+      case 'availability.recurring.save':
+        sendJson(response, 200, {
+          ...(await recurringService.saveRecurringAvailabilityRule(command, principal)),
+        });
         return;
       case 'version.restore':
         sendJson(response, 200, { ...(await service.restoreCatalogVersion(command, principal)) });
