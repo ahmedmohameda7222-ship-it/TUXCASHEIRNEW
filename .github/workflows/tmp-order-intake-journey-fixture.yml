@@ -1,0 +1,51 @@
+name: Temporary Order Intake Journey Fixture Repair
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/tmp-order-intake-journey-fixture.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add published policy to full journey fixture
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/application/src/menuOperationsWhatsAppJourney.test.ts')
+          text = path.read_text()
+          anchor = """  async loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null> {\n    return shopId === SHOP_ID ? this.catalog : null;\n  }\n\n"""
+          insertion = anchor + """  async loadPublishedCheckoutAuthority(shopId: string) {\n    if (shopId !== SHOP_ID) return null;\n    return {\n      shopId: SHOP_ID,\n      configurationVersion: 1,\n      settingsVersion: null,\n      lifecycleState: 'ACTIVE' as const,\n      temporaryClosed: false,\n      onlineOrdersPaused: false,\n      minimumOrderMinor: 0,\n      orderTypes: [{ behavior: 'DELIVERY' as const, active: true }],\n      paymentMethods: [\n        {\n          id: CASH_ID,\n          displayName: 'Cash',\n          logicType: 'CASH' as const,\n          active: true,\n          channel: 'BOTH' as const,\n          integrationReference: null,\n        },\n      ],\n    };\n  }\n\n"""
+          assert text.count(anchor) == 1
+          text = text.replace(anchor, insertion)
+          path.write_text(text)
+          PY
+          npx prettier --write packages/application/src/menuOperationsWhatsAppJourney.test.ts
+      - name: Verify full Menu Operations WhatsApp journey
+        run: npx vitest run packages/application/src/menuOperationsWhatsAppJourney.test.ts
+      - name: Commit fixture repair and remove temporary workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/application/src/menuOperationsWhatsAppJourney.test.ts
+          git rm .github/workflows/tmp-order-intake-journey-fixture.yml
+          git commit -m "test(order-intake): provide published policy for full journey"
+          git push origin HEAD:feat/admin-02-catalog-settings
