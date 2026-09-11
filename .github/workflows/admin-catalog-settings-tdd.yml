@@ -69,6 +69,7 @@ jobs:
         run: npx vitest run packages/domain/src/configurationBundle.settings.test.ts
       - name: Operations settings SQLite sync
         run: npx vitest run packages/application/src/configurationSync.settings.sqlite.test.ts
+      # Keep this checkout-level contract before typechecks so missing persistence is visible as RED.
       - name: Durable configured receipt snapshot at checkout
         run: npx vitest run packages/application/src/ordersAtomicDelivery.sqlite.test.ts
       - name: Configured receipt rendering contract
