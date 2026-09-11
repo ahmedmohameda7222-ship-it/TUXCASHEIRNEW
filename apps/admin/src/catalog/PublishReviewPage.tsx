@@ -1,12 +1,18 @@
 import { useState } from 'react';
 
-import type { CatalogPublishPreview, CatalogScheduledChangeSummary } from '@tux/admin-contracts';
+import type {
+  CatalogPublishPreview,
+  CatalogSaveRecurringAvailabilityRuleInput,
+  CatalogScheduledChangeSummary,
+} from '@tux/admin-contracts';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { RecurringAvailabilityEditor } from './RecurringAvailabilityEditor';
 import { ScheduleEditor } from './ScheduleEditor';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
+import { useRecurringAvailability } from './useRecurringAvailability';
 import './catalog.css';
 import './publishing.css';
 
@@ -17,6 +23,12 @@ function countLabel(count: number, singular: string, plural: string): string {
 function errorMessage(error: unknown): string {
   if (error instanceof CatalogUiError) {
     if (error.code === 'stale_version') return 'The live catalog changed. Refresh before publishing.';
+    if (error.code === 'stale_rule_version') {
+      return 'This recurring rule changed. Refresh before editing it again.';
+    }
+    if (error.code === 'recurring_rule_conflict') {
+      return 'This recurring window overlaps another active rule for the same product.';
+    }
     if (error.code === 'scheduled_time_must_be_future') {
       return 'Choose a future activation time in Africa/Cairo.';
     }
@@ -68,6 +80,7 @@ export function PublishReviewPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const publishing = useCatalogPublishing(shopId);
+  const recurring = useRecurringAvailability(shopId);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
@@ -90,6 +103,7 @@ export function PublishReviewPage() {
   }
 
   const canPublish = principal.permissions.includes('catalog.publish');
+  const canEditCatalog = principal.permissions.includes('catalog.edit');
   const data = publishing.publishingQuery.data;
   const preview = data?.draftPreviews[0];
   const schedules = (data?.schedules ?? []).filter((schedule) =>
@@ -130,6 +144,15 @@ export function PublishReviewPage() {
     });
   }
 
+  async function saveRecurringAvailability(
+    input: Omit<CatalogSaveRecurringAvailabilityRuleInput, 'shopId'>,
+  ) {
+    await runAction(async () => {
+      await recurring.saveRule.mutateAsync(input);
+      setNotice('Recurring availability saved.');
+    });
+  }
+
   async function restoreVersion(sourcePublishVersion: number) {
     if (!data) return;
     setPendingRestoreVersion(sourcePublishVersion);
@@ -154,7 +177,7 @@ export function PublishReviewPage() {
     <PageScaffold
       eyebrow="Catalog"
       title="Review & publish"
-      description="Review trusted draft differences, publish immediately, schedule in Cairo time, or restore a historical version as a new version."
+      description="Review trusted draft differences, control weekly availability, publish immediately, schedule in Cairo time, or restore a historical version as a new version."
       primaryAction={
         <a className="admin-secondary-button admin-publish-back-link" href="/catalog/products">
           Back to products
@@ -187,6 +210,15 @@ export function PublishReviewPage() {
             </div>
             <span className="admin-status-pill">Shop scoped</span>
           </div>
+
+          <RecurringAvailabilityEditor
+            workspace={recurring.recurringQuery.data}
+            isLoading={recurring.recurringQuery.isLoading}
+            isError={recurring.recurringQuery.isError}
+            disabled={!canEditCatalog}
+            isPending={recurring.saveRule.isPending}
+            onSave={saveRecurringAvailability}
+          />
 
           {preview ? (
             <>
