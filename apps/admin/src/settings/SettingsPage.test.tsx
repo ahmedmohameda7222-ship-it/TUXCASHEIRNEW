@@ -59,9 +59,7 @@ const workspace: AdminSettingsWorkspace = {
       integrationReference: 'terminal-1',
     },
   ],
-  deliveryZones: [
-    { id: 'dz-1', name: 'Maadi', feeMinor: 3000, active: true, sortOrder: 10 },
-  ],
+  deliveryZones: [{ id: 'dz-1', name: 'Maadi', feeMinor: 3000, active: true, sortOrder: 10 }],
   reasonCodes: [
     {
       id: 'reason-1',

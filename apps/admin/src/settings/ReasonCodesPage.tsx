@@ -30,7 +30,9 @@ export function ReasonCodesPage({ workspace }: { workspace: AdminSettingsWorkspa
                   <p className="admin-catalog-editor__eyebrow">{reason.family}</p>
                   <h3>{reason.label}</h3>
                 </div>
-                <span className={reason.active ? 'admin-status-pill' : 'admin-status-pill is-muted'}>
+                <span
+                  className={reason.active ? 'admin-status-pill' : 'admin-status-pill is-muted'}
+                >
                   {reason.active ? 'Active' : 'Inactive'}
                 </span>
               </div>

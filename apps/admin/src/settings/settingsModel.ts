@@ -1,13 +1,7 @@
 import type { AdminSettingsWorkspace, AdminSettingValue } from '@tux/admin-contracts';
 
 export type SettingsSection =
-  | 'overview'
-  | 'shop'
-  | 'order-types'
-  | 'payments'
-  | 'checkout'
-  | 'receipts'
-  | 'reason-codes';
+  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
 
 export const SETTINGS_SECTIONS: readonly { id: SettingsSection; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -26,7 +20,10 @@ export type EffectiveSetting = {
   version: number | null;
 };
 
-function findSetting(rows: readonly AdminSettingValue[], key: string): AdminSettingValue | undefined {
+function findSetting(
+  rows: readonly AdminSettingValue[],
+  key: string,
+): AdminSettingValue | undefined {
   return rows.find((row) => row.key === key);
 }
 

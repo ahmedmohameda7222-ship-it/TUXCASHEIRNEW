@@ -1,4 +1,8 @@
-import type { AdminSettingValue, AdminSettingsWorkspace, ResolvedSetting } from '@tux/admin-contracts';
+import type {
+  AdminSettingValue,
+  AdminSettingsWorkspace,
+  ResolvedSetting,
+} from '@tux/admin-contracts';
 
 function resolveSetting(workspace: AdminSettingsWorkspace, key: string): ResolvedSetting {
   const shopOverride = workspace.shopOverrides.find((setting) => setting.key === key);
@@ -74,13 +78,21 @@ export function ReceiptsPage({ workspace }: { workspace: AdminSettingsWorkspace 
         </div>
       </div>
       <p className="admin-field__help">
-        Effective values resolve the shop override first, then the business default. The source layer
-        remains visible for every value.
+        Effective values resolve the shop override first, then the business default. The source
+        layer remains visible for every value.
       </p>
       <div className="admin-settings-receipts__grid">
-        <ReceiptSetting workspace={workspace} settingKey="receipt.orderPrefix" label="Order prefix" />
+        <ReceiptSetting
+          workspace={workspace}
+          settingKey="receipt.orderPrefix"
+          label="Order prefix"
+        />
         <ReceiptSetting workspace={workspace} settingKey="receipt.footer" label="Receipt footer" />
-        <ReceiptSetting workspace={workspace} settingKey="receipt.sequenceStart" label="Sequence start" />
+        <ReceiptSetting
+          workspace={workspace}
+          settingKey="receipt.sequenceStart"
+          label="Sequence start"
+        />
         <ReceiptSetting
           workspace={workspace}
           settingKey="receipt.sequenceResetPolicy"

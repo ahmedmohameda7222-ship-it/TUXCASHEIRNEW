@@ -13,13 +13,7 @@ import './settings.css';
 import { useSettings } from './useSettings';
 
 export type SettingsSection =
-  | 'overview'
-  | 'shop'
-  | 'order-types'
-  | 'payments'
-  | 'checkout'
-  | 'receipts'
-  | 'reason-codes';
+  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
@@ -60,12 +54,15 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
         </p>
       </section>
 
-      <section className="admin-catalog-editor__section" aria-labelledby="settings-operations-summary">
+      <section
+        className="admin-catalog-editor__section"
+        aria-labelledby="settings-operations-summary"
+      >
         <p className="admin-catalog-editor__eyebrow">Operations</p>
         <h2 id="settings-operations-summary">Published configuration</h2>
         <p className="admin-field__help">
-          {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment methods ·{' '}
-          {workspace.deliveryZones.length} delivery zones
+          {workspace.orderTypes.length} order types · {workspace.paymentMethods.length} payment
+          methods · {workspace.deliveryZones.length} delivery zones
         </p>
       </section>
 

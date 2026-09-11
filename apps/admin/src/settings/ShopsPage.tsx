@@ -34,7 +34,9 @@ export function ShopsPage({
           <span>Online orders</span>
           <strong>{shop.onlineOrdersPaused ? 'Paused' : 'Accepting orders'}</strong>
           <small>
-            {shop.temporaryClosed ? 'Shop is temporarily closed.' : 'Shop is not temporarily closed.'}
+            {shop.temporaryClosed
+              ? 'Shop is temporarily closed.'
+              : 'Shop is not temporarily closed.'}
           </small>
         </article>
         <article className="admin-settings-card">
@@ -61,7 +63,9 @@ export function ShopsPage({
                     Day {hours.dayOfWeek} · {hours.timezone}
                   </span>
                 </div>
-                <span>{hours.active ? `${hours.opensLocal}–${hours.closesLocal}` : 'Inactive'}</span>
+                <span>
+                  {hours.active ? `${hours.opensLocal}–${hours.closesLocal}` : 'Inactive'}
+                </span>
               </div>
             ))}
           </div>
