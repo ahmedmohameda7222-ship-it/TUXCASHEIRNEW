@@ -20,6 +20,9 @@ const productId = '48000000-0000-4000-8000-000000000002';
 const behaviorSql = String.raw`
 begin;
 
+insert into public.businesses(id, name, timezone, currency_code)
+values ('${businessId}', 'Recurring Deactivation Fixture', 'Africa/Cairo', 'EGP');
+
 insert into public.shops(id, name, active)
 values ('${shopId}', 'Recurring Deactivation Fixture', true);
 
