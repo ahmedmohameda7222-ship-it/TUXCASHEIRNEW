@@ -18,6 +18,7 @@ on:
       - 'scripts/test-admin-catalog-publish-controls.mjs'
       - 'scripts/test-admin-catalog-recurring-availability.mjs'
       - 'scripts/test-admin-catalog-recurring-deactivation.mjs'
+      - 'scripts/test-admin-shop-settings-migration.mjs'
       - 'scripts/test-admin-deployment-contract.mjs'
       - '.github/workflows/admin-catalog-settings-tdd.yml'
   workflow_dispatch:
@@ -127,6 +128,8 @@ jobs:
         run: node scripts/test-admin-catalog-publish-controls.mjs
       - name: Catalog recurring availability migration invariant
         run: node scripts/test-admin-catalog-recurring-availability.mjs
+      - name: Shop settings migration invariant
+        run: node scripts/test-admin-shop-settings-migration.mjs
 
   catalog-control-postgres:
     runs-on: ubuntu-latest
@@ -167,5 +170,7 @@ jobs:
         run: node scripts/test-admin-catalog-recurring-availability.mjs
       - name: Catalog recurring deactivation restoration
         run: node scripts/test-admin-catalog-recurring-deactivation.mjs
+      - name: Shop settings PostgreSQL behavior
+        run: node scripts/test-admin-shop-settings-migration.mjs
       - name: Canonical catalog architecture regression
         run: npm run test:catalog-architecture
