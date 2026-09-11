@@ -23,6 +23,7 @@ export default async function handler(
         store: createSupabaseCatalogSchedulerStore(client),
         publish: executors.publish,
         setAvailability: executors.setAvailability,
+        materializeRecurring: executors.materializeRecurring,
       });
     },
   });
