@@ -14,6 +14,7 @@ import type {
   CatalogProductDetail,
   CatalogPublishDraftInput,
   CatalogPublishingWorkspace,
+  CatalogPublishPreview,
   CatalogPublishResult,
   CatalogPublishSourceKind,
   CatalogPublishVersionSummary,
@@ -141,6 +142,14 @@ type DraftRow = {
   updated_at: string;
 };
 
+type PublishingDraftRow = {
+  id: string;
+  shop_id: string;
+  base_publish_version: number | string;
+  draft_revision: number | string;
+  working_bundle_json: unknown;
+};
+
 type PublishVersionRow = {
   shop_id: string;
   publish_version: number | string;
@@ -163,6 +172,21 @@ type ScheduledChangeRow = {
   target_base_publish_version: number | string | null;
   attempt_count: number | string;
   last_error: string | null;
+};
+
+type ComparableProduct = {
+  categoryId: string;
+  slug: string | null;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  imageKey: string | null;
+  family: string | null;
+  bestSeller: boolean;
+  active: boolean;
+  soldOut: boolean;
+  isCombo: boolean;
+  sortOrder: number;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -219,6 +243,17 @@ function readNonemptyString(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new CatalogServiceError('backend_contract_invalid');
   }
+  return value;
+}
+
+function readNullableString(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new CatalogServiceError('backend_contract_invalid');
+  return value;
+}
+
+function readBoolean(value: unknown): boolean {
+  if (typeof value !== 'boolean') throw new CatalogServiceError('backend_contract_invalid');
   return value;
 }
 
@@ -313,6 +348,106 @@ function mapScheduledChange(row: ScheduledChangeRow): CatalogScheduledChangeSumm
         : readVersion(row.target_base_publish_version),
     attemptCount: readVersion(row.attempt_count),
     lastError: row.last_error,
+  };
+}
+
+function comparableLiveProduct(product: CatalogProductDetail): ComparableProduct {
+  return {
+    categoryId: product.categoryId,
+    slug: product.slug,
+    name: product.name,
+    description: product.description,
+    priceMinor: product.priceMinor,
+    imageKey: product.imageKey,
+    family: product.family,
+    bestSeller: product.bestSeller,
+    active: product.active,
+    soldOut: product.soldOut,
+    isCombo: product.isCombo,
+    sortOrder: product.sortOrder,
+  };
+}
+
+function comparableDraftProduct(value: unknown): { id: string; product: ComparableProduct } {
+  if (!isRecord(value)) throw new CatalogServiceError('backend_contract_invalid');
+  return {
+    id: readNonemptyString(value['id']),
+    product: {
+      categoryId: readNonemptyString(value['categoryId']),
+      slug: readNullableString(value['slug']),
+      name: readNonemptyString(value['name']),
+      description: readNullableString(value['description']),
+      priceMinor: readVersion(value['priceMinor']),
+      imageKey: readNullableString(value['imageKey']),
+      family: readNullableString(value['family']),
+      bestSeller: readBoolean(value['bestSeller']),
+      active: readBoolean(value['active']),
+      soldOut: readBoolean(value['soldOut']),
+      isCombo: readBoolean(value['isCombo']),
+      sortOrder: readVersion(value['sortOrder']),
+    },
+  };
+}
+
+function readDraftBundleProducts(bundle: unknown): Map<string, ComparableProduct> {
+  if (!isRecord(bundle) || !isRecord(bundle['snapshot']) || !Array.isArray(bundle['snapshot']['products'])) {
+    throw new CatalogServiceError('backend_contract_invalid');
+  }
+
+  const products = new Map<string, ComparableProduct>();
+  for (const rawProduct of bundle['snapshot']['products']) {
+    const parsed = comparableDraftProduct(rawProduct);
+    if (products.has(parsed.id)) throw new CatalogServiceError('backend_contract_invalid');
+    products.set(parsed.id, parsed.product);
+  }
+  return products;
+}
+
+function productsEqual(a: ComparableProduct, b: ComparableProduct): boolean {
+  return (
+    a.categoryId === b.categoryId &&
+    a.slug === b.slug &&
+    a.name === b.name &&
+    a.description === b.description &&
+    a.priceMinor === b.priceMinor &&
+    a.imageKey === b.imageKey &&
+    a.family === b.family &&
+    a.bestSeller === b.bestSeller &&
+    a.active === b.active &&
+    a.soldOut === b.soldOut &&
+    a.isCombo === b.isCombo &&
+    a.sortOrder === b.sortOrder
+  );
+}
+
+function buildPublishPreview(
+  row: PublishingDraftRow,
+  currentPublishVersion: number,
+  liveProducts: readonly CatalogProductDetail[],
+): CatalogPublishPreview {
+  const draftProducts = readDraftBundleProducts(row.working_bundle_json);
+  const liveById = new Map(liveProducts.map((product) => [product.id, comparableLiveProduct(product)]));
+  const allIds = [...new Set([...liveById.keys(), ...draftProducts.keys()])].sort();
+  const changedProductIds: string[] = [];
+  const priceChangedProductIds: string[] = [];
+
+  for (const id of allIds) {
+    const live = liveById.get(id);
+    const draft = draftProducts.get(id);
+    if (!live || !draft || !productsEqual(live, draft)) changedProductIds.push(id);
+    if (draft && (!live || live.priceMinor !== draft.priceMinor)) priceChangedProductIds.push(id);
+  }
+
+  const basePublishVersion = readVersion(row.base_publish_version);
+  return {
+    draftId: row.id,
+    shopId: row.shop_id,
+    basePublishVersion,
+    currentPublishVersion,
+    draftRevision: readVersion(row.draft_revision),
+    stale: basePublishVersion !== currentPublishVersion,
+    changedProductIds,
+    priceChangedProductIds,
   };
 }
 
@@ -578,7 +713,7 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
     },
 
     async loadPublishing(shopId, businessId) {
-      const [currentPublishVersion, versions, schedules] = await Promise.all([
+      const [currentPublishVersion, versions, schedules, drafts, productRows] = await Promise.all([
         loadCurrentPublishVersion(client, shopId),
         client.select<PublishVersionRow[]>(
           'catalog_publish_versions',
@@ -603,12 +738,36 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
             limit: '100',
           }),
         ),
+        client.select<PublishingDraftRow[]>(
+          'catalog_drafts',
+          new URLSearchParams({
+            select: 'id,shop_id,base_publish_version,draft_revision,working_bundle_json',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            status: 'eq.DRAFT',
+            order: 'updated_at.desc',
+            limit: '50',
+          }),
+        ),
+        client.select<ProductRow[]>(
+          'products',
+          new URLSearchParams({
+            select:
+              'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',
+            shop_id: `eq.${shopId}`,
+            order: 'sort_order.asc,id.asc',
+          }),
+        ),
       ]);
 
+      const liveProducts = productRows.map(mapProduct);
       return {
         shopId,
         currentPublishVersion,
         versions: versions.map(mapPublishVersion),
+        draftPreviews: drafts.map((draft) =>
+          buildPublishPreview(draft, currentPublishVersion, liveProducts),
+        ),
         schedules: schedules.map(mapScheduledChange),
       };
     },
