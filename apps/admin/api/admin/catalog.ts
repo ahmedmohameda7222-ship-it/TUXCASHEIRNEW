@@ -25,6 +25,9 @@ import { readAdminSessionToken } from '../../server/session';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 
 const uuidSchema = z.string().uuid();
+const cairoLocalTimestampSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/);
 const bundleChangeSchema = z
   .object({
     kind: z.literal('bundle.replace'),
@@ -68,6 +71,31 @@ const catalogCommandSchema = z.discriminatedUnion('type', [
       soldOut: z.boolean(),
     })
     .strict(),
+  z
+    .object({
+      type: z.literal('version.restore'),
+      shopId: uuidSchema,
+      sourcePublishVersion: z.number().int().positive(),
+      expectedVersion: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('draft.schedule'),
+      draftId: uuidSchema,
+      shopId: uuidSchema,
+      expectedDraftRevision: z.number().int().positive(),
+      expectedVersion: z.number().int().nonnegative(),
+      localScheduledAt: cairoLocalTimestampSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('schedule.cancel'),
+      shopId: uuidSchema,
+      scheduleId: uuidSchema,
+    })
+    .strict(),
 ]);
 
 function handleFailure(response: AdminResponse, error: unknown): void {
@@ -80,7 +108,8 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof CatalogServiceError) {
-    sendJson(response, error.code === 'invalid_change_set' ? 400 : 502, { error: error.code });
+    const badRequest = error.code === 'invalid_change_set' || error.code === 'invalid_scheduled_time';
+    sendJson(response, badRequest ? 400 : 502, { error: error.code });
     return;
   }
   if (error instanceof AdminSupabaseError) {
@@ -136,6 +165,11 @@ export default async function handler(
         return;
       }
       const principal = await loadPrincipal(request, client, false);
+      if (requestUrl.searchParams.get('view') === 'publishing') {
+        const publishing = await service.loadCatalogPublishing(shopId.data, principal);
+        sendJson(response, 200, { ...publishing });
+        return;
+      }
       const workspace = await service.loadCatalogWorkspace(shopId.data, principal);
       sendJson(response, 200, { ...workspace });
       return;
@@ -151,19 +185,31 @@ export default async function handler(
     const principal = await loadPrincipal(request, client, true);
     const command = parsed.data as unknown as CatalogCommand;
 
-    if (command.type === 'draft.create') {
-      sendJson(response, 200, { ...(await service.createCatalogDraft(command, principal)) });
-      return;
+    switch (command.type) {
+      case 'draft.create':
+        sendJson(response, 200, { ...(await service.createCatalogDraft(command, principal)) });
+        return;
+      case 'draft.save':
+        sendJson(response, 200, { ...(await service.saveCatalogDraftChange(command, principal)) });
+        return;
+      case 'draft.publish':
+        sendJson(response, 200, { ...(await service.publishCatalogDraft(command, principal)) });
+        return;
+      case 'availability.set':
+        sendJson(response, 200, { ...(await service.setImmediateAvailability(command, principal)) });
+        return;
+      case 'version.restore':
+        sendJson(response, 200, { ...(await service.restoreCatalogVersion(command, principal)) });
+        return;
+      case 'draft.schedule':
+        sendJson(response, 200, { ...(await service.scheduleCatalogDraft(command, principal)) });
+        return;
+      case 'schedule.cancel':
+        sendJson(response, 200, {
+          ...(await service.cancelScheduledCatalogChange(command, principal)),
+        });
+        return;
     }
-    if (command.type === 'draft.save') {
-      sendJson(response, 200, { ...(await service.saveCatalogDraftChange(command, principal)) });
-      return;
-    }
-    if (command.type === 'draft.publish') {
-      sendJson(response, 200, { ...(await service.publishCatalogDraft(command, principal)) });
-      return;
-    }
-    sendJson(response, 200, { ...(await service.setImmediateAvailability(command, principal)) });
   } catch (error) {
     handleFailure(response, error);
   }
