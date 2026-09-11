@@ -24,12 +24,12 @@ for (const name of requiredObjects) {
   if (!sql.includes(name)) throw new Error(`admin shop settings migration missing ${name}`);
 }
 for (const fragment of [
-  "lifecycle_state",
-  "channel",
-  "requires_reference",
-  "manual_confirmation_required",
-  "refund_allowed",
-  "africa/cairo",
+  'lifecycle_state',
+  'channel',
+  'requires_reference',
+  'manual_confirmation_required',
+  'refund_allowed',
+  'africa/cairo',
 ]) {
   if (!sql.includes(fragment)) throw new Error(`admin shop settings migration missing ${fragment}`);
 }
@@ -120,6 +120,7 @@ declare
   v_publish jsonb;
   v_first_bundle jsonb;
   v_second_bundle jsonb;
+  v_catalog_bundle jsonb;
   v_archive jsonb;
   v_delete jsonb;
   v_reason_failed boolean := false;
@@ -181,6 +182,13 @@ begin
     where s.shop_id = '${shopId}' and s.version = 1
   ) is distinct from v_first_bundle then
     raise exception 'historical settings snapshot was mutated';
+  end if;
+
+  v_catalog_bundle := private.build_admin_catalog_bundle_v1('${shopId}', 3, now());
+  if v_catalog_bundle #>> '{snapshot,settings,values,checkout.minimumOrderMinor}' <> '1500'
+     or v_catalog_bundle #>> '{snapshot,settings,values,receipt.orderPrefix}' <> 'FX-'
+     or v_catalog_bundle #>> '{snapshot,paymentMethods,0,channel}' <> 'POS' then
+    raise exception 'catalog bundle builder dropped published settings authority: %', v_catalog_bundle;
   end if;
 
   begin
