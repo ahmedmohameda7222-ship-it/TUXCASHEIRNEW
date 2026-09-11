@@ -1,0 +1,44 @@
+name: Temporary Admin Settings Formatter
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/tmp-admin-settings-format.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format exact settings files
+        run: >-
+          npx prettier --write
+          apps/admin/src/app/routes.tsx
+          apps/admin/src/settings/ReasonCodesPage.tsx
+          apps/admin/src/settings/ReceiptsPage.tsx
+          apps/admin/src/settings/settingsModel.ts
+          apps/admin/src/settings/SettingsPage.test.tsx
+          apps/admin/src/settings/SettingsPage.tsx
+          apps/admin/src/settings/ShopsPage.tsx
+      - name: Commit formatting and remove temporary workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/admin/src/app/routes.tsx apps/admin/src/settings/ReasonCodesPage.tsx apps/admin/src/settings/ReceiptsPage.tsx apps/admin/src/settings/settingsModel.ts apps/admin/src/settings/SettingsPage.test.tsx apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/ShopsPage.tsx
+          git rm .github/workflows/tmp-admin-settings-format.yml
+          git commit -m "style(admin): format settings workspace"
+          git push origin HEAD:feat/admin-02-catalog-settings
