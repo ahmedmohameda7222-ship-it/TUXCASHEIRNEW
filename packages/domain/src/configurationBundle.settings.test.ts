@@ -164,6 +164,7 @@ describe('Operations published settings configuration', () => {
     ).toThrow(/payment method channel/i);
 
     const invalidZoneRule = bundle();
+    if (!invalidZoneRule.snapshot.settings) throw new Error('settings fixture must be present');
     invalidZoneRule.snapshot.settings.paymentMethodZoneRules[0]!.deliveryZoneId =
       '99999999-9999-4999-8999-999999999999';
     expect(() => parseOperationsConfigurationBundle(invalidZoneRule)).toThrow(
