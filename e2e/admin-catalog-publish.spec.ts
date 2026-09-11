@@ -211,7 +211,7 @@ test('publish review shows version-fenced draft diff, history, and Cairo schedul
   await expect(page.getByText('Live version 48')).toBeVisible();
   await expect(page.getByText('1 product changed')).toBeVisible();
   await expect(page.getByText('1 price change')).toBeVisible();
-  await expect(page.getByText('Africa/Cairo')).toBeVisible();
+  await expect(page.getByLabel('Schedule publish').getByText('Africa/Cairo')).toBeVisible();
   await expect(page.getByText('Version 47')).toBeVisible();
 
   await page.getByLabel('Activation time (Cairo)').fill('2099-09-12T08:00');
