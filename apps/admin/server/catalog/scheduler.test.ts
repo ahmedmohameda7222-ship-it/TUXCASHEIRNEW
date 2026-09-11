@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createSupabaseCatalogSchedulerExecutors,
   createSupabaseCatalogSchedulerStore,
   handleCatalogSchedulerRequest,
   runCatalogScheduler,
@@ -58,6 +59,69 @@ describe('catalog scheduler', () => {
     expect(publish).toHaveBeenCalledTimes(1);
     expect(store.markApplied).toHaveBeenCalledTimes(1);
     expect(store.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('materializes recurring availability boundaries before claiming due work', async () => {
+    const events: string[] = [];
+    const store: CatalogSchedulerStore = {
+      claimDue: vi.fn(async () => {
+        events.push('claim');
+        return [];
+      }),
+      markApplied: vi.fn(),
+      markFailed: vi.fn(),
+    };
+    const materializeRecurring = vi.fn(async (now: string) => {
+      events.push(`materialize:${now}`);
+      return { ok: true, materialized: 2 };
+    });
+
+    await runCatalogScheduler({
+      store,
+      publish: vi.fn(),
+      setAvailability: vi.fn(),
+      materializeRecurring,
+      now: () => new Date('2026-09-11T18:00:00.000Z'),
+    });
+
+    expect(materializeRecurring).toHaveBeenCalledWith('2026-09-11T18:00:00.000Z');
+    expect(events).toEqual(['materialize:2026-09-11T18:00:00.000Z', 'claim']);
+  });
+
+  it('routes recurring availability jobs through the dedicated baseline-preserving RPC', async () => {
+    const rpc = vi.fn(async () => ({ ok: true, publishVersion: 50 }));
+    const client: CatalogSchedulerRpcClient = {
+      async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
+        return (await rpc(name, payload)) as T;
+      },
+    };
+    const executors = createSupabaseCatalogSchedulerExecutors(client);
+    const recurringChange: CatalogScheduledChange = {
+      id: 'schedule-recurring-1',
+      businessId: 'business-1',
+      shopId: 'shop-a',
+      createdByEmployeeId: 'employee-1',
+      changeKind: 'PRODUCT_AVAILABILITY',
+      payload: {
+        ruleId: 'rule-1',
+        ruleVersion: 3,
+        transition: 'EXIT',
+      },
+      scheduledFor: '2026-09-11T23:00:00.000Z',
+      targetBasePublishVersion: null,
+      idempotencyKey: 'recurring:rule-1:v3:2026-09-11:exit',
+      attemptCount: 1,
+    };
+
+    await executors.setAvailability(recurringChange);
+
+    expect(rpc).toHaveBeenCalledWith('apply_recurring_product_availability_v1', {
+      p_employee_id: 'employee-1',
+      p_shop_id: 'shop-a',
+      p_rule_id: 'rule-1',
+      p_rule_version: 3,
+      p_transition: 'EXIT',
+    });
   });
 
   it('maps durable scheduler claims and terminal transitions through trusted RPCs', async () => {
