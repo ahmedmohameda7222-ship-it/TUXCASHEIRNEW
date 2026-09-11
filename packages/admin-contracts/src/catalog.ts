@@ -4,6 +4,13 @@ export type CatalogJsonValue =
 export type CatalogJsonObject = { [key: string]: CatalogJsonValue };
 
 export type CatalogDraftStatus = 'DRAFT' | 'PUBLISHED' | 'DISCARDED';
+export type CatalogPublishSourceKind =
+  | 'BASELINE'
+  | 'DRAFT'
+  | 'IMMEDIATE_AVAILABILITY'
+  | 'SCHEDULE'
+  | 'ROLLBACK';
+export type CatalogScheduleStatus = 'PENDING' | 'CLAIMED' | 'APPLIED' | 'FAILED' | 'CANCELLED';
 
 export type CatalogDraftSummary = {
   id: string;
@@ -49,6 +56,38 @@ export type CatalogWorkspace = {
   categories: CatalogCategorySummary[];
   products: CatalogProductDetail[];
   drafts: CatalogDraftSummary[];
+};
+
+export type CatalogPublishVersionSummary = {
+  shopId: string;
+  publishVersion: number;
+  operationsConfigurationVersion: number;
+  sourceKind: CatalogPublishSourceKind;
+  draftId: string | null;
+  publishedByEmployeeId: string | null;
+  restoredFromPublishVersion: number | null;
+  publishedAt: string;
+};
+
+export type CatalogScheduledChangeSummary = {
+  id: string;
+  shopId: string;
+  draftId: string | null;
+  expectedDraftRevision: number | null;
+  status: CatalogScheduleStatus;
+  timezone: 'Africa/Cairo';
+  localScheduledAt: string;
+  scheduledFor: string;
+  targetBasePublishVersion: number | null;
+  attemptCount: number;
+  lastError: string | null;
+};
+
+export type CatalogPublishingWorkspace = {
+  shopId: string;
+  currentPublishVersion: number;
+  versions: CatalogPublishVersionSummary[];
+  schedules: CatalogScheduledChangeSummary[];
 };
 
 export type CatalogPublishPreview = {
@@ -98,6 +137,26 @@ export type CatalogImmediateAvailabilityInput = {
   shopId: string;
   productId: string;
   soldOut: boolean;
+};
+
+export type CatalogRestoreVersionInput = {
+  shopId: string;
+  sourcePublishVersion: number;
+  expectedVersion: number;
+};
+
+export type CatalogScheduleDraftInput = {
+  draftId: string;
+  shopId: string;
+  expectedDraftRevision: number;
+  expectedVersion: number;
+  /** Wall-clock activation time interpreted only in Africa/Cairo by the trusted server. */
+  localScheduledAt: string;
+};
+
+export type CatalogCancelScheduleInput = {
+  shopId: string;
+  scheduleId: string;
 };
 
 export type CatalogStaleVersionResult = {
@@ -155,8 +214,62 @@ export type CatalogImmediateAvailabilityResult =
     }
   | { ok: false; code: 'invalid_request' | 'product_not_found' };
 
+export type CatalogRestoreVersionResult =
+  | {
+      ok: true;
+      sourcePublishVersion: number;
+      publishVersion: number;
+      operationsConfigurationVersion: number;
+    }
+  | CatalogStaleVersionResult
+  | {
+      ok: false;
+      code: 'invalid_request' | 'publish_version_not_found' | 'restore_source_must_be_historical';
+    };
+
+export type CatalogScheduleResult =
+  | {
+      ok: true;
+      scheduleId: string;
+      status: CatalogScheduleStatus;
+      scheduledFor: string;
+      localScheduledAt: string;
+      timezone: 'Africa/Cairo';
+      idempotentReplay: boolean;
+    }
+  | CatalogStaleVersionResult
+  | {
+      ok: false;
+      code:
+        | 'draft_not_found'
+        | 'draft_not_schedulable'
+        | 'stale_draft_revision'
+        | 'scheduled_time_required'
+        | 'scheduled_time_must_be_future';
+      currentDraftRevision?: number;
+    };
+
+export type CatalogCancelScheduleResult =
+  | {
+      ok: true;
+      scheduleId: string;
+      status: 'CANCELLED';
+      idempotentReplay: boolean;
+    }
+  | {
+      ok: false;
+      code:
+        | 'schedule_not_found'
+        | 'unsupported_schedule_kind'
+        | 'schedule_in_progress'
+        | 'schedule_already_applied';
+    };
+
 export type CatalogCommand =
   | ({ type: 'draft.create' } & CatalogCreateDraftInput)
   | ({ type: 'draft.save' } & CatalogSaveDraftInput)
   | ({ type: 'draft.publish' } & CatalogPublishDraftInput)
-  | ({ type: 'availability.set' } & CatalogImmediateAvailabilityInput);
+  | ({ type: 'availability.set' } & CatalogImmediateAvailabilityInput)
+  | ({ type: 'version.restore' } & CatalogRestoreVersionInput)
+  | ({ type: 'draft.schedule' } & CatalogScheduleDraftInput)
+  | ({ type: 'schedule.cancel' } & CatalogCancelScheduleInput);
