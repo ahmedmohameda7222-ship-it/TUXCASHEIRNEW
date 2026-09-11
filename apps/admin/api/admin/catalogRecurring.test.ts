@@ -8,7 +8,7 @@ const masterProductId = '22222222-2222-4222-8222-222222222222';
 
 describe('Admin recurring catalog API contract', () => {
   it('accepts the recurring availability view', () => {
-    expect(catalogViewSchema.safeParse('recurring').success).toBe(true);
+    expect(catalogViewSchema.safeParse('recurring-availability').success).toBe(true);
     expect(catalogViewSchema.safeParse('unknown').success).toBe(false);
   });
 
