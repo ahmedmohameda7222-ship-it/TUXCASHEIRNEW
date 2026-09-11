@@ -141,6 +141,109 @@
   width: 100%;
 }
 
+.admin-recurring-card {
+  grid-column: 1 / -1;
+}
+
+.admin-recurring-form,
+.admin-recurring-rules {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-recurring-days {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-recurring-days legend {
+  margin-bottom: 8px;
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-recurring-days__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-recurring-day,
+.admin-recurring-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.admin-recurring-day {
+  padding: 10px 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 10px;
+  background: var(--tux-surface-subtle);
+  font-size: 13px;
+}
+
+.admin-recurring-day input,
+.admin-recurring-toggle input {
+  flex: 0 0 auto;
+}
+
+.admin-recurring-times {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-recurring-form__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.admin-recurring-rule {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  background: var(--tux-surface-panel);
+}
+
+.admin-recurring-rule__main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-recurring-rule__main > span {
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.admin-recurring-rule .admin-danger-link {
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  .admin-recurring-days__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-recurring-times {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 768px) {
   .admin-publish-page {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -148,6 +251,7 @@
 
   .admin-publish-live-bar,
   .admin-publish-summary,
+  .admin-recurring-card,
   .admin-publish-page > .admin-callout,
   .admin-publish-page > .admin-empty-state,
   .admin-publish-page > section:last-child {
@@ -168,13 +272,15 @@
     width: auto;
   }
 
-  .admin-publish-history__row {
+  .admin-publish-history__row,
+  .admin-recurring-rule {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
   }
 
   .admin-publish-history__row .admin-secondary-button,
-  .admin-publish-history__row .admin-danger-link {
+  .admin-publish-history__row .admin-danger-link,
+  .admin-recurring-rule .admin-danger-link {
     width: auto;
   }
 }
@@ -187,5 +293,17 @@
 
   .admin-publish-card {
     padding: 18px;
+  }
+
+  .admin-recurring-form {
+    grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.6fr);
+    align-items: start;
+  }
+
+  .admin-recurring-product-field,
+  .admin-recurring-times,
+  .admin-recurring-form__footer,
+  .admin-recurring-form > .admin-primary-button {
+    grid-column: 1 / -1;
   }
 }
