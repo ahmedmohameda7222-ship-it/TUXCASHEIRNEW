@@ -12,6 +12,7 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-catalog-control-migration.mjs'
       - 'scripts/test-admin-catalog-scheduler-migration.mjs'
+      - 'scripts/test-admin-deployment-contract.mjs'
       - '.github/workflows/admin-catalog-settings-tdd.yml'
   workflow_dispatch:
 
@@ -81,6 +82,8 @@ jobs:
         run: node scripts/test-admin-catalog-control-migration.mjs
       - name: Catalog scheduler migration invariant
         run: node scripts/test-admin-catalog-scheduler-migration.mjs
+      - name: Admin deployment cron contract
+        run: node scripts/test-admin-deployment-contract.mjs
 
   catalog-control-postgres:
     runs-on: ubuntu-latest
