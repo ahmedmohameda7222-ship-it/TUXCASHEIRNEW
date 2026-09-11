@@ -58,7 +58,7 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
       </div>
       <div className="admin-publish-version-line">
         <span>Draft base version {preview.basePublishVersion}</span>
-        <span>Live version {preview.currentPublishVersion}</span>
+        <span>Current catalog version {preview.currentPublishVersion}</span>
       </div>
     </section>
   );
@@ -252,8 +252,8 @@ export function PublishReviewPage() {
                         <strong>{schedule.localScheduledAt}</strong>
                         <span className="admin-status-pill">{scheduleStatusLabel(schedule)}</span>
                       </div>
-                      <span>{schedule.timezone}</span>
-                      <span>Target live version {schedule.targetBasePublishVersion ?? '—'}</span>
+                      <span>Timezone: {schedule.timezone}</span>
+                      <span>Target base version {schedule.targetBasePublishVersion ?? '—'}</span>
                     </div>
                     <button
                       className="admin-danger-link"
