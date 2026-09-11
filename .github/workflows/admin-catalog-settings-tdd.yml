@@ -39,6 +39,21 @@ jobs:
       - name: Admin API and server typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
 
+  catalog-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Catalog scheduler unit tests
+        run: npx vitest run apps/admin/server/catalog/scheduler.test.ts
+      - name: Admin API and server typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+
   catalog-ui:
     runs-on: ubuntu-latest
     steps:
