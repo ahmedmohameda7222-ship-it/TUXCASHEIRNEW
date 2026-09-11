@@ -1,0 +1,33 @@
+name: Admin Settings E2E RED
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - 'e2e/admin-settings.spec.ts'
+      - 'playwright.admin.config.ts'
+      - '.github/workflows/admin-settings-e2e-red.yml'
+
+concurrency:
+  group: admin-settings-e2e-red-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  settings-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Settings workspace rendered E2E
+        run: npx playwright test e2e/admin-settings.spec.ts --config playwright.admin.config.ts
