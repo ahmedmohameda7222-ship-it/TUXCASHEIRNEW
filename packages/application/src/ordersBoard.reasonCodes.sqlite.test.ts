@@ -16,16 +16,10 @@ import {
   type WorkerId,
   type WorkerSessionId,
 } from '@tux/domain';
-import {
-  SqliteOperationsDatabase,
-  SqliteOperatorSessionReadModel,
-} from '@tux/persistence/sqlite';
+import { SqliteOperationsDatabase, SqliteOperatorSessionReadModel } from '@tux/persistence/sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
-import {
-  OperationsOrdersBoardService,
-  type CancelOrderInput,
-} from './ordersBoard';
+import { OperationsOrdersBoardService, type CancelOrderInput } from './ordersBoard';
 
 const shopId = parseEntityId<ShopId>('10000000-0000-4000-8000-000000000001');
 const workerId = parseEntityId<WorkerId>('20000000-0000-4000-8000-000000000001');
@@ -172,7 +166,8 @@ describe('configured cancellation reasons', () => {
 
       const result = await test.service.cancelOrder(input);
       if (!result.ok) {
-        const cause = result.error.cause instanceof Error ? result.error.cause.message : result.error.cause;
+        const cause =
+          result.error.cause instanceof Error ? result.error.cause.message : result.error.cause;
         throw new Error(
           `Expected configured cancellation to succeed, got ${result.error.code}: ${result.error.message}; cause=${String(cause ?? 'none')}`,
         );
