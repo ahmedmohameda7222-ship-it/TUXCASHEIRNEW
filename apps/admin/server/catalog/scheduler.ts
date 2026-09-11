@@ -19,16 +19,8 @@ export interface CatalogSchedulerStore {
    * another worker can concurrently execute; persistent claim state is the idempotency fence.
    */
   claimDue(input: { now: string; limit: number }): Promise<CatalogScheduledChange[]>;
-  markApplied(input: {
-    id: string;
-    idempotencyKey: string;
-    result: unknown;
-  }): Promise<void>;
-  markFailed(input: {
-    id: string;
-    idempotencyKey: string;
-    error: string;
-  }): Promise<void>;
+  markApplied(input: { id: string; idempotencyKey: string; result: unknown }): Promise<void>;
+  markFailed(input: { id: string; idempotencyKey: string; error: string }): Promise<void>;
 }
 
 export interface CatalogSchedulerRpcClient {
@@ -74,7 +66,10 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function requiredString(value: unknown, code = 'catalog_scheduler_backend_contract_invalid'): string {
+function requiredString(
+  value: unknown,
+  code = 'catalog_scheduler_backend_contract_invalid',
+): string {
   if (typeof value !== 'string' || value.trim() === '') throw new Error(code);
   return value.trim();
 }
@@ -178,8 +173,14 @@ export function createSupabaseCatalogSchedulerExecutors(client: CatalogScheduler
       if (change.changeKind !== 'CATALOG_PUBLISH') {
         throw new Error('catalog_scheduler_change_kind_mismatch');
       }
-      const draftId = requiredString(change.payload['draftId'], 'catalog_scheduler_payload_invalid');
-      const expectedDraftRevision = positiveIntegerFromPayload(change.payload, 'expectedDraftRevision');
+      const draftId = requiredString(
+        change.payload['draftId'],
+        'catalog_scheduler_payload_invalid',
+      );
+      const expectedDraftRevision = positiveIntegerFromPayload(
+        change.payload,
+        'expectedDraftRevision',
+      );
       if (change.targetBasePublishVersion === null) {
         throw new Error('catalog_scheduler_publish_version_required');
       }
