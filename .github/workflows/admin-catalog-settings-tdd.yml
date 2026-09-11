@@ -99,6 +99,8 @@ jobs:
           node-version: 24
           cache: npm
       - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
       - name: Install locked dependencies
         run: npm ci
       - name: Published online checkout settings authority
@@ -111,7 +113,10 @@ jobs:
       - name: Order intake Deno regression
         run: deno test scripts/order-intake.deno.ts
       - name: Order intake Edge Function typecheck
-        run: deno check supabase/functions/order-intake/index.ts
+        run: >-
+          deno check
+          --config supabase/functions/order-intake/deno.json
+          supabase/functions/order-intake/index.ts
 
   catalog-scheduler:
     runs-on: ubuntu-latest
