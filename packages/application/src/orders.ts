@@ -129,6 +129,30 @@ function firstActiveOrderTypeId(
   return ordered[0]?.id ?? null;
 }
 
+function receiptIdentityForOrder(
+  configuration: OperationsConfigurationSnapshot,
+  displayOrderNo: number,
+): Pick<OrderSnapshot, 'displayOrderLabel' | 'receiptSnapshot'> {
+  const settings = configuration.settings;
+  if (settings === undefined || settings === null) return {};
+
+  const configuredPrefix = settings.values['receipt.orderPrefix'];
+  const configuredFooter = settings.values['receipt.footer'];
+  const orderNumberPrefix = typeof configuredPrefix === 'string' ? configuredPrefix : '#';
+
+  return {
+    displayOrderLabel: `${orderNumberPrefix}${displayOrderNo}`,
+    receiptSnapshot: {
+      configurationVersion: configuration.version,
+      shopDisplayName: settings.shopIdentity.displayName,
+      address: settings.shopIdentity.address,
+      contactPhone: settings.shopIdentity.phone,
+      footer: typeof configuredFooter === 'string' ? configuredFooter : null,
+      orderNumberPrefix,
+    },
+  };
+}
+
 export function createEmptyOrderDraft(input: {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
@@ -634,6 +658,10 @@ export class OperationsOrdersService {
             }
 
             const allocated = allocateDisplayOrderNo(currentDay);
+            const receiptIdentity = receiptIdentityForOrder(
+              currentConfiguration,
+              allocated.displayOrderNo,
+            );
             const orderId = placement.source === 'ONLINE' ? placement.orderId : this.#id<OrderId>();
             let customerContact: CustomerContact | null = null;
             if (
@@ -670,6 +698,7 @@ export class OperationsOrdersService {
               shopId: context.shopId,
               businessDayId: currentDay.id,
               displayOrderNo: allocated.displayOrderNo,
+              ...receiptIdentity,
               idempotencyKey: draft.checkoutIntentKey,
               status: 'ACTIVE',
               lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },

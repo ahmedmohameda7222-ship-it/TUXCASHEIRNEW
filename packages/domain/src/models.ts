@@ -167,11 +167,24 @@ export interface OrderLifecycleSnapshot {
   readonly returned: OrderReturnSnapshot | null;
 }
 
+export interface OrderReceiptSnapshot {
+  readonly configurationVersion: number;
+  readonly shopDisplayName: string;
+  readonly address: string | null;
+  readonly contactPhone: string | null;
+  readonly footer: string | null;
+  readonly orderNumberPrefix: string;
+}
+
 export interface OrderSnapshot {
   readonly id: OrderId;
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
   readonly displayOrderNo: number;
+  /** Immutable configured identity for orders created after receipt settings adoption. */
+  readonly displayOrderLabel?: string;
+  /** Optional for backwards compatibility with legacy persisted orders. */
+  readonly receiptSnapshot?: OrderReceiptSnapshot;
   readonly idempotencyKey: string;
   readonly status: OrderStatus;
   readonly lifecycle?: OrderLifecycleSnapshot;

@@ -25,20 +25,6 @@ function paymentDescription(payment: PaymentPart): string {
   return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)}`;
 }
 
-interface ReceiptSnapshotView {
-  readonly configurationVersion: number;
-  readonly shopDisplayName: string;
-  readonly address: string | null;
-  readonly contactPhone: string | null;
-  readonly footer: string | null;
-  readonly orderNumberPrefix: string;
-}
-
-type ReceiptAwareOrder = OrderSnapshot & {
-  readonly displayOrderLabel?: string;
-  readonly receiptSnapshot?: ReceiptSnapshotView;
-};
-
 export interface ReceiptRenderOptions {
   readonly paperWidthMm?: 58 | 80;
 }
@@ -47,9 +33,8 @@ export function renderOrderReceiptHtml(
   order: OrderSnapshot,
   options: ReceiptRenderOptions = {},
 ): string {
-  const receiptAwareOrder = order as ReceiptAwareOrder;
-  const receiptSnapshot = receiptAwareOrder.receiptSnapshot;
-  const orderLabel = receiptAwareOrder.displayOrderLabel ?? `#${order.displayOrderNo}`;
+  const receiptSnapshot = order.receiptSnapshot;
+  const orderLabel = order.displayOrderLabel ?? `#${order.displayOrderNo}`;
   const shopDisplayName = receiptSnapshot?.shopDisplayName ?? 'TUX';
   const receiptIdentity = [receiptSnapshot?.address, receiptSnapshot?.contactPhone]
     .filter((value): value is string => value !== null && value !== undefined && value.length > 0)
