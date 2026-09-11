@@ -55,6 +55,21 @@ jobs:
       - name: Admin API and server typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
 
+  settings-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Published settings domain contract
+        run: npx vitest run packages/domain/src/configurationBundle.settings.test.ts
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+
   catalog-scheduler:
     runs-on: ubuntu-latest
     steps:
