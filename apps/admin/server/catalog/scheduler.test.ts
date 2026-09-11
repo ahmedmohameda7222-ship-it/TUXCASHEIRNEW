@@ -61,7 +61,8 @@ describe('catalog scheduler', () => {
   });
 
   it('maps durable scheduler claims and terminal transitions through trusted RPCs', async () => {
-    const rpc = vi.fn(async (name: string, _payload: Readonly<Record<string, unknown>>) => {
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      void payload;
       if (name === 'claim_due_admin_config_changes_v1') {
         return [
           {
