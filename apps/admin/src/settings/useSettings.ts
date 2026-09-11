@@ -62,7 +62,7 @@ export function useSettings(shopId: string | undefined) {
       if (!result.ok) {
         throw new SettingsUiError(
           result.code,
-          result.code === 'stale_settings_version' ? result.currentVersion : undefined,
+          'currentVersion' in result ? result.currentVersion : undefined,
         );
       }
       return result;
