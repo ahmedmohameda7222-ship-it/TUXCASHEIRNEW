@@ -1,27 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runCatalogScheduler, type CatalogSchedulerStore } from './scheduler';
+import {
+  runCatalogScheduler,
+  type CatalogScheduledChange,
+  type CatalogSchedulerStore,
+} from './scheduler';
 
 function createStore(): CatalogSchedulerStore {
   let claimed = false;
   let applied = false;
+  const dueChange: CatalogScheduledChange = {
+    id: 'schedule-1',
+    businessId: 'business-1',
+    shopId: 'shop-a',
+    changeKind: 'CATALOG_PUBLISH',
+    payload: { draftId: 'draft-1', expectedDraftRevision: 3 },
+    scheduledFor: '2026-09-11T05:00:00.000Z',
+    targetBasePublishVersion: 48,
+    idempotencyKey: 'publish:draft-1:48',
+    attemptCount: 0,
+  };
+
   return {
     claimDue: vi.fn(async () => {
       if (claimed || applied) return [];
       claimed = true;
-      return [
-        {
-          id: 'schedule-1',
-          businessId: 'business-1',
-          shopId: 'shop-a',
-          changeKind: 'CATALOG_PUBLISH',
-          payload: { draftId: 'draft-1', expectedDraftRevision: 3 },
-          scheduledFor: '2026-09-11T05:00:00.000Z',
-          targetBasePublishVersion: 48,
-          idempotencyKey: 'publish:draft-1:48',
-          attemptCount: 0,
-        },
-      ];
+      return [dueChange];
     }),
     markApplied: vi.fn(async () => {
       applied = true;
