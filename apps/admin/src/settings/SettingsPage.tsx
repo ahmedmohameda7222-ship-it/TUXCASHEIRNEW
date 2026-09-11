@@ -48,9 +48,10 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
     <div className="admin-settings-overview">
       <section className="admin-catalog-editor__section" aria-labelledby="settings-shop-summary">
         <p className="admin-catalog-editor__eyebrow">Shop</p>
-        <h2 id="settings-shop-summary">{workspace.shop.name}</h2>
+        <h2 id="settings-shop-summary">Shop identity</h2>
         <p className="admin-field__help">
-          {workspace.shop.address ?? 'No address configured'} · {workspace.shop.timezone}
+          {workspace.shop.name} · {workspace.shop.address ?? 'No address configured'} ·{' '}
+          {workspace.shop.timezone}
         </p>
       </section>
 
@@ -87,7 +88,13 @@ function PlaceholderSection({ title, detail }: { title: string; detail: string }
   );
 }
 
-function SectionContent({ section, workspace }: { section: SettingsSection; workspace: AdminSettingsWorkspace }) {
+function SectionContent({
+  section,
+  workspace,
+}: {
+  section: SettingsSection;
+  workspace: AdminSettingsWorkspace;
+}) {
   switch (section) {
     case 'overview':
       return <Overview workspace={workspace} />;
@@ -96,17 +103,43 @@ function SectionContent({ section, workspace }: { section: SettingsSection; work
     case 'reason-codes':
       return <ReasonCodesPage workspace={workspace} />;
     case 'shop':
-      return <PlaceholderSection title="Shop" detail={`${workspace.shop.lifecycleState} · ${workspace.shop.temporaryClosed ? 'Temporarily closed' : 'Open according to schedule'}`} />;
+      return (
+        <PlaceholderSection
+          title="Shop"
+          detail={`${workspace.shop.lifecycleState} · ${workspace.shop.temporaryClosed ? 'Temporarily closed' : 'Open according to schedule'}`}
+        />
+      );
     case 'order-types':
-      return <PlaceholderSection title="Order types" detail={`${workspace.orderTypes.length} configured order types`} />;
+      return (
+        <PlaceholderSection
+          title="Order types"
+          detail={`${workspace.orderTypes.length} configured order types`}
+        />
+      );
     case 'payments':
-      return <PlaceholderSection title="Payments" detail={`${workspace.paymentMethods.length} configured payment methods`} />;
+      return (
+        <PlaceholderSection
+          title="Payments"
+          detail={`${workspace.paymentMethods.length} configured payment methods`}
+        />
+      );
     case 'checkout':
-      return <PlaceholderSection title="Checkout" detail={`${workspace.deliveryZones.length} configured delivery zones`} />;
+      return (
+        <PlaceholderSection
+          title="Checkout"
+          detail={`${workspace.deliveryZones.length} configured delivery zones`}
+        />
+      );
   }
 }
 
-export function SettingsWorkspaceView({ workspace, section, onSectionChange, onPublish, publishing }: SettingsWorkspaceViewProps) {
+export function SettingsWorkspaceView({
+  workspace,
+  section,
+  onSectionChange,
+  onPublish,
+  publishing,
+}: SettingsWorkspaceViewProps) {
   return (
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
       <header className="admin-settings-workspace__header">
@@ -116,7 +149,12 @@ export function SettingsWorkspaceView({ workspace, section, onSectionChange, onP
           <p className="admin-field__help">Live settings version {workspace.settingsVersion}</p>
         </div>
         <div>
-          <button className="admin-primary-button" type="button" disabled={publishing} onClick={() => void onPublish()}>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={publishing}
+            onClick={() => void onPublish()}
+          >
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
           <p className="admin-field__help">Changes become live only after publishing.</p>
@@ -124,11 +162,20 @@ export function SettingsWorkspaceView({ workspace, section, onSectionChange, onP
       </header>
 
       <nav className="admin-settings-workspace__nav" aria-label="Settings sections">
-        <button type="button" aria-current={section === 'overview' ? 'page' : undefined} onClick={() => onSectionChange('overview')}>
+        <button
+          type="button"
+          aria-current={section === 'overview' ? 'page' : undefined}
+          onClick={() => onSectionChange('overview')}
+        >
           Overview
         </button>
         {sections.map((item) => (
-          <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => onSectionChange(item.id)}>
+          <button
+            key={item.id}
+            type="button"
+            aria-current={section === item.id ? 'page' : undefined}
+            onClick={() => onSectionChange(item.id)}
+          >
             {item.label}
           </button>
         ))}
@@ -146,13 +193,31 @@ export function SettingsPage() {
   const settings = useSettings(shopId);
 
   if (!shopId) {
-    return <PageScaffold eyebrow="Settings" title="Select a shop" description="Settings changes require a concrete shop scope." />;
+    return (
+      <PageScaffold
+        eyebrow="Settings"
+        title="Select a shop"
+        description="Settings changes require a concrete shop scope."
+      />
+    );
   }
   if (settings.workspaceQuery.isPending) {
-    return <PageScaffold eyebrow="Settings" title="Loading settings" description="Loading the current published shop configuration." />;
+    return (
+      <PageScaffold
+        eyebrow="Settings"
+        title="Loading settings"
+        description="Loading the current published shop configuration."
+      />
+    );
   }
   if (settings.workspaceQuery.isError || !settings.workspaceQuery.data) {
-    return <PageScaffold eyebrow="Settings" title="Settings unavailable" description="The settings workspace could not be loaded." />;
+    return (
+      <PageScaffold
+        eyebrow="Settings"
+        title="Settings unavailable"
+        description="The settings workspace could not be loaded."
+      />
+    );
   }
 
   return (
