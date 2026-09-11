@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
-import { createCatalogService, type CatalogStore } from './catalogService';
+import {
+  createRecurringAvailabilityService,
+  type RecurringAvailabilityStore,
+} from './recurringAvailabilityService';
 
 const owner: AdminSessionPrincipal = {
   employeeId: 'employee-1',
@@ -11,35 +14,9 @@ const owner: AdminSessionPrincipal = {
   shopIds: ['shop-a'],
 };
 
-type RecurringStore = CatalogStore & {
-  loadRecurringAvailability(shopId: string, businessId: string): Promise<unknown>;
-  saveRecurringAvailabilityRule(input: Readonly<Record<string, unknown>>): Promise<unknown>;
-};
-
-type RecurringService = ReturnType<typeof createCatalogService> & {
-  loadRecurringAvailability(
-    shopId: string,
-    principal: AdminSessionPrincipal,
-  ): Promise<unknown>;
-  saveRecurringAvailabilityRule(
-    input: Readonly<Record<string, unknown>>,
-    principal: AdminSessionPrincipal,
-  ): Promise<unknown>;
-};
-
-function recurringStore(): RecurringStore {
+function recurringStore(): RecurringAvailabilityStore {
   return {
-    getCurrentPublishVersion: vi.fn().mockResolvedValue(48),
-    loadWorkspace: vi.fn(),
-    loadPublishing: vi.fn(),
-    createDraft: vi.fn(),
-    saveDraftChange: vi.fn(),
-    publishDraft: vi.fn(),
-    setImmediateAvailability: vi.fn(),
-    restoreVersion: vi.fn(),
-    scheduleDraft: vi.fn(),
-    cancelSchedule: vi.fn(),
-    loadRecurringAvailability: vi.fn().mockResolvedValue({
+    loadWorkspace: vi.fn().mockResolvedValue({
       shopId: 'shop-a',
       products: [
         {
@@ -65,39 +42,33 @@ function recurringStore(): RecurringStore {
         },
       ],
     }),
-    saveRecurringAvailabilityRule: vi.fn().mockResolvedValue({
+    saveRule: vi.fn().mockResolvedValue({
       ok: true,
       ruleId: 'rule-1',
       version: 2,
       timezone: 'Africa/Cairo',
       active: false,
     }),
-  } as RecurringStore;
-}
-
-function service(catalogStore: RecurringStore): RecurringService {
-  return createCatalogService(catalogStore) as RecurringService;
+  };
 }
 
 describe('Admin recurring availability service', () => {
   it('loads recurring rules only with catalog.view and explicit shop scope', async () => {
-    const catalogStore = recurringStore();
-    const catalogService = service(catalogStore);
+    const store = recurringStore();
+    const service = createRecurringAvailabilityService(store);
 
-    await expect(catalogService.loadRecurringAvailability('shop-a', owner)).resolves.toMatchObject({
+    await expect(service.loadRecurringAvailability('shop-a', owner)).resolves.toMatchObject({
       shopId: 'shop-a',
       rules: [{ id: 'rule-1', timezone: 'Africa/Cairo' }],
     });
-    expect(catalogStore.loadRecurringAvailability).toHaveBeenCalledWith('shop-a', 'business-1');
+    expect(store.loadWorkspace).toHaveBeenCalledWith('shop-a', 'business-1');
 
-    await expect(catalogService.loadRecurringAvailability('shop-b', owner)).rejects.toThrow(
-      /shop_forbidden/,
-    );
+    await expect(service.loadRecurringAvailability('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
   });
 
   it('saves and deactivates a rule with catalog.edit and the authenticated employee identity', async () => {
-    const catalogStore = recurringStore();
-    const catalogService = service(catalogStore);
+    const store = recurringStore();
+    const service = createRecurringAvailabilityService(store);
     const input = {
       shopId: 'shop-a',
       ruleId: 'rule-1',
@@ -110,13 +81,13 @@ describe('Admin recurring availability service', () => {
       expectedVersion: 1,
     };
 
-    await expect(catalogService.saveRecurringAvailabilityRule(input, owner)).resolves.toMatchObject({
+    await expect(service.saveRecurringAvailabilityRule(input, owner)).resolves.toMatchObject({
       ok: true,
       ruleId: 'rule-1',
       version: 2,
       active: false,
     });
-    expect(catalogStore.saveRecurringAvailabilityRule).toHaveBeenCalledWith({
+    expect(store.saveRule).toHaveBeenCalledWith({
       employeeId: 'employee-1',
       shopId: 'shop-a',
       ruleId: 'rule-1',
@@ -131,12 +102,12 @@ describe('Admin recurring availability service', () => {
   });
 
   it('rejects rule mutation without catalog.edit before the trusted RPC', async () => {
-    const catalogStore = recurringStore();
-    const catalogService = service(catalogStore);
+    const store = recurringStore();
+    const service = createRecurringAvailabilityService(store);
     const viewer: AdminSessionPrincipal = { ...owner, permissions: ['catalog.view'] };
 
     await expect(
-      catalogService.saveRecurringAvailabilityRule(
+      service.saveRecurringAvailabilityRule(
         {
           shopId: 'shop-a',
           ruleId: null,
@@ -151,6 +122,6 @@ describe('Admin recurring availability service', () => {
         viewer,
       ),
     ).rejects.toThrow(/permission_forbidden/);
-    expect(catalogStore.saveRecurringAvailabilityRule).not.toHaveBeenCalled();
+    expect(store.saveRule).not.toHaveBeenCalled();
   });
 });
