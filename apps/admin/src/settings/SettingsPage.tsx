@@ -3,8 +3,13 @@ import { useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
+import { CheckoutPage } from './CheckoutPage';
+import { OrderTypesPage } from './OrderTypesPage';
+import { PaymentsPage } from './PaymentsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
+import { ShopsPage } from './ShopsPage';
+import './settings.css';
 import { useSettings } from './useSettings';
 
 export type SettingsSection =
@@ -78,16 +83,6 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
   );
 }
 
-function PlaceholderSection({ title, detail }: { title: string; detail: string }) {
-  return (
-    <section className="admin-catalog-editor__section">
-      <p className="admin-catalog-editor__eyebrow">Settings</p>
-      <h2>{title}</h2>
-      <p className="admin-field__help">{detail}</p>
-    </section>
-  );
-}
-
 function SectionContent({
   section,
   workspace,
@@ -98,38 +93,18 @@ function SectionContent({
   switch (section) {
     case 'overview':
       return <Overview workspace={workspace} />;
+    case 'shop':
+      return <ShopsPage workspace={workspace} />;
+    case 'order-types':
+      return <OrderTypesPage workspace={workspace} />;
+    case 'payments':
+      return <PaymentsPage workspace={workspace} />;
+    case 'checkout':
+      return <CheckoutPage workspace={workspace} />;
     case 'receipts':
       return <ReceiptsPage workspace={workspace} />;
     case 'reason-codes':
       return <ReasonCodesPage workspace={workspace} />;
-    case 'shop':
-      return (
-        <PlaceholderSection
-          title="Shop"
-          detail={`${workspace.shop.lifecycleState} · ${workspace.shop.temporaryClosed ? 'Temporarily closed' : 'Open according to schedule'}`}
-        />
-      );
-    case 'order-types':
-      return (
-        <PlaceholderSection
-          title="Order types"
-          detail={`${workspace.orderTypes.length} configured order types`}
-        />
-      );
-    case 'payments':
-      return (
-        <PlaceholderSection
-          title="Payments"
-          detail={`${workspace.paymentMethods.length} configured payment methods`}
-        />
-      );
-    case 'checkout':
-      return (
-        <PlaceholderSection
-          title="Checkout"
-          detail={`${workspace.deliveryZones.length} configured delivery zones`}
-        />
-      );
   }
 }
 
@@ -148,7 +123,7 @@ export function SettingsWorkspaceView({
           <h1>{workspace.shop.name}</h1>
           <p className="admin-field__help">Live settings version {workspace.settingsVersion}</p>
         </div>
-        <div>
+        <div className="admin-settings-workspace__publish">
           <button
             className="admin-primary-button"
             type="button"
