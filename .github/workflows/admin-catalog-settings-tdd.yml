@@ -27,20 +27,24 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  format-diff:
+  format-fix:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Print exact Prettier diff
+      - name: Apply exact Prettier formatting once
         run: |
           npx prettier --write \
             apps/admin/api/admin/catalog.ts \
@@ -57,7 +61,7 @@ jobs:
             packages/admin-contracts/src/catalog.ts \
             e2e/admin-catalog-recurring-availability.spec.ts \
             playwright.admin.config.ts
-          git diff --no-color -- \
+          git add \
             apps/admin/api/admin/catalog.ts \
             apps/admin/server/catalog/catalogPublishHistory.test.ts \
             apps/admin/server/catalog/catalogService.test.ts \
@@ -72,6 +76,14 @@ jobs:
             packages/admin-contracts/src/catalog.ts \
             e2e/admin-catalog-recurring-availability.spec.ts \
             playwright.admin.config.ts
+          if git diff --cached --quiet; then
+            echo 'No formatter changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style(admin): format catalog settings'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
   catalog-service:
     runs-on: ubuntu-latest
