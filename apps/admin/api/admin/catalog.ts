@@ -33,7 +33,7 @@ const uuidSchema = z.string().uuid();
 const cairoLocalTimestampSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/);
-const localTimeSchema = z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/);
+const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/);
 const bundleChangeSchema = z
   .object({
     kind: z.literal('bundle.replace'),
@@ -42,7 +42,9 @@ const bundleChangeSchema = z
   })
   .strict();
 
-const catalogCommandSchema = z.discriminatedUnion('type', [
+export const catalogViewSchema = z.enum(['workspace', 'publishing', 'recurring-availability']);
+
+export const catalogCommandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('draft.create'),
@@ -187,18 +189,18 @@ export default async function handler(
     if (request.method === 'GET') {
       const requestUrl = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.safeParse(requestUrl.searchParams.get('shopId'));
-      if (!shopId.success) {
+      const view = catalogViewSchema.safeParse(requestUrl.searchParams.get('view') ?? 'workspace');
+      if (!shopId.success || !view.success) {
         sendJson(response, 400, { error: 'invalid_catalog_request' });
         return;
       }
       const principal = await loadPrincipal(request, client, false);
-      const view = requestUrl.searchParams.get('view');
-      if (view === 'publishing') {
+      if (view.data === 'publishing') {
         const publishing = await service.loadCatalogPublishing(shopId.data, principal);
         sendJson(response, 200, { ...publishing });
         return;
       }
-      if (view === 'recurring-availability') {
+      if (view.data === 'recurring-availability') {
         const recurring = await recurringService.loadRecurringAvailability(shopId.data, principal);
         sendJson(response, 200, { ...recurring });
         return;
