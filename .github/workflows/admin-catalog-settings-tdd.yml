@@ -78,6 +78,8 @@ jobs:
         run: npx vitest run packages/domain/src/businessDay.receiptNumbering.test.ts
       - name: Business Day numbering boundary
         run: npx vitest run packages/application/src/session.receiptNumbering.test.ts
+      - name: Configured cancellation reason snapshot
+        run: npx vitest run packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
       - name: Domain typecheck
         run: npm run typecheck -w @tux/domain
       - name: Application typecheck
