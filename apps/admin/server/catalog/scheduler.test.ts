@@ -5,6 +5,7 @@ import {
   handleCatalogSchedulerRequest,
   runCatalogScheduler,
   type CatalogScheduledChange,
+  type CatalogSchedulerRpcClient,
   type CatalogSchedulerStore,
 } from './scheduler';
 
@@ -60,7 +61,7 @@ describe('catalog scheduler', () => {
   });
 
   it('maps durable scheduler claims and terminal transitions through trusted RPCs', async () => {
-    const rpc = vi.fn(async (name: string) => {
+    const rpc = vi.fn(async (name: string, _payload: Readonly<Record<string, unknown>>) => {
       if (name === 'claim_due_admin_config_changes_v1') {
         return [
           {
@@ -79,7 +80,12 @@ describe('catalog scheduler', () => {
       }
       return true;
     });
-    const store = createSupabaseCatalogSchedulerStore({ rpc });
+    const client: CatalogSchedulerRpcClient = {
+      async rpc<T>(name, payload) {
+        return (await rpc(name, payload)) as T;
+      },
+    };
+    const store = createSupabaseCatalogSchedulerStore(client);
 
     const claimed = await store.claimDue({
       now: '2026-09-11T05:00:00.000Z',
