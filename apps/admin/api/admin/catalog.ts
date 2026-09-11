@@ -130,7 +130,8 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof CatalogServiceError) {
-    const badRequest = error.code === 'invalid_change_set' || error.code === 'invalid_scheduled_time';
+    const badRequest =
+      error.code === 'invalid_change_set' || error.code === 'invalid_scheduled_time';
     sendJson(response, badRequest ? 400 : 502, { error: error.code });
     return;
   }
@@ -231,7 +232,9 @@ export default async function handler(
         sendJson(response, 200, { ...(await service.publishCatalogDraft(command, principal)) });
         return;
       case 'availability.set':
-        sendJson(response, 200, { ...(await service.setImmediateAvailability(command, principal)) });
+        sendJson(response, 200, {
+          ...(await service.setImmediateAvailability(command, principal)),
+        });
         return;
       case 'availability.recurring.save':
         sendJson(response, 200, {

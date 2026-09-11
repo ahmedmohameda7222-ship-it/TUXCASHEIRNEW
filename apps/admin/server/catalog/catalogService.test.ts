@@ -304,10 +304,7 @@ describe('Admin catalog service', () => {
       ),
     ).rejects.toThrow(/permission_forbidden/);
     await expect(
-      service.cancelScheduledCatalogChange(
-        { shopId: 'shop-b', scheduleId: 'schedule-1' },
-        owner,
-      ),
+      service.cancelScheduledCatalogChange({ shopId: 'shop-b', scheduleId: 'schedule-1' }, owner),
     ).rejects.toThrow(/shop_forbidden/);
     expect(catalogStore.cancelSchedule).not.toHaveBeenCalled();
   });

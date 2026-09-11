@@ -22,7 +22,8 @@ function countLabel(count: number, singular: string, plural: string): string {
 
 function errorMessage(error: unknown): string {
   if (error instanceof CatalogUiError) {
-    if (error.code === 'stale_version') return 'The live catalog changed. Refresh before publishing.';
+    if (error.code === 'stale_version')
+      return 'The live catalog changed. Refresh before publishing.';
     if (error.code === 'stale_rule_version') {
       return 'This recurring rule changed. Refresh before editing it again.';
     }
@@ -48,7 +49,10 @@ function scheduleStatusLabel(schedule: CatalogScheduledChangeSummary): string {
 
 function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
   return (
-    <section className="admin-publish-card admin-publish-summary" aria-labelledby="publish-summary-heading">
+    <section
+      className="admin-publish-card admin-publish-summary"
+      aria-labelledby="publish-summary-heading"
+    >
       <div className="admin-publish-card__heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">Draft preview</p>
@@ -60,11 +64,15 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
       </div>
       <div className="admin-publish-metrics">
         <div>
-          <strong>{countLabel(preview.changedProductIds.length, 'product changed', 'products changed')}</strong>
+          <strong>
+            {countLabel(preview.changedProductIds.length, 'product changed', 'products changed')}
+          </strong>
           <span>Canonical product fields that differ from live state.</span>
         </div>
         <div>
-          <strong>{countLabel(preview.priceChangedProductIds.length, 'price change', 'price changes')}</strong>
+          <strong>
+            {countLabel(preview.priceChangedProductIds.length, 'price change', 'price changes')}
+          </strong>
           <span>Pricing changes require catalog.pricing at execution time.</span>
         </div>
       </div>
@@ -184,7 +192,11 @@ export function PublishReviewPage() {
         </a>
       }
     >
-      {notice ? <div className="admin-callout"><strong>{notice}</strong></div> : null}
+      {notice ? (
+        <div className="admin-callout">
+          <strong>{notice}</strong>
+        </div>
+      ) : null}
       {actionError ? (
         <div className="admin-callout is-danger" role="alert">
           <strong>{actionError}</strong>

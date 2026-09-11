@@ -71,7 +71,8 @@ function readInteger(value: unknown): number {
 }
 
 function readDays(value: unknown): number[] {
-  if (!Array.isArray(value)) throw new RecurringAvailabilityServiceError('backend_contract_invalid');
+  if (!Array.isArray(value))
+    throw new RecurringAvailabilityServiceError('backend_contract_invalid');
   const days = value.map(readInteger);
   if (days.length < 1 || days.length > 7 || days.some((day) => day > 6)) {
     throw new RecurringAvailabilityServiceError('backend_contract_invalid');
@@ -192,7 +193,10 @@ export function createSupabaseRecurringAvailabilityStore(
         };
       });
 
-      products.sort((left, right) => left.name.localeCompare(right.name) || left.productId.localeCompare(right.productId));
+      products.sort(
+        (left, right) =>
+          left.name.localeCompare(right.name) || left.productId.localeCompare(right.productId),
+      );
 
       return {
         shopId,

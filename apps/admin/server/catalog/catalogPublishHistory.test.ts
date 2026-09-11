@@ -26,7 +26,11 @@ describe('Admin catalog publish history mapping', () => {
           },
         ];
       }
-      if (table === 'scheduled_config_changes' || table === 'catalog_drafts' || table === 'products') {
+      if (
+        table === 'scheduled_config_changes' ||
+        table === 'catalog_drafts' ||
+        table === 'products'
+      ) {
         return [];
       }
       throw new Error(`Unexpected table ${table}`);

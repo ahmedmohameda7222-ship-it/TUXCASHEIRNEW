@@ -106,7 +106,10 @@ export function RecurringAvailabilityEditor({
   }
 
   return (
-    <section className="admin-publish-card admin-recurring-card" aria-labelledby="recurring-availability-heading">
+    <section
+      className="admin-publish-card admin-recurring-card"
+      aria-labelledby="recurring-availability-heading"
+    >
       <div className="admin-publish-card__heading">
         <div>
           <p className="admin-catalog-editor__eyebrow">Weekly controls</p>
@@ -194,7 +197,9 @@ export function RecurringAvailabilityEditor({
                 />
                 <span>Available during window</span>
               </label>
-              {crossesMidnight ? <span className="admin-status-pill is-warning">Ends next day</span> : null}
+              {crossesMidnight ? (
+                <span className="admin-status-pill is-warning">Ends next day</span>
+              ) : null}
             </div>
 
             <button className="admin-primary-button" type="submit" disabled={!canSubmit}>
@@ -224,12 +229,16 @@ export function RecurringAvailabilityEditor({
                       <span>{daySummary(rule.daysOfWeek)}</span>
                       <span>
                         {shortTime(rule.startLocal)}–{shortTime(rule.endLocal)}
-                        {shortTime(rule.endLocal) <= shortTime(rule.startLocal) ? ' · next day' : ''}
+                        {shortTime(rule.endLocal) <= shortTime(rule.startLocal)
+                          ? ' · next day'
+                          : ''}
                       </span>
                       <span>{rule.available ? 'Available' : 'Sold out'} during window</span>
                       <span>Rule version {rule.version}</span>
                       {product ? (
-                        <span>Manual baseline: {product.manualSoldOut ? 'Sold out' : 'Available'}</span>
+                        <span>
+                          Manual baseline: {product.manualSoldOut ? 'Sold out' : 'Available'}
+                        </span>
                       ) : null}
                     </div>
                     {rule.active ? (

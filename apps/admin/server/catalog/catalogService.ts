@@ -33,10 +33,7 @@ import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 export class CatalogServiceError extends Error {
   constructor(
-    readonly code:
-      | 'invalid_change_set'
-      | 'backend_contract_invalid'
-      | 'invalid_scheduled_time',
+    readonly code: 'invalid_change_set' | 'backend_contract_invalid' | 'invalid_scheduled_time',
   ) {
     super(code);
     this.name = 'CatalogServiceError';
@@ -323,11 +320,13 @@ function schedulePayload(row: ScheduledChangeRow): {
   expectedDraftRevision: number | null;
 } {
   if (!isRecord(row.payload_json)) return { draftId: null, expectedDraftRevision: null };
-  const draftId = typeof row.payload_json['draftId'] === 'string' ? row.payload_json['draftId'] : null;
+  const draftId =
+    typeof row.payload_json['draftId'] === 'string' ? row.payload_json['draftId'] : null;
   const revision = row.payload_json['expectedDraftRevision'];
   return {
     draftId,
-    expectedDraftRevision: revision === undefined || revision === null ? null : readVersion(revision),
+    expectedDraftRevision:
+      revision === undefined || revision === null ? null : readVersion(revision),
   };
 }
 
@@ -391,7 +390,11 @@ function comparableDraftProduct(value: unknown): { id: string; product: Comparab
 }
 
 function readDraftBundleProducts(bundle: unknown): Map<string, ComparableProduct> {
-  if (!isRecord(bundle) || !isRecord(bundle['snapshot']) || !Array.isArray(bundle['snapshot']['products'])) {
+  if (
+    !isRecord(bundle) ||
+    !isRecord(bundle['snapshot']) ||
+    !Array.isArray(bundle['snapshot']['products'])
+  ) {
     throw new CatalogServiceError('backend_contract_invalid');
   }
 
@@ -427,7 +430,9 @@ function buildPublishPreview(
   liveProducts: readonly CatalogProductDetail[],
 ): CatalogPublishPreview {
   const draftProducts = readDraftBundleProducts(row.working_bundle_json);
-  const liveById = new Map(liveProducts.map((product) => [product.id, comparableLiveProduct(product)]));
+  const liveById = new Map(
+    liveProducts.map((product) => [product.id, comparableLiveProduct(product)]),
+  );
   const allIds = [...new Set([...liveById.keys(), ...draftProducts.keys()])].sort();
   const changedProductIds: string[] = [];
   const priceChangedProductIds: string[] = [];

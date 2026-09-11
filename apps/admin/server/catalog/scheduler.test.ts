@@ -90,13 +90,11 @@ describe('catalog scheduler', () => {
   });
 
   it('routes recurring availability jobs through the dedicated baseline-preserving RPC', async () => {
-    const rpc = vi.fn(
-      async (name: string, payload: Readonly<Record<string, unknown>>) => {
-        void name;
-        void payload;
-        return { ok: true, publishVersion: 50 };
-      },
-    );
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      void name;
+      void payload;
+      return { ok: true, publishVersion: 50 };
+    });
     const client: CatalogSchedulerRpcClient = {
       async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
         return (await rpc(name, payload)) as T;

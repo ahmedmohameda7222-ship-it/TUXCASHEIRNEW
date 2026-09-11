@@ -277,7 +277,10 @@ export function useCatalogPublishing(shopId: string | undefined) {
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+        throw new CatalogUiError(
+          result.code,
+          'currentVersion' in result ? result.currentVersion : undefined,
+        );
       }
       return result;
     },
@@ -303,7 +306,10 @@ export function useCatalogPublishing(shopId: string | undefined) {
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+        throw new CatalogUiError(
+          result.code,
+          'currentVersion' in result ? result.currentVersion : undefined,
+        );
       }
       return result;
     },
@@ -324,7 +330,10 @@ export function useCatalogPublishing(shopId: string | undefined) {
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+        throw new CatalogUiError(
+          result.code,
+          'currentVersion' in result ? result.currentVersion : undefined,
+        );
       }
       return result;
     },

@@ -172,7 +172,9 @@ test('recurring availability creates an overnight Cairo rule through the trusted
   });
 });
 
-test('recurring availability deactivates an existing rule with version fencing', async ({ page }) => {
+test('recurring availability deactivates an existing rule with version fencing', async ({
+  page,
+}) => {
   const fixture = await mockRecurringAvailability(page);
   await page.goto('/catalog/products/publishing');
 

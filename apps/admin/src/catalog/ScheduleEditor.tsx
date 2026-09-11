@@ -9,12 +9,7 @@ type ScheduleEditorProps = {
   onSchedule(localScheduledAt: string): Promise<void>;
 };
 
-export function ScheduleEditor({
-  preview,
-  disabled,
-  isPending,
-  onSchedule,
-}: ScheduleEditorProps) {
+export function ScheduleEditor({ preview, disabled, isPending, onSchedule }: ScheduleEditorProps) {
   const [localScheduledAt, setLocalScheduledAt] = useState('');
 
   async function submit(event: FormEvent<HTMLFormElement>) {

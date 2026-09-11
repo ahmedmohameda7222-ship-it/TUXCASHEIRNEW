@@ -63,7 +63,9 @@ describe('Admin recurring availability service', () => {
     });
     expect(store.loadWorkspace).toHaveBeenCalledWith('shop-a', 'business-1');
 
-    await expect(service.loadRecurringAvailability('shop-b', owner)).rejects.toThrow(/shop_forbidden/);
+    await expect(service.loadRecurringAvailability('shop-b', owner)).rejects.toThrow(
+      /shop_forbidden/,
+    );
   });
 
   it('saves and deactivates a rule with catalog.edit and the authenticated employee identity', async () => {
