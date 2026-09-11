@@ -252,7 +252,7 @@ export function PublishReviewPage() {
                         <strong>{schedule.localScheduledAt}</strong>
                         <span className="admin-status-pill">{scheduleStatusLabel(schedule)}</span>
                       </div>
-                      <span>Timezone: {schedule.timezone}</span>
+                      <span>Cairo timezone</span>
                       <span>Target base version {schedule.targetBasePublishVersion ?? '—'}</span>
                     </div>
                     <button
