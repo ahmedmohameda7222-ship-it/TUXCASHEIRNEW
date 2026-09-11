@@ -10,6 +10,7 @@ on:
       - 'packages/sync/**'
       - 'apps/menu/**'
       - 'e2e/admin-catalog-publish.spec.ts'
+      - 'e2e/admin-catalog-recurring-availability.spec.ts'
       - 'playwright.admin.config.ts'
       - 'supabase/migrations/**'
       - 'scripts/test-admin-catalog-control-migration.mjs'
@@ -101,8 +102,12 @@ jobs:
         run: npm ci
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Catalog publish review rendered E2E
-        run: npx playwright test e2e/admin-catalog-publish.spec.ts --config playwright.admin.config.ts
+      - name: Catalog publishing and recurring availability rendered E2E
+        run: >-
+          npx playwright test
+          e2e/admin-catalog-publish.spec.ts
+          e2e/admin-catalog-recurring-availability.spec.ts
+          --config playwright.admin.config.ts
 
   catalog-control-invariant:
     runs-on: ubuntu-latest
