@@ -83,13 +83,6 @@ export type CatalogScheduledChangeSummary = {
   lastError: string | null;
 };
 
-export type CatalogPublishingWorkspace = {
-  shopId: string;
-  currentPublishVersion: number;
-  versions: CatalogPublishVersionSummary[];
-  schedules: CatalogScheduledChangeSummary[];
-};
-
 export type CatalogPublishPreview = {
   draftId: string;
   shopId: string;
@@ -99,6 +92,14 @@ export type CatalogPublishPreview = {
   stale: boolean;
   changedProductIds: string[];
   priceChangedProductIds: string[];
+};
+
+export type CatalogPublishingWorkspace = {
+  shopId: string;
+  currentPublishVersion: number;
+  versions: CatalogPublishVersionSummary[];
+  draftPreviews: CatalogPublishPreview[];
+  schedules: CatalogScheduledChangeSummary[];
 };
 
 /**
