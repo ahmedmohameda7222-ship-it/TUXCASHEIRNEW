@@ -22,6 +22,7 @@ on:
       - 'scripts/test-admin-shop-settings-migration.mjs'
       - 'scripts/test-admin-deployment-contract.mjs'
       - '.github/workflows/admin-catalog-settings-tdd.yml'
+      - '.github/workflows/admin-settings-e2e-red.yml'
   workflow_dispatch:
 
 concurrency:
@@ -142,11 +143,12 @@ jobs:
         run: npm ci
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Catalog publishing and recurring availability rendered E2E
+      - name: Catalog and settings rendered E2E
         run: >-
           npx playwright test
           e2e/admin-catalog-publish.spec.ts
           e2e/admin-catalog-recurring-availability.spec.ts
+          e2e/admin-settings.spec.ts
           --config playwright.admin.config.ts
 
   catalog-control-invariant:
