@@ -3,7 +3,6 @@ import {
   allocateDisplayOrderNo,
   instant,
   parseEntityId,
-  type BusinessDayId,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type Shop,
@@ -11,7 +10,6 @@ import {
   type Worker,
   type WorkerId,
   type WorkerSession,
-  type WorkerSessionId,
 } from '@tux/domain';
 import type {
   OperationsDatabase,
@@ -108,6 +106,7 @@ function fixture(initialConfiguration = configuration(100, 1)) {
     listActiveShops: async () => [shop],
     listActiveWorkers: async () => [worker],
     getOpenWorkerSession: async () => openSession,
+    close: async () => undefined,
   };
   const service = new OperationsSessionService(
     database,
