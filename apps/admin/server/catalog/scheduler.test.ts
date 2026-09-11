@@ -81,10 +81,7 @@ describe('catalog scheduler', () => {
       return true;
     });
     const client: CatalogSchedulerRpcClient = {
-      async rpc<T>(
-        name: string,
-        payload: Readonly<Record<string, unknown>>,
-      ): Promise<T> {
+      async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
         return (await rpc(name, payload)) as T;
       },
     };
