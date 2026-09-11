@@ -1,4 +1,4 @@
-import type { BusinessDayId } from './businessDay';
+import type { BusinessDayId } from './businessDay.ts';
 import type {
   AuditEventId,
   CustomerContactId,
@@ -19,12 +19,12 @@ import type {
   ShopId,
   WorkerId,
   WorkerSessionId,
-} from './ids';
-import type { JsonValue } from './json';
-import type { ConfiguredReasonFamily } from './settings';
-import type { MoneyMinor } from './money';
-import type { StockQuantityMicros } from './quantity';
-import type { Instant } from './time';
+} from './ids.ts';
+import type { JsonValue } from './json.ts';
+import type { ConfiguredReasonFamily } from './settings.ts';
+import type { MoneyMinor } from './money.ts';
+import type { StockQuantityMicros } from './quantity.ts';
+import type { Instant } from './time.ts';
 
 export interface Shop {
   readonly id: ShopId;

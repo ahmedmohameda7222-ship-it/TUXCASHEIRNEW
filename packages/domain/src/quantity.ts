@@ -1,5 +1,5 @@
-import { brandValue, type Brand } from './brand';
-import { DomainInvariantError } from './errors';
+import { brandValue, type Brand } from './brand.ts';
+import { DomainInvariantError } from './errors.ts';
 
 export const STOCK_QUANTITY_SCALE = 1_000_000;
 

@@ -8,16 +8,16 @@ import type {
   PaymentMethodId,
   ProductId,
   ShopId,
-} from './ids';
-import type { MoneyMinor } from './money';
-import type { OrderTypeBehavior, PaymentLogicType } from './models';
-import type { StockQuantityMicros } from './quantity';
+} from './ids.ts';
+import type { MoneyMinor } from './money.ts';
+import type { OrderTypeBehavior, PaymentLogicType } from './models.ts';
+import type { StockQuantityMicros } from './quantity.ts';
 import type {
   ConfiguredReasonCode,
   OperationsPublishedSettings,
   PaymentMethodChannel,
-} from './settings';
-import type { Instant } from './time';
+} from './settings.ts';
+import type { Instant } from './time.ts';
 
 export interface MenuCategory {
   readonly id: MenuCategoryId;

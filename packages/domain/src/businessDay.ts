@@ -1,8 +1,8 @@
-import { DomainInvariantError } from './errors';
-import type { BusinessDayId, ShopId, WorkerId } from './ids';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.ts';
+import type { BusinessDayId, ShopId, WorkerId } from './ids.ts';
+import type { Instant } from './time.ts';
 
-export type { BusinessDayId } from './ids';
+export type { BusinessDayId } from './ids.ts';
 
 interface BusinessDayBase {
   readonly id: BusinessDayId;

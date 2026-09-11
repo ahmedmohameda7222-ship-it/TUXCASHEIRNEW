@@ -9,7 +9,7 @@ import type {
   Product,
   ProductModifierLink,
   RecipeLine,
-} from './catalog';
+} from './catalog.ts';
 import {
   parseEntityId,
   type DeliveryZoneId,
@@ -21,16 +21,16 @@ import {
   type PaymentMethodId,
   type ProductId,
   type ShopId,
-} from './ids';
-import type { JsonValue } from './json';
-import { assertNonNegativeMoney, moneyMinor } from './money';
+} from './ids.ts';
+import type { JsonValue } from './json.ts';
+import { assertNonNegativeMoney, moneyMinor } from './money.ts';
 import type {
   InventoryItem,
   InventoryTrackingMode,
   OrderTypeBehavior,
   PaymentLogicType,
-} from './models';
-import { stockQuantityMicros } from './quantity';
+} from './models.ts';
+import { stockQuantityMicros } from './quantity.ts';
 import type {
   ConfiguredReasonCode,
   ConfiguredReasonFamily,
@@ -42,8 +42,8 @@ import type {
   PaymentMethodZoneRuleSetting,
   SettingsHoursServiceKind,
   ShopLifecycleState,
-} from './settings';
-import { instant } from './time';
+} from './settings.ts';
+import { instant } from './time.ts';
 
 export interface OperationsConfigurationBundle {
   readonly snapshot: OperationsConfigurationSnapshot;

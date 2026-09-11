@@ -1,5 +1,5 @@
-import type { DeliveryZoneId, PaymentMethodId, ShopId } from './ids';
-import type { JsonValue } from './json';
+import type { DeliveryZoneId, PaymentMethodId, ShopId } from './ids.ts';
+import type { JsonValue } from './json.ts';
 
 export type PaymentMethodChannel = 'POS' | 'ONLINE' | 'BOTH';
 export type ShopLifecycleState = 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
