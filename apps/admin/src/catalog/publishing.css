@@ -1,0 +1,191 @@
+.admin-publish-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.admin-publish-live-bar,
+.admin-publish-card {
+  min-width: 0;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--admin-radius-card, 16px);
+  background: var(--tux-surface-panel);
+  box-shadow: var(--tux-shadow-sm);
+}
+
+.admin-publish-live-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.admin-publish-live-bar > div {
+  min-width: 0;
+}
+
+.admin-publish-live-bar strong {
+  display: block;
+  margin-top: 3px;
+}
+
+.admin-publish-card {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.admin-publish-card__heading,
+.admin-publish-history__title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-publish-card__heading h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.admin-publish-card__copy {
+  margin: 0;
+  color: var(--tux-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.admin-publish-metrics {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-publish-metrics > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  background: var(--tux-surface-subtle);
+}
+
+.admin-publish-metrics strong {
+  font-size: 15px;
+}
+
+.admin-publish-metrics span,
+.admin-publish-version-line,
+.admin-publish-history__main > span,
+.admin-publish-history__main > time {
+  color: var(--tux-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-publish-version-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tux-border-subtle);
+}
+
+.admin-publish-schedule-form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-publish-history {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-publish-history__row {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 12px;
+  background: var(--tux-surface-panel);
+}
+
+.admin-publish-history__main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-publish-history__title {
+  align-items: center;
+}
+
+.admin-publish-history__title strong,
+.admin-publish-history__main > span,
+.admin-publish-history__main > time {
+  overflow-wrap: anywhere;
+}
+
+.admin-publish-back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.admin-publish-card .admin-primary-button,
+.admin-publish-history__row .admin-secondary-button,
+.admin-publish-history__row .admin-danger-link {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-publish-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-publish-live-bar,
+  .admin-publish-summary,
+  .admin-publish-page > .admin-callout,
+  .admin-publish-page > .admin-empty-state,
+  .admin-publish-page > section:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .admin-publish-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-publish-schedule-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .admin-publish-card .admin-primary-button,
+  .admin-publish-schedule-form .admin-primary-button {
+    width: auto;
+  }
+
+  .admin-publish-history__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .admin-publish-history__row .admin-secondary-button,
+  .admin-publish-history__row .admin-danger-link {
+    width: auto;
+  }
+}
+
+@media (min-width: 1200px) {
+  .admin-publish-page {
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 18px;
+  }
+
+  .admin-publish-card {
+    padding: 18px;
+  }
+}
