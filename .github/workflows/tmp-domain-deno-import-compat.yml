@@ -25,17 +25,32 @@ jobs:
           deno-version: v1.46.3
       - name: Install locked dependencies
         run: npm ci
-      - name: Rewrite resolvable Domain relative imports in runner only
+      - name: Rewrite only the Deno-reachable Domain graph in runner
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import json
           import re
 
-          root = Path('packages/domain/src')
+          targets = [
+              'packages/domain/src/configurationBundle.ts',
+              'packages/domain/src/catalog.ts',
+              'packages/domain/src/ids.ts',
+              'packages/domain/src/json.ts',
+              'packages/domain/src/money.ts',
+              'packages/domain/src/models.ts',
+              'packages/domain/src/quantity.ts',
+              'packages/domain/src/settings.ts',
+              'packages/domain/src/time.ts',
+              'packages/domain/src/businessDay.ts',
+              'packages/domain/src/brand.ts',
+              'packages/domain/src/errors.ts',
+          ]
           pattern = re.compile(r"(?P<prefix>\bfrom\s+|\bimport\s+)(?P<quote>['\"])(?P<spec>\.\.?/[^'\"]+)(?P=quote)")
           changed = []
 
-          for path in sorted(root.rglob('*.ts')):
+          for raw in targets:
+              path = Path(raw)
               text = path.read_text()
 
               def replace(match):
@@ -56,13 +71,18 @@ jobs:
                   path.write_text(updated)
                   changed.append(str(path))
 
-          if not changed:
-              raise SystemExit('No Domain imports were rewritten; hypothesis fixture is invalid.')
-          print('Rewritten Domain files:')
+          tsconfig_path = Path('packages/domain/tsconfig.json')
+          tsconfig = json.loads(tsconfig_path.read_text())
+          tsconfig['compilerOptions']['allowImportingTsExtensions'] = True
+          tsconfig_path.write_text(json.dumps(tsconfig, indent=2) + '\n')
+
+          if 'packages/domain/src/configurationBundle.ts' not in changed:
+              raise SystemExit('configurationBundle.ts was not rewritten; hypothesis fixture is invalid.')
+          print('Rewritten Deno-reachable Domain files:')
           print('\n'.join(changed))
           PY
           git diff --check
-          git diff -- packages/domain/src
+          git diff -- packages/domain/src packages/domain/tsconfig.json
       - name: Domain typecheck
         run: npm run typecheck -w @tux/domain
       - name: Published settings parser regression
