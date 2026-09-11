@@ -8,6 +8,7 @@ import { ScheduleEditor } from './ScheduleEditor';
 import { VersionHistory } from './VersionHistory';
 import { CatalogUiError, useCatalogPublishing } from './useCatalog';
 import './catalog.css';
+import './publishing.css';
 
 function countLabel(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
