@@ -112,6 +112,7 @@ export {
   wholeStockUnits,
 } from './quantity';
 export type { StockQuantityMicros } from './quantity';
+export type * from './settings';
 export {
   OPERATIONS_SYNC_PAYLOAD_VERSION,
   operationsSyncPayloadJson,
