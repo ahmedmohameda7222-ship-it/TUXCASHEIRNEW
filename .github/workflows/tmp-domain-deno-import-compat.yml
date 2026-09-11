@@ -31,7 +31,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import json
           import re
 
           targets = [
@@ -74,9 +73,13 @@ jobs:
                   changed.append(str(path))
 
           tsconfig_path = Path('packages/domain/tsconfig.json')
-          tsconfig = json.loads(tsconfig_path.read_text())
-          tsconfig['compilerOptions']['allowImportingTsExtensions'] = True
-          tsconfig_path.write_text(json.dumps(tsconfig, indent=2) + '\n')
+          tsconfig = tsconfig_path.read_text()
+          needle = '    "noEmit": true'
+          replacement = '    "allowImportingTsExtensions": true,\n    "noEmit": true'
+          if '"allowImportingTsExtensions"' not in tsconfig:
+              if needle not in tsconfig:
+                  raise SystemExit('Domain tsconfig noEmit anchor missing.')
+              tsconfig_path.write_text(tsconfig.replace(needle, replacement, 1))
 
           if 'packages/domain/src/configurationBundle.ts' not in changed:
               raise SystemExit('configurationBundle.ts was not rewritten; refusing source commit.')
