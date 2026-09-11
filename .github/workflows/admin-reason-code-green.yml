@@ -1,0 +1,109 @@
+name: Admin Reason Code GREEN
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/admin-reason-code-green.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply immutable configured cancellation reason support
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'expected source block missing in {path}')
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected exactly one source block in {path}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'packages/domain/src/models.ts',
+              "import type { JsonValue } from './json';\n",
+              "import type { JsonValue } from './json';\nimport type { ConfiguredReasonFamily } from './settings';\n",
+          )
+
+          replace_once(
+              'packages/domain/src/models.ts',
+              "export interface OrderCancellationSnapshot {\n  readonly at: Instant;\n  readonly workerId: WorkerId;\n  readonly workerName: string;\n  readonly foodPrepared: boolean;\n  readonly stockRestored: boolean;\n  readonly reason: string;\n}\n",
+              "export interface OrderReasonCodeSnapshot {\n  readonly id: string;\n  readonly key: string;\n  readonly family: ConfiguredReasonFamily;\n  readonly label: string;\n  readonly version: number;\n  readonly scope: 'BUSINESS' | 'SHOP';\n}\n\nexport interface OrderCancellationSnapshot {\n  readonly at: Instant;\n  readonly workerId: WorkerId;\n  readonly workerName: string;\n  readonly foodPrepared: boolean;\n  readonly stockRestored: boolean;\n  readonly reason: string;\n  /** Present for configured future mutations; absent on legacy cancellations. */\n  readonly reasonCode?: OrderReasonCodeSnapshot;\n  /** Optional operator context; never the reason authority. */\n  readonly note?: string;\n}\n",
+          )
+
+          replace_once(
+              'packages/domain/src/orderLifecycle.ts',
+              "import type { OrderLifecycleSnapshot, OrderSnapshot } from './models';\n",
+              "import type { OrderLifecycleSnapshot, OrderReasonCodeSnapshot, OrderSnapshot } from './models';\n",
+          )
+
+          replace_once(
+              'packages/domain/src/orderLifecycle.ts',
+              "    readonly foodPrepared: boolean;\n    readonly reason: string;\n  },\n): OrderSnapshot {\n  if (order.status !== 'ACTIVE') {\n    throw new DomainInvariantError('Only an ACTIVE order can be cancelled.');\n  }\n  const reason = input.reason.trim();\n  if (reason.length === 0) {\n    throw new DomainInvariantError('Cancellation reason is required.');\n  }\n  const current = orderLifecycle(order);\n",
+              "    readonly foodPrepared: boolean;\n    readonly reason: string;\n    readonly reasonCode?: OrderReasonCodeSnapshot;\n    readonly note?: string;\n  },\n): OrderSnapshot {\n  if (order.status !== 'ACTIVE') {\n    throw new DomainInvariantError('Only an ACTIVE order can be cancelled.');\n  }\n  if (input.reasonCode !== undefined && input.reasonCode.family !== 'CANCELLATION') {\n    throw new DomainInvariantError('Configured cancellation reason must belong to CANCELLATION.');\n  }\n  const reason = (input.reasonCode?.label ?? input.reason).trim();\n  if (reason.length === 0) {\n    throw new DomainInvariantError('Cancellation reason is required.');\n  }\n  const note = input.note?.trim() ?? '';\n  const current = orderLifecycle(order);\n",
+          )
+
+          replace_once(
+              'packages/domain/src/orderLifecycle.ts',
+              "        stockRestored: !input.foodPrepared,\n        reason,\n      },\n",
+              "        stockRestored: !input.foodPrepared,\n        reason,\n        ...(input.reasonCode !== undefined ? { reasonCode: input.reasonCode } : {}),\n        ...(note.length > 0 ? { note } : {}),\n      },\n",
+          )
+
+          replace_once(
+              'packages/application/src/ordersBoard.ts',
+              "  type OrderId,\n  type OrderSnapshot,\n",
+              "  type OrderId,\n  type OrderReasonCodeSnapshot,\n  type OrderSnapshot,\n",
+          )
+
+          replace_once(
+              'packages/application/src/ordersBoard.ts',
+              "export interface CancelOrderInput {\n  readonly orderId: OrderId;\n  readonly foodPrepared: boolean;\n  readonly reason: string;\n}\n",
+              "export interface CancelOrderInput {\n  readonly orderId: OrderId;\n  readonly foodPrepared: boolean;\n  /** Legacy free-text fallback for pre-configured callers. */\n  readonly reason: string;\n  /** Stable published reason identity for configured future mutations. */\n  readonly reasonCodeId?: string;\n  /** Operator context only; never the canonical reason authority. */\n  readonly note?: string;\n}\n",
+          )
+
+          replace_once(
+              'packages/application/src/ordersBoard.ts',
+              "      const order = await this.#currentOrder(transaction, context, input.orderId);\n      const updated = cancelActiveOrder(order, {\n        at: now,\n        workerId: context.operator.id,\n        workerName: context.operator.displayName,\n        foodPrepared: input.foodPrepared,\n        reason: input.reason,\n      });\n",
+              "      const order = await this.#currentOrder(transaction, context, input.orderId);\n      let reasonCode: OrderReasonCodeSnapshot | undefined;\n      if (input.reasonCodeId !== undefined) {\n        const configuration = await transaction.configuration.getForShop(context.shopId);\n        const configured = configuration?.reasonCodes?.find(\n          (candidate) =>\n            candidate.id === input.reasonCodeId &&\n            candidate.active &&\n            candidate.family === 'CANCELLATION',\n        );\n        if (configured === undefined) {\n          throw new DomainInvariantError(\n            'The selected cancellation reason is not active in the published configuration.',\n          );\n        }\n        reasonCode = {\n          id: configured.id,\n          key: configured.key,\n          family: configured.family,\n          label: configured.label,\n          version: configured.version,\n          scope: configured.scope,\n        };\n      }\n      const updated = cancelActiveOrder(order, {\n        at: now,\n        workerId: context.operator.id,\n        workerName: context.operator.displayName,\n        foodPrepared: input.foodPrepared,\n        reason: input.reason,\n        ...(reasonCode !== undefined ? { reasonCode } : {}),\n        ...(input.note !== undefined ? { note: input.note } : {}),\n      });\n",
+          )
+      - name: Format touched files
+        run: >-
+          npx prettier --write
+          packages/domain/src/models.ts
+          packages/domain/src/orderLifecycle.ts
+          packages/application/src/ordersBoard.ts
+      - name: Focused reason-code tests
+        run: >-
+          npx vitest run
+          packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+          packages/application/src/orders.test.ts
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Commit GREEN if verified
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/domain/src/models.ts packages/domain/src/orderLifecycle.ts packages/application/src/ordersBoard.ts
+          git commit -m 'feat(settings): persist configured cancellation reason snapshots'
+          git push origin HEAD:${GITHUB_HEAD_REF}
