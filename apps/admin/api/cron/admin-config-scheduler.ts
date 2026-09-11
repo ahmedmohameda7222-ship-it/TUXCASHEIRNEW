@@ -5,12 +5,7 @@ import {
   runCatalogScheduler,
 } from '../../server/catalog/scheduler';
 import { getAdminServerEnv } from '../../server/env';
-import {
-  firstHeader,
-  sendJson,
-  type AdminRequest,
-  type AdminResponse,
-} from '../../server/http';
+import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';
 import { AdminSupabaseClient } from '../../server/supabaseAdmin';
 
 export default async function handler(
