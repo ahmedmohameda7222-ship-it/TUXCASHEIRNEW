@@ -1,5 +1,7 @@
 import type {
   AdminSessionPrincipal,
+  CatalogCancelScheduleInput,
+  CatalogCancelScheduleResult,
   CatalogCategorySummary,
   CatalogCreateDraftInput,
   CatalogDraftCreateResult,
@@ -11,8 +13,17 @@ import type {
   CatalogJsonObject,
   CatalogProductDetail,
   CatalogPublishDraftInput,
+  CatalogPublishingWorkspace,
   CatalogPublishResult,
+  CatalogPublishSourceKind,
+  CatalogPublishVersionSummary,
+  CatalogRestoreVersionInput,
+  CatalogRestoreVersionResult,
   CatalogSaveDraftInput,
+  CatalogScheduledChangeSummary,
+  CatalogScheduleDraftInput,
+  CatalogScheduleResult,
+  CatalogScheduleStatus,
   CatalogWorkspace,
 } from '@tux/admin-contracts';
 
@@ -20,7 +31,12 @@ import { requirePermission } from '../authorization';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 export class CatalogServiceError extends Error {
-  constructor(readonly code: 'invalid_change_set' | 'backend_contract_invalid') {
+  constructor(
+    readonly code:
+      | 'invalid_change_set'
+      | 'backend_contract_invalid'
+      | 'invalid_scheduled_time',
+  ) {
     super(code);
     this.name = 'CatalogServiceError';
   }
@@ -32,10 +48,17 @@ type StorePublishResult =
 type StoreCreateDraftResult =
   | Exclude<CatalogDraftCreateResult, { ok: false; code: 'stale_version' }>
   | { ok: false; code: 'stale_version'; currentVersion: number };
+type StoreRestoreResult =
+  | Exclude<CatalogRestoreVersionResult, { ok: false; code: 'stale_version' }>
+  | { ok: false; code: 'stale_version'; currentVersion: number };
+type StoreScheduleResult =
+  | Exclude<CatalogScheduleResult, { ok: false; code: 'stale_version' }>
+  | { ok: false; code: 'stale_version'; currentVersion: number };
 
 export interface CatalogStore {
   getCurrentPublishVersion(shopId: string): Promise<number>;
   loadWorkspace(shopId: string, businessId: string): Promise<CatalogWorkspace>;
+  loadPublishing(shopId: string, businessId: string): Promise<CatalogPublishingWorkspace>;
   createDraft(input: {
     employeeId: string;
     shopId: string;
@@ -60,6 +83,24 @@ export interface CatalogStore {
     productId: string;
     soldOut: boolean;
   }): Promise<CatalogImmediateAvailabilityResult>;
+  restoreVersion(input: {
+    employeeId: string;
+    shopId: string;
+    sourcePublishVersion: number;
+    expectedVersion: number;
+  }): Promise<StoreRestoreResult>;
+  scheduleDraft(input: {
+    employeeId: string;
+    draftId: string;
+    expectedDraftRevision: number;
+    expectedVersion: number;
+    localScheduledAt: string;
+  }): Promise<StoreScheduleResult>;
+  cancelSchedule(input: {
+    employeeId: string;
+    shopId: string;
+    scheduleId: string;
+  }): Promise<CatalogCancelScheduleResult>;
 }
 
 type CategoryRow = {
@@ -100,6 +141,30 @@ type DraftRow = {
   updated_at: string;
 };
 
+type PublishVersionRow = {
+  shop_id: string;
+  publish_version: number | string;
+  operations_configuration_version: number | string;
+  source_kind: string;
+  draft_id: string | null;
+  published_by_employee_id: string | null;
+  restored_from_publish_version: number | string | null;
+  published_at: string;
+};
+
+type ScheduledChangeRow = {
+  id: string;
+  shop_id: string;
+  payload_json: unknown;
+  status: string;
+  timezone: string;
+  local_scheduled_at: string;
+  scheduled_for: string;
+  target_base_publish_version: number | string | null;
+  attempt_count: number | string;
+  last_error: string | null;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -122,6 +187,39 @@ function readVersion(value: unknown): number {
 function readDraftStatus(value: string): CatalogDraftStatus {
   if (value === 'DRAFT' || value === 'PUBLISHED' || value === 'DISCARDED') return value;
   throw new CatalogServiceError('backend_contract_invalid');
+}
+
+function readPublishSourceKind(value: string): CatalogPublishSourceKind {
+  if (
+    value === 'BASELINE' ||
+    value === 'DRAFT' ||
+    value === 'IMMEDIATE_AVAILABILITY' ||
+    value === 'SCHEDULE' ||
+    value === 'ROLLBACK'
+  ) {
+    return value;
+  }
+  throw new CatalogServiceError('backend_contract_invalid');
+}
+
+function readScheduleStatus(value: string): CatalogScheduleStatus {
+  if (
+    value === 'PENDING' ||
+    value === 'CLAIMED' ||
+    value === 'APPLIED' ||
+    value === 'FAILED' ||
+    value === 'CANCELLED'
+  ) {
+    return value;
+  }
+  throw new CatalogServiceError('backend_contract_invalid');
+}
+
+function readNonemptyString(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new CatalogServiceError('backend_contract_invalid');
+  }
+  return value;
 }
 
 function mapCategory(row: CategoryRow): CatalogCategorySummary {
@@ -165,6 +263,56 @@ function mapDraft(row: DraftRow): CatalogDraftSummary {
     draftRevision: readVersion(row.draft_revision),
     publishedVersion: row.published_version === null ? null : readVersion(row.published_version),
     updatedAt: row.updated_at,
+  };
+}
+
+function mapPublishVersion(row: PublishVersionRow): CatalogPublishVersionSummary {
+  return {
+    shopId: row.shop_id,
+    publishVersion: readVersion(row.publish_version),
+    operationsConfigurationVersion: readVersion(row.operations_configuration_version),
+    sourceKind: readPublishSourceKind(row.source_kind),
+    draftId: row.draft_id,
+    publishedByEmployeeId: row.published_by_employee_id,
+    restoredFromPublishVersion:
+      row.restored_from_publish_version === null
+        ? null
+        : readVersion(row.restored_from_publish_version),
+    publishedAt: readNonemptyString(row.published_at),
+  };
+}
+
+function schedulePayload(row: ScheduledChangeRow): {
+  draftId: string | null;
+  expectedDraftRevision: number | null;
+} {
+  if (!isRecord(row.payload_json)) return { draftId: null, expectedDraftRevision: null };
+  const draftId = typeof row.payload_json['draftId'] === 'string' ? row.payload_json['draftId'] : null;
+  const revision = row.payload_json['expectedDraftRevision'];
+  return {
+    draftId,
+    expectedDraftRevision: revision === undefined || revision === null ? null : readVersion(revision),
+  };
+}
+
+function mapScheduledChange(row: ScheduledChangeRow): CatalogScheduledChangeSummary {
+  if (row.timezone !== 'Africa/Cairo') throw new CatalogServiceError('backend_contract_invalid');
+  const payload = schedulePayload(row);
+  return {
+    id: row.id,
+    shopId: row.shop_id,
+    draftId: payload.draftId,
+    expectedDraftRevision: payload.expectedDraftRevision,
+    status: readScheduleStatus(row.status),
+    timezone: 'Africa/Cairo',
+    localScheduledAt: readNonemptyString(row.local_scheduled_at),
+    scheduledFor: readNonemptyString(row.scheduled_for),
+    targetBasePublishVersion:
+      row.target_base_publish_version === null
+        ? null
+        : readVersion(row.target_base_publish_version),
+    attemptCount: readVersion(row.attempt_count),
+    lastError: row.last_error,
   };
 }
 
@@ -218,6 +366,12 @@ function staleVersion(currentVersion: number) {
   };
 }
 
+function requireCairoLocalTimestamp(value: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/.test(value)) {
+    throw new CatalogServiceError('invalid_scheduled_time');
+  }
+}
+
 export function createCatalogService(store: CatalogStore) {
   return {
     async loadCatalogWorkspace(
@@ -226,6 +380,14 @@ export function createCatalogService(store: CatalogStore) {
     ): Promise<CatalogWorkspace> {
       requirePermission(principal, 'catalog.view', shopId);
       return store.loadWorkspace(shopId, principal.businessId);
+    },
+
+    async loadCatalogPublishing(
+      shopId: string,
+      principal: AdminSessionPrincipal,
+    ): Promise<CatalogPublishingWorkspace> {
+      requirePermission(principal, 'catalog.view', shopId);
+      return store.loadPublishing(shopId, principal.businessId);
     },
 
     async createCatalogDraft(
@@ -292,6 +454,60 @@ export function createCatalogService(store: CatalogStore) {
         shopId: input.shopId,
         productId: input.productId,
         soldOut: input.soldOut,
+      });
+    },
+
+    async restoreCatalogVersion(
+      input: CatalogRestoreVersionInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CatalogRestoreVersionResult> {
+      requirePermission(principal, 'catalog.publish', input.shopId);
+      const currentVersion = await store.getCurrentPublishVersion(input.shopId);
+      if (currentVersion !== input.expectedVersion) return staleVersion(currentVersion);
+
+      const result = await store.restoreVersion({
+        employeeId: principal.employeeId,
+        shopId: input.shopId,
+        sourcePublishVersion: input.sourcePublishVersion,
+        expectedVersion: input.expectedVersion,
+      });
+      if (!result.ok && result.code === 'stale_version') {
+        return staleVersion(result.currentVersion);
+      }
+      return result;
+    },
+
+    async scheduleCatalogDraft(
+      input: CatalogScheduleDraftInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CatalogScheduleResult> {
+      requirePermission(principal, 'catalog.publish', input.shopId);
+      requireCairoLocalTimestamp(input.localScheduledAt);
+      const currentVersion = await store.getCurrentPublishVersion(input.shopId);
+      if (currentVersion !== input.expectedVersion) return staleVersion(currentVersion);
+
+      const result = await store.scheduleDraft({
+        employeeId: principal.employeeId,
+        draftId: input.draftId,
+        expectedDraftRevision: input.expectedDraftRevision,
+        expectedVersion: input.expectedVersion,
+        localScheduledAt: input.localScheduledAt,
+      });
+      if (!result.ok && result.code === 'stale_version') {
+        return staleVersion(result.currentVersion);
+      }
+      return result;
+    },
+
+    async cancelScheduledCatalogChange(
+      input: CatalogCancelScheduleInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CatalogCancelScheduleResult> {
+      requirePermission(principal, 'catalog.publish', input.shopId);
+      return store.cancelSchedule({
+        employeeId: principal.employeeId,
+        shopId: input.shopId,
+        scheduleId: input.scheduleId,
       });
     },
   };
@@ -361,6 +577,42 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
       };
     },
 
+    async loadPublishing(shopId, businessId) {
+      const [currentPublishVersion, versions, schedules] = await Promise.all([
+        loadCurrentPublishVersion(client, shopId),
+        client.select<PublishVersionRow[]>(
+          'catalog_publish_versions',
+          new URLSearchParams({
+            select:
+              'shop_id,publish_version,operations_configuration_version,source_kind,draft_id,published_by_employee_id,restored_from_publish_version,published_at',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'publish_version.desc',
+            limit: '100',
+          }),
+        ),
+        client.select<ScheduledChangeRow[]>(
+          'scheduled_config_changes',
+          new URLSearchParams({
+            select:
+              'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,last_error',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            change_kind: 'eq.CATALOG_PUBLISH',
+            order: 'scheduled_for.desc',
+            limit: '100',
+          }),
+        ),
+      ]);
+
+      return {
+        shopId,
+        currentPublishVersion,
+        versions: versions.map(mapPublishVersion),
+        schedules: schedules.map(mapScheduledChange),
+      };
+    },
+
     async createDraft(input) {
       const result = await client.rpc<unknown>('create_catalog_draft_v1', {
         p_employee_id: input.employeeId,
@@ -399,6 +651,36 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
         p_sold_out: input.soldOut,
       });
       return requireRpcResult<CatalogImmediateAvailabilityResult>(result);
+    },
+
+    async restoreVersion(input) {
+      const result = await client.rpc<unknown>('restore_catalog_publish_version_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_source_publish_version: input.sourcePublishVersion,
+        p_expected_current_publish_version: input.expectedVersion,
+      });
+      return requireRpcResult<StoreRestoreResult>(result);
+    },
+
+    async scheduleDraft(input) {
+      const result = await client.rpc<unknown>('schedule_catalog_draft_v1', {
+        p_employee_id: input.employeeId,
+        p_draft_id: input.draftId,
+        p_expected_draft_revision: input.expectedDraftRevision,
+        p_expected_base_publish_version: input.expectedVersion,
+        p_local_scheduled_at: input.localScheduledAt,
+      });
+      return requireRpcResult<StoreScheduleResult>(result);
+    },
+
+    async cancelSchedule(input) {
+      const result = await client.rpc<unknown>('cancel_scheduled_config_change_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_schedule_id: input.scheduleId,
+      });
+      return requireRpcResult<CatalogCancelScheduleResult>(result);
     },
   };
 }
