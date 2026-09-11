@@ -31,6 +31,7 @@ export type CatalogSchedulerDependencies = {
   store: CatalogSchedulerStore;
   publish(change: CatalogScheduledChange): Promise<unknown>;
   setAvailability(change: CatalogScheduledChange): Promise<unknown>;
+  materializeRecurring(now: string): Promise<unknown>;
   now?: () => Date;
   batchSize?: number;
 };
@@ -167,8 +168,23 @@ function positiveIntegerFromPayload(payload: UnknownRecord, key: string): number
   return requiredInteger(payload[key], 1);
 }
 
+function isRecurringAvailabilityPayload(payload: UnknownRecord): boolean {
+  return (
+    payload['ruleId'] !== undefined ||
+    payload['ruleVersion'] !== undefined ||
+    payload['transition'] !== undefined
+  );
+}
+
 export function createSupabaseCatalogSchedulerExecutors(client: CatalogSchedulerRpcClient) {
   return {
+    async materializeRecurring(now: string): Promise<unknown> {
+      return client.rpc<unknown>('materialize_recurring_availability_changes_v1', {
+        p_now: now,
+        p_horizon_days: 8,
+      });
+    },
+
     async publish(change: CatalogScheduledChange): Promise<unknown> {
       if (change.changeKind !== 'CATALOG_PUBLISH') {
         throw new Error('catalog_scheduler_change_kind_mismatch');
@@ -196,6 +212,29 @@ export function createSupabaseCatalogSchedulerExecutors(client: CatalogScheduler
       if (change.changeKind !== 'PRODUCT_AVAILABILITY') {
         throw new Error('catalog_scheduler_change_kind_mismatch');
       }
+
+      if (isRecurringAvailabilityPayload(change.payload)) {
+        const ruleId = requiredString(
+          change.payload['ruleId'],
+          'catalog_scheduler_payload_invalid',
+        );
+        const ruleVersion = positiveIntegerFromPayload(change.payload, 'ruleVersion');
+        const transition = requiredString(
+          change.payload['transition'],
+          'catalog_scheduler_payload_invalid',
+        );
+        if (transition !== 'ENTER' && transition !== 'EXIT') {
+          throw new Error('catalog_scheduler_payload_invalid');
+        }
+        return client.rpc<unknown>('apply_recurring_product_availability_v1', {
+          p_employee_id: change.createdByEmployeeId,
+          p_shop_id: change.shopId,
+          p_rule_id: ruleId,
+          p_rule_version: ruleVersion,
+          p_transition: transition,
+        });
+      }
+
       const productId = requiredString(
         change.payload['productId'],
         'catalog_scheduler_payload_invalid',
@@ -217,14 +256,18 @@ export async function runCatalogScheduler(
 ): Promise<CatalogSchedulerRunResult> {
   const now = (dependencies.now ?? (() => new Date()))();
   if (!Number.isFinite(now.getTime())) throw new Error('catalog_scheduler_invalid_clock');
+  const nowIso = now.toISOString();
 
   const batchSize = dependencies.batchSize ?? 25;
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 100) {
     throw new Error('catalog_scheduler_invalid_batch_size');
   }
 
+  const materialized = await dependencies.materializeRecurring(nowIso);
+  assertSuccessfulExecution(materialized);
+
   const claimed = await dependencies.store.claimDue({
-    now: now.toISOString(),
+    now: nowIso,
     limit: batchSize,
   });
 
