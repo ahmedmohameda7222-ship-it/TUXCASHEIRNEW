@@ -1,5 +1,6 @@
 import type { AdminSettingsWorkspace, AdminSettingValue } from '@tux/admin-contracts';
 
+/** UI-only projection helpers; mutation and policy authority remain in the trusted settings BFF. */
 export type SettingsSection =
   'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
 
