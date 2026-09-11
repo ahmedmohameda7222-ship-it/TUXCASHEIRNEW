@@ -8,17 +8,17 @@ import type {
 
 import { requirePermission } from '../authorization';
 
-export type SettingLayers<T = unknown> = {
-  businessDefault: T | null;
-  shopOverride: T | null;
+export type SettingLayers = {
+  businessDefault: unknown | null;
+  shopOverride: unknown | null;
 };
 
 export interface SettingsStore {
-  getSettingLayers<T = unknown>(input: {
+  getSettingLayers(input: {
     businessId: string;
     shopId: string;
     key: string;
-  }): Promise<SettingLayers<T>>;
+  }): Promise<SettingLayers>;
   shopHasBusinessHistory(input: { businessId: string; shopId: string }): Promise<boolean>;
   archiveShop(input: {
     businessId: string;
@@ -44,11 +44,11 @@ export function resolveAllowedPaymentMethods<T extends AdminPaymentMethodConfigu
 
 export function createSettingsService(store: SettingsStore) {
   return {
-    async resolveSetting<T = unknown>(
+    async resolveSetting(
       key: string,
       context: { businessId: string; shopId: string },
-    ): Promise<ResolvedSetting<T>> {
-      const layers = await store.getSettingLayers<T>({ ...context, key });
+    ): Promise<ResolvedSetting<unknown>> {
+      const layers = await store.getSettingLayers({ ...context, key });
       if (layers.shopOverride !== null) {
         return { source: 'shop', value: layers.shopOverride };
       }
