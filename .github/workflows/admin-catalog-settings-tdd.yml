@@ -107,6 +107,7 @@ jobs:
           supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts
           supabase/functions/order-intake/order-intakeRateLimit.test.ts
           supabase/functions/order-intake/order-intakeAcceptedReplay.test.ts
+          packages/application/src/menuOperationsWhatsAppJourney.test.ts
       - name: Order intake Deno regression
         run: deno test scripts/order-intake.deno.ts
       - name: Order intake Edge Function typecheck
