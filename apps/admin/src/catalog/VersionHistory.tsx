@@ -59,12 +59,11 @@ export function VersionHistory({
                   <button
                     className="admin-secondary-button"
                     type="button"
+                    aria-label={`Restore version ${version.publishVersion}`}
                     disabled={!canRestore || pendingVersion !== null}
                     onClick={() => void onRestore(version.publishVersion)}
                   >
-                    {pendingVersion === version.publishVersion
-                      ? 'Restoring…'
-                      : `Restore version ${version.publishVersion}`}
+                    {pendingVersion === version.publishVersion ? 'Restoring…' : 'Restore'}
                   </button>
                 ) : null}
               </article>
