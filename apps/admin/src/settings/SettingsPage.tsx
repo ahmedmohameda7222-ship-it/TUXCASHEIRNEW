@@ -1,7 +1,11 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import { useState } from 'react';
 
+import { PageScaffold } from '../components/layout/PageScaffold';
+import { useShopScope } from '../shops/ShopScopeProvider';
 import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
+import { useSettings } from './useSettings';
 
 export type SettingsSection =
   | 'overview'
@@ -29,7 +33,17 @@ const sections: readonly { id: SettingsSection; label: string }[] = [
   { id: 'reason-codes', label: 'Reason codes' },
 ];
 
+function effectiveSetting(workspace: AdminSettingsWorkspace, key: string): unknown {
+  return (
+    workspace.shopOverrides.find((setting) => setting.key === key)?.value ??
+    workspace.businessDefaults.find((setting) => setting.key === key)?.value ??
+    null
+  );
+}
+
 function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
+  const receiptPrefix = effectiveSetting(workspace, 'receipt.orderPrefix');
+  const firstActiveReason = workspace.reasonCodes.find((reason) => reason.active);
   return (
     <div className="admin-settings-overview">
       <section className="admin-catalog-editor__section" aria-labelledby="settings-shop-summary">
@@ -48,6 +62,17 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
           {workspace.deliveryZones.length} delivery zones
         </p>
       </section>
+
+      <section className="admin-catalog-editor__section" aria-labelledby="settings-live-summary">
+        <p className="admin-catalog-editor__eyebrow">Live controls</p>
+        <h2 id="settings-live-summary">Receipt and reason authority</h2>
+        <p className="admin-field__help">
+          Receipt prefix: {receiptPrefix === null ? 'Not configured' : String(receiptPrefix)}
+        </p>
+        <p className="admin-field__help">
+          {firstActiveReason?.label ?? 'No active reason codes configured'}
+        </p>
+      </section>
     </div>
   );
 }
@@ -62,13 +87,7 @@ function PlaceholderSection({ title, detail }: { title: string; detail: string }
   );
 }
 
-function SectionContent({
-  section,
-  workspace,
-}: {
-  section: SettingsSection;
-  workspace: AdminSettingsWorkspace;
-}) {
+function SectionContent({ section, workspace }: { section: SettingsSection; workspace: AdminSettingsWorkspace }) {
   switch (section) {
     case 'overview':
       return <Overview workspace={workspace} />;
@@ -77,43 +96,17 @@ function SectionContent({
     case 'reason-codes':
       return <ReasonCodesPage workspace={workspace} />;
     case 'shop':
-      return (
-        <PlaceholderSection
-          title="Shop"
-          detail={`${workspace.shop.lifecycleState} · ${workspace.shop.temporaryClosed ? 'Temporarily closed' : 'Open according to schedule'}`}
-        />
-      );
+      return <PlaceholderSection title="Shop" detail={`${workspace.shop.lifecycleState} · ${workspace.shop.temporaryClosed ? 'Temporarily closed' : 'Open according to schedule'}`} />;
     case 'order-types':
-      return (
-        <PlaceholderSection
-          title="Order types"
-          detail={`${workspace.orderTypes.length} configured order types`}
-        />
-      );
+      return <PlaceholderSection title="Order types" detail={`${workspace.orderTypes.length} configured order types`} />;
     case 'payments':
-      return (
-        <PlaceholderSection
-          title="Payments"
-          detail={`${workspace.paymentMethods.length} configured payment methods`}
-        />
-      );
+      return <PlaceholderSection title="Payments" detail={`${workspace.paymentMethods.length} configured payment methods`} />;
     case 'checkout':
-      return (
-        <PlaceholderSection
-          title="Checkout"
-          detail={`${workspace.deliveryZones.length} configured delivery zones`}
-        />
-      );
+      return <PlaceholderSection title="Checkout" detail={`${workspace.deliveryZones.length} configured delivery zones`} />;
   }
 }
 
-export function SettingsWorkspaceView({
-  workspace,
-  section,
-  onSectionChange,
-  onPublish,
-  publishing,
-}: SettingsWorkspaceViewProps) {
+export function SettingsWorkspaceView({ workspace, section, onSectionChange, onPublish, publishing }: SettingsWorkspaceViewProps) {
   return (
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
       <header className="admin-settings-workspace__header">
@@ -123,12 +116,7 @@ export function SettingsWorkspaceView({
           <p className="admin-field__help">Live settings version {workspace.settingsVersion}</p>
         </div>
         <div>
-          <button
-            className="admin-primary-button"
-            type="button"
-            disabled={publishing}
-            onClick={() => void onPublish()}
-          >
+          <button className="admin-primary-button" type="button" disabled={publishing} onClick={() => void onPublish()}>
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
           <p className="admin-field__help">Changes become live only after publishing.</p>
@@ -136,20 +124,11 @@ export function SettingsWorkspaceView({
       </header>
 
       <nav className="admin-settings-workspace__nav" aria-label="Settings sections">
-        <button
-          type="button"
-          aria-current={section === 'overview' ? 'page' : undefined}
-          onClick={() => onSectionChange('overview')}
-        >
+        <button type="button" aria-current={section === 'overview' ? 'page' : undefined} onClick={() => onSectionChange('overview')}>
           Overview
         </button>
         {sections.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={section === item.id ? 'page' : undefined}
-            onClick={() => onSectionChange(item.id)}
-          >
+          <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => onSectionChange(item.id)}>
             {item.label}
           </button>
         ))}
@@ -157,5 +136,32 @@ export function SettingsWorkspaceView({
 
       <SectionContent section={section} workspace={workspace} />
     </main>
+  );
+}
+
+export function SettingsPage() {
+  const { scope } = useShopScope();
+  const [section, setSection] = useState<SettingsSection>('overview');
+  const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
+  const settings = useSettings(shopId);
+
+  if (!shopId) {
+    return <PageScaffold eyebrow="Settings" title="Select a shop" description="Settings changes require a concrete shop scope." />;
+  }
+  if (settings.workspaceQuery.isPending) {
+    return <PageScaffold eyebrow="Settings" title="Loading settings" description="Loading the current published shop configuration." />;
+  }
+  if (settings.workspaceQuery.isError || !settings.workspaceQuery.data) {
+    return <PageScaffold eyebrow="Settings" title="Settings unavailable" description="The settings workspace could not be loaded." />;
+  }
+
+  return (
+    <SettingsWorkspaceView
+      workspace={settings.workspaceQuery.data}
+      section={section}
+      onSectionChange={setSection}
+      onPublish={() => settings.publish.mutateAsync()}
+      publishing={settings.publish.isPending}
+    />
   );
 }
