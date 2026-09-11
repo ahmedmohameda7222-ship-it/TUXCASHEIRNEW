@@ -39,7 +39,7 @@ export function useSettings(shopId: string | undefined) {
   });
 
   const publish = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const workspace =
         queryClient.getQueryData<AdminSettingsWorkspace>(settingsQueryKey(shopId)) ??
@@ -65,7 +65,6 @@ export function useSettings(shopId: string | undefined) {
           'currentVersion' in result ? result.currentVersion : undefined,
         );
       }
-      return result;
     },
     onSuccess: async () => {
       if (!shopId) return;
