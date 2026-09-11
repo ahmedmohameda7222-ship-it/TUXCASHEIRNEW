@@ -39,7 +39,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Catalog service unit tests
-        run: npx vitest run apps/admin/server/catalog/catalogService.test.ts
+        run: >-
+          npx vitest run
+          apps/admin/server/catalog/catalogService.test.ts
+          apps/admin/server/catalog/recurringAvailabilityService.test.ts
       - name: Admin contracts typecheck
         run: npm run typecheck -w @tux/admin-contracts
       - name: Admin API and server typecheck
