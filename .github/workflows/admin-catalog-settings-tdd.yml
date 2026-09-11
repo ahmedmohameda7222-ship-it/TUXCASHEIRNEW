@@ -44,6 +44,7 @@ jobs:
           npx vitest run
           apps/admin/server/catalog/catalogService.test.ts
           apps/admin/server/catalog/recurringAvailabilityService.test.ts
+          apps/admin/server/catalog/catalogPublishHistory.test.ts
           apps/admin/api/admin/catalogRecurring.test.ts
       - name: Admin contracts typecheck
         run: npm run typecheck -w @tux/admin-contracts
