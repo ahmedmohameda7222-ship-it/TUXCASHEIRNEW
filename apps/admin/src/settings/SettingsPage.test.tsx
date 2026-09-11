@@ -2,7 +2,7 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SettingsWorkspaceView } from './SettingsPage';
+import { SettingsWorkspaceView, type SettingsSection } from './SettingsPage';
 import { ReceiptsPage } from './ReceiptsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 
@@ -87,17 +87,21 @@ const workspace: AdminSettingsWorkspace = {
   specialHours: [],
 };
 
+function renderSection(section: SettingsSection): string {
+  return renderToStaticMarkup(
+    <SettingsWorkspaceView
+      workspace={workspace}
+      section={section}
+      onSectionChange={vi.fn()}
+      onPublish={vi.fn()}
+      publishing={false}
+    />,
+  );
+}
+
 describe('Settings workspace', () => {
   it('surfaces every Task 5 settings area from one concrete shop workspace', () => {
-    const html = renderToStaticMarkup(
-      <SettingsWorkspaceView
-        workspace={workspace}
-        section="overview"
-        onSectionChange={vi.fn()}
-        onPublish={vi.fn()}
-        publishing={false}
-      />,
-    );
+    const html = renderSection('overview');
 
     expect(html).toContain('TUX Maadi');
     expect(html).toContain('Live settings version 7');
@@ -130,5 +134,30 @@ describe('Settings workspace', () => {
     expect(html).toContain('CUSTOMER_CHANGED_MIND');
     expect(html).toContain('CANCELLATION');
     expect(html).toContain('v4');
+  });
+
+  it('renders real shop, fulfillment, payment and checkout configuration instead of placeholders', () => {
+    const shop = renderSection('shop');
+    expect(shop).toContain('+201000000000');
+    expect(shop).toContain('Road 9, Maadi');
+    expect(shop).toContain('10:00');
+    expect(shop).toContain('23:00');
+
+    const orderTypes = renderSection('order-types');
+    expect(orderTypes).toContain('Take Away');
+    expect(orderTypes).toContain('TAKE_AWAY');
+    expect(orderTypes).toContain('Delivery');
+    expect(orderTypes).toContain('DELIVERY');
+
+    const payments = renderSection('payments');
+    expect(payments).toContain('Cash');
+    expect(payments).toContain('BOTH');
+    expect(payments).toContain('POS Card');
+    expect(payments).toContain('Reference required');
+    expect(payments).toContain('Manual confirmation');
+
+    const checkout = renderSection('checkout');
+    expect(checkout).toContain('Maadi');
+    expect(checkout).toContain('30.00 EGP');
   });
 });
