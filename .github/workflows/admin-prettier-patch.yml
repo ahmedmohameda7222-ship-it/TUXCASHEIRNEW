@@ -1,0 +1,38 @@
+name: Admin Prettier Patch
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/api/cron/admin-config-scheduler.ts'
+      - 'apps/admin/server/catalog/scheduler.ts'
+      - 'apps/admin/server/catalog/scheduler.test.ts'
+      - '.github/workflows/admin-prettier-patch.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prettier-patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format scheduler files
+        run: >-
+          npx prettier --write
+          apps/admin/api/cron/admin-config-scheduler.ts
+          apps/admin/server/catalog/scheduler.ts
+          apps/admin/server/catalog/scheduler.test.ts
+      - name: Create patch
+        run: git diff --binary -- apps/admin/api/cron/admin-config-scheduler.ts apps/admin/server/catalog/scheduler.ts apps/admin/server/catalog/scheduler.test.ts > prettier.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-prettier-patch
+          path: prettier.patch
+          if-no-files-found: error
+          retention-days: 1
