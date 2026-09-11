@@ -25,6 +25,20 @@ function paymentDescription(payment: PaymentPart): string {
   return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)}`;
 }
 
+interface ReceiptSnapshotView {
+  readonly configurationVersion: number;
+  readonly shopDisplayName: string;
+  readonly address: string | null;
+  readonly contactPhone: string | null;
+  readonly footer: string | null;
+  readonly orderNumberPrefix: string;
+}
+
+type ReceiptAwareOrder = OrderSnapshot & {
+  readonly displayOrderLabel?: string;
+  readonly receiptSnapshot?: ReceiptSnapshotView;
+};
+
 export interface ReceiptRenderOptions {
   readonly paperWidthMm?: 58 | 80;
 }
@@ -33,6 +47,18 @@ export function renderOrderReceiptHtml(
   order: OrderSnapshot,
   options: ReceiptRenderOptions = {},
 ): string {
+  const receiptAwareOrder = order as ReceiptAwareOrder;
+  const receiptSnapshot = receiptAwareOrder.receiptSnapshot;
+  const orderLabel = receiptAwareOrder.displayOrderLabel ?? `#${order.displayOrderNo}`;
+  const shopDisplayName = receiptSnapshot?.shopDisplayName ?? 'TUX';
+  const receiptIdentity = [receiptSnapshot?.address, receiptSnapshot?.contactPhone]
+    .filter((value): value is string => value !== null && value !== undefined && value.length > 0)
+    .map((value) => `<div>${escapeHtml(value)}</div>`)
+    .join('');
+  const configuredFooter =
+    receiptSnapshot?.footer === null || receiptSnapshot?.footer === undefined
+      ? ''
+      : `<div>${escapeHtml(receiptSnapshot.footer)}</div>`;
   const paperWidthMm = options.paperWidthMm ?? 80;
   const contentWidthMm = paperWidthMm - 8;
   const itemRows = order.items
@@ -79,7 +105,7 @@ export function renderOrderReceiptHtml(
 <html>
 <head>
 <meta charset="utf-8" />
-<title>TUX Order #${order.displayOrderNo}</title>
+<title>${escapeHtml(shopDisplayName)} Order ${escapeHtml(orderLabel)}</title>
 <style>
   @page { margin: 4mm; }
   * { box-sizing: border-box; }
@@ -98,9 +124,10 @@ export function renderOrderReceiptHtml(
 </style>
 </head>
 <body>
-  <h1>TUX</h1>
+  <h1>${escapeHtml(shopDisplayName)}</h1>
   <div class="meta">
-    <div><strong>Order #${order.displayOrderNo}</strong> · ${escapeHtml(order.fulfillment.orderTypeLabel)}</div>
+    <div><strong>Order ${escapeHtml(orderLabel)}</strong> · ${escapeHtml(order.fulfillment.orderTypeLabel)}</div>
+    ${receiptIdentity}
     <div>${escapeHtml(order.createdAt)}</div>
     <div>Operator: ${escapeHtml(order.operatorName)}</div>
   </div>
@@ -114,7 +141,7 @@ export function renderOrderReceiptHtml(
     <div class="row total"><span>Total EGP</span><span>${formatMoney(order.totalMinor)}</span></div>
   </section>
   <section class="block">${paymentRows}</section>
-  <div class="footer">Saved locally before printing · ${escapeHtml(order.id)}</div>
+  <div class="footer">${configuredFooter}<div>Saved locally before printing · ${escapeHtml(order.id)}</div></div>
 </body>
 </html>`;
 }
