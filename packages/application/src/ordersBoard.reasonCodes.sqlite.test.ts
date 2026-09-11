@@ -157,8 +157,12 @@ describe('configured cancellation reasons', () => {
       } as CancelOrderInput & { readonly reasonCodeId: string; readonly note: string };
 
       const result = await test.service.cancelOrder(input);
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
+      if (!result.ok) {
+        const cause = result.error.cause instanceof Error ? result.error.cause.message : result.error.cause;
+        throw new Error(
+          `Expected configured cancellation to succeed, got ${result.error.code}: ${result.error.message}; cause=${String(cause ?? 'none')}`,
+        );
+      }
 
       expect(orderLifecycle(result.value).cancellation as unknown).toEqual(
         expect.objectContaining({
