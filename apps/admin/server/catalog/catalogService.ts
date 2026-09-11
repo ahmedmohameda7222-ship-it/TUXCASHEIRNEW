@@ -218,6 +218,7 @@ function readPublishSourceKind(value: string): CatalogPublishSourceKind {
     value === 'BASELINE' ||
     value === 'DRAFT' ||
     value === 'IMMEDIATE_AVAILABILITY' ||
+    value === 'RECURRING_AVAILABILITY' ||
     value === 'SCHEDULE' ||
     value === 'ROLLBACK'
   ) {
