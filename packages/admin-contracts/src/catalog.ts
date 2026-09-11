@@ -8,6 +8,7 @@ export type CatalogPublishSourceKind =
   | 'BASELINE'
   | 'DRAFT'
   | 'IMMEDIATE_AVAILABILITY'
+  | 'RECURRING_AVAILABILITY'
   | 'SCHEDULE'
   | 'ROLLBACK';
 export type CatalogScheduleStatus = 'PENDING' | 'CLAIMED' | 'APPLIED' | 'FAILED' | 'CANCELLED';
@@ -102,6 +103,33 @@ export type CatalogPublishingWorkspace = {
   schedules: CatalogScheduledChangeSummary[];
 };
 
+export type CatalogRecurringAvailabilityProduct = {
+  masterProductId: string;
+  productId: string;
+  name: string;
+  manualSoldOut: boolean;
+};
+
+export type CatalogRecurringAvailabilityRuleSummary = {
+  id: string;
+  shopId: string;
+  masterProductId: string;
+  timezone: 'Africa/Cairo';
+  daysOfWeek: number[];
+  startLocal: string;
+  endLocal: string;
+  available: boolean;
+  active: boolean;
+  version: number;
+  updatedAt: string;
+};
+
+export type CatalogRecurringAvailabilityWorkspace = {
+  shopId: string;
+  products: CatalogRecurringAvailabilityProduct[];
+  rules: CatalogRecurringAvailabilityRuleSummary[];
+};
+
 /**
  * Bundle replacement is the compatibility boundary used while the editor evolves.
  * changedPaths is advisory UI metadata for early permission feedback only; the trusted
@@ -158,6 +186,22 @@ export type CatalogScheduleDraftInput = {
 export type CatalogCancelScheduleInput = {
   shopId: string;
   scheduleId: string;
+};
+
+export type CatalogSaveRecurringAvailabilityRuleInput = {
+  shopId: string;
+  ruleId: string | null;
+  masterProductId: string;
+  /** Sunday=0 through Saturday=6. */
+  daysOfWeek: number[];
+  /** Cairo wall-clock time, HH:MM or HH:MM:SS. */
+  startLocal: string;
+  /** Cairo wall-clock time, HH:MM or HH:MM:SS. end <= start means next local day. */
+  endLocal: string;
+  /** Whether the product should be available while the recurring window is active. */
+  available: boolean;
+  active: boolean;
+  expectedVersion: number | null;
 };
 
 export type CatalogStaleVersionResult = {
@@ -266,11 +310,31 @@ export type CatalogCancelScheduleResult =
         | 'schedule_already_applied';
     };
 
+export type CatalogSaveRecurringAvailabilityRuleResult =
+  | {
+      ok: true;
+      ruleId: string;
+      version: number;
+      timezone: 'Africa/Cairo';
+      active: boolean;
+    }
+  | {
+      ok: false;
+      code:
+        | 'invalid_request'
+        | 'product_not_found'
+        | 'rule_not_found'
+        | 'stale_rule_version'
+        | 'recurring_rule_conflict';
+      currentVersion?: number;
+    };
+
 export type CatalogCommand =
   | ({ type: 'draft.create' } & CatalogCreateDraftInput)
   | ({ type: 'draft.save' } & CatalogSaveDraftInput)
   | ({ type: 'draft.publish' } & CatalogPublishDraftInput)
   | ({ type: 'availability.set' } & CatalogImmediateAvailabilityInput)
+  | ({ type: 'availability.recurring.save' } & CatalogSaveRecurringAvailabilityRuleInput)
   | ({ type: 'version.restore' } & CatalogRestoreVersionInput)
   | ({ type: 'draft.schedule' } & CatalogScheduleDraftInput)
   | ({ type: 'schedule.cancel' } & CatalogCancelScheduleInput);
