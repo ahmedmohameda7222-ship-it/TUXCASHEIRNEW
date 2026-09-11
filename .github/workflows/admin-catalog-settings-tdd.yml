@@ -11,6 +11,7 @@ on:
       - 'apps/menu/**'
       - 'e2e/admin-catalog-publish.spec.ts'
       - 'e2e/admin-catalog-recurring-availability.spec.ts'
+      - 'e2e/admin-settings.spec.ts'
       - 'playwright.admin.config.ts'
       - 'supabase/migrations/**'
       - 'scripts/test-admin-catalog-control-migration.mjs'
@@ -124,6 +125,8 @@ jobs:
         run: npm ci
       - name: Catalog editor unit tests
         run: npx vitest run apps/admin/src/catalog/ProductEditor.test.tsx
+      - name: Settings workspace unit tests
+        run: npx vitest run apps/admin/src/settings/SettingsPage.test.tsx
       - name: Admin UI typecheck
         run: npm run typecheck -w @tux/admin
 
