@@ -56,6 +56,16 @@ jobs:
       - name: Admin API and server typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
 
+  admin-deployment-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Admin deployment cron contract
+        run: node scripts/test-admin-deployment-contract.mjs
+
   catalog-ui:
     runs-on: ubuntu-latest
     steps:
@@ -82,8 +92,6 @@ jobs:
         run: node scripts/test-admin-catalog-control-migration.mjs
       - name: Catalog scheduler migration invariant
         run: node scripts/test-admin-catalog-scheduler-migration.mjs
-      - name: Admin deployment cron contract
-        run: node scripts/test-admin-deployment-contract.mjs
 
   catalog-control-postgres:
     runs-on: ubuntu-latest
