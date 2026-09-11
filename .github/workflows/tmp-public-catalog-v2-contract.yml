@@ -1,0 +1,242 @@
+name: Temporary Public Catalog V2 Contract Patch
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - .github/workflows/tmp-public-catalog-v2-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add strict public catalog V2 contract
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('packages/catalog-contracts/src/index.ts')
+          text = path.read_text()
+
+          if 'parsePublicCatalogSnapshotV2' in text:
+              raise SystemExit('V2 parser already exists; refusing duplicate patch')
+
+          text = text.replace(
+              'export const CATALOG_SCHEMA_VERSION = 1 as const;\n',
+              'export const CATALOG_SCHEMA_VERSION = 1 as const;\nexport const PUBLIC_CATALOG_SCHEMA_VERSION = 2 as const;\n',
+              1,
+          )
+
+          v1_snapshot = '''export interface PublicCatalogSnapshotV1 {
+            readonly schemaVersion: 1;
+            readonly shopId: string;
+            readonly revision: string;
+            readonly categories: readonly PublicCatalogCategoryV1[];
+            readonly products: readonly PublicCatalogProductV1[];
+            readonly modifiers: readonly PublicCatalogModifierV1[];
+            readonly productModifierLinks: readonly PublicProductModifierLinkV1[];
+            readonly comboBeverageOptions: readonly PublicComboBeverageOptionV1[];
+          }
+          '''
+          v2_types = '''export interface PublicCatalogSnapshotV1 {
+            readonly schemaVersion: 1;
+            readonly shopId: string;
+            readonly revision: string;
+            readonly categories: readonly PublicCatalogCategoryV1[];
+            readonly products: readonly PublicCatalogProductV1[];
+            readonly modifiers: readonly PublicCatalogModifierV1[];
+            readonly productModifierLinks: readonly PublicProductModifierLinkV1[];
+            readonly comboBeverageOptions: readonly PublicComboBeverageOptionV1[];
+          }
+
+          export type PublicFulfillmentPreferenceV2 = 'PICKUP' | 'DELIVERY';
+          export type PublicPaymentPreferenceV2 = 'CASH' | 'INSTAPAY' | 'MIXED';
+
+          export interface PublicCatalogShopV2 {
+            readonly displayName: string;
+            readonly address: string | null;
+            readonly phone: string | null;
+            readonly latitude: number | null;
+            readonly longitude: number | null;
+          }
+
+          export interface PublicOrderingV2 {
+            readonly available: boolean;
+            readonly temporaryClosed: boolean;
+            readonly onlineOrdersPaused: boolean;
+            readonly minimumOrderMinor: number;
+            readonly fulfillmentPreferences: readonly PublicFulfillmentPreferenceV2[];
+            readonly paymentPreferences: readonly PublicPaymentPreferenceV2[];
+          }
+
+          export interface PublicCatalogSnapshotV2 extends Omit<PublicCatalogSnapshotV1, 'schemaVersion'> {
+            readonly schemaVersion: 2;
+            readonly shop: PublicCatalogShopV2;
+            readonly ordering: PublicOrderingV2;
+          }
+          '''
+          if v1_snapshot not in text:
+              raise SystemExit('V1 snapshot marker not found')
+          text = text.replace(v1_snapshot, v2_types, 1)
+
+          parser_marker = 'export function parsePublicCatalogSnapshotV1(value: unknown): PublicCatalogSnapshotV1 {'
+          helpers = '''function nullableCoordinate(
+            value: unknown,
+            path: string,
+            minimum: number,
+            maximum: number,
+          ): number | null {
+            if (value === null) return null;
+            if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+              throw new CatalogContractError(`${path} must be a finite coordinate in range`);
+            }
+            return value;
+          }
+
+          function parsePublicShopV2(value: unknown, path: string): PublicCatalogShopV2 {
+            const row = asObject(value, path);
+            exactKeys(row, ['displayName', 'address', 'phone', 'latitude', 'longitude'], path);
+            return {
+              displayName: requiredText(row.displayName, `${path}.displayName`, 200),
+              address: nullableText(row.address, `${path}.address`, 1000),
+              phone: nullableText(row.phone, `${path}.phone`, 80),
+              latitude: nullableCoordinate(row.latitude, `${path}.latitude`, -90, 90),
+              longitude: nullableCoordinate(row.longitude, `${path}.longitude`, -180, 180),
+            };
+          }
+
+          function parseStringEnumArray<T extends string>(
+            value: unknown,
+            path: string,
+            allowed: readonly T[],
+          ): T[] {
+            if (!Array.isArray(value)) throw new CatalogContractError(`${path} must be an array`);
+            const allowedSet = new Set<string>(allowed);
+            const parsed = value.map((entry, index) => {
+              if (typeof entry !== 'string' || !allowedSet.has(entry)) {
+                throw new CatalogContractError(`${path}[${index}] is not supported`);
+              }
+              return entry as T;
+            });
+            if (new Set(parsed).size !== parsed.length) {
+              throw new CatalogContractError(`${path} must not contain duplicates`);
+            }
+            return parsed;
+          }
+
+          function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
+            const row = asObject(value, path);
+            exactKeys(
+              row,
+              [
+                'available',
+                'temporaryClosed',
+                'onlineOrdersPaused',
+                'minimumOrderMinor',
+                'fulfillmentPreferences',
+                'paymentPreferences',
+              ],
+              path,
+            );
+            return {
+              available: requiredBoolean(row.available, `${path}.available`),
+              temporaryClosed: requiredBoolean(row.temporaryClosed, `${path}.temporaryClosed`),
+              onlineOrdersPaused: requiredBoolean(row.onlineOrdersPaused, `${path}.onlineOrdersPaused`),
+              minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),
+              fulfillmentPreferences: parseStringEnumArray(
+                row.fulfillmentPreferences,
+                `${path}.fulfillmentPreferences`,
+                ['PICKUP', 'DELIVERY'] as const,
+              ),
+              paymentPreferences: parseStringEnumArray(
+                row.paymentPreferences,
+                `${path}.paymentPreferences`,
+                ['CASH', 'INSTAPAY', 'MIXED'] as const,
+              ),
+            };
+          }
+
+          '''
+          if parser_marker not in text:
+              raise SystemExit('V1 parser marker not found')
+          text = text.replace(parser_marker, helpers + parser_marker, 1)
+
+          catalog_error_marker = 'export function parseCatalogErrorV1(value: unknown): CatalogErrorV1 {'
+          v2_parser = '''export function parsePublicCatalogSnapshotV2(value: unknown): PublicCatalogSnapshotV2 {
+            const root = asObject(value, 'snapshot');
+            exactKeys(
+              root,
+              [
+                'schemaVersion',
+                'shopId',
+                'revision',
+                'categories',
+                'products',
+                'modifiers',
+                'productModifierLinks',
+                'comboBeverageOptions',
+                'shop',
+                'ordering',
+              ],
+              'snapshot',
+            );
+            if (root.schemaVersion !== 2) throw new CatalogContractError('snapshot.schemaVersion must be 2');
+            if (typeof root.revision !== 'string' || !REVISION_PATTERN.test(root.revision)) {
+              throw new CatalogContractError('snapshot.revision must be a lowercase SHA-256 hex digest');
+            }
+            return {
+              schemaVersion: 2,
+              shopId: requiredUuid(root.shopId, 'snapshot.shopId'),
+              revision: root.revision,
+              categories: parseArray(root.categories, 'snapshot.categories', parseCategory),
+              products: parseArray(root.products, 'snapshot.products', parseProduct),
+              modifiers: parseArray(root.modifiers, 'snapshot.modifiers', parseModifier),
+              productModifierLinks: parseArray(
+                root.productModifierLinks,
+                'snapshot.productModifierLinks',
+                parseProductModifierLink,
+              ),
+              comboBeverageOptions: parseArray(
+                root.comboBeverageOptions,
+                'snapshot.comboBeverageOptions',
+                parseComboOption,
+              ),
+              shop: parsePublicShopV2(root.shop, 'snapshot.shop'),
+              ordering: parsePublicOrderingV2(root.ordering, 'snapshot.ordering'),
+            };
+          }
+
+          '''
+          if catalog_error_marker not in text:
+              raise SystemExit('catalog error parser marker not found')
+          text = text.replace(catalog_error_marker, v2_parser + catalog_error_marker, 1)
+          path.write_text(text)
+      - name: Format modified contract
+        run: npx prettier --write packages/catalog-contracts/src/index.ts
+      - name: Focused V2 contract tests
+        run: npx vitest run packages/catalog-contracts/src/publicOrderingProjection.test.ts packages/catalog-contracts/src/index.test.ts
+      - name: Catalog contracts typecheck
+        run: npm run typecheck --workspace @tux/catalog-contracts
+      - name: Verify formatting
+        run: npx prettier --check packages/catalog-contracts/src/index.ts packages/catalog-contracts/src/publicOrderingProjection.test.ts
+      - name: Commit proven source and self-delete workflow
+        run: |
+          rm .github/workflows/tmp-public-catalog-v2-contract.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/catalog-contracts/src/index.ts .github/workflows/tmp-public-catalog-v2-contract.yml
+          git commit -m "feat(catalog): add strict public ordering v2 contract"
+          git push origin HEAD:feat/admin-02-catalog-settings
