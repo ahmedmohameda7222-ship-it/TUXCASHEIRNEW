@@ -30,6 +30,49 @@ permissions:
   contents: read
 
 jobs:
+  format-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Print exact Prettier diff
+        run: |
+          npx prettier --write \
+            apps/admin/api/admin/catalog.ts \
+            apps/admin/server/catalog/catalogPublishHistory.test.ts \
+            apps/admin/server/catalog/catalogService.test.ts \
+            apps/admin/server/catalog/catalogService.ts \
+            apps/admin/server/catalog/recurringAvailabilityService.test.ts \
+            apps/admin/server/catalog/recurringAvailabilityService.ts \
+            apps/admin/server/catalog/scheduler.test.ts \
+            apps/admin/src/catalog/PublishReviewPage.tsx \
+            apps/admin/src/catalog/RecurringAvailabilityEditor.tsx \
+            apps/admin/src/catalog/ScheduleEditor.tsx \
+            apps/admin/src/catalog/useCatalog.ts \
+            packages/admin-contracts/src/catalog.ts \
+            e2e/admin-catalog-recurring-availability.spec.ts \
+            playwright.admin.config.ts
+          git diff --no-color -- \
+            apps/admin/api/admin/catalog.ts \
+            apps/admin/server/catalog/catalogPublishHistory.test.ts \
+            apps/admin/server/catalog/catalogService.test.ts \
+            apps/admin/server/catalog/catalogService.ts \
+            apps/admin/server/catalog/recurringAvailabilityService.test.ts \
+            apps/admin/server/catalog/recurringAvailabilityService.ts \
+            apps/admin/server/catalog/scheduler.test.ts \
+            apps/admin/src/catalog/PublishReviewPage.tsx \
+            apps/admin/src/catalog/RecurringAvailabilityEditor.tsx \
+            apps/admin/src/catalog/ScheduleEditor.tsx \
+            apps/admin/src/catalog/useCatalog.ts \
+            packages/admin-contracts/src/catalog.ts \
+            e2e/admin-catalog-recurring-availability.spec.ts \
+            playwright.admin.config.ts
+
   catalog-service:
     runs-on: ubuntu-latest
     steps:
