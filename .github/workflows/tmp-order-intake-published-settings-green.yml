@@ -1,4 +1,5 @@
 name: Temporary Order Intake Published Settings GREEN
+# retry after the accepted-replay fixture adopted the published checkout authority dependency
 
 on:
   push:
