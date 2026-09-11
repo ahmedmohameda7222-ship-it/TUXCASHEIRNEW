@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
+  CatalogCancelScheduleResult,
   CatalogDraftCreateResult,
   CatalogDraftSaveResult,
   CatalogImmediateAvailabilityResult,
   CatalogJsonObject,
   CatalogJsonValue,
   CatalogProductDetail,
+  CatalogPublishingWorkspace,
+  CatalogPublishResult,
+  CatalogRestoreVersionResult,
+  CatalogScheduleResult,
   CatalogWorkspace,
 } from '@tux/admin-contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +38,10 @@ export class CatalogUiError extends Error {
 
 function catalogQueryKey(shopId: string) {
   return ['admin', 'catalog', shopId] as const;
+}
+
+function catalogPublishingQueryKey(shopId: string) {
+  return ['admin', 'catalog', shopId, 'publishing'] as const;
 }
 
 function isJsonObject(value: CatalogJsonValue | undefined): value is CatalogJsonObject {
@@ -93,6 +102,13 @@ function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): stri
 
 function currentWorkspace(queryClient: QueryClient, shopId: string): CatalogWorkspace | undefined {
   return queryClient.getQueryData<CatalogWorkspace>(catalogQueryKey(shopId));
+}
+
+async function invalidateCatalogState(queryClient: QueryClient, shopId: string): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: catalogQueryKey(shopId) }),
+    queryClient.invalidateQueries({ queryKey: catalogPublishingQueryKey(shopId) }),
+  ]);
 }
 
 export function useCatalog(shopId: string | undefined) {
@@ -214,7 +230,7 @@ export function useCatalog(shopId: string | undefined) {
       setActiveDraft(null);
       setDraftProducts({});
       setDraftInvalidatedByLiveChange(hadDraft);
-      if (shopId) await queryClient.invalidateQueries({ queryKey: catalogQueryKey(shopId) });
+      if (shopId) await invalidateCatalogState(queryClient, shopId);
     },
   });
 
@@ -226,4 +242,115 @@ export function useCatalog(shopId: string | undefined) {
     saveProduct,
     setAvailability,
   };
+}
+
+export function useCatalogPublishing(shopId: string | undefined) {
+  const session = useAdminSession();
+  const queryClient = useQueryClient();
+
+  const publishingQuery = useQuery({
+    queryKey: shopId
+      ? catalogPublishingQueryKey(shopId)
+      : ['admin', 'catalog', 'no-shop', 'publishing'],
+    enabled: Boolean(shopId),
+    queryFn: async () => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      return adminFetch<CatalogPublishingWorkspace>(
+        `/api/admin/catalog?shopId=${encodeURIComponent(shopId)}&view=publishing`,
+      );
+    },
+  });
+
+  const publishDraft = useMutation({
+    mutationFn: async (input: {
+      draftId: string;
+      expectedDraftRevision: number;
+      expectedVersion: number;
+    }) => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      const result = await adminFetch<CatalogPublishResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'draft.publish', shopId, ...input }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) {
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+      }
+      return result;
+    },
+    async onSuccess() {
+      if (shopId) await invalidateCatalogState(queryClient, shopId);
+    },
+  });
+
+  const scheduleDraft = useMutation({
+    mutationFn: async (input: {
+      draftId: string;
+      expectedDraftRevision: number;
+      expectedVersion: number;
+      localScheduledAt: string;
+    }) => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      const result = await adminFetch<CatalogScheduleResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'draft.schedule', shopId, ...input }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) {
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+      }
+      return result;
+    },
+    async onSuccess() {
+      if (shopId) await invalidateCatalogState(queryClient, shopId);
+    },
+  });
+
+  const restoreVersion = useMutation({
+    mutationFn: async (input: { sourcePublishVersion: number; expectedVersion: number }) => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      const result = await adminFetch<CatalogRestoreVersionResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'version.restore', shopId, ...input }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) {
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+      }
+      return result;
+    },
+    async onSuccess() {
+      if (shopId) await invalidateCatalogState(queryClient, shopId);
+    },
+  });
+
+  const cancelSchedule = useMutation({
+    mutationFn: async (scheduleId: string) => {
+      if (!shopId) throw new CatalogUiError('concrete_shop_required');
+      const result = await adminFetch<CatalogCancelScheduleResult>(
+        '/api/admin/catalog',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'schedule.cancel', shopId, scheduleId }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) throw new CatalogUiError(result.code);
+      return result;
+    },
+    async onSuccess() {
+      if (shopId) await invalidateCatalogState(queryClient, shopId);
+    },
+  });
+
+  return { publishingQuery, publishDraft, scheduleDraft, restoreVersion, cancelSchedule };
 }
