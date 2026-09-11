@@ -21,6 +21,7 @@ import type {
   WorkerSessionId,
 } from './ids';
 import type { JsonValue } from './json';
+import type { ConfiguredReasonFamily } from './settings';
 import type { MoneyMinor } from './money';
 import type { StockQuantityMicros } from './quantity';
 import type { Instant } from './time';
@@ -144,6 +145,15 @@ export type OrderFulfillmentSnapshot =
 export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
 export type OrderSource = 'POS' | 'ONLINE';
 
+export interface OrderReasonCodeSnapshot {
+  readonly id: string;
+  readonly key: string;
+  readonly family: ConfiguredReasonFamily;
+  readonly label: string;
+  readonly version: number;
+  readonly scope: 'BUSINESS' | 'SHOP';
+}
+
 export interface OrderCancellationSnapshot {
   readonly at: Instant;
   readonly workerId: WorkerId;
@@ -151,6 +161,10 @@ export interface OrderCancellationSnapshot {
   readonly foodPrepared: boolean;
   readonly stockRestored: boolean;
   readonly reason: string;
+  /** Present for configured future mutations; absent on legacy cancellations. */
+  readonly reasonCode?: OrderReasonCodeSnapshot;
+  /** Optional operator context; never the reason authority. */
+  readonly note?: string;
 }
 
 export interface OrderReturnSnapshot {

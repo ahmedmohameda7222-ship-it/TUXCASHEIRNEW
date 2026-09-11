@@ -22,6 +22,7 @@ import {
   type JsonValue,
   type OperationsSyncPayloadV1,
   type OrderId,
+  type OrderReasonCodeSnapshot,
   type OrderSnapshot,
   type OrderTransitionSyncSnapshotV1,
   type OutboxEvent,
@@ -53,7 +54,12 @@ export interface OrdersBoardSnapshot {
 export interface CancelOrderInput {
   readonly orderId: OrderId;
   readonly foodPrepared: boolean;
+  /** Legacy free-text fallback for pre-configured callers. */
   readonly reason: string;
+  /** Stable published reason identity for configured future mutations. */
+  readonly reasonCodeId?: string;
+  /** Operator context only; never the canonical reason authority. */
+  readonly note?: string;
 }
 
 export interface ReturnDeliveryInput {
@@ -192,12 +198,37 @@ export class OperationsOrdersBoardService {
   async cancelOrder(input: CancelOrderInput): Promise<OrderTransitionResult> {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, input.orderId);
+      let reasonCode: OrderReasonCodeSnapshot | undefined;
+      if (input.reasonCodeId !== undefined) {
+        const configuration = await transaction.configuration.getForShop(context.shopId);
+        const configured = configuration?.reasonCodes?.find(
+          (candidate) =>
+            candidate.id === input.reasonCodeId &&
+            candidate.active &&
+            candidate.family === 'CANCELLATION',
+        );
+        if (configured === undefined) {
+          throw new DomainInvariantError(
+            'The selected cancellation reason is not active in the published configuration.',
+          );
+        }
+        reasonCode = {
+          id: configured.id,
+          key: configured.key,
+          family: configured.family,
+          label: configured.label,
+          version: configured.version,
+          scope: configured.scope,
+        };
+      }
       const updated = cancelActiveOrder(order, {
         at: now,
         workerId: context.operator.id,
         workerName: context.operator.displayName,
         foodPrepared: input.foodPrepared,
         reason: input.reason,
+        ...(reasonCode !== undefined ? { reasonCode } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
       });
       const restockMovements: InventoryMovement[] = [];
       if (!input.foodPrepared) {
