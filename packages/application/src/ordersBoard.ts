@@ -54,9 +54,9 @@ export interface OrdersBoardSnapshot {
 export interface CancelOrderInput {
   readonly orderId: OrderId;
   readonly foodPrepared: boolean;
-  /** Legacy free-text fallback for pre-configured callers. */
+  /** Legacy free-text fallback for genuinely pre-feature configuration snapshots only. */
   readonly reason: string;
-  /** Stable published reason identity for configured future mutations. */
+  /** Stable published reason identity required once reason/settings configuration exists. */
   readonly reasonCodeId?: string;
   /** Operator context only; never the canonical reason authority. */
   readonly note?: string;
@@ -198,14 +198,25 @@ export class OperationsOrdersBoardService {
   async cancelOrder(input: CancelOrderInput): Promise<OrderTransitionResult> {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, input.orderId);
+      const configuration = await transaction.configuration.getForShop(context.shopId);
+      const configuredCancellationReasons =
+        configuration?.reasonCodes?.filter(
+          (candidate) => candidate.active && candidate.family === 'CANCELLATION',
+        ) ?? [];
+      const configuredReasonAuthority =
+        configuration !== null &&
+        (configuration.settings !== null || configuration.reasonCodes.length > 0);
+
+      if (configuredReasonAuthority && input.reasonCodeId === undefined) {
+        throw new DomainInvariantError(
+          'A published cancellation reason is required for this configuration.',
+        );
+      }
+
       let reasonCode: OrderReasonCodeSnapshot | undefined;
       if (input.reasonCodeId !== undefined) {
-        const configuration = await transaction.configuration.getForShop(context.shopId);
-        const configured = configuration?.reasonCodes?.find(
-          (candidate) =>
-            candidate.id === input.reasonCodeId &&
-            candidate.active &&
-            candidate.family === 'CANCELLATION',
+        const configured = configuredCancellationReasons.find(
+          (candidate) => candidate.id === input.reasonCodeId,
         );
         if (configured === undefined) {
           throw new DomainInvariantError(
@@ -221,12 +232,13 @@ export class OperationsOrdersBoardService {
           scope: configured.scope,
         };
       }
+
       const updated = cancelActiveOrder(order, {
         at: now,
         workerId: context.operator.id,
         workerName: context.operator.displayName,
         foodPrepared: input.foodPrepared,
-        reason: input.reason,
+        reason: reasonCode?.label ?? input.reason,
         ...(reasonCode !== undefined ? { reasonCode } : {}),
         ...(input.note !== undefined ? { note: input.note } : {}),
       });
