@@ -2,9 +2,9 @@
 
 **Program:** TUX Admin control plane  
 **Execution start:** 2026-09-10  
-**Active plan:** Plan 1 — Foundation/Auth/Shell  
-**Active branch:** `feat/admin-01-foundation`  
-**Base main commit:** `3c19f13ae1f7adca69de0b5a511c99f534908824`
+**Active plan:** Plan 2 — Catalog/Publishing/Settings  
+**Active branch:** `feat/admin-02-catalog-settings`  
+**Base main commit:** `96d7bb26d5c738859036c0f75c035e664e447f31`
 
 ## Authority and execution rules
 
@@ -128,3 +128,65 @@ A review was requested on PR #61. The Codex bot reported that a Codex environmen
 ## Final Plan 1 acceptance gate
 
 The final acceptance head is the commit containing this ledger update together with all Plan 1 implementation and self-review fixes. Acceptance requires one exact-head `TUX V2 CI` run with all permanent jobs green, including `quality`, `admin`, `edge-security`, `windows-package`, `menu`, `monorepo-architecture`, and `Required quality gate`. The exact run is recorded in the PR checks; Plan 1 must not merge until that gate is green.
+
+## Plan 2 completion checklist
+
+- [x] Task 1 — additive master catalog, draft/version, publish, schedule, and recurring-availability control schema over the existing canonical shop catalog.
+- [x] Task 2 — trusted typed Admin catalog contracts/BFF commands with shop authorization, permission checks, and version fencing.
+- [x] Task 3 — responsive catalog management UI with draft editing, progressive disclosure, and immediate availability controls.
+- [x] Task 4 — publish preview/history, restore-as-new-version, Cairo scheduling, recurring availability, authenticated scheduler trigger, and deployment-contract coverage.
+- [x] Task 5 — canonical Shops/Order Types/Payments/Checkout/Receipts/Reason Codes settings authority with real Menu/Operations propagation and rendered Admin settings management.
+
+## Plan 2 authority and safety rulings
+
+1. Plan 2 extends the existing canonical catalog and settings authorities; it does not create a second runtime truth. Menu and Operations consume published/effective state only.
+2. Browser code uses the same-origin Admin BFF. Service-role access and canonical settings RPC execution remain inside trusted server boundaries.
+3. Catalog/settings migrations in Plan 2 are repository artifacts only. No Plan 2 migration was applied to production Supabase during implementation.
+4. Settings row edits are optimistic-concurrency writes. `settingsVersion` fences the published settings base and row `editVersion` fences the individual canonical Order Type or Payment Method.
+5. Payment operational semantics are not editable through the normal settings surface. `logicType`, `requiresReconciliation`, and integration identity remain protected/read-only; the editable surface is limited to display name, active state, sort order, channel, reference requirement, manual confirmation requirement, and refund allowance.
+6. Order Type edits are limited to name, behavior, active state, and sort order.
+7. Draft/settings changes do not become live merely because an Admin row edit succeeds; the existing publish boundary remains authoritative.
+
+## Plan 2 Task 5 TDD and hardening evidence
+
+The canonical settings edit boundary was implemented through explicit RED→GREEN cycles across database, service, BFF, client, and rendered UI layers.
+
+### Canonical row edit schema and migration-chain safety
+
+A failing migration invariant first required canonical Order Type and Payment Method edit RPCs, per-row `edit_version`, stale-row rejection, stale-published-base rejection, immutable protected payment semantics, and browser EXECUTE denial. The additive implementation introduced `update_admin_order_type_v1` and `update_admin_payment_method_v1` as service-role-only, version-fenced trusted writes.
+
+Repository migration smoke then exposed a real duplicate Supabase migration version: the first row-edit migration used `20260910120100`, which already belonged to `admin_settings_commands.sql`. The row-edit migration was therefore moved deterministically after the existing `120100` and `120200` migrations to `20260910120300_admin_canonical_settings_row_edits.sql`; the obsolete duplicate was deleted and the dedicated migration test was updated. The complete repository migration chain and dedicated shop-settings PostgreSQL behavior subsequently passed.
+
+### Trusted service/BFF command boundary
+
+Service contracts were extended with typed Order Type and Payment Method edit inputs/results. Focused RED tests required trusted dispatch and proved that payment operational fields must not cross the mutation boundary. Strict BFF Zod schemas and dispatch were then added for `order-type.update` and `payment-method.update`, including positive integer CAS versions and rejection of extra/protected fields. Service, contracts, and API/server typechecks passed after GREEN.
+
+### Workspace and client CAS authority
+
+A RED workspace test proved the management workspace lacked the row-level concurrency token required for safe edits. `editVersion` was then added to the Order Type and Payment Method management contracts plus the canonical database selects/mapping. A follow-up client RED cycle required command builders to derive `expectedSettingsVersion` and `expectedEditVersion` from the latest loaded workspace and fail closed when a shop/row is not loaded. The client mutations invalidate the workspace after a successful edit so the next command uses refreshed row state rather than guessed versions.
+
+### Rendered settings management
+
+Rendered E2E was extended before UI implementation to require the actual operator journey: edit an Order Type, save, edit a Payment Method, save, then publish. The first RED failed because the edit controls did not exist. Inline mobile-compatible editors were then added without introducing a second settings state machine or direct browser database writes.
+
+The rendered test subsequently exposed an unsafe React handler pattern that read `event.currentTarget` inside a state updater after the event handler returned. Both Order Type and Payment Method editors were corrected to capture input values synchronously before state updates. The final remaining E2E failure was only an ambiguous Playwright text locator after a successful save; the assertion was narrowed to exact row text rather than weakening product behavior.
+
+### Formatting and regression cleanup
+
+Root `format:check` identified only the newly touched settings/E2E files. Exact repository Prettier output was obtained through a temporary test diagnostic, applied verbatim, and the diagnostic was removed before acceptance. No test or production behavior was weakened to satisfy formatting or browser gates.
+
+## Plan 2 exact-head verification before ledger update
+
+Code head `ca2fa35d473e6ba9de25762a0037d6981ee58c55` passed:
+
+- `Admin Catalog Settings TDD` run `34673086852`: every job GREEN, including `catalog-ui`, `catalog-service`, `catalog-control-invariant`, full PostgreSQL migration-chain/application behavior, `settings-runtime`, `online-order-policy`, `catalog-scheduler`, deployment contract, and rendered catalog/settings E2E.
+- `TUX V2 CI` run `34673086798`: `quality`, `admin`, `edge-security`, `windows-package`, `menu`, `monorepo-architecture`, and `Required quality gate` all GREEN.
+- The `quality` job passed repository format, lint, unit/integration tests, Admin/WhatsApp security and architecture gates, typecheck, production builds, provisioning safety, full migration-chain smoke, Supabase function auth deployment contract, Edge Function typecheck, and root rendered browser E2E.
+- The dedicated Admin job passed security boundary, typecheck, production build, and rendered auth/shop-isolation/responsive-shell E2E.
+- The Menu job passed typecheck, production build, and rendered Menu E2E.
+
+No production Supabase migration or data write was performed as part of Plan 2 implementation or verification.
+
+## Plan 2 review/merge gate
+
+Plan 2 implementation is complete on draft PR #62, but the plan remains open until the human-triggered review/merge gate is satisfied. Do not start Plan 3 while PR #62 remains open. Do not merge automatically and do not apply Plan 2 repository migrations to production as part of this gate.
