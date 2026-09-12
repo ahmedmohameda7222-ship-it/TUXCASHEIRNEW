@@ -144,6 +144,11 @@ export type SettingWriteResult =
   | { ok: false; code: 'stale_setting_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type ReasonCodeWriteResult =
+  | { ok: true; reasonCodeId: string; version: number }
+  | { ok: false; code: 'stale_reason_code_version'; currentVersion: number }
+  | { ok: false; code: string };
+
 export type CanonicalSettingsRowEditResult =
   | { ok: true; editVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
@@ -154,6 +159,16 @@ export type SettingWriteInput = {
   shopId: string;
   settingKey: string;
   value: unknown;
+  expectedVersion: number | null;
+};
+
+export type ReasonCodeWriteInput = {
+  shopId: string;
+  reasonCodeId: string | null;
+  key: string;
+  family: AdminReasonFamily;
+  label: string;
+  active: boolean;
   expectedVersion: number | null;
 };
 
@@ -190,5 +205,6 @@ export type SettingsCommand =
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
+  | ({ type: 'reason-code.upsert' } & ReasonCodeWriteInput)
   | ({ type: 'order-type.update' } & OrderTypeEditInput)
   | ({ type: 'payment-method.update' } & PaymentMethodEditInput);
