@@ -126,7 +126,9 @@ export type ResolvedSetting<T = unknown> =
   | { source: 'unset'; value: null };
 
 export type ShopDeleteOrArchiveResult =
-  { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
+  | { ok: true; action: 'ARCHIVED' }
+  | { ok: true; action: 'DELETED' }
+  | { ok: false; code: string };
 
 export type SettingsPublishResult =
   | {
@@ -142,11 +144,42 @@ export type SettingWriteResult =
   | { ok: false; code: 'stale_setting_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type CanonicalSettingsRowEditResult =
+  | { ok: true; editVersion: number }
+  | { ok: false; code: 'stale_settings_version'; currentVersion: number }
+  | { ok: false; code: 'stale_edit_version'; currentVersion: number }
+  | { ok: false; code: string };
+
 export type SettingWriteInput = {
   shopId: string;
   settingKey: string;
   value: unknown;
   expectedVersion: number | null;
+};
+
+export type OrderTypeEditInput = {
+  shopId: string;
+  orderTypeId: string;
+  name: string;
+  behavior: AdminOrderTypeConfiguration['behavior'];
+  active: boolean;
+  sortOrder: number;
+  expectedSettingsVersion: number;
+  expectedEditVersion: number;
+};
+
+export type PaymentMethodEditInput = {
+  shopId: string;
+  paymentMethodId: string;
+  displayName: string;
+  active: boolean;
+  sortOrder: number;
+  channel: PaymentMethodChannel;
+  requiresReference: boolean;
+  manualConfirmationRequired: boolean;
+  refundAllowed: boolean;
+  expectedSettingsVersion: number;
+  expectedEditVersion: number;
 };
 
 export type SettingsCommand =
@@ -156,4 +189,6 @@ export type SettingsCommand =
     })
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
-  | ({ type: 'setting.override.upsert' } & SettingWriteInput);
+  | ({ type: 'setting.override.upsert' } & SettingWriteInput)
+  | ({ type: 'order-type.update' } & OrderTypeEditInput)
+  | ({ type: 'payment-method.update' } & PaymentMethodEditInput);
