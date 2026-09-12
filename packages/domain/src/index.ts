@@ -21,6 +21,14 @@ export {
 } from './businessDay';
 export type * from './catalog';
 export {
+  applyBasisPoints,
+  calculateCheckoutPricing,
+  resolveEffectiveCheckoutPolicy,
+  type CheckoutChannel,
+  type CheckoutPricing,
+  type EffectiveCheckoutPolicy,
+} from './checkoutPolicy';
+export {
   parseOperationsConfigurationBundle,
   type OperationsConfigurationBundle,
 } from './configurationBundle';
@@ -95,6 +103,7 @@ export {
   parseWholePoundsToMinor,
   preparePaymentParts,
   type PreparedPaymentPart,
+  type PaymentPreparationContext,
 } from './payment';
 export { normalizeEgyptianPhone, type EgyptianPhoneNormalization } from './phone';
 export { calculateDraftLineTotal, calculateOrderPricing, type OrderPricing } from './pricing';
