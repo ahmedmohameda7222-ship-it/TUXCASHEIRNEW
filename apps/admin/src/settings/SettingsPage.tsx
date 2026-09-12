@@ -26,6 +26,8 @@ export type SettingsWorkspaceViewProps = {
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
+  onDeleteOrArchiveShop(): void | Promise<void>;
+  deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   settingOverrideUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
@@ -94,6 +96,8 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
 function SectionContent({
   section,
   workspace,
+  onDeleteOrArchiveShop,
+  deletingOrArchivingShop,
   onUpdateSettingOverride,
   settingOverrideUpdating,
   onUpdateOrderType,
@@ -103,6 +107,8 @@ function SectionContent({
 }: {
   section: SettingsSection;
   workspace: AdminSettingsWorkspace;
+  onDeleteOrArchiveShop(): void | Promise<void>;
+  deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   settingOverrideUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
@@ -114,7 +120,13 @@ function SectionContent({
     case 'overview':
       return <Overview workspace={workspace} />;
     case 'shop':
-      return <ShopsPage workspace={workspace} />;
+      return (
+        <ShopsPage
+          workspace={workspace}
+          onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
+          busy={deletingOrArchivingShop}
+        />
+      );
     case 'order-types':
       return (
         <OrderTypesPage
@@ -158,6 +170,8 @@ export function SettingsWorkspaceView({
   onSectionChange,
   onPublish,
   publishing,
+  onDeleteOrArchiveShop,
+  deletingOrArchivingShop,
   onUpdateSettingOverride,
   settingOverrideUpdating,
   onUpdateOrderType,
@@ -209,6 +223,8 @@ export function SettingsWorkspaceView({
       <SectionContent
         section={section}
         workspace={workspace}
+        onDeleteOrArchiveShop={onDeleteOrArchiveShop}
+        deletingOrArchivingShop={deletingOrArchivingShop}
         onUpdateSettingOverride={onUpdateSettingOverride}
         settingOverrideUpdating={settingOverrideUpdating}
         onUpdateOrderType={onUpdateOrderType}
@@ -254,6 +270,14 @@ export function SettingsPage() {
     );
   }
 
+  async function deleteOrArchiveShop(): Promise<void> {
+    const confirmed = window.confirm(
+      'Archive this shop? If the shop has no business history, the server may delete it instead.',
+    );
+    if (!confirmed) return;
+    await settings.deleteOrArchiveShop.mutateAsync();
+  }
+
   return (
     <SettingsWorkspaceView
       workspace={settings.workspaceQuery.data}
@@ -261,6 +285,8 @@ export function SettingsPage() {
       onSectionChange={setSection}
       onPublish={() => settings.publish.mutateAsync()}
       publishing={settings.publish.isPending}
+      onDeleteOrArchiveShop={deleteOrArchiveShop}
+      deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
       onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
       settingOverrideUpdating={settings.updateSettingOverride.isPending}
       onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
