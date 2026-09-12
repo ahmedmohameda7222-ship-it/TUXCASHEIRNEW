@@ -33,11 +33,24 @@ const orderTypeNameSchema = z.string().trim().min(1).max(120);
 const paymentMethodNameSchema = z.string().trim().min(1).max(120);
 const orderBehaviorSchema = z.enum(['TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER']);
 const paymentChannelSchema = z.enum(['POS', 'ONLINE', 'BOTH']);
+const reasonFamilySchema = z.enum([
+  'CANCELLATION',
+  'REFUND_RETURN',
+  'DISCOUNT_COMP',
+  'WASTE',
+  'STOCK_ADJUSTMENT',
+  'CASH_VARIANCE',
+  'PAY_IN',
+  'PAY_OUT',
+]);
+const reasonKeySchema = z.string().regex(/^[a-z][a-z0-9_-]*$/).max(120);
+const reasonLabelSchema = z.string().trim().min(1).max(240);
 
 const settingValueSchemas = {
   'checkout.minimumOrderMinor': z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   'checkout.serviceChargeBps': z.number().int().min(0).max(10_000),
   'checkout.taxBps': z.number().int().min(0).max(10_000),
+  'checkout.allowDiscountStacking': z.boolean(),
   'checkout.requireCustomerPhone': z.boolean(),
   'checkout.allowScheduledOrders': z.boolean(),
   'receipt.orderPrefix': z.string().max(64),
@@ -75,6 +88,29 @@ function settingWriteCommandSchema(type: 'setting.default.upsert' | 'setting.ove
     });
 }
 
+const reasonCodeWriteCommandSchema = z
+  .object({
+    type: z.literal('reason-code.upsert'),
+    shopId: uuidSchema,
+    reasonCodeId: uuidSchema.nullable(),
+    key: reasonKeySchema,
+    family: reasonFamilySchema,
+    label: reasonLabelSchema,
+    active: z.boolean(),
+    expectedVersion: expectedRowVersionSchema,
+  })
+  .strict()
+  .superRefine((command, context) => {
+    const creating = command.reasonCodeId === null;
+    if ((creating && command.expectedVersion !== null) || (!creating && command.expectedVersion === null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['expectedVersion'],
+        message: 'Reason-code create/edit version fence is inconsistent.',
+      });
+    }
+  });
+
 export const settingsViewSchema = z.literal('workspace');
 
 export const settingsCommandSchema = z.union([
@@ -93,6 +129,7 @@ export const settingsCommandSchema = z.union([
     .strict(),
   settingWriteCommandSchema('setting.default.upsert'),
   settingWriteCommandSchema('setting.override.upsert'),
+  reasonCodeWriteCommandSchema,
   z
     .object({
       type: z.literal('order-type.update'),
@@ -223,6 +260,9 @@ export default async function handler(
         return;
       case 'setting.override.upsert':
         sendJson(response, 200, { ...(await service.upsertShopOverride(command, principal)) });
+        return;
+      case 'reason-code.upsert':
+        sendJson(response, 200, { ...(await service.upsertReasonCode(command, principal)) });
         return;
       case 'order-type.update':
         sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
