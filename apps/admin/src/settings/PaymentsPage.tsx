@@ -64,13 +64,10 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       maxLength={120}
                       required
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? { ...current, displayName: event.currentTarget.value }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const displayName = event.currentTarget.value;
+                        setDraft((current) => (current ? { ...current, displayName } : current));
+                      }}
                     />
                   </label>
                   <label className="admin-field">
@@ -78,16 +75,10 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                     <select
                       value={draft.channel}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? {
-                                ...current,
-                                channel: event.currentTarget.value as PaymentMethodUpdateDraft['channel'],
-                              }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const channel = event.currentTarget.value as PaymentMethodUpdateDraft['channel'];
+                        setDraft((current) => (current ? { ...current, channel } : current));
+                      }}
                     >
                       <option value="POS">POS</option>
                       <option value="ONLINE">Online</option>
@@ -102,13 +93,10 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       step={1}
                       value={draft.sortOrder}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? { ...current, sortOrder: Number(event.currentTarget.value) }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const sortOrder = Number(event.currentTarget.value);
+                        setDraft((current) => (current ? { ...current, sortOrder } : current));
+                      }}
                     />
                   </label>
                   <label className="admin-check-field">
@@ -116,11 +104,10 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       type="checkbox"
                       checked={draft.active}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current ? { ...current, active: event.currentTarget.checked } : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const active = event.currentTarget.checked;
+                        setDraft((current) => (current ? { ...current, active } : current));
+                      }}
                     />
                     <span>Active</span>
                   </label>
@@ -129,13 +116,12 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       type="checkbox"
                       checked={draft.requiresReference}
                       disabled={updating}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const requiresReference = event.currentTarget.checked;
                         setDraft((current) =>
-                          current
-                            ? { ...current, requiresReference: event.currentTarget.checked }
-                            : current,
-                        )
-                      }
+                          current ? { ...current, requiresReference } : current,
+                        );
+                      }}
                     />
                     <span>Reference required</span>
                   </label>
@@ -144,16 +130,12 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       type="checkbox"
                       checked={draft.manualConfirmationRequired}
                       disabled={updating}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const manualConfirmationRequired = event.currentTarget.checked;
                         setDraft((current) =>
-                          current
-                            ? {
-                                ...current,
-                                manualConfirmationRequired: event.currentTarget.checked,
-                              }
-                            : current,
-                        )
-                      }
+                          current ? { ...current, manualConfirmationRequired } : current,
+                        );
+                      }}
                     />
                     <span>Manual confirmation</span>
                   </label>
@@ -162,13 +144,10 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       type="checkbox"
                       checked={draft.refundAllowed}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? { ...current, refundAllowed: event.currentTarget.checked }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const refundAllowed = event.currentTarget.checked;
+                        setDraft((current) => (current ? { ...current, refundAllowed } : current));
+                      }}
                     />
                     <span>Refund allowed</span>
                   </label>
