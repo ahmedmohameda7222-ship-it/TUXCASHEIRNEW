@@ -31,6 +31,8 @@ export interface CatalogSchedulerStore {
     idempotencyKey: string;
     attemptCount: number;
     error: string;
+    retryable: boolean;
+    now: string;
   }): Promise<void>;
 }
 
@@ -130,6 +132,10 @@ function schedulerErrorMessage(error: unknown): string {
   return 'catalog_scheduler_execution_failed';
 }
 
+function isRetryableSchedulerError(error: unknown): boolean {
+  return !(error instanceof Error && error.message.startsWith('catalog_scheduler_'));
+}
+
 function assertSuccessfulExecution(result: unknown): void {
   if (isRecord(result) && result['ok'] === false) {
     const code = typeof result['code'] === 'string' ? result['code'] : 'command_rejected';
@@ -171,6 +177,8 @@ export function createSupabaseCatalogSchedulerStore(
         p_idempotency_key: input.idempotencyKey,
         p_attempt_count: input.attemptCount,
         p_error: input.error,
+        p_retryable: input.retryable,
+        p_now: input.now,
       });
       requireRpcTransition(result);
     },
@@ -313,6 +321,8 @@ export async function runCatalogScheduler(
         idempotencyKey: change.idempotencyKey,
         attemptCount: change.attemptCount,
         error: schedulerErrorMessage(error),
+        retryable: isRetryableSchedulerError(error),
+        now: nowIso,
       });
       failed += 1;
     }
