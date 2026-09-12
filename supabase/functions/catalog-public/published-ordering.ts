@@ -49,7 +49,7 @@ export function projectPublishedPublicOrdering(
   }
 
   const settings = snapshot.settings;
-  if (settings === null) {
+  if (settings == null) {
     throw new TypeError('published settings are required for public catalog V2');
   }
 
