@@ -44,11 +44,21 @@ export interface OrdersBoardRuntime {
   createUuid(): string;
 }
 
+export interface CancellationReasonOption {
+  readonly id: string;
+  readonly key: string;
+  readonly label: string;
+  readonly version: number;
+  readonly scope: 'BUSINESS' | 'SHOP';
+}
+
 export interface OrdersBoardSnapshot {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
   readonly loadedAt: Instant;
   readonly orders: readonly OrderSnapshot[];
+  readonly cancellationReasonMode: 'CONFIGURED' | 'LEGACY_FREE_TEXT';
+  readonly cancellationReasons: readonly CancellationReasonOption[];
 }
 
 export interface CancelOrderInput {
@@ -124,11 +134,27 @@ export class OperationsOrdersBoardService {
           const day = await transaction.businessDays.getOpenForShop(shop.id);
           if (day === null || day.status !== 'OPEN') return null;
           const orders = await transaction.orders.listByBusinessDay(day.id);
+          const configuration = await transaction.configuration.getForShop(shop.id);
+          const configuredReasonAuthority =
+            configuration !== null &&
+            (configuration.settings !== null || configuration.reasonCodes.length > 0);
+          const cancellationReasons: CancellationReasonOption[] =
+            configuration?.reasonCodes
+              .filter((reason) => reason.active && reason.family === 'CANCELLATION')
+              .map((reason) => ({
+                id: reason.id,
+                key: reason.key,
+                label: reason.label,
+                version: reason.version,
+                scope: reason.scope,
+              })) ?? [];
           return {
             shopId: shop.id,
             businessDayId: day.id,
             loadedAt: this.#runtime.now(),
             orders,
+            cancellationReasonMode: configuredReasonAuthority ? 'CONFIGURED' : 'LEGACY_FREE_TEXT',
+            cancellationReasons,
           } satisfies OrdersBoardSnapshot;
         });
         return snapshot === null
