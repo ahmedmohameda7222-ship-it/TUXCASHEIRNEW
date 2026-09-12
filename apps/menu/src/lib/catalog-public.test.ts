@@ -29,10 +29,10 @@ describe('fetchPublicCatalog rollout compatibility', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ schemaVersion: 1, error: { code: 'catalog_unavailable' } }),
-          { status: 503, headers: { 'content-type': 'application/json' } },
-        ),
+        new Response(JSON.stringify({ schemaVersion: 1, error: { code: 'catalog_unavailable' } }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' },
+        }),
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify(v1Snapshot), {
