@@ -5,6 +5,20 @@ import type { OperationsOrdersBoardClient, OperationsOrdersClient } from './sess
 import { OnlineOrderInboxPanelController } from './OnlineOrderInboxPanel';
 
 type BoardTab = OrderStatus;
+type CancellationReasonMode = 'CONFIGURED' | 'LEGACY_FREE_TEXT';
+type CancellationReasonOption = {
+  readonly id: string;
+  readonly key: string;
+  readonly label: string;
+  readonly version: number;
+  readonly scope: 'BUSINESS' | 'SHOP';
+};
+type CancellationSubmission = {
+  readonly foodPrepared: boolean;
+  readonly reason: string;
+  readonly reasonCodeId?: string;
+  readonly note?: string;
+};
 
 const TABS: readonly { status: BoardTab; label: string }[] = [
   { status: 'ACTIVE', label: 'Active' },
@@ -154,6 +168,9 @@ function DetailsDrawer({
           <section className="board-detail-section board-exception-detail">
             <h3>Cancellation</h3>
             <p>{cancellation.reason}</p>
+            {'note' in cancellation && cancellation.note ? (
+              <p className="board-note">Note: {cancellation.note}</p>
+            ) : null}
             <p>
               {cancellation.foodPrepared
                 ? "Food was prepared · stock wasn't restored"
@@ -262,16 +279,26 @@ function DetailsDrawer({
 function CancelDialog({
   order,
   busy,
+  reasonMode,
+  reasons,
   onClose,
   onConfirm,
 }: {
   readonly order: OrderSnapshot;
   readonly busy: boolean;
+  readonly reasonMode: CancellationReasonMode;
+  readonly reasons: readonly CancellationReasonOption[];
   readonly onClose: () => void;
-  readonly onConfirm: (foodPrepared: boolean, reason: string) => Promise<void>;
+  readonly onConfirm: (submission: CancellationSubmission) => Promise<void>;
 }) {
   const [foodPrepared, setFoodPrepared] = useState<boolean | null>(null);
-  const [reason, setReason] = useState('');
+  const [selectedReasonId, setSelectedReasonId] = useState('');
+  const [legacyReason, setLegacyReason] = useState('');
+  const [note, setNote] = useState('');
+  const selectedReason = reasons.find((reason) => reason.id === selectedReasonId);
+  const configured = reasonMode === 'CONFIGURED';
+  const validReason = configured ? selectedReason !== undefined : legacyReason.trim().length > 0;
+
   return (
     <div className="modal-backdrop">
       <section
@@ -308,20 +335,64 @@ function CancelDialog({
             </button>
           </div>
         </fieldset>
-        <label>
-          Reason
-          <textarea
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            maxLength={240}
-          />
-        </label>
+        {configured ? (
+          <>
+            <label>
+              Reason
+              <select
+                value={selectedReasonId}
+                onChange={(event) => setSelectedReasonId(event.target.value)}
+              >
+                <option value="">Select a published reason</option>
+                {reasons.map((reason) => (
+                  <option key={reason.id} value={reason.id}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {reasons.length === 0 ? (
+              <p className="board-inline-error" role="alert">
+                No active cancellation reasons are published. Cancellation is locked until Admin
+                publishes one.
+              </p>
+            ) : null}
+            <label>
+              Note (optional)
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                maxLength={240}
+              />
+            </label>
+          </>
+        ) : (
+          <label>
+            Reason
+            <textarea
+              value={legacyReason}
+              onChange={(event) => setLegacyReason(event.target.value)}
+              maxLength={240}
+            />
+          </label>
+        )}
         <button
           className="board-danger-button"
           type="button"
-          disabled={busy || foodPrepared === null || reason.trim().length === 0}
+          disabled={busy || foodPrepared === null || !validReason}
           onClick={() => {
-            if (foodPrepared !== null) void onConfirm(foodPrepared, reason);
+            if (foodPrepared === null) return;
+            if (configured) {
+              if (selectedReason === undefined) return;
+              void onConfirm({
+                foodPrepared,
+                reason: selectedReason.label,
+                reasonCodeId: selectedReason.id,
+                ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+              });
+              return;
+            }
+            void onConfirm({ foodPrepared, reason: legacyReason.trim() });
           }}
         >
           Confirm Cancellation
@@ -402,6 +473,11 @@ export function OrdersBoardWorkspace({
   }) => void;
 }) {
   const [orders, setOrders] = useState<readonly OrderSnapshot[]>([]);
+  const [cancellationReasonMode, setCancellationReasonMode] =
+    useState<CancellationReasonMode>('LEGACY_FREE_TEXT');
+  const [cancellationReasons, setCancellationReasons] = useState<
+    readonly CancellationReasonOption[]
+  >([]);
   const [tab, setTab] = useState<BoardTab>('ACTIVE');
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
@@ -421,6 +497,8 @@ export function OrdersBoardWorkspace({
       return;
     }
     setOrders(result.value.orders);
+    setCancellationReasonMode(result.value.cancellationReasonMode);
+    setCancellationReasons(result.value.cancellationReasons);
     setError(null);
     setSelected((current) =>
       current === null
@@ -688,10 +766,12 @@ export function OrdersBoardWorkspace({
         <CancelDialog
           order={cancelTarget}
           busy={busy}
+          reasonMode={cancellationReasonMode}
+          reasons={cancellationReasons}
           onClose={() => setCancelTarget(null)}
-          onConfirm={async (foodPrepared, reason) => {
+          onConfirm={async (submission) => {
             const changed = await mutate(
-              () => client.cancelOrder({ orderId: cancelTarget.id, foodPrepared, reason }),
+              () => client.cancelOrder({ orderId: cancelTarget.id, ...submission }),
               `Order #${cancelTarget.displayOrderNo} cancelled.`,
             );
             if (changed) {

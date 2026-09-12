@@ -1,8 +1,11 @@
 import type { PaymentMethod } from './catalog';
+import type { CheckoutChannel } from './checkoutPolicy';
 import { DomainInvariantError } from './errors';
+import type { DeliveryZoneId } from './ids';
 import { moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money';
-import type { PaymentDraft } from './orderDraft';
 import type { PaymentMethodSnapshot } from './models';
+import type { PaymentDraft } from './orderDraft';
+import type { PaymentMethodZoneRuleSetting } from './settings';
 
 export interface PreparedPaymentPart {
   readonly method: PaymentMethodSnapshot;
@@ -11,11 +14,46 @@ export interface PreparedPaymentPart {
   readonly changeMinor: MoneyMinor | null;
 }
 
-function activeMethod(methods: readonly PaymentMethod[], id: PaymentMethod['id']): PaymentMethod {
+export interface PaymentPreparationContext {
+  readonly channel?: CheckoutChannel;
+  readonly deliveryZoneId?: DeliveryZoneId | null;
+  readonly paymentMethodZoneRules?: readonly PaymentMethodZoneRuleSetting[] | undefined;
+}
+
+function activeMethod(
+  methods: readonly PaymentMethod[],
+  id: PaymentMethod['id'],
+  context: PaymentPreparationContext,
+): PaymentMethod {
   const method = methods.find((candidate) => candidate.id === id && candidate.active);
   if (method === undefined) {
     throw new DomainInvariantError('Selected payment method is unavailable.');
   }
+
+  const configuredChannel = method.channel ?? 'BOTH';
+  if (
+    context.channel !== undefined &&
+    configuredChannel !== 'BOTH' &&
+    configuredChannel !== context.channel
+  ) {
+    throw new DomainInvariantError(
+      `Selected payment method is unavailable for ${context.channel} checkout.`,
+    );
+  }
+
+  if (context.deliveryZoneId !== undefined && context.deliveryZoneId !== null) {
+    const zoneRule = context.paymentMethodZoneRules?.find(
+      (candidate) =>
+        candidate.paymentMethodId === method.id &&
+        candidate.deliveryZoneId === context.deliveryZoneId,
+    );
+    if (zoneRule?.allowed === false) {
+      throw new DomainInvariantError(
+        'Selected payment method is unavailable for this delivery zone.',
+      );
+    }
+  }
+
   return method;
 }
 
@@ -31,6 +69,10 @@ function preparePart(
     id: method.id,
     label: method.displayName,
     logicType: method.logicType,
+    channel: method.channel ?? 'BOTH',
+    requiresReference: method.requiresReference ?? false,
+    manualConfirmationRequired: method.manualConfirmationRequired ?? false,
+    refundAllowed: method.refundAllowed ?? true,
   };
   if (method.logicType !== 'CASH') {
     return { method: snapshot, allocatedMinor, receivedMinor: null, changeMinor: null };
@@ -51,6 +93,7 @@ export function preparePaymentParts(
   draft: PaymentDraft,
   methods: readonly PaymentMethod[],
   totalMinor: MoneyMinor,
+  context: PaymentPreparationContext = {},
 ): readonly PreparedPaymentPart[] {
   if (totalMinor < 0) {
     throw new DomainInvariantError('Order total cannot be negative.');
@@ -62,7 +105,7 @@ export function preparePaymentParts(
     throw new DomainInvariantError('Select a payment method.');
   }
   if (draft.mode === 'SINGLE') {
-    const method = activeMethod(methods, draft.methodId);
+    const method = activeMethod(methods, draft.methodId, context);
     return [preparePart(method, totalMinor, draft.cashReceivedMinor)];
   }
 
@@ -73,8 +116,8 @@ export function preparePaymentParts(
     throw new DomainInvariantError('Split Amount A must be between zero and the order total.');
   }
   const remainder = subtractMoney(totalMinor, draft.amountAMinor);
-  const methodA = activeMethod(methods, draft.methodAId);
-  const methodB = activeMethod(methods, draft.methodBId);
+  const methodA = activeMethod(methods, draft.methodAId, context);
+  const methodB = activeMethod(methods, draft.methodBId, context);
   return [preparePart(methodA, draft.amountAMinor, null), preparePart(methodB, remainder, null)];
 }
 

@@ -82,8 +82,39 @@ export interface OnlineOrderPendingInsert {
   acceptedOrderId: null;
 }
 
+export interface OnlineOrderPublishedOrderType {
+  behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
+  active: boolean;
+}
+
+export interface OnlineOrderPublishedPaymentMethod {
+  id: string;
+  displayName: string;
+  logicType: 'CASH' | 'CARD' | 'DIGITAL' | 'OTHER';
+  active: boolean;
+  channel: 'POS' | 'ONLINE' | 'BOTH';
+  integrationReference: string | null;
+}
+
+export interface OnlineOrderPublishedCheckoutAuthority {
+  shopId: string;
+  configurationVersion: number;
+  settingsVersion: number | null;
+  lifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+  temporaryClosed: boolean;
+  onlineOrdersPaused: boolean;
+  minimumOrderMinor: number;
+  serviceChargeBps?: number;
+  taxBps?: number;
+  orderTypes: readonly OnlineOrderPublishedOrderType[];
+  paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
+}
+
 export interface OnlineOrderIntakeStore {
   loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null>;
+  loadPublishedCheckoutAuthority?(
+    shopId: string,
+  ): Promise<OnlineOrderPublishedCheckoutAuthority | null>;
   findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -149,6 +180,41 @@ function assertTrustedMoney(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} is not a trusted non-negative safe integer`);
   }
+}
+
+function assertBasisPoints(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 10_000)
+    throw new Error(`${label} is not a trusted basis-point rate`);
+}
+
+function applyPublishedBasisPoints(baseMinor: number, basisPoints: number): number {
+  assertTrustedMoney(baseMinor, 'published checkout base');
+  assertBasisPoints(basisPoints, 'published checkout rate');
+  const rounded = (BigInt(baseMinor) * BigInt(basisPoints) + 5_000n) / 10_000n;
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('published checkout overflow');
+  return Number(rounded);
+}
+
+export function calculatePublishedCheckoutPricing(
+  itemsSubtotalMinor: number,
+  authority: Pick<OnlineOrderPublishedCheckoutAuthority, 'serviceChargeBps' | 'taxBps'>,
+): {
+  itemsSubtotalMinor: number;
+  serviceChargeMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+} {
+  assertTrustedMoney(itemsSubtotalMinor, 'published checkout items subtotal');
+  const serviceChargeMinor = applyPublishedBasisPoints(
+    itemsSubtotalMinor,
+    authority.serviceChargeBps ?? 0,
+  );
+  const preTaxMinor = itemsSubtotalMinor + serviceChargeMinor;
+  if (!Number.isSafeInteger(preTaxMinor)) throw new Error('published checkout overflow');
+  const taxMinor = applyPublishedBasisPoints(preTaxMinor, authority.taxBps ?? 0);
+  const totalMinor = preTaxMinor + taxMinor;
+  if (!Number.isSafeInteger(totalMinor)) throw new Error('published checkout overflow');
+  return { itemsSubtotalMinor, serviceChargeMinor, taxMinor, totalMinor };
 }
 
 function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string | null): unknown {
@@ -217,7 +283,8 @@ function validateCatalogTenant(catalog: OnlineOrderCatalogAuthority, shopId: str
       (link) => !productIds.has(link.productId) || !modifierIds.has(link.modifierId),
     ) ||
     catalog.comboBeverageOptions.some(
-      (option) => !productIds.has(option.comboProductId) || !productIds.has(option.beverageProductId),
+      (option) =>
+        !productIds.has(option.comboProductId) || !productIds.has(option.beverageProductId),
     )
   ) {
     throw new Error('catalog relationship authority mismatch');
@@ -357,6 +424,58 @@ function buildTrustedItems(
   return { trustedItems, itemsSubtotalMinor };
 }
 
+function isOnlinePaymentMethod(method: OnlineOrderPublishedPaymentMethod): boolean {
+  return method.active && (method.channel === 'ONLINE' || method.channel === 'BOTH');
+}
+
+function isPublishedInstaPayMethod(method: OnlineOrderPublishedPaymentMethod): boolean {
+  if (method.logicType !== 'DIGITAL') return false;
+  const integration = method.integrationReference?.trim().toUpperCase() ?? null;
+  if (integration !== null) return integration === 'INSTAPAY';
+  return method.displayName.replace(/\s+/g, '').toUpperCase() === 'INSTAPAY';
+}
+
+function publishedCheckoutPolicyError(
+  request: OnlineOrderRequestV1,
+  itemsSubtotalMinor: number,
+  authority: OnlineOrderPublishedCheckoutAuthority,
+): Response | null {
+  if (authority.shopId !== request.shopId) {
+    throw new Error('published checkout authority shop mismatch');
+  }
+  assertTrustedMoney(authority.minimumOrderMinor, 'published minimum order');
+  calculatePublishedCheckoutPricing(itemsSubtotalMinor, authority);
+
+  if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
+  if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
+  if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
+
+  const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
+  if (
+    !authority.orderTypes.some(
+      (orderType) => orderType.active && orderType.behavior === requiredBehavior,
+    )
+  ) {
+    return errorResponse(409, 'fulfillment_unavailable');
+  }
+
+  if (itemsSubtotalMinor < authority.minimumOrderMinor) {
+    return errorResponse(409, 'minimum_order_not_met');
+  }
+
+  const onlineMethods = authority.paymentMethods.filter(isOnlinePaymentMethod);
+  const cashAvailable = onlineMethods.some((method) => method.logicType === 'CASH');
+  const instaPayAvailable = onlineMethods.some(isPublishedInstaPayMethod);
+  const paymentAvailable =
+    request.paymentPreference === 'CASH'
+      ? cashAvailable
+      : request.paymentPreference === 'INSTAPAY'
+        ? instaPayAvailable
+        : cashAvailable && instaPayAvailable;
+
+  return paymentAvailable ? null : errorResponse(409, 'payment_method_unavailable');
+}
+
 export async function handleOrderIntakeRequest(
   httpRequest: Request,
   store: OnlineOrderIntakeStore,
@@ -389,7 +508,10 @@ export async function handleOrderIntakeRequest(
     if (error instanceof OnlineOrderIntakeContractError || error instanceof SyntaxError) {
       return errorResponse(400, 'invalid_request');
     }
-    console.error('order-intake request parse failed', error instanceof Error ? error.name : 'Error');
+    console.error(
+      'order-intake request parse failed',
+      error instanceof Error ? error.name : 'Error',
+    );
     return errorResponse(500, 'intake_failed');
   }
 
@@ -423,6 +545,20 @@ export async function handleOrderIntakeRequest(
 
     const trusted = buildTrustedItems(parsed, catalog);
     if (trusted instanceof Response) return trusted;
+
+    const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
+    if (!loadPublishedCheckoutAuthority) {
+      return errorResponse(503, 'published_configuration_unavailable');
+    }
+    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
+    if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
+    const policyError = publishedCheckoutPolicyError(
+      parsed,
+      trusted.itemsSubtotalMinor,
+      checkoutAuthority,
+    );
+    if (policyError) return policyError;
+
     const catalogRevision = await sha256Hex(canonicalCatalogForRevision(catalog));
     const record: OnlineOrderPendingInsert = {
       id: crypto.randomUUID(),

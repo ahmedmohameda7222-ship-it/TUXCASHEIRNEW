@@ -24,6 +24,7 @@ function configuration() {
   const inventory = (index: number) => uuid('60000000', index);
   const orderType = (index: number) => uuid('70000000', index);
   const payment = (index: number) => uuid('80000000', index);
+  const reasonCode = (index: number) => uuid('a0000000', index);
   const productRows = [
     {
       name: 'Single Smashed Patty',
@@ -393,6 +394,17 @@ function configuration() {
           active: true,
         },
       ],
+      reasonCodes: [
+        {
+          id: reasonCode(1),
+          key: 'CUSTOMER_CHANGED_MIND',
+          family: 'CANCELLATION',
+          label: 'Customer changed mind',
+          active: true,
+          version: 1,
+          scope: 'SHOP',
+        },
+      ],
     },
     inventoryItems,
   };
@@ -653,12 +665,21 @@ async function resolveBoardAndExerciseExceptions(page: Page): Promise<void> {
   await firstCancel.click();
   const cancelDialog = page.getByRole('dialog', { name: /Order #/ });
   await cancelDialog.getByRole('button', { name: 'No · Restore Stock' }).click();
-  await cancelDialog.getByLabel('Reason').fill('E2E customer cancellation');
+  await cancelDialog.getByLabel('Reason').selectOption({ label: 'Customer changed mind' });
+  await cancelDialog.getByLabel('Note (optional)').fill('E2E customer cancellation');
   await cancelDialog.getByRole('button', { name: 'Confirm Cancellation' }).click();
   await expect(page.getByRole('tab', { name: /Cancelled/ })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  const cancelledRow = page.locator('.history-row').filter({ hasText: 'Take Away' }).first();
+  await cancelledRow.click();
+  const cancelledDetails = page.getByRole('dialog', { name: /Order #/ });
+  await expect(cancelledDetails.getByText('Customer changed mind', { exact: true })).toBeVisible();
+  await expect(
+    cancelledDetails.getByText('Note: E2E customer cancellation', { exact: true }),
+  ).toBeVisible();
+  await cancelledDetails.getByRole('button', { name: 'Close' }).click();
 
   await page.getByRole('tab', { name: /Active/ }).click();
   for (let attempt = 0; attempt < 5; attempt += 1) {

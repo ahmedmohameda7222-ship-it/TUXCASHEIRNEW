@@ -1,8 +1,10 @@
 import {
   addMoney,
+  calculateCheckoutPricing,
   moneyMinor,
   parseEntityId,
   preparePaymentParts,
+  resolveEffectiveCheckoutPolicy,
   type DeliveryZoneId,
   type DraftLineId,
   type EntityId,
@@ -281,6 +283,7 @@ function assertPaymentAuthority(
   payment: PaymentDraft,
   workspace: OrdersWorkspace,
   totalMinor: MoneyMinor,
+  deliveryZoneId: DeliveryZoneId | null,
 ): void {
   if (payment.mode === 'NONE') fail('Worker-confirmed payment authority is required.');
 
@@ -303,7 +306,11 @@ function assertPaymentAuthority(
     }
   }
 
-  preparePaymentParts(payment, workspace.configuration.paymentMethods, totalMinor);
+  preparePaymentParts(payment, workspace.configuration.paymentMethods, totalMinor, {
+    channel: 'ONLINE',
+    deliveryZoneId,
+    paymentMethodZoneRules: workspace.configuration.settings?.paymentMethodZoneRules,
+  });
 }
 
 export function prepareOnlineOrderAcceptanceDraft(
@@ -398,8 +405,22 @@ export function prepareOnlineOrderAcceptanceDraft(
     };
   }
 
-  const totalMinor = addMoney(reconstructedSubtotalMinor, deliveryFeeMinor);
-  assertPaymentAuthority(confirmation.payment, workspace, totalMinor);
+  const checkoutPolicy = resolveEffectiveCheckoutPolicy(workspace.configuration);
+  const pricing = calculateCheckoutPricing({
+    lines,
+    discountMinor: moneyMinor(0),
+    deliveryFeeMinor,
+    policy: checkoutPolicy,
+  });
+  if (pricing.itemsSubtotalMinor < checkoutPolicy.minimumOrderMinor) {
+    fail('The online order does not meet the published minimum order amount.');
+  }
+  assertPaymentAuthority(
+    confirmation.payment,
+    workspace,
+    pricing.totalMinor,
+    request.fulfillmentPreference === 'DELIVERY' ? confirmation.deliveryZoneId : null,
+  );
 
   return {
     shopId: workspace.shopId,

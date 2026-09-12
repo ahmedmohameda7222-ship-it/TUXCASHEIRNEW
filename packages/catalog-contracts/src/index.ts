@@ -1,4 +1,5 @@
 export const CATALOG_SCHEMA_VERSION = 1 as const;
+export const PUBLIC_CATALOG_SCHEMA_VERSION = 2 as const;
 
 export class CatalogContractError extends Error {
   constructor(message: string) {
@@ -63,6 +64,35 @@ export interface PublicCatalogSnapshotV1 {
   readonly modifiers: readonly PublicCatalogModifierV1[];
   readonly productModifierLinks: readonly PublicProductModifierLinkV1[];
   readonly comboBeverageOptions: readonly PublicComboBeverageOptionV1[];
+}
+
+export type PublicFulfillmentPreferenceV2 = 'PICKUP' | 'DELIVERY';
+export type PublicPaymentPreferenceV2 = 'CASH' | 'INSTAPAY' | 'MIXED';
+
+export interface PublicCatalogShopV2 {
+  readonly displayName: string;
+  readonly address: string | null;
+  readonly phone: string | null;
+  readonly latitude: number | null;
+  readonly longitude: number | null;
+}
+
+export interface PublicOrderingV2 {
+  readonly available: boolean;
+  readonly temporaryClosed: boolean;
+  readonly onlineOrdersPaused: boolean;
+  readonly minimumOrderMinor: number;
+  readonly serviceChargeBps?: number;
+  readonly taxBps?: number;
+  readonly allowDiscountStacking?: boolean;
+  readonly fulfillmentPreferences: readonly PublicFulfillmentPreferenceV2[];
+  readonly paymentPreferences: readonly PublicPaymentPreferenceV2[];
+}
+
+export interface PublicCatalogSnapshotV2 extends Omit<PublicCatalogSnapshotV1, 'schemaVersion'> {
+  readonly schemaVersion: 2;
+  readonly shop: PublicCatalogShopV2;
+  readonly ordering: PublicOrderingV2;
 }
 
 export const CATALOG_ERROR_CODES = [
@@ -268,6 +298,15 @@ function nonNegativeInteger(value: unknown, path: string): number {
   return value as number;
 }
 
+function basisPointsOrDefault(value: unknown, path: string): number {
+  if (value === undefined) return 0;
+  const parsed = nonNegativeInteger(value, path);
+  if (parsed > 10_000) {
+    throw new CatalogContractError(`${path} must be an integer between 0 and 10000`);
+  }
+  return parsed;
+}
+
 function positiveIntegerOrNull(value: unknown, path: string): number | null {
   if (value === null) return null;
   if (!Number.isSafeInteger(value) || (value as number) <= 0) {
@@ -386,6 +425,91 @@ function parseArray<T>(
   return value.map((entry, index) => parser(entry, `${path}[${index}]`));
 }
 
+function nullableCoordinate(
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new CatalogContractError(`${path} must be a finite coordinate in range`);
+  }
+  return value;
+}
+
+function parsePublicShopV2(value: unknown, path: string): PublicCatalogShopV2 {
+  const row = asObject(value, path);
+  exactKeys(row, ['displayName', 'address', 'phone', 'latitude', 'longitude'], path);
+  return {
+    displayName: requiredText(row.displayName, `${path}.displayName`, 200),
+    address: nullableText(row.address, `${path}.address`, 1000),
+    phone: nullableText(row.phone, `${path}.phone`, 80),
+    latitude: nullableCoordinate(row.latitude, `${path}.latitude`, -90, 90),
+    longitude: nullableCoordinate(row.longitude, `${path}.longitude`, -180, 180),
+  };
+}
+
+function parseStringEnumArray<T extends string>(
+  value: unknown,
+  path: string,
+  allowed: readonly T[],
+): T[] {
+  if (!Array.isArray(value)) throw new CatalogContractError(`${path} must be an array`);
+  const allowedSet = new Set<string>(allowed);
+  const parsed = value.map((entry, index) => {
+    if (typeof entry !== 'string' || !allowedSet.has(entry)) {
+      throw new CatalogContractError(`${path}[${index}] is not supported`);
+    }
+    return entry as T;
+  });
+  if (new Set(parsed).size !== parsed.length) {
+    throw new CatalogContractError(`${path} must not contain duplicates`);
+  }
+  return parsed;
+}
+
+function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
+  const row = asObject(value, path);
+  exactKeys(
+    row,
+    [
+      'available',
+      'temporaryClosed',
+      'onlineOrdersPaused',
+      'minimumOrderMinor',
+      'serviceChargeBps',
+      'taxBps',
+      'allowDiscountStacking',
+      'fulfillmentPreferences',
+      'paymentPreferences',
+    ],
+    path,
+  );
+  return {
+    available: requiredBoolean(row.available, `${path}.available`),
+    temporaryClosed: requiredBoolean(row.temporaryClosed, `${path}.temporaryClosed`),
+    onlineOrdersPaused: requiredBoolean(row.onlineOrdersPaused, `${path}.onlineOrdersPaused`),
+    minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),
+    serviceChargeBps: basisPointsOrDefault(row.serviceChargeBps, `${path}.serviceChargeBps`),
+    taxBps: basisPointsOrDefault(row.taxBps, `${path}.taxBps`),
+    allowDiscountStacking:
+      row.allowDiscountStacking === undefined
+        ? false
+        : requiredBoolean(row.allowDiscountStacking, `${path}.allowDiscountStacking`),
+    fulfillmentPreferences: parseStringEnumArray(
+      row.fulfillmentPreferences,
+      `${path}.fulfillmentPreferences`,
+      ['PICKUP', 'DELIVERY'] as const,
+    ),
+    paymentPreferences: parseStringEnumArray(row.paymentPreferences, `${path}.paymentPreferences`, [
+      'CASH',
+      'INSTAPAY',
+      'MIXED',
+    ] as const),
+  };
+}
+
 export function parsePublicCatalogSnapshotV1(value: unknown): PublicCatalogSnapshotV1 {
   const root = asObject(value, 'snapshot');
   exactKeys(
@@ -423,6 +547,50 @@ export function parsePublicCatalogSnapshotV1(value: unknown): PublicCatalogSnaps
       'snapshot.comboBeverageOptions',
       parseComboOption,
     ),
+  };
+}
+
+export function parsePublicCatalogSnapshotV2(value: unknown): PublicCatalogSnapshotV2 {
+  const root = asObject(value, 'snapshot');
+  exactKeys(
+    root,
+    [
+      'schemaVersion',
+      'shopId',
+      'revision',
+      'categories',
+      'products',
+      'modifiers',
+      'productModifierLinks',
+      'comboBeverageOptions',
+      'shop',
+      'ordering',
+    ],
+    'snapshot',
+  );
+  if (root.schemaVersion !== 2) throw new CatalogContractError('snapshot.schemaVersion must be 2');
+  if (typeof root.revision !== 'string' || !REVISION_PATTERN.test(root.revision)) {
+    throw new CatalogContractError('snapshot.revision must be a lowercase SHA-256 hex digest');
+  }
+  return {
+    schemaVersion: 2,
+    shopId: requiredUuid(root.shopId, 'snapshot.shopId'),
+    revision: root.revision,
+    categories: parseArray(root.categories, 'snapshot.categories', parseCategory),
+    products: parseArray(root.products, 'snapshot.products', parseProduct),
+    modifiers: parseArray(root.modifiers, 'snapshot.modifiers', parseModifier),
+    productModifierLinks: parseArray(
+      root.productModifierLinks,
+      'snapshot.productModifierLinks',
+      parseProductModifierLink,
+    ),
+    comboBeverageOptions: parseArray(
+      root.comboBeverageOptions,
+      'snapshot.comboBeverageOptions',
+      parseComboOption,
+    ),
+    shop: parsePublicShopV2(root.shop, 'snapshot.shop'),
+    ordering: parsePublicOrderingV2(root.ordering, 'snapshot.ordering'),
   };
 }
 

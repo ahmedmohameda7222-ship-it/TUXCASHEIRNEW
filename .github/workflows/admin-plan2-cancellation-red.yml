@@ -1,0 +1,24 @@
+name: Admin Plan 2 Cancellation Fallback RED
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-cancellation-red.yml'
+  workflow_dispatch:
+
+jobs:
+  cancellation-fallback-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add rollout fallback behavior case in runner
+        run: python scripts/admin-plan2-cancellation-red.py
+      - name: Prove empty cancellation vocabulary fallback is RED
+        run: npx vitest run packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts

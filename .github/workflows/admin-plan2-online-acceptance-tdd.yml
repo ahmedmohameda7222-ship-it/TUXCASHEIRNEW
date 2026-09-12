@@ -1,0 +1,30 @@
+name: Admin Plan 2 Online Acceptance RED-GREEN
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - 'packages/application/src/onlineOrderAcceptance.ts'
+      - 'packages/application/src/onlineOrderAcceptance.test.ts'
+      - '.github/workflows/admin-plan2-online-acceptance-tdd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  online-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Online acceptance checkout authority
+        run: npx vitest run packages/application/src/onlineOrderAcceptance.test.ts
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application

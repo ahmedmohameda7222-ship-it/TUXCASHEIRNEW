@@ -1,6 +1,6 @@
 import { DomainInvariantError } from './errors';
 import type { WorkerId } from './ids';
-import type { OrderLifecycleSnapshot, OrderSnapshot } from './models';
+import type { OrderLifecycleSnapshot, OrderReasonCodeSnapshot, OrderSnapshot } from './models';
 import type { Instant } from './time';
 
 export const DONE_UNDO_WINDOW_MS = 8_000;
@@ -72,15 +72,21 @@ export function cancelActiveOrder(
     readonly workerName: string;
     readonly foodPrepared: boolean;
     readonly reason: string;
+    readonly reasonCode?: OrderReasonCodeSnapshot;
+    readonly note?: string;
   },
 ): OrderSnapshot {
   if (order.status !== 'ACTIVE') {
     throw new DomainInvariantError('Only an ACTIVE order can be cancelled.');
   }
-  const reason = input.reason.trim();
+  if (input.reasonCode !== undefined && input.reasonCode.family !== 'CANCELLATION') {
+    throw new DomainInvariantError('Configured cancellation reason must belong to CANCELLATION.');
+  }
+  const reason = (input.reasonCode?.label ?? input.reason).trim();
   if (reason.length === 0) {
     throw new DomainInvariantError('Cancellation reason is required.');
   }
+  const note = input.note?.trim() ?? '';
   const current = orderLifecycle(order);
   return {
     ...order,
@@ -96,6 +102,8 @@ export function cancelActiveOrder(
         foodPrepared: input.foodPrepared,
         stockRestored: !input.foodPrepared,
         reason,
+        ...(input.reasonCode !== undefined ? { reasonCode: input.reasonCode } : {}),
+        ...(note.length > 0 ? { note } : {}),
       },
     },
   };

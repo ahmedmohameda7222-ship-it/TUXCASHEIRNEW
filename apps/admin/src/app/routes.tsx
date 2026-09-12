@@ -1,7 +1,10 @@
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { useLocation } from 'wouter';
 
+import { CatalogPage } from '../catalog/CatalogPage';
+import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
+import { SettingsPage } from '../settings/SettingsPage';
 
 export type AdminRouteDefinition = {
   path: string;
@@ -61,6 +64,10 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
       />
     );
   }
+
+  if (location === '/catalog/products/publishing') return <PublishReviewPage />;
+  if (route.path === '/catalog/products') return <CatalogPage />;
+  if (route.path === '/settings') return <SettingsPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(

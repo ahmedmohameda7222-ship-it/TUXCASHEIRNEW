@@ -1,0 +1,72 @@
+# Retriggered after completing the SettingsStore reason-code fixture.
+name: Admin Plan 2 Reason Code GREEN
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-reason-code-green.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reason-code-management:
+    if: "${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'feat(admin): wire trusted reason code service') }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Patch trusted settings service
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('apps/admin/server/settings/settingsService.ts')
+          s=p.read_text()
+          def r(a,b):
+            global s
+            n=s.count(a)
+            if n != 1: raise SystemExit(f'settings service guard expected 1, found {n}: {a[:120]!r}')
+            s=s.replace(a,b,1)
+
+          r("  PaymentMethodEditInput,\n  ResolvedSetting,",
+            "  PaymentMethodEditInput,\n  ReasonCodeWriteInput,\n  ReasonCodeWriteResult,\n  ResolvedSetting,")
+
+          r("  upsertShopOverride(input: {\n    employeeId: string;\n    shopId: string;\n    settingKey: string;\n    value: unknown;\n    expectedVersion: number | null;\n  }): Promise<SettingWriteResult>;\n  updateOrderType(",
+            "  upsertShopOverride(input: {\n    employeeId: string;\n    shopId: string;\n    settingKey: string;\n    value: unknown;\n    expectedVersion: number | null;\n  }): Promise<SettingWriteResult>;\n  upsertReasonCode(\n    input: { employeeId: string } & ReasonCodeWriteInput,\n  ): Promise<ReasonCodeWriteResult>;\n  updateOrderType(")
+
+          r("function parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {",
+            "function parseReasonCodeWriteResult(value: unknown): ReasonCodeWriteResult {\n  if (!isRecord(value) || typeof value['ok'] !== 'boolean') {\n    throw new SettingsServiceError('backend_contract_invalid');\n  }\n  if (value['ok'] === true) {\n    if (typeof value['reasonCodeId'] !== 'string') {\n      throw new SettingsServiceError('backend_contract_invalid');\n    }\n    return {\n      ok: true,\n      reasonCodeId: value['reasonCodeId'],\n      version: safeInteger(value['version'], 1),\n    };\n  }\n  if (typeof value['code'] !== 'string') throw new SettingsServiceError('backend_contract_invalid');\n  if (value['code'] === 'stale_reason_code_version') {\n    return {\n      ok: false,\n      code: 'stale_reason_code_version',\n      currentVersion: safeInteger(value['currentVersion'], 1),\n    };\n  }\n  return { ok: false, code: value['code'] };\n}\n\nfunction parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {")
+
+          r("    async updateOrderType(\n      input: OrderTypeEditInput,",
+            "    async upsertReasonCode(\n      input: ReasonCodeWriteInput,\n      principal: AdminSessionPrincipal,\n    ): Promise<ReasonCodeWriteResult> {\n      requirePermission(principal, 'settings.manage', input.shopId);\n      return store.upsertReasonCode({ employeeId: principal.employeeId, ...input });\n    },\n\n    async updateOrderType(\n      input: OrderTypeEditInput,")
+
+          r("    async updateOrderType({\n      employeeId,",
+            "    async upsertReasonCode({\n      employeeId,\n      shopId,\n      reasonCodeId,\n      key,\n      family,\n      label,\n      active,\n      expectedVersion,\n    }) {\n      const result = await client.rpc<unknown>('upsert_admin_reason_code_v1', {\n        p_employee_id: employeeId,\n        p_shop_id: shopId,\n        p_reason_code_id: reasonCodeId,\n        p_reason_key: key,\n        p_family: family,\n        p_label: label,\n        p_active: active,\n        p_expected_version: expectedVersion,\n      });\n      return parseReasonCodeWriteResult(result);\n    },\n\n    async updateOrderType({\n      employeeId,")
+
+          p.write_text(s)
+          PY
+      - name: Format
+        run: npx prettier --write apps/admin/server/settings/settingsService.ts apps/admin/api/admin/settings.ts packages/admin-contracts/src/settings.ts apps/admin/server/settings/reasonCodeManagement.test.ts apps/admin/api/admin/reasonCodeCommand.test.ts
+      - name: Reason command contract
+        run: npx vitest run apps/admin/api/admin/reasonCodeCommand.test.ts
+      - name: Reason service contract
+        run: npx vitest run apps/admin/server/settings/reasonCodeManagement.test.ts
+      - name: Admin contracts typecheck
+        run: npm run typecheck -w @tux/admin-contracts
+      - name: Admin API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Commit verified service wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/admin/server/settings/settingsService.ts apps/admin/api/admin/settings.ts packages/admin-contracts/src/settings.ts apps/admin/server/settings/reasonCodeManagement.test.ts apps/admin/api/admin/reasonCodeCommand.test.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(admin): wire trusted reason code service"
+          git push origin HEAD:feat/admin-02-catalog-settings

@@ -1,6 +1,6 @@
 import { DomainInvariantError } from './errors';
 import type { OrderSnapshot } from './models';
-import { addMoney, assertNonNegativeMoney, subtractMoney } from './money';
+import { addMoney, assertNonNegativeMoney, subtractMoney, ZERO_MONEY } from './money';
 
 export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
   if (!Number.isSafeInteger(order.displayOrderNo) || order.displayOrderNo <= 0) {
@@ -13,9 +13,14 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     throw new DomainInvariantError('A placed order must contain at least one item.');
   }
 
+  const serviceChargeMinor = order.serviceChargeMinor ?? ZERO_MONEY;
+  const taxMinor = order.taxMinor ?? ZERO_MONEY;
+
   assertNonNegativeMoney(order.itemsSubtotalMinor, 'Items subtotal');
   assertNonNegativeMoney(order.discountMinor, 'Discount');
   assertNonNegativeMoney(order.deliveryFeeMinor, 'Delivery fee');
+  assertNonNegativeMoney(serviceChargeMinor, 'Service charge');
+  assertNonNegativeMoney(taxMinor, 'Tax');
   assertNonNegativeMoney(order.totalMinor, 'Order total');
 
   if (order.discountMinor > order.itemsSubtotalMinor) {
@@ -24,12 +29,45 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
 
   const expectedTotal = addMoney(
     subtractMoney(order.itemsSubtotalMinor, order.discountMinor),
+    serviceChargeMinor,
     order.deliveryFeeMinor,
+    taxMinor,
   );
   if (expectedTotal !== order.totalMinor) {
     throw new DomainInvariantError(
-      'Order total does not match subtotal, discount, and delivery fee.',
+      'Order total does not match subtotal, discount, service charge, delivery fee, and tax.',
     );
+  }
+
+  if (order.checkoutSnapshot !== undefined) {
+    const snapshot = order.checkoutSnapshot;
+    if (
+      !Number.isSafeInteger(snapshot.configurationVersion) ||
+      snapshot.configurationVersion <= 0
+    ) {
+      throw new DomainInvariantError('Checkout configuration version must be positive.');
+    }
+    if (
+      snapshot.settingsVersion !== null &&
+      (!Number.isSafeInteger(snapshot.settingsVersion) || snapshot.settingsVersion <= 0)
+    ) {
+      throw new DomainInvariantError('Checkout settings version must be positive when present.');
+    }
+    if (snapshot.channel !== order.source) {
+      throw new DomainInvariantError('Checkout channel snapshot must match the order source.');
+    }
+    if (snapshot.serviceChargeMinor !== serviceChargeMinor || snapshot.taxMinor !== taxMinor) {
+      throw new DomainInvariantError('Checkout charge snapshot must match the order totals.');
+    }
+    if (
+      snapshot.deliveryFeeMinor !== order.deliveryFeeMinor ||
+      snapshot.discountMinor !== order.discountMinor
+    ) {
+      throw new DomainInvariantError('Checkout fee and discount snapshot must match the order.');
+    }
+    if (snapshot.minimumOrderSatisfied !== order.itemsSubtotalMinor >= snapshot.minimumOrderMinor) {
+      throw new DomainInvariantError('Checkout minimum-order snapshot is inconsistent.');
+    }
   }
 
   const allocated = addMoney(...order.payments.map((payment) => payment.allocatedMinor));

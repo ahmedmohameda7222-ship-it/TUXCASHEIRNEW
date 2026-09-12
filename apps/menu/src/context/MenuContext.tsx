@@ -1,5 +1,10 @@
+import type { PublicCatalogShopV2 } from '@tux/catalog-contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { fetchPublicCatalog } from '@/lib/catalog-public';
+import {
+  projectPublishedCheckoutPolicy,
+  type PublishedCheckoutPolicy,
+} from '@/lib/published-checkout-policy';
 import {
   projectPublicCatalog,
   type MenuExtraOption,
@@ -22,6 +27,8 @@ interface MenuContextValue {
   modifiersByProduct: Readonly<Record<string, readonly MenuModifier[]>>;
   extrasByProduct: Readonly<Record<string, readonly MenuExtraOption[]>>;
   comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
+  shop: PublicCatalogShopV2 | null;
+  checkoutPolicy: PublishedCheckoutPolicy | null;
   loading: boolean;
   error: string | null;
   refreshMenu: () => Promise<void>;
@@ -41,6 +48,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [comboBeveragesByProduct, setComboBeveragesByProduct] = useState<
     Readonly<Record<string, readonly SupabaseProduct[]>>
   >({});
+  const [shop, setShop] = useState<PublicCatalogShopV2 | null>(null);
+  const [checkoutPolicy, setCheckoutPolicy] = useState<PublishedCheckoutPolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +64,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setModifiersByProduct(projection.modifiersByProduct);
       setExtrasByProduct(projection.extrasByProduct);
       setComboBeveragesByProduct(projection.comboBeveragesByProduct);
+      if (snapshot.schemaVersion === 2) {
+        setShop(snapshot.shop);
+        setCheckoutPolicy(projectPublishedCheckoutPolicy(snapshot.ordering));
+      } else {
+        // V1 is a browse-only rollout fallback. Never synthesize permissive checkout defaults.
+        setShop(null);
+        setCheckoutPolicy(null);
+      }
     } catch (cause) {
       console.error('Failed to load canonical public catalog', cause);
       setSections([]);
@@ -62,6 +79,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setModifiersByProduct({});
       setExtrasByProduct({});
       setComboBeveragesByProduct({});
+      setShop(null);
+      setCheckoutPolicy(null);
       setError('Menu temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
@@ -79,6 +98,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       modifiersByProduct,
       extrasByProduct,
       comboBeveragesByProduct,
+      shop,
+      checkoutPolicy,
       loading,
       error,
       refreshMenu,
@@ -89,6 +110,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       modifiersByProduct,
       extrasByProduct,
       comboBeveragesByProduct,
+      shop,
+      checkoutPolicy,
       loading,
       error,
       refreshMenu,

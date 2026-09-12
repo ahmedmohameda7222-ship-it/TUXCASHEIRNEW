@@ -8,6 +8,7 @@ import {
   type PublicProductModifierRow,
   type PublicProductRow,
 } from './catalog.ts';
+import type { PublishedPublicOrderingProjection } from './published-ordering.ts';
 
 const IMAGE_BUCKET = 'catalog-product-images';
 
@@ -35,6 +36,8 @@ function unavailable(): Response {
 function createStore(client: SupabaseClient): PublicCatalogStore {
   let cachedShopId: string | null = null;
   let cached: Promise<RpcPayload | null> | null = null;
+  let cachedOrderingShopId: string | null = null;
+  let cachedOrdering: Promise<PublishedPublicOrderingProjection | null> | null = null;
 
   const load = (shopId: string): Promise<RpcPayload | null> => {
     if (cached === null || cachedShopId !== shopId) {
@@ -50,6 +53,26 @@ function createStore(client: SupabaseClient): PublicCatalogStore {
     return cached;
   };
 
+  const loadPublishedOrdering = (
+    shopId: string,
+  ): Promise<PublishedPublicOrderingProjection | null> => {
+    if (cachedOrdering === null || cachedOrderingShopId !== shopId) {
+      cachedOrderingShopId = shopId;
+      cachedOrdering = (async () => {
+        const { data, error } = await client.rpc('read_catalog_public_ordering_v2', {
+          p_shop_id: shopId,
+        });
+        if (error) throw new Error('catalog public ordering RPC failed');
+        if (data === null) return null;
+        if (typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('catalog public ordering RPC returned invalid payload');
+        }
+        return data as unknown as PublishedPublicOrderingProjection;
+      })();
+    }
+    return cachedOrdering;
+  };
+
   return {
     getShop: async (shopId) => (await load(shopId))?.shop ?? null,
     listCategories: async (shopId) => (await load(shopId))?.categories ?? [],
@@ -61,6 +84,7 @@ function createStore(client: SupabaseClient): PublicCatalogStore {
       if (imageKey === null) return null;
       return client.storage.from(IMAGE_BUCKET).getPublicUrl(imageKey).data.publicUrl;
     },
+    getPublishedOrderingProjection: loadPublishedOrdering,
   };
 }
 

@@ -36,6 +36,26 @@ describe('anonymous order-intake bounded capacity', () => {
   it('returns 429 instead of persisting when the trusted store reports the bounded intake limit', async () => {
     const store: OnlineOrderIntakeStore = {
       loadCatalog: vi.fn().mockResolvedValue(catalog()),
+      loadPublishedCheckoutAuthority: vi.fn().mockResolvedValue({
+        shopId: SHOP_ID,
+        configurationVersion: 1,
+        settingsVersion: null,
+        lifecycleState: 'ACTIVE',
+        temporaryClosed: false,
+        onlineOrdersPaused: false,
+        minimumOrderMinor: 0,
+        orderTypes: [{ behavior: 'TAKE_AWAY', active: true }],
+        paymentMethods: [
+          {
+            id: '55555555-5555-4555-8555-555555555555',
+            displayName: 'Cash',
+            logicType: 'CASH',
+            active: true,
+            channel: 'BOTH',
+            integrationReference: null,
+          },
+        ],
+      }),
       findByIdempotency: vi.fn().mockResolvedValue(null),
       insertPending: vi.fn().mockRejectedValue({
         message: 'TUX_ONLINE_ORDER_INTAKE_CAPACITY_EXCEEDED',

@@ -22,6 +22,7 @@ import {
   type JsonValue,
   type OperationsSyncPayloadV1,
   type OrderId,
+  type OrderReasonCodeSnapshot,
   type OrderSnapshot,
   type OrderTransitionSyncSnapshotV1,
   type OutboxEvent,
@@ -43,17 +44,32 @@ export interface OrdersBoardRuntime {
   createUuid(): string;
 }
 
+export interface CancellationReasonOption {
+  readonly id: string;
+  readonly key: string;
+  readonly label: string;
+  readonly version: number;
+  readonly scope: 'BUSINESS' | 'SHOP';
+}
+
 export interface OrdersBoardSnapshot {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
   readonly loadedAt: Instant;
   readonly orders: readonly OrderSnapshot[];
+  readonly cancellationReasonMode: 'CONFIGURED' | 'LEGACY_FREE_TEXT';
+  readonly cancellationReasons: readonly CancellationReasonOption[];
 }
 
 export interface CancelOrderInput {
   readonly orderId: OrderId;
   readonly foodPrepared: boolean;
+  /** Legacy free-text fallback for genuinely pre-feature configuration snapshots only. */
   readonly reason: string;
+  /** Stable published reason identity required once reason/settings configuration exists. */
+  readonly reasonCodeId?: string;
+  /** Operator context only; never the canonical reason authority. */
+  readonly note?: string;
 }
 
 export interface ReturnDeliveryInput {
@@ -118,11 +134,26 @@ export class OperationsOrdersBoardService {
           const day = await transaction.businessDays.getOpenForShop(shop.id);
           if (day === null || day.status !== 'OPEN') return null;
           const orders = await transaction.orders.listByBusinessDay(day.id);
+          const configuration = await transaction.configuration.getForShop(shop.id);
+          const reasonCodes = configuration?.reasonCodes ?? [];
+          const configuredReasonAuthority =
+            configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
+          const cancellationReasons: CancellationReasonOption[] = reasonCodes
+            .filter((reason) => reason.active && reason.family === 'CANCELLATION')
+            .map((reason) => ({
+              id: reason.id,
+              key: reason.key,
+              label: reason.label,
+              version: reason.version,
+              scope: reason.scope,
+            }));
           return {
             shopId: shop.id,
             businessDayId: day.id,
             loadedAt: this.#runtime.now(),
             orders,
+            cancellationReasonMode: configuredReasonAuthority ? 'CONFIGURED' : 'LEGACY_FREE_TEXT',
+            cancellationReasons,
           } satisfies OrdersBoardSnapshot;
         });
         return snapshot === null
@@ -192,12 +223,48 @@ export class OperationsOrdersBoardService {
   async cancelOrder(input: CancelOrderInput): Promise<OrderTransitionResult> {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, input.orderId);
+      const configuration = await transaction.configuration.getForShop(context.shopId);
+      const reasonCodes = configuration?.reasonCodes ?? [];
+      const configuredCancellationReasons = reasonCodes.filter(
+        (candidate) => candidate.active && candidate.family === 'CANCELLATION',
+      );
+      const configuredReasonAuthority =
+        configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
+
+      if (configuredReasonAuthority && input.reasonCodeId === undefined) {
+        throw new DomainInvariantError(
+          'A published cancellation reason is required for this configuration.',
+        );
+      }
+
+      let reasonCode: OrderReasonCodeSnapshot | undefined;
+      if (input.reasonCodeId !== undefined) {
+        const configured = configuredCancellationReasons.find(
+          (candidate) => candidate.id === input.reasonCodeId,
+        );
+        if (configured === undefined) {
+          throw new DomainInvariantError(
+            'The selected cancellation reason is not active in the published configuration.',
+          );
+        }
+        reasonCode = {
+          id: configured.id,
+          key: configured.key,
+          family: configured.family,
+          label: configured.label,
+          version: configured.version,
+          scope: configured.scope,
+        };
+      }
+
       const updated = cancelActiveOrder(order, {
         at: now,
         workerId: context.operator.id,
         workerName: context.operator.displayName,
         foodPrepared: input.foodPrepared,
-        reason: input.reason,
+        reason: reasonCode?.label ?? input.reason,
+        ...(reasonCode !== undefined ? { reasonCode } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
       });
       const restockMovements: InventoryMovement[] = [];
       if (!input.foodPrepared) {

@@ -1,0 +1,263 @@
+name: Admin Catalog Settings TDD
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'packages/admin-contracts/**'
+      - 'packages/application/**'
+      - 'packages/domain/**'
+      - 'packages/sync/**'
+      - 'apps/menu/**'
+      - 'supabase/functions/order-intake/**'
+      - 'e2e/admin-catalog-publish.spec.ts'
+      - 'e2e/admin-catalog-recurring-availability.spec.ts'
+      - 'e2e/admin-settings.spec.ts'
+      - 'playwright.admin.config.ts'
+      - 'supabase/migrations/**'
+      - 'scripts/order-intake.deno.ts'
+      - 'scripts/test-admin-catalog-control-migration.mjs'
+      - 'scripts/test-admin-catalog-scheduler-migration.mjs'
+      - 'scripts/test-admin-catalog-publish-controls.mjs'
+      - 'scripts/test-admin-catalog-recurring-availability.mjs'
+      - 'scripts/test-admin-catalog-recurring-deactivation.mjs'
+      - 'scripts/test-admin-shop-settings-migration.mjs'
+      - 'scripts/test-admin-plan2-review-hardening.mjs'
+      - 'scripts/test-admin-settings-schema-hardening.mjs'
+      - 'scripts/test-catalog-public-ordering-projection.mjs'
+      - 'scripts/test-admin-deployment-contract.mjs'
+      - '.github/workflows/admin-catalog-settings-tdd.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: admin-catalog-settings-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Catalog service unit tests
+        run: >-
+          npx vitest run
+          apps/admin/server/catalog/catalogService.test.ts
+          apps/admin/server/catalog/recurringAvailabilityService.test.ts
+          apps/admin/server/catalog/catalogPublishHistory.test.ts
+          apps/admin/server/settings/settingsService.test.ts
+          apps/admin/api/admin/catalogRecurring.test.ts
+          apps/admin/api/admin/settings.test.ts
+      - name: Admin contracts typecheck
+        run: npm run typecheck -w @tux/admin-contracts
+      - name: Admin API and server typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+
+  settings-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Published settings domain contract
+        run: npx vitest run packages/domain/src/configurationBundle.settings.test.ts
+      - name: Operations settings SQLite sync
+        run: npx vitest run packages/application/src/configurationSync.settings.sqlite.test.ts
+      # Keep this checkout-level contract before typechecks so missing persistence is visible as RED.
+      - name: Durable configured receipt snapshot at checkout
+        run: npx vitest run packages/application/src/ordersAtomicDelivery.sqlite.test.ts
+      - name: Configured receipt rendering contract
+        run: npx vitest run packages/printing/src/receipt.settings.test.ts
+      - name: Business Day receipt numbering allocator
+        run: npx vitest run packages/domain/src/businessDay.receiptNumbering.test.ts
+      - name: Business Day numbering boundary
+        run: npx vitest run packages/application/src/session.receiptNumbering.test.ts
+      - name: Configured cancellation reason snapshot
+        run: npx vitest run packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Printing typecheck
+        run: npm run typecheck -w @tux/printing
+
+  online-order-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Published online checkout settings authority
+        run: >-
+          npx vitest run
+          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts
+          supabase/functions/order-intake/order-intakeRateLimit.test.ts
+          supabase/functions/order-intake/order-intakeAcceptedReplay.test.ts
+          packages/application/src/menuOperationsWhatsAppJourney.test.ts
+      - name: Order intake Deno regression
+        run: deno test scripts/order-intake.deno.ts
+      - name: Order intake Edge Function typecheck
+        run: >-
+          deno check
+          --config supabase/functions/order-intake/deno.json
+          supabase/functions/order-intake/index.ts
+
+  catalog-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Catalog scheduler unit tests
+        run: npx vitest run apps/admin/server/catalog/scheduler.test.ts
+      - name: Admin API and server typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+
+  admin-deployment-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Admin deployment cron contract
+        run: node scripts/test-admin-deployment-contract.mjs
+
+  catalog-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Catalog editor unit tests
+        run: npx vitest run apps/admin/src/catalog/ProductEditor.test.tsx
+      - name: Settings workspace unit tests
+        run: >-
+          npx vitest run
+          apps/admin/src/settings/SettingsPage.test.tsx
+          apps/admin/src/settings/useSettings.test.ts
+      - name: Menu catalog rollout compatibility
+        run: npx vitest run apps/menu/src/lib/catalog-public.test.ts
+      - name: Admin UI typecheck
+        run: npm run typecheck -w @tux/admin
+
+  catalog-publish-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Catalog and settings rendered E2E
+        run: >-
+          npx playwright test
+          e2e/admin-catalog-publish.spec.ts
+          e2e/admin-catalog-recurring-availability.spec.ts
+          e2e/admin-settings.spec.ts
+          --config playwright.admin.config.ts
+
+  catalog-control-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Catalog control migration invariant
+        run: node scripts/test-admin-catalog-control-migration.mjs
+      - name: Catalog scheduler migration invariant
+        run: node scripts/test-admin-catalog-scheduler-migration.mjs
+      - name: Catalog publish controls migration invariant
+        run: node scripts/test-admin-catalog-publish-controls.mjs
+      - name: Catalog recurring availability migration invariant
+        run: node scripts/test-admin-catalog-recurring-availability.mjs
+      - name: Shop settings migration invariant
+        run: node scripts/test-admin-shop-settings-migration.mjs
+      - name: Plan 2 review hardening invariant
+        run: node scripts/test-admin-plan2-review-hardening.mjs
+      - name: Settings schema hardening invariant
+        run: node scripts/test-admin-settings-schema-hardening.mjs
+      - name: Public catalog ordering projection invariant
+        run: node scripts/test-catalog-public-ordering-projection.mjs
+
+  catalog-control-postgres:
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Apply complete repository migration chain
+        run: node scripts/test-migrations.mjs
+      - name: Catalog control PostgreSQL behavior
+        run: node scripts/test-admin-catalog-control-migration.mjs
+      - name: Catalog scheduler PostgreSQL behavior
+        run: node scripts/test-admin-catalog-scheduler-migration.mjs
+      - name: Catalog publish controls PostgreSQL behavior
+        run: node scripts/test-admin-catalog-publish-controls.mjs
+      - name: Catalog recurring availability PostgreSQL behavior
+        run: node scripts/test-admin-catalog-recurring-availability.mjs
+      - name: Catalog recurring deactivation restoration
+        run: node scripts/test-admin-catalog-recurring-deactivation.mjs
+      - name: Shop settings PostgreSQL behavior
+        run: node scripts/test-admin-shop-settings-migration.mjs
+      - name: Plan 2 review hardening PostgreSQL behavior
+        run: node scripts/test-admin-plan2-review-hardening.mjs
+      - name: Settings schema hardening PostgreSQL behavior
+        run: node scripts/test-admin-settings-schema-hardening.mjs
+      - name: Public catalog ordering projection PostgreSQL behavior
+        run: node scripts/test-catalog-public-ordering-projection.mjs
+      - name: Canonical catalog architecture regression
+        run: npm run test:catalog-architecture

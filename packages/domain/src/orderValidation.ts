@@ -1,10 +1,16 @@
 import type { OperationsConfigurationSnapshot, OrderType } from './catalog';
+import {
+  calculateCheckoutPricing,
+  resolveEffectiveCheckoutPolicy,
+  type CheckoutChannel,
+  type CheckoutPricing,
+  type EffectiveCheckoutPolicy,
+} from './checkoutPolicy';
 import { DomainInvariantError } from './errors';
 import { ZERO_MONEY } from './money';
 import type { OrderDraft } from './orderDraft';
 import { preparePaymentParts } from './payment';
 import { normalizeEgyptianPhone } from './phone';
-import { calculateOrderPricing, type OrderPricing } from './pricing';
 
 export type OrderValidationPath =
   | 'businessDay'
@@ -27,7 +33,8 @@ export interface OrderValidationIssue {
 
 export interface ValidatedOrderDraft {
   readonly orderType: OrderType;
-  readonly pricing: OrderPricing;
+  readonly pricing: CheckoutPricing;
+  readonly checkoutPolicy: EffectiveCheckoutPolicy;
   readonly normalizedDeliveryPhone: string | null;
 }
 
@@ -38,6 +45,7 @@ export type OrderDraftValidationResult =
 export function validateOrderDraft(
   draft: OrderDraft,
   configuration: OperationsConfigurationSnapshot,
+  channel: CheckoutChannel = 'POS',
 ): OrderDraftValidationResult {
   const issues: OrderValidationIssue[] = [];
 
@@ -144,12 +152,15 @@ export function validateOrderDraft(
 
   const deliveryFeeMinor =
     orderType?.behavior === 'DELIVERY' ? draft.delivery.finalFeeMinor : ZERO_MONEY;
-  let pricing: OrderPricing | null = null;
+  let pricing: CheckoutPricing | null = null;
+  let checkoutPolicy: EffectiveCheckoutPolicy | null = null;
   try {
-    pricing = calculateOrderPricing({
+    checkoutPolicy = resolveEffectiveCheckoutPolicy(configuration);
+    pricing = calculateCheckoutPricing({
       lines: draft.lines,
       discountMinor: draft.discountMinor,
       deliveryFeeMinor,
+      policy: checkoutPolicy,
     });
   } catch (error) {
     issues.push({
@@ -159,9 +170,27 @@ export function validateOrderDraft(
     });
   }
 
+  if (
+    pricing !== null &&
+    checkoutPolicy !== null &&
+    pricing.itemsSubtotalMinor < checkoutPolicy.minimumOrderMinor
+  ) {
+    issues.push({
+      path: 'cart',
+      code: 'MINIMUM_ORDER_NOT_MET',
+      message: 'The order does not meet the published minimum order amount.',
+    });
+  }
+
   if (pricing !== null) {
     try {
-      preparePaymentParts(draft.payment, configuration.paymentMethods, pricing.totalMinor);
+      preparePaymentParts(draft.payment, configuration.paymentMethods, pricing.totalMinor, {
+        channel,
+        deliveryZoneId: orderType?.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+        ...(configuration.settings?.paymentMethodZoneRules === undefined
+          ? {}
+          : { paymentMethodZoneRules: configuration.settings.paymentMethodZoneRules }),
+      });
     } catch (error) {
       issues.push({
         path: 'payment',
@@ -171,13 +200,13 @@ export function validateOrderDraft(
     }
   }
 
-  if (issues.length > 0 || orderType === undefined || pricing === null) {
+  if (issues.length > 0 || orderType === undefined || pricing === null || checkoutPolicy === null) {
     return { valid: false, issues };
   }
 
   return {
     valid: true,
-    value: { orderType, pricing, normalizedDeliveryPhone },
+    value: { orderType, pricing, checkoutPolicy, normalizedDeliveryPhone },
     issues: [],
   };
 }

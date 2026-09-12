@@ -2,6 +2,7 @@ import {
   handleOrderIntakeRequest,
   type OnlineOrderCatalogAuthority,
   type OnlineOrderPendingInsert,
+  type OnlineOrderPublishedCheckoutAuthority,
   type OnlineOrderStoredRequest,
   type OnlineOrderIntakeStore,
 } from '../supabase/functions/order-intake/order-intake.ts';
@@ -24,7 +25,9 @@ async function json(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
 }
 
-function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): OnlineOrderCatalogAuthority {
+function authority(
+  overrides: Partial<OnlineOrderCatalogAuthority> = {},
+): OnlineOrderCatalogAuthority {
   return {
     shop: { id: SHOP_ID, active: true },
     categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: true }],
@@ -97,6 +100,40 @@ function authority(overrides: Partial<OnlineOrderCatalogAuthority> = {}): Online
   };
 }
 
+function publishedCheckoutAuthority(): OnlineOrderPublishedCheckoutAuthority {
+  return {
+    shopId: SHOP_ID,
+    configurationVersion: 1,
+    settingsVersion: null,
+    lifecycleState: 'ACTIVE',
+    temporaryClosed: false,
+    onlineOrdersPaused: false,
+    minimumOrderMinor: 0,
+    orderTypes: [
+      { behavior: 'TAKE_AWAY', active: true },
+      { behavior: 'DELIVERY', active: true },
+    ],
+    paymentMethods: [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Cash',
+        logicType: 'CASH',
+        active: true,
+        channel: 'BOTH',
+        integrationReference: null,
+      },
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        displayName: 'InstaPay',
+        logicType: 'DIGITAL',
+        active: true,
+        channel: 'BOTH',
+        integrationReference: 'INSTAPAY',
+      },
+    ],
+  };
+}
+
 class MemoryStore implements OnlineOrderIntakeStore {
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly inserted: OnlineOrderPendingInsert[] = [];
@@ -105,6 +142,12 @@ class MemoryStore implements OnlineOrderIntakeStore {
 
   async loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null> {
     return shopId === SHOP_ID ? this.catalog : null;
+  }
+
+  async loadPublishedCheckoutAuthority(
+    shopId: string,
+  ): Promise<OnlineOrderPublishedCheckoutAuthority | null> {
+    return shopId === SHOP_ID ? publishedCheckoutAuthority() : null;
   }
 
   async findByIdempotency(
@@ -190,32 +233,41 @@ Deno.test('order-intake rejects client-authoritative money before persistence', 
   assert(store.inserted.length === 0, 'invalid request reached persistence');
 });
 
-Deno.test('order-intake computes trusted pricing and normalizes delivery phone server-side', async () => {
-  const store = new MemoryStore();
-  const response = await handleOrderIntakeRequest(request(), store);
-  const responseBody = await json(response);
-  assert(response.status === 202, 'valid intake must return 202');
-  assert(responseBody.status === 'PENDING', 'valid intake must remain pending');
-  assert(typeof responseBody.requestId === 'string', 'request id missing');
-  assert(Object.keys(responseBody).sort().join(',') === 'requestId,schemaVersion,status', 'response leaked authority');
-  assert(store.inserted.length === 1, 'pending request was not persisted once');
+Deno.test(
+  'order-intake computes trusted pricing and normalizes delivery phone server-side',
+  async () => {
+    const store = new MemoryStore();
+    const response = await handleOrderIntakeRequest(request(), store);
+    const responseBody = await json(response);
+    assert(response.status === 202, 'valid intake must return 202');
+    assert(responseBody.status === 'PENDING', 'valid intake must remain pending');
+    assert(typeof responseBody.requestId === 'string', 'request id missing');
+    assert(
+      Object.keys(responseBody).sort().join(',') === 'requestId,schemaVersion,status',
+      'response leaked authority',
+    );
+    assert(store.inserted.length === 1, 'pending request was not persisted once');
 
-  const inserted = store.inserted[0]!;
-  assert(inserted.normalizedPhone === '01001234567', 'Egyptian phone was not canonicalized');
-  assert(inserted.itemsSubtotalMinor === 43000, 'trusted subtotal was not recomputed');
-  assert(inserted.paymentPreference === 'MIXED', 'payment preference intent was lost');
-  assert(inserted.status === 'PENDING', 'browser intake created a final order');
-  assert(inserted.acceptedOrderId === null, 'browser intake invented a final order id');
+    const inserted = store.inserted[0]!;
+    assert(inserted.normalizedPhone === '01001234567', 'Egyptian phone was not canonicalized');
+    assert(inserted.itemsSubtotalMinor === 43000, 'trusted subtotal was not recomputed');
+    assert(inserted.paymentPreference === 'MIXED', 'payment preference intent was lost');
+    assert(inserted.status === 'PENDING', 'browser intake created a final order');
+    assert(inserted.acceptedOrderId === null, 'browser intake invented a final order id');
 
-  const trustedItems = inserted.trustedItems as Array<Record<string, unknown>>;
-  const first = trustedItems[0]!;
-  assert(first.productId === PRODUCT_ID, 'trusted product identity changed');
-  assert(first.productName === 'Single Burger', 'trusted product name not snapshotted');
-  assert(first.unitPriceMinor === 19000, 'trusted unit price not snapshotted');
-  const modifiers = first.modifiers as Array<Record<string, unknown>>;
-  assert(modifiers.length === 2, 'canonical direct/addon modifiers were not snapshotted');
-  assert(!JSON.stringify(inserted).includes('Extra Cheese Product'), 'addon product was materialized as an order line');
-});
+    const trustedItems = inserted.trustedItems as Array<Record<string, unknown>>;
+    const first = trustedItems[0]!;
+    assert(first.productId === PRODUCT_ID, 'trusted product identity changed');
+    assert(first.productName === 'Single Burger', 'trusted product name not snapshotted');
+    assert(first.unitPriceMinor === 19000, 'trusted unit price not snapshotted');
+    const modifiers = first.modifiers as Array<Record<string, unknown>>;
+    assert(modifiers.length === 2, 'canonical direct/addon modifiers were not snapshotted');
+    assert(
+      !JSON.stringify(inserted).includes('Extra Cheese Product'),
+      'addon product was materialized as an order line',
+    );
+  },
+);
 
 Deno.test('order-intake rejects inactive or sold-out requested products', async () => {
   const unavailable = authority({
@@ -259,16 +311,19 @@ Deno.test('order-intake validates modifier links and maximum quantities', async 
   assert(errorCode(await json(maxResponse)) === 'invalid_selection', 'wrong max-quantity code');
 });
 
-Deno.test('order-intake accepts addon products only through linked standalone modifiers', async () => {
-  const brokenAddon = authority({
-    modifiers: authority().modifiers.map((modifier) =>
-      modifier.id === ADDON_MODIFIER_ID ? { ...modifier, standaloneProductId: null } : modifier,
-    ),
-  });
-  const response = await handleOrderIntakeRequest(request(), new MemoryStore(brokenAddon));
-  assert(response.status === 400, 'unmapped addon product must be rejected');
-  assert(errorCode(await json(response)) === 'invalid_selection', 'wrong addon mapping code');
-});
+Deno.test(
+  'order-intake accepts addon products only through linked standalone modifiers',
+  async () => {
+    const brokenAddon = authority({
+      modifiers: authority().modifiers.map((modifier) =>
+        modifier.id === ADDON_MODIFIER_ID ? { ...modifier, standaloneProductId: null } : modifier,
+      ),
+    });
+    const response = await handleOrderIntakeRequest(request(), new MemoryStore(brokenAddon));
+    assert(response.status === 400, 'unmapped addon product must be rejected');
+    assert(errorCode(await json(response)) === 'invalid_selection', 'wrong addon mapping code');
+  },
+);
 
 Deno.test('order-intake rejects unavailable standalone addon products', async () => {
   for (const availability of [
@@ -293,69 +348,81 @@ Deno.test('order-intake rejects unavailable standalone addon products', async ()
   }
 });
 
-Deno.test('order-intake validates combo beverage relationships without charging beverage retail price', async () => {
-  const comboPayload = payload({
-    items: [
-      {
-        productId: COMBO_ID,
-        quantity: 1,
-        addonProductIds: [],
-        modifierSelections: [],
-        comboBeverageProductId: BEVERAGE_ID,
-        note: null,
-      },
-    ],
-  });
-  const validStore = new MemoryStore();
-  const valid = await handleOrderIntakeRequest(request(comboPayload), validStore);
-  assert(valid.status === 202, 'valid combo beverage must be accepted');
-  assert(validStore.inserted[0]?.itemsSubtotalMinor === 30000, 'combo beverage retail price was added');
+Deno.test(
+  'order-intake validates combo beverage relationships without charging beverage retail price',
+  async () => {
+    const comboPayload = payload({
+      items: [
+        {
+          productId: COMBO_ID,
+          quantity: 1,
+          addonProductIds: [],
+          modifierSelections: [],
+          comboBeverageProductId: BEVERAGE_ID,
+          note: null,
+        },
+      ],
+    });
+    const validStore = new MemoryStore();
+    const valid = await handleOrderIntakeRequest(request(comboPayload), validStore);
+    assert(valid.status === 202, 'valid combo beverage must be accepted');
+    assert(
+      validStore.inserted[0]?.itemsSubtotalMinor === 30000,
+      'combo beverage retail price was added',
+    );
 
-  const invalidStore = new MemoryStore(authority({ comboBeverageOptions: [] }));
-  const invalid = await handleOrderIntakeRequest(request(comboPayload), invalidStore);
-  assert(invalid.status === 400, 'unlinked combo beverage must be rejected');
-  assert(errorCode(await json(invalid)) === 'invalid_selection', 'wrong combo relationship code');
-});
+    const invalidStore = new MemoryStore(authority({ comboBeverageOptions: [] }));
+    const invalid = await handleOrderIntakeRequest(request(comboPayload), invalidStore);
+    assert(invalid.status === 400, 'unlinked combo beverage must be rejected');
+    assert(errorCode(await json(invalid)) === 'invalid_selection', 'wrong combo relationship code');
+  },
+);
 
-Deno.test('order-intake replays an equivalent canonical request and conflicts on idempotency reuse', async () => {
-  const store = new MemoryStore();
-  const first = await handleOrderIntakeRequest(request(), store);
-  const firstBody = await json(first);
-  assert(first.status === 202, 'first intake failed');
+Deno.test(
+  'order-intake replays an equivalent canonical request and conflicts on idempotency reuse',
+  async () => {
+    const store = new MemoryStore();
+    const first = await handleOrderIntakeRequest(request(), store);
+    const firstBody = await json(first);
+    assert(first.status === 202, 'first intake failed');
 
-  const equivalent = payload();
-  equivalent.customer = {
-    name: 'Ahmed Mohamed',
-    phone: '01001234567',
-    address: 'Nasr City, Cairo',
-  };
-  const replay = await handleOrderIntakeRequest(request(equivalent), store);
-  const replayBody = await json(replay);
-  assert(replay.status === 200, 'equivalent retry must replay');
-  assert(replayBody.requestId === firstBody.requestId, 'retry changed request identity');
-  assert(store.inserted.length === 1, 'retry duplicated pending request');
+    const equivalent = payload();
+    equivalent.customer = {
+      name: 'Ahmed Mohamed',
+      phone: '01001234567',
+      address: 'Nasr City, Cairo',
+    };
+    const replay = await handleOrderIntakeRequest(request(equivalent), store);
+    const replayBody = await json(replay);
+    assert(replay.status === 200, 'equivalent retry must replay');
+    assert(replayBody.requestId === firstBody.requestId, 'retry changed request identity');
+    assert(store.inserted.length === 1, 'retry duplicated pending request');
 
-  const conflict = await handleOrderIntakeRequest(
-    request(payload({ orderNote: 'Different request with same key' })),
-    store,
-  );
-  assert(conflict.status === 409, 'different payload reused idempotency key');
-  assert(errorCode(await json(conflict)) === 'idempotency_conflict', 'wrong conflict code');
-});
+    const conflict = await handleOrderIntakeRequest(
+      request(payload({ orderNote: 'Different request with same key' })),
+      store,
+    );
+    assert(conflict.status === 409, 'different payload reused idempotency key');
+    assert(errorCode(await json(conflict)) === 'idempotency_conflict', 'wrong conflict code');
+  },
+);
 
-Deno.test('order-intake rejects invalid delivery phone and fails closed on cross-shop authority', async () => {
-  const badPhone = payload();
-  badPhone.customer = { name: 'Ahmed', phone: '+4912345', address: 'Cairo' };
-  const badPhoneResponse = await handleOrderIntakeRequest(request(badPhone), new MemoryStore());
-  assert(badPhoneResponse.status === 400, 'invalid Egyptian delivery phone must be rejected');
-  assert(errorCode(await json(badPhoneResponse)) === 'invalid_phone', 'wrong phone code');
+Deno.test(
+  'order-intake rejects invalid delivery phone and fails closed on cross-shop authority',
+  async () => {
+    const badPhone = payload();
+    badPhone.customer = { name: 'Ahmed', phone: '+4912345', address: 'Cairo' };
+    const badPhoneResponse = await handleOrderIntakeRequest(request(badPhone), new MemoryStore());
+    assert(badPhoneResponse.status === 400, 'invalid Egyptian delivery phone must be rejected');
+    assert(errorCode(await json(badPhoneResponse)) === 'invalid_phone', 'wrong phone code');
 
-  const crossShop = authority({
-    products: authority().products.map((product, index) =>
-      index === 0 ? { ...product, shopId: '99999999-9999-4999-8999-999999999999' } : product,
-    ),
-  });
-  const crossShopResponse = await handleOrderIntakeRequest(request(), new MemoryStore(crossShop));
-  assert(crossShopResponse.status === 500, 'cross-shop authority must fail closed');
-  assert(errorCode(await json(crossShopResponse)) === 'intake_failed', 'wrong cross-shop code');
-});
+    const crossShop = authority({
+      products: authority().products.map((product, index) =>
+        index === 0 ? { ...product, shopId: '99999999-9999-4999-8999-999999999999' } : product,
+      ),
+    });
+    const crossShopResponse = await handleOrderIntakeRequest(request(), new MemoryStore(crossShop));
+    assert(crossShopResponse.status === 500, 'cross-shop authority must fail closed');
+    assert(errorCode(await json(crossShopResponse)) === 'intake_failed', 'wrong cross-shop code');
+  },
+);

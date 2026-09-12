@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import type { OnlineOrderRequestV1 } from '@tux/order-intake-contracts';
 import { useCart } from '@/context/CartContext';
@@ -12,21 +12,27 @@ import {
   type PendingCheckoutAttempt,
 } from '@/lib/checkout-attempt';
 import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
+import {
+  calculatePublishedCheckoutEstimate,
+  checkoutBlockReason,
+  type PublishedOrderTypeLabel,
+  type PublishedPaymentMethodLabel,
+} from '@/lib/published-checkout-policy';
 
 const DELIVERY_FEE_MESSAGE =
-  'Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.';
+  'Delivery fee is not included in this estimate. After you place the order, we will confirm the delivery fee; final tax and total will be recalculated from the same published checkout rules.';
 
 const DELIVERY_MIXED_PAYMENT_MESSAGE =
   'Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.';
 
-type OrderType = 'Pick up' | 'Delivery' | '';
-type PaymentMethod = 'Cash' | 'InstaPay' | 'Mixed Payment' | '';
+type OrderType = PublishedOrderTypeLabel | '';
+type PaymentMethod = PublishedPaymentMethodLabel | '';
 type SubmissionStatus = 'idle' | 'submitting' | 'success' | 'error';
 type OrderIntent = Omit<OnlineOrderRequestV1, 'idempotencyKey'>;
 
 export function CartDrawer() {
   const { items, isCartOpen, setIsCartOpen, updateQuantity, removeFromCart, clearCart } = useCart();
-  const { extrasByProduct, comboBeveragesByProduct, products } = useMenu();
+  const { extrasByProduct, comboBeveragesByProduct, products, checkoutPolicy } = useMenu();
   const [, navigate] = useLocation();
 
   const [orderType, setOrderType] = useState<OrderType>('');
@@ -42,6 +48,21 @@ export function CartDrawer() {
   const [comboBeverageSelections, setComboBeverageSelections] = useState<Record<string, string>>(
     {},
   );
+
+  const availableOrderTypes = checkoutPolicy ? checkoutPolicy.orderTypes : [];
+  const availablePaymentMethods = checkoutPolicy ? checkoutPolicy.paymentMethods : [];
+
+  useEffect(() => {
+    if (orderType !== '' && !availableOrderTypes.includes(orderType)) {
+      setOrderType('');
+    }
+  }, [availableOrderTypes, orderType]);
+
+  useEffect(() => {
+    if (paymentMethod !== '' && !availablePaymentMethods.includes(paymentMethod)) {
+      setPaymentMethod('');
+    }
+  }, [availablePaymentMethods, paymentMethod]);
 
   const canonicalUnitPrice = (item: (typeof items)[number]): number | null => {
     const productId = item.baseProductId ?? item.id;
@@ -63,20 +84,33 @@ export function CartDrawer() {
     const unitPrice = canonicalUnitPrice(item);
     return total + (unitPrice ?? 0) * item.quantity;
   }, 0);
+  const checkoutPolicyBlock = checkoutPolicy
+    ? checkoutBlockReason(checkoutPolicy, canonicalCartTotal)
+    : 'unavailable';
+  const checkoutEstimate = checkoutPolicy
+    ? calculatePublishedCheckoutEstimate(checkoutPolicy, canonicalCartTotal)
+    : null;
+  const hasAllowedOrderType = orderType !== '' && availableOrderTypes.includes(orderType);
+  const hasAllowedPaymentMethod =
+    paymentMethod !== '' && availablePaymentMethods.includes(paymentMethod);
   const isDelivery = orderType === 'Delivery';
   const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
+  const displayedCheckoutTotal = checkoutEstimate
+    ? (checkoutEstimate.totalMinor / 100).toFixed(2)
+    : canonicalCartTotal.toFixed(2);
   const displayTotal = isDelivery
-    ? `${canonicalCartTotal} EGP + Delivery Fee`
-    : `${canonicalCartTotal} EGP`;
+    ? `${displayedCheckoutTotal} EGP + Delivery Fee`
+    : `${displayedCheckoutTotal} EGP`;
   const isCustomerNameMissing = !customerName.trim();
 
   const isCheckoutDisabled =
+    checkoutPolicyBlock !== null ||
     submissionStatus === 'submitting' ||
     items.length === 0 ||
     hasUnpriceableCartItem ||
     isCustomerNameMissing ||
-    !orderType ||
-    !paymentMethod ||
+    !hasAllowedOrderType ||
+    !hasAllowedPaymentMethod ||
     (isDelivery && (!customerPhone.trim() || !deliveryAddress.trim()));
 
   const handleStartOrdering = () => {
@@ -118,11 +152,19 @@ export function CartDrawer() {
 
   const handleCheckout = async () => {
     if (items.length === 0 || submissionStatus === 'submitting') return;
+    if (!checkoutPolicy || checkoutPolicyBlock === 'unavailable') {
+      alert('Online ordering is temporarily unavailable.');
+      return;
+    }
+    if (checkoutPolicyBlock === 'minimum_order') {
+      alert(`Minimum order is ${checkoutPolicy.minimumOrderMinor / 100} EGP.`);
+      return;
+    }
     if (!customerName.trim()) {
       alert('Please enter your name.');
       return;
     }
-    if (!orderType) {
+    if (!hasAllowedOrderType) {
       alert('Please select an order type.');
       return;
     }
@@ -134,7 +176,7 @@ export function CartDrawer() {
       alert('Please enter your delivery address.');
       return;
     }
-    if (!paymentMethod) {
+    if (!hasAllowedPaymentMethod) {
       alert('Please select a payment method.');
       return;
     }
@@ -402,7 +444,7 @@ export function CartDrawer() {
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Order Type</label>
               <div className="flex gap-2">
-                {(['Pick up', 'Delivery'] as const).map((type) => (
+                {availableOrderTypes.map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -454,7 +496,7 @@ export function CartDrawer() {
             <div className="space-y-2">
               <label className="text-sm text-gray-400 font-semibold">Payment Method</label>
               <div className="flex gap-2">
-                {(['Cash', 'InstaPay', 'Mixed Payment'] as const).map((method) => (
+                {availablePaymentMethods.map((method) => (
                   <button
                     key={method}
                     type="button"
@@ -485,6 +527,24 @@ export function CartDrawer() {
               </div>
             )}
 
+            {checkoutPolicyBlock === 'unavailable' && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300"
+              >
+                Online ordering is temporarily unavailable.
+              </div>
+            )}
+
+            {checkoutPolicyBlock === 'minimum_order' && checkoutPolicy && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300"
+              >
+                Minimum order is {checkoutPolicy.minimumOrderMinor / 100} EGP.
+              </div>
+            )}
+
             {hasUnpriceableCartItem && (
               <div
                 role="alert"
@@ -508,8 +568,30 @@ export function CartDrawer() {
 
         {items.length > 0 && submissionStatus !== 'success' && (
           <div className="p-4 bg-[#111] border-t border-white/10">
+            {checkoutEstimate && (
+              <div className="mb-3 space-y-1 text-sm text-gray-300">
+                <div className="flex justify-between">
+                  <span>Items</span>
+                  <span>{(checkoutEstimate.itemsSubtotalMinor / 100).toFixed(2)} EGP</span>
+                </div>
+                {checkoutEstimate.serviceChargeMinor > 0 && (
+                  <div className="flex justify-between">
+                    <span>Service charge</span>
+                    <span>{(checkoutEstimate.serviceChargeMinor / 100).toFixed(2)} EGP</span>
+                  </div>
+                )}
+                {checkoutEstimate.taxMinor > 0 && (
+                  <div className="flex justify-between">
+                    <span>{isDelivery ? 'Tax/VAT before delivery fee' : 'Tax/VAT'}</span>
+                    <span>{(checkoutEstimate.taxMinor / 100).toFixed(2)} EGP</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2 text-white">
-              <span className="font-bold text-gray-400">Total</span>
+              <span className="font-bold text-gray-400">
+                {isDelivery ? 'Estimated total' : 'Total'}
+              </span>
               <span className="text-xl font-bold text-[#D4AF37]">{displayTotal}</span>
             </div>
             {isDelivery && (
