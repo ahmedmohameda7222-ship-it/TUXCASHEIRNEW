@@ -187,7 +187,9 @@ export function validateOrderDraft(
       preparePaymentParts(draft.payment, configuration.paymentMethods, pricing.totalMinor, {
         channel,
         deliveryZoneId: orderType?.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
-        paymentMethodZoneRules: configuration.settings?.paymentMethodZoneRules,
+        ...(configuration.settings?.paymentMethodZoneRules === undefined
+          ? {}
+          : { paymentMethodZoneRules: configuration.settings.paymentMethodZoneRules }),
       });
     } catch (error) {
       issues.push({
