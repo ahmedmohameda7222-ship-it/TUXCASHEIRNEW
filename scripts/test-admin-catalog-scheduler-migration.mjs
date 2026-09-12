@@ -11,6 +11,7 @@ for (const required of [
   'for update skip locked',
   'claimed_at',
   'lease',
+  'p_attempt_count',
 ]) {
   if (!sql.includes(required)) throw new Error(`catalog scheduler migration missing ${required}`);
 }
@@ -86,7 +87,7 @@ begin
   end if;
 
   if not public.mark_admin_config_change_failed_v1(
-    '${scheduleId}', 'publish:draft-fixture:48', 'fixture failure'
+    '${scheduleId}', 'publish:draft-fixture:48', 1, 'fixture failure'
   ) then
     raise exception 'scheduler failed transition was rejected';
   end if;
@@ -100,8 +101,14 @@ begin
     raise exception 'failed scheduler row was not retryable: %', v_reclaim;
   end if;
 
+  if public.mark_admin_config_change_applied_v1(
+    '${scheduleId}', 'publish:draft-fixture:48', 1, '{"ok":true,"publishVersion":48}'::jsonb
+  ) then
+    raise exception 'stale scheduler attempt was allowed to complete a newer claim';
+  end if;
+
   if not public.mark_admin_config_change_applied_v1(
-    '${scheduleId}', 'publish:draft-fixture:48', '{"ok":true,"publishVersion":49}'::jsonb
+    '${scheduleId}', 'publish:draft-fixture:48', 2, '{"ok":true,"publishVersion":49}'::jsonb
   ) then
     raise exception 'scheduler applied transition was rejected';
   end if;
@@ -147,6 +154,18 @@ begin
   where x.id = '${staleScheduleId}' and x.attempt_count = 2;
   if v_count <> 1 then
     raise exception 'stale scheduler lease was not reclaimed';
+  end if;
+
+  if public.mark_admin_config_change_failed_v1(
+    '${staleScheduleId}', 'availability:fixture:true', 1, 'stale worker failure'
+  ) then
+    raise exception 'stale scheduler failure transition changed a newer claim';
+  end if;
+
+  if not public.mark_admin_config_change_failed_v1(
+    '${staleScheduleId}', 'availability:fixture:true', 2, 'current worker failure'
+  ) then
+    raise exception 'current scheduler failure transition was rejected';
   end if;
 
   if has_function_privilege(
