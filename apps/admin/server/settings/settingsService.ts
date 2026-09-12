@@ -10,7 +10,10 @@ import type {
   AdminShopSettingsSummary,
   AdminSpecialHoursConfiguration,
   AdminWeeklyHoursConfiguration,
+  CanonicalSettingsRowEditResult,
+  OrderTypeEditInput,
   PaymentMethodChannel,
+  PaymentMethodEditInput,
   ResolvedSetting,
   SettingWriteInput,
   SettingWriteResult,
@@ -66,6 +69,10 @@ export interface SettingsStore {
     value: unknown;
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
+  updateOrderType(input: { employeeId: string } & OrderTypeEditInput): Promise<CanonicalSettingsRowEditResult>;
+  updatePaymentMethod(
+    input: { employeeId: string } & PaymentMethodEditInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
 }
 
 type ShopRow = {
@@ -335,6 +342,24 @@ function parseSettingWriteResult(value: unknown): SettingWriteResult {
   return { ok: false, code: value['code'] };
 }
 
+function parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {
+  if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
+    throw new SettingsServiceError('backend_contract_invalid');
+  }
+  if (value['ok'] === true) {
+    return { ok: true, editVersion: safeInteger(value['editVersion'], 1) };
+  }
+  if (typeof value['code'] !== 'string') throw new SettingsServiceError('backend_contract_invalid');
+  if (value['code'] === 'stale_settings_version' || value['code'] === 'stale_edit_version') {
+    return {
+      ok: false,
+      code: value['code'],
+      currentVersion: safeInteger(value['currentVersion']),
+    };
+  }
+  return { ok: false, code: value['code'] };
+}
+
 function parsePublishResult(value: unknown): SettingsPublishResult {
   if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
     throw new SettingsServiceError('backend_contract_invalid');
@@ -429,6 +454,22 @@ export function createSettingsService(store: SettingsStore) {
     ): Promise<SettingWriteResult> {
       requirePermission(principal, 'settings.manage', input.shopId);
       return store.upsertShopOverride({ employeeId: principal.employeeId, ...input });
+    },
+
+    async updateOrderType(
+      input: OrderTypeEditInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.updateOrderType({ employeeId: principal.employeeId, ...input });
+    },
+
+    async updatePaymentMethod(
+      input: PaymentMethodEditInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<CanonicalSettingsRowEditResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.updatePaymentMethod({ employeeId: principal.employeeId, ...input });
     },
 
     async deleteOrArchiveShop(
@@ -631,6 +672,62 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_expected_version: expectedVersion,
       });
       return parseSettingWriteResult(result);
+    },
+
+    async updateOrderType({
+      employeeId,
+      shopId,
+      orderTypeId,
+      name,
+      behavior,
+      active,
+      sortOrder,
+      expectedSettingsVersion,
+      expectedEditVersion,
+    }) {
+      const result = await client.rpc<unknown>('update_admin_order_type_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_order_type_id: orderTypeId,
+        p_name: name,
+        p_behavior: behavior,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_expected_edit_version: expectedEditVersion,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
+    },
+
+    async updatePaymentMethod({
+      employeeId,
+      shopId,
+      paymentMethodId,
+      displayName,
+      active,
+      sortOrder,
+      channel,
+      requiresReference,
+      manualConfirmationRequired,
+      refundAllowed,
+      expectedSettingsVersion,
+      expectedEditVersion,
+    }) {
+      const result = await client.rpc<unknown>('update_admin_payment_method_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_payment_method_id: paymentMethodId,
+        p_display_name: displayName,
+        p_active: active,
+        p_sort_order: sortOrder,
+        p_channel: channel,
+        p_requires_reference: requiresReference,
+        p_manual_confirmation_required: manualConfirmationRequired,
+        p_refund_allowed: refundAllowed,
+        p_expected_settings_version: expectedSettingsVersion,
+        p_expected_edit_version: expectedEditVersion,
+      });
+      return parseCanonicalSettingsRowEditResult(result);
     },
   };
 }
