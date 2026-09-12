@@ -344,9 +344,7 @@ function parseSettingWriteResult(value: unknown): SettingWriteResult {
   return { ok: false, code: value['code'] };
 }
 
-function parseCanonicalSettingsRowEditResult(
-  value: unknown,
-): CanonicalSettingsRowEditResult {
+function parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {
   if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
     throw new SettingsServiceError('backend_contract_invalid');
   }
