@@ -1,9 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-
 import type { AdminSessionPrincipal, AdminSettingsWorkspace } from '@tux/admin-contracts';
-import * as prettier from 'prettier';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -136,32 +131,29 @@ describe('Admin settings service', () => {
     });
   });
 
-  it(
-    'updates a canonical order type through a shop and row version-fenced trusted command',
-    async () => {
-      const updateOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
-      const service = createSettingsService(store({ updateOrderType }));
-      const input = {
-        shopId: 'shop-1',
-        orderTypeId: 'order-type-1',
-        name: 'Pick up',
-        behavior: 'TAKE_AWAY' as const,
-        active: true,
-        sortOrder: 1,
-        expectedSettingsVersion: 4,
-        expectedEditVersion: 2,
-      };
+  it('updates a canonical order type through a shop and row version-fenced trusted command', async () => {
+    const updateOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
+    const service = createSettingsService(store({ updateOrderType }));
+    const input = {
+      shopId: 'shop-1',
+      orderTypeId: 'order-type-1',
+      name: 'Pick up',
+      behavior: 'TAKE_AWAY' as const,
+      active: true,
+      sortOrder: 1,
+      expectedSettingsVersion: 4,
+      expectedEditVersion: 2,
+    };
 
-      await expect(service.updateOrderType(input, owner)).resolves.toEqual({
-        ok: true,
-        editVersion: 3,
-      });
-      expect(updateOrderType).toHaveBeenCalledWith({
-        employeeId: 'employee-1',
-        ...input,
-      });
-    },
-  );
+    await expect(service.updateOrderType(input, owner)).resolves.toEqual({
+      ok: true,
+      editVersion: 3,
+    });
+    expect(updateOrderType).toHaveBeenCalledWith({
+      employeeId: 'employee-1',
+      ...input,
+    });
+  });
 
   it('updates only approved payment configuration fields through the trusted command', async () => {
     const updatePaymentMethod = vi.fn(async () => ({ ok: true as const, editVersion: 8 }));
@@ -208,25 +200,5 @@ describe('Admin settings service', () => {
 
     expect(resolveAllowedPaymentMethods(methods, { channel: 'ONLINE' })).toEqual([]);
     expect(resolveAllowedPaymentMethods(methods, { channel: 'POS' })).toEqual(methods);
-  });
-
-  it('prints exact prettier diffs for the three currently failing format targets', async () => {
-    const targets = [
-      'apps/admin/server/settings/settingsService.test.ts',
-      'apps/admin/server/settings/settingsService.ts',
-      'packages/admin-contracts/src/settings.ts',
-    ];
-
-    for (const target of targets) {
-      const source = fs.readFileSync(target, 'utf8');
-      const config = await prettier.resolveConfig(target);
-      const formatted = await prettier.format(source, { ...config, filepath: target });
-      const temporary = path.join('/tmp', `${path.basename(target)}.prettier`);
-      fs.writeFileSync(temporary, formatted);
-      const diff = spawnSync('git', ['diff', '--no-index', '--', target, temporary], {
-        encoding: 'utf8',
-      });
-      console.log(`PRETTIER_DIFF_BEGIN ${target}\n${diff.stdout}\nPRETTIER_DIFF_END ${target}`);
-    }
   });
 });
