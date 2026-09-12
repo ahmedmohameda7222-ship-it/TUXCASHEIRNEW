@@ -16,11 +16,22 @@ export type CatalogScheduledChange = {
 export interface CatalogSchedulerStore {
   /**
    * Atomically claims due rows for this worker. Implementations must not return a row that
-   * another worker can concurrently execute; persistent claim state is the idempotency fence.
+   * another worker can concurrently execute; persistent claim state plus attemptCount fence
+   * terminal transitions against a newer reclaimed lease.
    */
   claimDue(input: { now: string; limit: number }): Promise<CatalogScheduledChange[]>;
-  markApplied(input: { id: string; idempotencyKey: string; result: unknown }): Promise<void>;
-  markFailed(input: { id: string; idempotencyKey: string; error: string }): Promise<void>;
+  markApplied(input: {
+    id: string;
+    idempotencyKey: string;
+    attemptCount: number;
+    result: unknown;
+  }): Promise<void>;
+  markFailed(input: {
+    id: string;
+    idempotencyKey: string;
+    attemptCount: number;
+    error: string;
+  }): Promise<void>;
 }
 
 export interface CatalogSchedulerRpcClient {
@@ -148,6 +159,7 @@ export function createSupabaseCatalogSchedulerStore(
       const result = await client.rpc<unknown>('mark_admin_config_change_applied_v1', {
         p_id: input.id,
         p_idempotency_key: input.idempotencyKey,
+        p_attempt_count: input.attemptCount,
         p_result: input.result,
       });
       requireRpcTransition(result);
@@ -157,6 +169,7 @@ export function createSupabaseCatalogSchedulerStore(
       const result = await client.rpc<unknown>('mark_admin_config_change_failed_v1', {
         p_id: input.id,
         p_idempotency_key: input.idempotencyKey,
+        p_attempt_count: input.attemptCount,
         p_error: input.error,
       });
       requireRpcTransition(result);
@@ -290,6 +303,7 @@ export async function runCatalogScheduler(
       await dependencies.store.markApplied({
         id: change.id,
         idempotencyKey: change.idempotencyKey,
+        attemptCount: change.attemptCount,
         result,
       });
       applied += 1;
@@ -297,6 +311,7 @@ export async function runCatalogScheduler(
       await dependencies.store.markFailed({
         id: change.id,
         idempotencyKey: change.idempotencyKey,
+        attemptCount: change.attemptCount,
         error: schedulerErrorMessage(error),
       });
       failed += 1;
