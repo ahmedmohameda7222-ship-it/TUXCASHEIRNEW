@@ -7,6 +7,7 @@ import type {
   SettingsCommand,
   SettingsPublishResult,
   SettingWriteResult,
+  ShopDeleteOrArchiveResult,
 } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
@@ -233,11 +234,30 @@ export function useSettings(shopId: string | undefined) {
     onSuccess: invalidateWorkspace,
   });
 
+  const deleteOrArchiveShop = useMutation({
+    mutationFn: async (): Promise<ShopDeleteOrArchiveResult> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      requireWorkspaceShop(shopId, latestWorkspace());
+      const result = await adminFetch<ShopDeleteOrArchiveResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'shop.delete-or-archive', shopId }),
+        },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) throw new SettingsUiError(result.code);
+      return result;
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   return {
     workspaceQuery,
     publish,
     updateSettingOverride,
     updateOrderType,
     updatePaymentMethod,
+    deleteOrArchiveShop,
   };
 }
