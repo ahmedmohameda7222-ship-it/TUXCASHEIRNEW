@@ -40,6 +40,18 @@ async function mockSettings(page: Page) {
     integrationReference: null,
     editVersion: 5,
   };
+  const businessDefaults = [
+    { key: 'checkout.minimumOrderMinor', value: 3000, version: 1 },
+    { key: 'checkout.serviceChargeBps', value: 500, version: 1 },
+    { key: 'checkout.taxBps', value: 1400, version: 1 },
+    { key: 'checkout.requireCustomerPhone', value: false, version: 1 },
+    { key: 'checkout.allowScheduledOrders', value: false, version: 1 },
+    { key: 'receipt.footer', value: 'Thank you', version: 2 },
+    { key: 'receipt.orderPrefix', value: 'TUX-', version: 1 },
+    { key: 'receipt.sequenceStart', value: 1, version: 1 },
+    { key: 'receipt.sequenceResetPolicy', value: 'BUSINESS_DAY', version: 1 },
+  ];
+  const shopOverrides = [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }];
   const commands: Record<string, unknown>[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
@@ -74,12 +86,8 @@ async function mockSettings(page: Page) {
             onlineOrdersPaused: false,
           },
           settingsVersion,
-          businessDefaults: [
-            { key: 'receipt.footer', value: 'Thank you', version: 2 },
-            { key: 'receipt.orderPrefix', value: 'TUX-', version: 1 },
-            { key: 'receipt.sequenceStart', value: 1, version: 1 },
-          ],
-          shopOverrides: [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }],
+          businessDefaults,
+          shopOverrides,
           orderTypes: [orderType],
           paymentMethods: [paymentMethod],
           deliveryZones: [],
@@ -105,6 +113,27 @@ async function mockSettings(page: Page) {
     expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
+
+    if (command.type === 'setting.override.upsert') {
+      const settingKey = String(command.settingKey);
+      const current = shopOverrides.find((row) => row.key === settingKey);
+      expect(command.expectedVersion).toBe(current?.version ?? null);
+      if (current) {
+        current.value = command.value;
+        current.version += 1;
+      } else {
+        shopOverrides.push({ key: settingKey, value: command.value, version: 1 });
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          version: shopOverrides.find((row) => row.key === settingKey)!.version,
+        }),
+      });
+      return;
+    }
 
     if (command.type === 'order-type.update') {
       expect(command).toMatchObject({
@@ -222,10 +251,45 @@ test('settings route edits canonical order and payment configuration before publ
   await page.getByRole('button', { name: 'Publish settings' }).click();
   await expect(page.getByText('Live settings version 8')).toBeVisible();
 
-  expect(fixture.commands).toHaveLength(3);
   expect(fixture.commands.map((command) => command.type)).toEqual([
     'order-type.update',
     'payment-method.update',
     'settings.publish',
+  ]);
+});
+
+test('settings route saves checkout and receipt shop overrides with CAS before publish', async ({
+  page,
+}) => {
+  const fixture = await mockSettings(page);
+  await page.goto('/settings');
+
+  await page.getByRole('button', { name: 'Checkout' }).click();
+  await page.getByLabel('Tax / VAT (bps)').fill('1200');
+  await page.getByRole('button', { name: 'Save Tax / VAT (bps)' }).click();
+  await expect(page.getByText('Shop override')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Receipts' }).click();
+  await page.getByLabel('Order prefix').fill('MAADI-');
+  await page.getByRole('button', { name: 'Save Order prefix' }).click();
+  await expect(page.getByLabel('Order prefix')).toHaveValue('MAADI-');
+
+  await page.getByRole('button', { name: 'Publish settings' }).click();
+  await expect(page.getByText('Live settings version 8')).toBeVisible();
+
+  expect(fixture.commands).toEqual([
+    expect.objectContaining({
+      type: 'setting.override.upsert',
+      settingKey: 'checkout.taxBps',
+      value: 1200,
+      expectedVersion: null,
+    }),
+    expect.objectContaining({
+      type: 'setting.override.upsert',
+      settingKey: 'receipt.orderPrefix',
+      value: 'MAADI-',
+      expectedVersion: 4,
+    }),
+    expect.objectContaining({ type: 'settings.publish' }),
   ]);
 });
