@@ -41,6 +41,21 @@ function createStore(): CatalogSchedulerStore {
   };
 }
 
+function scheduledPublish(id: string, attemptCount = 1): CatalogScheduledChange {
+  return {
+    id,
+    businessId: 'business-1',
+    shopId: 'shop-a',
+    createdByEmployeeId: 'employee-1',
+    changeKind: 'CATALOG_PUBLISH',
+    payload: { draftId: `draft-${id}`, expectedDraftRevision: 3 },
+    scheduledFor: '2026-09-11T05:00:00.000Z',
+    targetBasePublishVersion: 48,
+    idempotencyKey: `publish:${id}:48`,
+    attemptCount,
+  };
+}
+
 describe('catalog scheduler', () => {
   it('activates a due Cairo schedule exactly once across repeated runs', async () => {
     const store = createStore();
@@ -66,6 +81,46 @@ describe('catalog scheduler', () => {
       result: { ok: true, publishVersion: 49 },
     });
     expect(store.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('classifies deterministic command rejection as terminal and transport failure as retryable', async () => {
+    const first = scheduledPublish('terminal');
+    const second = scheduledPublish('retryable');
+    const markFailed = vi.fn();
+    const store: CatalogSchedulerStore = {
+      claimDue: vi.fn(async () => [first, second]),
+      markApplied: vi.fn(),
+      markFailed,
+    };
+    const publish = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, code: 'stale_draft_revision' })
+      .mockRejectedValueOnce(new Error('socket reset'));
+
+    await runCatalogScheduler({
+      store,
+      publish,
+      setAvailability: vi.fn(),
+      materializeRecurring: vi.fn().mockResolvedValue({ ok: true, materialized: 0 }),
+      now: () => new Date('2026-09-11T05:00:00.000Z'),
+    });
+
+    expect(markFailed).toHaveBeenNthCalledWith(1, {
+      id: first.id,
+      idempotencyKey: first.idempotencyKey,
+      attemptCount: 1,
+      error: 'catalog_scheduler_stale_draft_revision',
+      retryable: false,
+      now: '2026-09-11T05:00:00.000Z',
+    });
+    expect(markFailed).toHaveBeenNthCalledWith(2, {
+      id: second.id,
+      idempotencyKey: second.idempotencyKey,
+      attemptCount: 1,
+      error: 'socket reset',
+      retryable: true,
+      now: '2026-09-11T05:00:00.000Z',
+    });
   });
 
   it('materializes recurring availability boundaries before claiming due work', async () => {
