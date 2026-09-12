@@ -234,7 +234,10 @@ describe('order-intake published checkout settings authority', () => {
       publishedAuthority({ orderTypes: [{ behavior: 'DELIVERY', active: true }] }),
     );
 
-    const response = await handleOrderIntakeRequest(request({ fulfillmentPreference: 'PICKUP' }), store);
+    const response = await handleOrderIntakeRequest(
+      request({ fulfillmentPreference: 'PICKUP' }),
+      store,
+    );
 
     expect(response.status).toBe(409);
     await expect(errorCode(response)).resolves.toBe('fulfillment_unavailable');

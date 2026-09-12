@@ -7,6 +7,9 @@ describe('CartDrawer published checkout policy integration', () => {
   it('renders only published checkout choices and uses the public policy block reason', () => {
     expect(source).toContain('checkoutPolicy');
     expect(source).toContain('checkoutBlockReason');
+    expect(source).toContain('calculatePublishedCheckoutEstimate');
+    expect(source).toContain('Service charge');
+    expect(source).toContain('Tax/VAT');
     expect(source).toContain('checkoutPolicy.orderTypes');
     expect(source).toContain('checkoutPolicy.paymentMethods');
     expect(source).toContain("'minimum_order'");

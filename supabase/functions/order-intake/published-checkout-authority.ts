@@ -2,11 +2,15 @@ import { parseOperationsConfigurationBundle } from '../../../packages/domain/src
 
 import type { OnlineOrderPublishedCheckoutAuthority } from './order-intake.ts';
 
-function minimumOrderMinor(values: Readonly<Record<string, unknown>>): number {
-  const value = values['checkout.minimumOrderMinor'];
+function nonNegativeIntegerSetting(
+  values: Readonly<Record<string, unknown>>,
+  key: 'checkout.minimumOrderMinor' | 'checkout.serviceChargeBps' | 'checkout.taxBps',
+  maximum: number,
+): number {
+  const value = values[key];
   if (value === undefined) return 0;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw new TypeError('published checkout.minimumOrderMinor is invalid');
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new TypeError(`published ${key} is invalid`);
   }
   return value;
 }
@@ -28,7 +32,17 @@ export function projectPublishedCheckoutAuthority(
     lifecycleState: settings?.shopIdentity.lifecycleState ?? 'ACTIVE',
     temporaryClosed: settings?.shopIdentity.temporaryClosed ?? false,
     onlineOrdersPaused: settings?.shopIdentity.onlineOrdersPaused ?? false,
-    minimumOrderMinor: minimumOrderMinor(settings?.values ?? {}),
+    minimumOrderMinor: nonNegativeIntegerSetting(
+      settings?.values ?? {},
+      'checkout.minimumOrderMinor',
+      Number.MAX_SAFE_INTEGER,
+    ),
+    serviceChargeBps: nonNegativeIntegerSetting(
+      settings?.values ?? {},
+      'checkout.serviceChargeBps',
+      10_000,
+    ),
+    taxBps: nonNegativeIntegerSetting(settings?.values ?? {}, 'checkout.taxBps', 10_000),
     orderTypes: snapshot.orderTypes.map((orderType) => ({
       behavior: orderType.behavior,
       active: orderType.active,

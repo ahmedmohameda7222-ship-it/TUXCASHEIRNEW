@@ -172,6 +172,8 @@ describe('published catalog-public ordering projection', () => {
   });
 
   it('fails closed on a cross-shop published bundle', () => {
-    expect(() => projectPublishedPublicOrdering(bundle(), OTHER_SHOP_ID)).toThrow(/different shop/i);
+    expect(() => projectPublishedPublicOrdering(bundle(), OTHER_SHOP_ID)).toThrow(
+      /different shop/i,
+    );
   });
 });

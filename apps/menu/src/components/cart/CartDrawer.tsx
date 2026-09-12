@@ -13,13 +13,14 @@ import {
 } from '@/lib/checkout-attempt';
 import { configuredOrderShopId, submitOnlineOrder } from '@/lib/order-intake';
 import {
+  calculatePublishedCheckoutEstimate,
   checkoutBlockReason,
   type PublishedOrderTypeLabel,
   type PublishedPaymentMethodLabel,
 } from '@/lib/published-checkout-policy';
 
 const DELIVERY_FEE_MESSAGE =
-  'Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.';
+  'Delivery fee is not included in this estimate. After you place the order, we will confirm the delivery fee; final tax and total will be recalculated from the same published checkout rules.';
 
 const DELIVERY_MIXED_PAYMENT_MESSAGE =
   'Because this is a delivery order, the delivery fee has not been calculated yet. After you place the order, we will contact you to confirm the delivery fee and arrange the mixed payment details.';
@@ -86,14 +87,20 @@ export function CartDrawer() {
   const checkoutPolicyBlock = checkoutPolicy
     ? checkoutBlockReason(checkoutPolicy, canonicalCartTotal)
     : 'unavailable';
+  const checkoutEstimate = checkoutPolicy
+    ? calculatePublishedCheckoutEstimate(checkoutPolicy, canonicalCartTotal)
+    : null;
   const hasAllowedOrderType = orderType !== '' && availableOrderTypes.includes(orderType);
   const hasAllowedPaymentMethod =
     paymentMethod !== '' && availablePaymentMethods.includes(paymentMethod);
   const isDelivery = orderType === 'Delivery';
   const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
+  const displayedCheckoutTotal = checkoutEstimate
+    ? (checkoutEstimate.totalMinor / 100).toFixed(2)
+    : canonicalCartTotal.toFixed(2);
   const displayTotal = isDelivery
-    ? `${canonicalCartTotal} EGP + Delivery Fee`
-    : `${canonicalCartTotal} EGP`;
+    ? `${displayedCheckoutTotal} EGP + Delivery Fee`
+    : `${displayedCheckoutTotal} EGP`;
   const isCustomerNameMissing = !customerName.trim();
 
   const isCheckoutDisabled =
@@ -561,8 +568,30 @@ export function CartDrawer() {
 
         {items.length > 0 && submissionStatus !== 'success' && (
           <div className="p-4 bg-[#111] border-t border-white/10">
+            {checkoutEstimate && (
+              <div className="mb-3 space-y-1 text-sm text-gray-300">
+                <div className="flex justify-between">
+                  <span>Items</span>
+                  <span>{(checkoutEstimate.itemsSubtotalMinor / 100).toFixed(2)} EGP</span>
+                </div>
+                {checkoutEstimate.serviceChargeMinor > 0 && (
+                  <div className="flex justify-between">
+                    <span>Service charge</span>
+                    <span>{(checkoutEstimate.serviceChargeMinor / 100).toFixed(2)} EGP</span>
+                  </div>
+                )}
+                {checkoutEstimate.taxMinor > 0 && (
+                  <div className="flex justify-between">
+                    <span>{isDelivery ? 'Tax/VAT before delivery fee' : 'Tax/VAT'}</span>
+                    <span>{(checkoutEstimate.taxMinor / 100).toFixed(2)} EGP</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2 text-white">
-              <span className="font-bold text-gray-400">Total</span>
+              <span className="font-bold text-gray-400">
+                {isDelivery ? 'Estimated total' : 'Total'}
+              </span>
               <span className="text-xl font-bold text-[#D4AF37]">{displayTotal}</span>
             </div>
             {isDelivery && (

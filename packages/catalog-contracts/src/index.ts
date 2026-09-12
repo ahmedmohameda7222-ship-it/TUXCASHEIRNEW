@@ -82,6 +82,8 @@ export interface PublicOrderingV2 {
   readonly temporaryClosed: boolean;
   readonly onlineOrdersPaused: boolean;
   readonly minimumOrderMinor: number;
+  readonly serviceChargeBps?: number;
+  readonly taxBps?: number;
   readonly fulfillmentPreferences: readonly PublicFulfillmentPreferenceV2[];
   readonly paymentPreferences: readonly PublicPaymentPreferenceV2[];
 }
@@ -295,6 +297,15 @@ function nonNegativeInteger(value: unknown, path: string): number {
   return value as number;
 }
 
+function basisPointsOrDefault(value: unknown, path: string): number {
+  if (value === undefined) return 0;
+  const parsed = nonNegativeInteger(value, path);
+  if (parsed > 10_000) {
+    throw new CatalogContractError(`${path} must be an integer between 0 and 10000`);
+  }
+  return parsed;
+}
+
 function positiveIntegerOrNull(value: unknown, path: string): number | null {
   if (value === null) return null;
   if (!Number.isSafeInteger(value) || (value as number) <= 0) {
@@ -466,6 +477,8 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
       'temporaryClosed',
       'onlineOrdersPaused',
       'minimumOrderMinor',
+      'serviceChargeBps',
+      'taxBps',
       'fulfillmentPreferences',
       'paymentPreferences',
     ],
@@ -476,6 +489,8 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
     temporaryClosed: requiredBoolean(row.temporaryClosed, `${path}.temporaryClosed`),
     onlineOrdersPaused: requiredBoolean(row.onlineOrdersPaused, `${path}.onlineOrdersPaused`),
     minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),
+    serviceChargeBps: basisPointsOrDefault(row.serviceChargeBps, `${path}.serviceChargeBps`),
+    taxBps: basisPointsOrDefault(row.taxBps, `${path}.taxBps`),
     fulfillmentPreferences: parseStringEnumArray(
       row.fulfillmentPreferences,
       `${path}.fulfillmentPreferences`,

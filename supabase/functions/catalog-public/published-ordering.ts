@@ -11,11 +11,15 @@ export interface PublishedPublicOrderingProjection {
   readonly ordering: PublicOrderingV2;
 }
 
-function minimumOrderMinor(values: Readonly<Record<string, unknown>>): number {
-  const value = values['checkout.minimumOrderMinor'];
+function nonNegativeIntegerSetting(
+  values: Readonly<Record<string, unknown>>,
+  key: 'checkout.minimumOrderMinor' | 'checkout.serviceChargeBps' | 'checkout.taxBps',
+  maximum: number,
+): number {
+  const value = values[key];
   if (value === undefined) return 0;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw new TypeError('published checkout.minimumOrderMinor is invalid');
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new TypeError(`published ${key} is invalid`);
   }
   return value;
 }
@@ -55,10 +59,14 @@ export function projectPublishedPublicOrdering(
 
   const identity = settings.shopIdentity;
   const fulfillmentPreferences: PublicFulfillmentPreferenceV2[] = [];
-  if (snapshot.orderTypes.some((orderType) => orderType.active && orderType.behavior === 'TAKE_AWAY')) {
+  if (
+    snapshot.orderTypes.some((orderType) => orderType.active && orderType.behavior === 'TAKE_AWAY')
+  ) {
     fulfillmentPreferences.push('PICKUP');
   }
-  if (snapshot.orderTypes.some((orderType) => orderType.active && orderType.behavior === 'DELIVERY')) {
+  if (
+    snapshot.orderTypes.some((orderType) => orderType.active && orderType.behavior === 'DELIVERY')
+  ) {
     fulfillmentPreferences.push('DELIVERY');
   }
 
@@ -85,7 +93,17 @@ export function projectPublishedPublicOrdering(
         !identity.onlineOrdersPaused,
       temporaryClosed: identity.temporaryClosed,
       onlineOrdersPaused: identity.onlineOrdersPaused,
-      minimumOrderMinor: minimumOrderMinor(settings.values),
+      minimumOrderMinor: nonNegativeIntegerSetting(
+        settings.values,
+        'checkout.minimumOrderMinor',
+        Number.MAX_SAFE_INTEGER,
+      ),
+      serviceChargeBps: nonNegativeIntegerSetting(
+        settings.values,
+        'checkout.serviceChargeBps',
+        10_000,
+      ),
+      taxBps: nonNegativeIntegerSetting(settings.values, 'checkout.taxBps', 10_000),
       fulfillmentPreferences,
       paymentPreferences,
     },

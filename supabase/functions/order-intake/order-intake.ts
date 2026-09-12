@@ -104,6 +104,8 @@ export interface OnlineOrderPublishedCheckoutAuthority {
   temporaryClosed: boolean;
   onlineOrdersPaused: boolean;
   minimumOrderMinor: number;
+  serviceChargeBps?: number;
+  taxBps?: number;
   orderTypes: readonly OnlineOrderPublishedOrderType[];
   paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
 }
@@ -178,6 +180,41 @@ function assertTrustedMoney(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} is not a trusted non-negative safe integer`);
   }
+}
+
+function assertBasisPoints(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 10_000)
+    throw new Error(`${label} is not a trusted basis-point rate`);
+}
+
+function applyPublishedBasisPoints(baseMinor: number, basisPoints: number): number {
+  assertTrustedMoney(baseMinor, 'published checkout base');
+  assertBasisPoints(basisPoints, 'published checkout rate');
+  const rounded = (BigInt(baseMinor) * BigInt(basisPoints) + 5_000n) / 10_000n;
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('published checkout overflow');
+  return Number(rounded);
+}
+
+export function calculatePublishedCheckoutPricing(
+  itemsSubtotalMinor: number,
+  authority: Pick<OnlineOrderPublishedCheckoutAuthority, 'serviceChargeBps' | 'taxBps'>,
+): {
+  itemsSubtotalMinor: number;
+  serviceChargeMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+} {
+  assertTrustedMoney(itemsSubtotalMinor, 'published checkout items subtotal');
+  const serviceChargeMinor = applyPublishedBasisPoints(
+    itemsSubtotalMinor,
+    authority.serviceChargeBps ?? 0,
+  );
+  const preTaxMinor = itemsSubtotalMinor + serviceChargeMinor;
+  if (!Number.isSafeInteger(preTaxMinor)) throw new Error('published checkout overflow');
+  const taxMinor = applyPublishedBasisPoints(preTaxMinor, authority.taxBps ?? 0);
+  const totalMinor = preTaxMinor + taxMinor;
+  if (!Number.isSafeInteger(totalMinor)) throw new Error('published checkout overflow');
+  return { itemsSubtotalMinor, serviceChargeMinor, taxMinor, totalMinor };
 }
 
 function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string | null): unknown {
@@ -407,6 +444,7 @@ function publishedCheckoutPolicyError(
     throw new Error('published checkout authority shop mismatch');
   }
   assertTrustedMoney(authority.minimumOrderMinor, 'published minimum order');
+  calculatePublishedCheckoutPricing(itemsSubtotalMinor, authority);
 
   if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
   if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');

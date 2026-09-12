@@ -165,7 +165,9 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
   };
 }
 
-function workspace(configuration: OperationsConfigurationSnapshot = CONFIGURATION): OrdersWorkspace {
+function workspace(
+  configuration: OperationsConfigurationSnapshot = CONFIGURATION,
+): OrdersWorkspace {
   return {
     shopId: SHOP_ID,
     businessDayId: DAY_ID,
