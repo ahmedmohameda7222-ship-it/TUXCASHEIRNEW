@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   checkout-policy:
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'feat(admin): enforce checkout execution authority')
+    if: "${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'feat(admin): enforce checkout execution authority') }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
