@@ -121,7 +121,7 @@ function renderSection(section: SettingsSection): string {
       deletingOrArchivingShop={false}
       onUpdateSettingOverride={noop}
       settingOverrideUpdating={false}
-      onUpdateReasonCode={noop}
+      onUpsertReasonCode={noop}
       reasonCodeUpdating={false}
       onUpdateOrderType={noop}
       orderTypeUpdating={false}
