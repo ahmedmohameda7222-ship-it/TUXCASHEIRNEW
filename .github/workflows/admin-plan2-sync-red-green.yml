@@ -1,0 +1,28 @@
+name: Admin Plan 2 Checkout Snapshot Sync RED-GREEN
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - 'packages/domain/src/checkoutSnapshotSync.test.ts'
+      - 'packages/domain/src/syncContract.ts'
+      - '.github/workflows/admin-plan2-sync-red-green.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkout-snapshot-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Checkout snapshot sync contract
+        run: npx vitest run packages/domain/src/checkoutSnapshotSync.test.ts
