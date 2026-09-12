@@ -56,6 +56,7 @@ begin
      or p_order_type_id is null
      or p_name is null
      or btrim(p_name) = ''
+     or p_behavior is null
      or p_behavior not in ('TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER')
      or p_active is null
      or p_sort_order is null
@@ -162,6 +163,7 @@ begin
      or btrim(p_display_name) = ''
      or p_active is null
      or p_sort_order is null
+     or p_channel is null
      or p_channel not in ('POS', 'ONLINE', 'BOTH')
      or p_requires_reference is null
      or p_manual_confirmation_required is null
