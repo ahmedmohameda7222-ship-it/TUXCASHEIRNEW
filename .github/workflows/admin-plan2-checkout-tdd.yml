@@ -37,75 +37,84 @@ jobs:
           path = Path('packages/application/src/orders.ts')
           text = path.read_text()
 
-          replacements = [
-              (
-                  "const validation = validateOrderDraft(draft, context.configuration);",
-                  "const validation = validateOrderDraft(draft, context.configuration, placement.source);",
-              ),
-              (
-                  """          const preparedPayments = preparePaymentParts(
-            draft.payment,
-            context.configuration.paymentMethods,
-            validation.value.pricing.totalMinor,
-          );""",
-                  """          const preparedPayments = preparePaymentParts(
-            draft.payment,
-            context.configuration.paymentMethods,
-            validation.value.pricing.totalMinor,
-            {
-              channel: placement.source,
-              deliveryZoneId:
-                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
-              paymentMethodZoneRules: context.configuration.settings?.paymentMethodZoneRules,
-            },
-          );""",
-              ),
-              (
-                  """            const payments = this.#buildPayments(preparedPayments);
-            const order: OrderSnapshot = {""",
-                  """            const payments = this.#buildPayments(preparedPayments);
-            const checkoutPaymentRules = preparedPayments.map((part) => ({
-              paymentMethodId: part.method.id,
-              channel: part.method.channel ?? 'BOTH',
-              deliveryZoneId:
-                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
-              zoneAllowed: true,
-            }));
-            const order: OrderSnapshot = {""",
-              ),
-              (
-                  """              discountMinor: validation.value.pricing.discountMinor,
-              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
-              totalMinor: validation.value.pricing.totalMinor,
-              payments,""",
-                  """              discountMinor: validation.value.pricing.discountMinor,
-              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
-              serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
-              taxMinor: validation.value.pricing.taxMinor,
-              checkoutSnapshot: {
-                configurationVersion: currentConfiguration.version,
-                settingsVersion: validation.value.checkoutPolicy.settingsVersion,
-                channel: placement.source,
-                minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,
-                minimumOrderSatisfied: true,
-                serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,
-                serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
-                taxBps: validation.value.checkoutPolicy.taxBps,
-                taxMinor: validation.value.pricing.taxMinor,
-                deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
-                discountMinor: validation.value.pricing.discountMinor,
-                paymentRules: checkoutPaymentRules,
-              },
-              totalMinor: validation.value.pricing.totalMinor,
-              payments,""",
-              ),
-          ]
-
-          for old, new in replacements:
+          def replace_once(old: str, new: str) -> None:
+              global text
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'guarded replacement expected once, found {count}: {old[:80]!r}')
+                  raise SystemExit(
+                      f'guarded replacement expected once, found {count}: {old[:100]!r}'
+                  )
               text = text.replace(old, new, 1)
+
+          replace_once(
+              'const validation = validateOrderDraft(draft, context.configuration);',
+              'const validation = validateOrderDraft(draft, context.configuration, placement.source);',
+          )
+
+          replace_once(
+              'const preparedPayments = preparePaymentParts(\n'
+              '            draft.payment,\n'
+              '            context.configuration.paymentMethods,\n'
+              '            validation.value.pricing.totalMinor,\n'
+              '          );',
+              'const preparedPayments = preparePaymentParts(\n'
+              '            draft.payment,\n'
+              '            context.configuration.paymentMethods,\n'
+              '            validation.value.pricing.totalMinor,\n'
+              '            {\n'
+              '              channel: placement.source,\n'
+              '              deliveryZoneId:\n'
+              "                validation.value.orderType.behavior === 'DELIVERY'\n"
+              '                  ? draft.delivery.zoneId\n'
+              '                  : null,\n'
+              '              paymentMethodZoneRules:\n'
+              '                context.configuration.settings?.paymentMethodZoneRules,\n'
+              '            },\n'
+              '          );',
+          )
+
+          replace_once(
+              'const payments = this.#buildPayments(preparedPayments);\n'
+              '            const order: OrderSnapshot = {',
+              'const payments = this.#buildPayments(preparedPayments);\n'
+              '            const checkoutPaymentRules = preparedPayments.map((part) => ({\n'
+              '              paymentMethodId: part.method.id,\n'
+              "              channel: part.method.channel ?? 'BOTH',\n"
+              '              deliveryZoneId:\n'
+              "                validation.value.orderType.behavior === 'DELIVERY'\n"
+              '                  ? draft.delivery.zoneId\n'
+              '                  : null,\n'
+              '              zoneAllowed: true,\n'
+              '            }));\n'
+              '            const order: OrderSnapshot = {',
+          )
+
+          replace_once(
+              'discountMinor: validation.value.pricing.discountMinor,\n'
+              '              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,\n'
+              '              totalMinor: validation.value.pricing.totalMinor,\n'
+              '              payments,',
+              'discountMinor: validation.value.pricing.discountMinor,\n'
+              '              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,\n'
+              '              serviceChargeMinor: validation.value.pricing.serviceChargeMinor,\n'
+              '              taxMinor: validation.value.pricing.taxMinor,\n'
+              '              checkoutSnapshot: {\n'
+              '                configurationVersion: currentConfiguration.version,\n'
+              '                settingsVersion: validation.value.checkoutPolicy.settingsVersion,\n'
+              '                channel: placement.source,\n'
+              '                minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,\n'
+              '                minimumOrderSatisfied: true,\n'
+              '                serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,\n'
+              '                serviceChargeMinor: validation.value.pricing.serviceChargeMinor,\n'
+              '                taxBps: validation.value.checkoutPolicy.taxBps,\n'
+              '                taxMinor: validation.value.pricing.taxMinor,\n'
+              '                deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,\n'
+              '                discountMinor: validation.value.pricing.discountMinor,\n'
+              '                paymentRules: checkoutPaymentRules,\n'
+              '              },\n'
+              '              totalMinor: validation.value.pricing.totalMinor,\n'
+              '              payments,',
+          )
 
           path.write_text(text)
           PY
