@@ -126,9 +126,7 @@ export type ResolvedSetting<T = unknown> =
   | { source: 'unset'; value: null };
 
 export type ShopDeleteOrArchiveResult =
-  | { ok: true; action: 'ARCHIVED' }
-  | { ok: true; action: 'DELETED' }
-  | { ok: false; code: string };
+  { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
 
 export type SettingsPublishResult =
   | {
