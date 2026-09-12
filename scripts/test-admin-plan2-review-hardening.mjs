@@ -8,8 +8,8 @@ if (!fs.existsSync(migrationPath)) {
 const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
 for (const fragment of [
   'merge_catalog_owned_draft_bundle_v1',
+  'build_admin_catalog_bundle_v1',
   'catalog.pricing',
-  'snapshot,settings',
   'inventoryitems',
 ]) {
   if (!sql.includes(fragment)) throw new Error(`Plan 2 review hardening missing ${fragment}`);
