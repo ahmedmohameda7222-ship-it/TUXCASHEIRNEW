@@ -14,6 +14,7 @@ import {
   useSettings,
   type OrderTypeUpdateDraft,
   type PaymentMethodUpdateDraft,
+  type ReasonCodeUpdateDraft,
   type SettingOverrideUpdateDraft,
 } from './useSettings';
 
@@ -30,6 +31,8 @@ export type SettingsWorkspaceViewProps = {
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   settingOverrideUpdating: boolean;
+  onUpsertReasonCode(draft: ReasonCodeUpdateDraft): void | Promise<void>;
+  reasonCodeUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
@@ -100,6 +103,8 @@ function SectionContent({
   deletingOrArchivingShop,
   onUpdateSettingOverride,
   settingOverrideUpdating,
+  onUpsertReasonCode,
+  reasonCodeUpdating,
   onUpdateOrderType,
   orderTypeUpdating,
   onUpdatePaymentMethod,
@@ -111,6 +116,8 @@ function SectionContent({
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
   settingOverrideUpdating: boolean;
+  onUpsertReasonCode(draft: ReasonCodeUpdateDraft): void | Promise<void>;
+  reasonCodeUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
@@ -160,7 +167,13 @@ function SectionContent({
         />
       );
     case 'reason-codes':
-      return <ReasonCodesPage workspace={workspace} />;
+      return (
+        <ReasonCodesPage
+          workspace={workspace}
+          onUpsert={onUpsertReasonCode}
+          updating={reasonCodeUpdating}
+        />
+      );
   }
 }
 
@@ -174,6 +187,8 @@ export function SettingsWorkspaceView({
   deletingOrArchivingShop,
   onUpdateSettingOverride,
   settingOverrideUpdating,
+  onUpsertReasonCode,
+  reasonCodeUpdating,
   onUpdateOrderType,
   orderTypeUpdating,
   onUpdatePaymentMethod,
@@ -227,6 +242,8 @@ export function SettingsWorkspaceView({
         deletingOrArchivingShop={deletingOrArchivingShop}
         onUpdateSettingOverride={onUpdateSettingOverride}
         settingOverrideUpdating={settingOverrideUpdating}
+        onUpsertReasonCode={onUpsertReasonCode}
+        reasonCodeUpdating={reasonCodeUpdating}
         onUpdateOrderType={onUpdateOrderType}
         orderTypeUpdating={orderTypeUpdating}
         onUpdatePaymentMethod={onUpdatePaymentMethod}
@@ -289,6 +306,8 @@ export function SettingsPage() {
       deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
       onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
       settingOverrideUpdating={settings.updateSettingOverride.isPending}
+      onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
+      reasonCodeUpdating={settings.upsertReasonCode.isPending}
       onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
       orderTypeUpdating={settings.updateOrderType.isPending}
       onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
