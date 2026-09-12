@@ -38,7 +38,9 @@ const RESERVED_ORDER_ID = parseEntityId<OrderId>('88888888-8888-4888-8888-888888
 const AT = instant('2026-09-08T10:30:00.000Z');
 const temporaryDirectories: string[] = [];
 
-function configuration(paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH'): OperationsConfigurationSnapshot {
+function configuration(
+  paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
+): OperationsConfigurationSnapshot {
   return {
     shopId: SHOP_ID,
     version: 1,
