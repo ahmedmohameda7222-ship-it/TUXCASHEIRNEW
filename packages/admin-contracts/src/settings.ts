@@ -38,6 +38,7 @@ export type AdminPaymentMethodDetail = AdminPaymentMethodConfiguration & {
   manualConfirmationRequired: boolean;
   refundAllowed: boolean;
   integrationReference: string | null;
+  editVersion: number;
 };
 
 export type AdminShopSettingsSummary = {
@@ -66,6 +67,7 @@ export type AdminOrderTypeConfiguration = {
   behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
   active: boolean;
   sortOrder: number;
+  editVersion: number;
 };
 
 export type AdminDeliveryZoneConfiguration = {
