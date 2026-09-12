@@ -223,7 +223,8 @@ describe('configured cancellation reasons', () => {
       });
 
       expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('configured cancellation unexpectedly succeeded without reason code');
+      if (result.ok)
+        throw new Error('configured cancellation unexpectedly succeeded without reason code');
       expect(result.error.code).toBe('CONFLICT_ERROR');
       expect(result.error.message).toMatch(/published cancellation reason/i);
     } finally {
