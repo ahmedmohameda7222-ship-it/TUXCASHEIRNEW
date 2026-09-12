@@ -121,6 +121,8 @@ function renderSection(section: SettingsSection): string {
       deletingOrArchivingShop={false}
       onUpdateSettingOverride={noop}
       settingOverrideUpdating={false}
+      onUpdateReasonCode={noop}
+      reasonCodeUpdating={false}
       onUpdateOrderType={noop}
       orderTypeUpdating={false}
       onUpdatePaymentMethod={noop}
@@ -163,7 +165,9 @@ describe('Settings workspace', () => {
   });
 
   it('shows stable configured reason identity and version instead of free-text-only reasons', () => {
-    const html = renderToStaticMarkup(<ReasonCodesPage workspace={workspace} />);
+    const html = renderToStaticMarkup(
+      <ReasonCodesPage workspace={workspace} onUpsert={noop} updating={false} />,
+    );
     expect(html).toContain('Customer changed mind');
     expect(html).toContain('CUSTOMER_CHANGED_MIND');
     expect(html).toContain('CANCELLATION');
