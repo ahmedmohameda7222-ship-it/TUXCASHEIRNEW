@@ -200,12 +200,7 @@ export function validateOrderDraft(
     }
   }
 
-  if (
-    issues.length > 0 ||
-    orderType === undefined ||
-    pricing === null ||
-    checkoutPolicy === null
-  ) {
+  if (issues.length > 0 || orderType === undefined || pricing === null || checkoutPolicy === null) {
     return { valid: false, issues };
   }
 

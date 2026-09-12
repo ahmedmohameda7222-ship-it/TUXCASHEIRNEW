@@ -608,7 +608,7 @@ export class OperationsOrdersService {
             });
           }
 
-          const validation = validateOrderDraft(draft, context.configuration);
+          const validation = validateOrderDraft(draft, context.configuration, placement.source);
           if (!validation.valid) {
             return err({
               code: 'VALIDATION_ERROR',
@@ -621,6 +621,12 @@ export class OperationsOrdersService {
             draft.payment,
             context.configuration.paymentMethods,
             validation.value.pricing.totalMinor,
+            {
+              channel: placement.source,
+              deliveryZoneId:
+                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+              paymentMethodZoneRules: context.configuration.settings?.paymentMethodZoneRules,
+            },
           );
           const inventoryUsage = calculateInventoryConsumption(draft, context.configuration);
           const committedAt = this.#runtime.now();
@@ -693,6 +699,13 @@ export class OperationsOrdersService {
               customerContact,
             );
             const payments = this.#buildPayments(preparedPayments);
+            const checkoutPaymentRules = preparedPayments.map((part) => ({
+              paymentMethodId: part.method.id,
+              channel: part.method.channel ?? 'BOTH',
+              deliveryZoneId:
+                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+              zoneAllowed: true,
+            }));
             const order: OrderSnapshot = {
               id: orderId,
               shopId: context.shopId,
@@ -721,6 +734,22 @@ export class OperationsOrdersService {
               itemsSubtotalMinor: validation.value.pricing.itemsSubtotalMinor,
               discountMinor: validation.value.pricing.discountMinor,
               deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+              serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
+              taxMinor: validation.value.pricing.taxMinor,
+              checkoutSnapshot: {
+                configurationVersion: currentConfiguration.version,
+                settingsVersion: validation.value.checkoutPolicy.settingsVersion,
+                channel: placement.source,
+                minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,
+                minimumOrderSatisfied: true,
+                serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,
+                serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
+                taxBps: validation.value.checkoutPolicy.taxBps,
+                taxMinor: validation.value.pricing.taxMinor,
+                deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+                discountMinor: validation.value.pricing.discountMinor,
+                paymentRules: checkoutPaymentRules,
+              },
               totalMinor: validation.value.pricing.totalMinor,
               payments,
             };

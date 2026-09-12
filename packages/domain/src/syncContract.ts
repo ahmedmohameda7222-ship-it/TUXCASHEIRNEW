@@ -243,6 +243,15 @@ function paymentLogic(value: unknown): PaymentLogicType {
   throw new TypeError('Operations sync payment logic type is unsupported.');
 }
 
+function paymentMethodChannel(value: unknown): 'POS' | 'ONLINE' | 'BOTH' {
+  if (value === 'POS' || value === 'ONLINE' || value === 'BOTH') return value;
+  throw new TypeError('Operations sync payment method channel is unsupported.');
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  return value === undefined ? undefined : booleanValue(value, label);
+}
+
 function expensePaidFrom(value: unknown): ExpensePaidFrom {
   if (value === 'CASH' || value === 'OTHER') return value;
   throw new TypeError('Operations sync expense paidFrom is unsupported.');
@@ -347,12 +356,27 @@ function parsePayment(value: unknown): PaymentPart {
   const source = record(value, 'order payment');
   const method = record(source['method'], 'order payment method');
   const logicType = paymentLogic(method['logicType']);
+  const channel =
+    method['channel'] === undefined ? undefined : paymentMethodChannel(method['channel']);
+  const requiresReference = optionalBoolean(
+    method['requiresReference'],
+    'payment method requiresReference',
+  );
+  const manualConfirmationRequired = optionalBoolean(
+    method['manualConfirmationRequired'],
+    'payment method manualConfirmationRequired',
+  );
+  const refundAllowed = optionalBoolean(method['refundAllowed'], 'payment method refundAllowed');
   const identity = {
     id: entityId<PaymentId>(source['id'], 'payment id'),
     method: {
       id: entityId<PaymentMethodId>(method['id'], 'payment method id'),
       label: fieldString(method, 'label'),
       logicType,
+      ...(channel === undefined ? {} : { channel }),
+      ...(requiresReference === undefined ? {} : { requiresReference }),
+      ...(manualConfirmationRequired === undefined ? {} : { manualConfirmationRequired }),
+      ...(refundAllowed === undefined ? {} : { refundAllowed }),
     },
     allocatedMinor: money(source['allocatedMinor'], 'payment allocatedMinor'),
   };
@@ -377,6 +401,69 @@ function parsePayment(value: unknown): PaymentPart {
     method: { ...identity.method, logicType },
     receivedMinor: null,
     changeMinor: null,
+  };
+}
+
+function parseReceiptSnapshot(value: unknown): NonNullable<OrderSnapshot['receiptSnapshot']> {
+  const source = record(value, 'order receipt snapshot');
+  return {
+    configurationVersion: safeInteger(
+      source['configurationVersion'],
+      'receipt configurationVersion',
+      1,
+    ),
+    shopDisplayName: fieldString(source, 'shopDisplayName'),
+    address: nullableString(source['address'], 'receipt address'),
+    contactPhone: nullableString(source['contactPhone'], 'receipt contactPhone'),
+    footer: nullableString(source['footer'], 'receipt footer'),
+    orderNumberPrefix: stringValue(source['orderNumberPrefix'], 'receipt orderNumberPrefix', true),
+  };
+}
+
+function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['checkoutSnapshot']> {
+  const source = record(value, 'order checkout snapshot');
+  const serviceChargeBps = safeInteger(source['serviceChargeBps'], 'checkout serviceChargeBps', 0);
+  const taxBps = safeInteger(source['taxBps'], 'checkout taxBps', 0);
+  if (serviceChargeBps > 10_000 || taxBps > 10_000) {
+    throw new TypeError('Operations sync checkout basis points cannot exceed 10000.');
+  }
+  return {
+    configurationVersion: safeInteger(
+      source['configurationVersion'],
+      'checkout configurationVersion',
+      1,
+    ),
+    settingsVersion:
+      source['settingsVersion'] === null
+        ? null
+        : safeInteger(source['settingsVersion'], 'checkout settingsVersion', 1),
+    channel: orderSource(source['channel']),
+    minimumOrderMinor: money(source['minimumOrderMinor'], 'checkout minimumOrderMinor'),
+    minimumOrderSatisfied: booleanValue(
+      source['minimumOrderSatisfied'],
+      'checkout minimumOrderSatisfied',
+    ),
+    serviceChargeBps,
+    serviceChargeMinor: money(source['serviceChargeMinor'], 'checkout serviceChargeMinor'),
+    taxBps,
+    taxMinor: money(source['taxMinor'], 'checkout taxMinor'),
+    deliveryFeeMinor: money(source['deliveryFeeMinor'], 'checkout deliveryFeeMinor'),
+    discountMinor: money(source['discountMinor'], 'checkout discountMinor'),
+    paymentRules: arrayValue(source['paymentRules'], 'checkout paymentRules').map((rawRule) => {
+      const rule = record(rawRule, 'checkout payment rule');
+      return {
+        paymentMethodId: entityId<PaymentMethodId>(
+          rule['paymentMethodId'],
+          'checkout paymentMethodId',
+        ),
+        channel: paymentMethodChannel(rule['channel']),
+        deliveryZoneId:
+          rule['deliveryZoneId'] === null
+            ? null
+            : entityId<DeliveryZoneId>(rule['deliveryZoneId'], 'checkout deliveryZoneId'),
+        zoneAllowed: booleanValue(rule['zoneAllowed'], 'checkout zoneAllowed'),
+      };
+    }),
   };
 }
 
@@ -412,11 +499,31 @@ function parseOrder(value: unknown): OrderSnapshot {
     };
   });
   const lifecycle = parseLifecycle(source['lifecycle']);
+  const displayOrderLabel =
+    source['displayOrderLabel'] === undefined
+      ? undefined
+      : stringValue(source['displayOrderLabel'], 'order displayOrderLabel', true);
+  const receiptSnapshot =
+    source['receiptSnapshot'] === undefined
+      ? undefined
+      : parseReceiptSnapshot(source['receiptSnapshot']);
+  const serviceChargeMinor =
+    source['serviceChargeMinor'] === undefined
+      ? undefined
+      : money(source['serviceChargeMinor'], 'order serviceChargeMinor');
+  const taxMinor =
+    source['taxMinor'] === undefined ? undefined : money(source['taxMinor'], 'order taxMinor');
+  const checkoutSnapshot =
+    source['checkoutSnapshot'] === undefined
+      ? undefined
+      : parseCheckoutSnapshot(source['checkoutSnapshot']);
   const order: OrderSnapshot = {
     id: entityId<OrderId>(source['id'], 'order id'),
     shopId: entityId<ShopId>(source['shopId'], 'order shopId'),
     businessDayId: entityId<BusinessDayId>(source['businessDayId'], 'order businessDayId'),
     displayOrderNo: safeInteger(source['displayOrderNo'], 'order displayOrderNo', 1),
+    ...(displayOrderLabel === undefined ? {} : { displayOrderLabel }),
+    ...(receiptSnapshot === undefined ? {} : { receiptSnapshot }),
     idempotencyKey: fieldString(source, 'idempotencyKey'),
     status: orderStatus(source['status']),
     lifecycle,
@@ -430,6 +537,9 @@ function parseOrder(value: unknown): OrderSnapshot {
     itemsSubtotalMinor: money(source['itemsSubtotalMinor'], 'order itemsSubtotalMinor'),
     discountMinor: money(source['discountMinor'], 'order discountMinor'),
     deliveryFeeMinor: money(source['deliveryFeeMinor'], 'order deliveryFeeMinor'),
+    ...(serviceChargeMinor === undefined ? {} : { serviceChargeMinor }),
+    ...(taxMinor === undefined ? {} : { taxMinor }),
+    ...(checkoutSnapshot === undefined ? {} : { checkoutSnapshot }),
     totalMinor: money(source['totalMinor'], 'order totalMinor'),
     payments: arrayValue(source['payments'], 'order payments').map(parsePayment),
   };

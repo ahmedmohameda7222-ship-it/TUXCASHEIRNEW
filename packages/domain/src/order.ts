@@ -41,7 +41,10 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
 
   if (order.checkoutSnapshot !== undefined) {
     const snapshot = order.checkoutSnapshot;
-    if (!Number.isSafeInteger(snapshot.configurationVersion) || snapshot.configurationVersion <= 0) {
+    if (
+      !Number.isSafeInteger(snapshot.configurationVersion) ||
+      snapshot.configurationVersion <= 0
+    ) {
       throw new DomainInvariantError('Checkout configuration version must be positive.');
     }
     if (
@@ -62,7 +65,7 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     ) {
       throw new DomainInvariantError('Checkout fee and discount snapshot must match the order.');
     }
-    if (snapshot.minimumOrderSatisfied !== (order.itemsSubtotalMinor >= snapshot.minimumOrderMinor)) {
+    if (snapshot.minimumOrderSatisfied !== order.itemsSubtotalMinor >= snapshot.minimumOrderMinor) {
       throw new DomainInvariantError('Checkout minimum-order snapshot is inconsistent.');
     }
   }

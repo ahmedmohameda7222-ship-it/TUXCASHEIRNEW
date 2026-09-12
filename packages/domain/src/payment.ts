@@ -48,7 +48,9 @@ function activeMethod(
         candidate.deliveryZoneId === context.deliveryZoneId,
     );
     if (zoneRule?.allowed === false) {
-      throw new DomainInvariantError('Selected payment method is unavailable for this delivery zone.');
+      throw new DomainInvariantError(
+        'Selected payment method is unavailable for this delivery zone.',
+      );
     }
   }
 

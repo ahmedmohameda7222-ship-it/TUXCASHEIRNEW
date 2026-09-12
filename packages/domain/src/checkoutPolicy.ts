@@ -37,13 +37,13 @@ export function resolveEffectiveCheckoutPolicy(
   return {
     settingsVersion: configuration.settings?.version ?? null,
     minimumOrderMinor: moneyMinor(
-      nonNegativeIntegerSetting(configuration, 'checkout.minimumOrderMinor', Number.MAX_SAFE_INTEGER),
+      nonNegativeIntegerSetting(
+        configuration,
+        'checkout.minimumOrderMinor',
+        Number.MAX_SAFE_INTEGER,
+      ),
     ),
-    serviceChargeBps: nonNegativeIntegerSetting(
-      configuration,
-      'checkout.serviceChargeBps',
-      10_000,
-    ),
+    serviceChargeBps: nonNegativeIntegerSetting(configuration, 'checkout.serviceChargeBps', 10_000),
     taxBps: nonNegativeIntegerSetting(configuration, 'checkout.taxBps', 10_000),
   };
 }

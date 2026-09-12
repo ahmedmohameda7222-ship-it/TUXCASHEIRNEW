@@ -25,9 +25,7 @@ const ITEM_ID = parseEntityId<OrderItemId>('55555555-5555-4555-8555-555555555555
 const PRODUCT_ID = parseEntityId<ProductId>('66666666-6666-4666-8666-666666666666');
 const ORDER_TYPE_ID = parseEntityId<OrderTypeId>('77777777-7777-4777-8777-777777777777');
 const PAYMENT_ID = parseEntityId<PaymentId>('88888888-8888-4888-8888-888888888888');
-const PAYMENT_METHOD_ID = parseEntityId<PaymentMethodId>(
-  '99999999-9999-4999-8999-999999999999',
-);
+const PAYMENT_METHOD_ID = parseEntityId<PaymentMethodId>('99999999-9999-4999-8999-999999999999');
 const ZONE_ID = parseEntityId<DeliveryZoneId>('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const AT = instant('2026-09-12T18:00:00.000Z');
 
