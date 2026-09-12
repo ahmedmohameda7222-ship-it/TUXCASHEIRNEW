@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const migrationPaths = [
   'supabase/migrations/20260910120000_admin_shop_settings.sql',
-  'supabase/migrations/20260910120100_admin_canonical_settings_row_edits.sql',
+  'supabase/migrations/20260910120300_admin_canonical_settings_row_edits.sql',
 ];
 for (const migrationPath of migrationPaths) {
   if (!fs.existsSync(migrationPath)) {
