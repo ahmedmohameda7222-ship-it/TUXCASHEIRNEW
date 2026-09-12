@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { settingsCommandSchema, settingsViewSchema } from './settings';
 
 const shopId = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
+const orderTypeId = 'a373f2ac-6a95-59a2-a630-1b1b9d5a3224';
+const paymentMethodId = '8b4fe5d4-7c88-5d42-859f-1e8ec4a89457';
 
 describe('Admin settings API contract', () => {
   it('accepts only the reviewed settings workspace view', () => {
@@ -47,6 +49,45 @@ describe('Admin settings API contract', () => {
     ).toBe(true);
   });
 
+  it('accepts strict version-fenced canonical order type edits', () => {
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'order-type.update',
+        shopId,
+        orderTypeId,
+        name: 'Pick up',
+        behavior: 'TAKE_AWAY',
+        active: true,
+        sortOrder: 1,
+        expectedSettingsVersion: 4,
+        expectedEditVersion: 2,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts only approved payment configuration fields', () => {
+    const command = {
+      type: 'payment-method.update',
+      shopId,
+      paymentMethodId,
+      displayName: 'InstaPay',
+      active: true,
+      sortOrder: 2,
+      channel: 'ONLINE',
+      requiresReference: true,
+      manualConfirmationRequired: true,
+      refundAllowed: false,
+      expectedSettingsVersion: 4,
+      expectedEditVersion: 7,
+    };
+
+    expect(settingsCommandSchema.safeParse(command).success).toBe(true);
+    expect(settingsCommandSchema.safeParse({ ...command, logicType: 'CASH' }).success).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({ ...command, requiresReconciliation: true }).success,
+    ).toBe(false);
+  });
+
   it('rejects unreviewed commands, unsafe setting keys, and malformed versions', () => {
     expect(settingsCommandSchema.safeParse({ type: 'settings.anything', shopId }).success).toBe(
       false,
@@ -65,6 +106,19 @@ describe('Admin settings API contract', () => {
         type: 'settings.publish',
         shopId,
         expectedSettingsVersion: -1,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'order-type.update',
+        shopId,
+        orderTypeId,
+        name: 'Pick up',
+        behavior: 'TAKE_AWAY',
+        active: true,
+        sortOrder: 1,
+        expectedSettingsVersion: 4,
+        expectedEditVersion: 0,
       }).success,
     ).toBe(false);
   });
