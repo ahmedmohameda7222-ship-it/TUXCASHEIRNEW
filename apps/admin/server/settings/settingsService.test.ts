@@ -1,8 +1,10 @@
 import type { AdminSessionPrincipal, AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AdminSupabaseClient } from '../supabaseAdmin';
 import {
   createSettingsService,
+  createSupabaseSettingsStore,
   resolveAllowedPaymentMethods,
   type SettingsStore,
 } from './settingsService';
@@ -186,6 +188,72 @@ describe('Admin settings service', () => {
     expect(updatePaymentMethod).not.toHaveBeenCalledWith(
       expect.objectContaining({ requiresReconciliation: expect.anything() }),
     );
+  });
+
+  it('loads canonical row edit versions so clients can submit safe CAS edits', async () => {
+    const client = {
+      select: vi.fn(async (table: string) => {
+        switch (table) {
+          case 'shops':
+            return [
+              {
+                id: 'shop-1',
+                name: 'TUX',
+                lifecycle_state: 'ACTIVE',
+                active: true,
+                address_text: null,
+                contact_phone: null,
+                latitude: null,
+                longitude: null,
+                timezone: 'Africa/Cairo',
+                temporary_closed: false,
+                online_orders_paused: false,
+              },
+            ];
+          case 'shop_settings_versions':
+            return [{ settings_version: 4 }];
+          case 'order_types':
+            return [
+              {
+                id: 'order-type-1',
+                name: 'Pick up',
+                behavior: 'TAKE_AWAY',
+                active: true,
+                sort_order: 1,
+                edit_version: 3,
+              },
+            ];
+          case 'payment_methods':
+            return [
+              {
+                id: 'payment-method-1',
+                display_name: 'Cash',
+                logic_type: 'CASH',
+                requires_reconciliation: true,
+                active: true,
+                sort_order: 0,
+                channel: 'POS',
+                requires_reference: false,
+                manual_confirmation_required: false,
+                refund_allowed: true,
+                integration_reference: null,
+                edit_version: 8,
+              },
+            ];
+          default:
+            return [];
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as AdminSupabaseClient;
+
+    const loaded = await createSupabaseSettingsStore(client).loadWorkspace({
+      businessId: 'business-1',
+      shopId: 'shop-1',
+    });
+
+    expect(loaded.orderTypes[0]).toMatchObject({ editVersion: 3 });
+    expect(loaded.paymentMethods[0]).toMatchObject({ editVersion: 8 });
   });
 
   it('rejects an ONLINE checkout method configured for POS only', () => {
