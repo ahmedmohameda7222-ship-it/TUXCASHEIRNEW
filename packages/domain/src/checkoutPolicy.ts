@@ -11,6 +11,7 @@ export interface EffectiveCheckoutPolicy {
   readonly minimumOrderMinor: MoneyMinor;
   readonly serviceChargeBps: number;
   readonly taxBps: number;
+  readonly allowDiscountStacking: boolean;
 }
 
 export interface CheckoutPricing extends OrderPricing {
@@ -31,6 +32,19 @@ function nonNegativeIntegerSetting(
   return value;
 }
 
+function booleanSetting(
+  configuration: OperationsConfigurationSnapshot,
+  key: 'checkout.allowDiscountStacking',
+  fallback: boolean,
+): boolean {
+  const value = configuration.settings?.values[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'boolean') {
+    throw new DomainInvariantError(`Published ${key} is invalid.`);
+  }
+  return value;
+}
+
 export function resolveEffectiveCheckoutPolicy(
   configuration: OperationsConfigurationSnapshot,
 ): EffectiveCheckoutPolicy {
@@ -45,6 +59,11 @@ export function resolveEffectiveCheckoutPolicy(
     ),
     serviceChargeBps: nonNegativeIntegerSetting(configuration, 'checkout.serviceChargeBps', 10_000),
     taxBps: nonNegativeIntegerSetting(configuration, 'checkout.taxBps', 10_000),
+    allowDiscountStacking: booleanSetting(
+      configuration,
+      'checkout.allowDiscountStacking',
+      false,
+    ),
   };
 }
 
