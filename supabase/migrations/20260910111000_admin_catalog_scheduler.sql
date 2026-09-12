@@ -107,6 +107,7 @@ $$;
 create or replace function public.mark_admin_config_change_applied_v1(
   p_id uuid,
   p_idempotency_key text,
+  p_attempt_count integer,
   p_result jsonb
 )
 returns boolean
@@ -117,7 +118,10 @@ as $$
 declare
   v_updated integer;
 begin
-  if p_id is null or nullif(btrim(p_idempotency_key), '') is null then
+  if p_id is null
+     or nullif(btrim(p_idempotency_key), '') is null
+     or p_attempt_count is null
+     or p_attempt_count < 1 then
     return false;
   end if;
 
@@ -130,7 +134,8 @@ begin
       updated_at = now()
   where s.id = p_id
     and s.idempotency_key = p_idempotency_key
-    and s.status = 'CLAIMED';
+    and s.status = 'CLAIMED'
+    and s.attempt_count = p_attempt_count;
 
   get diagnostics v_updated = row_count;
   return v_updated = 1;
@@ -140,6 +145,7 @@ $$;
 create or replace function public.mark_admin_config_change_failed_v1(
   p_id uuid,
   p_idempotency_key text,
+  p_attempt_count integer,
   p_error text
 )
 returns boolean
@@ -150,7 +156,10 @@ as $$
 declare
   v_updated integer;
 begin
-  if p_id is null or nullif(btrim(p_idempotency_key), '') is null then
+  if p_id is null
+     or nullif(btrim(p_idempotency_key), '') is null
+     or p_attempt_count is null
+     or p_attempt_count < 1 then
     return false;
   end if;
 
@@ -163,7 +172,8 @@ begin
       updated_at = now()
   where s.id = p_id
     and s.idempotency_key = p_idempotency_key
-    and s.status = 'CLAIMED';
+    and s.status = 'CLAIMED'
+    and s.attempt_count = p_attempt_count;
 
   get diagnostics v_updated = row_count;
   return v_updated = 1;
@@ -172,9 +182,9 @@ $$;
 
 revoke all on function public.claim_due_admin_config_changes_v1(timestamptz, integer, integer)
   from public, anon, authenticated;
-revoke all on function public.mark_admin_config_change_applied_v1(uuid, text, jsonb)
+revoke all on function public.mark_admin_config_change_applied_v1(uuid, text, integer, jsonb)
   from public, anon, authenticated;
-revoke all on function public.mark_admin_config_change_failed_v1(uuid, text, text)
+revoke all on function public.mark_admin_config_change_failed_v1(uuid, text, integer, text)
   from public, anon, authenticated;
 
 do $$
@@ -182,9 +192,9 @@ begin
   if to_regrole('service_role') is not null then
     grant execute on function public.claim_due_admin_config_changes_v1(timestamptz, integer, integer)
       to service_role;
-    grant execute on function public.mark_admin_config_change_applied_v1(uuid, text, jsonb)
+    grant execute on function public.mark_admin_config_change_applied_v1(uuid, text, integer, jsonb)
       to service_role;
-    grant execute on function public.mark_admin_config_change_failed_v1(uuid, text, text)
+    grant execute on function public.mark_admin_config_change_failed_v1(uuid, text, integer, text)
       to service_role;
   end if;
 end $$;
