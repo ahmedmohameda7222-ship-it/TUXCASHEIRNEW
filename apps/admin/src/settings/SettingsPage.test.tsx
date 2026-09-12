@@ -28,8 +28,22 @@ const workspace: AdminSettingsWorkspace = {
   ],
   shopOverrides: [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }],
   orderTypes: [
-    { id: 'ot-1', name: 'Take Away', behavior: 'TAKE_AWAY', active: true, sortOrder: 10 },
-    { id: 'ot-2', name: 'Delivery', behavior: 'DELIVERY', active: true, sortOrder: 20 },
+    {
+      id: 'ot-1',
+      name: 'Take Away',
+      behavior: 'TAKE_AWAY',
+      active: true,
+      sortOrder: 10,
+      editVersion: 3,
+    },
+    {
+      id: 'ot-2',
+      name: 'Delivery',
+      behavior: 'DELIVERY',
+      active: true,
+      sortOrder: 20,
+      editVersion: 4,
+    },
   ],
   paymentMethods: [
     {
@@ -44,6 +58,7 @@ const workspace: AdminSettingsWorkspace = {
       manualConfirmationRequired: false,
       refundAllowed: true,
       integrationReference: null,
+      editVersion: 5,
     },
     {
       id: 'pm-2',
@@ -57,6 +72,7 @@ const workspace: AdminSettingsWorkspace = {
       manualConfirmationRequired: true,
       refundAllowed: true,
       integrationReference: 'terminal-1',
+      editVersion: 6,
     },
   ],
   deliveryZones: [{ id: 'dz-1', name: 'Maadi', feeMinor: 3000, active: true, sortOrder: 10 }],
