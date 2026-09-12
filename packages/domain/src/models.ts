@@ -21,7 +21,7 @@ import type {
   WorkerSessionId,
 } from './ids.ts';
 import type { JsonValue } from './json.ts';
-import type { ConfiguredReasonFamily } from './settings.ts';
+import type { ConfiguredReasonFamily, PaymentMethodChannel } from './settings.ts';
 import type { MoneyMinor } from './money.ts';
 import type { StockQuantityMicros } from './quantity.ts';
 import type { Instant } from './time.ts';
@@ -71,6 +71,11 @@ export interface PaymentMethodSnapshot {
   readonly id: PaymentMethodId;
   readonly label: string;
   readonly logicType: PaymentLogicType;
+  /** Present for orders created after Admin checkout-rule adoption. */
+  readonly channel?: PaymentMethodChannel;
+  readonly requiresReference?: boolean;
+  readonly manualConfirmationRequired?: boolean;
+  readonly refundAllowed?: boolean;
 }
 
 export type CashPaymentPart = {
@@ -190,6 +195,28 @@ export interface OrderReceiptSnapshot {
   readonly orderNumberPrefix: string;
 }
 
+export interface OrderCheckoutPaymentRuleSnapshot {
+  readonly paymentMethodId: PaymentMethodId;
+  readonly channel: PaymentMethodChannel;
+  readonly deliveryZoneId: DeliveryZoneId | null;
+  readonly zoneAllowed: boolean;
+}
+
+export interface OrderCheckoutSnapshot {
+  readonly configurationVersion: number;
+  readonly settingsVersion: number | null;
+  readonly channel: OrderSource;
+  readonly minimumOrderMinor: MoneyMinor;
+  readonly minimumOrderSatisfied: boolean;
+  readonly serviceChargeBps: number;
+  readonly serviceChargeMinor: MoneyMinor;
+  readonly taxBps: number;
+  readonly taxMinor: MoneyMinor;
+  readonly deliveryFeeMinor: MoneyMinor;
+  readonly discountMinor: MoneyMinor;
+  readonly paymentRules: readonly OrderCheckoutPaymentRuleSnapshot[];
+}
+
 export interface OrderSnapshot {
   readonly id: OrderId;
   readonly shopId: ShopId;
@@ -212,6 +239,10 @@ export interface OrderSnapshot {
   readonly itemsSubtotalMinor: MoneyMinor;
   readonly discountMinor: MoneyMinor;
   readonly deliveryFeeMinor: MoneyMinor;
+  /** Optional on legacy orders; all new checkout-policy-aware orders persist these values. */
+  readonly serviceChargeMinor?: MoneyMinor;
+  readonly taxMinor?: MoneyMinor;
+  readonly checkoutSnapshot?: OrderCheckoutSnapshot;
   readonly totalMinor: MoneyMinor;
   readonly payments: readonly PaymentPart[];
 }
