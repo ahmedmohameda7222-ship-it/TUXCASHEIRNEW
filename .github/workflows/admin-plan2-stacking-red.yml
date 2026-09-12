@@ -1,0 +1,22 @@
+name: Admin Plan 2 Discount Stacking RED
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-stacking-red.yml'
+  workflow_dispatch:
+
+jobs:
+  discount-stacking-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prove missing discount stacking policy is RED
+        run: npx vitest run packages/domain/src/checkoutPolicyStacking.test.ts
