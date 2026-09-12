@@ -25,6 +25,8 @@ function validSnapshotV2() {
       temporaryClosed: false,
       onlineOrdersPaused: false,
       minimumOrderMinor: 3000,
+      serviceChargeBps: 500,
+      taxBps: 1400,
       fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
       paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
     },
@@ -74,5 +76,23 @@ describe('PublicCatalogSnapshotV2 ordering projection', () => {
         },
       }),
     ).toThrow(/minimumOrderMinor/);
+  });
+
+  it.each([
+    ['serviceChargeBps', -1],
+    ['serviceChargeBps', 10_001],
+    ['taxBps', -1],
+    ['taxBps', 10_001],
+  ] as const)('rejects an invalid %s checkout rate', (key, value) => {
+    const snapshot = validSnapshotV2();
+    expect(() =>
+      parsePublicCatalogSnapshotV2({
+        ...snapshot,
+        ordering: {
+          ...snapshot.ordering,
+          [key]: value,
+        },
+      }),
+    ).toThrow(new RegExp(key));
   });
 });
