@@ -14,6 +14,8 @@ import type {
   OrderTypeEditInput,
   PaymentMethodChannel,
   PaymentMethodEditInput,
+  ReasonCodeWriteInput,
+  ReasonCodeWriteResult,
   ResolvedSetting,
   SettingWriteInput,
   SettingWriteResult,
@@ -69,6 +71,9 @@ export interface SettingsStore {
     value: unknown;
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
+  upsertReasonCode(
+    input: { employeeId: string } & ReasonCodeWriteInput,
+  ): Promise<ReasonCodeWriteResult>;
   updateOrderType(
     input: { employeeId: string } & OrderTypeEditInput,
   ): Promise<CanonicalSettingsRowEditResult>;
@@ -348,6 +353,31 @@ function parseSettingWriteResult(value: unknown): SettingWriteResult {
   return { ok: false, code: value['code'] };
 }
 
+function parseReasonCodeWriteResult(value: unknown): ReasonCodeWriteResult {
+  if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
+    throw new SettingsServiceError('backend_contract_invalid');
+  }
+  if (value['ok'] === true) {
+    if (typeof value['reasonCodeId'] !== 'string') {
+      throw new SettingsServiceError('backend_contract_invalid');
+    }
+    return {
+      ok: true,
+      reasonCodeId: value['reasonCodeId'],
+      version: safeInteger(value['version'], 1),
+    };
+  }
+  if (typeof value['code'] !== 'string') throw new SettingsServiceError('backend_contract_invalid');
+  if (value['code'] === 'stale_reason_code_version') {
+    return {
+      ok: false,
+      code: 'stale_reason_code_version',
+      currentVersion: safeInteger(value['currentVersion'], 1),
+    };
+  }
+  return { ok: false, code: value['code'] };
+}
+
 function parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {
   if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
     throw new SettingsServiceError('backend_contract_invalid');
@@ -460,6 +490,14 @@ export function createSettingsService(store: SettingsStore) {
     ): Promise<SettingWriteResult> {
       requirePermission(principal, 'settings.manage', input.shopId);
       return store.upsertShopOverride({ employeeId: principal.employeeId, ...input });
+    },
+
+    async upsertReasonCode(
+      input: ReasonCodeWriteInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<ReasonCodeWriteResult> {
+      requirePermission(principal, 'settings.manage', input.shopId);
+      return store.upsertReasonCode({ employeeId: principal.employeeId, ...input });
     },
 
     async updateOrderType(
@@ -678,6 +716,29 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         p_expected_version: expectedVersion,
       });
       return parseSettingWriteResult(result);
+    },
+
+    async upsertReasonCode({
+      employeeId,
+      shopId,
+      reasonCodeId,
+      key,
+      family,
+      label,
+      active,
+      expectedVersion,
+    }) {
+      const result = await client.rpc<unknown>('upsert_admin_reason_code_v1', {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_reason_code_id: reasonCodeId,
+        p_reason_key: key,
+        p_family: family,
+        p_label: label,
+        p_active: active,
+        p_expected_version: expectedVersion,
+      });
+      return parseReasonCodeWriteResult(result);
     },
 
     async updateOrderType({

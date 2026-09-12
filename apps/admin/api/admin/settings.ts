@@ -43,7 +43,10 @@ const reasonFamilySchema = z.enum([
   'PAY_IN',
   'PAY_OUT',
 ]);
-const reasonKeySchema = z.string().regex(/^[a-z][a-z0-9_-]*$/).max(120);
+const reasonKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_-]*$/)
+  .max(120);
 const reasonLabelSchema = z.string().trim().min(1).max(240);
 
 const settingValueSchemas = {
@@ -102,7 +105,10 @@ const reasonCodeWriteCommandSchema = z
   .strict()
   .superRefine((command, context) => {
     const creating = command.reasonCodeId === null;
-    if ((creating && command.expectedVersion !== null) || (!creating && command.expectedVersion === null)) {
+    if (
+      (creating && command.expectedVersion !== null) ||
+      (!creating && command.expectedVersion === null)
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['expectedVersion'],
