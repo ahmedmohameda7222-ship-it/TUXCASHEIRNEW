@@ -53,9 +53,7 @@ const supportedSettingKeys = Object.keys(settingValueSchemas) as [
 ];
 const settingKeySchema = z.enum(supportedSettingKeys);
 
-function settingWriteCommandSchema(
-  type: 'setting.default.upsert' | 'setting.override.upsert',
-) {
+function settingWriteCommandSchema(type: 'setting.default.upsert' | 'setting.override.upsert') {
   return z
     .object({
       type: z.literal(type),
