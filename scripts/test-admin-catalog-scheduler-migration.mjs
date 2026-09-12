@@ -2,10 +2,13 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
 const baseMigrationPath = 'supabase/migrations/20260910111000_admin_catalog_scheduler.sql';
-const hardeningMigrationPath = 'supabase/migrations/20260910120600_admin_scheduler_retry_hardening.sql';
+const hardeningMigrationPath =
+  'supabase/migrations/20260910120600_admin_scheduler_retry_hardening.sql';
 const baseSql = fs.readFileSync(baseMigrationPath, 'utf8').toLowerCase();
 if (!fs.existsSync(hardeningMigrationPath)) {
-  throw new Error(`catalog scheduler retry hardening migration is missing: ${hardeningMigrationPath}`);
+  throw new Error(
+    `catalog scheduler retry hardening migration is missing: ${hardeningMigrationPath}`,
+  );
 }
 const hardeningSql = fs.readFileSync(hardeningMigrationPath, 'utf8').toLowerCase();
 
@@ -18,7 +21,8 @@ for (const required of [
   'lease',
   'p_attempt_count',
 ]) {
-  if (!baseSql.includes(required)) throw new Error(`catalog scheduler migration missing ${required}`);
+  if (!baseSql.includes(required))
+    throw new Error(`catalog scheduler migration missing ${required}`);
 }
 for (const required of [
   'next_attempt_at',
