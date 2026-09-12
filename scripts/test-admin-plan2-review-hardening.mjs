@@ -18,6 +18,7 @@ for (const fragment of [
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
   console.log('Plan 2 review hardening static invariant passed.');
+  await import('./test-admin-plan2-second-review-hardening.mjs');
   process.exit(0);
 }
 
@@ -200,3 +201,4 @@ if (result.status !== 0) {
 }
 
 console.log('Plan 2 catalog draft review hardening PostgreSQL behavior passed.');
+await import('./test-admin-plan2-second-review-hardening.mjs');
