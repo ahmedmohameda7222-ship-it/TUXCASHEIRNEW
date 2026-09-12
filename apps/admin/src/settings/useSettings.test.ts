@@ -82,22 +82,18 @@ describe('Settings client CAS command builders', () => {
   });
 
   it('derives payment CAS versions while dropping protected operational semantics', () => {
-    const command = buildPaymentMethodUpdateCommand(
-      shopId,
-      workspace,
-      {
-        paymentMethodId: workspace.paymentMethods[0]!.id,
-        displayName: 'Front Cash',
-        active: true,
-        sortOrder: 15,
-        channel: 'POS',
-        requiresReference: true,
-        manualConfirmationRequired: true,
-        refundAllowed: false,
-        logicType: 'CARD',
-        requiresReconciliation: false,
-      } as never,
-    );
+    const command = buildPaymentMethodUpdateCommand(shopId, workspace, {
+      paymentMethodId: workspace.paymentMethods[0]!.id,
+      displayName: 'Front Cash',
+      active: true,
+      sortOrder: 15,
+      channel: 'POS',
+      requiresReference: true,
+      manualConfirmationRequired: true,
+      refundAllowed: false,
+      logicType: 'CARD',
+      requiresReconciliation: false,
+    } as never);
 
     expect(command).toEqual({
       type: 'payment-method.update',
