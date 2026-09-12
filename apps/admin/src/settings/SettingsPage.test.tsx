@@ -109,6 +109,10 @@ function renderSection(section: SettingsSection): string {
       onSectionChange={vi.fn()}
       onPublish={vi.fn()}
       publishing={false}
+      onUpdateOrderType={vi.fn()}
+      orderTypeUpdating={false}
+      onUpdatePaymentMethod={vi.fn()}
+      paymentMethodUpdating={false}
     />,
   );
 }
@@ -162,6 +166,7 @@ describe('Settings workspace', () => {
     expect(orderTypes).toContain('TAKE_AWAY');
     expect(orderTypes).toContain('Delivery');
     expect(orderTypes).toContain('DELIVERY');
+    expect(orderTypes).toContain('Edit Take Away');
 
     const payments = renderSection('payments');
     expect(payments).toContain('Cash');
@@ -169,6 +174,7 @@ describe('Settings workspace', () => {
     expect(payments).toContain('POS Card');
     expect(payments).toContain('Reference required');
     expect(payments).toContain('Manual confirmation');
+    expect(payments).toContain('Edit Cash');
 
     const checkout = renderSection('checkout');
     expect(checkout).toContain('Maadi');
