@@ -102,6 +102,8 @@ function bundle(options: { lifecycleState?: 'ACTIVE' | 'SUSPENDED'; withSettings
               version: 7,
               values: {
                 'checkout.minimumOrderMinor': 3000,
+                'checkout.serviceChargeBps': 500,
+                'checkout.taxBps': 1400,
               },
               shopIdentity: {
                 shopId: SHOP_ID,
@@ -143,6 +145,8 @@ describe('published catalog-public ordering projection', () => {
         temporaryClosed: false,
         onlineOrdersPaused: false,
         minimumOrderMinor: 3000,
+        serviceChargeBps: 500,
+        taxBps: 1400,
         fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
         paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
       },
