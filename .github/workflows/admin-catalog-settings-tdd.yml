@@ -162,6 +162,8 @@ jobs:
           npx vitest run
           apps/admin/src/settings/SettingsPage.test.tsx
           apps/admin/src/settings/useSettings.test.ts
+      - name: Menu catalog rollout compatibility
+        run: npx vitest run apps/menu/src/lib/catalog-public.test.ts
       - name: Admin UI typecheck
         run: npm run typecheck -w @tux/admin
 
