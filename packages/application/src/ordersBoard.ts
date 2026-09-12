@@ -135,19 +135,19 @@ export class OperationsOrdersBoardService {
           if (day === null || day.status !== 'OPEN') return null;
           const orders = await transaction.orders.listByBusinessDay(day.id);
           const configuration = await transaction.configuration.getForShop(shop.id);
+          const reasonCodes = configuration?.reasonCodes ?? [];
           const configuredReasonAuthority =
             configuration !== null &&
-            (configuration.settings !== null || configuration.reasonCodes.length > 0);
-          const cancellationReasons: CancellationReasonOption[] =
-            configuration?.reasonCodes
-              .filter((reason) => reason.active && reason.family === 'CANCELLATION')
-              .map((reason) => ({
-                id: reason.id,
-                key: reason.key,
-                label: reason.label,
-                version: reason.version,
-                scope: reason.scope,
-              })) ?? [];
+            (configuration.settings !== null || reasonCodes.length > 0);
+          const cancellationReasons: CancellationReasonOption[] = reasonCodes
+            .filter((reason) => reason.active && reason.family === 'CANCELLATION')
+            .map((reason) => ({
+              id: reason.id,
+              key: reason.key,
+              label: reason.label,
+              version: reason.version,
+              scope: reason.scope,
+            }));
           return {
             shopId: shop.id,
             businessDayId: day.id,
@@ -225,13 +225,13 @@ export class OperationsOrdersBoardService {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, input.orderId);
       const configuration = await transaction.configuration.getForShop(context.shopId);
-      const configuredCancellationReasons =
-        configuration?.reasonCodes?.filter(
-          (candidate) => candidate.active && candidate.family === 'CANCELLATION',
-        ) ?? [];
+      const reasonCodes = configuration?.reasonCodes ?? [];
+      const configuredCancellationReasons = reasonCodes.filter(
+        (candidate) => candidate.active && candidate.family === 'CANCELLATION',
+      );
       const configuredReasonAuthority =
         configuration !== null &&
-        (configuration.settings !== null || configuration.reasonCodes.length > 0);
+        (configuration.settings !== null || reasonCodes.length > 0);
 
       if (configuredReasonAuthority && input.reasonCodeId === undefined) {
         throw new DomainInvariantError(
