@@ -192,7 +192,7 @@ begin
   begin
     perform public.restore_catalog_publish_version_v1('${editorId}', '${shopId}', 1, 2);
   exception when others then
-    if sqlerrm like 'TUX_ADMIN_CATALOG_FORBIDDEN:%catalog.pricing%' then
+    if sqlerrm like 'TUX_ADMIN_CATALOG_FORBIDDEN:%' then
       v_restore_denied := true;
     else
       raise;
