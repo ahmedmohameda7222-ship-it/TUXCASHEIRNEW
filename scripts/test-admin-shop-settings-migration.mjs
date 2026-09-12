@@ -1,12 +1,17 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-const migrationPath = 'supabase/migrations/20260910120000_admin_shop_settings.sql';
-if (!fs.existsSync(migrationPath)) {
-  throw new Error('admin shop settings migration is missing');
+const migrationPaths = [
+  'supabase/migrations/20260910120000_admin_shop_settings.sql',
+  'supabase/migrations/20260910120100_admin_canonical_settings_row_edits.sql',
+];
+for (const migrationPath of migrationPaths) {
+  if (!fs.existsSync(migrationPath)) {
+    throw new Error(`admin shop settings migration is missing: ${migrationPath}`);
+  }
 }
 
-const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
+const sql = migrationPaths.map((migrationPath) => fs.readFileSync(migrationPath, 'utf8')).join('\n').toLowerCase();
 const requiredObjects = [
   'business_setting_defaults',
   'shop_setting_overrides',
