@@ -42,7 +42,7 @@ jobs:
               count = text.count(old)
               if count != 1:
                   raise SystemExit(
-                      f'guarded replacement expected once, found {count}: {old[:100]!r}'
+                      f'orders guarded replacement expected once, found {count}: {old[:100]!r}'
                   )
               text = text.replace(old, new, 1)
 
@@ -118,17 +118,213 @@ jobs:
 
           path.write_text(text)
           PY
+      - name: Apply guarded Operations sync snapshot patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/domain/src/syncContract.ts')
+          text = path.read_text()
+
+          def replace_once(old: str, new: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f'sync guarded replacement expected once, found {count}: {old[:120]!r}'
+                  )
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "function expensePaidFrom(value: unknown): ExpensePaidFrom {\n",
+              "function paymentMethodChannel(value: unknown): 'POS' | 'ONLINE' | 'BOTH' {\n"
+              "  if (value === 'POS' || value === 'ONLINE' || value === 'BOTH') return value;\n"
+              "  throw new TypeError('Operations sync payment method channel is unsupported.');\n"
+              "}\n\n"
+              "function optionalBoolean(value: unknown, label: string): boolean | undefined {\n"
+              "  return value === undefined ? undefined : booleanValue(value, label);\n"
+              "}\n\n"
+              "function expensePaidFrom(value: unknown): ExpensePaidFrom {\n",
+          )
+
+          replace_once(
+              "  const identity = {\n"
+              "    id: entityId<PaymentId>(source['id'], 'payment id'),\n"
+              "    method: {\n"
+              "      id: entityId<PaymentMethodId>(method['id'], 'payment method id'),\n"
+              "      label: fieldString(method, 'label'),\n"
+              "      logicType,\n"
+              "    },\n"
+              "    allocatedMinor: money(source['allocatedMinor'], 'payment allocatedMinor'),\n"
+              "  };",
+              "  const channel =\n"
+              "    method['channel'] === undefined ? undefined : paymentMethodChannel(method['channel']);\n"
+              "  const requiresReference = optionalBoolean(\n"
+              "    method['requiresReference'],\n"
+              "    'payment method requiresReference',\n"
+              "  );\n"
+              "  const manualConfirmationRequired = optionalBoolean(\n"
+              "    method['manualConfirmationRequired'],\n"
+              "    'payment method manualConfirmationRequired',\n"
+              "  );\n"
+              "  const refundAllowed = optionalBoolean(method['refundAllowed'], 'payment method refundAllowed');\n"
+              "  const identity = {\n"
+              "    id: entityId<PaymentId>(source['id'], 'payment id'),\n"
+              "    method: {\n"
+              "      id: entityId<PaymentMethodId>(method['id'], 'payment method id'),\n"
+              "      label: fieldString(method, 'label'),\n"
+              "      logicType,\n"
+              "      ...(channel === undefined ? {} : { channel }),\n"
+              "      ...(requiresReference === undefined ? {} : { requiresReference }),\n"
+              "      ...(manualConfirmationRequired === undefined ? {} : { manualConfirmationRequired }),\n"
+              "      ...(refundAllowed === undefined ? {} : { refundAllowed }),\n"
+              "    },\n"
+              "    allocatedMinor: money(source['allocatedMinor'], 'payment allocatedMinor'),\n"
+              "  };",
+          )
+
+          replace_once(
+              "function parseOrder(value: unknown): OrderSnapshot {\n",
+              "function parseReceiptSnapshot(\n"
+              "  value: unknown,\n"
+              "): NonNullable<OrderSnapshot['receiptSnapshot']> {\n"
+              "  const source = record(value, 'order receipt snapshot');\n"
+              "  return {\n"
+              "    configurationVersion: safeInteger(\n"
+              "      source['configurationVersion'],\n"
+              "      'receipt configurationVersion',\n"
+              "      1,\n"
+              "    ),\n"
+              "    shopDisplayName: fieldString(source, 'shopDisplayName'),\n"
+              "    address: nullableString(source['address'], 'receipt address'),\n"
+              "    contactPhone: nullableString(source['contactPhone'], 'receipt contactPhone'),\n"
+              "    footer: nullableString(source['footer'], 'receipt footer'),\n"
+              "    orderNumberPrefix: stringValue(\n"
+              "      source['orderNumberPrefix'],\n"
+              "      'receipt orderNumberPrefix',\n"
+              "      true,\n"
+              "    ),\n"
+              "  };\n"
+              "}\n\n"
+              "function parseCheckoutSnapshot(\n"
+              "  value: unknown,\n"
+              "): NonNullable<OrderSnapshot['checkoutSnapshot']> {\n"
+              "  const source = record(value, 'order checkout snapshot');\n"
+              "  const serviceChargeBps = safeInteger(\n"
+              "    source['serviceChargeBps'],\n"
+              "    'checkout serviceChargeBps',\n"
+              "    0,\n"
+              "  );\n"
+              "  const taxBps = safeInteger(source['taxBps'], 'checkout taxBps', 0);\n"
+              "  if (serviceChargeBps > 10_000 || taxBps > 10_000) {\n"
+              "    throw new TypeError('Operations sync checkout basis points cannot exceed 10000.');\n"
+              "  }\n"
+              "  return {\n"
+              "    configurationVersion: safeInteger(\n"
+              "      source['configurationVersion'],\n"
+              "      'checkout configurationVersion',\n"
+              "      1,\n"
+              "    ),\n"
+              "    settingsVersion:\n"
+              "      source['settingsVersion'] === null\n"
+              "        ? null\n"
+              "        : safeInteger(source['settingsVersion'], 'checkout settingsVersion', 1),\n"
+              "    channel: orderSource(source['channel']),\n"
+              "    minimumOrderMinor: money(source['minimumOrderMinor'], 'checkout minimumOrderMinor'),\n"
+              "    minimumOrderSatisfied: booleanValue(\n"
+              "      source['minimumOrderSatisfied'],\n"
+              "      'checkout minimumOrderSatisfied',\n"
+              "    ),\n"
+              "    serviceChargeBps,\n"
+              "    serviceChargeMinor: money(\n"
+              "      source['serviceChargeMinor'],\n"
+              "      'checkout serviceChargeMinor',\n"
+              "    ),\n"
+              "    taxBps,\n"
+              "    taxMinor: money(source['taxMinor'], 'checkout taxMinor'),\n"
+              "    deliveryFeeMinor: money(source['deliveryFeeMinor'], 'checkout deliveryFeeMinor'),\n"
+              "    discountMinor: money(source['discountMinor'], 'checkout discountMinor'),\n"
+              "    paymentRules: arrayValue(source['paymentRules'], 'checkout paymentRules').map((rawRule) => {\n"
+              "      const rule = record(rawRule, 'checkout payment rule');\n"
+              "      return {\n"
+              "        paymentMethodId: entityId<PaymentMethodId>(\n"
+              "          rule['paymentMethodId'],\n"
+              "          'checkout paymentMethodId',\n"
+              "        ),\n"
+              "        channel: paymentMethodChannel(rule['channel']),\n"
+              "        deliveryZoneId:\n"
+              "          rule['deliveryZoneId'] === null\n"
+              "            ? null\n"
+              "            : entityId<DeliveryZoneId>(rule['deliveryZoneId'], 'checkout deliveryZoneId'),\n"
+              "        zoneAllowed: booleanValue(rule['zoneAllowed'], 'checkout zoneAllowed'),\n"
+              "      };\n"
+              "    }),\n"
+              "  };\n"
+              "}\n\n"
+              "function parseOrder(value: unknown): OrderSnapshot {\n",
+          )
+
+          replace_once(
+              "  const lifecycle = parseLifecycle(source['lifecycle']);\n"
+              "  const order: OrderSnapshot = {",
+              "  const lifecycle = parseLifecycle(source['lifecycle']);\n"
+              "  const displayOrderLabel =\n"
+              "    source['displayOrderLabel'] === undefined\n"
+              "      ? undefined\n"
+              "      : stringValue(source['displayOrderLabel'], 'order displayOrderLabel', true);\n"
+              "  const receiptSnapshot =\n"
+              "    source['receiptSnapshot'] === undefined\n"
+              "      ? undefined\n"
+              "      : parseReceiptSnapshot(source['receiptSnapshot']);\n"
+              "  const serviceChargeMinor =\n"
+              "    source['serviceChargeMinor'] === undefined\n"
+              "      ? undefined\n"
+              "      : money(source['serviceChargeMinor'], 'order serviceChargeMinor');\n"
+              "  const taxMinor =\n"
+              "    source['taxMinor'] === undefined ? undefined : money(source['taxMinor'], 'order taxMinor');\n"
+              "  const checkoutSnapshot =\n"
+              "    source['checkoutSnapshot'] === undefined\n"
+              "      ? undefined\n"
+              "      : parseCheckoutSnapshot(source['checkoutSnapshot']);\n"
+              "  const order: OrderSnapshot = {",
+          )
+
+          replace_once(
+              "    displayOrderNo: safeInteger(source['displayOrderNo'], 'order displayOrderNo', 1),\n"
+              "    idempotencyKey: fieldString(source, 'idempotencyKey'),",
+              "    displayOrderNo: safeInteger(source['displayOrderNo'], 'order displayOrderNo', 1),\n"
+              "    ...(displayOrderLabel === undefined ? {} : { displayOrderLabel }),\n"
+              "    ...(receiptSnapshot === undefined ? {} : { receiptSnapshot }),\n"
+              "    idempotencyKey: fieldString(source, 'idempotencyKey'),",
+          )
+
+          replace_once(
+              "    deliveryFeeMinor: money(source['deliveryFeeMinor'], 'order deliveryFeeMinor'),\n"
+              "    totalMinor: money(source['totalMinor'], 'order totalMinor'),",
+              "    deliveryFeeMinor: money(source['deliveryFeeMinor'], 'order deliveryFeeMinor'),\n"
+              "    ...(serviceChargeMinor === undefined ? {} : { serviceChargeMinor }),\n"
+              "    ...(taxMinor === undefined ? {} : { taxMinor }),\n"
+              "    ...(checkoutSnapshot === undefined ? {} : { checkoutSnapshot }),\n"
+              "    totalMinor: money(source['totalMinor'], 'order totalMinor'),",
+          )
+
+          path.write_text(text)
+          PY
       - name: Format checkout authority files
         run: >-
           npx prettier --write
           packages/domain/src/checkoutPolicy.ts
+          packages/domain/src/checkoutSnapshotSync.test.ts
           packages/domain/src/index.ts
           packages/domain/src/models.ts
           packages/domain/src/order.ts
           packages/domain/src/orderValidation.ts
           packages/domain/src/payment.ts
+          packages/domain/src/syncContract.ts
           packages/application/src/orders.ts
           packages/application/src/ordersOnlineSource.sqlite.test.ts
+      - name: Checkout snapshot sync contract
+        run: npx vitest run packages/domain/src/checkoutSnapshotSync.test.ts
       - name: Trusted POS and ONLINE checkout policy
         run: npx vitest run packages/application/src/ordersOnlineSource.sqlite.test.ts
       - name: Domain typecheck
@@ -145,11 +341,13 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
             packages/domain/src/checkoutPolicy.ts \
+            packages/domain/src/checkoutSnapshotSync.test.ts \
             packages/domain/src/index.ts \
             packages/domain/src/models.ts \
             packages/domain/src/order.ts \
             packages/domain/src/orderValidation.ts \
             packages/domain/src/payment.ts \
+            packages/domain/src/syncContract.ts \
             packages/application/src/orders.ts \
             packages/application/src/ordersOnlineSource.sqlite.test.ts
           git commit -m 'feat(admin): enforce checkout execution authority'
