@@ -1,0 +1,207 @@
+name: Admin Plan 2 Checkout Charges GREEN
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-service-tax-green.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  checkout-charges:
+    if: "${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'feat(admin): propagate published checkout charges') }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.46.3
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply guarded public contract patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('packages/catalog-contracts/src/index.ts')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'catalog contract guard expected 1, found {n}: {old[:100]!r}')
+              s=s.replace(old,new,1)
+          r("  readonly minimumOrderMinor: number;\n  readonly fulfillmentPreferences:",
+            "  readonly minimumOrderMinor: number;\n  readonly serviceChargeBps: number;\n  readonly taxBps: number;\n  readonly fulfillmentPreferences:")
+          r("function positiveIntegerOrNull(value: unknown, path: string): number | null {",
+            "function basisPoints(value: unknown, path: string): number {\n  const parsed = nonNegativeInteger(value, path);\n  if (parsed > 10_000) {\n    throw new CatalogContractError(`${path} must be an integer between 0 and 10000`);\n  }\n  return parsed;\n}\n\nfunction positiveIntegerOrNull(value: unknown, path: string): number | null {")
+          r("      'minimumOrderMinor',\n      'fulfillmentPreferences',",
+            "      'minimumOrderMinor',\n      'serviceChargeBps',\n      'taxBps',\n      'fulfillmentPreferences',")
+          r("    minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),\n    fulfillmentPreferences:",
+            "    minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),\n    serviceChargeBps: basisPoints(row.serviceChargeBps, `${path}.serviceChargeBps`),\n    taxBps: basisPoints(row.taxBps, `${path}.taxBps`),\n    fulfillmentPreferences:")
+          p.write_text(s)
+          PY
+
+      - name: Apply guarded catalog projection patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('supabase/functions/catalog-public/published-ordering.ts')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'public projection guard expected 1, found {n}: {old[:100]!r}')
+              s=s.replace(old,new,1)
+          r("function minimumOrderMinor(values: Readonly<Record<string, unknown>>): number {\n  const value = values['checkout.minimumOrderMinor'];\n  if (value === undefined) return 0;\n  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {\n    throw new TypeError('published checkout.minimumOrderMinor is invalid');\n  }\n  return value;\n}",
+            "function nonNegativeIntegerSetting(\n  values: Readonly<Record<string, unknown>>,\n  key: 'checkout.minimumOrderMinor' | 'checkout.serviceChargeBps' | 'checkout.taxBps',\n  maximum: number,\n): number {\n  const value = values[key];\n  if (value === undefined) return 0;\n  if (\n    typeof value !== 'number' ||\n    !Number.isSafeInteger(value) ||\n    value < 0 ||\n    value > maximum\n  ) {\n    throw new TypeError(`published ${key} is invalid`);\n  }\n  return value;\n}")
+          r("      minimumOrderMinor: minimumOrderMinor(settings.values),\n      fulfillmentPreferences,",
+            "      minimumOrderMinor: nonNegativeIntegerSetting(\n        settings.values,\n        'checkout.minimumOrderMinor',\n        Number.MAX_SAFE_INTEGER,\n      ),\n      serviceChargeBps: nonNegativeIntegerSetting(\n        settings.values,\n        'checkout.serviceChargeBps',\n        10_000,\n      ),\n      taxBps: nonNegativeIntegerSetting(settings.values, 'checkout.taxBps', 10_000),\n      fulfillmentPreferences,")
+          p.write_text(s)
+          PY
+
+      - name: Apply guarded Menu checkout policy patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/menu/src/lib/published-checkout-policy.ts')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'Menu policy guard expected 1, found {n}: {old[:100]!r}')
+              s=s.replace(old,new,1)
+          r("  minimumOrderMinor: number;\n  orderTypes:",
+            "  minimumOrderMinor: number;\n  serviceChargeBps: number;\n  taxBps: number;\n  orderTypes:")
+          r("    minimumOrderMinor: ordering.minimumOrderMinor,\n    orderTypes:",
+            "    minimumOrderMinor: ordering.minimumOrderMinor,\n    serviceChargeBps: ordering.serviceChargeBps,\n    taxBps: ordering.taxBps,\n    orderTypes:")
+          r("export function checkoutBlockReason(",
+            "function applyBasisPoints(baseMinor: number, basisPoints: number): number {\n  if (!Number.isSafeInteger(baseMinor) || baseMinor < 0) {\n    throw new Error('checkout_estimate_invalid_base');\n  }\n  if (!Number.isSafeInteger(basisPoints) || basisPoints < 0 || basisPoints > 10_000) {\n    throw new Error('checkout_estimate_invalid_rate');\n  }\n  const rounded = (BigInt(baseMinor) * BigInt(basisPoints) + 5_000n) / 10_000n;\n  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) {\n    throw new Error('checkout_estimate_overflow');\n  }\n  return Number(rounded);\n}\n\nexport interface PublishedCheckoutEstimate {\n  itemsSubtotalMinor: number;\n  serviceChargeMinor: number;\n  taxMinor: number;\n  totalMinor: number;\n}\n\nexport function calculatePublishedCheckoutEstimate(\n  policy: PublishedCheckoutPolicy,\n  cartTotalMajor: number,\n): PublishedCheckoutEstimate {\n  const itemsSubtotalMinor = cartTotalMinor(cartTotalMajor);\n  const serviceChargeMinor = applyBasisPoints(itemsSubtotalMinor, policy.serviceChargeBps);\n  const preTaxMinor = itemsSubtotalMinor + serviceChargeMinor;\n  if (!Number.isSafeInteger(preTaxMinor)) throw new Error('checkout_estimate_overflow');\n  const taxMinor = applyBasisPoints(preTaxMinor, policy.taxBps);\n  const totalMinor = preTaxMinor + taxMinor;\n  if (!Number.isSafeInteger(totalMinor)) throw new Error('checkout_estimate_overflow');\n  return { itemsSubtotalMinor, serviceChargeMinor, taxMinor, totalMinor };\n}\n\nexport function checkoutBlockReason(")
+          p.write_text(s)
+          PY
+
+      - name: Apply guarded trusted intake pricing patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('supabase/functions/order-intake/order-intake.ts')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'intake guard expected 1, found {n}: {old[:110]!r}')
+              s=s.replace(old,new,1)
+          r("  minimumOrderMinor: number;\n  orderTypes:",
+            "  minimumOrderMinor: number;\n  serviceChargeBps: number;\n  taxBps: number;\n  orderTypes:")
+          r("function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string | null): unknown {",
+            "function assertBasisPoints(value: number, label: string): void {\n  if (!Number.isSafeInteger(value) || value < 0 || value > 10_000) {\n    throw new Error(`${label} is not a trusted basis-point rate`);\n  }\n}\n\nfunction applyPublishedBasisPoints(baseMinor: number, basisPoints: number): number {\n  assertTrustedMoney(baseMinor, 'published checkout base');\n  assertBasisPoints(basisPoints, 'published checkout rate');\n  const rounded = (BigInt(baseMinor) * BigInt(basisPoints) + 5_000n) / 10_000n;\n  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('published checkout overflow');\n  return Number(rounded);\n}\n\nexport function calculatePublishedCheckoutPricing(\n  itemsSubtotalMinor: number,\n  authority: Pick<\n    OnlineOrderPublishedCheckoutAuthority,\n    'serviceChargeBps' | 'taxBps'\n  >,\n): {\n  itemsSubtotalMinor: number;\n  serviceChargeMinor: number;\n  taxMinor: number;\n  totalMinor: number;\n} {\n  assertTrustedMoney(itemsSubtotalMinor, 'published checkout items subtotal');\n  const serviceChargeMinor = applyPublishedBasisPoints(\n    itemsSubtotalMinor,\n    authority.serviceChargeBps,\n  );\n  const preTaxMinor = itemsSubtotalMinor + serviceChargeMinor;\n  if (!Number.isSafeInteger(preTaxMinor)) throw new Error('published checkout overflow');\n  const taxMinor = applyPublishedBasisPoints(preTaxMinor, authority.taxBps);\n  const totalMinor = preTaxMinor + taxMinor;\n  if (!Number.isSafeInteger(totalMinor)) throw new Error('published checkout overflow');\n  return { itemsSubtotalMinor, serviceChargeMinor, taxMinor, totalMinor };\n}\n\nfunction canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string | null): unknown {")
+          r("  assertTrustedMoney(authority.minimumOrderMinor, 'published minimum order');\n\n  if (authority.lifecycleState",
+            "  assertTrustedMoney(authority.minimumOrderMinor, 'published minimum order');\n  calculatePublishedCheckoutPricing(itemsSubtotalMinor, authority);\n\n  if (authority.lifecycleState")
+          p.write_text(s)
+          PY
+
+      - name: Apply guarded intake authority projection patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('supabase/functions/order-intake/published-checkout-authority.ts')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'intake authority guard expected 1, found {n}: {old[:100]!r}')
+              s=s.replace(old,new,1)
+          r("function minimumOrderMinor(values: Readonly<Record<string, unknown>>): number {\n  const value = values['checkout.minimumOrderMinor'];\n  if (value === undefined) return 0;\n  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {\n    throw new TypeError('published checkout.minimumOrderMinor is invalid');\n  }\n  return value;\n}",
+            "function nonNegativeIntegerSetting(\n  values: Readonly<Record<string, unknown>>,\n  key: 'checkout.minimumOrderMinor' | 'checkout.serviceChargeBps' | 'checkout.taxBps',\n  maximum: number,\n): number {\n  const value = values[key];\n  if (value === undefined) return 0;\n  if (\n    typeof value !== 'number' ||\n    !Number.isSafeInteger(value) ||\n    value < 0 ||\n    value > maximum\n  ) {\n    throw new TypeError(`published ${key} is invalid`);\n  }\n  return value;\n}")
+          r("    minimumOrderMinor: minimumOrderMinor(settings?.values ?? {}),\n    orderTypes:",
+            "    minimumOrderMinor: nonNegativeIntegerSetting(\n      settings?.values ?? {},\n      'checkout.minimumOrderMinor',\n      Number.MAX_SAFE_INTEGER,\n    ),\n    serviceChargeBps: nonNegativeIntegerSetting(\n      settings?.values ?? {},\n      'checkout.serviceChargeBps',\n      10_000,\n    ),\n    taxBps: nonNegativeIntegerSetting(settings?.values ?? {}, 'checkout.taxBps', 10_000),\n    orderTypes:")
+          p.write_text(s)
+          PY
+
+      - name: Apply guarded Menu cart estimate patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/menu/src/components/cart/CartDrawer.tsx')
+          s = p.read_text()
+          def r(old,new):
+              global s
+              n=s.count(old)
+              if n != 1: raise SystemExit(f'CartDrawer guard expected 1, found {n}: {old[:110]!r}')
+              s=s.replace(old,new,1)
+          r("  checkoutBlockReason,\n  type PublishedOrderTypeLabel,",
+            "  calculatePublishedCheckoutEstimate,\n  checkoutBlockReason,\n  type PublishedOrderTypeLabel,")
+          r("const DELIVERY_FEE_MESSAGE =\n  'Delivery fee is not included in this total. After you place the order, we will contact you to confirm the delivery fee.';",
+            "const DELIVERY_FEE_MESSAGE =\n  'Delivery fee is not included in this estimate. After you place the order, we will confirm the delivery fee; final tax and total will be recalculated from the same published checkout rules.';")
+          r("  const checkoutPolicyBlock = checkoutPolicy\n    ? checkoutBlockReason(checkoutPolicy, canonicalCartTotal)\n    : 'unavailable';",
+            "  const checkoutPolicyBlock = checkoutPolicy\n    ? checkoutBlockReason(checkoutPolicy, canonicalCartTotal)\n    : 'unavailable';\n  const checkoutEstimate = checkoutPolicy\n    ? calculatePublishedCheckoutEstimate(checkoutPolicy, canonicalCartTotal)\n    : null;")
+          r("  const displayTotal = isDelivery\n    ? `${canonicalCartTotal} EGP + Delivery Fee`\n    : `${canonicalCartTotal} EGP`;",
+            "  const displayedCheckoutTotal = checkoutEstimate\n    ? (checkoutEstimate.totalMinor / 100).toFixed(2)\n    : canonicalCartTotal.toFixed(2);\n  const displayTotal = isDelivery\n    ? `${displayedCheckoutTotal} EGP + Delivery Fee`\n    : `${displayedCheckoutTotal} EGP`;")
+          r("            <div className=\"flex justify-between items-center mb-2 text-white\">\n              <span className=\"font-bold text-gray-400\">Total</span>\n              <span className=\"text-xl font-bold text-[#D4AF37]\">{displayTotal}</span>\n            </div>",
+            "            {checkoutEstimate && (\n              <div className=\"mb-3 space-y-1 text-sm text-gray-300\">\n                <div className=\"flex justify-between\">\n                  <span>Items</span>\n                  <span>{(checkoutEstimate.itemsSubtotalMinor / 100).toFixed(2)} EGP</span>\n                </div>\n                {checkoutEstimate.serviceChargeMinor > 0 && (\n                  <div className=\"flex justify-between\">\n                    <span>Service charge</span>\n                    <span>{(checkoutEstimate.serviceChargeMinor / 100).toFixed(2)} EGP</span>\n                  </div>\n                )}\n                {checkoutEstimate.taxMinor > 0 && (\n                  <div className=\"flex justify-between\">\n                    <span>{isDelivery ? 'Tax/VAT before delivery fee' : 'Tax/VAT'}</span>\n                    <span>{(checkoutEstimate.taxMinor / 100).toFixed(2)} EGP</span>\n                  </div>\n                )}\n              </div>\n            )}\n            <div className=\"flex justify-between items-center mb-2 text-white\">\n              <span className=\"font-bold text-gray-400\">{isDelivery ? 'Estimated total' : 'Total'}</span>\n              <span className=\"text-xl font-bold text-[#D4AF37]\">{displayTotal}</span>\n            </div>")
+          p.write_text(s)
+          PY
+
+      - name: Strengthen Menu source coverage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/menu/src/components/cart/CartDrawerPublishedCheckout.source.test.ts')
+          s=p.read_text()
+          old="    expect(source).toContain('checkoutBlockReason');\n"
+          new=(old+"    expect(source).toContain('calculatePublishedCheckoutEstimate');\n"
+                   "    expect(source).toContain('Service charge');\n"
+                   "    expect(source).toContain('Tax/VAT');\n")
+          if s.count(old)!=1: raise SystemExit('Menu source test guard failed')
+          p.write_text(s.replace(old,new,1))
+          PY
+
+      - name: Format checkout charge files
+        run: >-
+          npx prettier --write
+          packages/catalog-contracts/src/index.ts
+          packages/catalog-contracts/src/publicOrderingProjection.test.ts
+          supabase/functions/catalog-public/published-ordering.ts
+          supabase/functions/catalog-public/published-ordering.test.ts
+          apps/menu/src/lib/published-checkout-policy.ts
+          apps/menu/src/lib/published-checkout-policy.test.ts
+          apps/menu/src/components/cart/CartDrawer.tsx
+          apps/menu/src/components/cart/CartDrawerPublishedCheckout.source.test.ts
+          supabase/functions/order-intake/order-intake.ts
+          supabase/functions/order-intake/published-checkout-authority.ts
+          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts
+          packages/application/src/onlineOrderAcceptance.ts
+          packages/application/src/onlineOrderAcceptance.test.ts
+
+      - name: Public catalog checkout contract
+        run: npx vitest run packages/catalog-contracts/src/publicOrderingProjection.test.ts supabase/functions/catalog-public/published-ordering.test.ts
+      - name: Menu published checkout estimate
+        run: npx vitest run apps/menu/src/lib/published-checkout-policy.test.ts apps/menu/src/components/cart/CartDrawerPublishedCheckout.source.test.ts
+      - name: Trusted intake checkout pricing
+        run: npx vitest run supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts supabase/functions/order-intake/order-intakeRateLimit.test.ts supabase/functions/order-intake/order-intakeAcceptedReplay.test.ts
+      - name: ONLINE Operations acceptance
+        run: npx vitest run packages/application/src/onlineOrderAcceptance.test.ts
+      - name: Catalog contract typecheck
+        run: npm run typecheck -w @tux/catalog-contracts
+      - name: Menu typecheck
+        run: npm run typecheck -w @tux/menu
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Order intake Deno check
+        run: deno check --config supabase/functions/order-intake/deno.json supabase/functions/order-intake/index.ts
+
+      - name: Commit verified checkout charge propagation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/catalog-contracts/src/index.ts packages/catalog-contracts/src/publicOrderingProjection.test.ts supabase/functions/catalog-public/published-ordering.ts supabase/functions/catalog-public/published-ordering.test.ts apps/menu/src/lib/published-checkout-policy.ts apps/menu/src/lib/published-checkout-policy.test.ts apps/menu/src/components/cart/CartDrawer.tsx apps/menu/src/components/cart/CartDrawerPublishedCheckout.source.test.ts supabase/functions/order-intake/order-intake.ts supabase/functions/order-intake/published-checkout-authority.ts supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts packages/application/src/onlineOrderAcceptance.ts packages/application/src/onlineOrderAcceptance.test.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(admin): propagate published checkout charges"
+          git push origin HEAD:feat/admin-02-catalog-settings
