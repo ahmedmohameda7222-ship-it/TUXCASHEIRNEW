@@ -6,6 +6,7 @@ import type {
   PaymentMethodEditInput,
   SettingsCommand,
   SettingsPublishResult,
+  SettingWriteResult,
 } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
@@ -31,8 +32,14 @@ export type PaymentMethodUpdateDraft = Omit<
   'shopId' | 'expectedSettingsVersion' | 'expectedEditVersion'
 >;
 
+export type SettingOverrideUpdateDraft = {
+  settingKey: string;
+  value: unknown;
+};
+
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
+type SettingOverrideUpdateCommand = Extract<SettingsCommand, { type: 'setting.override.upsert' }>;
 
 function settingsQueryKey(shopId: string) {
   return ['admin', 'settings', shopId] as const;
@@ -94,7 +101,31 @@ export function buildPaymentMethodUpdateCommand(
   };
 }
 
+export function buildSettingOverrideCommand(
+  shopId: string,
+  workspace: AdminSettingsWorkspace,
+  draft: SettingOverrideUpdateDraft,
+): SettingOverrideUpdateCommand {
+  requireWorkspaceShop(shopId, workspace);
+  const currentOverride = workspace.shopOverrides.find((row) => row.key === draft.settingKey);
+  return {
+    type: 'setting.override.upsert',
+    shopId,
+    settingKey: draft.settingKey,
+    value: draft.value,
+    expectedVersion: currentOverride?.version ?? null,
+  };
+}
+
 function requireCanonicalEditSuccess(result: CanonicalSettingsRowEditResult): void {
+  if (result.ok) return;
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
+}
+
+function requireSettingWriteSuccess(result: SettingWriteResult): void {
   if (result.ok) return;
   throw new SettingsUiError(
     result.code,
@@ -160,6 +191,20 @@ export function useSettings(shopId: string | undefined) {
     onSuccess: invalidateWorkspace,
   });
 
+  const updateSettingOverride = useMutation({
+    mutationFn: async (draft: SettingOverrideUpdateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      const command = buildSettingOverrideCommand(shopId, latestWorkspace(), draft);
+      const result = await adminFetch<SettingWriteResult>(
+        '/api/admin/settings',
+        { method: 'POST', body: JSON.stringify(command) },
+        csrfTokenForMutation(session),
+      );
+      requireSettingWriteSuccess(result);
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   const updateOrderType = useMutation({
     mutationFn: async (draft: OrderTypeUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -188,5 +233,11 @@ export function useSettings(shopId: string | undefined) {
     onSuccess: invalidateWorkspace,
   });
 
-  return { workspaceQuery, publish, updateOrderType, updatePaymentMethod };
+  return {
+    workspaceQuery,
+    publish,
+    updateSettingOverride,
+    updateOrderType,
+    updatePaymentMethod,
+  };
 }
