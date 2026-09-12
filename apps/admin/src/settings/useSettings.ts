@@ -4,6 +4,8 @@ import type {
   CanonicalSettingsRowEditResult,
   OrderTypeEditInput,
   PaymentMethodEditInput,
+  ReasonCodeWriteInput,
+  ReasonCodeWriteResult,
   SettingsCommand,
   SettingsPublishResult,
   SettingWriteResult,
@@ -32,6 +34,8 @@ export type PaymentMethodUpdateDraft = Omit<
   PaymentMethodEditInput,
   'shopId' | 'expectedSettingsVersion' | 'expectedEditVersion'
 >;
+
+export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
 
 export type SettingOverrideUpdateDraft = {
   settingKey: string;
@@ -134,6 +138,14 @@ function requireSettingWriteSuccess(result: SettingWriteResult): void {
   );
 }
 
+function requireReasonCodeWriteSuccess(result: ReasonCodeWriteResult): void {
+  if (result.ok) return;
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
+}
+
 export function useSettings(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
@@ -206,6 +218,23 @@ export function useSettings(shopId: string | undefined) {
     onSuccess: invalidateWorkspace,
   });
 
+  const upsertReasonCode = useMutation({
+    mutationFn: async (draft: ReasonCodeUpdateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      requireWorkspaceShop(shopId, latestWorkspace());
+      const result = await adminFetch<ReasonCodeWriteResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'reason-code.upsert', shopId, ...draft }),
+        },
+        csrfTokenForMutation(session),
+      );
+      requireReasonCodeWriteSuccess(result);
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
   const updateOrderType = useMutation({
     mutationFn: async (draft: OrderTypeUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -256,6 +285,7 @@ export function useSettings(shopId: string | undefined) {
     workspaceQuery,
     publish,
     updateSettingOverride,
+    upsertReasonCode,
     updateOrderType,
     updatePaymentMethod,
     deleteOrArchiveShop,
