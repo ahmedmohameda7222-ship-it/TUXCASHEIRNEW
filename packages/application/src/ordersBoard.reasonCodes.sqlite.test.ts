@@ -153,6 +153,27 @@ async function fixture() {
 }
 
 describe('configured cancellation reasons', () => {
+  it('exposes active published cancellation reasons to the Orders Board UI', async () => {
+    const test = await fixture();
+    try {
+      const board = await test.service.loadBoard();
+      expect(board.ok).toBe(true);
+      if (!board.ok) throw new Error(board.error.message);
+      expect(board.value.cancellationReasonMode).toBe('CONFIGURED');
+      expect(board.value.cancellationReasons).toEqual([
+        {
+          id: cancellationReason.id,
+          key: cancellationReason.key,
+          label: cancellationReason.label,
+          version: cancellationReason.version,
+          scope: cancellationReason.scope,
+        },
+      ]);
+    } finally {
+      await test.readModel.close();
+    }
+  });
+
   it('uses the active configured reason as immutable cancellation authority and keeps free text as note only', async () => {
     const test = await fixture();
     try {
