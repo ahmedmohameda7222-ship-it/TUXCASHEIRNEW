@@ -117,6 +117,8 @@ function renderSection(section: SettingsSection): string {
       onSectionChange={noop}
       onPublish={noop}
       publishing={false}
+      onDeleteOrArchiveShop={noop}
+      deletingOrArchivingShop={false}
       onUpdateSettingOverride={noop}
       settingOverrideUpdating={false}
       onUpdateOrderType={noop}
@@ -174,6 +176,7 @@ describe('Settings workspace', () => {
     expect(shop).toContain('Road 9, Maadi');
     expect(shop).toContain('10:00');
     expect(shop).toContain('23:00');
+    expect(shop).toContain('Archive / delete unused shop');
 
     const orderTypes = renderSection('order-types');
     expect(orderTypes).toContain('Take Away');
