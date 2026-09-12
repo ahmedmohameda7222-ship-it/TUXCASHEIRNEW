@@ -38,12 +38,21 @@ const RESERVED_ORDER_ID = parseEntityId<OrderId>('88888888-8888-4888-8888-888888
 const AT = instant('2026-09-08T10:30:00.000Z');
 const temporaryDirectories: string[] = [];
 
+interface CheckoutFixtureSettings {
+  readonly settingsVersion: number;
+  readonly minimumOrderMinor: number;
+  readonly serviceChargeBps: number;
+  readonly taxBps: number;
+}
+
 function configuration(
   paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
+  checkout?: CheckoutFixtureSettings,
+  configurationVersion = 1,
 ): OperationsConfigurationSnapshot {
   return {
     shopId: SHOP_ID,
-    version: 1,
+    version: configurationVersion,
     updatedAt: AT,
     categories: [
       { id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true },
@@ -90,6 +99,33 @@ function configuration(
       },
     ],
     deliveryZones: [],
+    ...(checkout === undefined
+      ? {}
+      : {
+          settings: {
+            version: checkout.settingsVersion,
+            values: {
+              'checkout.minimumOrderMinor': checkout.minimumOrderMinor,
+              'checkout.serviceChargeBps': checkout.serviceChargeBps,
+              'checkout.taxBps': checkout.taxBps,
+            },
+            shopIdentity: {
+              shopId: SHOP_ID,
+              displayName: 'TUX',
+              address: null,
+              phone: null,
+              latitude: null,
+              longitude: null,
+              timezone: 'Africa/Cairo' as const,
+              lifecycleState: 'ACTIVE' as const,
+              temporaryClosed: false,
+              onlineOrdersPaused: false,
+            },
+            weeklyHours: [],
+            specialHours: [],
+            paymentMethodZoneRules: [],
+          },
+        }),
   };
 }
 
@@ -130,12 +166,16 @@ function draft(intentKey: string): OrderDraft {
     payment: {
       mode: 'SINGLE',
       methodId: PAYMENT_ID,
-      cashReceivedMinor: moneyMinor(20_000),
+      cashReceivedMinor: moneyMinor(30_000),
     },
   };
 }
 
-async function fixture(paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH') {
+async function fixture(
+  paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
+  checkout?: CheckoutFixtureSettings,
+  configurationVersion = 1,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-source-'));
   temporaryDirectories.push(directory);
   const path = join(directory, 'operations.sqlite3');
@@ -168,7 +208,9 @@ async function fixture(paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH') {
       startedAt: AT,
       endedAt: null,
     });
-    await transaction.configuration.put(configuration(paymentChannel));
+    await transaction.configuration.put(
+      configuration(paymentChannel, checkout, configurationVersion),
+    );
   });
 
   const readModel = new SqliteOperatorSessionReadModel(path);
@@ -250,6 +292,102 @@ describe('OperationsOrdersService placement origin', () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.order.source).toBe('ONLINE');
+    await closeFixture(test);
+  });
+
+  it('rejects a POS order below the effective published minimum', async () => {
+    const test = await fixture('BOTH', {
+      settingsVersion: 4,
+      minimumOrderMinor: 20_000,
+      serviceChargeBps: 0,
+      taxBps: 0,
+    });
+    const result = await test.service.placeOrder(draft('11111111-aaaa-4aaa-8aaa-111111111111'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toMatch(/minimum order/i);
+    await closeFixture(test);
+  });
+
+  it('applies published service charge and tax to the trusted total and immutable order snapshot', async () => {
+    const test = await fixture(
+      'BOTH',
+      {
+        settingsVersion: 7,
+        minimumOrderMinor: 5_000,
+        serviceChargeBps: 1_000,
+        taxBps: 1_400,
+      },
+      12,
+    );
+    const result = await test.service.placeOrder(draft('22222222-aaaa-4aaa-8aaa-222222222222'));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.order.itemsSubtotalMinor).toBe(19_000);
+    expect(result.value.order.serviceChargeMinor).toBe(1_900);
+    expect(result.value.order.taxMinor).toBe(2_926);
+    expect(result.value.order.totalMinor).toBe(23_826);
+    expect(result.value.order.checkoutSnapshot).toMatchObject({
+      configurationVersion: 12,
+      settingsVersion: 7,
+      channel: 'POS',
+      minimumOrderMinor: 5_000,
+      serviceChargeBps: 1_000,
+      serviceChargeMinor: 1_900,
+      taxBps: 1_400,
+      taxMinor: 2_926,
+    });
+
+    await closeFixture(test);
+  });
+
+  it('keeps an earlier checkout snapshot unchanged after a later settings publication', async () => {
+    const test = await fixture(
+      'BOTH',
+      {
+        settingsVersion: 1,
+        minimumOrderMinor: 0,
+        serviceChargeBps: 1_000,
+        taxBps: 0,
+      },
+      1,
+    );
+    const first = await test.service.placeOrder(draft('33333333-aaaa-4aaa-8aaa-333333333333'));
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.order.totalMinor).toBe(20_900);
+
+    await test.database.transaction((transaction) =>
+      transaction.configuration.put(
+        configuration(
+          'BOTH',
+          {
+            settingsVersion: 2,
+            minimumOrderMinor: 0,
+            serviceChargeBps: 2_000,
+            taxBps: 0,
+          },
+          2,
+        ),
+      ),
+    );
+
+    const second = await test.service.placeOrder(draft('44444444-aaaa-4aaa-8aaa-444444444444'));
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.order.totalMinor).toBe(22_800);
+    expect(first.value.order.totalMinor).toBe(20_900);
+    expect(first.value.order.checkoutSnapshot).toMatchObject({
+      configurationVersion: 1,
+      settingsVersion: 1,
+      serviceChargeMinor: 1_900,
+    });
+    expect(second.value.order.checkoutSnapshot).toMatchObject({
+      configurationVersion: 2,
+      settingsVersion: 2,
+      serviceChargeMinor: 3_800,
+    });
+
     await closeFixture(test);
   });
 });
