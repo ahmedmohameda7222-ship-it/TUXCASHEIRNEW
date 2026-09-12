@@ -47,6 +47,7 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
       <div className="admin-settings-list">
         {workspace.orderTypes.map((orderType) => {
           if (draft?.orderTypeId === orderType.id) {
+            const activeId = `order-type-active-${orderType.id}`;
             return (
               <form
                 className="admin-settings-row admin-settings-row--stack"
@@ -61,11 +62,10 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
                       maxLength={120}
                       required
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current ? { ...current, name: event.currentTarget.value } : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const name = event.currentTarget.value;
+                        setDraft((current) => (current ? { ...current, name } : current));
+                      }}
                     />
                   </label>
                   <label className="admin-field">
@@ -73,16 +73,10 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
                     <select
                       value={draft.behavior}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? {
-                                ...current,
-                                behavior: event.currentTarget.value as OrderTypeUpdateDraft['behavior'],
-                              }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const behavior = event.currentTarget.value as OrderTypeUpdateDraft['behavior'];
+                        setDraft((current) => (current ? { ...current, behavior } : current));
+                      }}
                     >
                       <option value="TAKE_AWAY">Take away</option>
                       <option value="DINE_IN">Dine in</option>
@@ -98,28 +92,24 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
                       step={1}
                       value={draft.sortOrder}
                       disabled={updating}
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current
-                            ? { ...current, sortOrder: Number(event.currentTarget.value) }
-                            : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const sortOrder = Number(event.currentTarget.value);
+                        setDraft((current) => (current ? { ...current, sortOrder } : current));
+                      }}
                     />
                   </label>
-                  <label className="admin-check-field">
+                  <label className="admin-check-field" htmlFor={activeId}>
                     <input
+                      id={activeId}
                       type="checkbox"
                       checked={draft.active}
                       disabled={updating}
-                      aria-label="Order type active"
-                      onChange={(event) =>
-                        setDraft((current) =>
-                          current ? { ...current, active: event.currentTarget.checked } : current,
-                        )
-                      }
+                      onChange={(event) => {
+                        const active = event.currentTarget.checked;
+                        setDraft((current) => (current ? { ...current, active } : current));
+                      }}
                     />
-                    <span>Active</span>
+                    <span>Order type active</span>
                   </label>
                 </div>
                 <div className="admin-settings-row__main">
