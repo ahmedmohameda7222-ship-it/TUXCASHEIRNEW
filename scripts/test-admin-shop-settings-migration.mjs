@@ -18,6 +18,8 @@ const requiredObjects = [
   'resolve_effective_shop_setting_v1',
   'publish_shop_settings_v1',
   'delete_or_archive_shop_v1',
+  'update_admin_order_type_v1',
+  'update_admin_payment_method_v1',
   'build_admin_catalog_bundle_v1',
 ];
 for (const name of requiredObjects) {
@@ -25,6 +27,7 @@ for (const name of requiredObjects) {
 }
 for (const fragment of [
   'lifecycle_state',
+  'edit_version',
   'channel',
   'requires_reference',
   'manual_confirmation_required',
@@ -49,6 +52,7 @@ const businessId = '00000000-0000-4000-8000-000000000001';
 const shopId = '17000000-0000-4000-8000-000000000001';
 const unusedShopId = '17000000-0000-4000-8000-000000000002';
 const employeeId = '27000000-0000-4000-8000-000000000001';
+const orderTypeId = '32000000-0000-4000-8000-000000000001';
 const paymentMethodId = '37000000-0000-4000-8000-000000000001';
 const zoneId = '47000000-0000-4000-8000-000000000001';
 const reasonCodeId = '57000000-0000-4000-8000-000000000001';
@@ -68,6 +72,9 @@ values
 
 insert into public.business_employees(id, business_id, display_name, role, active)
 values ('${employeeId}', '${businessId}', 'Settings Fixture Owner', 'OWNER', true);
+
+insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
+values ('${orderTypeId}', '${shopId}', 'Take Away', 'TAKE_AWAY', true, 0);
 
 insert into public.payment_methods(
   id, shop_id, display_name, logic_type, requires_reconciliation, active, sort_order,
@@ -117,6 +124,8 @@ insert into public.shop_special_hours(
 do $$
 declare
   v_resolved jsonb;
+  v_order_edit jsonb;
+  v_payment_edit jsonb;
   v_publish jsonb;
   v_first_bundle jsonb;
   v_second_bundle jsonb;
@@ -124,7 +133,42 @@ declare
   v_archive jsonb;
   v_delete jsonb;
   v_reason_failed boolean := false;
+  v_logic_type text;
+  v_requires_reconciliation boolean;
 begin
+  v_order_edit := public.update_admin_order_type_v1(
+    '${employeeId}', '${shopId}', '${orderTypeId}', 'Pick up', 'TAKE_AWAY', true, 1, 0, 1
+  );
+  if coalesce((v_order_edit ->> 'ok')::boolean, false) is not true
+     or (v_order_edit ->> 'editVersion')::bigint <> 2 then
+    raise exception 'order type edit failed: %', v_order_edit;
+  end if;
+
+  v_order_edit := public.update_admin_order_type_v1(
+    '${employeeId}', '${shopId}', '${orderTypeId}', 'Stale edit', 'TAKE_AWAY', true, 2, 0, 1
+  );
+  if v_order_edit ->> 'code' <> 'stale_edit_version'
+     or (v_order_edit ->> 'currentVersion')::bigint <> 2 then
+    raise exception 'stale order type row edit was not rejected: %', v_order_edit;
+  end if;
+
+  v_payment_edit := public.update_admin_payment_method_v1(
+    '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
+    'BOTH', true, true, false, 0, 1
+  );
+  if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
+     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
+    raise exception 'payment method edit failed: %', v_payment_edit;
+  end if;
+
+  select p.logic_type, p.requires_reconciliation
+    into v_logic_type, v_requires_reconciliation
+  from public.payment_methods p
+  where p.id = '${paymentMethodId}' and p.shop_id = '${shopId}';
+  if v_logic_type <> 'CASH' or v_requires_reconciliation is not true then
+    raise exception 'Admin payment edit changed protected operational semantics';
+  end if;
+
   v_resolved := public.resolve_effective_shop_setting_v1(
     '${businessId}', '${shopId}', 'checkout.minimumOrderMinor'
   );
@@ -146,6 +190,14 @@ begin
     raise exception 'first settings publish failed: %', v_publish;
   end if;
 
+  v_order_edit := public.update_admin_order_type_v1(
+    '${employeeId}', '${shopId}', '${orderTypeId}', 'Wrong base', 'TAKE_AWAY', true, 2, 0, 2
+  );
+  if v_order_edit ->> 'code' <> 'stale_settings_version'
+     or (v_order_edit ->> 'currentVersion')::bigint <> 1 then
+    raise exception 'stale published settings base was not rejected: %', v_order_edit;
+  end if;
+
   select s.bundle_json into v_first_bundle
   from public.operations_configuration_snapshots s
   where s.shop_id = '${shopId}' and s.version = 1;
@@ -153,7 +205,9 @@ begin
   if v_first_bundle #>> '{snapshot,settings,values,checkout.minimumOrderMinor}' <> '1500'
      or v_first_bundle #>> '{snapshot,settings,values,checkout.taxBps}' <> '1400'
      or v_first_bundle #>> '{snapshot,settings,values,receipt.orderPrefix}' <> 'FX-'
-     or v_first_bundle #>> '{snapshot,paymentMethods,0,channel}' <> 'POS'
+     or v_first_bundle #>> '{snapshot,orderTypes,0,name}' <> 'Pick up'
+     or v_first_bundle #>> '{snapshot,paymentMethods,0,displayName}' <> 'Front Cash'
+     or v_first_bundle #>> '{snapshot,paymentMethods,0,channel}' <> 'BOTH'
      or v_first_bundle #>> '{snapshot,reasonCodes,0,family}' <> 'CANCELLATION'
      or v_first_bundle #>> '{snapshot,reasonCodes,0,label}' <> 'Customer request' then
     raise exception 'published Operations settings snapshot is incomplete: %', v_first_bundle;
@@ -187,7 +241,7 @@ begin
   v_catalog_bundle := private.build_admin_catalog_bundle_v1('${shopId}', 3, now());
   if v_catalog_bundle #>> '{snapshot,settings,values,checkout.minimumOrderMinor}' <> '1500'
      or v_catalog_bundle #>> '{snapshot,settings,values,receipt.orderPrefix}' <> 'FX-'
-     or v_catalog_bundle #>> '{snapshot,paymentMethods,0,channel}' <> 'POS' then
+     or v_catalog_bundle #>> '{snapshot,paymentMethods,0,channel}' <> 'BOTH' then
     raise exception 'catalog bundle builder dropped published settings authority: %', v_catalog_bundle;
   end if;
 
@@ -254,7 +308,9 @@ begin
   foreach v_function in array array[
     'resolve_effective_shop_setting_v1(uuid,uuid,text)',
     'publish_shop_settings_v1(uuid,uuid,bigint)',
-    'delete_or_archive_shop_v1(uuid,uuid)'
+    'delete_or_archive_shop_v1(uuid,uuid)',
+    'update_admin_order_type_v1(uuid,uuid,uuid,text,text,boolean,integer,bigint,bigint)',
+    'update_admin_payment_method_v1(uuid,uuid,uuid,text,boolean,integer,text,boolean,boolean,boolean,bigint,bigint)'
   ] loop
     if has_function_privilege('anon', 'public.' || v_function, 'EXECUTE')
        or has_function_privilege('authenticated', 'public.' || v_function, 'EXECUTE') then
