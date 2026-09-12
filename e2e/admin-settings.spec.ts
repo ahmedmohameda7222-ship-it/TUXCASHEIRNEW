@@ -205,7 +205,7 @@ test('settings route edits canonical order and payment configuration before publ
   await page.getByLabel('Order type name').fill('Pick up');
   await page.getByLabel('Order type active').uncheck();
   await page.getByRole('button', { name: 'Save order type' }).click();
-  await expect(page.getByText('Pick up')).toBeVisible();
+  await expect(page.getByText('Pick up', { exact: true })).toBeVisible();
   await expect(page.getByText('Inactive')).toBeVisible();
 
   await page.getByRole('button', { name: 'Payments' }).click();
@@ -215,7 +215,7 @@ test('settings route edits canonical order and payment configuration before publ
   await page.getByLabel('Reference required').check();
   await page.getByLabel('Manual confirmation').check();
   await page.getByRole('button', { name: 'Save payment method' }).click();
-  await expect(page.getByText('Front Cash')).toBeVisible();
+  await expect(page.getByText('Front Cash', { exact: true })).toBeVisible();
   await expect(page.getByText('Reference required')).toBeVisible();
   await expect(page.getByText('Manual confirmation')).toBeVisible();
 
