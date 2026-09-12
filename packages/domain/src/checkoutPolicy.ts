@@ -59,11 +59,7 @@ export function resolveEffectiveCheckoutPolicy(
     ),
     serviceChargeBps: nonNegativeIntegerSetting(configuration, 'checkout.serviceChargeBps', 10_000),
     taxBps: nonNegativeIntegerSetting(configuration, 'checkout.taxBps', 10_000),
-    allowDiscountStacking: booleanSetting(
-      configuration,
-      'checkout.allowDiscountStacking',
-      false,
-    ),
+    allowDiscountStacking: booleanSetting(configuration, 'checkout.allowDiscountStacking', false),
   };
 }
 

@@ -23,8 +23,8 @@ export function CheckoutPage({
       </div>
 
       <p className="admin-field__help">
-        Save creates or updates this shop&apos;s override. Publish settings makes the saved rules live
-        for future Menu and Operations checkouts.
+        Save creates or updates this shop&apos;s override. Publish settings makes the saved rules
+        live for future Menu and Operations checkouts.
       </p>
 
       <div className="admin-settings-grid">
@@ -73,6 +73,15 @@ export function CheckoutPage({
           settingKey="checkout.allowScheduledOrders"
           label="Scheduled orders"
           kind="boolean"
+          updating={updating}
+          onUpdate={onUpdate}
+        />
+        <SettingOverrideEditor
+          workspace={workspace}
+          settingKey="checkout.allowDiscountStacking"
+          label="Allow discount stacking"
+          kind="boolean"
+          help="Future promotion and loyalty calculations use this published policy; existing orders keep their checkout snapshot."
           updating={updating}
           onUpdate={onUpdate}
         />

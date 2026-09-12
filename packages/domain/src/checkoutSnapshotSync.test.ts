@@ -90,6 +90,7 @@ function checkoutAwareOrder(): OrderSnapshot {
       channel: 'ONLINE',
       minimumOrderMinor: moneyMinor(10_000),
       minimumOrderSatisfied: true,
+      allowDiscountStacking: true,
       serviceChargeBps: 1_000,
       serviceChargeMinor: moneyMinor(2_000),
       taxBps: 1_400,

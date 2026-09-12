@@ -208,7 +208,8 @@ export interface OrderCheckoutSnapshot {
   readonly channel: OrderSource;
   readonly minimumOrderMinor: MoneyMinor;
   readonly minimumOrderSatisfied: boolean;
-  readonly allowDiscountStacking: boolean;
+  /** Present on new checkout snapshots; omitted by legacy persisted orders. */
+  readonly allowDiscountStacking?: boolean;
   readonly serviceChargeBps: number;
   readonly serviceChargeMinor: MoneyMinor;
   readonly taxBps: number;

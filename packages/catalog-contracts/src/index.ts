@@ -84,6 +84,7 @@ export interface PublicOrderingV2 {
   readonly minimumOrderMinor: number;
   readonly serviceChargeBps?: number;
   readonly taxBps?: number;
+  readonly allowDiscountStacking?: boolean;
   readonly fulfillmentPreferences: readonly PublicFulfillmentPreferenceV2[];
   readonly paymentPreferences: readonly PublicPaymentPreferenceV2[];
 }
@@ -479,6 +480,7 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
       'minimumOrderMinor',
       'serviceChargeBps',
       'taxBps',
+      'allowDiscountStacking',
       'fulfillmentPreferences',
       'paymentPreferences',
     ],
@@ -491,6 +493,10 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
     minimumOrderMinor: nonNegativeInteger(row.minimumOrderMinor, `${path}.minimumOrderMinor`),
     serviceChargeBps: basisPointsOrDefault(row.serviceChargeBps, `${path}.serviceChargeBps`),
     taxBps: basisPointsOrDefault(row.taxBps, `${path}.taxBps`),
+    allowDiscountStacking:
+      row.allowDiscountStacking === undefined
+        ? false
+        : requiredBoolean(row.allowDiscountStacking, `${path}.allowDiscountStacking`),
     fulfillmentPreferences: parseStringEnumArray(
       row.fulfillmentPreferences,
       `${path}.fulfillmentPreferences`,

@@ -742,6 +742,7 @@ export class OperationsOrdersService {
                 channel: placement.source,
                 minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,
                 minimumOrderSatisfied: true,
+                allowDiscountStacking: validation.value.checkoutPolicy.allowDiscountStacking,
                 serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,
                 serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
                 taxBps: validation.value.checkoutPolicy.taxBps,

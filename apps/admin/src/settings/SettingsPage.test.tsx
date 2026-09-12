@@ -27,6 +27,7 @@ const workspace: AdminSettingsWorkspace = {
     { key: 'checkout.taxBps', value: 1400, version: 1 },
     { key: 'checkout.requireCustomerPhone', value: false, version: 1 },
     { key: 'checkout.allowScheduledOrders', value: false, version: 1 },
+    { key: 'checkout.allowDiscountStacking', value: true, version: 1 },
     { key: 'receipt.footer', value: 'Thank you', version: 2 },
     { key: 'receipt.orderPrefix', value: 'TUX-', version: 1 },
     { key: 'receipt.sequenceStart', value: 1, version: 1 },
@@ -205,5 +206,7 @@ describe('Settings workspace', () => {
     expect(checkout).toContain('Tax / VAT (bps)');
     expect(checkout).toContain('1400');
     expect(checkout).toContain('Save Tax / VAT (bps)');
+    expect(checkout).toContain('Allow discount stacking');
+    expect(checkout).toContain('Save Allow discount stacking');
   });
 });

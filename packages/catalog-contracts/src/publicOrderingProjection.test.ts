@@ -27,6 +27,7 @@ function validSnapshotV2() {
       minimumOrderMinor: 3000,
       serviceChargeBps: 500,
       taxBps: 1400,
+      allowDiscountStacking: true,
       fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
       paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
     },
@@ -76,6 +77,22 @@ describe('PublicCatalogSnapshotV2 ordering projection', () => {
         },
       }),
     ).toThrow(/minimumOrderMinor/);
+  });
+
+  it('defaults an omitted legacy stacking policy to false and rejects malformed values', () => {
+    const snapshot = validSnapshotV2();
+    const legacyOrdering = { ...snapshot.ordering } as Record<string, unknown>;
+    delete legacyOrdering.allowDiscountStacking;
+    expect(
+      parsePublicCatalogSnapshotV2({ ...snapshot, ordering: legacyOrdering }).ordering
+        .allowDiscountStacking,
+    ).toBe(false);
+    expect(() =>
+      parsePublicCatalogSnapshotV2({
+        ...snapshot,
+        ordering: { ...snapshot.ordering, allowDiscountStacking: 'yes' },
+      }),
+    ).toThrow(/allowDiscountStacking/);
   });
 
   it.each([

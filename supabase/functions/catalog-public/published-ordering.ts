@@ -24,6 +24,17 @@ function nonNegativeIntegerSetting(
   return value;
 }
 
+function booleanSetting(
+  values: Readonly<Record<string, unknown>>,
+  key: 'checkout.allowDiscountStacking',
+  fallback = false,
+): boolean {
+  const value = values[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'boolean') throw new TypeError(`published ${key} is invalid`);
+  return value;
+}
+
 function isOnlinePaymentMethod(method: {
   readonly active: boolean;
   readonly channel?: 'POS' | 'ONLINE' | 'BOTH';
@@ -104,6 +115,7 @@ export function projectPublishedPublicOrdering(
         10_000,
       ),
       taxBps: nonNegativeIntegerSetting(settings.values, 'checkout.taxBps', 10_000),
+      allowDiscountStacking: booleanSetting(settings.values, 'checkout.allowDiscountStacking'),
       fulfillmentPreferences,
       paymentPreferences,
     },

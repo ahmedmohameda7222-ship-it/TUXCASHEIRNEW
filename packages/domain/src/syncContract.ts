@@ -443,6 +443,10 @@ function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['check
       source['minimumOrderSatisfied'],
       'checkout minimumOrderSatisfied',
     ),
+    allowDiscountStacking:
+      source['allowDiscountStacking'] === undefined
+        ? false
+        : booleanValue(source['allowDiscountStacking'], 'checkout allowDiscountStacking'),
     serviceChargeBps,
     serviceChargeMinor: money(source['serviceChargeMinor'], 'checkout serviceChargeMinor'),
     taxBps,
