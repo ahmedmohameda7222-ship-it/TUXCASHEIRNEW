@@ -76,7 +76,8 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       value={draft.channel}
                       disabled={updating}
                       onChange={(event) => {
-                        const channel = event.currentTarget.value as PaymentMethodUpdateDraft['channel'];
+                        const channel = event.currentTarget
+                          .value as PaymentMethodUpdateDraft['channel'];
                         setDraft((current) => (current ? { ...current, channel } : current));
                       }}
                     >
