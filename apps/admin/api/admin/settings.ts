@@ -33,6 +33,13 @@ const settingKeySchema = z
   .refine((value) => !['__proto__', 'prototype', 'constructor'].includes(value));
 const settingValueSchema = z.unknown().refine((value) => value !== undefined);
 const expectedRowVersionSchema = z.number().int().positive().nullable();
+const expectedSettingsVersionSchema = z.number().int().nonnegative();
+const expectedEditVersionSchema = z.number().int().positive();
+const sortOrderSchema = z.number().int().nonnegative();
+const orderTypeNameSchema = z.string().trim().min(1).max(120);
+const paymentMethodNameSchema = z.string().trim().min(1).max(120);
+const orderBehaviorSchema = z.enum(['TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER']);
+const paymentChannelSchema = z.enum(['POS', 'ONLINE', 'BOTH']);
 
 export const settingsViewSchema = z.literal('workspace');
 
@@ -41,7 +48,7 @@ export const settingsCommandSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('settings.publish'),
       shopId: uuidSchema,
-      expectedSettingsVersion: z.number().int().nonnegative(),
+      expectedSettingsVersion: expectedSettingsVersionSchema,
     })
     .strict(),
   z
@@ -66,6 +73,35 @@ export const settingsCommandSchema = z.discriminatedUnion('type', [
       settingKey: settingKeySchema,
       value: settingValueSchema,
       expectedVersion: expectedRowVersionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('order-type.update'),
+      shopId: uuidSchema,
+      orderTypeId: uuidSchema,
+      name: orderTypeNameSchema,
+      behavior: orderBehaviorSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      expectedEditVersion: expectedEditVersionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('payment-method.update'),
+      shopId: uuidSchema,
+      paymentMethodId: uuidSchema,
+      displayName: paymentMethodNameSchema,
+      active: z.boolean(),
+      sortOrder: sortOrderSchema,
+      channel: paymentChannelSchema,
+      requiresReference: z.boolean(),
+      manualConfirmationRequired: z.boolean(),
+      refundAllowed: z.boolean(),
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+      expectedEditVersion: expectedEditVersionSchema,
     })
     .strict(),
 ]);
@@ -169,6 +205,12 @@ export default async function handler(
         return;
       case 'setting.override.upsert':
         sendJson(response, 200, { ...(await service.upsertShopOverride(command, principal)) });
+        return;
+      case 'order-type.update':
+        sendJson(response, 200, { ...(await service.updateOrderType(command, principal)) });
+        return;
+      case 'payment-method.update':
+        sendJson(response, 200, { ...(await service.updatePaymentMethod(command, principal)) });
         return;
     }
   } catch (error) {
