@@ -52,6 +52,8 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
     deleteOrArchiveShop: vi.fn(async () => ({ ok: true as const, action: 'ARCHIVED' as const })),
     upsertBusinessDefault: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
+    updateOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
+    updatePaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     ...overrides,
   };
 }
@@ -127,6 +129,63 @@ describe('Admin settings service', () => {
       value: 'MD-',
       expectedVersion: 2,
     });
+  });
+
+  it('updates a canonical order type through a shop and row version-fenced trusted command', async () => {
+    const updateOrderType = vi.fn(async () => ({ ok: true as const, editVersion: 3 }));
+    const service = createSettingsService(store({ updateOrderType }));
+    const input = {
+      shopId: 'shop-1',
+      orderTypeId: 'order-type-1',
+      name: 'Pick up',
+      behavior: 'TAKE_AWAY' as const,
+      active: true,
+      sortOrder: 1,
+      expectedSettingsVersion: 4,
+      expectedEditVersion: 2,
+    };
+
+    await expect(service.updateOrderType(input, owner)).resolves.toEqual({
+      ok: true,
+      editVersion: 3,
+    });
+    expect(updateOrderType).toHaveBeenCalledWith({
+      employeeId: 'employee-1',
+      ...input,
+    });
+  });
+
+  it('updates only approved payment configuration fields through the trusted command', async () => {
+    const updatePaymentMethod = vi.fn(async () => ({ ok: true as const, editVersion: 8 }));
+    const service = createSettingsService(store({ updatePaymentMethod }));
+    const input = {
+      shopId: 'shop-1',
+      paymentMethodId: 'payment-method-1',
+      displayName: 'InstaPay',
+      active: true,
+      sortOrder: 2,
+      channel: 'ONLINE' as const,
+      requiresReference: true,
+      manualConfirmationRequired: true,
+      refundAllowed: false,
+      expectedSettingsVersion: 4,
+      expectedEditVersion: 7,
+    };
+
+    await expect(service.updatePaymentMethod(input, owner)).resolves.toEqual({
+      ok: true,
+      editVersion: 8,
+    });
+    expect(updatePaymentMethod).toHaveBeenCalledWith({
+      employeeId: 'employee-1',
+      ...input,
+    });
+    expect(updatePaymentMethod).not.toHaveBeenCalledWith(
+      expect.objectContaining({ logicType: expect.anything() }),
+    );
+    expect(updatePaymentMethod).not.toHaveBeenCalledWith(
+      expect.objectContaining({ requiresReconciliation: expect.anything() }),
+    );
   });
 
   it('rejects an ONLINE checkout method configured for POS only', () => {
