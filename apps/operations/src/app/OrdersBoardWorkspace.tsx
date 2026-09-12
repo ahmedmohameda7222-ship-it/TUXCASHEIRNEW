@@ -475,9 +475,9 @@ export function OrdersBoardWorkspace({
   const [orders, setOrders] = useState<readonly OrderSnapshot[]>([]);
   const [cancellationReasonMode, setCancellationReasonMode] =
     useState<CancellationReasonMode>('LEGACY_FREE_TEXT');
-  const [cancellationReasons, setCancellationReasons] = useState<readonly CancellationReasonOption[]>(
-    [],
-  );
+  const [cancellationReasons, setCancellationReasons] = useState<
+    readonly CancellationReasonOption[]
+  >([]);
   const [tab, setTab] = useState<BoardTab>('ACTIVE');
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
