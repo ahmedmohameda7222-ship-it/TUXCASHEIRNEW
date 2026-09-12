@@ -14,6 +14,7 @@ import {
   useSettings,
   type OrderTypeUpdateDraft,
   type PaymentMethodUpdateDraft,
+  type SettingOverrideUpdateDraft,
 } from './useSettings';
 
 export type SettingsSection =
@@ -25,6 +26,8 @@ export type SettingsWorkspaceViewProps = {
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
+  onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+  settingOverrideUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
@@ -91,6 +94,8 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
 function SectionContent({
   section,
   workspace,
+  onUpdateSettingOverride,
+  settingOverrideUpdating,
   onUpdateOrderType,
   orderTypeUpdating,
   onUpdatePaymentMethod,
@@ -98,6 +103,8 @@ function SectionContent({
 }: {
   section: SettingsSection;
   workspace: AdminSettingsWorkspace;
+  onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+  settingOverrideUpdating: boolean;
   onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
   orderTypeUpdating: boolean;
   onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
@@ -125,9 +132,21 @@ function SectionContent({
         />
       );
     case 'checkout':
-      return <CheckoutPage workspace={workspace} />;
+      return (
+        <CheckoutPage
+          workspace={workspace}
+          onUpdate={onUpdateSettingOverride}
+          updating={settingOverrideUpdating}
+        />
+      );
     case 'receipts':
-      return <ReceiptsPage workspace={workspace} />;
+      return (
+        <ReceiptsPage
+          workspace={workspace}
+          onUpdate={onUpdateSettingOverride}
+          updating={settingOverrideUpdating}
+        />
+      );
     case 'reason-codes':
       return <ReasonCodesPage workspace={workspace} />;
   }
@@ -139,6 +158,8 @@ export function SettingsWorkspaceView({
   onSectionChange,
   onPublish,
   publishing,
+  onUpdateSettingOverride,
+  settingOverrideUpdating,
   onUpdateOrderType,
   orderTypeUpdating,
   onUpdatePaymentMethod,
@@ -188,6 +209,8 @@ export function SettingsWorkspaceView({
       <SectionContent
         section={section}
         workspace={workspace}
+        onUpdateSettingOverride={onUpdateSettingOverride}
+        settingOverrideUpdating={settingOverrideUpdating}
         onUpdateOrderType={onUpdateOrderType}
         orderTypeUpdating={orderTypeUpdating}
         onUpdatePaymentMethod={onUpdatePaymentMethod}
@@ -238,6 +261,8 @@ export function SettingsPage() {
       onSectionChange={setSection}
       onPublish={() => settings.publish.mutateAsync()}
       publishing={settings.publish.isPending}
+      onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+      settingOverrideUpdating={settings.updateSettingOverride.isPending}
       onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
       orderTypeUpdating={settings.updateOrderType.isPending}
       onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
