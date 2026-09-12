@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
+  calculatePublishedCheckoutPricing,
   handleOrderIntakeRequest,
   type OnlineOrderCatalogAuthority,
   type OnlineOrderIntakeStore,
@@ -22,6 +23,8 @@ type PublishedCheckoutAuthority = {
   temporaryClosed: boolean;
   onlineOrdersPaused: boolean;
   minimumOrderMinor: number;
+  serviceChargeBps: number;
+  taxBps: number;
   orderTypes: ReadonlyArray<{
     behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
     active: boolean;
@@ -69,6 +72,8 @@ function publishedAuthority(
     temporaryClosed: false,
     onlineOrdersPaused: false,
     minimumOrderMinor: 0,
+    serviceChargeBps: 0,
+    taxBps: 0,
     orderTypes: [
       { behavior: 'TAKE_AWAY', active: true },
       { behavior: 'DELIVERY', active: true },
@@ -97,8 +102,6 @@ class MemoryStore implements OnlineOrderIntakeStore {
     return shopId === SHOP_ID ? catalog() : null;
   }
 
-  // Deliberately present before the production interface adopts it: RED proves the handler does not
-  // yet consult the trusted published Operations configuration authority.
   async loadPublishedCheckoutAuthority(shopId: string): Promise<PublishedCheckoutAuthority | null> {
     return shopId === SHOP_ID ? this.published : null;
   }
@@ -187,6 +190,20 @@ describe('order-intake published checkout settings authority', () => {
     expect(response.status).toBe(409);
     await expect(errorCode(response)).resolves.toBe('minimum_order_not_met');
     expect(store.inserted).toHaveLength(0);
+  });
+
+  it('recomputes published service charge and tax from the trusted server subtotal', () => {
+    expect(
+      calculatePublishedCheckoutPricing(
+        19_000,
+        publishedAuthority({ serviceChargeBps: 500, taxBps: 1400 }),
+      ),
+    ).toEqual({
+      itemsSubtotalMinor: 19_000,
+      serviceChargeMinor: 950,
+      taxMinor: 2_793,
+      totalMinor: 22_743,
+    });
   });
 
   it('rejects an ONLINE cash intent when the published cash method is POS-only', async () => {
