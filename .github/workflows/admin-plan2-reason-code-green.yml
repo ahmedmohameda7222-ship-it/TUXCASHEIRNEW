@@ -1,4 +1,4 @@
-# Triggered during Plan 2 closure to apply the already-reviewed trusted reason-code service patch.
+# Retriggered after completing the SettingsStore reason-code fixture.
 name: Admin Plan 2 Reason Code GREEN
 
 on:
