@@ -1,0 +1,24 @@
+name: Admin Plan 2 Reason Code RED
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-reason-code-red.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reason-code-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run apps/admin/api/admin/reasonCodeCommand.test.ts
