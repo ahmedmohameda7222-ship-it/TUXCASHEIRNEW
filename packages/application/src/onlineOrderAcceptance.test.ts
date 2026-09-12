@@ -99,6 +99,38 @@ const CONFIGURATION: OperationsConfigurationSnapshot = {
   ],
 };
 
+function configurationWithCheckout(
+  values: Readonly<Record<string, boolean | number | string>>,
+  paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
+): OperationsConfigurationSnapshot {
+  return {
+    ...CONFIGURATION,
+    paymentMethods: CONFIGURATION.paymentMethods.map((method) => ({
+      ...method,
+      channel: paymentChannel,
+    })),
+    settings: {
+      version: 7,
+      values,
+      shopIdentity: {
+        shopId: SHOP_ID,
+        displayName: 'TUX',
+        address: null,
+        phone: null,
+        latitude: null,
+        longitude: null,
+        timezone: 'Africa/Cairo',
+        lifecycleState: 'ACTIVE',
+        temporaryClosed: false,
+        onlineOrdersPaused: false,
+      },
+      weeklyHours: [],
+      specialHours: [],
+      paymentMethodZoneRules: [],
+    },
+  };
+}
+
 function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlineOrderRequest {
   return {
     requestId: REQUEST_ID,
@@ -133,11 +165,11 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
   };
 }
 
-function workspace(): OrdersWorkspace {
+function workspace(configuration: OperationsConfigurationSnapshot = CONFIGURATION): OrdersWorkspace {
   return {
     shopId: SHOP_ID,
     businessDayId: DAY_ID,
-    configuration: CONFIGURATION,
+    configuration,
     operator: { id: WORKER_ID, displayName: 'Current Worker' },
     draft: {
       shopId: SHOP_ID,
@@ -172,21 +204,25 @@ const runtime = {
   createUuid: vi.fn(() => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
 };
 
+function deliveryConfirmation(cashReceivedMinor = 25_000) {
+  return {
+    orderTypeId: DELIVERY_ID,
+    deliveryZoneId: ZONE_ID,
+    finalDeliveryFeeMinor: moneyMinor(2_500),
+    payment: {
+      mode: 'SINGLE' as const,
+      methodId: CASH_ID,
+      cashReceivedMinor: moneyMinor(cashReceivedMinor),
+    },
+  };
+}
+
 describe('prepareOnlineOrderAcceptanceDraft', () => {
   it('builds a worker-confirmed DELIVERY draft from a live PROCESSING request', () => {
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: request(),
       workspace: workspace(),
-      confirmation: {
-        orderTypeId: DELIVERY_ID,
-        deliveryZoneId: ZONE_ID,
-        finalDeliveryFeeMinor: moneyMinor(2_500),
-        payment: {
-          mode: 'SINGLE',
-          methodId: CASH_ID,
-          cashReceivedMinor: moneyMinor(25_000),
-        },
-      },
+      confirmation: deliveryConfirmation(),
       runtime,
     });
 
@@ -238,12 +274,7 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
           itemsSubtotalMinor: 18_000,
         }),
         workspace: workspace(),
-        confirmation: {
-          orderTypeId: DELIVERY_ID,
-          deliveryZoneId: ZONE_ID,
-          finalDeliveryFeeMinor: moneyMinor(3_000),
-          payment: { mode: 'SINGLE', methodId: CASH_ID, cashReceivedMinor: moneyMinor(25_000) },
-        },
+        confirmation: deliveryConfirmation(),
         runtime,
       }),
     ).toThrow(/catalog|price/i);
@@ -264,6 +295,60 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
       }),
     ).toThrow(/fulfillment|delivery/i);
   });
+
+  it('rejects a POS-only payment method before ONLINE acceptance can reach placement', () => {
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: request(),
+        workspace: workspace(configurationWithCheckout({}, 'POS')),
+        confirmation: deliveryConfirmation(),
+        runtime,
+      }),
+    ).toThrow(/payment.*online|online.*payment/i);
+  });
+
+  it('rejects an ONLINE request below the effective published minimum before placement', () => {
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: request(),
+        workspace: workspace(configurationWithCheckout({ 'checkout.minimumOrderMinor': 20_000 })),
+        confirmation: deliveryConfirmation(),
+        runtime,
+      }),
+    ).toThrow(/minimum order/i);
+  });
+
+  it('uses published service charge and tax when validating worker-confirmed cash authority', () => {
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: request(),
+        workspace: workspace(
+          configurationWithCheckout({
+            'checkout.minimumOrderMinor': 0,
+            'checkout.serviceChargeBps': 1_000,
+            'checkout.taxBps': 1_400,
+          }),
+        ),
+        confirmation: deliveryConfirmation(25_000),
+        runtime,
+      }),
+    ).toThrow(/cash received|payment/i);
+
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: request(),
+        workspace: workspace(
+          configurationWithCheckout({
+            'checkout.minimumOrderMinor': 0,
+            'checkout.serviceChargeBps': 1_000,
+            'checkout.taxBps': 1_400,
+          }),
+        ),
+        confirmation: deliveryConfirmation(30_000),
+        runtime,
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe('OperationsOnlineOrderAcceptanceService', () => {
@@ -275,18 +360,7 @@ describe('OperationsOnlineOrderAcceptanceService', () => {
     };
     const service = new OperationsOnlineOrderAcceptanceService(orders, runtime);
 
-    await expect(
-      service.accept(request(), {
-        orderTypeId: DELIVERY_ID,
-        deliveryZoneId: ZONE_ID,
-        finalDeliveryFeeMinor: moneyMinor(2_500),
-        payment: {
-          mode: 'SINGLE',
-          methodId: CASH_ID,
-          cashReceivedMinor: moneyMinor(25_000),
-        },
-      }),
-    ).resolves.toBe(placement);
+    await expect(service.accept(request(), deliveryConfirmation())).resolves.toBe(placement);
 
     expect(orders.loadWorkspace).toHaveBeenCalledWith(`online-order:${REQUEST_ID}`);
     expect(orders.placeOrder).toHaveBeenCalledWith(
