@@ -5,6 +5,7 @@ import {
   SettingsUiError,
   buildOrderTypeUpdateCommand,
   buildPaymentMethodUpdateCommand,
+  buildSettingOverrideCommand,
 } from './useSettings';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
@@ -24,8 +25,8 @@ const workspace: AdminSettingsWorkspace = {
     onlineOrdersPaused: false,
   },
   settingsVersion: 7,
-  businessDefaults: [],
-  shopOverrides: [],
+  businessDefaults: [{ key: 'checkout.taxBps', value: 1400, version: 2 }],
+  shopOverrides: [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }],
   orderTypes: [
     {
       id: '22222222-2222-4222-8222-222222222222',
@@ -111,6 +112,34 @@ describe('Settings client CAS command builders', () => {
     });
     expect(command).not.toHaveProperty('logicType');
     expect(command).not.toHaveProperty('requiresReconciliation');
+  });
+
+  it('uses the current shop override version and creates a new override when inherited', () => {
+    expect(
+      buildSettingOverrideCommand(shopId, workspace, {
+        settingKey: 'receipt.orderPrefix',
+        value: 'MAADI-',
+      }),
+    ).toEqual({
+      type: 'setting.override.upsert',
+      shopId,
+      settingKey: 'receipt.orderPrefix',
+      value: 'MAADI-',
+      expectedVersion: 4,
+    });
+
+    expect(
+      buildSettingOverrideCommand(shopId, workspace, {
+        settingKey: 'checkout.taxBps',
+        value: 1200,
+      }),
+    ).toEqual({
+      type: 'setting.override.upsert',
+      shopId,
+      settingKey: 'checkout.taxBps',
+      value: 1200,
+      expectedVersion: null,
+    });
   });
 
   it('fails closed when the requested canonical row is not in the loaded workspace', () => {
