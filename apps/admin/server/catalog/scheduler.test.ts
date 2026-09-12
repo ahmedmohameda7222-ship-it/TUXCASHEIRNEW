@@ -23,7 +23,7 @@ function createStore(): CatalogSchedulerStore {
     scheduledFor: '2026-09-11T05:00:00.000Z',
     targetBasePublishVersion: 48,
     idempotencyKey: 'publish:draft-1:48',
-    attemptCount: 0,
+    attemptCount: 1,
   };
 
   return {
@@ -59,6 +59,12 @@ describe('catalog scheduler', () => {
 
     expect(publish).toHaveBeenCalledTimes(1);
     expect(store.markApplied).toHaveBeenCalledTimes(1);
+    expect(store.markApplied).toHaveBeenCalledWith({
+      id: 'schedule-1',
+      idempotencyKey: 'publish:draft-1:48',
+      attemptCount: 1,
+      result: { ok: true, publishVersion: 49 },
+    });
     expect(store.markFailed).not.toHaveBeenCalled();
   });
 
@@ -129,7 +135,7 @@ describe('catalog scheduler', () => {
     });
   });
 
-  it('maps durable scheduler claims and terminal transitions through trusted RPCs', async () => {
+  it('maps durable scheduler claims and claim-fenced terminal transitions through trusted RPCs', async () => {
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
       void payload;
       if (name === 'claim_due_admin_config_changes_v1') {
@@ -144,7 +150,7 @@ describe('catalog scheduler', () => {
             scheduled_for: '2026-09-11T05:00:00.000Z',
             target_base_publish_version: '48',
             idempotency_key: 'publish:draft-1:48',
-            attempt_count: 1,
+            attempt_count: 2,
           },
         ];
       }
@@ -172,7 +178,7 @@ describe('catalog scheduler', () => {
         scheduledFor: '2026-09-11T05:00:00.000Z',
         targetBasePublishVersion: 48,
         idempotencyKey: 'publish:draft-1:48',
-        attemptCount: 1,
+        attemptCount: 2,
       },
     ]);
     expect(rpc).toHaveBeenNthCalledWith(1, 'claim_due_admin_config_changes_v1', {
@@ -184,11 +190,13 @@ describe('catalog scheduler', () => {
     await store.markApplied({
       id: 'schedule-1',
       idempotencyKey: 'publish:draft-1:48',
+      attemptCount: 2,
       result: { ok: true, publishVersion: 49 },
     });
     expect(rpc).toHaveBeenNthCalledWith(2, 'mark_admin_config_change_applied_v1', {
       p_id: 'schedule-1',
       p_idempotency_key: 'publish:draft-1:48',
+      p_attempt_count: 2,
       p_result: { ok: true, publishVersion: 49 },
     });
   });
