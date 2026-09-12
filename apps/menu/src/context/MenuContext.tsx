@@ -64,8 +64,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       setModifiersByProduct(projection.modifiersByProduct);
       setExtrasByProduct(projection.extrasByProduct);
       setComboBeveragesByProduct(projection.comboBeveragesByProduct);
-      setShop(snapshot.shop);
-      setCheckoutPolicy(projectPublishedCheckoutPolicy(snapshot.ordering));
+      if (snapshot.schemaVersion === 2) {
+        setShop(snapshot.shop);
+        setCheckoutPolicy(projectPublishedCheckoutPolicy(snapshot.ordering));
+      } else {
+        // V1 is a browse-only rollout fallback. Never synthesize permissive checkout defaults.
+        setShop(null);
+        setCheckoutPolicy(null);
+      }
     } catch (cause) {
       console.error('Failed to load canonical public catalog', cause);
       setSections([]);
