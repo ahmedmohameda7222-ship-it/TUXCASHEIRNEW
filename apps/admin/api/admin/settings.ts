@@ -25,13 +25,6 @@ import {
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 
 const uuidSchema = z.string().uuid();
-const settingKeySchema = z
-  .string()
-  .min(1)
-  .max(120)
-  .regex(/^[A-Za-z][A-Za-z0-9_.-]*$/)
-  .refine((value) => !['__proto__', 'prototype', 'constructor'].includes(value));
-const settingValueSchema = z.unknown().refine((value) => value !== undefined);
 const expectedRowVersionSchema = z.number().int().positive().nullable();
 const expectedSettingsVersionSchema = z.number().int().nonnegative();
 const expectedEditVersionSchema = z.number().int().positive();
@@ -41,9 +34,52 @@ const paymentMethodNameSchema = z.string().trim().min(1).max(120);
 const orderBehaviorSchema = z.enum(['TAKE_AWAY', 'DINE_IN', 'DELIVERY', 'OTHER']);
 const paymentChannelSchema = z.enum(['POS', 'ONLINE', 'BOTH']);
 
+const settingValueSchemas = {
+  'checkout.minimumOrderMinor': z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  'checkout.serviceChargeBps': z.number().int().min(0).max(10_000),
+  'checkout.taxBps': z.number().int().min(0).max(10_000),
+  'checkout.requireCustomerPhone': z.boolean(),
+  'checkout.allowScheduledOrders': z.boolean(),
+  'receipt.orderPrefix': z.string().max(64),
+  'receipt.footer': z.string().max(1_000),
+  'receipt.sequenceStart': z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  'receipt.sequenceResetPolicy': z.literal('BUSINESS_DAY'),
+} as const;
+
+type SupportedSettingKey = keyof typeof settingValueSchemas;
+const supportedSettingKeys = Object.keys(settingValueSchemas) as [
+  SupportedSettingKey,
+  ...SupportedSettingKey[],
+];
+const settingKeySchema = z.enum(supportedSettingKeys);
+
+function settingWriteCommandSchema(
+  type: 'setting.default.upsert' | 'setting.override.upsert',
+) {
+  return z
+    .object({
+      type: z.literal(type),
+      shopId: uuidSchema,
+      settingKey: settingKeySchema,
+      value: z.unknown(),
+      expectedVersion: expectedRowVersionSchema,
+    })
+    .strict()
+    .superRefine((command, context) => {
+      const result = settingValueSchemas[command.settingKey].safeParse(command.value);
+      if (!result.success) {
+        context.addIssue({
+          code: 'custom',
+          path: ['value'],
+          message: `Invalid value for ${command.settingKey}`,
+        });
+      }
+    });
+}
+
 export const settingsViewSchema = z.literal('workspace');
 
-export const settingsCommandSchema = z.discriminatedUnion('type', [
+export const settingsCommandSchema = z.union([
   z
     .object({
       type: z.literal('settings.publish'),
@@ -57,24 +93,8 @@ export const settingsCommandSchema = z.discriminatedUnion('type', [
       shopId: uuidSchema,
     })
     .strict(),
-  z
-    .object({
-      type: z.literal('setting.default.upsert'),
-      shopId: uuidSchema,
-      settingKey: settingKeySchema,
-      value: settingValueSchema,
-      expectedVersion: expectedRowVersionSchema,
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal('setting.override.upsert'),
-      shopId: uuidSchema,
-      settingKey: settingKeySchema,
-      value: settingValueSchema,
-      expectedVersion: expectedRowVersionSchema,
-    })
-    .strict(),
+  settingWriteCommandSchema('setting.default.upsert'),
+  settingWriteCommandSchema('setting.override.upsert'),
   z
     .object({
       type: z.literal('order-type.update'),
