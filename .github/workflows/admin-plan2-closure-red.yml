@@ -1,0 +1,22 @@
+name: Admin Plan 2 Closure RED
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-closure-red.yml'
+  workflow_dispatch:
+
+jobs:
+  business-default-authority-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prove business-wide default authority is RED
+        run: npx vitest run apps/admin/server/settings/businessDefaultAuthority.test.ts
