@@ -240,10 +240,9 @@ describe('configured cancellation reasons', () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.error.message);
-      expect(orderLifecycle(result.value).cancellation).toMatchObject({
-        reason: 'Legacy free-text reason',
-        reasonCode: null,
-      });
+      const cancellation = orderLifecycle(result.value).cancellation;
+      expect(cancellation).toMatchObject({ reason: 'Legacy free-text reason' });
+      expect((cancellation as { reasonCode?: unknown } | null)?.reasonCode).toBeUndefined();
     } finally {
       await test.readModel.close();
     }
