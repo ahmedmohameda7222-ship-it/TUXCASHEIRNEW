@@ -38,53 +38,58 @@ const RESERVED_ORDER_ID = parseEntityId<OrderId>('88888888-8888-4888-8888-888888
 const AT = instant('2026-09-08T10:30:00.000Z');
 const temporaryDirectories: string[] = [];
 
-const CONFIGURATION: OperationsConfigurationSnapshot = {
-  shopId: SHOP_ID,
-  version: 1,
-  updatedAt: AT,
-  categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true }],
-  products: [
-    {
-      id: PRODUCT_ID,
-      shopId: SHOP_ID,
-      categoryId: CATEGORY_ID,
-      name: 'Online Burger',
-      description: null,
-      priceMinor: moneyMinor(19_000),
-      imageKey: null,
-      active: true,
-      soldOut: false,
-      isCombo: false,
-      sortOrder: 0,
-    },
-  ],
-  modifiers: [],
-  productModifierLinks: [],
-  comboBeverageOptions: [],
-  recipeLines: [],
-  orderTypes: [
-    {
-      id: ORDER_TYPE_ID,
-      shopId: SHOP_ID,
-      name: 'Take Away',
-      behavior: 'TAKE_AWAY',
-      active: true,
-      sortOrder: 0,
-    },
-  ],
-  paymentMethods: [
-    {
-      id: PAYMENT_ID,
-      shopId: SHOP_ID,
-      displayName: 'Cash',
-      logicType: 'CASH',
-      requiresReconciliation: true,
-      active: true,
-      sortOrder: 0,
-    },
-  ],
-  deliveryZones: [],
-};
+function configuration(paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH'): OperationsConfigurationSnapshot {
+  return {
+    shopId: SHOP_ID,
+    version: 1,
+    updatedAt: AT,
+    categories: [
+      { id: CATEGORY_ID, shopId: SHOP_ID, name: 'Burgers', sortOrder: 0, active: true },
+    ],
+    products: [
+      {
+        id: PRODUCT_ID,
+        shopId: SHOP_ID,
+        categoryId: CATEGORY_ID,
+        name: 'Online Burger',
+        description: null,
+        priceMinor: moneyMinor(19_000),
+        imageKey: null,
+        active: true,
+        soldOut: false,
+        isCombo: false,
+        sortOrder: 0,
+      },
+    ],
+    modifiers: [],
+    productModifierLinks: [],
+    comboBeverageOptions: [],
+    recipeLines: [],
+    orderTypes: [
+      {
+        id: ORDER_TYPE_ID,
+        shopId: SHOP_ID,
+        name: 'Take Away',
+        behavior: 'TAKE_AWAY',
+        active: true,
+        sortOrder: 0,
+      },
+    ],
+    paymentMethods: [
+      {
+        id: PAYMENT_ID,
+        shopId: SHOP_ID,
+        displayName: 'Cash',
+        logicType: 'CASH',
+        requiresReconciliation: true,
+        active: true,
+        sortOrder: 0,
+        channel: paymentChannel,
+      },
+    ],
+    deliveryZones: [],
+  };
+}
 
 function draft(intentKey: string): OrderDraft {
   return {
@@ -128,7 +133,7 @@ function draft(intentKey: string): OrderDraft {
   };
 }
 
-async function fixture() {
+async function fixture(paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH') {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-source-'));
   temporaryDirectories.push(directory);
   const path = join(directory, 'operations.sqlite3');
@@ -161,7 +166,7 @@ async function fixture() {
       startedAt: AT,
       endedAt: null,
     });
-    await transaction.configuration.put(CONFIGURATION);
+    await transaction.configuration.put(configuration(paymentChannel));
   });
 
   const readModel = new SqliteOperatorSessionReadModel(path);
@@ -183,6 +188,12 @@ async function fixture() {
   return { database, readModel, draftStore, service };
 }
 
+async function closeFixture(test: Awaited<ReturnType<typeof fixture>>) {
+  await test.readModel.close();
+  await test.draftStore.close();
+  await test.database.close();
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -198,9 +209,7 @@ describe('OperationsOrdersService placement origin', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.order.source).toBe('POS');
-    await test.readModel.close();
-    await test.draftStore.close();
-    await test.database.close();
+    await closeFixture(test);
   });
 
   it('uses the worker-confirmed reserved remote identity only for explicit ONLINE placement', async () => {
@@ -220,8 +229,25 @@ describe('OperationsOrdersService placement origin', () => {
     expect(persisted?.source).toBe('ONLINE');
     expect(persisted?.id).toBe(RESERVED_ORDER_ID);
 
-    await test.readModel.close();
-    await test.draftStore.close();
-    await test.database.close();
+    await closeFixture(test);
+  });
+
+  it('rejects an ONLINE-only payment method at the trusted POS placement boundary', async () => {
+    const test = await fixture('ONLINE');
+    const result = await test.service.placeOrder(draft('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toMatch(/payment.*pos|pos.*payment/i);
+    await closeFixture(test);
+  });
+
+  it('accepts an ONLINE-only payment method for explicit ONLINE placement', async () => {
+    const test = await fixture('ONLINE');
+    const result = await test.service.placeOrder(draft('ffffffff-ffff-4fff-8fff-ffffffffffff'), {
+      source: 'ONLINE',
+      orderId: RESERVED_ORDER_ID,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.order.source).toBe('ONLINE');
+    await closeFixture(test);
   });
 });
