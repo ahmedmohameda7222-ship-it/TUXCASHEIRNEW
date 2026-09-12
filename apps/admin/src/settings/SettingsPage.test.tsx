@@ -1,4 +1,6 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import { readFileSync } from 'node:fs';
+import { format } from 'prettier';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -179,5 +181,23 @@ describe('Settings workspace', () => {
     const checkout = renderSection('checkout');
     expect(checkout).toContain('Maadi');
     expect(checkout).toContain('30.00 EGP');
+  });
+
+  it('prints temporary exact Prettier output for settings files', async () => {
+    for (const path of [
+      'apps/admin/src/settings/OrderTypesPage.tsx',
+      'apps/admin/src/settings/PaymentsPage.tsx',
+      'apps/admin/src/settings/useSettings.test.ts',
+      'e2e/admin-settings.spec.ts',
+    ]) {
+      const formatted = await format(readFileSync(path, 'utf8'), {
+        filepath: path,
+        singleQuote: true,
+        trailingComma: 'all',
+        semi: true,
+        printWidth: 100,
+      });
+      console.log(`PRETTIER_BEGIN:${path}\n${formatted}PRETTIER_END:${path}`);
+    }
   });
 });
