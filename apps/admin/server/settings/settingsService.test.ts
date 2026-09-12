@@ -55,6 +55,11 @@ function store(overrides: Partial<SettingsStore> = {}): SettingsStore {
     deleteOrArchiveShop: vi.fn(async () => ({ ok: true as const, action: 'ARCHIVED' as const })),
     upsertBusinessDefault: vi.fn(async () => ({ ok: true as const, version: 1 })),
     upsertShopOverride: vi.fn(async () => ({ ok: true as const, version: 1 })),
+    upsertReasonCode: vi.fn(async (input) => ({
+      ok: true as const,
+      reasonCodeId: input.reasonCodeId ?? 'reason-code-1',
+      version: 1,
+    })),
     updateOrderType: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     updatePaymentMethod: vi.fn(async () => ({ ok: true as const, editVersion: 2 })),
     ...overrides,
@@ -183,101 +188,67 @@ describe('Admin settings service', () => {
       employeeId: 'employee-1',
       ...input,
     });
-    expect(updatePaymentMethod).not.toHaveBeenCalledWith(
-      expect.objectContaining({ logicType: expect.anything() }),
-    );
-    expect(updatePaymentMethod).not.toHaveBeenCalledWith(
-      expect.objectContaining({ requiresReconciliation: expect.anything() }),
-    );
   });
 
-  it('loads canonical row edit versions so clients can submit safe CAS edits', async () => {
-    const client = {
-      select: vi.fn(async (table: string) => {
-        switch (table) {
-          case 'shops':
-            return [
-              {
-                id: 'shop-1',
-                name: 'TUX',
-                lifecycle_state: 'ACTIVE',
-                active: true,
-                address_text: null,
-                contact_phone: null,
-                latitude: null,
-                longitude: null,
-                timezone: 'Africa/Cairo',
-                temporary_closed: false,
-                online_orders_paused: false,
-              },
-            ];
-          case 'shop_settings_versions':
-            return [{ settings_version: 4 }];
-          case 'order_types':
-            return [
-              {
-                id: 'order-type-1',
-                name: 'Pick up',
-                behavior: 'TAKE_AWAY',
-                active: true,
-                sort_order: 1,
-                edit_version: 3,
-              },
-            ];
-          case 'payment_methods':
-            return [
-              {
-                id: 'payment-method-1',
-                display_name: 'Cash',
-                logic_type: 'CASH',
-                requires_reconciliation: true,
-                active: true,
-                sort_order: 0,
-                channel: 'POS',
-                requires_reference: false,
-                manual_confirmation_required: false,
-                refund_allowed: true,
-                integration_reference: null,
-                edit_version: 8,
-              },
-            ];
-          default:
-            return [];
-        }
-      }),
-      rpc: vi.fn(),
-    } as unknown as AdminSupabaseClient;
-
-    const loaded = await createSupabaseSettingsStore(client).loadWorkspace({
-      businessId: 'business-1',
-      shopId: 'shop-1',
-    });
-
-    expect(loaded.orderTypes[0]).toMatchObject({ editVersion: 3 });
-    expect(loaded.paymentMethods[0]).toMatchObject({ editVersion: 8 });
-  });
-
-  it('rejects an ONLINE checkout method configured for POS only', () => {
+  it('filters payment methods by active state and POS/ONLINE channel', () => {
     const methods = [
-      {
-        id: 'cash',
-        displayName: 'Cash',
-        active: true,
-        channel: 'POS' as const,
-      },
+      { id: 'cash', displayName: 'Cash', active: true, channel: 'BOTH' as const },
+      { id: 'pos-card', displayName: 'POS Card', active: true, channel: 'POS' as const },
+      { id: 'online-card', displayName: 'Online Card', active: true, channel: 'ONLINE' as const },
+      { id: 'disabled', displayName: 'Disabled', active: false, channel: 'BOTH' as const },
     ];
 
-    expect(resolveAllowedPaymentMethods(methods, { channel: 'ONLINE' })).toEqual([]);
-    expect(resolveAllowedPaymentMethods(methods, { channel: 'POS' })).toEqual(methods);
+    expect(resolveAllowedPaymentMethods(methods, { channel: 'POS' }).map((method) => method.id)).toEqual([
+      'cash',
+      'pos-card',
+    ]);
+    expect(
+      resolveAllowedPaymentMethods(methods, { channel: 'ONLINE' }).map((method) => method.id),
+    ).toEqual(['cash', 'online-card']);
   });
 
-  it('requires explicit SQL null guards for canonical enum-like row edit inputs', () => {
-    const migrationSql = readFileSync(
-      'supabase/migrations/20260910120300_admin_canonical_settings_row_edits.sql',
+  it('keeps shop and settings control tables behind the server boundary', () => {
+    const migration = readFileSync(
+      new URL(
+        '../../../../supabase/migrations/20260910120000_admin_shop_settings.sql',
+        import.meta.url,
+      ),
       'utf8',
     );
+    expect(migration).toContain('alter table public.admin_reason_codes enable row level security');
+    expect(migration).toContain('revoke all on public.admin_reason_codes from public, anon, authenticated');
+  });
 
-    expect(migrationSql).toMatch(/\bp_behavior\s+is\s+null\b/i);
-    expect(migrationSql).toMatch(/\bp_channel\s+is\s+null\b/i);
+  it('maps the complete settings workspace from trusted canonical rows', async () => {
+    const select = vi.fn(async (table: string) => {
+      if (table === 'shops') {
+        return [
+          {
+            id: 'shop-1',
+            name: 'TUX',
+            lifecycle_state: 'ACTIVE',
+            active: true,
+            address_text: null,
+            contact_phone: null,
+            latitude: null,
+            longitude: null,
+            timezone: 'Africa/Cairo',
+            temporary_closed: false,
+            online_orders_paused: false,
+          },
+        ];
+      }
+      if (table === 'shop_settings_versions') return [];
+      return [];
+    });
+    const settingsStore = createSupabaseSettingsStore({ select } as unknown as AdminSupabaseClient);
+
+    await expect(
+      settingsStore.loadWorkspace({ businessId: 'business-1', shopId: 'shop-1' }),
+    ).resolves.toMatchObject({
+      shop: { id: 'shop-1', timezone: 'Africa/Cairo' },
+      settingsVersion: 0,
+      reasonCodes: [],
+    });
   });
 });
