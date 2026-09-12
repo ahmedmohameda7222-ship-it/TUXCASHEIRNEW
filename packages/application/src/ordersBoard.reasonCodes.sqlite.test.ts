@@ -191,4 +191,61 @@ describe('configured cancellation reasons', () => {
       await test.readModel.close();
     }
   });
+
+  it('rejects free-text-only cancellation once published cancellation reasons are configured', async () => {
+    const test = await fixture();
+    try {
+      const result = await test.service.cancelOrder({
+        orderId,
+        foodPrepared: true,
+        reason: 'typed reason must not become canonical',
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('configured cancellation unexpectedly succeeded without reason code');
+      expect(result.error.code).toBe('CONFLICT_ERROR');
+      expect(result.error.message).toMatch(/published cancellation reason/i);
+    } finally {
+      await test.readModel.close();
+    }
+  });
+
+  it('keeps free-text cancellation only for a genuinely pre-feature configuration snapshot', async () => {
+    const test = await fixture();
+    try {
+      await test.database.transaction((transaction) =>
+        transaction.configuration.put({
+          shopId,
+          version: 12,
+          updatedAt: createdAt,
+          categories: [],
+          products: [],
+          modifiers: [],
+          productModifierLinks: [],
+          comboBeverageOptions: [],
+          recipeLines: [],
+          orderTypes: [],
+          paymentMethods: [],
+          deliveryZones: [],
+          settings: null,
+          reasonCodes: [],
+        }),
+      );
+
+      const result = await test.service.cancelOrder({
+        orderId,
+        foodPrepared: true,
+        reason: 'Legacy free-text reason',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.error.message);
+      expect(orderLifecycle(result.value).cancellation).toMatchObject({
+        reason: 'Legacy free-text reason',
+        reasonCode: null,
+      });
+    } finally {
+      await test.readModel.close();
+    }
+  });
 });
