@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicOrderingV2 } from '@tux/catalog-contracts';
 import {
+  calculatePublishedCheckoutEstimate,
   cartTotalMinor,
   checkoutBlockReason,
   projectPublishedCheckoutPolicy,
@@ -12,6 +13,8 @@ function ordering(overrides: Partial<PublicOrderingV2> = {}): PublicOrderingV2 {
     temporaryClosed: false,
     onlineOrdersPaused: false,
     minimumOrderMinor: 0,
+    serviceChargeBps: 0,
+    taxBps: 0,
     fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
     paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
     ...overrides,
@@ -19,10 +22,12 @@ function ordering(overrides: Partial<PublicOrderingV2> = {}): PublicOrderingV2 {
 }
 
 describe('published Menu checkout policy', () => {
-  it('maps only the published fulfillment and payment preferences to existing customer labels', () => {
+  it('maps only the published fulfillment, payment, and financial rules to customer-safe policy', () => {
     expect(
       projectPublishedCheckoutPolicy(
         ordering({
+          serviceChargeBps: 500,
+          taxBps: 1400,
           fulfillmentPreferences: ['DELIVERY', 'PICKUP'],
           paymentPreferences: ['MIXED', 'INSTAPAY'],
         }),
@@ -30,6 +35,8 @@ describe('published Menu checkout policy', () => {
     ).toEqual({
       available: true,
       minimumOrderMinor: 0,
+      serviceChargeBps: 500,
+      taxBps: 1400,
       orderTypes: ['Delivery', 'Pick up'],
       paymentMethods: ['Mixed Payment', 'InstaPay'],
     });
@@ -55,5 +62,18 @@ describe('published Menu checkout policy', () => {
 
     expect(cartTotalMinor(10.1 + 19.9)).toBe(3000);
     expect(checkoutBlockReason(policy, 10.1 + 19.9)).toBeNull();
+  });
+
+  it('calculates the same pre-delivery service charge and tax components from published basis points', () => {
+    const policy = projectPublishedCheckoutPolicy(
+      ordering({ serviceChargeBps: 500, taxBps: 1400 }),
+    );
+
+    expect(calculatePublishedCheckoutEstimate(policy, 100)).toEqual({
+      itemsSubtotalMinor: 10_000,
+      serviceChargeMinor: 500,
+      taxMinor: 1_470,
+      totalMinor: 11_970,
+    });
   });
 });
