@@ -74,7 +74,8 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
                       value={draft.behavior}
                       disabled={updating}
                       onChange={(event) => {
-                        const behavior = event.currentTarget.value as OrderTypeUpdateDraft['behavior'];
+                        const behavior = event.currentTarget
+                          .value as OrderTypeUpdateDraft['behavior'];
                         setDraft((current) => (current ? { ...current, behavior } : current));
                       }}
                     >
