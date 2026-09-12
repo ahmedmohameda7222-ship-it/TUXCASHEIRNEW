@@ -22,6 +22,7 @@ on:
       - 'scripts/test-admin-catalog-recurring-availability.mjs'
       - 'scripts/test-admin-catalog-recurring-deactivation.mjs'
       - 'scripts/test-admin-shop-settings-migration.mjs'
+      - 'scripts/test-admin-plan2-review-hardening.mjs'
       - 'scripts/test-catalog-public-ordering-projection.mjs'
       - 'scripts/test-admin-deployment-contract.mjs'
       - '.github/workflows/admin-catalog-settings-tdd.yml'
@@ -201,6 +202,8 @@ jobs:
         run: node scripts/test-admin-catalog-recurring-availability.mjs
       - name: Shop settings migration invariant
         run: node scripts/test-admin-shop-settings-migration.mjs
+      - name: Plan 2 review hardening invariant
+        run: node scripts/test-admin-plan2-review-hardening.mjs
       - name: Public catalog ordering projection invariant
         run: node scripts/test-catalog-public-ordering-projection.mjs
 
@@ -245,6 +248,8 @@ jobs:
         run: node scripts/test-admin-catalog-recurring-deactivation.mjs
       - name: Shop settings PostgreSQL behavior
         run: node scripts/test-admin-shop-settings-migration.mjs
+      - name: Plan 2 review hardening PostgreSQL behavior
+        run: node scripts/test-admin-plan2-review-hardening.mjs
       - name: Public catalog ordering projection PostgreSQL behavior
         run: node scripts/test-catalog-public-ordering-projection.mjs
       - name: Canonical catalog architecture regression
