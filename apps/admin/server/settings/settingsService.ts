@@ -69,7 +69,9 @@ export interface SettingsStore {
     value: unknown;
     expectedVersion: number | null;
   }): Promise<SettingWriteResult>;
-  updateOrderType(input: { employeeId: string } & OrderTypeEditInput): Promise<CanonicalSettingsRowEditResult>;
+  updateOrderType(
+    input: { employeeId: string } & OrderTypeEditInput,
+  ): Promise<CanonicalSettingsRowEditResult>;
   updatePaymentMethod(
     input: { employeeId: string } & PaymentMethodEditInput,
   ): Promise<CanonicalSettingsRowEditResult>;
@@ -342,7 +344,9 @@ function parseSettingWriteResult(value: unknown): SettingWriteResult {
   return { ok: false, code: value['code'] };
 }
 
-function parseCanonicalSettingsRowEditResult(value: unknown): CanonicalSettingsRowEditResult {
+function parseCanonicalSettingsRowEditResult(
+  value: unknown,
+): CanonicalSettingsRowEditResult {
   if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
     throw new SettingsServiceError('backend_contract_invalid');
   }
