@@ -60,26 +60,6 @@ jobs:
         run: npm run typecheck -w @tux/admin-contracts
       - name: Admin API and server typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
-      - name: Plan 2 formatting diagnostic
-        run: |
-          npx prettier --write \
-            apps/admin/api/admin/settings.ts \
-            apps/menu/src/lib/catalog-public.test.ts \
-            apps/operations/src/app/OrdersBoardWorkspace.tsx \
-            packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts \
-            packages/application/src/ordersBoard.ts \
-            apps/admin/server/catalog/scheduler.ts \
-            apps/admin/server/catalog/scheduler.test.ts \
-            scripts/test-admin-catalog-scheduler-migration.mjs >/dev/null
-          git diff -- \
-            apps/admin/api/admin/settings.ts \
-            apps/menu/src/lib/catalog-public.test.ts \
-            apps/operations/src/app/OrdersBoardWorkspace.tsx \
-            packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts \
-            packages/application/src/ordersBoard.ts \
-            apps/admin/server/catalog/scheduler.ts \
-            apps/admin/server/catalog/scheduler.test.ts \
-            scripts/test-admin-catalog-scheduler-migration.mjs
 
   settings-runtime:
     runs-on: ubuntu-latest
