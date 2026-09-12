@@ -17,7 +17,7 @@ export interface PreparedPaymentPart {
 export interface PaymentPreparationContext {
   readonly channel?: CheckoutChannel;
   readonly deliveryZoneId?: DeliveryZoneId | null;
-  readonly paymentMethodZoneRules?: readonly PaymentMethodZoneRuleSetting[];
+  readonly paymentMethodZoneRules?: readonly PaymentMethodZoneRuleSetting[] | undefined;
 }
 
 function activeMethod(
