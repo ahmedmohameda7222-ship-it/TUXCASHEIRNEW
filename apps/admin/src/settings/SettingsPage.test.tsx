@@ -22,9 +22,15 @@ const workspace: AdminSettingsWorkspace = {
   },
   settingsVersion: 7,
   businessDefaults: [
+    { key: 'checkout.minimumOrderMinor', value: 3000, version: 1 },
+    { key: 'checkout.serviceChargeBps', value: 500, version: 1 },
+    { key: 'checkout.taxBps', value: 1400, version: 1 },
+    { key: 'checkout.requireCustomerPhone', value: false, version: 1 },
+    { key: 'checkout.allowScheduledOrders', value: false, version: 1 },
     { key: 'receipt.footer', value: 'Thank you', version: 2 },
     { key: 'receipt.orderPrefix', value: 'TUX-', version: 1 },
     { key: 'receipt.sequenceStart', value: 1, version: 1 },
+    { key: 'receipt.sequenceResetPolicy', value: 'BUSINESS_DAY', version: 1 },
   ],
   shopOverrides: [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }],
   orderTypes: [
@@ -101,17 +107,21 @@ const workspace: AdminSettingsWorkspace = {
   specialHours: [],
 };
 
+const noop = vi.fn();
+
 function renderSection(section: SettingsSection): string {
   return renderToStaticMarkup(
     <SettingsWorkspaceView
       workspace={workspace}
       section={section}
-      onSectionChange={vi.fn()}
-      onPublish={vi.fn()}
+      onSectionChange={noop}
+      onPublish={noop}
       publishing={false}
-      onUpdateOrderType={vi.fn()}
+      onUpdateSettingOverride={noop}
+      settingOverrideUpdating={false}
+      onUpdateOrderType={noop}
       orderTypeUpdating={false}
-      onUpdatePaymentMethod={vi.fn()}
+      onUpdatePaymentMethod={noop}
       paymentMethodUpdating={false}
     />,
   );
@@ -137,13 +147,17 @@ describe('Settings workspace', () => {
     expect(html).toContain('Changes become live only after publishing');
   });
 
-  it('shows effective receipt inheritance without hiding the source layer', () => {
-    const html = renderToStaticMarkup(<ReceiptsPage workspace={workspace} />);
+  it('shows editable receipt inheritance without hiding the source layer', () => {
+    const html = renderToStaticMarkup(
+      <ReceiptsPage workspace={workspace} onUpdate={noop} updating={false} />,
+    );
     expect(html).toContain('MD-');
     expect(html).toContain('Shop override');
     expect(html).toContain('Thank you');
     expect(html).toContain('Business default');
     expect(html).toContain('Sequence start');
+    expect(html).toContain('Save Order prefix');
+    expect(html).toContain('Save Receipt footer');
   });
 
   it('shows stable configured reason identity and version instead of free-text-only reasons', () => {
@@ -154,7 +168,7 @@ describe('Settings workspace', () => {
     expect(html).toContain('v4');
   });
 
-  it('renders real shop, fulfillment, payment and checkout configuration instead of placeholders', () => {
+  it('renders real shop, fulfillment, payment and editable checkout configuration', () => {
     const shop = renderSection('shop');
     expect(shop).toContain('+201000000000');
     expect(shop).toContain('Road 9, Maadi');
@@ -179,5 +193,10 @@ describe('Settings workspace', () => {
     const checkout = renderSection('checkout');
     expect(checkout).toContain('Maadi');
     expect(checkout).toContain('30.00 EGP');
+    expect(checkout).toContain('Minimum order (minor units)');
+    expect(checkout).toContain('Service charge (bps)');
+    expect(checkout).toContain('Tax / VAT (bps)');
+    expect(checkout).toContain('1400');
+    expect(checkout).toContain('Save Tax / VAT (bps)');
   });
 });
