@@ -10,11 +10,16 @@ on:
       - '.github/workflows/admin-plan2-checkout-tdd.yml'
   workflow_dispatch:
 
+concurrency:
+  group: admin-plan2-checkout-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   checkout-policy:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'feat(admin): enforce checkout execution authority')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,5 +29,119 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Apply guarded Operations checkout authority patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/application/src/orders.ts')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "const validation = validateOrderDraft(draft, context.configuration);",
+                  "const validation = validateOrderDraft(draft, context.configuration, placement.source);",
+              ),
+              (
+                  """          const preparedPayments = preparePaymentParts(
+            draft.payment,
+            context.configuration.paymentMethods,
+            validation.value.pricing.totalMinor,
+          );""",
+                  """          const preparedPayments = preparePaymentParts(
+            draft.payment,
+            context.configuration.paymentMethods,
+            validation.value.pricing.totalMinor,
+            {
+              channel: placement.source,
+              deliveryZoneId:
+                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+              paymentMethodZoneRules: context.configuration.settings?.paymentMethodZoneRules,
+            },
+          );""",
+              ),
+              (
+                  """            const payments = this.#buildPayments(preparedPayments);
+            const order: OrderSnapshot = {""",
+                  """            const payments = this.#buildPayments(preparedPayments);
+            const checkoutPaymentRules = preparedPayments.map((part) => ({
+              paymentMethodId: part.method.id,
+              channel: part.method.channel ?? 'BOTH',
+              deliveryZoneId:
+                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+              zoneAllowed: true,
+            }));
+            const order: OrderSnapshot = {""",
+              ),
+              (
+                  """              discountMinor: validation.value.pricing.discountMinor,
+              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+              totalMinor: validation.value.pricing.totalMinor,
+              payments,""",
+                  """              discountMinor: validation.value.pricing.discountMinor,
+              deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+              serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
+              taxMinor: validation.value.pricing.taxMinor,
+              checkoutSnapshot: {
+                configurationVersion: currentConfiguration.version,
+                settingsVersion: validation.value.checkoutPolicy.settingsVersion,
+                channel: placement.source,
+                minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,
+                minimumOrderSatisfied: true,
+                serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,
+                serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
+                taxBps: validation.value.checkoutPolicy.taxBps,
+                taxMinor: validation.value.pricing.taxMinor,
+                deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
+                discountMinor: validation.value.pricing.discountMinor,
+                paymentRules: checkoutPaymentRules,
+              },
+              totalMinor: validation.value.pricing.totalMinor,
+              payments,""",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'guarded replacement expected once, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Format checkout authority files
+        run: >-
+          npx prettier --write
+          packages/domain/src/checkoutPolicy.ts
+          packages/domain/src/index.ts
+          packages/domain/src/models.ts
+          packages/domain/src/order.ts
+          packages/domain/src/orderValidation.ts
+          packages/domain/src/payment.ts
+          packages/application/src/orders.ts
+          packages/application/src/ordersOnlineSource.sqlite.test.ts
       - name: Trusted POS and ONLINE checkout policy
         run: npx vitest run packages/application/src/ordersOnlineSource.sqlite.test.ts
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Commit verified checkout authority
+        run: |
+          if git diff --quiet; then
+            echo 'No checkout authority changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            packages/domain/src/checkoutPolicy.ts \
+            packages/domain/src/index.ts \
+            packages/domain/src/models.ts \
+            packages/domain/src/order.ts \
+            packages/domain/src/orderValidation.ts \
+            packages/domain/src/payment.ts \
+            packages/application/src/orders.ts \
+            packages/application/src/ordersOnlineSource.sqlite.test.ts
+          git commit -m 'feat(admin): enforce checkout execution authority'
+          git push origin HEAD:feat/admin-02-catalog-settings
