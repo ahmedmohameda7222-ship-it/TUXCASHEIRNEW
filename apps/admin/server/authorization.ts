@@ -19,3 +19,14 @@ export function requirePermission(
     throw new AdminAuthorizationError('shop_forbidden');
   }
 }
+
+export function requireBusinessWidePermission(
+  principal: AdminSessionPrincipal,
+  permission: AdminPermission,
+  shopId?: string,
+): void {
+  requirePermission(principal, permission, shopId);
+  if (principal.role !== 'OWNER' && principal.role !== 'ADMIN') {
+    throw new AdminAuthorizationError('permission_forbidden');
+  }
+}
