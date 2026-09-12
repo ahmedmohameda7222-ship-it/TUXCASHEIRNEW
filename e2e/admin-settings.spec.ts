@@ -194,7 +194,9 @@ test('settings route loads the concrete shop workspace and publishes through the
   expect(fixture.commands).toHaveLength(1);
 });
 
-test('settings route edits canonical order and payment configuration before publish', async ({ page }) => {
+test('settings route edits canonical order and payment configuration before publish', async ({
+  page,
+}) => {
   const fixture = await mockSettings(page);
   await page.goto('/settings');
 
