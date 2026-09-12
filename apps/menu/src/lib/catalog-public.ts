@@ -1,4 +1,7 @@
-import { parsePublicCatalogSnapshotV1, type PublicCatalogSnapshotV1 } from '@tux/catalog-contracts';
+import {
+  parsePublicCatalogSnapshotV2,
+  type PublicCatalogSnapshotV2,
+} from '@tux/catalog-contracts';
 
 const catalogPublicUrl = (): string => {
   const explicit = import.meta.env.VITE_CATALOG_PUBLIC_URL?.trim();
@@ -17,10 +20,11 @@ const configuredShopId = (): string => {
   return shopId;
 };
 
-export async function fetchPublicCatalog(signal?: AbortSignal): Promise<PublicCatalogSnapshotV1> {
+export async function fetchPublicCatalog(signal?: AbortSignal): Promise<PublicCatalogSnapshotV2> {
   const shopId = configuredShopId();
   const url = new URL(catalogPublicUrl());
   url.searchParams.set('shopId', shopId);
+  url.searchParams.set('schemaVersion', '2');
 
   const response = await fetch(url, {
     method: 'GET',
@@ -29,7 +33,7 @@ export async function fetchPublicCatalog(signal?: AbortSignal): Promise<PublicCa
   });
   if (!response.ok) throw new Error('catalog_public_unavailable');
 
-  const snapshot = parsePublicCatalogSnapshotV1(await response.json());
+  const snapshot = parsePublicCatalogSnapshotV2(await response.json());
   if (snapshot.shopId !== shopId.toLowerCase()) {
     throw new Error('catalog_shop_mismatch');
   }
