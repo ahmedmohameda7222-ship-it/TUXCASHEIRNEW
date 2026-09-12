@@ -49,6 +49,57 @@ describe('Admin settings API contract', () => {
     ).toBe(true);
   });
 
+  it('rejects unknown setting keys and key-specific malformed values', () => {
+    const base = {
+      type: 'setting.override.upsert',
+      shopId,
+      expectedVersion: null,
+    } as const;
+
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'checkout.futureUnreviewedFlag',
+        value: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'checkout.minimumOrderMinor',
+        value: '1500',
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'checkout.serviceChargeBps',
+        value: 10001,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'checkout.requireCustomerPhone',
+        value: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'receipt.sequenceStart',
+        value: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'receipt.orderPrefix',
+        value: 'X'.repeat(65),
+      }).success,
+    ).toBe(false);
+  });
+
   it('accepts strict version-fenced canonical order type edits', () => {
     expect(
       settingsCommandSchema.safeParse({
