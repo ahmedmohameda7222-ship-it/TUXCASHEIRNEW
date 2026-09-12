@@ -1,4 +1,4 @@
-import type { PublicCatalogSnapshotV1 } from '@tux/catalog-contracts';
+import type { PublicCatalogSnapshotV1, PublicCatalogSnapshotV2 } from '@tux/catalog-contracts';
 
 export interface SupabaseSection {
   id: string;
@@ -53,7 +53,9 @@ export interface MenuProjection {
   readonly comboBeveragesByProduct: Readonly<Record<string, readonly SupabaseProduct[]>>;
 }
 
-export function projectPublicCatalog(snapshot: PublicCatalogSnapshotV1): MenuProjection {
+export function projectPublicCatalog(
+  snapshot: PublicCatalogSnapshotV1 | PublicCatalogSnapshotV2,
+): MenuProjection {
   const activeCategoryIds = new Set(
     snapshot.categories.filter((category) => category.active).map((category) => category.id),
   );
