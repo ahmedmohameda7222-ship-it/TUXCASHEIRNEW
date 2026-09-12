@@ -105,6 +105,7 @@ type OrderTypeRow = {
   behavior: string;
   active: boolean;
   sort_order: number | string;
+  edit_version: number | string;
 };
 
 type PaymentMethodRow = {
@@ -119,6 +120,7 @@ type PaymentMethodRow = {
   manual_confirmation_required: boolean;
   refund_allowed: boolean;
   integration_reference: string | null;
+  edit_version: number | string;
 };
 
 type DeliveryZoneRow = {
@@ -260,6 +262,7 @@ function mapOrderType(row: OrderTypeRow): AdminOrderTypeConfiguration {
     behavior: readOrderBehavior(row.behavior),
     active: row.active,
     sortOrder: safeInteger(row.sort_order),
+    editVersion: safeInteger(row.edit_version, 1),
   };
 }
 
@@ -276,6 +279,7 @@ function mapPaymentMethod(row: PaymentMethodRow): AdminPaymentMethodDetail {
     manualConfirmationRequired: row.manual_confirmation_required,
     refundAllowed: row.refund_allowed,
     integrationReference: row.integration_reference,
+    editVersion: safeInteger(row.edit_version, 1),
   };
 }
 
@@ -566,7 +570,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
         client.select<OrderTypeRow[]>(
           'order_types',
           new URLSearchParams({
-            select: 'id,name,behavior,active,sort_order',
+            select: 'id,name,behavior,active,sort_order,edit_version',
             shop_id: `eq.${shopId}`,
             order: 'sort_order.asc,id.asc',
           }),
@@ -575,7 +579,7 @@ export function createSupabaseSettingsStore(client: AdminSupabaseClient): Settin
           'payment_methods',
           new URLSearchParams({
             select:
-              'id,display_name,logic_type,requires_reconciliation,active,sort_order,channel,requires_reference,manual_confirmation_required,refund_allowed,integration_reference',
+              'id,display_name,logic_type,requires_reconciliation,active,sort_order,channel,requires_reference,manual_confirmation_required,refund_allowed,integration_reference,edit_version',
             shop_id: `eq.${shopId}`,
             order: 'sort_order.asc,id.asc',
           }),
