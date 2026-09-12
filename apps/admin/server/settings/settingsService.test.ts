@@ -1,4 +1,5 @@
 import type { AdminSessionPrincipal, AdminSettingsWorkspace } from '@tux/admin-contracts';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSupabaseClient } from '../supabaseAdmin';
@@ -268,5 +269,15 @@ describe('Admin settings service', () => {
 
     expect(resolveAllowedPaymentMethods(methods, { channel: 'ONLINE' })).toEqual([]);
     expect(resolveAllowedPaymentMethods(methods, { channel: 'POS' })).toEqual(methods);
+  });
+
+  it('requires explicit SQL null guards for canonical enum-like row edit inputs', () => {
+    const migrationSql = readFileSync(
+      'supabase/migrations/20260910120300_admin_canonical_settings_row_edits.sql',
+      'utf8',
+    );
+
+    expect(migrationSql).toMatch(/\bp_behavior\s+is\s+null\b/i);
+    expect(migrationSql).toMatch(/\bp_channel\s+is\s+null\b/i);
   });
 });
