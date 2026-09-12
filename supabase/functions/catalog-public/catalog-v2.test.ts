@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -101,5 +103,18 @@ describe('catalog-public V2 HTTP contract', () => {
       schemaVersion: 1,
       error: { code: 'catalog_unavailable' },
     });
+  });
+
+  it('wires the V2 store to the reviewed narrow public ordering RPC without replacing V1', () => {
+    const indexSource = readFileSync(
+      fileURLToPath(new URL('./index.ts', import.meta.url)),
+      'utf8',
+    );
+
+    expect(indexSource).toContain("client.rpc('read_catalog_public_v1'");
+    expect(indexSource).toContain("client.rpc('read_catalog_public_ordering_v2'");
+    expect(indexSource).toContain('getPublishedOrderingProjection');
+    expect(indexSource).not.toContain('operations_configuration_snapshots');
+    expect(indexSource).not.toContain('bundle_json');
   });
 });
