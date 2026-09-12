@@ -1,6 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const orderTypeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const paymentMethodId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const csrfToken = 's'.repeat(64);
 
 const ownerSession = {
@@ -16,6 +18,28 @@ const ownerSession = {
 
 async function mockSettings(page: Page) {
   let settingsVersion = 7;
+  let orderType = {
+    id: orderTypeId,
+    name: 'Take Away',
+    behavior: 'TAKE_AWAY',
+    active: true,
+    sortOrder: 10,
+    editVersion: 3,
+  };
+  let paymentMethod = {
+    id: paymentMethodId,
+    displayName: 'Cash',
+    logicType: 'CASH',
+    requiresReconciliation: true,
+    active: true,
+    sortOrder: 10,
+    channel: 'BOTH',
+    requiresReference: false,
+    manualConfirmationRequired: false,
+    refundAllowed: true,
+    integrationReference: null,
+    editVersion: 5,
+  };
   const commands: Record<string, unknown>[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
@@ -56,24 +80,8 @@ async function mockSettings(page: Page) {
             { key: 'receipt.sequenceStart', value: 1, version: 1 },
           ],
           shopOverrides: [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }],
-          orderTypes: [
-            { id: 'ot-1', name: 'Take Away', behavior: 'TAKE_AWAY', active: true, sortOrder: 10 },
-          ],
-          paymentMethods: [
-            {
-              id: 'pm-1',
-              displayName: 'Cash',
-              logicType: 'CASH',
-              requiresReconciliation: true,
-              active: true,
-              sortOrder: 10,
-              channel: 'BOTH',
-              requiresReference: false,
-              manualConfirmationRequired: false,
-              refundAllowed: true,
-              integrationReference: null,
-            },
-          ],
+          orderTypes: [orderType],
+          paymentMethods: [paymentMethod],
           deliveryZones: [],
           reasonCodes: [
             {
@@ -97,6 +105,58 @@ async function mockSettings(page: Page) {
     expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
     const command = request.postDataJSON() as Record<string, unknown>;
     commands.push(command);
+
+    if (command.type === 'order-type.update') {
+      expect(command).toMatchObject({
+        shopId,
+        orderTypeId,
+        expectedSettingsVersion: settingsVersion,
+        expectedEditVersion: orderType.editVersion,
+      });
+      orderType = {
+        ...orderType,
+        name: String(command.name),
+        behavior: command.behavior as typeof orderType.behavior,
+        active: Boolean(command.active),
+        sortOrder: Number(command.sortOrder),
+        editVersion: orderType.editVersion + 1,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, editVersion: orderType.editVersion }),
+      });
+      return;
+    }
+
+    if (command.type === 'payment-method.update') {
+      expect(command).toMatchObject({
+        shopId,
+        paymentMethodId,
+        expectedSettingsVersion: settingsVersion,
+        expectedEditVersion: paymentMethod.editVersion,
+      });
+      expect(command).not.toHaveProperty('logicType');
+      expect(command).not.toHaveProperty('requiresReconciliation');
+      paymentMethod = {
+        ...paymentMethod,
+        displayName: String(command.displayName),
+        active: Boolean(command.active),
+        sortOrder: Number(command.sortOrder),
+        channel: command.channel as typeof paymentMethod.channel,
+        requiresReference: Boolean(command.requiresReference),
+        manualConfirmationRequired: Boolean(command.manualConfirmationRequired),
+        refundAllowed: Boolean(command.refundAllowed),
+        editVersion: paymentMethod.editVersion + 1,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, editVersion: paymentMethod.editVersion }),
+      });
+      return;
+    }
+
     expect(command).toMatchObject({
       type: 'settings.publish',
       shopId,
@@ -132,4 +192,38 @@ test('settings route loads the concrete shop workspace and publishes through the
 
   await expect(page.getByText('Live settings version 8')).toBeVisible();
   expect(fixture.commands).toHaveLength(1);
+});
+
+test('settings route edits canonical order and payment configuration before publish', async ({ page }) => {
+  const fixture = await mockSettings(page);
+  await page.goto('/settings');
+
+  await page.getByRole('button', { name: 'Order types' }).click();
+  await page.getByRole('button', { name: 'Edit Take Away' }).click();
+  await page.getByLabel('Order type name').fill('Pick up');
+  await page.getByLabel('Order type active').uncheck();
+  await page.getByRole('button', { name: 'Save order type' }).click();
+  await expect(page.getByText('Pick up')).toBeVisible();
+  await expect(page.getByText('Inactive')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Payments' }).click();
+  await page.getByRole('button', { name: 'Edit Cash' }).click();
+  await page.getByLabel('Payment method name').fill('Front Cash');
+  await page.getByLabel('Payment channel').selectOption('POS');
+  await page.getByLabel('Reference required').check();
+  await page.getByLabel('Manual confirmation').check();
+  await page.getByRole('button', { name: 'Save payment method' }).click();
+  await expect(page.getByText('Front Cash')).toBeVisible();
+  await expect(page.getByText('Reference required')).toBeVisible();
+  await expect(page.getByText('Manual confirmation')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Publish settings' }).click();
+  await expect(page.getByText('Live settings version 8')).toBeVisible();
+
+  expect(fixture.commands).toHaveLength(3);
+  expect(fixture.commands.map((command) => command.type)).toEqual([
+    'order-type.update',
+    'payment-method.update',
+    'settings.publish',
+  ]);
 });
