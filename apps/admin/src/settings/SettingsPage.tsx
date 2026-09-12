@@ -10,7 +10,11 @@ import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
 import { ShopsPage } from './ShopsPage';
 import './settings.css';
-import { useSettings } from './useSettings';
+import {
+  useSettings,
+  type OrderTypeUpdateDraft,
+  type PaymentMethodUpdateDraft,
+} from './useSettings';
 
 export type SettingsSection =
   'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
@@ -21,6 +25,10 @@ export type SettingsWorkspaceViewProps = {
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
+  onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
+  orderTypeUpdating: boolean;
+  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
+  paymentMethodUpdating: boolean;
 };
 
 const sections: readonly { id: SettingsSection; label: string }[] = [
@@ -83,9 +91,17 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
 function SectionContent({
   section,
   workspace,
+  onUpdateOrderType,
+  orderTypeUpdating,
+  onUpdatePaymentMethod,
+  paymentMethodUpdating,
 }: {
   section: SettingsSection;
   workspace: AdminSettingsWorkspace;
+  onUpdateOrderType(draft: OrderTypeUpdateDraft): void | Promise<void>;
+  orderTypeUpdating: boolean;
+  onUpdatePaymentMethod(draft: PaymentMethodUpdateDraft): void | Promise<void>;
+  paymentMethodUpdating: boolean;
 }) {
   switch (section) {
     case 'overview':
@@ -93,9 +109,21 @@ function SectionContent({
     case 'shop':
       return <ShopsPage workspace={workspace} />;
     case 'order-types':
-      return <OrderTypesPage workspace={workspace} />;
+      return (
+        <OrderTypesPage
+          workspace={workspace}
+          onUpdate={onUpdateOrderType}
+          updating={orderTypeUpdating}
+        />
+      );
     case 'payments':
-      return <PaymentsPage workspace={workspace} />;
+      return (
+        <PaymentsPage
+          workspace={workspace}
+          onUpdate={onUpdatePaymentMethod}
+          updating={paymentMethodUpdating}
+        />
+      );
     case 'checkout':
       return <CheckoutPage workspace={workspace} />;
     case 'receipts':
@@ -111,6 +139,10 @@ export function SettingsWorkspaceView({
   onSectionChange,
   onPublish,
   publishing,
+  onUpdateOrderType,
+  orderTypeUpdating,
+  onUpdatePaymentMethod,
+  paymentMethodUpdating,
 }: SettingsWorkspaceViewProps) {
   return (
     <main className="admin-settings-workspace" data-settings-version={workspace.settingsVersion}>
@@ -153,7 +185,14 @@ export function SettingsWorkspaceView({
         ))}
       </nav>
 
-      <SectionContent section={section} workspace={workspace} />
+      <SectionContent
+        section={section}
+        workspace={workspace}
+        onUpdateOrderType={onUpdateOrderType}
+        orderTypeUpdating={orderTypeUpdating}
+        onUpdatePaymentMethod={onUpdatePaymentMethod}
+        paymentMethodUpdating={paymentMethodUpdating}
+      />
     </main>
   );
 }
@@ -199,6 +238,10 @@ export function SettingsPage() {
       onSectionChange={setSection}
       onPublish={() => settings.publish.mutateAsync()}
       publishing={settings.publish.isPending}
+      onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
+      orderTypeUpdating={settings.updateOrderType.isPending}
+      onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
+      paymentMethodUpdating={settings.updatePaymentMethod.isPending}
     />
   );
 }
