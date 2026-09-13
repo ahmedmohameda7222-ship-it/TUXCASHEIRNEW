@@ -86,7 +86,7 @@ narrow_new = """              const scope = reason['scope'];
                   'reconciliation variance reason version',
                   1,
                 ),
-                scope,
+                scope: scope as 'SHOP' | 'BUSINESS',
               };
 """
 if fixed.count(narrow_old) != 1:
