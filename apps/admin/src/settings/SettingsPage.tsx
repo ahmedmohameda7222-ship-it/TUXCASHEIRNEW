@@ -1,5 +1,5 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
-import { useState } from 'react';
+import { useLocation } from 'wouter';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
@@ -19,7 +19,13 @@ import {
 } from './useSettings';
 
 export type SettingsSection =
-  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
+  | 'overview'
+  | 'shop'
+  | 'order-types'
+  | 'payments'
+  | 'checkout'
+  | 'receipts'
+  | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
@@ -47,6 +53,26 @@ const sections: readonly { id: SettingsSection; label: string }[] = [
   { id: 'receipts', label: 'Receipts' },
   { id: 'reason-codes', label: 'Reason codes' },
 ];
+
+const settingsSectionIds = new Set<SettingsSection>([
+  'shop',
+  'order-types',
+  'payments',
+  'checkout',
+  'receipts',
+  'reason-codes',
+]);
+
+export function settingsSectionForLocation(location: string): SettingsSection {
+  if (location === '/settings' || location === '/settings/') return 'overview';
+  if (!location.startsWith('/settings/')) return 'overview';
+  const candidate = location.slice('/settings/'.length).split('/')[0] as SettingsSection;
+  return settingsSectionIds.has(candidate) ? candidate : 'overview';
+}
+
+export function settingsLocationForSection(section: SettingsSection): string {
+  return section === 'overview' ? '/settings' : `/settings/${section}`;
+}
 
 function effectiveSetting(workspace: AdminSettingsWorkspace, key: string): unknown {
   return (
@@ -255,7 +281,8 @@ export function SettingsWorkspaceView({
 
 export function SettingsPage() {
   const { scope } = useShopScope();
-  const [section, setSection] = useState<SettingsSection>('overview');
+  const [location, navigate] = useLocation();
+  const section = settingsSectionForLocation(location);
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const settings = useSettings(shopId);
 
@@ -299,7 +326,7 @@ export function SettingsPage() {
     <SettingsWorkspaceView
       workspace={settings.workspaceQuery.data}
       section={section}
-      onSectionChange={setSection}
+      onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
       onPublish={() => settings.publish.mutateAsync()}
       publishing={settings.publish.isPending}
       onDeleteOrArchiveShop={deleteOrArchiveShop}
