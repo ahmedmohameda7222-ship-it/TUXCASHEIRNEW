@@ -7,11 +7,14 @@ import type { PaymentMethodSnapshot } from './models';
 import type { PaymentDraft } from './orderDraft';
 import type { PaymentMethodZoneRuleSetting } from './settings';
 
+const MAX_PAYMENT_REFERENCE_LENGTH = 200;
+
 export interface PreparedPaymentPart {
   readonly method: PaymentMethodSnapshot;
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor | null;
   readonly changeMinor: MoneyMinor | null;
+  readonly reference: string | null;
 }
 
 export interface PaymentPreparationContext {
@@ -57,10 +60,25 @@ function activeMethod(
   return method;
 }
 
+function normalizePaymentReference(
+  method: PaymentMethod,
+  rawReference: string | null | undefined,
+): string | null {
+  const reference = rawReference?.trim() ?? '';
+  if ((method.requiresReference ?? false) && reference.length === 0) {
+    throw new DomainInvariantError('Payment reference is required for the selected payment method.');
+  }
+  if (reference.length > MAX_PAYMENT_REFERENCE_LENGTH) {
+    throw new DomainInvariantError('Payment reference cannot exceed 200 characters.');
+  }
+  return reference.length === 0 ? null : reference;
+}
+
 function preparePart(
   method: PaymentMethod,
   allocatedMinor: MoneyMinor,
   cashReceivedMinor: MoneyMinor | null,
+  rawReference: string | null | undefined,
 ): PreparedPaymentPart {
   if (allocatedMinor < 0) {
     throw new DomainInvariantError('Payment allocation cannot be negative.');
@@ -74,8 +92,15 @@ function preparePart(
     manualConfirmationRequired: method.manualConfirmationRequired ?? false,
     refundAllowed: method.refundAllowed ?? true,
   };
+  const reference = normalizePaymentReference(method, rawReference);
   if (method.logicType !== 'CASH') {
-    return { method: snapshot, allocatedMinor, receivedMinor: null, changeMinor: null };
+    return {
+      method: snapshot,
+      allocatedMinor,
+      receivedMinor: null,
+      changeMinor: null,
+      reference,
+    };
   }
   const effectiveReceived = cashReceivedMinor ?? allocatedMinor;
   if (effectiveReceived < allocatedMinor) {
@@ -86,6 +111,7 @@ function preparePart(
     allocatedMinor,
     receivedMinor: effectiveReceived,
     changeMinor: subtractMoney(effectiveReceived, allocatedMinor),
+    reference,
   };
 }
 
@@ -106,7 +132,7 @@ export function preparePaymentParts(
   }
   if (draft.mode === 'SINGLE') {
     const method = activeMethod(methods, draft.methodId, context);
-    return [preparePart(method, totalMinor, draft.cashReceivedMinor)];
+    return [preparePart(method, totalMinor, draft.cashReceivedMinor, draft.reference)];
   }
 
   if (draft.methodAId === draft.methodBId) {
@@ -118,7 +144,10 @@ export function preparePaymentParts(
   const remainder = subtractMoney(totalMinor, draft.amountAMinor);
   const methodA = activeMethod(methods, draft.methodAId, context);
   const methodB = activeMethod(methods, draft.methodBId, context);
-  return [preparePart(methodA, draft.amountAMinor, null), preparePart(methodB, remainder, null)];
+  return [
+    preparePart(methodA, draft.amountAMinor, null, draft.referenceA),
+    preparePart(methodB, remainder, null, draft.referenceB),
+  ];
 }
 
 export function parsePoundsToMinor(raw: string): MoneyMinor | null {
