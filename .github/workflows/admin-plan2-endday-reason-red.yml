@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/admin-plan2-endday-reason-red.yml'
       - 'packages/application/src/endDay.reasonCodes.test.ts'
+      - 'packages/domain/src/endDayReasonSync.test.ts'
+      - 'apps/operations/src/app/EndDayFlow.reasonCodes.test.ts'
   workflow_dispatch:
 
 jobs:
@@ -21,3 +23,7 @@ jobs:
       - run: npm ci
       - name: Prove CASH_VARIANCE reason authority is RED
         run: npx vitest run packages/application/src/endDay.reasonCodes.test.ts
+      - name: Prove reconciliation reason snapshot sync is RED
+        run: npx vitest run packages/domain/src/endDayReasonSync.test.ts
+      - name: Prove End Day UI reason selection is RED
+        run: npx vitest run apps/operations/src/app/EndDayFlow.reasonCodes.test.ts
