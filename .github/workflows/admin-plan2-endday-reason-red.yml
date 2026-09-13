@@ -1,0 +1,23 @@
+name: Admin Plan 2 End Day Reason RED
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - '.github/workflows/admin-plan2-endday-reason-red.yml'
+      - 'packages/application/src/endDay.reasonCodes.test.ts'
+  workflow_dispatch:
+
+jobs:
+  end-day-reason-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prove CASH_VARIANCE reason authority is RED
+        run: npx vitest run packages/application/src/endDay.reasonCodes.test.ts
