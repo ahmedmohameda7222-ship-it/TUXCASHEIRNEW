@@ -29,11 +29,15 @@ jobs:
           import type { OperationsConfigurationSnapshot } from './catalog';
           import type { OrderDraft } from './orderDraft';
           import { moneyMinor } from './money';
-          import { validateFulfillment } from './orderValidation';
+          import { validateOrderDraft } from './orderValidation';
 
           const shopId = '10000000-0000-4000-8000-000000000001' as never;
+          const categoryId = '11000000-0000-4000-8000-000000000001' as never;
+          const productId = '12000000-0000-4000-8000-000000000001' as never;
+          const lineId = '13000000-0000-4000-8000-000000000001' as never;
           const orderTypeId = '20000000-0000-4000-8000-000000000001' as never;
           const zoneId = '30000000-0000-4000-8000-000000000001' as never;
+          const paymentMethodId = '31000000-0000-4000-8000-000000000001' as never;
 
           function config(allowDeliveryFeeOverride: boolean): OperationsConfigurationSnapshot {
             return {
@@ -41,7 +45,21 @@ jobs:
               version: 9,
               updatedAt: '2026-09-13T00:00:00.000Z' as never,
               categories: [],
-              products: [],
+              products: [
+                {
+                  id: productId,
+                  shopId,
+                  categoryId,
+                  name: 'Burger',
+                  description: null,
+                  priceMinor: moneyMinor(1_000),
+                  imageKey: null,
+                  active: true,
+                  soldOut: false,
+                  isCombo: false,
+                  sortOrder: 1,
+                },
+              ],
               modifiers: [],
               productModifierLinks: [],
               comboBeverageOptions: [],
@@ -56,7 +74,18 @@ jobs:
                   sortOrder: 1,
                 },
               ],
-              paymentMethods: [],
+              paymentMethods: [
+                {
+                  id: paymentMethodId,
+                  shopId,
+                  displayName: 'Cash',
+                  logicType: 'CASH',
+                  requiresReconciliation: true,
+                  active: true,
+                  sortOrder: 1,
+                  channel: 'BOTH',
+                },
+              ],
               deliveryZones: [
                 {
                   id: zoneId,
@@ -84,12 +113,24 @@ jobs:
               updatedAt: '2026-09-13T00:00:00.000Z' as never,
               checkoutIntentKey: '50000000-0000-4000-8000-000000000001',
               orderTypeId,
-              lines: [],
+              lines: [
+                {
+                  id: lineId,
+                  productId,
+                  productName: 'Burger',
+                  unitPriceMinor: moneyMinor(1_000),
+                  quantity: 1,
+                  modifiers: [],
+                  comboBeverages: [],
+                  itemNote: null,
+                  addedSequence: 1,
+                },
+              ],
               orderNote: null,
               discountMinor: moneyMinor(0),
               delivery: {
-                displayPhone: '01000000000',
-                normalizedPhone: '01000000000',
+                displayPhone: '01012345678',
+                normalizedPhone: '01012345678',
                 customerName: 'Customer',
                 address: 'Address',
                 zoneId,
@@ -97,14 +138,23 @@ jobs:
                 configuredFeeMinor: moneyMinor(2_000),
                 finalFeeMinor: moneyMinor(finalFeeMinor),
               },
-              payment: { mode: 'NONE' },
+              payment: {
+                mode: 'SINGLE',
+                methodId: paymentMethodId,
+                cashReceivedMinor: moneyMinor(4_000),
+              },
             };
           }
 
           describe('delivery fee override authority', () => {
             it('rejects a fee different from the configured zone fee when override policy is disabled', () => {
-              expect(() => validateFulfillment(config(false), draft(3_000))).toThrow(
-                'DELIVERY_FEE_OVERRIDE_NOT_ALLOWED',
+              const result = validateOrderDraft(draft(3_000), config(false));
+              expect(result.valid).toBe(false);
+              if (result.valid) throw new Error('delivery fee override unexpectedly validated');
+              expect(result.issues).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({ code: 'DELIVERY_FEE_OVERRIDE_NOT_ALLOWED' }),
+                ]),
               );
             });
           });
