@@ -1,3 +1,4 @@
+import type { AdminPaymentMethodDetail } from '@tux/admin-contracts';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -26,7 +27,7 @@ async function mockSettings(page: Page) {
     sortOrder: 10,
     editVersion: 3,
   };
-  let paymentMethod = {
+  let paymentMethod: AdminPaymentMethodDetail = {
     id: paymentMethodId,
     displayName: 'Cash',
     logicType: 'CASH',
@@ -172,7 +173,7 @@ async function mockSettings(page: Page) {
         displayName: String(command.displayName),
         active: Boolean(command.active),
         sortOrder: Number(command.sortOrder),
-        channel: String(command.channel),
+        channel: String(command.channel) as AdminPaymentMethodDetail['channel'],
         requiresReference: Boolean(command.requiresReference),
         manualConfirmationRequired: Boolean(command.manualConfirmationRequired),
         refundAllowed: Boolean(command.refundAllowed),
@@ -214,85 +215,125 @@ async function mockSettings(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, publishedSettingsVersion: settingsVersion }),
+        body: JSON.stringify({
+          ok: true,
+          settingsVersion,
+          operationsConfigurationVersion: 20 + settingsVersion,
+        }),
       });
       return;
     }
 
-    throw new Error(`Unexpected command ${String(command.type)}`);
+    if (command.type === 'shop.delete-or-archive') {
+      expect(command).toEqual({ type: 'shop.delete-or-archive', shopId });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, action: 'ARCHIVED' }),
+      });
+      return;
+    }
+
+    throw new Error(`Unexpected settings command ${JSON.stringify(command)}`);
   });
 
   return { commands };
 }
 
-test.describe('Admin settings workspace', () => {
-  test('edits checkout and receipt overrides, order types, payments, reasons, then publishes', async ({
-    page,
-  }) => {
-    const { commands } = await mockSettings(page);
-    await page.goto('/settings/checkout');
+test('edits checkout and receipt overrides with CAS, then publishes settings', async ({ page }) => {
+  const { commands } = await mockSettings(page);
 
-    await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
-    await page.getByLabel('Minimum order (minor)').fill('4200');
-    await page.getByRole('button', { name: 'Save minimum order' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(0);
-    expect(commands.at(-1)).toMatchObject({
-      type: 'setting.override.upsert',
-      shopId,
-      settingKey: 'checkout.minimumOrderMinor',
-      value: 4200,
-      expectedVersion: null,
-    });
+  await page.goto('/settings/checkout');
+  await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
 
-    await page.getByLabel('Tax / VAT (basis points)').fill('1500');
-    await page.getByRole('button', { name: 'Save tax / VAT' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(1);
-    expect(commands.at(-1)).toMatchObject({
-      type: 'setting.override.upsert',
-      settingKey: 'checkout.taxBps',
-      value: 1500,
-      expectedVersion: null,
-    });
+  await page.getByRole('button', { name: 'Edit Tax / VAT (bps)' }).click();
+  await page.getByLabel('Tax / VAT (bps)').fill('1600');
+  await page.getByRole('button', { name: 'Save Tax / VAT (bps)' }).click();
 
-    await page.goto('/settings/receipts');
-    await page.getByLabel('Order prefix').fill('TUXM-');
-    await page.getByRole('button', { name: 'Save order prefix' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(2);
-    expect(commands.at(-1)).toMatchObject({
-      type: 'setting.override.upsert',
-      settingKey: 'receipt.orderPrefix',
-      value: 'TUXM-',
-      expectedVersion: 4,
-    });
-
-    await page.goto('/settings/order-types');
-    await page.getByLabel('Name').fill('Pickup');
-    await page.getByRole('button', { name: 'Save order type' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(3);
-    expect(commands.at(-1)).toMatchObject({ type: 'order-type.update', name: 'Pickup' });
-
-    await page.goto('/settings/payments');
-    await page.getByLabel('Display name').fill('Till cash');
-    await page.getByRole('button', { name: 'Save payment method' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(4);
-    expect(commands.at(-1)).toMatchObject({
-      type: 'payment-method.update',
-      displayName: 'Till cash',
-    });
-
-    await page.goto('/settings/reason-codes');
-    await page.getByLabel('Reason label').fill('Customer changed their mind');
-    await page.getByRole('button', { name: 'Save reason' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(5);
-    expect(commands.at(-1)).toMatchObject({
-      type: 'reason-code.upsert',
-      reasonCodeId: 'reason-1',
-      label: 'Customer changed their mind',
-      active: true,
-    });
-
-    await page.getByRole('button', { name: 'Publish settings' }).click();
-    await expect.poll(() => commands.length).toBeGreaterThan(6);
-    expect(commands.at(-1)).toMatchObject({ type: 'settings.publish', expectedSettingsVersion: 7 });
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toMatchObject({
+    type: 'setting.override.upsert',
+    shopId,
+    settingKey: 'checkout.taxBps',
+    value: 1600,
+    expectedVersion: null,
   });
+
+  await page.getByRole('button', { name: 'Receipts' }).click();
+  await page.getByRole('button', { name: 'Edit Order prefix' }).click();
+  await page.getByLabel('Order prefix').fill('MD2-');
+  await page.getByRole('button', { name: 'Save Order prefix' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(2);
+  expect(commands[1]).toMatchObject({
+    type: 'setting.override.upsert',
+    shopId,
+    settingKey: 'receipt.orderPrefix',
+    value: 'MD2-',
+    expectedVersion: 4,
+  });
+
+  await page.getByRole('button', { name: 'Publish settings' }).click();
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(3);
+  expect(commands[2]).toEqual({
+    type: 'settings.publish',
+    shopId,
+    expectedSettingsVersion: 7,
+  });
+});
+
+test('edits payment flags and preserves the settings CAS boundary', async ({ page }) => {
+  const { commands } = await mockSettings(page);
+
+  await page.goto('/settings/payments');
+  await expect(page.getByRole('heading', { name: 'Payments' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit Cash' }).click();
+  await page.getByLabel('Requires reference').check();
+  await page.getByLabel('Manual confirmation').check();
+  await page.getByRole('button', { name: 'Save Cash' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toMatchObject({
+    type: 'payment-method.update',
+    shopId,
+    paymentMethodId,
+    expectedSettingsVersion: 7,
+    expectedEditVersion: 5,
+    requiresReference: true,
+    manualConfirmationRequired: true,
+  });
+});
+
+test('deactivates an existing reason code through the trusted settings command', async ({ page }) => {
+  const { commands } = await mockSettings(page);
+
+  await page.goto('/settings/reason-codes');
+  await expect(page.getByRole('heading', { name: 'Reason codes' })).toBeVisible();
+  await page.getByLabel('Active').uncheck();
+  await page.getByRole('button', { name: 'Save reason' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toMatchObject({
+    type: 'reason-code.upsert',
+    shopId,
+    reasonCodeId: 'reason-1',
+    key: 'CUSTOMER_CHANGED_MIND',
+    family: 'CANCELLATION',
+    active: false,
+    expectedVersion: 4,
+  });
+});
+
+test('confirms archive before routing shop lifecycle management through the trusted BFF', async ({
+  page,
+}) => {
+  const { commands } = await mockSettings(page);
+  page.once('dialog', (dialog) => dialog.accept());
+
+  await page.goto('/settings/shop');
+  await page.getByRole('button', { name: 'Archive / delete unused shop' }).click();
+
+  await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
+  expect(commands[0]).toEqual({ type: 'shop.delete-or-archive', shopId });
 });
