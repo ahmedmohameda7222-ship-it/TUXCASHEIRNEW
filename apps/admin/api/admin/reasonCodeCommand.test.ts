@@ -6,13 +6,13 @@ const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const REASON_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('reason-code settings command contract', () => {
-  it('accepts a version-fenced shop reason-code edit', () => {
+  it('accepts a version-fenced edit using the existing uppercase stable-key convention', () => {
     expect(
       settingsCommandSchema.safeParse({
         type: 'reason-code.upsert',
         shopId: SHOP_ID,
         reasonCodeId: REASON_ID,
-        key: 'customer_changed_mind',
+        key: 'CUSTOMER_CHANGED_MIND',
         family: 'CANCELLATION',
         label: 'Customer changed mind',
         active: false,
@@ -27,7 +27,7 @@ describe('reason-code settings command contract', () => {
         type: 'reason-code.upsert',
         shopId: SHOP_ID,
         reasonCodeId: null,
-        key: 'kitchen_delay',
+        key: 'KITCHEN_DELAY',
         family: 'CANCELLATION',
         label: 'Kitchen delay',
         active: true,
