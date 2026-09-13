@@ -112,23 +112,24 @@ function checkoutAwareOrder(): OrderSnapshot {
         id: PAYMENT_ID,
         method: {
           id: PAYMENT_METHOD_ID,
-          label: 'Cash',
-          logicType: 'CASH',
+          label: 'Instapay',
+          logicType: 'DIGITAL',
           channel: 'ONLINE',
-          requiresReference: false,
+          requiresReference: true,
           manualConfirmationRequired: true,
           refundAllowed: true,
         },
         allocatedMinor: moneyMinor(27_930),
-        receivedMinor: moneyMinor(30_000),
-        changeMinor: moneyMinor(2_070),
+        receivedMinor: null,
+        changeMinor: null,
+        reference: 'TXN-2026-0091',
       },
     ],
-  };
+  } as OrderSnapshot;
 }
 
 describe('checkout-aware Operations sync order snapshot', () => {
-  it('round-trips immutable checkout, receipt, and payment-rule facts', () => {
+  it('round-trips immutable checkout, receipt, payment-rule, and payment-reference facts', () => {
     const order = checkoutAwareOrder();
     const payload: OperationsSyncPayloadV1 = {
       eventType: 'ORDER_PLACED',
