@@ -247,7 +247,6 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
   await page.goto('/settings/checkout');
   await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Edit Tax / VAT (bps)' }).click();
   await page.getByLabel('Tax / VAT (bps)').fill('1600');
   await page.getByRole('button', { name: 'Save Tax / VAT (bps)' }).click();
 
@@ -261,7 +260,6 @@ test('edits checkout and receipt overrides with CAS, then publishes settings', a
   });
 
   await page.getByRole('button', { name: 'Receipts' }).click();
-  await page.getByRole('button', { name: 'Edit Order prefix' }).click();
   await page.getByLabel('Order prefix').fill('MD2-');
   await page.getByRole('button', { name: 'Save Order prefix' }).click();
 
@@ -290,9 +288,9 @@ test('edits payment flags and preserves the settings CAS boundary', async ({ pag
   await expect(page.getByRole('heading', { name: 'Payments' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Edit Cash' }).click();
-  await page.getByLabel('Requires reference').check();
+  await page.getByLabel('Reference required').check();
   await page.getByLabel('Manual confirmation').check();
-  await page.getByRole('button', { name: 'Save Cash' }).click();
+  await page.getByRole('button', { name: 'Save payment method' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toMatchObject({
@@ -312,9 +310,9 @@ test('deactivates an existing reason code through the trusted settings command',
   const { commands } = await mockSettings(page);
 
   await page.goto('/settings/reason-codes');
-  await expect(page.getByRole('heading', { name: 'Reason codes' })).toBeVisible();
-  await page.getByLabel('Active').uncheck();
-  await page.getByRole('button', { name: 'Save reason' }).click();
+  await expect(page.getByRole('heading', { name: 'Configured operational reasons' })).toBeVisible();
+  await page.getByLabel('CUSTOMER_CHANGED_MIND reason status').selectOption('inactive');
+  await page.getByRole('button', { name: 'Save CUSTOMER_CHANGED_MIND' }).click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(1);
   expect(commands[0]).toMatchObject({

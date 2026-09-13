@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const baseMigrationPath = 'supabase/migrations/20260910111000_admin_catalog_scheduler.sql';
 const hardeningMigrationPath =
-  'supabase/migrations/20260910120600_admin_scheduler_retry_hardening.sql';
+  'supabase/migrations/20260910120630_admin_scheduler_retry_hardening.sql';
 const baseSql = fs.readFileSync(baseMigrationPath, 'utf8').toLowerCase();
 if (!fs.existsSync(hardeningMigrationPath)) {
   throw new Error(
