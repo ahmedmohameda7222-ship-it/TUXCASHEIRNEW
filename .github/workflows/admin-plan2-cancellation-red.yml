@@ -6,6 +6,7 @@ on:
       - feat/admin-02-catalog-settings
     paths:
       - '.github/workflows/admin-plan2-cancellation-red.yml'
+      - 'scripts/admin-plan2-cancellation-red.py'
   workflow_dispatch:
 
 jobs:
