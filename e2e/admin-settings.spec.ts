@@ -305,7 +305,9 @@ test('edits payment flags and preserves the settings CAS boundary', async ({ pag
   });
 });
 
-test('deactivates an existing reason code through the trusted settings command', async ({ page }) => {
+test('deactivates an existing reason code through the trusted settings command', async ({
+  page,
+}) => {
   const { commands } = await mockSettings(page);
 
   await page.goto('/settings/reason-codes');
