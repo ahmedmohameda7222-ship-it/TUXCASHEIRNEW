@@ -743,6 +743,7 @@ export class OperationsOrdersService {
                 minimumOrderMinor: validation.value.checkoutPolicy.minimumOrderMinor,
                 minimumOrderSatisfied: true,
                 allowDiscountStacking: validation.value.checkoutPolicy.allowDiscountStacking,
+                allowDeliveryFeeOverride: validation.value.checkoutPolicy.allowDeliveryFeeOverride,
                 serviceChargeBps: validation.value.checkoutPolicy.serviceChargeBps,
                 serviceChargeMinor: validation.value.pricing.serviceChargeMinor,
                 taxBps: validation.value.checkoutPolicy.taxBps,

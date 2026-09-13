@@ -47,6 +47,15 @@ describe('Admin settings API contract', () => {
         expectedVersion: 2,
       }).success,
     ).toBe(true);
+    expect(
+      settingsCommandSchema.safeParse({
+        type: 'setting.override.upsert',
+        shopId,
+        settingKey: 'checkout.allowDeliveryFeeOverride',
+        value: true,
+        expectedVersion: null,
+      }).success,
+    ).toBe(true);
   });
 
   it('rejects unknown setting keys and key-specific malformed values', () => {
@@ -81,6 +90,13 @@ describe('Admin settings API contract', () => {
       settingsCommandSchema.safeParse({
         ...base,
         settingKey: 'checkout.requireCustomerPhone',
+        value: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsCommandSchema.safeParse({
+        ...base,
+        settingKey: 'checkout.allowDeliveryFeeOverride',
         value: 1,
       }).success,
     ).toBe(false);

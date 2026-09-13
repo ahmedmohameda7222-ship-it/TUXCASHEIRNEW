@@ -191,6 +191,8 @@ export function OrdersCart({
   const selectedOrderType =
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
+  const allowDeliveryFeeOverride =
+    configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
   const methods = activePaymentMethods(configuration);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
@@ -482,7 +484,13 @@ export function OrdersCart({
             />
             <SectionIssues
               issues={issues}
-              paths={['delivery.phone', 'delivery.name', 'delivery.zone', 'delivery.address']}
+              paths={[
+                'delivery.phone',
+                'delivery.name',
+                'delivery.zone',
+                'delivery.address',
+                'delivery.fee',
+              ]}
             />
           </section>
         ) : null}
@@ -810,7 +818,7 @@ export function OrdersCart({
                 id={controlId('delivery-fee')}
                 label="Delivery"
                 value={draft.delivery.finalFeeMinor}
-                disabled={busy}
+                disabled={busy || !allowDeliveryFeeOverride}
                 compact
                 onCommit={(finalFeeMinor) =>
                   onMutate((current) => ({

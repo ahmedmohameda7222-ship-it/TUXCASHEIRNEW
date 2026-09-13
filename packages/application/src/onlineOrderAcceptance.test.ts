@@ -206,11 +206,11 @@ const runtime = {
   createUuid: vi.fn(() => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
 };
 
-function deliveryConfirmation(cashReceivedMinor = 25_000) {
+function deliveryConfirmation(cashReceivedMinor = 25_000, finalDeliveryFeeMinor = 3_000) {
   return {
     orderTypeId: DELIVERY_ID,
     deliveryZoneId: ZONE_ID,
-    finalDeliveryFeeMinor: moneyMinor(2_500),
+    finalDeliveryFeeMinor: moneyMinor(finalDeliveryFeeMinor),
     payment: {
       mode: 'SINGLE' as const,
       methodId: CASH_ID,
@@ -249,13 +249,40 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
       zoneId: ZONE_ID,
       zoneLabel: 'Nasr City',
       configuredFeeMinor: moneyMinor(3_000),
-      finalFeeMinor: moneyMinor(2_500),
+      finalFeeMinor: moneyMinor(3_000),
     });
     expect(draft.payment).toEqual({
       mode: 'SINGLE',
       methodId: CASH_ID,
       cashReceivedMinor: moneyMinor(25_000),
     });
+  });
+
+  it('rejects a delivery-fee override when the published policy is disabled', () => {
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: request(),
+        workspace: workspace(
+          configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': false }),
+        ),
+        confirmation: deliveryConfirmation(25_000, 2_500),
+        runtime,
+      }),
+    ).toThrow(/configured delivery zone fee|checkout policy/i);
+  });
+
+  it('allows a delivery-fee override only when the published policy enables it', () => {
+    const draft = prepareOnlineOrderAcceptanceDraft({
+      request: request(),
+      workspace: workspace(
+        configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': true }),
+      ),
+      confirmation: deliveryConfirmation(25_000, 2_500),
+      runtime,
+    });
+
+    expect(draft.delivery.finalFeeMinor).toBe(moneyMinor(2_500));
+    expect(draft.delivery.configuredFeeMinor).toBe(moneyMinor(3_000));
   });
 
   it('refuses stale trusted prices instead of silently accepting an old catalog snapshot', () => {

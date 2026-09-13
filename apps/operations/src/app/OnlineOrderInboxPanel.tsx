@@ -63,6 +63,12 @@ function parseMinorInput(value: string): MoneyMinor | null {
   return Number.isSafeInteger(minor) ? moneyMinor(minor) : null;
 }
 
+function minorInput(minor: MoneyMinor): string {
+  const whole = Math.floor(minor / 100);
+  const fraction = String(minor % 100).padStart(2, '0');
+  return fraction === '00' ? String(whole) : `${whole}.${fraction}`;
+}
+
 function fulfillmentLabel(request: CachedOnlineOrderRequest): string {
   return request.fulfillmentPreference === 'DELIVERY' ? 'Delivery' : 'Pickup';
 }
@@ -255,6 +261,8 @@ function OnlineOrderAcceptanceForm({
   const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;
   const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;
+  const allowDeliveryFeeOverride =
+    workspace.configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
   const finalFeeMinor =
     request.fulfillmentPreference === 'DELIVERY' ? parseMinorInput(finalDeliveryFee) : null;
   const cashReceivedMinor =
@@ -317,7 +325,12 @@ function OnlineOrderAcceptanceForm({
               <select
                 aria-label="Delivery zone"
                 value={deliveryZoneId}
-                onChange={(event) => setDeliveryZoneId(event.target.value)}
+                onChange={(event) => {
+                  const nextZoneId = event.target.value;
+                  setDeliveryZoneId(nextZoneId);
+                  const nextZone = deliveryZones.find((zone) => zone.id === nextZoneId);
+                  setFinalDeliveryFee(nextZone === undefined ? '' : minorInput(nextZone.feeMinor));
+                }}
               >
                 <option value="">Select current zone</option>
                 {deliveryZones.map((zone) => (
@@ -333,6 +346,7 @@ function OnlineOrderAcceptanceForm({
                 inputMode="decimal"
                 placeholder="EGP"
                 value={finalDeliveryFee}
+                disabled={busy || !allowDeliveryFeeOverride}
                 onChange={(event) => setFinalDeliveryFee(event.target.value)}
               />
             </label>

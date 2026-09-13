@@ -65,6 +65,15 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     ) {
       throw new DomainInvariantError('Checkout fee and discount snapshot must match the order.');
     }
+    if (
+      snapshot.allowDeliveryFeeOverride === false &&
+      order.fulfillment.behavior === 'DELIVERY' &&
+      order.fulfillment.delivery.finalFeeMinor !== order.fulfillment.delivery.configuredFeeMinor
+    ) {
+      throw new DomainInvariantError(
+        'Checkout delivery fee override conflicts with the immutable checkout policy.',
+      );
+    }
     if (snapshot.minimumOrderSatisfied !== order.itemsSubtotalMinor >= snapshot.minimumOrderMinor) {
       throw new DomainInvariantError('Checkout minimum-order snapshot is inconsistent.');
     }

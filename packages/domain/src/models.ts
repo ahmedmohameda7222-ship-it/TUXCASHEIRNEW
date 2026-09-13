@@ -217,6 +217,8 @@ export interface OrderCheckoutSnapshot {
   readonly minimumOrderSatisfied: boolean;
   /** Present on new checkout snapshots; omitted by legacy persisted orders. */
   readonly allowDiscountStacking?: boolean;
+  /** Present on new checkout snapshots; omitted by legacy persisted orders. */
+  readonly allowDeliveryFeeOverride?: boolean;
   readonly serviceChargeBps: number;
   readonly serviceChargeMinor: MoneyMinor;
   readonly taxBps: number;

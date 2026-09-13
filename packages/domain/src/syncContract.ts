@@ -452,6 +452,14 @@ function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['check
       source['allowDiscountStacking'] === undefined
         ? false
         : booleanValue(source['allowDiscountStacking'], 'checkout allowDiscountStacking'),
+    ...(source['allowDeliveryFeeOverride'] === undefined
+      ? {}
+      : {
+          allowDeliveryFeeOverride: booleanValue(
+            source['allowDeliveryFeeOverride'],
+            'checkout allowDeliveryFeeOverride',
+          ),
+        }),
     serviceChargeBps,
     serviceChargeMinor: money(source['serviceChargeMinor'], 'checkout serviceChargeMinor'),
     taxBps,

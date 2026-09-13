@@ -37,7 +37,9 @@ if (!databaseUrl) {
 
 const url = new URL(databaseUrl);
 if (!new Set(['127.0.0.1', 'localhost', '::1']).has(url.hostname)) {
-  throw new Error('Admin settings schema hardening behavioral test refuses non-loopback PostgreSQL.');
+  throw new Error(
+    'Admin settings schema hardening behavioral test refuses non-loopback PostgreSQL.',
+  );
 }
 
 const businessId = '00000000-0000-4000-8000-000000000001';

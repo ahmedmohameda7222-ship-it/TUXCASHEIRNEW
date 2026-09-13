@@ -85,6 +85,15 @@ export function CheckoutPage({
           updating={updating}
           onUpdate={onUpdate}
         />
+        <SettingOverrideEditor
+          workspace={workspace}
+          settingKey="checkout.allowDeliveryFeeOverride"
+          label="Allow delivery fee override"
+          kind="boolean"
+          help="When off, Delivery orders must use the published zone fee. Existing orders keep their checkout snapshot."
+          updating={updating}
+          onUpdate={onUpdate}
+        />
       </div>
 
       <div className="admin-settings-subsection">

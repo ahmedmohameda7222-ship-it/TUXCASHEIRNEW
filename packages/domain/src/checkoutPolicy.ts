@@ -12,6 +12,7 @@ export interface EffectiveCheckoutPolicy {
   readonly serviceChargeBps: number;
   readonly taxBps: number;
   readonly allowDiscountStacking: boolean;
+  readonly allowDeliveryFeeOverride: boolean;
 }
 
 export interface CheckoutPricing extends OrderPricing {
@@ -34,7 +35,7 @@ function nonNegativeIntegerSetting(
 
 function booleanSetting(
   configuration: OperationsConfigurationSnapshot,
-  key: 'checkout.allowDiscountStacking',
+  key: 'checkout.allowDiscountStacking' | 'checkout.allowDeliveryFeeOverride',
   fallback: boolean,
 ): boolean {
   const value = configuration.settings?.values[key];
@@ -60,6 +61,11 @@ export function resolveEffectiveCheckoutPolicy(
     serviceChargeBps: nonNegativeIntegerSetting(configuration, 'checkout.serviceChargeBps', 10_000),
     taxBps: nonNegativeIntegerSetting(configuration, 'checkout.taxBps', 10_000),
     allowDiscountStacking: booleanSetting(configuration, 'checkout.allowDiscountStacking', false),
+    allowDeliveryFeeOverride: booleanSetting(
+      configuration,
+      'checkout.allowDeliveryFeeOverride',
+      false,
+    ),
   };
 }
 

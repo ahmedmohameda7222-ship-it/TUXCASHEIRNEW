@@ -54,6 +54,7 @@ const settingValueSchemas = {
   'checkout.serviceChargeBps': z.number().int().min(0).max(10_000),
   'checkout.taxBps': z.number().int().min(0).max(10_000),
   'checkout.allowDiscountStacking': z.boolean(),
+  'checkout.allowDeliveryFeeOverride': z.boolean(),
   'checkout.requireCustomerPhone': z.boolean(),
   'checkout.allowScheduledOrders': z.boolean(),
   'receipt.orderPrefix': z.string().max(64),

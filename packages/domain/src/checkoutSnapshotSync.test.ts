@@ -91,6 +91,7 @@ function checkoutAwareOrder(): OrderSnapshot {
       minimumOrderMinor: moneyMinor(10_000),
       minimumOrderSatisfied: true,
       allowDiscountStacking: true,
+      allowDeliveryFeeOverride: true,
       serviceChargeBps: 1_000,
       serviceChargeMinor: moneyMinor(2_000),
       taxBps: 1_400,

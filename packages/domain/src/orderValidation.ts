@@ -22,6 +22,7 @@ export type OrderValidationPath =
   | 'delivery.name'
   | 'delivery.zone'
   | 'delivery.address'
+  | 'delivery.fee'
   | 'discount'
   | 'payment';
 
@@ -116,6 +117,12 @@ export function validateOrderDraft(
   }
 
   let normalizedDeliveryPhone: string | null = null;
+  const activeDeliveryZone =
+    orderType?.behavior === 'DELIVERY' && draft.delivery.zoneId !== null
+      ? configuration.deliveryZones.find(
+          (candidate) => candidate.id === draft.delivery.zoneId && candidate.active,
+        )
+      : undefined;
   if (orderType?.behavior === 'DELIVERY') {
     const normalized = normalizeEgyptianPhone(draft.delivery.displayPhone);
     if (!normalized.valid) {
@@ -140,6 +147,18 @@ export function validateOrderDraft(
         code: 'DELIVERY_ZONE_REQUIRED',
         message: 'Delivery Zone is required.',
       });
+    } else if (activeDeliveryZone === undefined) {
+      issues.push({
+        path: 'delivery.zone',
+        code: 'DELIVERY_ZONE_UNAVAILABLE',
+        message: 'Choose an available delivery zone.',
+      });
+    } else if (draft.delivery.configuredFeeMinor !== activeDeliveryZone.feeMinor) {
+      issues.push({
+        path: 'delivery.fee',
+        code: 'DELIVERY_ZONE_FEE_STALE',
+        message: 'The delivery zone fee changed. Re-select the delivery zone.',
+      });
     }
     if (draft.delivery.address.trim().length === 0) {
       issues.push({
@@ -156,6 +175,18 @@ export function validateOrderDraft(
   let checkoutPolicy: EffectiveCheckoutPolicy | null = null;
   try {
     checkoutPolicy = resolveEffectiveCheckoutPolicy(configuration);
+    if (
+      orderType?.behavior === 'DELIVERY' &&
+      activeDeliveryZone !== undefined &&
+      !checkoutPolicy.allowDeliveryFeeOverride &&
+      draft.delivery.finalFeeMinor !== activeDeliveryZone.feeMinor
+    ) {
+      issues.push({
+        path: 'delivery.fee',
+        code: 'DELIVERY_FEE_OVERRIDE_NOT_ALLOWED',
+        message: 'The published checkout policy requires the configured delivery zone fee.',
+      });
+    }
     pricing = calculateCheckoutPricing({
       lines: draft.lines,
       discountMinor: draft.discountMinor,

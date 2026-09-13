@@ -357,6 +357,7 @@ export function prepareOnlineOrderAcceptanceDraft(
     fail('The online-order trusted subtotal does not match current canonical item prices.');
   }
 
+  const checkoutPolicy = resolveEffectiveCheckoutPolicy(workspace.configuration);
   let delivery: OrderDraft['delivery'];
   let deliveryFeeMinor = moneyMinor(0);
   if (request.fulfillmentPreference === 'DELIVERY') {
@@ -378,6 +379,12 @@ export function prepareOnlineOrderAcceptanceDraft(
     );
     if (zone === undefined) fail('The worker-confirmed delivery zone is unavailable.');
     if (confirmation.finalDeliveryFeeMinor < 0) fail('The final delivery fee is invalid.');
+    if (
+      !checkoutPolicy.allowDeliveryFeeOverride &&
+      confirmation.finalDeliveryFeeMinor !== zone.feeMinor
+    ) {
+      fail('The published checkout policy requires the configured delivery zone fee.');
+    }
     deliveryFeeMinor = confirmation.finalDeliveryFeeMinor;
     delivery = {
       displayPhone: request.normalizedPhone,
@@ -405,7 +412,6 @@ export function prepareOnlineOrderAcceptanceDraft(
     };
   }
 
-  const checkoutPolicy = resolveEffectiveCheckoutPolicy(workspace.configuration);
   const pricing = calculateCheckoutPricing({
     lines,
     discountMinor: moneyMinor(0),
