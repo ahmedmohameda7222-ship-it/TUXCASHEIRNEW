@@ -33,13 +33,29 @@ replace(
 
 replace(
     'packages/application/src/ordersBoard.ts',
-    """    mode:
-      configuration?.settings !== undefined && configuration?.settings !== null
-        ? 'CONFIGURED'
-        : 'LEGACY',
-    reasons,
+    """          const reasonCodes = configuration?.reasonCodes ?? [];
+          const configuredReasonAuthority =
+            configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
+          const cancellationReasons: CancellationReasonOption[] = reasonCodes
+            .filter((reason) => reason.active && reason.family === 'CANCELLATION')
+            .map((reason) => ({
+              id: reason.id,
+              key: reason.key,
+              label: reason.label,
+              version: reason.version,
+              scope: reason.scope,
+            }));
 """,
-    """    mode: reasons.length > 0 ? 'CONFIGURED' : 'LEGACY',
-    reasons,
+    """          const reasonCodes = configuration?.reasonCodes ?? [];
+          const cancellationReasons: CancellationReasonOption[] = reasonCodes
+            .filter((reason) => reason.active && reason.family === 'CANCELLATION')
+            .map((reason) => ({
+              id: reason.id,
+              key: reason.key,
+              label: reason.label,
+              version: reason.version,
+              scope: reason.scope,
+            }));
+          const configuredReasonAuthority = cancellationReasons.length > 0;
 """,
 )
