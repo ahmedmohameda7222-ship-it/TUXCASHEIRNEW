@@ -17,6 +17,7 @@ const ownerSession = {
   csrfToken,
 };
 
+// Keep mutable payment fixtures aligned with the published Admin settings contract.
 async function mockSettings(page: Page) {
   let settingsVersion = 7;
   let orderType = {
