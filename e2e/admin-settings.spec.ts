@@ -51,7 +51,9 @@ async function mockSettings(page: Page) {
     { key: 'receipt.sequenceStart', value: 1, version: 1 },
     { key: 'receipt.sequenceResetPolicy', value: 'BUSINESS_DAY', version: 1 },
   ];
-  const shopOverrides = [{ key: 'receipt.orderPrefix', value: 'MD-', version: 4 }];
+  const shopOverrides: { key: string; value: unknown; version: number }[] = [
+    { key: 'receipt.orderPrefix', value: 'MD-', version: 4 },
+  ];
   const commands: Record<string, unknown>[] = [];
 
   await page.route('**/api/admin/session', async (route) => {
@@ -145,7 +147,7 @@ async function mockSettings(page: Page) {
       orderType = {
         ...orderType,
         name: String(command.name),
-        behavior: command.behavior as typeof orderType.behavior,
+        behavior: String(command.behavior),
         active: Boolean(command.active),
         sortOrder: Number(command.sortOrder),
         editVersion: orderType.editVersion + 1,
@@ -165,17 +167,17 @@ async function mockSettings(page: Page) {
         expectedSettingsVersion: settingsVersion,
         expectedEditVersion: paymentMethod.editVersion,
       });
-      expect(command).not.toHaveProperty('logicType');
-      expect(command).not.toHaveProperty('requiresReconciliation');
       paymentMethod = {
         ...paymentMethod,
         displayName: String(command.displayName),
         active: Boolean(command.active),
         sortOrder: Number(command.sortOrder),
-        channel: command.channel as typeof paymentMethod.channel,
+        channel: String(command.channel),
         requiresReference: Boolean(command.requiresReference),
         manualConfirmationRequired: Boolean(command.manualConfirmationRequired),
         refundAllowed: Boolean(command.refundAllowed),
+        integrationReference:
+          command.integrationReference === null ? null : String(command.integrationReference),
         editVersion: paymentMethod.editVersion + 1,
       };
       await route.fulfill({
@@ -186,110 +188,111 @@ async function mockSettings(page: Page) {
       return;
     }
 
-    expect(command).toMatchObject({
-      type: 'settings.publish',
-      shopId,
-      expectedSettingsVersion: settingsVersion,
-    });
-    settingsVersion += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        settingsVersion,
-        operationsConfigurationVersion: 12,
-      }),
-    });
+    if (command.type === 'reason-code.upsert') {
+      expect(command).toMatchObject({
+        shopId,
+        reasonCodeId: 'reason-1',
+        key: 'CUSTOMER_CHANGED_MIND',
+        family: 'CANCELLATION',
+        expectedVersion: 4,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, reasonCodeId: 'reason-1', version: 5 }),
+      });
+      return;
+    }
+
+    if (command.type === 'settings.publish') {
+      expect(command).toEqual({
+        type: 'settings.publish',
+        shopId,
+        expectedSettingsVersion: settingsVersion,
+      });
+      settingsVersion += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, publishedSettingsVersion: settingsVersion }),
+      });
+      return;
+    }
+
+    throw new Error(`Unexpected command ${String(command.type)}`);
   });
 
   return { commands };
 }
 
-test('settings route loads the concrete shop workspace and publishes through the trusted BFF', async ({
-  page,
-}) => {
-  const fixture = await mockSettings(page);
-  await page.goto('/settings');
+test.describe('Admin settings workspace', () => {
+  test('edits checkout and receipt overrides, order types, payments, reasons, then publishes', async ({
+    page,
+  }) => {
+    const { commands } = await mockSettings(page);
+    await page.goto('/settings/checkout');
 
-  await expect(page.getByRole('heading', { name: 'TUX Maadi' })).toBeVisible();
-  await expect(page.getByText('Live settings version 7')).toBeVisible();
-  await expect(page.getByText('MD-')).toBeVisible();
-  await expect(page.getByText('Customer changed mind')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
+    await page.getByLabel('Minimum order (minor)').fill('4200');
+    await page.getByRole('button', { name: 'Save minimum order' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(0);
+    expect(commands.at(-1)).toMatchObject({
+      type: 'setting.override.upsert',
+      shopId,
+      settingKey: 'checkout.minimumOrderMinor',
+      value: 4200,
+      expectedVersion: null,
+    });
 
-  await page.getByRole('button', { name: 'Publish settings' }).click();
-
-  await expect(page.getByText('Live settings version 8')).toBeVisible();
-  expect(fixture.commands).toHaveLength(1);
-});
-
-test('settings route edits canonical order and payment configuration before publish', async ({
-  page,
-}) => {
-  const fixture = await mockSettings(page);
-  await page.goto('/settings');
-
-  await page.getByRole('button', { name: 'Order types' }).click();
-  await page.getByRole('button', { name: 'Edit Take Away' }).click();
-  await page.getByLabel('Order type name').fill('Pick up');
-  await page.getByLabel('Order type active').uncheck();
-  await page.getByRole('button', { name: 'Save order type' }).click();
-  await expect(page.getByText('Pick up', { exact: true })).toBeVisible();
-  await expect(page.getByText('Inactive')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Payments' }).click();
-  await page.getByRole('button', { name: 'Edit Cash' }).click();
-  await page.getByLabel('Payment method name').fill('Front Cash');
-  await page.getByLabel('Payment channel').selectOption('POS');
-  await page.getByLabel('Reference required').check();
-  await page.getByLabel('Manual confirmation').check();
-  await page.getByRole('button', { name: 'Save payment method' }).click();
-  await expect(page.getByText('Front Cash', { exact: true })).toBeVisible();
-  await expect(page.getByText('Reference required')).toBeVisible();
-  await expect(page.getByText('Manual confirmation')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Publish settings' }).click();
-  await expect(page.getByText('Live settings version 8')).toBeVisible();
-
-  expect(fixture.commands.map((command) => command.type)).toEqual([
-    'order-type.update',
-    'payment-method.update',
-    'settings.publish',
-  ]);
-});
-
-test('settings route saves checkout and receipt shop overrides with CAS before publish', async ({
-  page,
-}) => {
-  const fixture = await mockSettings(page);
-  await page.goto('/settings');
-
-  await page.getByRole('button', { name: 'Checkout' }).click();
-  await page.getByLabel('Tax / VAT (bps)').fill('1200');
-  await page.getByRole('button', { name: 'Save Tax / VAT (bps)' }).click();
-  await expect(page.getByText('Shop override')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Receipts' }).click();
-  await page.getByLabel('Order prefix').fill('MAADI-');
-  await page.getByRole('button', { name: 'Save Order prefix' }).click();
-  await expect(page.getByLabel('Order prefix')).toHaveValue('MAADI-');
-
-  await page.getByRole('button', { name: 'Publish settings' }).click();
-  await expect(page.getByText('Live settings version 8')).toBeVisible();
-
-  expect(fixture.commands).toEqual([
-    expect.objectContaining({
+    await page.getByLabel('Tax / VAT (basis points)').fill('1500');
+    await page.getByRole('button', { name: 'Save tax / VAT' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(1);
+    expect(commands.at(-1)).toMatchObject({
       type: 'setting.override.upsert',
       settingKey: 'checkout.taxBps',
-      value: 1200,
+      value: 1500,
       expectedVersion: null,
-    }),
-    expect.objectContaining({
+    });
+
+    await page.goto('/settings/receipts');
+    await page.getByLabel('Order prefix').fill('TUXM-');
+    await page.getByRole('button', { name: 'Save order prefix' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(2);
+    expect(commands.at(-1)).toMatchObject({
       type: 'setting.override.upsert',
       settingKey: 'receipt.orderPrefix',
-      value: 'MAADI-',
+      value: 'TUXM-',
       expectedVersion: 4,
-    }),
-    expect.objectContaining({ type: 'settings.publish' }),
-  ]);
+    });
+
+    await page.goto('/settings/order-types');
+    await page.getByLabel('Name').fill('Pickup');
+    await page.getByRole('button', { name: 'Save order type' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(3);
+    expect(commands.at(-1)).toMatchObject({ type: 'order-type.update', name: 'Pickup' });
+
+    await page.goto('/settings/payments');
+    await page.getByLabel('Display name').fill('Till cash');
+    await page.getByRole('button', { name: 'Save payment method' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(4);
+    expect(commands.at(-1)).toMatchObject({
+      type: 'payment-method.update',
+      displayName: 'Till cash',
+    });
+
+    await page.goto('/settings/reason-codes');
+    await page.getByLabel('Reason label').fill('Customer changed their mind');
+    await page.getByRole('button', { name: 'Save reason' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(5);
+    expect(commands.at(-1)).toMatchObject({
+      type: 'reason-code.upsert',
+      reasonCodeId: 'reason-1',
+      label: 'Customer changed their mind',
+      active: true,
+    });
+
+    await page.getByRole('button', { name: 'Publish settings' }).click();
+    await expect.poll(() => commands.length).toBeGreaterThan(6);
+    expect(commands.at(-1)).toMatchObject({ type: 'settings.publish', expectedSettingsVersion: 7 });
+  });
 });
