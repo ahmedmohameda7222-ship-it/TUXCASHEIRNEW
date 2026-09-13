@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  end-day-reason-red:
+  service-red:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -21,9 +21,26 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Prove CASH_VARIANCE reason authority is RED
-        run: npx vitest run packages/application/src/endDay.reasonCodes.test.ts
-      - name: Prove reconciliation reason snapshot sync is RED
-        run: npx vitest run packages/domain/src/endDayReasonSync.test.ts
-      - name: Prove End Day UI reason selection is RED
-        run: npx vitest run apps/operations/src/app/EndDayFlow.reasonCodes.test.ts
+      - run: npx vitest run packages/application/src/endDay.reasonCodes.test.ts
+
+  sync-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run packages/domain/src/endDayReasonSync.test.ts
+
+  ui-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run apps/operations/src/app/EndDayFlow.reasonCodes.test.ts
