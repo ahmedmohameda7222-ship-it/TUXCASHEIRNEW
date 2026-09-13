@@ -59,3 +59,15 @@ replace(
           const configuredReasonAuthority = cancellationReasons.length > 0;
 """,
 )
+replace(
+    'packages/application/src/ordersBoard.ts',
+    """      const configuredReasonAuthority =
+        configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
+
+      if (configuredReasonAuthority && input.reasonCodeId === undefined) {
+""",
+    """      const configuredReasonAuthority = configuredCancellationReasons.length > 0;
+
+      if (configuredReasonAuthority && input.reasonCodeId === undefined) {
+""",
+)
