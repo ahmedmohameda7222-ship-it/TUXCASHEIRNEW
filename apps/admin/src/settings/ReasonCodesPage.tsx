@@ -156,7 +156,7 @@ function NewReasonCode({
     event.preventDefault();
     await onUpsert({
       reasonCodeId: null,
-      key: key.trim().toLowerCase(),
+      key: key.trim().toUpperCase(),
       family,
       label: label.trim(),
       active: true,
@@ -180,10 +180,10 @@ function NewReasonCode({
           aria-label="New reason stable key"
           value={key}
           maxLength={120}
-          pattern="[a-z][a-z0-9_-]*"
-          placeholder="customer_changed_mind"
+          pattern="[A-Za-z][A-Za-z0-9_-]*"
+          placeholder="CUSTOMER_CHANGED_MIND"
           disabled={updating}
-          onChange={(event) => setKey(event.target.value.toLowerCase())}
+          onChange={(event) => setKey(event.target.value.toUpperCase())}
         />
       </label>
       <label className="admin-field">

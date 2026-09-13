@@ -45,7 +45,7 @@ const reasonFamilySchema = z.enum([
 ]);
 const reasonKeySchema = z
   .string()
-  .regex(/^[a-z][a-z0-9_-]*$/)
+  .regex(/^[A-Za-z][A-Za-z0-9_-]*$/)
   .max(120);
 const reasonLabelSchema = z.string().trim().min(1).max(240);
 

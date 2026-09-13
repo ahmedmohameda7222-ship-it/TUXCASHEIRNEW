@@ -1,5 +1,5 @@
 -- TUX Admin Plan 2: trusted, version-fenced management for shop-scoped reason codes.
--- Repository migration only. Do not apply to a remote project during Plans 1-9.
+-- Remote application is permitted only by explicit operator authorization; authorization granted 2026-09-13 for the canonical TUX project.
 -- Reason key/family form immutable classification identity after creation; label/active may evolve.
 
 create or replace function public.upsert_admin_reason_code_v1(
@@ -26,7 +26,7 @@ begin
   if p_employee_id is null
      or p_shop_id is null
      or p_reason_key is null
-     or p_reason_key !~ '^[a-z][a-z0-9_-]*$'
+     or p_reason_key !~ '^[A-Za-z][A-Za-z0-9_-]*$'
      or p_family is null
      or p_family not in (
        'CANCELLATION',

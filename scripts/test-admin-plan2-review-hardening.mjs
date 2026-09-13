@@ -19,6 +19,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
   console.log('Plan 2 review hardening static invariant passed.');
   await import('./test-admin-plan2-second-review-hardening.mjs');
+  await import('./test-admin-reason-code-edits.mjs');
   process.exit(0);
 }
 
@@ -107,8 +108,6 @@ begin
   v_draft_id := (v_create ->> 'draftId')::uuid;
   v_bundle := v_create -> 'bundleJson';
 
-  -- A catalog editor may submit a whole transport bundle, but protected domains must be
-  -- reconstructed from trusted current authority before anything is persisted.
   v_bundle := jsonb_set(v_bundle, '{inventoryItems,0,name}', '"Hacked Ingredient"'::jsonb, false);
   v_bundle := jsonb_set(v_bundle, '{snapshot,orderTypes,0,name}', '"Hacked Order Type"'::jsonb, false);
   v_bundle := jsonb_set(v_bundle, '{snapshot,paymentMethods,0,displayName}', '"Hacked Payment"'::jsonb, false);
@@ -138,7 +137,6 @@ begin
     raise exception 'catalog draft persisted protected-domain mutation: %', v_saved;
   end if;
 
-  -- Modifier pricing is catalog-owned but still requires catalog.pricing, just like product price.
   v_bundle := jsonb_set(v_saved, '{snapshot,modifiers,0,priceMinor}', '250'::jsonb, false);
   begin
     perform public.apply_catalog_draft_change_v1(
@@ -155,8 +153,6 @@ begin
     raise exception 'modifier price changed without catalog.pricing permission';
   end if;
 
-  -- Advance published settings after the draft was created. Catalog publish must merge the
-  -- latest immutable settings authority instead of replaying the draft's stale settings copy.
   update public.business_setting_defaults
   set value_json = '2000'::jsonb, version = version + 1, updated_at = now()
   where business_id = '${businessId}' and setting_key = 'checkout.minimumOrderMinor';
@@ -202,3 +198,4 @@ if (result.status !== 0) {
 
 console.log('Plan 2 catalog draft review hardening PostgreSQL behavior passed.');
 await import('./test-admin-plan2-second-review-hardening.mjs');
+await import('./test-admin-reason-code-edits.mjs');
