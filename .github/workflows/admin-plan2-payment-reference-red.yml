@@ -7,10 +7,12 @@ on:
     paths:
       - '.github/workflows/admin-plan2-payment-reference-red.yml'
       - 'packages/domain/src/paymentReference.test.ts'
+      - 'packages/domain/src/checkoutSnapshotSync.test.ts'
+      - 'apps/operations/src/app/paymentReferenceUi.test.ts'
   workflow_dispatch:
 
 jobs:
-  payment-reference-red:
+  domain-reference-red:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -19,5 +21,29 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Required payment reference RED
+      - name: Required payment reference domain RED
         run: npx vitest run packages/domain/src/paymentReference.test.ts
+
+  sync-reference-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Payment reference sync RED
+        run: npx vitest run packages/domain/src/checkoutSnapshotSync.test.ts
+
+  ui-reference-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Payment reference UI RED
+        run: npx vitest run apps/operations/src/app/paymentReferenceUi.test.ts
