@@ -1,22 +1,28 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-const migrationPath = 'supabase/migrations/20260910120600_admin_reason_code_edits.sql';
-if (!fs.existsSync(migrationPath)) {
-  throw new Error(`Admin reason-code edits migration is missing: ${migrationPath}`);
+const migrationPaths = [
+  'supabase/migrations/20260910120600_admin_reason_code_edits.sql',
+  'supabase/migrations/20260910120900_admin_reason_code_identity_constraint.sql',
+];
+for (const migrationPath of migrationPaths) {
+  if (!fs.existsSync(migrationPath)) {
+    throw new Error(`Admin reason-code hardening migration is missing: ${migrationPath}`);
+  }
 }
-const sql = fs.readFileSync(migrationPath, 'utf8');
+const sql = migrationPaths.map((migrationPath) => fs.readFileSync(migrationPath, 'utf8')).join('\n');
 for (const fragment of [
   'upsert_admin_reason_code_v1',
   "^[A-Za-z][A-Za-z0-9_-]*$",
+  'admin_reason_codes_reason_key_format_ck',
   'reason_code_identity_immutable',
   'stale_reason_code_version',
 ]) {
   if (!sql.includes(fragment)) {
-    throw new Error(`Admin reason-code edits migration missing ${fragment}`);
+    throw new Error(`Admin reason-code hardening missing ${fragment}`);
   }
 }
-if (sql.includes("^[a-z][a-z0-9_-]*$")) {
+if (sql.includes("p_reason_key !~ '^[a-z][a-z0-9_-]*$'")) {
   throw new Error('Admin reason-code edit validation still rejects existing uppercase stable keys.');
 }
 
@@ -45,12 +51,24 @@ values ('${employeeId}', '${businessId}', 'Reason Key Fixture Owner', 'OWNER', t
 
 do $$
 declare
+  v_constraint_definition text;
   v_create jsonb;
   v_edit jsonb;
   v_stale jsonb;
   v_identity jsonb;
   v_reason_id uuid;
 begin
+  select pg_get_constraintdef(c.oid)
+    into v_constraint_definition
+  from pg_constraint c
+  where c.conrelid = 'public.admin_reason_codes'::regclass
+    and c.conname = 'admin_reason_codes_reason_key_format_ck';
+  if v_constraint_definition is null
+     or v_constraint_definition not like '%[A-Za-z][A-Za-z0-9_-]*%' then
+    raise exception 'reason-key storage constraint does not preserve uppercase identities: %',
+      v_constraint_definition;
+  end if;
+
   v_create := public.upsert_admin_reason_code_v1(
     '${employeeId}', '${shopId}', null, 'KITCHEN_DELAY', 'CANCELLATION',
     'Kitchen delay', true, null
