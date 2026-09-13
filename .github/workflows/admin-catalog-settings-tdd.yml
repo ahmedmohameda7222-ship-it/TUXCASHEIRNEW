@@ -114,6 +114,7 @@ jobs:
         run: >-
           npx vitest run
           packages/domain/src/checkoutPolicyStacking.test.ts
+          packages/domain/src/deliveryFeePolicy.test.ts
           packages/domain/src/checkoutSnapshotSync.test.ts
           packages/domain/src/paymentReference.test.ts
           packages/domain/src/payment.test.ts
@@ -127,6 +128,7 @@ jobs:
           packages/application/src/onlineOrderAcceptance.test.ts
           apps/operations/src/app/EndDayFlow.reasonCodes.test.ts
           apps/operations/src/app/paymentReferenceUi.test.ts
+          apps/operations/src/app/deliveryFeePolicyUi.test.ts
           apps/operations/src/app/OnlineOrderInboxPanel.test.tsx
       - name: Domain typecheck
         run: npm run typecheck -w @tux/domain
