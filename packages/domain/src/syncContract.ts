@@ -367,6 +367,10 @@ function parsePayment(value: unknown): PaymentPart {
     'payment method manualConfirmationRequired',
   );
   const refundAllowed = optionalBoolean(method['refundAllowed'], 'payment method refundAllowed');
+  const reference =
+    source['reference'] === undefined
+      ? undefined
+      : nullableString(source['reference'], 'payment reference');
   const identity = {
     id: entityId<PaymentId>(source['id'], 'payment id'),
     method: {
@@ -379,6 +383,7 @@ function parsePayment(value: unknown): PaymentPart {
       ...(refundAllowed === undefined ? {} : { refundAllowed }),
     },
     allocatedMinor: money(source['allocatedMinor'], 'payment allocatedMinor'),
+    ...(reference === undefined ? {} : { reference }),
   };
   if (logicType === 'CASH') {
     if (source['receivedMinor'] === null || source['changeMinor'] === null) {

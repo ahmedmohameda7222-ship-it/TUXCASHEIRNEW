@@ -78,6 +78,20 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
   for (const payment of order.payments) {
     assertNonNegativeMoney(payment.allocatedMinor, 'Payment allocation');
 
+    if (payment.reference !== undefined) {
+      if (payment.reference !== null) {
+        if (payment.reference.trim().length === 0) {
+          throw new DomainInvariantError('Payment reference cannot be blank when present.');
+        }
+        if (payment.reference.length > 200) {
+          throw new DomainInvariantError('Payment reference cannot exceed 200 characters.');
+        }
+      }
+      if ((payment.method.requiresReference ?? false) && payment.reference === null) {
+        throw new DomainInvariantError('Required payment reference is missing from the snapshot.');
+      }
+    }
+
     if (payment.method.logicType === 'CASH') {
       const receivedMinor = payment.receivedMinor;
       const changeMinor = payment.changeMinor;

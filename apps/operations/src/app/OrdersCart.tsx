@@ -245,6 +245,7 @@ export function OrdersCart({
         mode: 'SINGLE',
         methodId: method.id,
         cashReceivedMinor: null,
+        reference: null,
       },
     }));
   }
@@ -260,6 +261,8 @@ export function OrdersCart({
         methodAId: methodA.id,
         amountAMinor: ZERO_MONEY,
         methodBId: methodB.id,
+        referenceA: null,
+        referenceB: null,
       },
     }));
   }
@@ -604,25 +607,42 @@ export function OrdersCart({
                   ) : null}
                 </div>
                 {draft.payment.mode === 'SINGLE' && pricing !== null ? (
-                  methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
-                    <CashEditor
-                      idPrefix={controlId('single')}
-                      label="Cash received"
-                      allocatedMinor={pricing.totalMinor}
-                      receivedMinor={draft.payment.cashReceivedMinor}
-                      busy={busy}
-                      onCommit={(cashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SINGLE'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, cashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null
+                  <>
+                    {methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
+                      <CashEditor
+                        idPrefix={controlId('single')}
+                        label="Cash received"
+                        allocatedMinor={pricing.totalMinor}
+                        receivedMinor={draft.payment.cashReceivedMinor}
+                        busy={busy}
+                        onCommit={(cashReceivedMinor) =>
+                          onMutate((current) =>
+                            current.payment.mode === 'SINGLE'
+                              ? {
+                                  ...current,
+                                  payment: { ...current.payment, cashReceivedMinor },
+                                }
+                              : current,
+                          )
+                        }
+                      />
+                    ) : null}
+                    {methodById(methods, draft.payment.methodId)?.requiresReference ? (
+                      <DraftTextField
+                        id={controlId('single-payment-reference')}
+                        label="Payment reference"
+                        value={draft.payment.reference ?? ''}
+                        disabled={busy}
+                        onCommit={(reference) =>
+                          onMutate((current) =>
+                            current.payment.mode === 'SINGLE'
+                              ? { ...current, payment: { ...current.payment, reference } }
+                              : current,
+                          )
+                        }
+                      />
+                    ) : null}
+                  </>
                 ) : null}
               </>
             ) : pricing === null ? null : (
@@ -648,6 +668,8 @@ export function OrdersCart({
                                 current.payment.methodBId === methodAId && fallbackB !== undefined
                                   ? fallbackB.id
                                   : current.payment.methodBId,
+                              referenceA: null,
+                              referenceB: null,
                             },
                           };
                         });
@@ -673,6 +695,21 @@ export function OrdersCart({
                       )
                     }
                   />
+                  {methodById(methods, draft.payment.methodAId)?.requiresReference ? (
+                    <DraftTextField
+                      id={controlId('split-reference-a')}
+                      label="Payment reference A"
+                      value={draft.payment.referenceA ?? ''}
+                      disabled={busy}
+                      onCommit={(referenceA) =>
+                        onMutate((current) =>
+                          current.payment.mode === 'SPLIT'
+                            ? { ...current, payment: { ...current.payment, referenceA } }
+                            : current,
+                        )
+                      }
+                    />
+                  ) : null}
                 </div>
 
                 <div className="split-method-block">
@@ -696,6 +733,8 @@ export function OrdersCart({
                                 current.payment.methodAId === methodBId && fallbackA !== undefined
                                   ? fallbackA.id
                                   : current.payment.methodAId,
+                              referenceA: null,
+                              referenceB: null,
                             },
                           };
                         });
@@ -718,6 +757,21 @@ export function OrdersCart({
                         : '—'}
                     </strong>
                   </div>
+                  {methodById(methods, draft.payment.methodBId)?.requiresReference ? (
+                    <DraftTextField
+                      id={controlId('split-reference-b')}
+                      label="Payment reference B"
+                      value={draft.payment.referenceB ?? ''}
+                      disabled={busy}
+                      onCommit={(referenceB) =>
+                        onMutate((current) =>
+                          current.payment.mode === 'SPLIT'
+                            ? { ...current, payment: { ...current.payment, referenceB } }
+                            : current,
+                        )
+                      }
+                    />
+                  ) : null}
                 </div>
 
                 <button

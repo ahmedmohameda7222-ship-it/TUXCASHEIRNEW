@@ -244,6 +244,7 @@ function OnlineOrderAcceptanceForm({
   const [finalDeliveryFee, setFinalDeliveryFee] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
   const orderTypes = workspace.configuration.orderTypes.filter(
@@ -263,7 +264,8 @@ function OnlineOrderAcceptanceForm({
     request.fulfillmentPreference === 'PICKUP' || (selectedZone !== null && finalFeeMinor !== null);
   const paymentReady =
     selectedPayment !== null &&
-    (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null);
+    (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null) &&
+    (!selectedPayment.requiresReference || paymentReference.trim().length > 0);
   const canSubmit = selectedOrderType !== null && deliveryReady && paymentReady && !busy;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
@@ -278,6 +280,7 @@ function OnlineOrderAcceptanceForm({
         mode: 'SINGLE',
         methodId: selectedPayment.id,
         cashReceivedMinor: selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
+        reference: selectedPayment.requiresReference ? paymentReference : null,
       },
     };
     void onAccept(request, confirmation);
@@ -343,6 +346,7 @@ function OnlineOrderAcceptanceForm({
             onChange={(event) => {
               setPaymentMethodId(event.target.value);
               setCashReceived('');
+              setPaymentReference('');
             }}
           >
             <option value="">Select authoritative payment</option>
@@ -361,6 +365,18 @@ function OnlineOrderAcceptanceForm({
               placeholder="EGP received"
               value={cashReceived}
               onChange={(event) => setCashReceived(event.target.value)}
+            />
+          </label>
+        ) : null}
+        {selectedPayment?.requiresReference ? (
+          <label>
+            Payment reference
+            <input
+              type="text"
+              maxLength={200}
+              placeholder="Transaction or provider reference"
+              value={paymentReference}
+              onChange={(event) => setPaymentReference(event.target.value)}
             />
           </label>
         ) : null}

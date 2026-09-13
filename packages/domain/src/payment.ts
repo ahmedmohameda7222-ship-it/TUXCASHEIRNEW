@@ -66,7 +66,9 @@ function normalizePaymentReference(
 ): string | null {
   const reference = rawReference?.trim() ?? '';
   if ((method.requiresReference ?? false) && reference.length === 0) {
-    throw new DomainInvariantError('Payment reference is required for the selected payment method.');
+    throw new DomainInvariantError(
+      'Payment reference is required for the selected payment method.',
+    );
   }
   if (reference.length > MAX_PAYMENT_REFERENCE_LENGTH) {
     throw new DomainInvariantError('Payment reference cannot exceed 200 characters.');

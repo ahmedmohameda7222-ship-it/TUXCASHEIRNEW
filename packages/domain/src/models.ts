@@ -84,6 +84,8 @@ export type CashPaymentPart = {
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor;
   readonly changeMinor: MoneyMinor;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly reference?: string | null;
 };
 
 export type NonCashPaymentPart = {
@@ -94,6 +96,8 @@ export type NonCashPaymentPart = {
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: null;
   readonly changeMinor: null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly reference?: string | null;
 };
 
 export type PaymentPart = CashPaymentPart | NonCashPaymentPart;

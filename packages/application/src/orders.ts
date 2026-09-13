@@ -1031,6 +1031,7 @@ export class OperationsOrdersService {
           allocatedMinor: part.allocatedMinor,
           receivedMinor: part.receivedMinor,
           changeMinor: part.changeMinor,
+          reference: part.reference,
         };
       }
       return {
@@ -1039,6 +1040,7 @@ export class OperationsOrdersService {
         allocatedMinor: part.allocatedMinor,
         receivedMinor: null,
         changeMinor: null,
+        reference: part.reference,
       };
     });
   }
