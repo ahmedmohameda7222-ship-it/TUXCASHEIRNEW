@@ -1,5 +1,6 @@
 -- TUX Admin Plan 2 delivery-fee override authority.
--- Repository migration only. Do not apply to a remote project during Plans 1-9.
+-- Applied to canonical Supabase project awpdcsayuwbsruwvaosg on 2026-09-13 under explicit user authorization;
+-- supabase_migrations.schema_migrations was synchronized to repository version 20260910121000.
 -- Manual delivery-fee overrides are fail-closed unless this reviewed boolean setting is published.
 
 create or replace function private.validate_admin_setting_value_v1(
