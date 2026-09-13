@@ -49,7 +49,7 @@ case = r'''  it('keeps free-text cancellation during rollout when settings exist
       const board = await test.service.loadBoard();
       expect(board.ok).toBe(true);
       if (!board.ok) throw new Error(board.error.message);
-      expect(board.value.cancellationReasonMode).toBe('LEGACY');
+      expect(board.value.cancellationReasonMode).toBe('LEGACY_FREE_TEXT');
 
       const result = await test.service.cancelOrder({
         orderId,
