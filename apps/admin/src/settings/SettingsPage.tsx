@@ -19,13 +19,7 @@ import {
 } from './useSettings';
 
 export type SettingsSection =
-  | 'overview'
-  | 'shop'
-  | 'order-types'
-  | 'payments'
-  | 'checkout'
-  | 'receipts'
-  | 'reason-codes';
+  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
