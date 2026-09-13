@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps/admin/**'
+      - 'apps/operations/**'
       - 'packages/admin-contracts/**'
       - 'packages/application/**'
       - 'packages/domain/**'
@@ -92,6 +93,51 @@ jobs:
         run: npm run typecheck -w @tux/application
       - name: Printing typecheck
         run: npm run typecheck -w @tux/printing
+
+  plan2-authority-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Trusted Admin settings authority regressions
+        run: >-
+          npx vitest run
+          apps/admin/server/settings/businessDefaultAuthority.test.ts
+          apps/admin/api/admin/reasonCodeCommand.test.ts
+          apps/admin/server/settings/reasonCodeManagement.test.ts
+      - name: Checkout policy and immutable snapshot regressions
+        run: >-
+          npx vitest run
+          packages/domain/src/checkoutPolicyStacking.test.ts
+          packages/domain/src/checkoutSnapshotSync.test.ts
+          packages/domain/src/paymentReference.test.ts
+          packages/domain/src/payment.test.ts
+      - name: Operations reason and payment execution regressions
+        run: >-
+          npx vitest run
+          packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+          packages/application/src/endDay.reasonCodes.test.ts
+          packages/domain/src/endDayReasonSync.test.ts
+          packages/application/src/paymentReferencePersistence.test.ts
+          packages/application/src/onlineOrderAcceptance.test.ts
+          apps/operations/src/app/EndDayFlow.reasonCodes.test.ts
+          apps/operations/src/app/paymentReferenceUi.test.ts
+          apps/operations/src/app/OnlineOrderInboxPanel.test.tsx
+      - name: Domain typecheck
+        run: npm run typecheck -w @tux/domain
+      - name: Application typecheck
+        run: npm run typecheck -w @tux/application
+      - name: Operations typecheck
+        run: npm run typecheck -w @tux/operations
+      - name: Admin contracts typecheck
+        run: npm run typecheck -w @tux/admin-contracts
+      - name: Admin API and server typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
 
   online-order-policy:
     runs-on: ubuntu-latest
