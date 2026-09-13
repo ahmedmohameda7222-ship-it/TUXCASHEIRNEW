@@ -173,7 +173,7 @@ function deliveryConfirmation() {
   return {
     orderTypeId: DELIVERY_ID,
     deliveryZoneId: ZONE_ID,
-    finalDeliveryFeeMinor: moneyMinor(2_500),
+    finalDeliveryFeeMinor: moneyMinor(3_000),
     payment: {
       mode: 'SINGLE' as const,
       methodId: CASH_ID,
@@ -339,8 +339,8 @@ describe('OperationsOnlineOrderAcceptanceService durable conversion', () => {
     expect(result.value.order.id).toBe(RESERVED_ORDER_ID);
     expect(result.value.order.source).toBe('ONLINE');
     expect(result.value.order.fulfillment.behavior).toBe('DELIVERY');
-    expect(result.value.order.deliveryFeeMinor).toBe(moneyMinor(2_500));
-    expect(result.value.order.totalMinor).toBe(moneyMinor(21_500));
+    expect(result.value.order.deliveryFeeMinor).toBe(moneyMinor(3_000));
+    expect(result.value.order.totalMinor).toBe(moneyMinor(22_000));
     expect(result.value.order.operatorWorkerId).toBe(WORKER_ID);
 
     await closeFixture(test);
