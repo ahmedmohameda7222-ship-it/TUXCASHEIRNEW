@@ -71,6 +71,8 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.api.json
       - name: Commit verified GREEN implementation
         run: |
+          git checkout -- .github/workflows/admin-catalog-settings-tdd.yml
+          rm -rf scripts/__pycache__
           git rm .github/workflows/admin-plan2-delivery-fee-red.yml
           git rm scripts/admin-plan2-delivery-fee-green.py
           git rm scripts/admin-plan2-delivery-fee-green-v2.py
