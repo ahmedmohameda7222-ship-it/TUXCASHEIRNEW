@@ -16,6 +16,19 @@ for (const fragment of [
   if (!sql.includes(fragment)) throw new Error(`Settings schema hardening missing ${fragment}`);
 }
 
+const deliveryFeePolicyMigrationPath =
+  'supabase/migrations/20260910121000_admin_delivery_fee_override_policy.sql';
+if (!fs.existsSync(deliveryFeePolicyMigrationPath)) {
+  throw new Error(`Delivery fee override migration is missing: ${deliveryFeePolicyMigrationPath}`);
+}
+const deliveryFeePolicySql = fs.readFileSync(deliveryFeePolicyMigrationPath, 'utf8').toLowerCase();
+if (
+  !deliveryFeePolicySql.includes('validate_admin_setting_value_v1') ||
+  !deliveryFeePolicySql.includes('checkout.allowdeliveryfeeoverride')
+) {
+  throw new Error('Delivery fee override migration does not extend the reviewed setting validator');
+}
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
   console.log('Admin settings schema hardening static invariant passed.');
@@ -57,6 +70,20 @@ begin
   );
   if coalesce((v_result ->> 'ok')::boolean, false) is not true then
     raise exception 'valid receipt prefix rejected: %', v_result;
+  end if;
+
+  v_result := public.upsert_shop_setting_override_v1(
+    '${ownerId}', '${shopId}', 'checkout.allowDeliveryFeeOverride', 'true'::jsonb, null
+  );
+  if coalesce((v_result ->> 'ok')::boolean, false) is not true then
+    raise exception 'valid delivery fee override policy rejected: %', v_result;
+  end if;
+
+  v_result := public.upsert_shop_setting_override_v1(
+    '${ownerId}', '${shopId}', 'checkout.allowDeliveryFeeOverride', '1'::jsonb, null
+  );
+  if v_result ->> 'code' <> 'invalid_setting' then
+    raise exception 'non-boolean delivery fee override policy was accepted: %', v_result;
   end if;
 
   v_result := public.upsert_shop_setting_override_v1(
