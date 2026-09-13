@@ -765,6 +765,36 @@ function parseReconciliation(value: unknown): Reconciliation {
           'Operations sync reconciliation difference does not match actual minus expected.',
         );
       }
+      const varianceReasonCodeValue = line['varianceReasonCode'];
+      const varianceReasonCode =
+        varianceReasonCodeValue === undefined
+          ? undefined
+          : (() => {
+              const reason = record(varianceReasonCodeValue, 'reconciliation variance reason code');
+              if (reason['family'] !== 'CASH_VARIANCE') {
+                throw new TypeError(
+                  'Operations sync reconciliation variance reason family must be CASH_VARIANCE.',
+                );
+              }
+              const scope = reason['scope'];
+              if (scope !== 'SHOP' && scope !== 'BUSINESS') {
+                throw new TypeError(
+                  'Operations sync reconciliation variance reason scope is invalid.',
+                );
+              }
+              return {
+                id: stringValue(reason['id'], 'reconciliation variance reason id'),
+                key: stringValue(reason['key'], 'reconciliation variance reason key'),
+                family: 'CASH_VARIANCE' as const,
+                label: stringValue(reason['label'], 'reconciliation variance reason label'),
+                version: safeInteger(
+                  reason['version'],
+                  'reconciliation variance reason version',
+                  1,
+                ),
+                scope: scope as 'SHOP' | 'BUSINESS',
+              };
+            })();
       return {
         paymentMethod: {
           id: entityId<PaymentMethodId>(paymentMethod['id'], 'reconciliation payment method id'),
@@ -775,6 +805,7 @@ function parseReconciliation(value: unknown): Reconciliation {
         actualMinor,
         differenceMinor,
         varianceReason: nullableString(line['varianceReason'], 'reconciliation varianceReason'),
+        ...(varianceReasonCode === undefined ? {} : { varianceReasonCode }),
       };
     }),
   };

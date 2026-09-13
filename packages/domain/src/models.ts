@@ -150,7 +150,7 @@ export type OrderFulfillmentSnapshot =
 export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
 export type OrderSource = 'POS' | 'ONLINE';
 
-export interface OrderReasonCodeSnapshot {
+export interface ReasonCodeSnapshot {
   readonly id: string;
   readonly key: string;
   readonly family: ConfiguredReasonFamily;
@@ -158,6 +158,9 @@ export interface OrderReasonCodeSnapshot {
   readonly version: number;
   readonly scope: 'BUSINESS' | 'SHOP';
 }
+
+/** Backwards-compatible order-specific name retained for existing consumers. */
+export type OrderReasonCodeSnapshot = ReasonCodeSnapshot;
 
 export interface OrderCancellationSnapshot {
   readonly at: Instant;
@@ -319,6 +322,8 @@ export interface ReconciliationLine {
   readonly actualMinor: MoneyMinor;
   readonly differenceMinor: MoneyMinor;
   readonly varianceReason: string | null;
+  /** Present when a published CASH_VARIANCE reason code was authoritative. */
+  readonly varianceReasonCode?: ReasonCodeSnapshot;
 }
 
 export interface Reconciliation {
