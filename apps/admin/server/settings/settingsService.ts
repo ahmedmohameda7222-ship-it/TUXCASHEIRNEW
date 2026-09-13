@@ -26,7 +26,7 @@ import type {
   ShopLifecycleState,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization';
+import { requireBusinessWidePermission, requirePermission } from '../authorization';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 export class SettingsServiceError extends Error {
@@ -480,7 +480,7 @@ export function createSettingsService(store: SettingsStore) {
       input: SettingWriteInput,
       principal: AdminSessionPrincipal,
     ): Promise<SettingWriteResult> {
-      requirePermission(principal, 'settings.manage', input.shopId);
+      requireBusinessWidePermission(principal, 'settings.manage', input.shopId);
       return store.upsertBusinessDefault({ employeeId: principal.employeeId, ...input });
     },
 

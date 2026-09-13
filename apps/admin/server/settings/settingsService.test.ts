@@ -198,10 +198,9 @@ describe('Admin settings service', () => {
       { id: 'disabled', displayName: 'Disabled', active: false, channel: 'BOTH' as const },
     ];
 
-    expect(resolveAllowedPaymentMethods(methods, { channel: 'POS' }).map((method) => method.id)).toEqual([
-      'cash',
-      'pos-card',
-    ]);
+    expect(
+      resolveAllowedPaymentMethods(methods, { channel: 'POS' }).map((method) => method.id),
+    ).toEqual(['cash', 'pos-card']);
     expect(
       resolveAllowedPaymentMethods(methods, { channel: 'ONLINE' }).map((method) => method.id),
     ).toEqual(['cash', 'online-card']);
@@ -216,7 +215,9 @@ describe('Admin settings service', () => {
       'utf8',
     );
     expect(migration).toContain('alter table public.admin_reason_codes enable row level security');
-    expect(migration).toContain('revoke all on public.admin_reason_codes from public, anon, authenticated');
+    expect(migration).toContain(
+      'revoke all on public.admin_reason_codes from public, anon, authenticated',
+    );
   });
 
   it('maps the complete settings workspace from trusted canonical rows', async () => {

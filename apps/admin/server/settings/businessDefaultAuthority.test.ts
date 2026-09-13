@@ -23,7 +23,9 @@ const managerWithExplicitOverride: AdminSessionPrincipal = {
   role: 'MANAGER',
 };
 
-function settingsStore(upsertBusinessDefault: SettingsStore['upsertBusinessDefault']): SettingsStore {
+function settingsStore(
+  upsertBusinessDefault: SettingsStore['upsertBusinessDefault'],
+): SettingsStore {
   return {
     getSettingLayers: vi.fn(async () => ({ businessDefault: null, shopOverride: null })),
     loadWorkspace: vi.fn(),

@@ -136,8 +136,6 @@ export class OperationsOrdersBoardService {
           const orders = await transaction.orders.listByBusinessDay(day.id);
           const configuration = await transaction.configuration.getForShop(shop.id);
           const reasonCodes = configuration?.reasonCodes ?? [];
-          const configuredReasonAuthority =
-            configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
           const cancellationReasons: CancellationReasonOption[] = reasonCodes
             .filter((reason) => reason.active && reason.family === 'CANCELLATION')
             .map((reason) => ({
@@ -147,6 +145,7 @@ export class OperationsOrdersBoardService {
               version: reason.version,
               scope: reason.scope,
             }));
+          const configuredReasonAuthority = cancellationReasons.length > 0;
           return {
             shopId: shop.id,
             businessDayId: day.id,
@@ -228,8 +227,7 @@ export class OperationsOrdersBoardService {
       const configuredCancellationReasons = reasonCodes.filter(
         (candidate) => candidate.active && candidate.family === 'CANCELLATION',
       );
-      const configuredReasonAuthority =
-        configuration !== null && (configuration.settings !== null || reasonCodes.length > 0);
+      const configuredReasonAuthority = configuredCancellationReasons.length > 0;
 
       if (configuredReasonAuthority && input.reasonCodeId === undefined) {
         throw new DomainInvariantError(

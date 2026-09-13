@@ -54,9 +54,7 @@ describe('published checkout discount-stacking policy', () => {
     const legacy = configuration(false);
     const withoutSetting: OperationsConfigurationSnapshot = {
       ...legacy,
-      settings: legacy.settings
-        ? { ...legacy.settings, values: {} }
-        : null,
+      settings: legacy.settings ? { ...legacy.settings, values: {} } : null,
     };
     expect(resolveEffectiveCheckoutPolicy(withoutSetting).allowDiscountStacking).toBe(false);
   });
