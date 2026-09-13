@@ -2342,8 +2342,8 @@ test('follow-up desktop approval evidence is captured from the committed tree', 
   await cart.getByLabel('Full address').fill('Evidence address');
   const deliveryTotal = cart.getByRole('textbox', { name: 'Delivery', exact: true });
   await expect(deliveryTotal).toBeVisible();
-  await deliveryTotal.fill('45');
-  await deliveryTotal.blur();
+  await expect(deliveryTotal).toBeDisabled();
+  await expect(deliveryTotal).toHaveValue('35.00');
   await shot('followup-07-delivery-fee-totals-1440.png');
 
   await page.getByRole('button', { name: 'Expenses', exact: true }).click();
