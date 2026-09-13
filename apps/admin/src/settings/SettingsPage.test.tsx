@@ -2,7 +2,12 @@ import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SettingsWorkspaceView, type SettingsSection } from './SettingsPage';
+import {
+  settingsLocationForSection,
+  settingsSectionForLocation,
+  SettingsWorkspaceView,
+  type SettingsSection,
+} from './SettingsPage';
 import { ReceiptsPage } from './ReceiptsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 
@@ -133,6 +138,15 @@ function renderSection(section: SettingsSection): string {
 }
 
 describe('Settings workspace', () => {
+  it('maps settings deep links to the matching section and canonical path', () => {
+    expect(settingsSectionForLocation('/settings')).toBe('overview');
+    expect(settingsSectionForLocation('/settings/checkout')).toBe('checkout');
+    expect(settingsSectionForLocation('/settings/reason-codes')).toBe('reason-codes');
+    expect(settingsSectionForLocation('/settings/unknown')).toBe('overview');
+    expect(settingsLocationForSection('overview')).toBe('/settings');
+    expect(settingsLocationForSection('receipts')).toBe('/settings/receipts');
+  });
+
   it('surfaces every Task 5 settings area from one concrete shop workspace', () => {
     const html = renderSection('overview');
 
