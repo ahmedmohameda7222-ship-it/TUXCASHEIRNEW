@@ -1,0 +1,46 @@
+name: Admin Plan 2 Delivery Fixture GREEN
+
+on:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+    paths:
+      - .github/workflows/admin-plan2-delivery-fixture-green.yml
+
+permissions:
+  contents: write
+
+jobs:
+  delivery-fixture-green:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply fixture-only patch
+        run: python3 scripts/admin-plan2-delivery-fixture-green.py
+      - name: Format check changed fixtures
+        run: npx prettier --check packages/application/src/onlineOrderAcceptance.sqlite.test.ts apps/operations-desktop/src/main/orders.integration.test.ts
+      - name: Verify original failing integration tests and policy regression
+        run: >-
+          npx vitest run
+          packages/application/src/onlineOrderAcceptance.sqlite.test.ts
+          apps/operations-desktop/src/main/orders.integration.test.ts
+          packages/domain/src/deliveryFeePolicy.test.ts
+          packages/application/src/onlineOrderAcceptance.test.ts
+      - name: Commit verified fixture alignment
+        run: |
+          git rm scripts/admin-plan2-delivery-fixture-green.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "test(admin): align delivery happy paths with published fee policy"
+          git push origin HEAD:feat/admin-02-catalog-settings
