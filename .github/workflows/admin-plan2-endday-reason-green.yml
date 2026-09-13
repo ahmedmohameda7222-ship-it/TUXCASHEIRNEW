@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/admin-plan2-endday-reason-green.yml'
       - 'scripts/admin-plan2-endday-reason-green.py'
+      - 'scripts/admin-plan2-endday-reason-green-v2.py'
   workflow_dispatch:
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply guarded End Day reason authority patch
-        run: python scripts/admin-plan2-endday-reason-green.py
+        run: python scripts/admin-plan2-endday-reason-green-v2.py
       - name: Format touched sources
         run: >-
           npx prettier --write
