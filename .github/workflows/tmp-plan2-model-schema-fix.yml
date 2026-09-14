@@ -1,0 +1,73 @@
+name: Temp Plan 2 Model Schema Fix
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-2-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-final-review-2-fixes
+      - name: Add rollout-compatible immutable fields
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('packages/domain/src/models.ts')
+          text = p.read_text()
+          replacements = [
+            ("""  /** Present on new payments; omitted by legacy persisted snapshots. */
+            readonly reference?: string | null;
+          };
+          """, """  /** Present on new payments; omitted by legacy persisted snapshots. */
+            readonly reference?: string | null;
+            /** Present on new payments; omitted by legacy persisted snapshots. */
+            readonly manuallyConfirmed?: boolean;
+          };
+          """, 2),
+            ("""      readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
+                  readonly delivery: null;
+          """, """      readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
+                  /** Present for new non-delivery orders when customer phone is required/captured. */
+                  readonly customerPhone?: string;
+                  readonly delivery: null;
+          """, 1),
+            ("""export interface OrderReturnSnapshot {
+            readonly at: Instant;
+            readonly workerId: WorkerId;
+            readonly workerName: string;
+            readonly reason: string;
+          }
+          """, """export interface OrderReturnSnapshot {
+            readonly at: Instant;
+            readonly workerId: WorkerId;
+            readonly workerName: string;
+            readonly reason: string;
+            /** Present for configured future mutations; absent on legacy returns. */
+            readonly reasonCode?: OrderReasonCodeSnapshot;
+            /** Optional operator context; never the reason authority. */
+            readonly note?: string;
+          }
+          """, 1),
+          ]
+          for old, new, expected in replacements:
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'model matcher expected {expected}, found {count}')
+              text = text.replace(old, new)
+          p.write_text(text)
+          PY
+      - name: Commit model schema
+        run: |
+          git rm .github/workflows/tmp-plan2-model-schema-fix.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/domain/src/models.ts
+          git commit -m "fix(plan2): persist rollout order evidence types"
+          git push origin HEAD:tmp/admin-plan2-final-review-2-fixes
