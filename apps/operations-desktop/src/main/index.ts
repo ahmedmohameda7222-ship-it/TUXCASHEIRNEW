@@ -720,9 +720,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
       orderId: parseEntityId<OrderId>(input['orderId']),
       foodPrepared: input['foodPrepared'],
       reason: input['reason'],
-      ...(typeof input['reasonCodeId'] === 'string'
-        ? { reasonCodeId: input['reasonCodeId'] }
-        : {}),
+      ...(typeof input['reasonCodeId'] === 'string' ? { reasonCodeId: input['reasonCodeId'] } : {}),
       ...(typeof input['note'] === 'string' ? { note: input['note'] } : {}),
     });
   });
@@ -740,9 +738,7 @@ function registerIpcHandlers(window: BrowserWindow): void {
     return currentOrdersBoardService().returnDelivery({
       orderId: parseEntityId<OrderId>(input['orderId']),
       reason: input['reason'],
-      ...(typeof input['reasonCodeId'] === 'string'
-        ? { reasonCodeId: input['reasonCodeId'] }
-        : {}),
+      ...(typeof input['reasonCodeId'] === 'string' ? { reasonCodeId: input['reasonCodeId'] } : {}),
       ...(typeof input['note'] === 'string' ? { note: input['note'] } : {}),
     });
   });

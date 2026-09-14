@@ -80,9 +80,7 @@ function parseVarianceReasons(value: unknown) {
     return {
       paymentMethodId: parseEntityId<PaymentMethodId>(entry['paymentMethodId']),
       reason: entry['reason'] as string | null,
-      ...(typeof entry['reasonCodeId'] === 'string'
-        ? { reasonCodeId: entry['reasonCodeId'] }
-        : {}),
+      ...(typeof entry['reasonCodeId'] === 'string' ? { reasonCodeId: entry['reasonCodeId'] } : {}),
     };
   });
 }
