@@ -105,6 +105,7 @@ function bundle(options: { lifecycleState?: 'ACTIVE' | 'SUSPENDED'; withSettings
                 'checkout.serviceChargeBps': 500,
                 'checkout.taxBps': 1400,
                 'checkout.allowDiscountStacking': true,
+                'checkout.requireCustomerPhone': true,
               },
               shopIdentity: {
                 shopId: SHOP_ID,
@@ -149,6 +150,7 @@ describe('published catalog-public ordering projection', () => {
         serviceChargeBps: 500,
         taxBps: 1400,
         allowDiscountStacking: true,
+        requireCustomerPhone: true,
         fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
         paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
       },

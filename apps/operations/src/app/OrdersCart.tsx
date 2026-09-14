@@ -191,6 +191,8 @@ export function OrdersCart({
   const selectedOrderType =
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
+  const requireCustomerPhone =
+    configuration.settings?.values['checkout.requireCustomerPhone'] === true;
   const allowDeliveryFeeOverride =
     configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
   const methods = activePaymentMethods(configuration);
@@ -415,12 +417,12 @@ export function OrdersCart({
           <SectionIssues issues={issues} paths={['orderType']} />
         </section>
 
-        {delivery ? (
+        {delivery || requireCustomerPhone ? (
           <section
             className="cart-section delivery-section"
             aria-labelledby={controlId('delivery-title')}
           >
-            <h2 id={controlId('delivery-title')}>Delivery</h2>
+            <h2 id={controlId('delivery-title')}>{delivery ? 'Delivery' : 'Customer'}</h2>
             <DraftTextField
               id={controlId('delivery-phone')}
               label="Phone"
@@ -429,59 +431,64 @@ export function OrdersCart({
               disabled={busy}
               onCommit={onDeliveryPhoneCommit}
             />
-            <DraftTextField
-              id={controlId('delivery-name')}
-              label="Customer name"
-              value={draft.delivery.customerName}
-              disabled={busy}
-              onCommit={(customerName) =>
-                onMutate((current) => ({
-                  ...current,
-                  delivery: { ...current.delivery, customerName },
-                }))
-              }
-            />
-            <label className="field-stack" htmlFor={controlId('delivery-zone')}>
-              <span>Zone</span>
-              <select
-                id={controlId('delivery-zone')}
-                value={draft.delivery.zoneId ?? ''}
-                disabled={busy}
-                onChange={(event) => {
-                  if (event.target.value === '') return;
-                  const zoneId = parseEntityId<NonNullable<OrderDraft['delivery']['zoneId']>>(
-                    event.target.value,
-                  );
-                  const zone = configuration.deliveryZones.find(
-                    (candidate) => candidate.id === zoneId && candidate.active,
-                  );
-                  if (zone !== undefined) onMutate((current) => applyDeliveryZone(current, zone));
-                }}
-              >
-                <option value="">Choose a zone</option>
-                {configuration.deliveryZones
-                  .filter((zone) => zone.active)
-                  .sort((left, right) => left.sortOrder - right.sortOrder)
-                  .map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name} — {formatMoneyMinor(zone.feeMinor)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <DraftTextField
-              id={controlId('delivery-address')}
-              label="Full address"
-              value={draft.delivery.address}
-              multiline
-              disabled={busy}
-              onCommit={(address) =>
-                onMutate((current) => ({
-                  ...current,
-                  delivery: { ...current.delivery, address },
-                }))
-              }
-            />
+            {delivery ? (
+              <>
+                <DraftTextField
+                  id={controlId('delivery-name')}
+                  label="Customer name"
+                  value={draft.delivery.customerName}
+                  disabled={busy}
+                  onCommit={(customerName) =>
+                    onMutate((current) => ({
+                      ...current,
+                      delivery: { ...current.delivery, customerName },
+                    }))
+                  }
+                />
+                <label className="field-stack" htmlFor={controlId('delivery-zone')}>
+                  <span>Zone</span>
+                  <select
+                    id={controlId('delivery-zone')}
+                    value={draft.delivery.zoneId ?? ''}
+                    disabled={busy}
+                    onChange={(event) => {
+                      if (event.target.value === '') return;
+                      const zoneId = parseEntityId<NonNullable<OrderDraft['delivery']['zoneId']>>(
+                        event.target.value,
+                      );
+                      const zone = configuration.deliveryZones.find(
+                        (candidate) => candidate.id === zoneId && candidate.active,
+                      );
+                      if (zone !== undefined)
+                        onMutate((current) => applyDeliveryZone(current, zone));
+                    }}
+                  >
+                    <option value="">Choose a zone</option>
+                    {configuration.deliveryZones
+                      .filter((zone) => zone.active)
+                      .sort((left, right) => left.sortOrder - right.sortOrder)
+                      .map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} — {formatMoneyMinor(zone.feeMinor)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <DraftTextField
+                  id={controlId('delivery-address')}
+                  label="Full address"
+                  value={draft.delivery.address}
+                  multiline
+                  disabled={busy}
+                  onCommit={(address) =>
+                    onMutate((current) => ({
+                      ...current,
+                      delivery: { ...current.delivery, address },
+                    }))
+                  }
+                />
+              </>
+            ) : null}
             <SectionIssues
               issues={issues}
               paths={[

@@ -94,6 +94,9 @@ export function CartDrawer() {
   const hasAllowedPaymentMethod =
     paymentMethod !== '' && availablePaymentMethods.includes(paymentMethod);
   const isDelivery = orderType === 'Delivery';
+  const phoneRequiredForCheckout = checkoutPolicy
+    ? isDelivery || checkoutPolicy.requireCustomerPhone
+    : isDelivery;
   const isDeliveryMixedPayment = isDelivery && paymentMethod === 'Mixed Payment';
   const displayedCheckoutTotal = checkoutEstimate
     ? (checkoutEstimate.totalMinor / 100).toFixed(2)
@@ -111,7 +114,8 @@ export function CartDrawer() {
     isCustomerNameMissing ||
     !hasAllowedOrderType ||
     !hasAllowedPaymentMethod ||
-    (isDelivery && (!customerPhone.trim() || !deliveryAddress.trim()));
+    (phoneRequiredForCheckout && !customerPhone.trim()) ||
+    (isDelivery && !deliveryAddress.trim());
 
   const handleStartOrdering = () => {
     setSubmissionStatus('idle');
@@ -133,7 +137,7 @@ export function CartDrawer() {
       shopId: configuredOrderShopId(),
       customer: {
         name: customerName.trim(),
-        phone: isDelivery ? customerPhone.trim() : null,
+        phone: phoneRequiredForCheckout ? customerPhone.trim() : null,
         address: isDelivery ? deliveryAddress.trim() : null,
       },
       fulfillmentPreference: isDelivery ? 'DELIVERY' : 'PICKUP',
@@ -168,7 +172,7 @@ export function CartDrawer() {
       alert('Please select an order type.');
       return;
     }
-    if (isDelivery && !customerPhone.trim()) {
+    if (phoneRequiredForCheckout && !customerPhone.trim()) {
       alert('Please enter your phone number.');
       return;
     }
@@ -461,7 +465,7 @@ export function CartDrawer() {
               </div>
             </div>
 
-            {isDelivery && (
+            {phoneRequiredForCheckout && (
               <>
                 <div className="space-y-1">
                   <label className="text-sm text-gray-400 font-semibold">
@@ -477,19 +481,21 @@ export function CartDrawer() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-sm text-gray-400 font-semibold">
-                    Delivery Address <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryAddress}
-                    onChange={(event) => setDeliveryAddress(event.target.value)}
-                    placeholder="Enter your full address"
-                    aria-required="true"
-                    className="w-full bg-black border border-white/20 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
+                {isDelivery && (
+                  <div className="space-y-1">
+                    <label className="text-sm text-gray-400 font-semibold">
+                      Delivery Address <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryAddress}
+                      onChange={(event) => setDeliveryAddress(event.target.value)}
+                      placeholder="Enter your full address"
+                      aria-required="true"
+                      className="w-full bg-black border border-white/20 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                )}
               </>
             )}
 

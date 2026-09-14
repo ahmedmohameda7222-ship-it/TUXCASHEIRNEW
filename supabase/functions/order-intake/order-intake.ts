@@ -106,6 +106,7 @@ export interface OnlineOrderPublishedCheckoutAuthority {
   minimumOrderMinor: number;
   serviceChargeBps?: number;
   taxBps?: number;
+  requireCustomerPhone?: boolean;
   orderTypes: readonly OnlineOrderPublishedOrderType[];
   paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
 }
@@ -438,6 +439,7 @@ function isPublishedInstaPayMethod(method: OnlineOrderPublishedPaymentMethod): b
 function publishedCheckoutPolicyError(
   request: OnlineOrderRequestV1,
   itemsSubtotalMinor: number,
+  normalizedPhone: string | null,
   authority: OnlineOrderPublishedCheckoutAuthority,
 ): Response | null {
   if (authority.shopId !== request.shopId) {
@@ -449,6 +451,9 @@ function publishedCheckoutPolicyError(
   if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
   if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
   if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
+  if (authority.requireCustomerPhone === true && normalizedPhone === null) {
+    return errorResponse(409, 'customer_phone_required');
+  }
 
   const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
   if (
@@ -555,6 +560,7 @@ export async function handleOrderIntakeRequest(
     const policyError = publishedCheckoutPolicyError(
       parsed,
       trusted.itemsSubtotalMinor,
+      normalizedPhone,
       checkoutAuthority,
     );
     if (policyError) return policyError;

@@ -85,6 +85,7 @@ export interface PublicOrderingV2 {
   readonly serviceChargeBps?: number;
   readonly taxBps?: number;
   readonly allowDiscountStacking?: boolean;
+  readonly requireCustomerPhone?: boolean;
   readonly fulfillmentPreferences: readonly PublicFulfillmentPreferenceV2[];
   readonly paymentPreferences: readonly PublicPaymentPreferenceV2[];
 }
@@ -481,6 +482,7 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
       'serviceChargeBps',
       'taxBps',
       'allowDiscountStacking',
+      'requireCustomerPhone',
       'fulfillmentPreferences',
       'paymentPreferences',
     ],
@@ -497,6 +499,10 @@ function parsePublicOrderingV2(value: unknown, path: string): PublicOrderingV2 {
       row.allowDiscountStacking === undefined
         ? false
         : requiredBoolean(row.allowDiscountStacking, `${path}.allowDiscountStacking`),
+    requireCustomerPhone:
+      row.requireCustomerPhone === undefined
+        ? false
+        : requiredBoolean(row.requireCustomerPhone, `${path}.requireCustomerPhone`),
     fulfillmentPreferences: parseStringEnumArray(
       row.fulfillmentPreferences,
       `${path}.fulfillmentPreferences`,

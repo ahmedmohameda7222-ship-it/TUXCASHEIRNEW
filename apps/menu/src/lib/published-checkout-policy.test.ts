@@ -28,6 +28,7 @@ describe('published Menu checkout policy', () => {
         ordering({
           serviceChargeBps: 500,
           taxBps: 1400,
+          requireCustomerPhone: true,
           fulfillmentPreferences: ['DELIVERY', 'PICKUP'],
           paymentPreferences: ['MIXED', 'INSTAPAY'],
         }),
@@ -37,6 +38,7 @@ describe('published Menu checkout policy', () => {
       minimumOrderMinor: 0,
       serviceChargeBps: 500,
       taxBps: 1400,
+      requireCustomerPhone: true,
       orderTypes: ['Delivery', 'Pick up'],
       paymentMethods: ['Mixed Payment', 'InstaPay'],
     });

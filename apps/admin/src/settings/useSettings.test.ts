@@ -119,6 +119,7 @@ describe('Settings client CAS command builders', () => {
       buildSettingOverrideCommand(shopId, workspace, {
         settingKey: 'receipt.orderPrefix',
         value: 'MAADI-',
+        expectedVersion: 4,
       }),
     ).toEqual({
       type: 'setting.override.upsert',
@@ -132,6 +133,7 @@ describe('Settings client CAS command builders', () => {
       buildSettingOverrideCommand(shopId, workspace, {
         settingKey: 'checkout.taxBps',
         value: 1200,
+        expectedVersion: null,
       }),
     ).toEqual({
       type: 'setting.override.upsert',
@@ -149,15 +151,11 @@ describe('Settings client CAS command builders', () => {
     };
 
     expect(
-      buildSettingOverrideCommand(
-        shopId,
-        refreshedWorkspace,
-        {
-          settingKey: 'receipt.orderPrefix',
-          value: 'LOCAL-',
-          expectedVersion: 4,
-        } as never,
-      ),
+      buildSettingOverrideCommand(shopId, refreshedWorkspace, {
+        settingKey: 'receipt.orderPrefix',
+        value: 'LOCAL-',
+        expectedVersion: 4,
+      } as never),
     ).toEqual({
       type: 'setting.override.upsert',
       shopId,
