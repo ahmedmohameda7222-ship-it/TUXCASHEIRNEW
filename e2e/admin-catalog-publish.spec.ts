@@ -201,6 +201,150 @@ async function mockPublishing(page: Page) {
   return { commands };
 }
 
+async function mockAdvancedCatalog(page: Page) {
+  const productId = '11111111-1111-4111-8111-111111111111';
+  const categoryId = '22222222-2222-4222-8222-222222222222';
+  const modifierId = '44444444-4444-4444-8444-444444444444';
+  const beverageId = '99999999-9999-4999-8999-999999999999';
+  const inventoryItemId = '77777777-7777-4777-8777-777777777777';
+  const commands: Command[] = [];
+  const product = {
+    id: productId,
+    shopId,
+    categoryId,
+    slug: 'classic-smash',
+    name: 'Classic Smash',
+    description: 'Single smashed burger',
+    priceMinor: 1550,
+    imageKey: null,
+    family: 'burger',
+    bestSeller: true,
+    active: true,
+    soldOut: false,
+    isCombo: true,
+    sortOrder: 10,
+  };
+  const bundleJson = {
+    snapshot: {
+      products: [
+        product,
+        {
+          ...product,
+          id: beverageId,
+          slug: 'water',
+          name: 'Water',
+          priceMinor: 1000,
+          family: 'drink',
+          bestSeller: false,
+          isCombo: false,
+          sortOrder: 20,
+        },
+      ],
+      categories: [],
+      modifiers: [
+        {
+          id: modifierId,
+          shopId,
+          name: 'Bacon',
+          priceMinor: 2000,
+          standaloneProductId: null,
+          active: true,
+          sortOrder: 0,
+        },
+      ],
+      productModifierLinks: [
+        { shopId, productId, modifierId, maxQuantity: 2, sortOrder: 0 },
+      ],
+      comboBeverageOptions: [
+        { shopId, comboProductId: productId, beverageProductId: beverageId, sortOrder: 0 },
+      ],
+      recipeLines: [
+        { shopId, productId, inventoryItemId, quantityMicros: 250000 },
+      ],
+    },
+    inventoryItems: [
+      {
+        id: inventoryItemId,
+        shopId,
+        name: 'Meat',
+        unitLabel: 'g',
+        trackingMode: 'RECIPE_TRACKED',
+        active: true,
+      },
+    ],
+  };
+
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ownerSession),
+    });
+  });
+
+  await page.route('**/api/admin/catalog**', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          shopId,
+          currentPublishVersion: 48,
+          categories: [
+            {
+              id: categoryId,
+              shopId,
+              slug: 'smash',
+              name: 'Smash',
+              description: null,
+              sortOrder: 0,
+              active: true,
+            },
+          ],
+          products: [product],
+          drafts: [],
+        }),
+      });
+      return;
+    }
+
+    expect(request.headers()['x-tux-admin-csrf']).toBe(ownerSession.csrfToken);
+    const body = request.postDataJSON() as Command;
+    commands.push(body);
+    if (body.type === 'draft.create') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          draftId,
+          draftRevision: 1,
+          basePublishVersion: 48,
+          bundleJson,
+        }),
+      });
+      return;
+    }
+    if (body.type === 'draft.save') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          draftId,
+          draftRevision: 2,
+          basePublishVersion: 48,
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 400, body: '{}' });
+  });
+
+  return { commands, productId, modifierId, beverageId, inventoryItemId };
+}
+
 test('publish review shows version-fenced draft diff, history, and Cairo scheduling', async ({
   page,
 }) => {
@@ -246,6 +390,52 @@ test('publish history restores as a new version and pending schedules can be can
     type: 'schedule.cancel',
     scheduleId,
   });
+});
+
+test('advanced product controls load from a version-fenced draft and save canonical relations', async ({
+  page,
+}) => {
+  const fixture = await mockAdvancedCatalog(page);
+  await page.goto('/catalog/products');
+
+  await page.getByRole('button', { name: /Classic Smash/ }).click();
+  await page.getByRole('button', { name: /More/ }).click();
+  await expect(page.getByText('Bacon')).toBeVisible();
+  await expect(page.getByText('Water')).toBeVisible();
+  await expect(page.getByText(/Meat/)).toBeVisible();
+
+  await page.getByLabel('Max quantity').fill('4');
+  await page.getByLabel('Meat quantity micro-units').fill('750000');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+
+  await expect.poll(() => fixture.commands.some((command) => command.type === 'draft.save')).toBe(
+    true,
+  );
+  const save = fixture.commands.find((command) => command.type === 'draft.save');
+  expect(save).toBeTruthy();
+  const changes = save?.changes as Array<Record<string, unknown>>;
+  const change = changes[0] as Record<string, unknown>;
+  expect(change.changedPaths).toEqual(
+    expect.arrayContaining(['productModifierLinks', 'comboBeverageOptions', 'recipeLines']),
+  );
+  const savedBundle = change.bundleJson as Record<string, unknown>;
+  const snapshot = savedBundle.snapshot as Record<string, unknown>;
+  expect(snapshot.productModifierLinks).toContainEqual(
+    expect.objectContaining({ productId: fixture.productId, modifierId: fixture.modifierId, maxQuantity: 4 }),
+  );
+  expect(snapshot.comboBeverageOptions).toContainEqual(
+    expect.objectContaining({
+      comboProductId: fixture.productId,
+      beverageProductId: fixture.beverageId,
+    }),
+  );
+  expect(snapshot.recipeLines).toContainEqual(
+    expect.objectContaining({
+      productId: fixture.productId,
+      inventoryItemId: fixture.inventoryItemId,
+      quantityMicros: 750000,
+    }),
+  );
 });
 
 for (const viewport of [
