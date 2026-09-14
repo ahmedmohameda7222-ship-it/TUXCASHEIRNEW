@@ -63,14 +63,14 @@ jobs:
           );
 
           const intake = 'supabase/functions/order-intake/order-intake.ts';
-          replaceOnce(
+          replaceRegexOnce(
             intake,
-            `  readonly serviceChargeBps?: number;\n  readonly taxBps?: number;\n  readonly orderTypes: readonly OnlineOrderPublishedOrderType[];`,
-            `  readonly serviceChargeBps?: number;\n  readonly taxBps?: number;\n  readonly requireCustomerPhone?: boolean;\n  readonly orderTypes: readonly OnlineOrderPublishedOrderType[];`,
+            /  serviceChargeBps\?: number;\s+taxBps\?: number;\s+orderTypes: readonly OnlineOrderPublishedOrderType\[\];/,
+            `  serviceChargeBps?: number;\n  taxBps?: number;\n  requireCustomerPhone?: boolean;\n  orderTypes: readonly OnlineOrderPublishedOrderType[];`,
           );
-          replaceOnce(
+          replaceRegexOnce(
             intake,
-            `function publishedCheckoutPolicyError(\n  request: OnlineOrderRequestV1,\n  itemsSubtotalMinor: number,\n  authority: OnlineOrderPublishedCheckoutAuthority,\n): Response | null {`,
+            /function publishedCheckoutPolicyError\(\s+request: OnlineOrderRequestV1,\s+itemsSubtotalMinor: number,\s+authority: OnlineOrderPublishedCheckoutAuthority,\s+\): Response \| null \{/,
             `function publishedCheckoutPolicyError(\n  request: OnlineOrderRequestV1,\n  itemsSubtotalMinor: number,\n  normalizedPhone: string | null,\n  authority: OnlineOrderPublishedCheckoutAuthority,\n): Response | null {`,
           );
           replaceOnce(
@@ -78,9 +78,9 @@ jobs:
             `  if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');\n\n  const requiredBehavior =`,
             `  if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');\n  if (authority.requireCustomerPhone === true && normalizedPhone === null) {\n    return errorResponse(409, 'customer_phone_required');\n  }\n\n  const requiredBehavior =`,
           );
-          replaceOnce(
+          replaceRegexOnce(
             intake,
-            `    const policyError = publishedCheckoutPolicyError(\n      parsed,\n      trusted.itemsSubtotalMinor,\n      checkoutAuthority,\n    );`,
+            /    const policyError = publishedCheckoutPolicyError\(\s+parsed,\s+trusted\.itemsSubtotalMinor,\s+checkoutAuthority,\s+\);/,
             `    const policyError = publishedCheckoutPolicyError(\n      parsed,\n      trusted.itemsSubtotalMinor,\n      normalizedPhone,\n      checkoutAuthority,\n    );`,
           );
 
