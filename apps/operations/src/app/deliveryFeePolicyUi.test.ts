@@ -21,6 +21,13 @@ describe('published checkout policy UI authority', () => {
     expect(ordersCart).toContain('onDeliveryPhoneCommit');
   });
 
+  it('quotes and prepares POS payment against the published checkout charges', () => {
+    expect(ordersCart).toContain('calculateCheckoutPricing');
+    expect(ordersCart).toContain('resolveEffectiveCheckoutPolicy');
+    expect(ordersCart).toContain('policy: checkoutPolicy');
+    expect(ordersCart).toContain('pricing.totalMinor');
+  });
+
   it('defaults online acceptance to the selected zone fee and disables manual editing unless allowed', () => {
     expect(onlineInbox).toContain(
       "workspace.configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true",
