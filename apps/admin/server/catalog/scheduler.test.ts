@@ -151,11 +151,15 @@ describe('catalog scheduler', () => {
   });
 
   it('routes scheduled publication through the replay-safe trusted RPC', async () => {
-    const rpc = vi.fn(async (_name: string, _payload: Readonly<Record<string, unknown>>) => ({
-      ok: true,
-      publishVersion: 49,
-      replayed: true,
-    }));
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      void name;
+      void payload;
+      return {
+        ok: true,
+        publishVersion: 49,
+        replayed: true,
+      };
+    });
     const client: CatalogSchedulerRpcClient = {
       async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
         return (await rpc(name, payload)) as T;
