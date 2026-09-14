@@ -25,6 +25,7 @@ type PublishedCheckoutAuthority = {
   minimumOrderMinor: number;
   serviceChargeBps: number;
   taxBps: number;
+  requireCustomerPhone: boolean;
   orderTypes: ReadonlyArray<{
     behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
     active: boolean;
@@ -74,6 +75,7 @@ function publishedAuthority(
     minimumOrderMinor: 0,
     serviceChargeBps: 0,
     taxBps: 0,
+    requireCustomerPhone: false,
     orderTypes: [
       { behavior: 'TAKE_AWAY', active: true },
       { behavior: 'DELIVERY', active: true },
@@ -129,6 +131,7 @@ function request(
   overrides: Partial<{
     fulfillmentPreference: 'DELIVERY' | 'PICKUP';
     paymentPreference: 'CASH' | 'INSTAPAY' | 'MIXED';
+    customerPhone: string | null;
   }> = {},
 ): Request {
   return new Request('https://example.test/functions/v1/order-intake', {
@@ -138,7 +141,11 @@ function request(
       schemaVersion: 1,
       shopId: SHOP_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
-      customer: { name: 'Pickup Customer', phone: null, address: null },
+      customer: {
+        name: 'Pickup Customer',
+        phone: overrides.customerPhone ?? null,
+        address: null,
+      },
       fulfillmentPreference: overrides.fulfillmentPreference ?? 'PICKUP',
       paymentPreference: overrides.paymentPreference ?? 'CASH',
       items: [
@@ -204,6 +211,24 @@ describe('order-intake published checkout settings authority', () => {
       taxMinor: 2_793,
       totalMinor: 22_743,
     });
+  });
+
+  it('requires a customer phone for pickup when the published policy enables it', async () => {
+    const missingStore = new MemoryStore(publishedAuthority({ requireCustomerPhone: true }));
+    const missing = await handleOrderIntakeRequest(request(), missingStore);
+
+    expect(missing.status).toBe(409);
+    await expect(errorCode(missing)).resolves.toBe('customer_phone_required');
+    expect(missingStore.inserted).toHaveLength(0);
+
+    const presentStore = new MemoryStore(publishedAuthority({ requireCustomerPhone: true }));
+    const present = await handleOrderIntakeRequest(
+      request({ customerPhone: '01012345678' }),
+      presentStore,
+    );
+
+    expect(present.status).toBe(202);
+    expect(presentStore.inserted[0]?.normalizedPhone).toBe('+201012345678');
   });
 
   it('rejects an ONLINE cash intent when the published cash method is POS-only', async () => {
