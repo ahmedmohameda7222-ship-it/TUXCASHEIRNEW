@@ -72,9 +72,7 @@ function requiredAndOptionalKeys(
   label: string,
 ): void {
   const allowed = new Set([...required, ...optional]);
-  const missingRequired = required.some(
-    (key) => !Object.prototype.hasOwnProperty.call(value, key),
-  );
+  const missingRequired = required.some((key) => !Object.prototype.hasOwnProperty.call(value, key));
   const hasUnexpected = Object.keys(value).some((key) => !allowed.has(key));
   if (missingRequired || hasUnexpected) {
     throw new TypeError(`${label} IPC payload contains unexpected fields.`);
