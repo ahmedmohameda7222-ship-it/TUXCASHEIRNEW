@@ -3,6 +3,7 @@ import { moneyMinor, type OrderSnapshot } from '@tux/domain';
 
 import { renderOrderReceiptHtml } from './receipt';
 
+// This regression intentionally proves receipt rows are conditional on configured percentage rates.
 function orderWithCharges(serviceChargeBps: number, taxBps: number): OrderSnapshot {
   return {
     id: '10000000-0000-4000-8000-000000000001',
