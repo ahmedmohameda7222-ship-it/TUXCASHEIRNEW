@@ -1,0 +1,60 @@
+name: Plan 2 Prettier Exact Fix
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-prettier-396
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-prettier-396
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply repository Prettier 3.9.6 to exact failing files
+        run: |
+          npx prettier --write \
+            apps/admin/server/catalog/scheduler.test.ts \
+            apps/admin/src/catalog/catalogAdvancedDraft.ts \
+            apps/admin/src/catalog/catalogProductSlug.ts \
+            apps/admin/src/catalog/ProductEditor.tsx \
+            packages/application/src/onlineOrderAcceptance.phonePolicy.test.ts \
+            e2e/admin-catalog-publish.spec.ts
+      - name: Verify exact files
+        run: |
+          npx prettier --check \
+            apps/admin/server/catalog/scheduler.test.ts \
+            apps/admin/src/catalog/catalogAdvancedDraft.ts \
+            apps/admin/src/catalog/catalogProductSlug.ts \
+            apps/admin/src/catalog/ProductEditor.tsx \
+            packages/application/src/onlineOrderAcceptance.phonePolicy.test.ts \
+            e2e/admin-catalog-publish.spec.ts
+          git diff --check
+      - name: Commit deterministic formatting only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            apps/admin/server/catalog/scheduler.test.ts \
+            apps/admin/src/catalog/catalogAdvancedDraft.ts \
+            apps/admin/src/catalog/catalogProductSlug.ts \
+            apps/admin/src/catalog/ProductEditor.tsx \
+            packages/application/src/onlineOrderAcceptance.phonePolicy.test.ts \
+            e2e/admin-catalog-publish.spec.ts
+          if git diff --cached --quiet; then
+            echo 'No formatting changes required.'
+            exit 0
+          fi
+          git commit -m 'style(admin): apply repository Prettier to Plan 2 fixes'
+          git push origin HEAD:tmp/admin-plan2-prettier-396
