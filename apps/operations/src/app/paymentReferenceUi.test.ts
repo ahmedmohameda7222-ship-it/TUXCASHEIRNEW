@@ -19,4 +19,13 @@ describe('payment reference UI authority', () => {
     expect(onlineInbox).toContain('Payment reference');
     expect(onlineInbox).toContain('reference:');
   });
+
+  it('uses the canonical PaymentDraft confirmation fields in POS and online-order acceptance', () => {
+    expect(ordersCart).toContain('manualConfirmed');
+    expect(ordersCart).toContain('manualConfirmedA');
+    expect(ordersCart).toContain('manualConfirmedB');
+    expect(onlineInbox).toContain('manualConfirmed:');
+    expect(ordersCart).not.toContain('manuallyConfirmed');
+    expect(onlineInbox).not.toContain('manuallyConfirmed');
+  });
 });
