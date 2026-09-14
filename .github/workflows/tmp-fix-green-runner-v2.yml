@@ -1,0 +1,51 @@
+name: Temp Repair Plan 2 Green Runner
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-2-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-final-review-2-fixes
+      - name: Repair runner block with direct slicing
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/tmp-plan2-green-patch.yml')
+          text = path.read_text()
+          start_marker = '          # Persist the validated customer phone and confirmation evidence in immutable orders.'
+          end_marker = '          # Preserve the new optional rollout fields through sync decoding.'
+          start = text.index(start_marker)
+          end = text.index(end_marker)
+          block = '''          # Persist the validated customer phone and confirmation evidence in immutable orders.
+          path = 'packages/application/src/orders.ts'
+          regex_once(path,
+          r"(if \(orderType\.behavior !== 'DELIVERY'\) \{\s+return \{\s+orderTypeId: orderType\.id,\s+orderTypeLabel: orderType\.name,\s+behavior: orderType\.behavior,)(\s+delivery: null,)",
+          "\\1\\n        customerPhone: normalizedDeliveryPhone ?? '',\\2")
+          regex_once(path,
+          r"(reference: part\.reference,)(\s+\};\s+\}\s+return \{)",
+          "\\1\\n          manuallyConfirmed: part.manuallyConfirmed,\\2")
+          regex_once(path,
+          r"(changeMinor: null,\s+reference: part\.reference,)(\s+\};)",
+          "\\1\\n        manuallyConfirmed: part.manuallyConfirmed,\\2")
+
+'''
+          path.write_text(text[:start] + block + text[end:])
+          PY
+      - name: Remove patchers and commit
+        run: |
+          git rm .github/workflows/tmp-fix-green-runner.yml
+          git rm .github/workflows/tmp-fix-green-runner-v2.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/tmp-plan2-green-patch.yml
+          git commit -m "chore(plan2): repair green runner matcher"
+          git push origin HEAD:tmp/admin-plan2-final-review-2-fixes
