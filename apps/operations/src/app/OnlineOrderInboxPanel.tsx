@@ -251,6 +251,7 @@ function OnlineOrderAcceptanceForm({
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [cashReceived, setCashReceived] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
+  const [manuallyConfirmed, setManuallyConfirmed] = useState(false);
 
   const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
   const orderTypes = workspace.configuration.orderTypes.filter(
@@ -273,7 +274,8 @@ function OnlineOrderAcceptanceForm({
   const paymentReady =
     selectedPayment !== null &&
     (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null) &&
-    (!selectedPayment.requiresReference || paymentReference.trim().length > 0);
+    (!selectedPayment.requiresReference || paymentReference.trim().length > 0) &&
+    (!selectedPayment.manualConfirmationRequired || manuallyConfirmed);
   const canSubmit = selectedOrderType !== null && deliveryReady && paymentReady && !busy;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
@@ -289,6 +291,7 @@ function OnlineOrderAcceptanceForm({
         methodId: selectedPayment.id,
         cashReceivedMinor: selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
         reference: selectedPayment.requiresReference ? paymentReference : null,
+        manuallyConfirmed: selectedPayment.manualConfirmationRequired ? manuallyConfirmed : false,
       },
     };
     void onAccept(request, confirmation);
@@ -361,6 +364,7 @@ function OnlineOrderAcceptanceForm({
               setPaymentMethodId(event.target.value);
               setCashReceived('');
               setPaymentReference('');
+              setManuallyConfirmed(false);
             }}
           >
             <option value="">Select authoritative payment</option>
@@ -392,6 +396,16 @@ function OnlineOrderAcceptanceForm({
               value={paymentReference}
               onChange={(event) => setPaymentReference(event.target.value)}
             />
+          </label>
+        ) : null}
+        {selectedPayment?.manualConfirmationRequired ? (
+          <label className="payment-confirmation">
+            <input
+              type="checkbox"
+              checked={manuallyConfirmed}
+              onChange={(event) => setManuallyConfirmed(event.currentTarget.checked)}
+            />
+            <span>Payment manually confirmed</span>
           </label>
         ) : null}
       </div>

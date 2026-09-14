@@ -35,6 +35,7 @@ import type {
   InventoryMovementType,
   OrderFulfillmentSnapshot,
   OrderLifecycleSnapshot,
+  OrderReasonCodeSnapshot,
   OrderSnapshot,
   OrderSource,
   OrderStatus,
@@ -272,6 +273,29 @@ function movementType(value: unknown): InventoryMovementType {
   throw new TypeError('Operations sync inventory movement type is unsupported.');
 }
 
+function parseReasonCode(
+  value: unknown,
+  label: string,
+  family: 'CANCELLATION' | 'REFUND_RETURN',
+): OrderReasonCodeSnapshot {
+  const source = record(value, label);
+  if (source['family'] !== family) {
+    throw new TypeError(`Operations sync ${label} must belong to ${family}.`);
+  }
+  const scope = source['scope'];
+  if (scope !== 'BUSINESS' && scope !== 'SHOP') {
+    throw new TypeError(`Operations sync ${label} scope is unsupported.`);
+  }
+  return {
+    id: fieldString(source, 'id'),
+    key: fieldString(source, 'key'),
+    family,
+    label: fieldString(source, 'label'),
+    version: safeInteger(source['version'], `${label} version`, 1),
+    scope,
+  };
+}
+
 function parseLifecycle(value: unknown): OrderLifecycleSnapshot {
   const source = record(value, 'order lifecycle');
   const cancellationValue = source['cancellation'];
@@ -281,6 +305,18 @@ function parseLifecycle(value: unknown): OrderLifecycleSnapshot {
       ? null
       : (() => {
           const cancellationSource = record(cancellationValue, 'order cancellation');
+          const reasonCode =
+            cancellationSource['reasonCode'] === undefined
+              ? undefined
+              : parseReasonCode(
+                  cancellationSource['reasonCode'],
+                  'order cancellation reasonCode',
+                  'CANCELLATION',
+                );
+          const note =
+            cancellationSource['note'] === undefined
+              ? undefined
+              : stringValue(cancellationSource['note'], 'order cancellation note', true);
           return {
             at: timestamp(cancellationSource['at'], 'order cancellation at'),
             workerId: entityId<WorkerId>(
@@ -297,6 +333,8 @@ function parseLifecycle(value: unknown): OrderLifecycleSnapshot {
               'order cancellation stockRestored',
             ),
             reason: fieldString(cancellationSource, 'reason'),
+            ...(reasonCode === undefined ? {} : { reasonCode }),
+            ...(note === undefined ? {} : { note }),
           };
         })();
   const returned =
@@ -304,11 +342,25 @@ function parseLifecycle(value: unknown): OrderLifecycleSnapshot {
       ? null
       : (() => {
           const returnedSource = record(returnedValue, 'order return');
+          const reasonCode =
+            returnedSource['reasonCode'] === undefined
+              ? undefined
+              : parseReasonCode(
+                  returnedSource['reasonCode'],
+                  'order return reasonCode',
+                  'REFUND_RETURN',
+                );
+          const note =
+            returnedSource['note'] === undefined
+              ? undefined
+              : stringValue(returnedSource['note'], 'order return note', true);
           return {
             at: timestamp(returnedSource['at'], 'order return at'),
             workerId: entityId<WorkerId>(returnedSource['workerId'], 'order return workerId'),
             workerName: fieldString(returnedSource, 'workerName'),
             reason: fieldString(returnedSource, 'reason'),
+            ...(reasonCode === undefined ? {} : { reasonCode }),
+            ...(note === undefined ? {} : { note }),
           };
         })();
   return {
@@ -328,7 +380,17 @@ function parseFulfillment(value: unknown): OrderFulfillmentSnapshot {
     if (source['delivery'] !== null) {
       throw new TypeError('Operations sync non-Delivery fulfillment must have delivery=null.');
     }
-    return { orderTypeId, orderTypeLabel, behavior, delivery: null };
+    const customerPhone =
+      source['customerPhone'] === undefined
+        ? undefined
+        : stringValue(source['customerPhone'], 'order fulfillment customerPhone', true);
+    return {
+      orderTypeId,
+      orderTypeLabel,
+      behavior,
+      ...(customerPhone === undefined ? {} : { customerPhone }),
+      delivery: null,
+    };
   }
   const delivery = record(source['delivery'], 'Delivery customer snapshot');
   const customerContactId =
@@ -371,6 +433,10 @@ function parsePayment(value: unknown): PaymentPart {
     source['reference'] === undefined
       ? undefined
       : nullableString(source['reference'], 'payment reference');
+  const manuallyConfirmed = optionalBoolean(
+    source['manuallyConfirmed'],
+    'payment manuallyConfirmed',
+  );
   const identity = {
     id: entityId<PaymentId>(source['id'], 'payment id'),
     method: {
@@ -384,6 +450,7 @@ function parsePayment(value: unknown): PaymentPart {
     },
     allocatedMinor: money(source['allocatedMinor'], 'payment allocatedMinor'),
     ...(reference === undefined ? {} : { reference }),
+    ...(manuallyConfirmed === undefined ? {} : { manuallyConfirmed }),
   };
   if (logicType === 'CASH') {
     if (source['receivedMinor'] === null || source['changeMinor'] === null) {

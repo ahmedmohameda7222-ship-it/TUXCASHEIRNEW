@@ -19,6 +19,11 @@ type CancellationSubmission = {
   readonly reasonCodeId?: string;
   readonly note?: string;
 };
+type ReturnSubmission = {
+  readonly reason: string;
+  readonly reasonCodeId?: string;
+  readonly note?: string;
+};
 
 const TABS: readonly { status: BoardTab; label: string }[] = [
   { status: 'ACTIVE', label: 'Active' },
@@ -405,15 +410,24 @@ function CancelDialog({
 function ReturnDialog({
   order,
   busy,
+  reasonMode,
+  reasons,
   onClose,
   onConfirm,
 }: {
   readonly order: OrderSnapshot;
   readonly busy: boolean;
+  readonly reasonMode: CancellationReasonMode;
+  readonly reasons: readonly CancellationReasonOption[];
   readonly onClose: () => void;
-  readonly onConfirm: (reason: string) => Promise<void>;
+  readonly onConfirm: (submission: ReturnSubmission) => Promise<void>;
 }) {
-  const [reason, setReason] = useState('');
+  const [selectedReasonId, setSelectedReasonId] = useState('');
+  const [legacyReason, setLegacyReason] = useState('');
+  const [note, setNote] = useState('');
+  const selectedReason = reasons.find((reason) => reason.id === selectedReasonId);
+  const configured = reasonMode === 'CONFIGURED';
+  const validReason = configured ? selectedReason !== undefined : legacyReason.trim().length > 0;
   return (
     <div className="modal-backdrop">
       <section
@@ -435,19 +449,63 @@ function ReturnDialog({
           This records no collected payment, no recognized revenue, no inventory restoration, and
           creates the locked Delivery Failed expense event.
         </p>
-        <label>
-          Reason
-          <textarea
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            maxLength={240}
-          />
-        </label>
+        {configured ? (
+          <>
+            <label>
+              Reason
+              <select
+                value={selectedReasonId}
+                onChange={(event) => setSelectedReasonId(event.target.value)}
+              >
+                <option value="">Select a published refund/return reason</option>
+                {reasons.map((reason) => (
+                  <option key={reason.id} value={reason.id}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {reasons.length === 0 ? (
+              <p className="board-inline-error" role="alert">
+                No active refund/return reasons are published. Delivery Failed is locked until Admin
+                publishes one.
+              </p>
+            ) : null}
+            <label>
+              Note (optional)
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                maxLength={240}
+              />
+            </label>
+          </>
+        ) : (
+          <label>
+            Reason
+            <textarea
+              value={legacyReason}
+              onChange={(event) => setLegacyReason(event.target.value)}
+              maxLength={240}
+            />
+          </label>
+        )}
         <button
           className="board-danger-button"
           type="button"
-          disabled={busy || reason.trim().length === 0}
-          onClick={() => void onConfirm(reason)}
+          disabled={busy || !validReason}
+          onClick={() => {
+            if (configured) {
+              if (selectedReason === undefined) return;
+              void onConfirm({
+                reason: selectedReason.label,
+                reasonCodeId: selectedReason.id,
+                ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+              });
+              return;
+            }
+            void onConfirm({ reason: legacyReason.trim() });
+          }}
         >
           Confirm Delivery Failed
         </button>
@@ -478,6 +536,9 @@ export function OrdersBoardWorkspace({
   const [cancellationReasons, setCancellationReasons] = useState<
     readonly CancellationReasonOption[]
   >([]);
+  const [returnReasonMode, setReturnReasonMode] =
+    useState<CancellationReasonMode>('LEGACY_FREE_TEXT');
+  const [returnReasons, setReturnReasons] = useState<readonly CancellationReasonOption[]>([]);
   const [tab, setTab] = useState<BoardTab>('ACTIVE');
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
@@ -499,6 +560,8 @@ export function OrdersBoardWorkspace({
     setOrders(result.value.orders);
     setCancellationReasonMode(result.value.cancellationReasonMode);
     setCancellationReasons(result.value.cancellationReasons);
+    setReturnReasonMode(result.value.returnReasonMode);
+    setReturnReasons(result.value.returnReasons);
     setError(null);
     setSelected((current) =>
       current === null
@@ -786,10 +849,12 @@ export function OrdersBoardWorkspace({
         <ReturnDialog
           order={returnTarget}
           busy={busy}
+          reasonMode={returnReasonMode}
+          reasons={returnReasons}
           onClose={() => setReturnTarget(null)}
-          onConfirm={async (reason) => {
+          onConfirm={async (submission) => {
             const changed = await mutate(
-              () => client.returnDelivery({ orderId: returnTarget.id, reason }),
+              () => client.returnDelivery({ orderId: returnTarget.id, ...submission }),
               `Order #${returnTarget.displayOrderNo} marked Delivery Failed.`,
             );
             if (changed) {

@@ -10,9 +10,8 @@ const syncSource = readFileSync(
 
 describe('required non-delivery customer phone persistence', () => {
   it('keeps validated pickup/take-away phone authority in the immutable fulfillment snapshot', () => {
-    expect(modelsSource).toContain('readonly customerPhone:');
-    expect(ordersSource).toContain('customerPhone:');
-    expect(ordersSource).toContain('normalizedPhone: input.normalizedDeliveryPhone');
+    expect(modelsSource).toContain('readonly customerPhone?: string;');
+    expect(ordersSource).toContain('customerPhone: normalizedDeliveryPhone');
     expect(syncSource).toContain("source['customerPhone']");
   });
 });

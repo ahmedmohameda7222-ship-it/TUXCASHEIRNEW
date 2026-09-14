@@ -59,6 +59,8 @@ export interface OrdersBoardSnapshot {
   readonly orders: readonly OrderSnapshot[];
   readonly cancellationReasonMode: 'CONFIGURED' | 'LEGACY_FREE_TEXT';
   readonly cancellationReasons: readonly CancellationReasonOption[];
+  readonly returnReasonMode: 'CONFIGURED' | 'LEGACY_FREE_TEXT';
+  readonly returnReasons: readonly CancellationReasonOption[];
 }
 
 export interface CancelOrderInput {
@@ -74,7 +76,12 @@ export interface CancelOrderInput {
 
 export interface ReturnDeliveryInput {
   readonly orderId: OrderId;
+  /** Legacy free-text fallback for genuinely pre-feature configuration snapshots only. */
   readonly reason: string;
+  /** Stable published reason identity required once REFUND_RETURN configuration exists. */
+  readonly reasonCodeId?: string;
+  /** Operator context only; never the canonical reason authority. */
+  readonly note?: string;
 }
 
 export type OrdersBoardResult = Result<OrdersBoardSnapshot, ApplicationError>;
@@ -145,7 +152,17 @@ export class OperationsOrdersBoardService {
               version: reason.version,
               scope: reason.scope,
             }));
+          const returnReasons: CancellationReasonOption[] = reasonCodes
+            .filter((reason) => reason.active && reason.family === 'REFUND_RETURN')
+            .map((reason) => ({
+              id: reason.id,
+              key: reason.key,
+              label: reason.label,
+              version: reason.version,
+              scope: reason.scope,
+            }));
           const configuredReasonAuthority = cancellationReasons.length > 0;
+          const configuredReturnReasonAuthority = returnReasons.length > 0;
           return {
             shopId: shop.id,
             businessDayId: day.id,
@@ -153,6 +170,8 @@ export class OperationsOrdersBoardService {
             orders,
             cancellationReasonMode: configuredReasonAuthority ? 'CONFIGURED' : 'LEGACY_FREE_TEXT',
             cancellationReasons,
+            returnReasonMode: configuredReturnReasonAuthority ? 'CONFIGURED' : 'LEGACY_FREE_TEXT',
+            returnReasons,
           } satisfies OrdersBoardSnapshot;
         });
         return snapshot === null
@@ -324,11 +343,46 @@ export class OperationsOrdersBoardService {
   async returnDelivery(input: ReturnDeliveryInput): Promise<OrderTransitionResult> {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, input.orderId);
+      const configuration = await transaction.configuration.getForShop(context.shopId);
+      const reasonCodes = configuration?.reasonCodes ?? [];
+      const configuredReturnReasons = reasonCodes.filter(
+        (candidate) => candidate.active && candidate.family === 'REFUND_RETURN',
+      );
+      const configuredReasonAuthority = configuredReturnReasons.length > 0;
+
+      if (configuredReasonAuthority && input.reasonCodeId === undefined) {
+        throw new DomainInvariantError(
+          'A published refund/return reason is required for this configuration.',
+        );
+      }
+
+      let reasonCode: OrderReasonCodeSnapshot | undefined;
+      if (input.reasonCodeId !== undefined) {
+        const configured = configuredReturnReasons.find(
+          (candidate) => candidate.id === input.reasonCodeId,
+        );
+        if (configured === undefined) {
+          throw new DomainInvariantError(
+            'The selected refund/return reason is not active in the published configuration.',
+          );
+        }
+        reasonCode = {
+          id: configured.id,
+          key: configured.key,
+          family: configured.family,
+          label: configured.label,
+          version: configured.version,
+          scope: configured.scope,
+        };
+      }
+
       const updated = returnFailedDelivery(order, {
         at: now,
         workerId: context.operator.id,
         workerName: context.operator.displayName,
-        reason: input.reason,
+        reason: reasonCode?.label ?? input.reason,
+        ...(reasonCode !== undefined ? { reasonCode } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
       });
       const returned = orderLifecycle(updated).returned;
       if (returned === null) throw new Error('Returned Delivery is missing return metadata.');
@@ -360,6 +414,13 @@ export class OperationsOrdersBoardService {
       await transaction.audit.append(
         this.#audit(updated, context.operator, now, 'DELIVERY_RETURNED', {
           reason: returned.reason,
+          ...(returned.reasonCode === undefined
+            ? {}
+            : {
+                reasonCodeId: returned.reasonCode.id,
+                reasonCodeKey: returned.reasonCode.key,
+                reasonCodeVersion: returned.reasonCode.version,
+              }),
           historicalOrderTotalMinor: order.totalMinor,
           recognizedRevenueMinor: ZERO_MONEY,
           collectedPaymentMinor: ZERO_MONEY,

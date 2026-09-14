@@ -260,6 +260,7 @@ export function OrdersCart({
         methodId: method.id,
         cashReceivedMinor: null,
         reference: null,
+        manuallyConfirmed: false,
       },
     }));
   }
@@ -277,6 +278,8 @@ export function OrdersCart({
         methodBId: methodB.id,
         referenceA: null,
         referenceB: null,
+        manuallyConfirmedA: false,
+        manuallyConfirmedB: false,
       },
     }));
   }
@@ -667,6 +670,24 @@ export function OrdersCart({
                         }
                       />
                     ) : null}
+                    {methodById(methods, draft.payment.methodId)?.manualConfirmationRequired ? (
+                      <label className="payment-confirmation">
+                        <input
+                          type="checkbox"
+                          checked={draft.payment.manuallyConfirmed ?? false}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const manuallyConfirmed = event.currentTarget.checked;
+                            onMutate((current) =>
+                              current.payment.mode === 'SINGLE'
+                                ? { ...current, payment: { ...current.payment, manuallyConfirmed } }
+                                : current,
+                            );
+                          }}
+                        />
+                        <span>Payment manually confirmed</span>
+                      </label>
+                    ) : null}
                   </>
                 ) : null}
               </>
@@ -695,6 +716,8 @@ export function OrdersCart({
                                   : current.payment.methodBId,
                               referenceA: null,
                               referenceB: null,
+                              manuallyConfirmedA: false,
+                              manuallyConfirmedB: false,
                             },
                           };
                         });
@@ -735,6 +758,24 @@ export function OrdersCart({
                       }
                     />
                   ) : null}
+                  {methodById(methods, draft.payment.methodAId)?.manualConfirmationRequired ? (
+                    <label className="payment-confirmation">
+                      <input
+                        type="checkbox"
+                        checked={draft.payment.manuallyConfirmedA ?? false}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const manuallyConfirmedA = event.currentTarget.checked;
+                          onMutate((current) =>
+                            current.payment.mode === 'SPLIT'
+                              ? { ...current, payment: { ...current.payment, manuallyConfirmedA } }
+                              : current,
+                          );
+                        }}
+                      />
+                      <span>Method A manually confirmed</span>
+                    </label>
+                  ) : null}
                 </div>
 
                 <div className="split-method-block">
@@ -760,6 +801,8 @@ export function OrdersCart({
                                   : current.payment.methodAId,
                               referenceA: null,
                               referenceB: null,
+                              manuallyConfirmedA: false,
+                              manuallyConfirmedB: false,
                             },
                           };
                         });
@@ -796,6 +839,24 @@ export function OrdersCart({
                         )
                       }
                     />
+                  ) : null}
+                  {methodById(methods, draft.payment.methodBId)?.manualConfirmationRequired ? (
+                    <label className="payment-confirmation">
+                      <input
+                        type="checkbox"
+                        checked={draft.payment.manuallyConfirmedB ?? false}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const manuallyConfirmedB = event.currentTarget.checked;
+                          onMutate((current) =>
+                            current.payment.mode === 'SPLIT'
+                              ? { ...current, payment: { ...current.payment, manuallyConfirmedB } }
+                              : current,
+                          );
+                        }}
+                      />
+                      <span>Method B manually confirmed</span>
+                    </label>
                   ) : null}
                 </div>
 

@@ -991,6 +991,7 @@ export class OperationsOrdersService {
         orderTypeId: orderType.id,
         orderTypeLabel: orderType.name,
         behavior: orderType.behavior,
+        customerPhone: normalizedDeliveryPhone ?? '',
         delivery: null,
       };
     }
@@ -1033,6 +1034,7 @@ export class OperationsOrdersService {
           receivedMinor: part.receivedMinor,
           changeMinor: part.changeMinor,
           reference: part.reference,
+          manuallyConfirmed: part.manuallyConfirmed,
         };
       }
       return {
@@ -1042,6 +1044,7 @@ export class OperationsOrdersService {
         receivedMinor: null,
         changeMinor: null,
         reference: part.reference,
+        manuallyConfirmed: part.manuallyConfirmed,
       };
     });
   }

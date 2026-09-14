@@ -60,7 +60,7 @@ const workspace: AdminSettingsWorkspace = {
 };
 
 describe('Settings client CAS command builders', () => {
-  it('derives order type CAS versions from the latest loaded workspace', () => {
+  it('uses form-captured order type CAS versions', () => {
     expect(
       buildOrderTypeUpdateCommand(shopId, workspace, {
         orderTypeId: workspace.orderTypes[0]!.id,
@@ -68,6 +68,8 @@ describe('Settings client CAS command builders', () => {
         behavior: 'TAKE_AWAY',
         active: false,
         sortOrder: 20,
+        expectedSettingsVersion: 7,
+        expectedEditVersion: 3,
       }),
     ).toEqual({
       type: 'order-type.update',
@@ -82,7 +84,7 @@ describe('Settings client CAS command builders', () => {
     });
   });
 
-  it('derives payment CAS versions while dropping protected operational semantics', () => {
+  it('uses form-captured payment CAS versions while dropping protected operational semantics', () => {
     const command = buildPaymentMethodUpdateCommand(shopId, workspace, {
       paymentMethodId: workspace.paymentMethods[0]!.id,
       displayName: 'Front Cash',
@@ -92,6 +94,8 @@ describe('Settings client CAS command builders', () => {
       requiresReference: true,
       manualConfirmationRequired: true,
       refundAllowed: false,
+      expectedSettingsVersion: 7,
+      expectedEditVersion: 5,
       logicType: 'CARD',
       requiresReconciliation: false,
     } as never);
@@ -173,6 +177,8 @@ describe('Settings client CAS command builders', () => {
         behavior: 'OTHER',
         active: true,
         sortOrder: 0,
+        expectedSettingsVersion: 7,
+        expectedEditVersion: 0,
       }),
     ).toThrowError(new SettingsUiError('order_type_not_loaded'));
 
@@ -186,6 +192,8 @@ describe('Settings client CAS command builders', () => {
         requiresReference: false,
         manualConfirmationRequired: false,
         refundAllowed: false,
+        expectedSettingsVersion: 7,
+        expectedEditVersion: 0,
       }),
     ).toThrowError(new SettingsUiError('payment_method_not_loaded'));
   });

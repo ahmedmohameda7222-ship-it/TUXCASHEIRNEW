@@ -7,6 +7,17 @@ if (!fs.existsSync(migrationPath)) {
   throw new Error(`Plan 2 second-review hardening migration is missing: ${migrationPath}`);
 }
 const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
+const safePriceMigrationPath =
+  'supabase/migrations/20260910121300_admin_plan2_safe_price_hardening.sql';
+if (!fs.existsSync(safePriceMigrationPath)) {
+  throw new Error(`Plan 2 safe-price hardening migration is missing: ${safePriceMigrationPath}`);
+}
+const safePriceSql = fs.readFileSync(safePriceMigrationPath, 'utf8').toLowerCase();
+for (const fragment of ['validate_admin_catalog_safe_prices_v1', '9007199254740991']) {
+  if (!safePriceSql.includes(fragment)) {
+    throw new Error(`Plan 2 safe-price hardening missing ${fragment}`);
+  }
+}
 for (const fragment of [
   'publish_admin_catalog_configuration_v1',
   'restore_catalog_publish_version_v1',
@@ -104,6 +115,7 @@ declare
   v_latest jsonb;
   v_rule_id uuid;
   v_restore_denied boolean := false;
+  v_unsafe_price_denied boolean := false;
   v_name text;
   v_edit_version bigint;
   v_manual_sold_out boolean;
@@ -176,6 +188,33 @@ begin
   end if;
   v_draft_id := (v_create ->> 'draftId')::uuid;
   v_bundle := v_create -> 'bundleJson';
+
+  begin
+    perform public.apply_catalog_draft_change_v1(
+      '${ownerId}',
+      v_draft_id,
+      1,
+      jsonb_build_object(
+        'bundleJson',
+        jsonb_set(
+          v_bundle,
+          '{snapshot,modifiers,0,priceMinor}',
+          '9007199254740992'::jsonb,
+          false
+        )
+      )
+    );
+  exception when others then
+    if sqlerrm like '%TUX_ADMIN_CATALOG_PRICE_OUT_OF_SAFE_RANGE%' then
+      v_unsafe_price_denied := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_unsafe_price_denied then
+    raise exception 'catalog draft accepted a modifier price above Number.MAX_SAFE_INTEGER';
+  end if;
+
   v_bundle := jsonb_set(v_bundle, '{snapshot,modifiers,0,priceMinor}', '250'::jsonb, false);
   v_apply := public.apply_catalog_draft_change_v1(
     '${ownerId}', v_draft_id, 1, jsonb_build_object('bundleJson', v_bundle)
