@@ -77,8 +77,13 @@ export function CatalogPage() {
     return catalog.products[0] ?? null;
   }, [catalog.products, selectedProductId, unsavedProduct]);
 
-  const actionError = mutationMessage(catalog.saveProduct.error ?? catalog.setAvailability.error);
-  const busy = catalog.saveProduct.isPending || catalog.setAvailability.isPending;
+  const actionError = mutationMessage(
+    catalog.prepareProductDraft.error ?? catalog.saveProduct.error ?? catalog.setAvailability.error,
+  );
+  const busy =
+    catalog.prepareProductDraft.isPending ||
+    catalog.saveProduct.isPending ||
+    catalog.setAvailability.isPending;
 
   function openProduct(productId: string) {
     setUnsavedProduct(null);
@@ -222,7 +227,11 @@ export function CatalogPage() {
               canPrice={canPrice}
               busy={busy}
               draftRevision={catalog.activeDraft?.draftRevision ?? null}
+              advancedBundle={catalog.activeDraft?.bundleJson ?? null}
               onClose={closeEditor}
+              onRequestAdvanced={async () => {
+                await catalog.prepareProductDraft.mutateAsync(selectedProduct);
+              }}
               onSaveDraft={async (draft) => {
                 await catalog.saveProduct.mutateAsync(draft);
                 setUnsavedProduct(null);
