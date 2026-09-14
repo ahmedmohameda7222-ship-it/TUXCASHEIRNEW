@@ -401,8 +401,8 @@ export function prepareOnlineOrderAcceptanceDraft(
       fail('Pickup fulfillment cannot invent Delivery authority.');
     }
     delivery = {
-      displayPhone: '',
-      normalizedPhone: '',
+      displayPhone: request.normalizedPhone ?? '',
+      normalizedPhone: request.normalizedPhone ?? '',
       customerName: '',
       address: '',
       zoneId: null,
