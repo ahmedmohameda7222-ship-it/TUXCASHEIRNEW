@@ -19,48 +19,38 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path('packages/domain/src/models.ts')
           text = p.read_text()
-          replacements = [
-            ("""  /** Present on new payments; omitted by legacy persisted snapshots. */
-            readonly reference?: string | null;
-          };
-          """, """  /** Present on new payments; omitted by legacy persisted snapshots. */
-            readonly reference?: string | null;
-            /** Present on new payments; omitted by legacy persisted snapshots. */
-            readonly manuallyConfirmed?: boolean;
-          };
-          """, 2),
-            ("""      readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
-                  readonly delivery: null;
-          """, """      readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
-                  /** Present for new non-delivery orders when customer phone is required/captured. */
-                  readonly customerPhone?: string;
-                  readonly delivery: null;
-          """, 1),
-            ("""export interface OrderReturnSnapshot {
-            readonly at: Instant;
-            readonly workerId: WorkerId;
-            readonly workerName: string;
-            readonly reason: string;
-          }
-          """, """export interface OrderReturnSnapshot {
-            readonly at: Instant;
-            readonly workerId: WorkerId;
-            readonly workerName: string;
-            readonly reason: string;
-            /** Present for configured future mutations; absent on legacy returns. */
-            readonly reasonCode?: OrderReasonCodeSnapshot;
-            /** Optional operator context; never the reason authority. */
-            readonly note?: string;
-          }
-          """, 1),
-          ]
-          for old, new, expected in replacements:
-              count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f'model matcher expected {expected}, found {count}')
-              text = text.replace(old, new)
+
+          text, count = re.subn(
+              r"(\/\*\* Present on new payments; omitted by legacy persisted snapshots\. \*\/\s+readonly reference\?: string \| null;)(\s+\};)",
+              r"\1\n  /** Present on new payments; omitted by legacy persisted snapshots. */\n  readonly manuallyConfirmed?: boolean;\2",
+              text,
+          )
+          if count != 2:
+              raise SystemExit(f'payment evidence matcher expected 2, found {count}')
+
+          text, count = re.subn(
+              r"(readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;)(\s+readonly delivery: null;)",
+              r"\1\n      /** Present for new non-delivery orders when customer phone is required/captured. */\n      readonly customerPhone?: string;\2",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'customer phone matcher expected 1, found {count}')
+
+          pattern = r"(export interface OrderReturnSnapshot \{\s+readonly at: Instant;\s+readonly workerId: WorkerId;\s+readonly workerName: string;\s+readonly reason: string;)(\s+\})"
+          text, count = re.subn(
+              pattern,
+              r"\1\n  /** Present for configured future mutations; absent on legacy returns. */\n  readonly reasonCode?: OrderReasonCodeSnapshot;\n  /** Optional operator context; never the reason authority. */\n  readonly note?: string;\2",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'return evidence matcher expected 1, found {count}')
+
           p.write_text(text)
           PY
       - name: Commit model schema
