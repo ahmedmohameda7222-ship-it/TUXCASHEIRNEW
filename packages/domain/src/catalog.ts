@@ -8,11 +8,16 @@ import type {
   PaymentMethodId,
   ProductId,
   ShopId,
-} from './ids';
-import type { MoneyMinor } from './money';
-import type { OrderTypeBehavior, PaymentLogicType } from './models';
-import type { StockQuantityMicros } from './quantity';
-import type { Instant } from './time';
+} from './ids.ts';
+import type { MoneyMinor } from './money.ts';
+import type { OrderTypeBehavior, PaymentLogicType } from './models.ts';
+import type { StockQuantityMicros } from './quantity.ts';
+import type {
+  ConfiguredReasonCode,
+  OperationsPublishedSettings,
+  PaymentMethodChannel,
+} from './settings.ts';
+import type { Instant } from './time.ts';
 
 export interface MenuCategory {
   readonly id: MenuCategoryId;
@@ -95,6 +100,12 @@ export interface PaymentMethod {
   readonly requiresReconciliation: boolean;
   readonly active: boolean;
   readonly sortOrder: number;
+  /** Additive Admin settings fields. Legacy constructors may omit them; parser output always fills defaults. */
+  readonly channel?: PaymentMethodChannel;
+  readonly requiresReference?: boolean;
+  readonly manualConfirmationRequired?: boolean;
+  readonly refundAllowed?: boolean;
+  readonly integrationReference?: string | null;
 }
 
 export interface DeliveryZone {
@@ -119,6 +130,10 @@ export interface OperationsConfigurationSnapshot {
   readonly orderTypes: readonly OrderType[];
   readonly paymentMethods: readonly PaymentMethod[];
   readonly deliveryZones: readonly DeliveryZone[];
+  /** Optional at the type boundary for legacy source compatibility; parser output normalizes absence to null. */
+  readonly settings?: OperationsPublishedSettings | null;
+  /** Optional at the type boundary for legacy source compatibility; parser output normalizes absence to []. */
+  readonly reasonCodes?: readonly ConfiguredReasonCode[];
 }
 
 export interface CustomerContact {

@@ -1,4 +1,4 @@
-import type { BusinessDayId } from './businessDay';
+import type { BusinessDayId } from './businessDay.ts';
 import type {
   AuditEventId,
   CustomerContactId,
@@ -19,11 +19,12 @@ import type {
   ShopId,
   WorkerId,
   WorkerSessionId,
-} from './ids';
-import type { JsonValue } from './json';
-import type { MoneyMinor } from './money';
-import type { StockQuantityMicros } from './quantity';
-import type { Instant } from './time';
+} from './ids.ts';
+import type { JsonValue } from './json.ts';
+import type { ConfiguredReasonFamily, PaymentMethodChannel } from './settings.ts';
+import type { MoneyMinor } from './money.ts';
+import type { StockQuantityMicros } from './quantity.ts';
+import type { Instant } from './time.ts';
 
 export interface Shop {
   readonly id: ShopId;
@@ -70,6 +71,11 @@ export interface PaymentMethodSnapshot {
   readonly id: PaymentMethodId;
   readonly label: string;
   readonly logicType: PaymentLogicType;
+  /** Present for orders created after Admin checkout-rule adoption. */
+  readonly channel?: PaymentMethodChannel;
+  readonly requiresReference?: boolean;
+  readonly manualConfirmationRequired?: boolean;
+  readonly refundAllowed?: boolean;
 }
 
 export type CashPaymentPart = {
@@ -78,6 +84,10 @@ export type CashPaymentPart = {
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor;
   readonly changeMinor: MoneyMinor;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly reference?: string | null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly manuallyConfirmed?: boolean;
 };
 
 export type NonCashPaymentPart = {
@@ -88,6 +98,10 @@ export type NonCashPaymentPart = {
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: null;
   readonly changeMinor: null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly reference?: string | null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly manuallyConfirmed?: boolean;
 };
 
 export type PaymentPart = CashPaymentPart | NonCashPaymentPart;
@@ -125,6 +139,8 @@ interface FulfillmentBase {
 export type OrderFulfillmentSnapshot =
   | (FulfillmentBase & {
       readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
+      /** Present for new non-delivery orders when customer phone is required/captured. */
+      readonly customerPhone?: string;
       readonly delivery: null;
     })
   | (FulfillmentBase & {
@@ -144,6 +160,18 @@ export type OrderFulfillmentSnapshot =
 export type OrderStatus = 'ACTIVE' | 'DONE' | 'CANCELLED' | 'RETURNED';
 export type OrderSource = 'POS' | 'ONLINE';
 
+export interface ReasonCodeSnapshot {
+  readonly id: string;
+  readonly key: string;
+  readonly family: ConfiguredReasonFamily;
+  readonly label: string;
+  readonly version: number;
+  readonly scope: 'BUSINESS' | 'SHOP';
+}
+
+/** Backwards-compatible order-specific name retained for existing consumers. */
+export type OrderReasonCodeSnapshot = ReasonCodeSnapshot;
+
 export interface OrderCancellationSnapshot {
   readonly at: Instant;
   readonly workerId: WorkerId;
@@ -151,6 +179,10 @@ export interface OrderCancellationSnapshot {
   readonly foodPrepared: boolean;
   readonly stockRestored: boolean;
   readonly reason: string;
+  /** Present for configured future mutations; absent on legacy cancellations. */
+  readonly reasonCode?: OrderReasonCodeSnapshot;
+  /** Optional operator context; never the reason authority. */
+  readonly note?: string;
 }
 
 export interface OrderReturnSnapshot {
@@ -158,6 +190,10 @@ export interface OrderReturnSnapshot {
   readonly workerId: WorkerId;
   readonly workerName: string;
   readonly reason: string;
+  /** Present for configured future mutations; absent on legacy returns. */
+  readonly reasonCode?: OrderReasonCodeSnapshot;
+  /** Optional operator context; never the reason authority. */
+  readonly note?: string;
 }
 
 export interface OrderLifecycleSnapshot {
@@ -167,11 +203,50 @@ export interface OrderLifecycleSnapshot {
   readonly returned: OrderReturnSnapshot | null;
 }
 
+export interface OrderReceiptSnapshot {
+  readonly configurationVersion: number;
+  readonly shopDisplayName: string;
+  readonly address: string | null;
+  readonly contactPhone: string | null;
+  readonly footer: string | null;
+  readonly orderNumberPrefix: string;
+}
+
+export interface OrderCheckoutPaymentRuleSnapshot {
+  readonly paymentMethodId: PaymentMethodId;
+  readonly channel: PaymentMethodChannel;
+  readonly deliveryZoneId: DeliveryZoneId | null;
+  readonly zoneAllowed: boolean;
+}
+
+export interface OrderCheckoutSnapshot {
+  readonly configurationVersion: number;
+  readonly settingsVersion: number | null;
+  readonly channel: OrderSource;
+  readonly minimumOrderMinor: MoneyMinor;
+  readonly minimumOrderSatisfied: boolean;
+  /** Present on new checkout snapshots; omitted by legacy persisted orders. */
+  readonly allowDiscountStacking?: boolean;
+  /** Present on new checkout snapshots; omitted by legacy persisted orders. */
+  readonly allowDeliveryFeeOverride?: boolean;
+  readonly serviceChargeBps: number;
+  readonly serviceChargeMinor: MoneyMinor;
+  readonly taxBps: number;
+  readonly taxMinor: MoneyMinor;
+  readonly deliveryFeeMinor: MoneyMinor;
+  readonly discountMinor: MoneyMinor;
+  readonly paymentRules: readonly OrderCheckoutPaymentRuleSnapshot[];
+}
+
 export interface OrderSnapshot {
   readonly id: OrderId;
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
   readonly displayOrderNo: number;
+  /** Immutable configured identity for orders created after receipt settings adoption. */
+  readonly displayOrderLabel?: string;
+  /** Optional for backwards compatibility with legacy persisted orders. */
+  readonly receiptSnapshot?: OrderReceiptSnapshot;
   readonly idempotencyKey: string;
   readonly status: OrderStatus;
   readonly lifecycle?: OrderLifecycleSnapshot;
@@ -185,6 +260,10 @@ export interface OrderSnapshot {
   readonly itemsSubtotalMinor: MoneyMinor;
   readonly discountMinor: MoneyMinor;
   readonly deliveryFeeMinor: MoneyMinor;
+  /** Optional on legacy orders; all new checkout-policy-aware orders persist these values. */
+  readonly serviceChargeMinor?: MoneyMinor;
+  readonly taxMinor?: MoneyMinor;
+  readonly checkoutSnapshot?: OrderCheckoutSnapshot;
   readonly totalMinor: MoneyMinor;
   readonly payments: readonly PaymentPart[];
 }
@@ -259,6 +338,8 @@ export interface ReconciliationLine {
   readonly actualMinor: MoneyMinor;
   readonly differenceMinor: MoneyMinor;
   readonly varianceReason: string | null;
+  /** Present when a published CASH_VARIANCE reason code was authoritative. */
+  readonly varianceReasonCode?: ReasonCodeSnapshot;
 }
 
 export interface Reconciliation {

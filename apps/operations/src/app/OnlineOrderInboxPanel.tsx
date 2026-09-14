@@ -63,6 +63,12 @@ function parseMinorInput(value: string): MoneyMinor | null {
   return Number.isSafeInteger(minor) ? moneyMinor(minor) : null;
 }
 
+function minorInput(minor: MoneyMinor): string {
+  const whole = Math.floor(minor / 100);
+  const fraction = String(minor % 100).padStart(2, '0');
+  return fraction === '00' ? String(whole) : `${whole}.${fraction}`;
+}
+
 function fulfillmentLabel(request: CachedOnlineOrderRequest): string {
   return request.fulfillmentPreference === 'DELIVERY' ? 'Delivery' : 'Pickup';
 }
@@ -244,6 +250,8 @@ function OnlineOrderAcceptanceForm({
   const [finalDeliveryFee, setFinalDeliveryFee] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [cashReceived, setCashReceived] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [manuallyConfirmed, setManuallyConfirmed] = useState(false);
 
   const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
   const orderTypes = workspace.configuration.orderTypes.filter(
@@ -254,6 +262,8 @@ function OnlineOrderAcceptanceForm({
   const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;
   const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;
+  const allowDeliveryFeeOverride =
+    workspace.configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
   const finalFeeMinor =
     request.fulfillmentPreference === 'DELIVERY' ? parseMinorInput(finalDeliveryFee) : null;
   const cashReceivedMinor =
@@ -263,7 +273,9 @@ function OnlineOrderAcceptanceForm({
     request.fulfillmentPreference === 'PICKUP' || (selectedZone !== null && finalFeeMinor !== null);
   const paymentReady =
     selectedPayment !== null &&
-    (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null);
+    (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null) &&
+    (!selectedPayment.requiresReference || paymentReference.trim().length > 0) &&
+    (!selectedPayment.manualConfirmationRequired || manuallyConfirmed);
   const canSubmit = selectedOrderType !== null && deliveryReady && paymentReady && !busy;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
@@ -278,6 +290,8 @@ function OnlineOrderAcceptanceForm({
         mode: 'SINGLE',
         methodId: selectedPayment.id,
         cashReceivedMinor: selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
+        reference: selectedPayment.requiresReference ? paymentReference : null,
+        manuallyConfirmed: selectedPayment.manualConfirmationRequired ? manuallyConfirmed : false,
       },
     };
     void onAccept(request, confirmation);
@@ -314,7 +328,12 @@ function OnlineOrderAcceptanceForm({
               <select
                 aria-label="Delivery zone"
                 value={deliveryZoneId}
-                onChange={(event) => setDeliveryZoneId(event.target.value)}
+                onChange={(event) => {
+                  const nextZoneId = event.target.value;
+                  setDeliveryZoneId(nextZoneId);
+                  const nextZone = deliveryZones.find((zone) => zone.id === nextZoneId);
+                  setFinalDeliveryFee(nextZone === undefined ? '' : minorInput(nextZone.feeMinor));
+                }}
               >
                 <option value="">Select current zone</option>
                 {deliveryZones.map((zone) => (
@@ -330,6 +349,7 @@ function OnlineOrderAcceptanceForm({
                 inputMode="decimal"
                 placeholder="EGP"
                 value={finalDeliveryFee}
+                disabled={busy || !allowDeliveryFeeOverride}
                 onChange={(event) => setFinalDeliveryFee(event.target.value)}
               />
             </label>
@@ -343,6 +363,8 @@ function OnlineOrderAcceptanceForm({
             onChange={(event) => {
               setPaymentMethodId(event.target.value);
               setCashReceived('');
+              setPaymentReference('');
+              setManuallyConfirmed(false);
             }}
           >
             <option value="">Select authoritative payment</option>
@@ -362,6 +384,28 @@ function OnlineOrderAcceptanceForm({
               value={cashReceived}
               onChange={(event) => setCashReceived(event.target.value)}
             />
+          </label>
+        ) : null}
+        {selectedPayment?.requiresReference ? (
+          <label>
+            Payment reference
+            <input
+              type="text"
+              maxLength={200}
+              placeholder="Transaction or provider reference"
+              value={paymentReference}
+              onChange={(event) => setPaymentReference(event.target.value)}
+            />
+          </label>
+        ) : null}
+        {selectedPayment?.manualConfirmationRequired ? (
+          <label className="payment-confirmation">
+            <input
+              type="checkbox"
+              checked={manuallyConfirmed}
+              onChange={(event) => setManuallyConfirmed(event.currentTarget.checked)}
+            />
+            <span>Payment manually confirmed</span>
           </label>
         ) : null}
       </div>

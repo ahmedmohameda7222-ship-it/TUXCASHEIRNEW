@@ -2,10 +2,11 @@ import {
   ZERO_MONEY,
   addMoney,
   applyDeliveryZone,
+  calculateCheckoutPricing,
   calculateDraftLineTotal,
-  calculateOrderPricing,
   parseEntityId,
   preparePaymentParts,
+  resolveEffectiveCheckoutPolicy,
   subtractMoney,
   suggestCashTenders,
   type DraftLineId,
@@ -191,22 +192,35 @@ export function OrdersCart({
   const selectedOrderType =
     orderTypes.find((orderType) => orderType.id === draft.orderTypeId) ?? null;
   const delivery = selectedOrderType?.behavior === 'DELIVERY';
+  const requireCustomerPhone =
+    configuration.settings?.values['checkout.requireCustomerPhone'] === true;
+  const allowDeliveryFeeOverride =
+    configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
   const methods = activePaymentMethods(configuration);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
   );
-  const pricing = useMemo(() => {
+  const checkoutPolicy = useMemo(() => {
     try {
-      return calculateOrderPricing({
+      return resolveEffectiveCheckoutPolicy(configuration);
+    } catch {
+      return null;
+    }
+  }, [configuration]);
+  const pricing = useMemo(() => {
+    if (checkoutPolicy === null) return null;
+    try {
+      return calculateCheckoutPricing({
         lines: draft.lines,
         discountMinor: draft.discountMinor,
         deliveryFeeMinor: delivery ? draft.delivery.finalFeeMinor : ZERO_MONEY,
+        policy: checkoutPolicy,
       });
     } catch {
       return null;
     }
-  }, [delivery, draft.delivery.finalFeeMinor, draft.discountMinor, draft.lines]);
+  }, [checkoutPolicy, delivery, draft.delivery.finalFeeMinor, draft.discountMinor, draft.lines]);
 
   const preparedPayments = useMemo(() => {
     if (pricing === null) return null;
@@ -245,6 +259,8 @@ export function OrdersCart({
         mode: 'SINGLE',
         methodId: method.id,
         cashReceivedMinor: null,
+        reference: null,
+        manuallyConfirmed: false,
       },
     }));
   }
@@ -260,6 +276,10 @@ export function OrdersCart({
         methodAId: methodA.id,
         amountAMinor: ZERO_MONEY,
         methodBId: methodB.id,
+        referenceA: null,
+        referenceB: null,
+        manuallyConfirmedA: false,
+        manuallyConfirmedB: false,
       },
     }));
   }
@@ -410,12 +430,12 @@ export function OrdersCart({
           <SectionIssues issues={issues} paths={['orderType']} />
         </section>
 
-        {delivery ? (
+        {delivery || requireCustomerPhone ? (
           <section
             className="cart-section delivery-section"
             aria-labelledby={controlId('delivery-title')}
           >
-            <h2 id={controlId('delivery-title')}>Delivery</h2>
+            <h2 id={controlId('delivery-title')}>{delivery ? 'Delivery' : 'Customer'}</h2>
             <DraftTextField
               id={controlId('delivery-phone')}
               label="Phone"
@@ -424,62 +444,73 @@ export function OrdersCart({
               disabled={busy}
               onCommit={onDeliveryPhoneCommit}
             />
-            <DraftTextField
-              id={controlId('delivery-name')}
-              label="Customer name"
-              value={draft.delivery.customerName}
-              disabled={busy}
-              onCommit={(customerName) =>
-                onMutate((current) => ({
-                  ...current,
-                  delivery: { ...current.delivery, customerName },
-                }))
-              }
-            />
-            <label className="field-stack" htmlFor={controlId('delivery-zone')}>
-              <span>Zone</span>
-              <select
-                id={controlId('delivery-zone')}
-                value={draft.delivery.zoneId ?? ''}
-                disabled={busy}
-                onChange={(event) => {
-                  if (event.target.value === '') return;
-                  const zoneId = parseEntityId<NonNullable<OrderDraft['delivery']['zoneId']>>(
-                    event.target.value,
-                  );
-                  const zone = configuration.deliveryZones.find(
-                    (candidate) => candidate.id === zoneId && candidate.active,
-                  );
-                  if (zone !== undefined) onMutate((current) => applyDeliveryZone(current, zone));
-                }}
-              >
-                <option value="">Choose a zone</option>
-                {configuration.deliveryZones
-                  .filter((zone) => zone.active)
-                  .sort((left, right) => left.sortOrder - right.sortOrder)
-                  .map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name} — {formatMoneyMinor(zone.feeMinor)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <DraftTextField
-              id={controlId('delivery-address')}
-              label="Full address"
-              value={draft.delivery.address}
-              multiline
-              disabled={busy}
-              onCommit={(address) =>
-                onMutate((current) => ({
-                  ...current,
-                  delivery: { ...current.delivery, address },
-                }))
-              }
-            />
+            {delivery ? (
+              <>
+                <DraftTextField
+                  id={controlId('delivery-name')}
+                  label="Customer name"
+                  value={draft.delivery.customerName}
+                  disabled={busy}
+                  onCommit={(customerName) =>
+                    onMutate((current) => ({
+                      ...current,
+                      delivery: { ...current.delivery, customerName },
+                    }))
+                  }
+                />
+                <label className="field-stack" htmlFor={controlId('delivery-zone')}>
+                  <span>Zone</span>
+                  <select
+                    id={controlId('delivery-zone')}
+                    value={draft.delivery.zoneId ?? ''}
+                    disabled={busy}
+                    onChange={(event) => {
+                      if (event.target.value === '') return;
+                      const zoneId = parseEntityId<NonNullable<OrderDraft['delivery']['zoneId']>>(
+                        event.target.value,
+                      );
+                      const zone = configuration.deliveryZones.find(
+                        (candidate) => candidate.id === zoneId && candidate.active,
+                      );
+                      if (zone !== undefined)
+                        onMutate((current) => applyDeliveryZone(current, zone));
+                    }}
+                  >
+                    <option value="">Choose a zone</option>
+                    {configuration.deliveryZones
+                      .filter((zone) => zone.active)
+                      .sort((left, right) => left.sortOrder - right.sortOrder)
+                      .map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} — {formatMoneyMinor(zone.feeMinor)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <DraftTextField
+                  id={controlId('delivery-address')}
+                  label="Full address"
+                  value={draft.delivery.address}
+                  multiline
+                  disabled={busy}
+                  onCommit={(address) =>
+                    onMutate((current) => ({
+                      ...current,
+                      delivery: { ...current.delivery, address },
+                    }))
+                  }
+                />
+              </>
+            ) : null}
             <SectionIssues
               issues={issues}
-              paths={['delivery.phone', 'delivery.name', 'delivery.zone', 'delivery.address']}
+              paths={[
+                'delivery.phone',
+                'delivery.name',
+                'delivery.zone',
+                'delivery.address',
+                'delivery.fee',
+              ]}
             />
           </section>
         ) : null}
@@ -604,25 +635,60 @@ export function OrdersCart({
                   ) : null}
                 </div>
                 {draft.payment.mode === 'SINGLE' && pricing !== null ? (
-                  methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
-                    <CashEditor
-                      idPrefix={controlId('single')}
-                      label="Cash received"
-                      allocatedMinor={pricing.totalMinor}
-                      receivedMinor={draft.payment.cashReceivedMinor}
-                      busy={busy}
-                      onCommit={(cashReceivedMinor) =>
-                        onMutate((current) =>
-                          current.payment.mode === 'SINGLE'
-                            ? {
-                                ...current,
-                                payment: { ...current.payment, cashReceivedMinor },
-                              }
-                            : current,
-                        )
-                      }
-                    />
-                  ) : null
+                  <>
+                    {methodById(methods, draft.payment.methodId)?.logicType === 'CASH' ? (
+                      <CashEditor
+                        idPrefix={controlId('single')}
+                        label="Cash received"
+                        allocatedMinor={pricing.totalMinor}
+                        receivedMinor={draft.payment.cashReceivedMinor}
+                        busy={busy}
+                        onCommit={(cashReceivedMinor) =>
+                          onMutate((current) =>
+                            current.payment.mode === 'SINGLE'
+                              ? {
+                                  ...current,
+                                  payment: { ...current.payment, cashReceivedMinor },
+                                }
+                              : current,
+                          )
+                        }
+                      />
+                    ) : null}
+                    {methodById(methods, draft.payment.methodId)?.requiresReference ? (
+                      <DraftTextField
+                        id={controlId('single-payment-reference')}
+                        label="Payment reference"
+                        value={draft.payment.reference ?? ''}
+                        disabled={busy}
+                        onCommit={(reference) =>
+                          onMutate((current) =>
+                            current.payment.mode === 'SINGLE'
+                              ? { ...current, payment: { ...current.payment, reference } }
+                              : current,
+                          )
+                        }
+                      />
+                    ) : null}
+                    {methodById(methods, draft.payment.methodId)?.manualConfirmationRequired ? (
+                      <label className="payment-confirmation">
+                        <input
+                          type="checkbox"
+                          checked={draft.payment.manuallyConfirmed ?? false}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const manuallyConfirmed = event.currentTarget.checked;
+                            onMutate((current) =>
+                              current.payment.mode === 'SINGLE'
+                                ? { ...current, payment: { ...current.payment, manuallyConfirmed } }
+                                : current,
+                            );
+                          }}
+                        />
+                        <span>Payment manually confirmed</span>
+                      </label>
+                    ) : null}
+                  </>
                 ) : null}
               </>
             ) : pricing === null ? null : (
@@ -648,6 +714,10 @@ export function OrdersCart({
                                 current.payment.methodBId === methodAId && fallbackB !== undefined
                                   ? fallbackB.id
                                   : current.payment.methodBId,
+                              referenceA: null,
+                              referenceB: null,
+                              manuallyConfirmedA: false,
+                              manuallyConfirmedB: false,
                             },
                           };
                         });
@@ -673,6 +743,39 @@ export function OrdersCart({
                       )
                     }
                   />
+                  {methodById(methods, draft.payment.methodAId)?.requiresReference ? (
+                    <DraftTextField
+                      id={controlId('split-reference-a')}
+                      label="Payment reference A"
+                      value={draft.payment.referenceA ?? ''}
+                      disabled={busy}
+                      onCommit={(referenceA) =>
+                        onMutate((current) =>
+                          current.payment.mode === 'SPLIT'
+                            ? { ...current, payment: { ...current.payment, referenceA } }
+                            : current,
+                        )
+                      }
+                    />
+                  ) : null}
+                  {methodById(methods, draft.payment.methodAId)?.manualConfirmationRequired ? (
+                    <label className="payment-confirmation">
+                      <input
+                        type="checkbox"
+                        checked={draft.payment.manuallyConfirmedA ?? false}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const manuallyConfirmedA = event.currentTarget.checked;
+                          onMutate((current) =>
+                            current.payment.mode === 'SPLIT'
+                              ? { ...current, payment: { ...current.payment, manuallyConfirmedA } }
+                              : current,
+                          );
+                        }}
+                      />
+                      <span>Method A manually confirmed</span>
+                    </label>
+                  ) : null}
                 </div>
 
                 <div className="split-method-block">
@@ -696,6 +799,10 @@ export function OrdersCart({
                                 current.payment.methodAId === methodBId && fallbackA !== undefined
                                   ? fallbackA.id
                                   : current.payment.methodAId,
+                              referenceA: null,
+                              referenceB: null,
+                              manuallyConfirmedA: false,
+                              manuallyConfirmedB: false,
                             },
                           };
                         });
@@ -718,6 +825,39 @@ export function OrdersCart({
                         : '—'}
                     </strong>
                   </div>
+                  {methodById(methods, draft.payment.methodBId)?.requiresReference ? (
+                    <DraftTextField
+                      id={controlId('split-reference-b')}
+                      label="Payment reference B"
+                      value={draft.payment.referenceB ?? ''}
+                      disabled={busy}
+                      onCommit={(referenceB) =>
+                        onMutate((current) =>
+                          current.payment.mode === 'SPLIT'
+                            ? { ...current, payment: { ...current.payment, referenceB } }
+                            : current,
+                        )
+                      }
+                    />
+                  ) : null}
+                  {methodById(methods, draft.payment.methodBId)?.manualConfirmationRequired ? (
+                    <label className="payment-confirmation">
+                      <input
+                        type="checkbox"
+                        checked={draft.payment.manuallyConfirmedB ?? false}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const manuallyConfirmedB = event.currentTarget.checked;
+                          onMutate((current) =>
+                            current.payment.mode === 'SPLIT'
+                              ? { ...current, payment: { ...current.payment, manuallyConfirmedB } }
+                              : current,
+                          );
+                        }}
+                      />
+                      <span>Method B manually confirmed</span>
+                    </label>
+                  ) : null}
                 </div>
 
                 <button
@@ -756,7 +896,7 @@ export function OrdersCart({
                 id={controlId('delivery-fee')}
                 label="Delivery"
                 value={draft.delivery.finalFeeMinor}
-                disabled={busy}
+                disabled={busy || !allowDeliveryFeeOverride}
                 compact
                 onCommit={(finalFeeMinor) =>
                   onMutate((current) => ({
@@ -771,6 +911,18 @@ export function OrdersCart({
                   Zone reference: {formatMoneyMinor(draft.delivery.configuredFeeMinor)}
                 </span>
               )}
+            </div>
+          ) : null}
+          {pricing !== null && pricing.serviceChargeMinor > ZERO_MONEY ? (
+            <div>
+              <dt>Service charge</dt>
+              <dd>{formatMoneyMinor(pricing.serviceChargeMinor)}</dd>
+            </div>
+          ) : null}
+          {pricing !== null && pricing.taxMinor > ZERO_MONEY ? (
+            <div>
+              <dt>Tax</dt>
+              <dd>{formatMoneyMinor(pricing.taxMinor)}</dd>
             </div>
           ) : null}
           <div className="grand-total">

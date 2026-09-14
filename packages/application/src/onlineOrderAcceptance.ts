@@ -1,8 +1,10 @@
 import {
   addMoney,
+  calculateCheckoutPricing,
   moneyMinor,
   parseEntityId,
   preparePaymentParts,
+  resolveEffectiveCheckoutPolicy,
   type DeliveryZoneId,
   type DraftLineId,
   type EntityId,
@@ -281,6 +283,7 @@ function assertPaymentAuthority(
   payment: PaymentDraft,
   workspace: OrdersWorkspace,
   totalMinor: MoneyMinor,
+  deliveryZoneId: DeliveryZoneId | null,
 ): void {
   if (payment.mode === 'NONE') fail('Worker-confirmed payment authority is required.');
 
@@ -303,7 +306,11 @@ function assertPaymentAuthority(
     }
   }
 
-  preparePaymentParts(payment, workspace.configuration.paymentMethods, totalMinor);
+  preparePaymentParts(payment, workspace.configuration.paymentMethods, totalMinor, {
+    channel: 'ONLINE',
+    deliveryZoneId,
+    paymentMethodZoneRules: workspace.configuration.settings?.paymentMethodZoneRules,
+  });
 }
 
 export function prepareOnlineOrderAcceptanceDraft(
@@ -350,6 +357,7 @@ export function prepareOnlineOrderAcceptanceDraft(
     fail('The online-order trusted subtotal does not match current canonical item prices.');
   }
 
+  const checkoutPolicy = resolveEffectiveCheckoutPolicy(workspace.configuration);
   let delivery: OrderDraft['delivery'];
   let deliveryFeeMinor = moneyMinor(0);
   if (request.fulfillmentPreference === 'DELIVERY') {
@@ -371,6 +379,12 @@ export function prepareOnlineOrderAcceptanceDraft(
     );
     if (zone === undefined) fail('The worker-confirmed delivery zone is unavailable.');
     if (confirmation.finalDeliveryFeeMinor < 0) fail('The final delivery fee is invalid.');
+    if (
+      !checkoutPolicy.allowDeliveryFeeOverride &&
+      confirmation.finalDeliveryFeeMinor !== zone.feeMinor
+    ) {
+      fail('The published checkout policy requires the configured delivery zone fee.');
+    }
     deliveryFeeMinor = confirmation.finalDeliveryFeeMinor;
     delivery = {
       displayPhone: request.normalizedPhone,
@@ -387,8 +401,8 @@ export function prepareOnlineOrderAcceptanceDraft(
       fail('Pickup fulfillment cannot invent Delivery authority.');
     }
     delivery = {
-      displayPhone: '',
-      normalizedPhone: '',
+      displayPhone: request.normalizedPhone ?? '',
+      normalizedPhone: request.normalizedPhone ?? '',
       customerName: '',
       address: '',
       zoneId: null,
@@ -398,8 +412,21 @@ export function prepareOnlineOrderAcceptanceDraft(
     };
   }
 
-  const totalMinor = addMoney(reconstructedSubtotalMinor, deliveryFeeMinor);
-  assertPaymentAuthority(confirmation.payment, workspace, totalMinor);
+  const pricing = calculateCheckoutPricing({
+    lines,
+    discountMinor: moneyMinor(0),
+    deliveryFeeMinor,
+    policy: checkoutPolicy,
+  });
+  if (pricing.itemsSubtotalMinor < checkoutPolicy.minimumOrderMinor) {
+    fail('The online order does not meet the published minimum order amount.');
+  }
+  assertPaymentAuthority(
+    confirmation.payment,
+    workspace,
+    pricing.totalMinor,
+    request.fulfillmentPreference === 'DELIVERY' ? confirmation.deliveryZoneId : null,
+  );
 
   return {
     shopId: workspace.shopId,

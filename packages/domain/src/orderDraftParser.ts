@@ -47,6 +47,19 @@ function nullableString(value: unknown, path: string): string | null {
   return stringValue(value, path);
 }
 
+function optionalNullableString(value: unknown, path: string): string | null | undefined {
+  if (value === undefined) return undefined;
+  return nullableString(value, path);
+}
+
+function optionalBoolean(value: unknown, path: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new InvalidOrderDraftError(`${path} must be boolean.`);
+  }
+  return value;
+}
+
 function safeInteger(value: unknown, path: string, minimum?: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
     throw new InvalidOrderDraftError(`${path} must be a safe integer.`);
@@ -139,6 +152,11 @@ function parsePayment(value: unknown): PaymentDraft {
   const mode = stringValue(payment['mode'], 'OrderDraft.payment.mode', false);
   if (mode === 'NONE') return { mode: 'NONE' };
   if (mode === 'SINGLE') {
+    const reference = optionalNullableString(payment['reference'], 'OrderDraft.payment.reference');
+    const manuallyConfirmed = optionalBoolean(
+      payment['manuallyConfirmed'],
+      'OrderDraft.payment.manuallyConfirmed',
+    );
     return {
       mode: 'SINGLE',
       methodId: entityId<PaymentMethodId>(payment['methodId'], 'OrderDraft.payment.methodId'),
@@ -146,9 +164,27 @@ function parsePayment(value: unknown): PaymentDraft {
         payment['cashReceivedMinor'],
         'OrderDraft.payment.cashReceivedMinor',
       ),
+      ...(reference === undefined ? {} : { reference }),
+      ...(manuallyConfirmed === undefined ? {} : { manuallyConfirmed }),
     };
   }
   if (mode === 'SPLIT') {
+    const referenceA = optionalNullableString(
+      payment['referenceA'],
+      'OrderDraft.payment.referenceA',
+    );
+    const referenceB = optionalNullableString(
+      payment['referenceB'],
+      'OrderDraft.payment.referenceB',
+    );
+    const manuallyConfirmedA = optionalBoolean(
+      payment['manuallyConfirmedA'],
+      'OrderDraft.payment.manuallyConfirmedA',
+    );
+    const manuallyConfirmedB = optionalBoolean(
+      payment['manuallyConfirmedB'],
+      'OrderDraft.payment.manuallyConfirmedB',
+    );
     return {
       mode: 'SPLIT',
       methodAId: entityId<PaymentMethodId>(payment['methodAId'], 'OrderDraft.payment.methodAId'),
@@ -156,6 +192,10 @@ function parsePayment(value: unknown): PaymentDraft {
         safeInteger(payment['amountAMinor'], 'OrderDraft.payment.amountAMinor'),
       ),
       methodBId: entityId<PaymentMethodId>(payment['methodBId'], 'OrderDraft.payment.methodBId'),
+      ...(referenceA === undefined ? {} : { referenceA }),
+      ...(referenceB === undefined ? {} : { referenceB }),
+      ...(manuallyConfirmedA === undefined ? {} : { manuallyConfirmedA }),
+      ...(manuallyConfirmedB === undefined ? {} : { manuallyConfirmedB }),
     };
   }
   throw new InvalidOrderDraftError('OrderDraft.payment.mode is unsupported.');

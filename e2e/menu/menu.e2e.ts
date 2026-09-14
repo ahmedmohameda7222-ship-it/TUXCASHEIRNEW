@@ -65,7 +65,7 @@ const productRows = [
 ] as const;
 
 const catalogFixture = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   shopId: SHOP_ID,
   revision: 'a'.repeat(64),
   categories: categoryRows.map(([id, slug, name], sortOrder) => ({
@@ -94,6 +94,21 @@ const catalogFixture = {
   modifiers: [],
   productModifierLinks: [],
   comboBeverageOptions: [],
+  shop: {
+    displayName: 'TUX Test Shop',
+    address: 'Road 9, Maadi',
+    phone: '+201000000000',
+    latitude: 29.9602,
+    longitude: 31.2569,
+  },
+  ordering: {
+    available: true,
+    temporaryClosed: false,
+    onlineOrdersPaused: false,
+    minimumOrderMinor: 0,
+    fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
+    paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
+  },
 };
 
 async function installCatalogFixture(page: Page): Promise<string[]> {
@@ -179,7 +194,7 @@ test('uses catalog-public UUID identity, family, and priceMinor without stale fa
   await expect(page.getByText('Canonical Tuxify', { exact: true })).toHaveCount(0);
   await expect(page.getByText('190.5 EGP', { exact: true })).toBeVisible();
   await expect(page.getByText('Double Tux Burger', { exact: true })).toHaveCount(0);
-  expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}`]);
+  expect(requests).toEqual([`${CATALOG_URL}?shopId=${SHOP_ID}&schemaVersion=2`]);
 });
 
 test('shows explicit unavailable state instead of checked-in catalog data', async ({ page }) => {

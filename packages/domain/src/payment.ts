@@ -1,28 +1,101 @@
 import type { PaymentMethod } from './catalog';
+import type { CheckoutChannel } from './checkoutPolicy';
 import { DomainInvariantError } from './errors';
+import type { DeliveryZoneId } from './ids';
 import { moneyMinor, subtractMoney, ZERO_MONEY, type MoneyMinor } from './money';
-import type { PaymentDraft } from './orderDraft';
 import type { PaymentMethodSnapshot } from './models';
+import type { PaymentDraft } from './orderDraft';
+import type { PaymentMethodZoneRuleSetting } from './settings';
+
+const MAX_PAYMENT_REFERENCE_LENGTH = 200;
 
 export interface PreparedPaymentPart {
   readonly method: PaymentMethodSnapshot;
   readonly allocatedMinor: MoneyMinor;
   readonly receivedMinor: MoneyMinor | null;
   readonly changeMinor: MoneyMinor | null;
+  readonly reference: string | null;
+  readonly manualConfirmed: boolean;
 }
 
-function activeMethod(methods: readonly PaymentMethod[], id: PaymentMethod['id']): PaymentMethod {
+export interface PaymentPreparationContext {
+  readonly channel?: CheckoutChannel;
+  readonly deliveryZoneId?: DeliveryZoneId | null;
+  readonly paymentMethodZoneRules?: readonly PaymentMethodZoneRuleSetting[] | undefined;
+}
+
+function activeMethod(
+  methods: readonly PaymentMethod[],
+  id: PaymentMethod['id'],
+  context: PaymentPreparationContext,
+): PaymentMethod {
   const method = methods.find((candidate) => candidate.id === id && candidate.active);
   if (method === undefined) {
     throw new DomainInvariantError('Selected payment method is unavailable.');
   }
+
+  const configuredChannel = method.channel ?? 'BOTH';
+  if (
+    context.channel !== undefined &&
+    configuredChannel !== 'BOTH' &&
+    configuredChannel !== context.channel
+  ) {
+    throw new DomainInvariantError(
+      `Selected payment method is unavailable for ${context.channel} checkout.`,
+    );
+  }
+
+  if (context.deliveryZoneId !== undefined && context.deliveryZoneId !== null) {
+    const zoneRule = context.paymentMethodZoneRules?.find(
+      (candidate) =>
+        candidate.paymentMethodId === method.id &&
+        candidate.deliveryZoneId === context.deliveryZoneId,
+    );
+    if (zoneRule?.allowed === false) {
+      throw new DomainInvariantError(
+        'Selected payment method is unavailable for this delivery zone.',
+      );
+    }
+  }
+
   return method;
+}
+
+function normalizePaymentReference(
+  method: PaymentMethod,
+  rawReference: string | null | undefined,
+): string | null {
+  const reference = rawReference?.trim() ?? '';
+  if ((method.requiresReference ?? false) && reference.length === 0) {
+    throw new DomainInvariantError(
+      'Payment reference is required for the selected payment method.',
+    );
+  }
+  if (reference.length > MAX_PAYMENT_REFERENCE_LENGTH) {
+    throw new DomainInvariantError('Payment reference cannot exceed 200 characters.');
+  }
+  return reference.length === 0 ? null : reference;
+}
+
+function requireManualConfirmation(
+  method: PaymentMethod,
+  manualConfirmed: boolean | undefined,
+): boolean {
+  const confirmed = manualConfirmed === true;
+  if ((method.manualConfirmationRequired ?? false) && !confirmed) {
+    throw new DomainInvariantError(
+      'Manual confirmation is required for the selected payment method.',
+    );
+  }
+  return confirmed;
 }
 
 function preparePart(
   method: PaymentMethod,
   allocatedMinor: MoneyMinor,
   cashReceivedMinor: MoneyMinor | null,
+  rawReference: string | null | undefined,
+  manualConfirmed: boolean | undefined,
 ): PreparedPaymentPart {
   if (allocatedMinor < 0) {
     throw new DomainInvariantError('Payment allocation cannot be negative.');
@@ -31,9 +104,22 @@ function preparePart(
     id: method.id,
     label: method.displayName,
     logicType: method.logicType,
+    channel: method.channel ?? 'BOTH',
+    requiresReference: method.requiresReference ?? false,
+    manualConfirmationRequired: method.manualConfirmationRequired ?? false,
+    refundAllowed: method.refundAllowed ?? true,
   };
+  const reference = normalizePaymentReference(method, rawReference);
+  const confirmed = requireManualConfirmation(method, manualConfirmed);
   if (method.logicType !== 'CASH') {
-    return { method: snapshot, allocatedMinor, receivedMinor: null, changeMinor: null };
+    return {
+      method: snapshot,
+      allocatedMinor,
+      receivedMinor: null,
+      changeMinor: null,
+      reference,
+      manualConfirmed: confirmed,
+    };
   }
   const effectiveReceived = cashReceivedMinor ?? allocatedMinor;
   if (effectiveReceived < allocatedMinor) {
@@ -44,6 +130,8 @@ function preparePart(
     allocatedMinor,
     receivedMinor: effectiveReceived,
     changeMinor: subtractMoney(effectiveReceived, allocatedMinor),
+    reference,
+    manualConfirmed: confirmed,
   };
 }
 
@@ -51,6 +139,7 @@ export function preparePaymentParts(
   draft: PaymentDraft,
   methods: readonly PaymentMethod[],
   totalMinor: MoneyMinor,
+  context: PaymentPreparationContext = {},
 ): readonly PreparedPaymentPart[] {
   if (totalMinor < 0) {
     throw new DomainInvariantError('Order total cannot be negative.');
@@ -62,8 +151,16 @@ export function preparePaymentParts(
     throw new DomainInvariantError('Select a payment method.');
   }
   if (draft.mode === 'SINGLE') {
-    const method = activeMethod(methods, draft.methodId);
-    return [preparePart(method, totalMinor, draft.cashReceivedMinor)];
+    const method = activeMethod(methods, draft.methodId, context);
+    return [
+      preparePart(
+        method,
+        totalMinor,
+        draft.cashReceivedMinor,
+        draft.reference,
+        draft.manualConfirmed,
+      ),
+    ];
   }
 
   if (draft.methodAId === draft.methodBId) {
@@ -73,9 +170,12 @@ export function preparePaymentParts(
     throw new DomainInvariantError('Split Amount A must be between zero and the order total.');
   }
   const remainder = subtractMoney(totalMinor, draft.amountAMinor);
-  const methodA = activeMethod(methods, draft.methodAId);
-  const methodB = activeMethod(methods, draft.methodBId);
-  return [preparePart(methodA, draft.amountAMinor, null), preparePart(methodB, remainder, null)];
+  const methodA = activeMethod(methods, draft.methodAId, context);
+  const methodB = activeMethod(methods, draft.methodBId, context);
+  return [
+    preparePart(methodA, draft.amountAMinor, null, draft.referenceA, draft.manualConfirmedA),
+    preparePart(methodB, remainder, null, draft.referenceB, draft.manualConfirmedB),
+  ];
 }
 
 export function parsePoundsToMinor(raw: string): MoneyMinor | null {
