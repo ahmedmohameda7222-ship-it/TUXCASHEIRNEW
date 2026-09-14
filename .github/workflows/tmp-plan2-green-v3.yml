@@ -26,6 +26,7 @@ jobs:
       - name: Format touched sources
         run: >-
           npx prettier --write
+          packages/domain/src/models.ts
           packages/domain/src/orderDraftParser.ts
           packages/application/src/orders.ts
           packages/domain/src/syncContract.ts
