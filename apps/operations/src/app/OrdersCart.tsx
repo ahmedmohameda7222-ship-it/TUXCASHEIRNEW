@@ -2,10 +2,11 @@ import {
   ZERO_MONEY,
   addMoney,
   applyDeliveryZone,
+  calculateCheckoutPricing,
   calculateDraftLineTotal,
-  calculateOrderPricing,
   parseEntityId,
   preparePaymentParts,
+  resolveEffectiveCheckoutPolicy,
   subtractMoney,
   suggestCashTenders,
   type DraftLineId,
@@ -200,17 +201,26 @@ export function OrdersCart({
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
   );
-  const pricing = useMemo(() => {
+  const checkoutPolicy = useMemo(() => {
     try {
-      return calculateOrderPricing({
+      return resolveEffectiveCheckoutPolicy(configuration);
+    } catch {
+      return null;
+    }
+  }, [configuration]);
+  const pricing = useMemo(() => {
+    if (checkoutPolicy === null) return null;
+    try {
+      return calculateCheckoutPricing({
         lines: draft.lines,
         discountMinor: draft.discountMinor,
         deliveryFeeMinor: delivery ? draft.delivery.finalFeeMinor : ZERO_MONEY,
+        policy: checkoutPolicy,
       });
     } catch {
       return null;
     }
-  }, [delivery, draft.delivery.finalFeeMinor, draft.discountMinor, draft.lines]);
+  }, [checkoutPolicy, delivery, draft.delivery.finalFeeMinor, draft.discountMinor, draft.lines]);
 
   const preparedPayments = useMemo(() => {
     if (pricing === null) return null;
@@ -840,6 +850,18 @@ export function OrdersCart({
                   Zone reference: {formatMoneyMinor(draft.delivery.configuredFeeMinor)}
                 </span>
               )}
+            </div>
+          ) : null}
+          {pricing !== null && pricing.serviceChargeMinor > ZERO_MONEY ? (
+            <div>
+              <dt>Service charge</dt>
+              <dd>{formatMoneyMinor(pricing.serviceChargeMinor)}</dd>
+            </div>
+          ) : null}
+          {pricing !== null && pricing.taxMinor > ZERO_MONEY ? (
+            <div>
+              <dt>Tax</dt>
+              <dd>{formatMoneyMinor(pricing.taxMinor)}</dd>
             </div>
           ) : null}
           <div className="grand-total">
