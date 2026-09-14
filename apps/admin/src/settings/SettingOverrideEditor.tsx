@@ -30,7 +30,12 @@ function initialText(value: unknown, kind: SettingEditorKind): string {
   return String(value);
 }
 
-function parseValue(raw: string, kind: SettingEditorKind, min?: number, max?: number): unknown {
+function parseValue(
+  raw: string,
+  kind: SettingEditorKind,
+  min?: number,
+  max?: number,
+): unknown {
   if (kind === 'boolean') return raw === 'true';
   if (kind === 'text') return raw;
 
