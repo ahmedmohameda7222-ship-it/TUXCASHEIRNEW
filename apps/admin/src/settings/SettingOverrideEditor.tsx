@@ -18,7 +18,7 @@ type SettingOverrideEditorProps = {
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
 };
 
-type SettingEditorState = {
+export type SettingEditorState = {
   raw: string;
   baselineRaw: string;
   expectedVersion: number | null;
@@ -39,6 +39,26 @@ function parseValue(raw: string, kind: SettingEditorKind, min?: number, max?: nu
   if (min !== undefined && value < min) throw new Error(`Minimum is ${min}.`);
   if (max !== undefined && value > max) throw new Error(`Maximum is ${max}.`);
   return value;
+}
+
+export function reconcileSettingEditorState(
+  current: SettingEditorState,
+  resolvedRaw: string,
+  resolvedExpectedVersion: number | null,
+): SettingEditorState {
+  if (current.raw !== current.baselineRaw) return current;
+  if (
+    current.raw === resolvedRaw &&
+    current.baselineRaw === resolvedRaw &&
+    current.expectedVersion === resolvedExpectedVersion
+  ) {
+    return current;
+  }
+  return {
+    raw: resolvedRaw,
+    baselineRaw: resolvedRaw,
+    expectedVersion: resolvedExpectedVersion,
+  };
 }
 
 export function SettingOverrideEditor({
@@ -72,21 +92,9 @@ export function SettingOverrideEditor({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setEditor((current) => {
-      if (current.raw !== current.baselineRaw) return current;
-      if (
-        current.raw === resolvedRaw &&
-        current.baselineRaw === resolvedRaw &&
-        current.expectedVersion === resolvedExpectedVersion
-      ) {
-        return current;
-      }
-      return {
-        raw: resolvedRaw,
-        baselineRaw: resolvedRaw,
-        expectedVersion: resolvedExpectedVersion,
-      };
-    });
+    setEditor((current) =>
+      reconcileSettingEditorState(current, resolvedRaw, resolvedExpectedVersion),
+    );
   }, [resolvedExpectedVersion, resolvedRaw]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {

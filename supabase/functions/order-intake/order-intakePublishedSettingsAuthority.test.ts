@@ -228,7 +228,7 @@ describe('order-intake published checkout settings authority', () => {
     );
 
     expect(present.status).toBe(202);
-    expect(presentStore.inserted[0]?.normalizedPhone).toBe('+201012345678');
+    expect(presentStore.inserted[0]?.normalizedPhone).toBe('01012345678');
   });
 
   it('rejects an ONLINE cash intent when the published cash method is POS-only', async () => {
