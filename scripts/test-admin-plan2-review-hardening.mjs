@@ -20,6 +20,7 @@ if (!databaseUrl) {
   console.log('Plan 2 review hardening static invariant passed.');
   await import('./test-admin-plan2-second-review-hardening.mjs');
   await import('./test-admin-reason-code-edits.mjs');
+  await import('./test-admin-plan2-final-review-hardening.mjs');
   process.exit(0);
 }
 
@@ -199,3 +200,4 @@ if (result.status !== 0) {
 console.log('Plan 2 catalog draft review hardening PostgreSQL behavior passed.');
 await import('./test-admin-plan2-second-review-hardening.mjs');
 await import('./test-admin-reason-code-edits.mjs');
+await import('./test-admin-plan2-final-review-hardening.mjs');
