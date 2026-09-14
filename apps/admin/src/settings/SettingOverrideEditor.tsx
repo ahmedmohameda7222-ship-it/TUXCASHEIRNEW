@@ -30,12 +30,7 @@ function initialText(value: unknown, kind: SettingEditorKind): string {
   return String(value);
 }
 
-function parseValue(
-  raw: string,
-  kind: SettingEditorKind,
-  min?: number,
-  max?: number,
-): unknown {
+function parseValue(raw: string, kind: SettingEditorKind, min?: number, max?: number): unknown {
   if (kind === 'boolean') return raw === 'true';
   if (kind === 'text') return raw;
 
@@ -141,9 +136,7 @@ export function SettingOverrideEditor({
             aria-label={label}
             value={editor.raw}
             disabled={updating}
-            onChange={(event) =>
-              setEditor((current) => ({ ...current, raw: event.target.value }))
-            }
+            onChange={(event) => setEditor((current) => ({ ...current, raw: event.target.value }))}
           >
             <option value="false">Disabled</option>
             <option value="true">Enabled</option>
@@ -161,9 +154,7 @@ export function SettingOverrideEditor({
             step={kind === 'integer' ? 1 : undefined}
             value={editor.raw}
             disabled={updating}
-            onChange={(event) =>
-              setEditor((current) => ({ ...current, raw: event.target.value }))
-            }
+            onChange={(event) => setEditor((current) => ({ ...current, raw: event.target.value }))}
           />
         </label>
       )}
