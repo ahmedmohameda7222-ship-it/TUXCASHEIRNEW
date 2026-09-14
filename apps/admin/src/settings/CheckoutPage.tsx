@@ -70,14 +70,6 @@ export function CheckoutPage({
         />
         <SettingOverrideEditor
           workspace={workspace}
-          settingKey="checkout.allowScheduledOrders"
-          label="Scheduled orders"
-          kind="boolean"
-          updating={updating}
-          onUpdate={onUpdate}
-        />
-        <SettingOverrideEditor
-          workspace={workspace}
           settingKey="checkout.allowDiscountStacking"
           label="Allow discount stacking"
           kind="boolean"
