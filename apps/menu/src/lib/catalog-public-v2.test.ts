@@ -28,6 +28,7 @@ const snapshot: PublicCatalogSnapshotV2 = {
     serviceChargeBps: 0,
     taxBps: 0,
     allowDiscountStacking: false,
+    requireCustomerPhone: false,
     fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
     paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
   },
