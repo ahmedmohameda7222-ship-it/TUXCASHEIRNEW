@@ -1,0 +1,63 @@
+name: Temporary Plan 2 P2 E2E Fixture Patch
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-3-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  patch-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Update publishing fixture to current preview contract
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('e2e/admin-catalog-publish.spec.ts')
+          text = path.read_text()
+          old = """              changedProductIds: ['11111111-1111-4111-8111-111111111111'],
+              priceChangedProductIds: ['11111111-1111-4111-8111-111111111111'],
+"""
+          new = """              changedProductIds: ['11111111-1111-4111-8111-111111111111'],
+              priceChangedProductIds: ['11111111-1111-4111-8111-111111111111'],
+              changedRelationCounts: {
+                productModifierLinks: 0,
+                comboBeverageOptions: 0,
+                recipeLines: 0,
+              },
+"""
+          if old not in text:
+              if new in text:
+                  print('Fixture already updated.')
+              else:
+                  raise SystemExit('Expected publishing fixture pattern not found')
+          else:
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expected exactly one fixture pattern, found {text.count(old)}')
+              path.write_text(text.replace(old, new, 1))
+          PY
+
+          npx prettier --write e2e/admin-catalog-publish.spec.ts
+          npx playwright install chromium
+          npx playwright test e2e/admin-catalog-publish.spec.ts --config playwright.admin.config.ts
+
+          if git diff --quiet -- e2e/admin-catalog-publish.spec.ts; then
+            echo "No fixture change required."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/admin-catalog-publish.spec.ts
+          git commit -m "test(plan2): align publish E2E fixture with preview contract"
+          git push origin HEAD:tmp/admin-plan2-final-review-3-fixes
