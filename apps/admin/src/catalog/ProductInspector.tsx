@@ -1,4 +1,4 @@
-import type { CatalogProductDetail } from '@tux/admin-contracts';
+import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
 
 import { ProductEditor, type ProductEditorDraft } from './ProductEditor';
 
@@ -8,7 +8,9 @@ export function ProductInspector({
   canPrice,
   busy,
   draftRevision,
+  advancedBundle,
   onClose,
+  onRequestAdvanced,
   onSaveDraft,
   onSetAvailability,
 }: {
@@ -17,7 +19,9 @@ export function ProductInspector({
   canPrice: boolean;
   busy: boolean;
   draftRevision: number | null;
+  advancedBundle: CatalogJsonObject | null;
   onClose(): void;
+  onRequestAdvanced(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
 }) {
@@ -44,6 +48,8 @@ export function ProductInspector({
         canEdit={canEdit}
         canPrice={canPrice}
         busy={busy}
+        advancedBundle={advancedBundle}
+        onRequestAdvanced={onRequestAdvanced}
         onSaveDraft={onSaveDraft}
         onSetAvailability={onSetAvailability}
       />
