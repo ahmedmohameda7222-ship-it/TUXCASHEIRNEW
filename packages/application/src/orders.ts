@@ -1034,7 +1034,7 @@ export class OperationsOrdersService {
           receivedMinor: part.receivedMinor,
           changeMinor: part.changeMinor,
           reference: part.reference,
-          manuallyConfirmed: part.manuallyConfirmed,
+          manuallyConfirmed: part.manualConfirmed,
         };
       }
       return {
@@ -1044,7 +1044,7 @@ export class OperationsOrdersService {
         receivedMinor: null,
         changeMinor: null,
         reference: part.reference,
-        manuallyConfirmed: part.manuallyConfirmed,
+        manuallyConfirmed: part.manualConfirmed,
       };
     });
   }
