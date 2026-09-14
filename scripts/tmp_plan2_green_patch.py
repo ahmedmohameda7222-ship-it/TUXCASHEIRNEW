@@ -870,48 +870,25 @@ regex_once(
 
 export function OrdersBoardWorkspace""",
 )
-replace_once(
+regex_once(
     path,
-    """  const [cancellationReasons, setCancellationReasons] = useState<
-    readonly CancellationReasonOption[]
-  >([]);
-  const [tab, setTab] = useState<BoardTab>('ACTIVE');
-""",
-    """  const [cancellationReasons, setCancellationReasons] = useState<
-    readonly CancellationReasonOption[]
-  >([]);
+    r"(const \[cancellationReasons, setCancellationReasons\] = useState<\s*readonly CancellationReasonOption\[\]\s*>\(\[\]\);)(\s*const \[tab, setTab\] = useState<BoardTab>\('ACTIVE'\);)",
+    """\\1
   const [returnReasonMode, setReturnReasonMode] =
     useState<CancellationReasonMode>('LEGACY_FREE_TEXT');
-  const [returnReasons, setReturnReasons] = useState<readonly CancellationReasonOption[]>([]);
-  const [tab, setTab] = useState<BoardTab>('ACTIVE');
-""",
+  const [returnReasons, setReturnReasons] = useState<readonly CancellationReasonOption[]>([]);\\2""",
 )
-replace_once(
+regex_once(
     path,
-    """    setCancellationReasonMode(result.value.cancellationReasonMode);
-    setCancellationReasons(result.value.cancellationReasons);
-    setError(null);
-""",
-    """    setCancellationReasonMode(result.value.cancellationReasonMode);
-    setCancellationReasons(result.value.cancellationReasons);
+    r"(setCancellationReasonMode\(result\.value\.cancellationReasonMode\);\s*setCancellationReasons\(result\.value\.cancellationReasons\);)(\s*setError\(null\);)",
+    """\\1
     setReturnReasonMode(result.value.returnReasonMode);
-    setReturnReasons(result.value.returnReasons);
-    setError(null);
-""",
+    setReturnReasons(result.value.returnReasons);\\2""",
 )
-replace_once(
+regex_once(
     path,
-    """      <ReturnDialog
-        order={returnTarget}
-        busy={busy}
-        onClose={() => setReturnTarget(null)}
-        onConfirm={async (reason) => {
-          const changed = await mutate(
-            () => client.returnDelivery({ orderId: returnTarget.id, reason }),
-            `Order #${returnTarget.displayOrderNo} marked Delivery Failed.`,
-          );
-""",
-    """      <ReturnDialog
+    r"<ReturnDialog\s+order=\{returnTarget\}\s+busy=\{busy\}\s+onClose=\{\(\) => setReturnTarget\(null\)\}\s+onConfirm=\{async \(reason\) => \{\s+const changed = await mutate\(\s+\(\) => client\.returnDelivery\(\{ orderId: returnTarget\.id, reason \}\),\s+`Order #\$\{returnTarget\.displayOrderNo\} marked Delivery Failed\.`,\s+\);",
+    """<ReturnDialog
         order={returnTarget}
         busy={busy}
         reasonMode={returnReasonMode}
@@ -921,8 +898,7 @@ replace_once(
           const changed = await mutate(
             () => client.returnDelivery({ orderId: returnTarget.id, ...submission }),
             `Order #${returnTarget.displayOrderNo} marked Delivery Failed.`,
-          );
-""",
+          );""",
 )
 
 # Update source regression to assert rollout-compatible immutable phone field.
