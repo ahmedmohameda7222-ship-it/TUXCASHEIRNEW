@@ -22,8 +22,72 @@ const fixtureProduct: CatalogProductDetail = {
   sortOrder: 10,
 };
 
+const advancedBundle: CatalogJsonObject = {
+  snapshot: {
+    products: [
+      {
+        id: fixtureProduct.id,
+        shopId: fixtureProduct.shopId,
+        name: fixtureProduct.name,
+        active: true,
+      },
+      {
+        id: '55555555-5555-4555-8555-555555555555',
+        shopId: fixtureProduct.shopId,
+        name: 'Water',
+        active: true,
+      },
+    ],
+    modifiers: [
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        shopId: fixtureProduct.shopId,
+        name: 'Bacon',
+        priceMinor: 2000,
+        active: true,
+        sortOrder: 0,
+      },
+    ],
+    productModifierLinks: [
+      {
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        modifierId: '44444444-4444-4444-8444-444444444444',
+        maxQuantity: 2,
+        sortOrder: 0,
+      },
+    ],
+    comboBeverageOptions: [
+      {
+        shopId: fixtureProduct.shopId,
+        comboProductId: fixtureProduct.id,
+        beverageProductId: '55555555-5555-4555-8555-555555555555',
+        sortOrder: 0,
+      },
+    ],
+    recipeLines: [
+      {
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        inventoryItemId: '66666666-6666-4666-8666-666666666666',
+        quantityMicros: 250000,
+      },
+    ],
+  },
+  inventoryItems: [
+    {
+      id: '66666666-6666-4666-8666-666666666666',
+      shopId: fixtureProduct.shopId,
+      name: 'Meat',
+      unitLabel: 'g',
+      trackingMode: 'RECIPE_TRACKED',
+      active: true,
+    },
+  ],
+};
+
 describe('ProductEditor', () => {
-  it('keeps advanced fields behind progressive disclosure', () => {
+  it('keeps advanced fields behind progressive disclosure and renders real controls when loaded', () => {
     const collapsed = renderToStaticMarkup(
       <ProductEditor
         product={fixtureProduct}
@@ -43,6 +107,7 @@ describe('ProductEditor', () => {
         canEdit
         canPrice
         initialAdvancedOpen
+        advancedBundle={advancedBundle}
         onSaveDraft={vi.fn()}
         onSetAvailability={vi.fn()}
       />,
@@ -51,6 +116,13 @@ describe('ProductEditor', () => {
     expect(expanded).toContain('Extras / Modifiers');
     expect(expanded).toContain('Shop Overrides');
     expect(expanded).toContain('History');
+    expect(expanded).toContain('Bacon');
+    expect(expanded).toContain('Max quantity');
+    expect(expanded).toContain('Water');
+    expect(expanded).toContain('Meat');
+    expect(expanded).toContain('Visible in this shop');
+    expect(expanded).toContain('Open version history');
+    expect(expanded).not.toContain('expanded in the next catalog workflow tasks');
   });
 
   it('keeps pricing read-only without catalog.pricing', () => {
