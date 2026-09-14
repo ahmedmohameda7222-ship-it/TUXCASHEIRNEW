@@ -711,7 +711,8 @@ function registerIpcHandlers(window: BrowserWindow): void {
       typeof input['orderId'] !== 'string' ||
       typeof input['foodPrepared'] !== 'boolean' ||
       typeof input['reason'] !== 'string' ||
-      (input['reasonCodeId'] !== undefined && typeof input['reasonCodeId'] !== 'string') ||
+      (input['reasonCodeId'] !== undefined &&
+        typeof input['reasonCodeId'] !== 'string') ||
       (input['note'] !== undefined && typeof input['note'] !== 'string')
     ) {
       throw new TypeError('Cancel order IPC payload is invalid.');
@@ -732,7 +733,8 @@ function registerIpcHandlers(window: BrowserWindow): void {
     if (
       typeof input['orderId'] !== 'string' ||
       typeof input['reason'] !== 'string' ||
-      (input['reasonCodeId'] !== undefined && typeof input['reasonCodeId'] !== 'string') ||
+      (input['reasonCodeId'] !== undefined &&
+        typeof input['reasonCodeId'] !== 'string') ||
       (input['note'] !== undefined && typeof input['note'] !== 'string')
     ) {
       throw new TypeError('Return Delivery IPC payload is invalid.');
