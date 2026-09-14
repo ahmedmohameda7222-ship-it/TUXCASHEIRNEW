@@ -75,6 +75,36 @@ function PublishSummary({ preview }: { preview: CatalogPublishPreview }) {
           </strong>
           <span>Pricing changes require catalog.pricing at execution time.</span>
         </div>
+        <div>
+          <strong>
+            {countLabel(
+              preview.changedRelationCounts.productModifierLinks,
+              'modifier link changed',
+              'modifier links changed',
+            )}
+          </strong>
+          <span>Product-to-modifier relations that differ from the published catalog.</span>
+        </div>
+        <div>
+          <strong>
+            {countLabel(
+              preview.changedRelationCounts.comboBeverageOptions,
+              'combo option changed',
+              'combo options changed',
+            )}
+          </strong>
+          <span>Combo beverage relations that differ from the published catalog.</span>
+        </div>
+        <div>
+          <strong>
+            {countLabel(
+              preview.changedRelationCounts.recipeLines,
+              'recipe line changed',
+              'recipe lines changed',
+            )}
+          </strong>
+          <span>Recipe relations that differ from the published catalog.</span>
+        </div>
       </div>
       <div className="admin-publish-version-line">
         <span>Draft base version {preview.basePublishVersion}</span>
@@ -92,6 +122,7 @@ export function PublishReviewPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
 
   if (!shopId) {
     return (
@@ -113,7 +144,9 @@ export function PublishReviewPage() {
   const canPublish = principal.permissions.includes('catalog.publish');
   const canEditCatalog = principal.permissions.includes('catalog.edit');
   const data = publishing.publishingQuery.data;
-  const preview = data?.draftPreviews[0];
+  const draftPreviews = data?.draftPreviews ?? [];
+  const preview =
+    draftPreviews.find((candidate) => candidate.draftId === selectedDraftId) ?? draftPreviews[0];
   const schedules = (data?.schedules ?? []).filter((schedule) =>
     new Set(['PENDING', 'FAILED', 'CLAIMED']).has(schedule.status),
   );
@@ -231,6 +264,23 @@ export function PublishReviewPage() {
             isPending={recurring.saveRule.isPending}
             onSave={saveRecurringAvailability}
           />
+
+          {draftPreviews.length > 1 ? (
+            <label className="admin-field">
+              <span>Draft to review</span>
+              <select
+                aria-label="Draft to review"
+                value={preview?.draftId ?? ''}
+                onChange={(event) => setSelectedDraftId(event.target.value)}
+              >
+                {draftPreviews.map((candidate) => (
+                  <option key={candidate.draftId} value={candidate.draftId}>
+                    Draft {candidate.draftId.slice(0, 8)} · r{candidate.draftRevision}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           {preview ? (
             <>

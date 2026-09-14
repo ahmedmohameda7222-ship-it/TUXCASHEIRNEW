@@ -43,7 +43,7 @@ export function ProductInspector({
         )}
       </header>
       <ProductEditor
-        key={`${product.id}:${product.name}:${product.priceMinor}:${product.soldOut}:${product.active}`}
+        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}`}
         product={product}
         canEdit={canEdit}
         canPrice={canPrice}

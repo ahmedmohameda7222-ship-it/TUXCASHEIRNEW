@@ -93,6 +93,11 @@ export type CatalogPublishPreview = {
   stale: boolean;
   changedProductIds: string[];
   priceChangedProductIds: string[];
+  changedRelationCounts: {
+    productModifierLinks: number;
+    comboBeverageOptions: number;
+    recipeLines: number;
+  };
 };
 
 export type CatalogPublishingWorkspace = {

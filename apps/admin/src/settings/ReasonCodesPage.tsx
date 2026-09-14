@@ -35,6 +35,7 @@ function EditableReasonCode({
 }) {
   const [label, setLabel] = useState(reason.label);
   const [active, setActive] = useState(reason.active);
+  const [expectedVersion] = useState(reason.version);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +45,7 @@ function EditableReasonCode({
       family: reason.family,
       label: label.trim(),
       active,
-      expectedVersion: reason.version,
+      expectedVersion: expectedVersion,
     });
   }
 

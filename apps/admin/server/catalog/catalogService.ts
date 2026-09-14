@@ -147,6 +147,12 @@ type PublishingDraftRow = {
   working_bundle_json: unknown;
 };
 
+type PublishedBundleRow = {
+  bundle_json: unknown;
+};
+
+type CatalogRelationKey = 'productModifierLinks' | 'comboBeverageOptions' | 'recipeLines';
+
 type PublishVersionRow = {
   shop_id: string;
   publish_version: number | string;
@@ -184,6 +190,12 @@ type ComparableProduct = {
   soldOut: boolean;
   isCombo: boolean;
   sortOrder: number;
+};
+
+const relationIdentityFields: Record<CatalogRelationKey, readonly string[]> = {
+  productModifierLinks: ['productId', 'modifierId'],
+  comboBeverageOptions: ['comboProductId', 'beverageProductId'],
+  recipeLines: ['productId', 'inventoryItemId'],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -424,10 +436,74 @@ function productsEqual(a: ComparableProduct, b: ComparableProduct): boolean {
   );
 }
 
+function stableJson(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function readRelationMap(bundle: unknown, key: CatalogRelationKey): Map<string, string> {
+  if (!isRecord(bundle) || !isRecord(bundle['snapshot'])) {
+    throw new CatalogServiceError('backend_contract_invalid');
+  }
+  const rawCollection = bundle['snapshot'][key];
+  if (rawCollection === undefined) return new Map();
+  if (!Array.isArray(rawCollection)) throw new CatalogServiceError('backend_contract_invalid');
+
+  const rows = new Map<string, string>();
+  for (const rawRow of rawCollection) {
+    if (!isRecord(rawRow)) throw new CatalogServiceError('backend_contract_invalid');
+    const identity = relationIdentityFields[key]
+      .map((field) => readNonemptyString(rawRow[field]))
+      .join('\u0000');
+    if (rows.has(identity)) throw new CatalogServiceError('backend_contract_invalid');
+    rows.set(identity, stableJson(rawRow));
+  }
+  return rows;
+}
+
+function countRelationChanges(
+  draftBundle: unknown,
+  publishedBundle: unknown,
+  key: CatalogRelationKey,
+): number {
+  const draftRows = readRelationMap(draftBundle, key);
+  const publishedRows = readRelationMap(publishedBundle, key);
+  const identities = new Set([...draftRows.keys(), ...publishedRows.keys()]);
+  let changed = 0;
+  for (const identity of identities) {
+    if (draftRows.get(identity) !== publishedRows.get(identity)) changed += 1;
+  }
+  return changed;
+}
+
+function buildRelationChangeCounts(draftBundle: unknown, publishedBundle: unknown) {
+  return {
+    productModifierLinks: countRelationChanges(
+      draftBundle,
+      publishedBundle,
+      'productModifierLinks',
+    ),
+    comboBeverageOptions: countRelationChanges(
+      draftBundle,
+      publishedBundle,
+      'comboBeverageOptions',
+    ),
+    recipeLines: countRelationChanges(draftBundle, publishedBundle, 'recipeLines'),
+  };
+}
+
 function buildPublishPreview(
   row: PublishingDraftRow,
   currentPublishVersion: number,
   liveProducts: readonly CatalogProductDetail[],
+  publishedBundle: unknown,
 ): CatalogPublishPreview {
   const draftProducts = readDraftBundleProducts(row.working_bundle_json);
   const liveById = new Map(
@@ -454,6 +530,7 @@ function buildPublishPreview(
     stale: basePublishVersion !== currentPublishVersion,
     changedProductIds,
     priceChangedProductIds,
+    changedRelationCounts: buildRelationChangeCounts(row.working_bundle_json, publishedBundle),
   };
 }
 
@@ -719,60 +796,74 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
     },
 
     async loadPublishing(shopId, businessId) {
-      const [currentPublishVersion, versions, schedules, drafts, productRows] = await Promise.all([
-        loadCurrentPublishVersion(client, shopId),
-        client.select<PublishVersionRow[]>(
-          'catalog_publish_versions',
-          new URLSearchParams({
-            select:
-              'shop_id,publish_version,operations_configuration_version,source_kind,draft_id,published_by_employee_id,restored_from_publish_version,published_at',
-            business_id: `eq.${businessId}`,
-            shop_id: `eq.${shopId}`,
-            order: 'publish_version.desc',
-            limit: '100',
-          }),
-        ),
-        client.select<ScheduledChangeRow[]>(
-          'scheduled_config_changes',
-          new URLSearchParams({
-            select:
-              'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,last_error',
-            business_id: `eq.${businessId}`,
-            shop_id: `eq.${shopId}`,
-            change_kind: 'eq.CATALOG_PUBLISH',
-            order: 'scheduled_for.desc',
-            limit: '100',
-          }),
-        ),
-        client.select<PublishingDraftRow[]>(
-          'catalog_drafts',
-          new URLSearchParams({
-            select: 'id,shop_id,base_publish_version,draft_revision,working_bundle_json',
-            business_id: `eq.${businessId}`,
-            shop_id: `eq.${shopId}`,
-            status: 'eq.DRAFT',
-            order: 'updated_at.desc',
-            limit: '50',
-          }),
-        ),
-        client.select<ProductRow[]>(
-          'products',
-          new URLSearchParams({
-            select:
-              'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',
-            shop_id: `eq.${shopId}`,
-            order: 'sort_order.asc,id.asc',
-          }),
-        ),
-      ]);
+      const [currentPublishVersion, versions, schedules, drafts, productRows, publishedBundleRows] =
+        await Promise.all([
+          loadCurrentPublishVersion(client, shopId),
+          client.select<PublishVersionRow[]>(
+            'catalog_publish_versions',
+            new URLSearchParams({
+              select:
+                'shop_id,publish_version,operations_configuration_version,source_kind,draft_id,published_by_employee_id,restored_from_publish_version,published_at',
+              business_id: `eq.${businessId}`,
+              shop_id: `eq.${shopId}`,
+              order: 'publish_version.desc',
+              limit: '100',
+            }),
+          ),
+          client.select<ScheduledChangeRow[]>(
+            'scheduled_config_changes',
+            new URLSearchParams({
+              select:
+                'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,last_error',
+              business_id: `eq.${businessId}`,
+              shop_id: `eq.${shopId}`,
+              change_kind: 'eq.CATALOG_PUBLISH',
+              order: 'scheduled_for.desc',
+              limit: '100',
+            }),
+          ),
+          client.select<PublishingDraftRow[]>(
+            'catalog_drafts',
+            new URLSearchParams({
+              select: 'id,shop_id,base_publish_version,draft_revision,working_bundle_json',
+              business_id: `eq.${businessId}`,
+              shop_id: `eq.${shopId}`,
+              status: 'eq.DRAFT',
+              order: 'updated_at.desc',
+              limit: '50',
+            }),
+          ),
+          client.select<ProductRow[]>(
+            'products',
+            new URLSearchParams({
+              select:
+                'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',
+              shop_id: `eq.${shopId}`,
+              order: 'sort_order.asc,id.asc',
+            }),
+          ),
+          client.select<PublishedBundleRow[]>(
+            'catalog_publish_versions',
+            new URLSearchParams({
+              select: 'bundle_json',
+              business_id: `eq.${businessId}`,
+              shop_id: `eq.${shopId}`,
+              order: 'publish_version.desc',
+              limit: '1',
+            }),
+          ),
+        ]);
 
       const liveProducts = productRows.map(mapProduct);
+      const publishedBundle = publishedBundleRows[0]?.bundle_json ?? {
+        snapshot: { productModifierLinks: [], comboBeverageOptions: [], recipeLines: [] },
+      };
       return {
         shopId,
         currentPublishVersion,
         versions: versions.map(mapPublishVersion),
         draftPreviews: drafts.map((draft) =>
-          buildPublishPreview(draft, currentPublishVersion, liveProducts),
+          buildPublishPreview(draft, currentPublishVersion, liveProducts, publishedBundle),
         ),
         schedules: schedules.map(mapScheduledChange),
       };
