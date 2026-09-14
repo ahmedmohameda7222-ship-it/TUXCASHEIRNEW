@@ -8,6 +8,7 @@ import {
   buildProductAdvancedDraft,
   readProductAdvancedModel,
 } from './catalogAdvancedDraft';
+import { buildProductDraftBundle } from './useCatalog';
 
 const fixtureProduct: CatalogProductDetail = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -207,6 +208,42 @@ describe('ProductEditor', () => {
         },
       ],
     });
+  });
+
+  it('merges product and advanced edits into one version-fenced draft bundle', () => {
+    const advanced = buildProductAdvancedDraft({
+      shopId: fixtureProduct.shopId,
+      productId: fixtureProduct.id,
+      model: readProductAdvancedModel(advancedBundle, fixtureProduct.id),
+      modifierState: {
+        '44444444-4444-4444-8444-444444444444': { linked: true, maxQuantity: '4' },
+      },
+      comboState: { '55555555-5555-4555-8555-555555555555': true },
+      recipeState: { '66666666-6666-4666-8666-666666666666': '750000' },
+    });
+    const result = buildProductDraftBundle(advancedBundle, {
+      product: { ...fixtureProduct, name: 'Classic Smash XL' },
+      changedPaths: ['products[].name'],
+      advanced,
+    });
+    const snapshot = result.bundleJson.snapshot as CatalogJsonObject;
+    const products = snapshot.products as CatalogJsonObject[];
+    const links = snapshot.productModifierLinks as CatalogJsonObject[];
+    const recipes = snapshot.recipeLines as CatalogJsonObject[];
+
+    expect(products.find((product) => product.id === fixtureProduct.id)?.name).toBe(
+      'Classic Smash XL',
+    );
+    expect(links.find((link) => link.productId === fixtureProduct.id)?.maxQuantity).toBe(4);
+    expect(recipes.find((line) => line.productId === fixtureProduct.id)?.quantityMicros).toBe(
+      750000,
+    );
+    expect(result.changedPaths).toEqual([
+      'products[].name',
+      'productModifierLinks',
+      'comboBeverageOptions',
+      'recipeLines',
+    ]);
   });
 
   it('replaces only this product advanced relations in the draft bundle', () => {
