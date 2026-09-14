@@ -19,6 +19,8 @@ export function OrderTypesPage({ workspace, updating, onUpdate }: OrderTypesPage
       behavior: orderType.behavior,
       active: orderType.active,
       sortOrder: orderType.sortOrder,
+      expectedSettingsVersion: workspace.settingsVersion,
+      expectedEditVersion: orderType.editVersion,
     });
   }
 
