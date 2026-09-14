@@ -73,6 +73,11 @@ async function mockPublishing(page: Page) {
               stale: currentPublishVersion !== 48,
               changedProductIds: ['11111111-1111-4111-8111-111111111111'],
               priceChangedProductIds: ['11111111-1111-4111-8111-111111111111'],
+              changedRelationCounts: {
+                productModifierLinks: 0,
+                comboBeverageOptions: 0,
+                recipeLines: 0,
+              },
             },
           ],
           schedules: pendingSchedule
