@@ -1,0 +1,153 @@
+name: Temporary Plan 2 Final P2 GREEN
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-3-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  apply-green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply deterministic GREEN patch
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count == 0 and new in text:
+                  return False
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one source match, found {count}")
+              p.write_text(text.replace(old, new, 1))
+              return True
+
+          changed = False
+
+          changed |= replace_once(
+              'packages/admin-contracts/src/catalog.ts',
+              "  priceChangedProductIds: string[];\n};",
+              "  priceChangedProductIds: string[];\n  changedRelationCounts: {\n    productModifierLinks: number;\n    comboBeverageOptions: number;\n    recipeLines: number;\n  };\n};",
+          )
+
+          changed |= replace_once(
+              'apps/admin/src/catalog/ProductInspector.tsx',
+              "        key={`${product.id}:${product.name}:${product.priceMinor}:${product.soldOut}:${product.active}`}\n",
+              "        key={`${product.id}:${product.name}:${product.description}:${product.priceMinor}:${product.imageKey}:${product.bestSeller}:${product.soldOut}:${product.active}`}\n",
+          )
+
+          changed |= replace_once(
+              'apps/admin/src/settings/ReasonCodesPage.tsx',
+              "  const [label, setLabel] = useState(reason.label);\n  const [active, setActive] = useState(reason.active);\n",
+              "  const [label, setLabel] = useState(reason.label);\n  const [active, setActive] = useState(reason.active);\n  const [expectedVersion] = useState(reason.version);\n",
+          )
+          changed |= replace_once(
+              'apps/admin/src/settings/ReasonCodesPage.tsx',
+              "      expectedVersion: reason.version,\n",
+              "      expectedVersion: expectedVersion,\n",
+          )
+
+          changed |= replace_once(
+              'apps/admin/src/catalog/PublishReviewPage.tsx',
+              "  const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);\n",
+              "  const [pendingRestoreVersion, setPendingRestoreVersion] = useState<number | null>(null);\n  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);\n",
+          )
+          changed |= replace_once(
+              'apps/admin/src/catalog/PublishReviewPage.tsx',
+              "  const data = publishing.publishingQuery.data;\n  const preview = data?.draftPreviews[0];\n",
+              "  const data = publishing.publishingQuery.data;\n  const draftPreviews = data?.draftPreviews ?? [];\n  const preview =\n    draftPreviews.find((candidate) => candidate.draftId === selectedDraftId) ?? draftPreviews[0];\n",
+          )
+          changed |= replace_once(
+              'apps/admin/src/catalog/PublishReviewPage.tsx',
+              "        <div>\n          <strong>\n            {countLabel(preview.priceChangedProductIds.length, 'price change', 'price changes')}\n          </strong>\n          <span>Pricing changes require catalog.pricing at execution time.</span>\n        </div>\n",
+              "        <div>\n          <strong>\n            {countLabel(preview.priceChangedProductIds.length, 'price change', 'price changes')}\n          </strong>\n          <span>Pricing changes require catalog.pricing at execution time.</span>\n        </div>\n        <div>\n          <strong>\n            {countLabel(\n              preview.changedRelationCounts.productModifierLinks,\n              'modifier link changed',\n              'modifier links changed',\n            )}\n          </strong>\n          <span>Product-to-modifier relations that differ from the published catalog.</span>\n        </div>\n        <div>\n          <strong>\n            {countLabel(\n              preview.changedRelationCounts.comboBeverageOptions,\n              'combo option changed',\n              'combo options changed',\n            )}\n          </strong>\n          <span>Combo beverage relations that differ from the published catalog.</span>\n        </div>\n        <div>\n          <strong>\n            {countLabel(\n              preview.changedRelationCounts.recipeLines,\n              'recipe line changed',\n              'recipe lines changed',\n            )}\n          </strong>\n          <span>Recipe relations that differ from the published catalog.</span>\n        </div>\n",
+          )
+          changed |= replace_once(
+              'apps/admin/src/catalog/PublishReviewPage.tsx',
+              "          <RecurringAvailabilityEditor\n            workspace={recurring.recurringQuery.data}\n            isLoading={recurring.recurringQuery.isLoading}\n            isError={recurring.recurringQuery.isError}\n            disabled={!canEditCatalog}\n            isPending={recurring.saveRule.isPending}\n            onSave={saveRecurringAvailability}\n          />\n\n          {preview ? (\n",
+              "          <RecurringAvailabilityEditor\n            workspace={recurring.recurringQuery.data}\n            isLoading={recurring.recurringQuery.isLoading}\n            isError={recurring.recurringQuery.isError}\n            disabled={!canEditCatalog}\n            isPending={recurring.saveRule.isPending}\n            onSave={saveRecurringAvailability}\n          />\n\n          {draftPreviews.length > 1 ? (\n            <label className=\"admin-field\">\n              <span>Draft to review</span>\n              <select\n                aria-label=\"Draft to review\"\n                value={preview?.draftId ?? ''}\n                onChange={(event) => setSelectedDraftId(event.target.value)}\n              >\n                {draftPreviews.map((candidate) => (\n                  <option key={candidate.draftId} value={candidate.draftId}>\n                    Draft {candidate.draftId.slice(0, 8)} · r{candidate.draftRevision}\n                  </option>\n                ))}\n              </select>\n            </label>\n          ) : null}\n\n          {preview ? (\n",
+          )
+
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "type PublishingDraftRow = {\n  id: string;\n  shop_id: string;\n  base_publish_version: number | string;\n  draft_revision: number | string;\n  working_bundle_json: unknown;\n};\n\n",
+              "type PublishingDraftRow = {\n  id: string;\n  shop_id: string;\n  base_publish_version: number | string;\n  draft_revision: number | string;\n  working_bundle_json: unknown;\n};\n\ntype PublishedBundleRow = {\n  bundle_json: unknown;\n};\n\ntype CatalogRelationKey = 'productModifierLinks' | 'comboBeverageOptions' | 'recipeLines';\n\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "type ComparableProduct = {\n  categoryId: string;\n  slug: string | null;\n  name: string;\n  description: string | null;\n  priceMinor: number;\n  imageKey: string | null;\n  family: string | null;\n  bestSeller: boolean;\n  active: boolean;\n  soldOut: boolean;\n  isCombo: boolean;\n  sortOrder: number;\n};\n\n",
+              "type ComparableProduct = {\n  categoryId: string;\n  slug: string | null;\n  name: string;\n  description: string | null;\n  priceMinor: number;\n  imageKey: string | null;\n  family: string | null;\n  bestSeller: boolean;\n  active: boolean;\n  soldOut: boolean;\n  isCombo: boolean;\n  sortOrder: number;\n};\n\nconst relationIdentityFields: Record<CatalogRelationKey, readonly string[]> = {\n  productModifierLinks: ['productId', 'modifierId'],\n  comboBeverageOptions: ['comboProductId', 'beverageProductId'],\n  recipeLines: ['productId', 'inventoryItemId'],\n};\n\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "function productsEqual(a: ComparableProduct, b: ComparableProduct): boolean {\n  return (\n    a.categoryId === b.categoryId &&\n    a.slug === b.slug &&\n    a.name === b.name &&\n    a.description === b.description &&\n    a.priceMinor === b.priceMinor &&\n    a.imageKey === b.imageKey &&\n    a.family === b.family &&\n    a.bestSeller === b.bestSeller &&\n    a.active === b.active &&\n    a.soldOut === b.soldOut &&\n    a.isCombo === b.isCombo &&\n    a.sortOrder === b.sortOrder\n  );\n}\n\n",
+              "function productsEqual(a: ComparableProduct, b: ComparableProduct): boolean {\n  return (\n    a.categoryId === b.categoryId &&\n    a.slug === b.slug &&\n    a.name === b.name &&\n    a.description === b.description &&\n    a.priceMinor === b.priceMinor &&\n    a.imageKey === b.imageKey &&\n    a.family === b.family &&\n    a.bestSeller === b.bestSeller &&\n    a.active === b.active &&\n    a.soldOut === b.soldOut &&\n    a.isCombo === b.isCombo &&\n    a.sortOrder === b.sortOrder\n  );\n}\n\nfunction stableJson(value: unknown): string {\n  if (value === undefined) return 'undefined';\n  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;\n  if (isRecord(value)) {\n    return `{${Object.keys(value)\n      .sort()\n      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)\n      .join(',')}}`;\n  }\n  return JSON.stringify(value);\n}\n\nfunction readRelationMap(bundle: unknown, key: CatalogRelationKey): Map<string, string> {\n  if (!isRecord(bundle) || !isRecord(bundle['snapshot'])) {\n    throw new CatalogServiceError('backend_contract_invalid');\n  }\n  const rawCollection = bundle['snapshot'][key];\n  if (rawCollection === undefined) return new Map();\n  if (!Array.isArray(rawCollection)) throw new CatalogServiceError('backend_contract_invalid');\n\n  const rows = new Map<string, string>();\n  for (const rawRow of rawCollection) {\n    if (!isRecord(rawRow)) throw new CatalogServiceError('backend_contract_invalid');\n    const identity = relationIdentityFields[key]\n      .map((field) => readNonemptyString(rawRow[field]))\n      .join('\\u0000');\n    if (rows.has(identity)) throw new CatalogServiceError('backend_contract_invalid');\n    rows.set(identity, stableJson(rawRow));\n  }\n  return rows;\n}\n\nfunction countRelationChanges(\n  draftBundle: unknown,\n  publishedBundle: unknown,\n  key: CatalogRelationKey,\n): number {\n  const draftRows = readRelationMap(draftBundle, key);\n  const publishedRows = readRelationMap(publishedBundle, key);\n  const identities = new Set([...draftRows.keys(), ...publishedRows.keys()]);\n  let changed = 0;\n  for (const identity of identities) {\n    if (draftRows.get(identity) !== publishedRows.get(identity)) changed += 1;\n  }\n  return changed;\n}\n\nfunction buildRelationChangeCounts(draftBundle: unknown, publishedBundle: unknown) {\n  return {\n    productModifierLinks: countRelationChanges(\n      draftBundle,\n      publishedBundle,\n      'productModifierLinks',\n    ),\n    comboBeverageOptions: countRelationChanges(\n      draftBundle,\n      publishedBundle,\n      'comboBeverageOptions',\n    ),\n    recipeLines: countRelationChanges(draftBundle, publishedBundle, 'recipeLines'),\n  };\n}\n\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "function buildPublishPreview(\n  row: PublishingDraftRow,\n  currentPublishVersion: number,\n  liveProducts: readonly CatalogProductDetail[],\n): CatalogPublishPreview {\n",
+              "function buildPublishPreview(\n  row: PublishingDraftRow,\n  currentPublishVersion: number,\n  liveProducts: readonly CatalogProductDetail[],\n  publishedBundle: unknown,\n): CatalogPublishPreview {\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "    changedProductIds,\n    priceChangedProductIds,\n  };\n}\n",
+              "    changedProductIds,\n    priceChangedProductIds,\n    changedRelationCounts: buildRelationChangeCounts(row.working_bundle_json, publishedBundle),\n  };\n}\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "      const [currentPublishVersion, versions, schedules, drafts, productRows] = await Promise.all([\n",
+              "      const [\n        currentPublishVersion,\n        versions,\n        schedules,\n        drafts,\n        productRows,\n        publishedBundleRows,\n      ] = await Promise.all([\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "        client.select<ProductRow[]>(\n          'products',\n          new URLSearchParams({\n            select:\n              'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',\n            shop_id: `eq.${shopId}`,\n            order: 'sort_order.asc,id.asc',\n          }),\n        ),\n      ]);\n\n      const liveProducts = productRows.map(mapProduct);\n",
+              "        client.select<ProductRow[]>(\n          'products',\n          new URLSearchParams({\n            select:\n              'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',\n            shop_id: `eq.${shopId}`,\n            order: 'sort_order.asc,id.asc',\n          }),\n        ),\n        client.select<PublishedBundleRow[]>(\n          'catalog_publish_versions',\n          new URLSearchParams({\n            select: 'bundle_json',\n            business_id: `eq.${businessId}`,\n            shop_id: `eq.${shopId}`,\n            order: 'publish_version.desc',\n            limit: '1',\n          }),\n        ),\n      ]);\n\n      const liveProducts = productRows.map(mapProduct);\n      const publishedBundle =\n        publishedBundleRows[0]?.bundle_json ?? {\n          snapshot: { productModifierLinks: [], comboBeverageOptions: [], recipeLines: [] },\n        };\n",
+          )
+          changed |= replace_once(
+              'apps/admin/server/catalog/catalogService.ts',
+              "        draftPreviews: drafts.map((draft) =>\n          buildPublishPreview(draft, currentPublishVersion, liveProducts),\n        ),\n",
+              "        draftPreviews: drafts.map((draft) =>\n          buildPublishPreview(draft, currentPublishVersion, liveProducts, publishedBundle),\n        ),\n",
+          )
+
+          if not changed:
+              print('GREEN patch already applied; nothing to do.')
+          PY
+
+          npx prettier --write \
+            packages/admin-contracts/src/catalog.ts \
+            apps/admin/src/catalog/ProductInspector.tsx \
+            apps/admin/src/settings/ReasonCodesPage.tsx \
+            apps/admin/src/catalog/PublishReviewPage.tsx \
+            apps/admin/server/catalog/catalogService.ts
+
+          npx vitest run apps/admin/src/catalog/finalReviewP2Regressions.source.test.ts apps/admin/server/catalog/catalogService.test.ts apps/admin/src/catalog/ProductEditor.test.tsx apps/admin/src/settings/SettingsPage.test.tsx
+          npm run typecheck:admin-ui
+          npm run typecheck:admin-server
+
+          if git diff --quiet; then
+            echo "No changes required."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            packages/admin-contracts/src/catalog.ts \
+            apps/admin/src/catalog/ProductInspector.tsx \
+            apps/admin/src/settings/ReasonCodesPage.tsx \
+            apps/admin/src/catalog/PublishReviewPage.tsx \
+            apps/admin/server/catalog/catalogService.ts
+          git commit -m "fix(plan2): close final P2 review gaps"
+          git push origin HEAD:tmp/admin-plan2-final-review-3-fixes
