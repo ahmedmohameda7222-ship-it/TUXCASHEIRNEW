@@ -1,5 +1,5 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { resolveWorkspaceSetting, settingSourceLabel } from './settingsModel';
 import type { SettingOverrideUpdateDraft } from './useSettings';
@@ -16,6 +16,12 @@ type SettingOverrideEditorProps = {
   max?: number;
   updating: boolean;
   onUpdate(draft: SettingOverrideUpdateDraft): void | Promise<void>;
+};
+
+type SettingEditorState = {
+  raw: string;
+  baselineRaw: string;
+  expectedVersion: number | null;
 };
 
 function initialText(value: unknown, kind: SettingEditorKind): string {
@@ -47,15 +53,53 @@ export function SettingOverrideEditor({
   onUpdate,
 }: SettingOverrideEditorProps) {
   const resolved = resolveWorkspaceSetting(workspace, settingKey);
-  const [raw, setRaw] = useState(() => initialText(resolved.value, kind));
+  const resolvedRaw = initialText(resolved.value, kind);
+  const resolvedExpectedVersion = resolved.source === 'shop' ? resolved.version : null;
+  const latestResolvedRef = useRef({
+    raw: resolvedRaw,
+    expectedVersion: resolvedExpectedVersion,
+  });
+  latestResolvedRef.current = {
+    raw: resolvedRaw,
+    expectedVersion: resolvedExpectedVersion,
+  };
+
+  const [editor, setEditor] = useState<SettingEditorState>(() => ({
+    raw: resolvedRaw,
+    baselineRaw: resolvedRaw,
+    expectedVersion: resolvedExpectedVersion,
+  }));
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditor((current) => {
+      if (current.raw !== current.baselineRaw) return current;
+      if (
+        current.raw === resolvedRaw &&
+        current.baselineRaw === resolvedRaw &&
+        current.expectedVersion === resolvedExpectedVersion
+      ) {
+        return current;
+      }
+      return {
+        raw: resolvedRaw,
+        baselineRaw: resolvedRaw,
+        expectedVersion: resolvedExpectedVersion,
+      };
+    });
+  }, [resolvedExpectedVersion, resolvedRaw]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     try {
-      const value = parseValue(raw, kind, min, max);
-      await onUpdate({ settingKey, value });
+      const value = parseValue(editor.raw, kind, min, max);
+      await onUpdate({ settingKey, value, expectedVersion: editor.expectedVersion });
+      setEditor((current) => ({
+        raw: current.raw,
+        baselineRaw: current.raw,
+        expectedVersion: latestResolvedRef.current.expectedVersion,
+      }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save this setting.');
     }
@@ -82,9 +126,11 @@ export function SettingOverrideEditor({
           <span>{label}</span>
           <select
             aria-label={label}
-            value={raw}
+            value={editor.raw}
             disabled={updating}
-            onChange={(event) => setRaw(event.target.value)}
+            onChange={(event) =>
+              setEditor((current) => ({ ...current, raw: event.target.value }))
+            }
           >
             <option value="false">Disabled</option>
             <option value="true">Enabled</option>
@@ -100,9 +146,11 @@ export function SettingOverrideEditor({
             min={min}
             max={max}
             step={kind === 'integer' ? 1 : undefined}
-            value={raw}
+            value={editor.raw}
             disabled={updating}
-            onChange={(event) => setRaw(event.target.value)}
+            onChange={(event) =>
+              setEditor((current) => ({ ...current, raw: event.target.value }))
+            }
           />
         </label>
       )}

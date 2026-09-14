@@ -15,6 +15,18 @@ function nonNegativeIntegerSetting(
   return value;
 }
 
+function booleanSetting(
+  values: Readonly<Record<string, unknown>>,
+  key: 'checkout.requireCustomerPhone',
+): boolean {
+  const value = values[key];
+  if (value === undefined) return false;
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`published ${key} is invalid`);
+  }
+  return value;
+}
+
 export function projectPublishedCheckoutAuthority(
   bundleJson: unknown,
   expectedShopId: string,
@@ -43,6 +55,7 @@ export function projectPublishedCheckoutAuthority(
       10_000,
     ),
     taxBps: nonNegativeIntegerSetting(settings?.values ?? {}, 'checkout.taxBps', 10_000),
+    requireCustomerPhone: booleanSetting(settings?.values ?? {}, 'checkout.requireCustomerPhone'),
     orderTypes: snapshot.orderTypes.map((orderType) => ({
       behavior: orderType.behavior,
       active: orderType.active,

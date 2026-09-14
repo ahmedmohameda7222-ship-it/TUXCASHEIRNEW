@@ -12,6 +12,7 @@ export interface PublishedCheckoutPolicy {
   minimumOrderMinor: number;
   serviceChargeBps: number;
   taxBps: number;
+  requireCustomerPhone: boolean;
   orderTypes: PublishedOrderTypeLabel[];
   paymentMethods: PublishedPaymentMethodLabel[];
 }
@@ -37,6 +38,7 @@ export function projectPublishedCheckoutPolicy(
     minimumOrderMinor: ordering.minimumOrderMinor,
     serviceChargeBps: ordering.serviceChargeBps ?? 0,
     taxBps: ordering.taxBps ?? 0,
+    requireCustomerPhone: ordering.requireCustomerPhone ?? false,
     orderTypes: ordering.fulfillmentPreferences.map((preference) => orderTypeLabel[preference]),
     paymentMethods: ordering.paymentPreferences.map((preference) => paymentMethodLabel[preference]),
   };

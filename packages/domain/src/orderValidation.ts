@@ -175,6 +175,18 @@ export function validateOrderDraft(
   let checkoutPolicy: EffectiveCheckoutPolicy | null = null;
   try {
     checkoutPolicy = resolveEffectiveCheckoutPolicy(configuration);
+    if (orderType?.behavior !== 'DELIVERY' && checkoutPolicy.requireCustomerPhone) {
+      const normalized = normalizeEgyptianPhone(draft.delivery.displayPhone);
+      if (!normalized.valid) {
+        issues.push({
+          path: 'delivery.phone',
+          code: 'CUSTOMER_PHONE_REQUIRED',
+          message: 'Enter a valid Egyptian mobile number.',
+        });
+      } else {
+        normalizedDeliveryPhone = normalized.normalizedPhone;
+      }
+    }
     if (
       orderType?.behavior === 'DELIVERY' &&
       activeDeliveryZone !== undefined &&

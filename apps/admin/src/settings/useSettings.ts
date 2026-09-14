@@ -40,6 +40,7 @@ export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
 export type SettingOverrideUpdateDraft = {
   settingKey: string;
   value: unknown;
+  expectedVersion: number | null;
 };
 
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
@@ -112,13 +113,12 @@ export function buildSettingOverrideCommand(
   draft: SettingOverrideUpdateDraft,
 ): SettingOverrideUpdateCommand {
   requireWorkspaceShop(shopId, workspace);
-  const currentOverride = workspace.shopOverrides.find((row) => row.key === draft.settingKey);
   return {
     type: 'setting.override.upsert',
     shopId,
     settingKey: draft.settingKey,
     value: draft.value,
-    expectedVersion: currentOverride?.version ?? null,
+    expectedVersion: draft.expectedVersion,
   };
 }
 

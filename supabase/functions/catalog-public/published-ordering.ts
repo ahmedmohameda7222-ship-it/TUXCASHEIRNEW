@@ -26,7 +26,7 @@ function nonNegativeIntegerSetting(
 
 function booleanSetting(
   values: Readonly<Record<string, unknown>>,
-  key: 'checkout.allowDiscountStacking',
+  key: 'checkout.allowDiscountStacking' | 'checkout.requireCustomerPhone',
   fallback = false,
 ): boolean {
   const value = values[key];
@@ -116,6 +116,7 @@ export function projectPublishedPublicOrdering(
       ),
       taxBps: nonNegativeIntegerSetting(settings.values, 'checkout.taxBps', 10_000),
       allowDiscountStacking: booleanSetting(settings.values, 'checkout.allowDiscountStacking'),
+      requireCustomerPhone: booleanSetting(settings.values, 'checkout.requireCustomerPhone'),
       fulfillmentPreferences,
       paymentPreferences,
     },
