@@ -28,6 +28,7 @@ function validSnapshotV2() {
       serviceChargeBps: 500,
       taxBps: 1400,
       allowDiscountStacking: true,
+      requireCustomerPhone: false,
       fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
       paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
     },
