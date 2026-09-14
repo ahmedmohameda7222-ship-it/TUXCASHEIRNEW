@@ -1,0 +1,51 @@
+name: Plan 2 Lint Fix
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-lint-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-lint-fix
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply exact scheduler mock lint fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/admin/server/catalog/scheduler.test.ts')
+          text = path.read_text()
+          old = """    const rpc = vi.fn(async (_name: string, _payload: Readonly<Record<string, unknown>>) => ({\n      ok: true,\n      publishVersion: 49,\n      replayed: true,\n    }));\n"""
+          new = """    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {\n      void name;\n      void payload;\n      return {\n        ok: true,\n        publishVersion: 49,\n        replayed: true,\n      };\n    });\n"""
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one scheduler mock block, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          npx prettier --write apps/admin/server/catalog/scheduler.test.ts
+      - name: Verify lint fix
+        run: |
+          npx prettier --check apps/admin/server/catalog/scheduler.test.ts
+          npx eslint apps/admin/server/catalog/scheduler.test.ts --max-warnings 0
+          npx vitest run apps/admin/server/catalog/scheduler.test.ts
+          git diff --check
+      - name: Commit verified source change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- apps/admin/server/catalog/scheduler.test.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'test(admin): satisfy scheduler mock lint contract'
+          git push origin HEAD:tmp/admin-plan2-lint-fix
