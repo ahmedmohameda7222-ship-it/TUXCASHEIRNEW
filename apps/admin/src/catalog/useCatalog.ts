@@ -163,38 +163,53 @@ export function useCatalog(shopId: string | undefined) {
     );
   }, [draftProducts, workspaceQuery.data?.products]);
 
+  async function loadOrCreateDraft(product: CatalogProductDetail): Promise<ActiveCatalogDraft> {
+    if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
+    const workspace = currentWorkspace(queryClient, shopId) ?? workspaceQuery.data;
+    if (!workspace) throw new CatalogUiError('catalog_not_loaded');
+
+    const existing = activeDraftRef.current;
+    if (existing && existing.basePublishVersion === workspace.currentPublishVersion) {
+      return existing;
+    }
+
+    const created = await adminFetch<CatalogDraftCreateResult>(
+      '/api/admin/catalog',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'draft.create',
+          shopId,
+          expectedVersion: workspace.currentPublishVersion,
+          title: `Catalog edits · ${product.name}`,
+        }),
+      },
+      csrfTokenForMutation(session),
+    );
+    if (!created.ok) throw new CatalogUiError(created.code, created.currentVersion);
+
+    const draft: ActiveCatalogDraft = {
+      draftId: created.draftId,
+      draftRevision: created.draftRevision,
+      basePublishVersion: created.basePublishVersion,
+      bundleJson: created.bundleJson,
+    };
+    activeDraftRef.current = draft;
+    return draft;
+  }
+
+  const prepareProductDraft = useMutation({
+    mutationFn: loadOrCreateDraft,
+    onSuccess(draft) {
+      setActiveDraft(draft);
+      setDraftInvalidatedByLiveChange(false);
+    },
+  });
+
   const saveProduct = useMutation({
     mutationFn: async (input: ProductEditorDraft) => {
       const { product } = input;
-      if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
-      const workspace = currentWorkspace(queryClient, shopId) ?? workspaceQuery.data;
-      if (!workspace) throw new CatalogUiError('catalog_not_loaded');
-      const csrfToken = csrfTokenForMutation(session);
-
-      let draft = activeDraftRef.current;
-      if (!draft || draft.basePublishVersion !== workspace.currentPublishVersion) {
-        const created = await adminFetch<CatalogDraftCreateResult>(
-          '/api/admin/catalog',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              type: 'draft.create',
-              shopId,
-              expectedVersion: workspace.currentPublishVersion,
-              title: `Catalog edits · ${product.name}`,
-            }),
-          },
-          csrfToken,
-        );
-        if (!created.ok) throw new CatalogUiError(created.code, created.currentVersion);
-        draft = {
-          draftId: created.draftId,
-          draftRevision: created.draftRevision,
-          basePublishVersion: created.basePublishVersion,
-          bundleJson: created.bundleJson,
-        };
-      }
-
+      const draft = await loadOrCreateDraft(product);
       const built = buildProductDraftBundle(draft.bundleJson, input);
       const saved = await adminFetch<CatalogDraftSaveResult>(
         '/api/admin/catalog',
@@ -214,7 +229,7 @@ export function useCatalog(shopId: string | undefined) {
             ],
           }),
         },
-        csrfToken,
+        csrfTokenForMutation(session),
       );
       if (!saved.ok) throw new CatalogUiError(saved.code);
 
@@ -263,6 +278,7 @@ export function useCatalog(shopId: string | undefined) {
     products,
     activeDraft,
     draftInvalidatedByLiveChange,
+    prepareProductDraft,
     saveProduct,
     setAvailability,
   };
