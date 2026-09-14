@@ -153,9 +153,9 @@ function parsePayment(value: unknown): PaymentDraft {
   if (mode === 'NONE') return { mode: 'NONE' };
   if (mode === 'SINGLE') {
     const reference = optionalNullableString(payment['reference'], 'OrderDraft.payment.reference');
-    const manuallyConfirmed = optionalBoolean(
-      payment['manuallyConfirmed'],
-      'OrderDraft.payment.manuallyConfirmed',
+    const manualConfirmed = optionalBoolean(
+      payment['manualConfirmed'],
+      'OrderDraft.payment.manualConfirmed',
     );
     return {
       mode: 'SINGLE',
@@ -165,7 +165,7 @@ function parsePayment(value: unknown): PaymentDraft {
         'OrderDraft.payment.cashReceivedMinor',
       ),
       ...(reference === undefined ? {} : { reference }),
-      ...(manuallyConfirmed === undefined ? {} : { manuallyConfirmed }),
+      ...(manualConfirmed === undefined ? {} : { manualConfirmed }),
     };
   }
   if (mode === 'SPLIT') {
@@ -177,13 +177,13 @@ function parsePayment(value: unknown): PaymentDraft {
       payment['referenceB'],
       'OrderDraft.payment.referenceB',
     );
-    const manuallyConfirmedA = optionalBoolean(
-      payment['manuallyConfirmedA'],
-      'OrderDraft.payment.manuallyConfirmedA',
+    const manualConfirmedA = optionalBoolean(
+      payment['manualConfirmedA'],
+      'OrderDraft.payment.manualConfirmedA',
     );
-    const manuallyConfirmedB = optionalBoolean(
-      payment['manuallyConfirmedB'],
-      'OrderDraft.payment.manuallyConfirmedB',
+    const manualConfirmedB = optionalBoolean(
+      payment['manualConfirmedB'],
+      'OrderDraft.payment.manualConfirmedB',
     );
     return {
       mode: 'SPLIT',
@@ -194,8 +194,8 @@ function parsePayment(value: unknown): PaymentDraft {
       methodBId: entityId<PaymentMethodId>(payment['methodBId'], 'OrderDraft.payment.methodBId'),
       ...(referenceA === undefined ? {} : { referenceA }),
       ...(referenceB === undefined ? {} : { referenceB }),
-      ...(manuallyConfirmedA === undefined ? {} : { manuallyConfirmedA }),
-      ...(manuallyConfirmedB === undefined ? {} : { manuallyConfirmedB }),
+      ...(manualConfirmedA === undefined ? {} : { manualConfirmedA }),
+      ...(manualConfirmedB === undefined ? {} : { manualConfirmedB }),
     };
   }
   throw new InvalidOrderDraftError('OrderDraft.payment.mode is unsupported.');
