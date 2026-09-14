@@ -142,6 +142,31 @@ describe('Settings client CAS command builders', () => {
     });
   });
 
+  it('preserves the form-captured override version after the workspace refreshes', () => {
+    const refreshedWorkspace: AdminSettingsWorkspace = {
+      ...workspace,
+      shopOverrides: [{ key: 'receipt.orderPrefix', value: 'REMOTE-', version: 5 }],
+    };
+
+    expect(
+      buildSettingOverrideCommand(
+        shopId,
+        refreshedWorkspace,
+        {
+          settingKey: 'receipt.orderPrefix',
+          value: 'LOCAL-',
+          expectedVersion: 4,
+        } as never,
+      ),
+    ).toEqual({
+      type: 'setting.override.upsert',
+      shopId,
+      settingKey: 'receipt.orderPrefix',
+      value: 'LOCAL-',
+      expectedVersion: 4,
+    });
+  });
+
   it('fails closed when the requested canonical row is not in the loaded workspace', () => {
     expect(() =>
       buildOrderTypeUpdateCommand(shopId, workspace, {
