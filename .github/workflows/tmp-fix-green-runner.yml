@@ -1,0 +1,51 @@
+name: Temp Fix Plan 2 Green Runner
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-2-fixes
+
+permissions:
+  contents: write
+
+jobs:
+  fix-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-final-review-2-fixes
+      - name: Replace brittle orders matcher
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('.github/workflows/tmp-plan2-green-patch.yml')
+          text = path.read_text()
+          pattern = r"          # Persist the validated customer phone and confirmation evidence in immutable orders\..*?          # Preserve the new optional rollout fields through sync decoding\."
+          replacement = '''          # Persist the validated customer phone and confirmation evidence in immutable orders.
+          path = 'packages/application/src/orders.ts'
+          regex_once(path,
+          r"(if \(orderType\.behavior !== 'DELIVERY'\) \{\s+return \{\s+orderTypeId: orderType\.id,\s+orderTypeLabel: orderType\.name,\s+behavior: orderType\.behavior,)(\s+delivery: null,)",
+          r"\\1\\n        customerPhone: normalizedDeliveryPhone ?? '',\\2")
+          regex_once(path,
+          r"(reference: part\.reference,)(\s+\};\s+\}\s+return \{)",
+          r"\\1\\n          manuallyConfirmed: part.manuallyConfirmed,\\2")
+          regex_once(path,
+          r"(changeMinor: null,\s+reference: part\.reference,)(\s+\};)",
+          r"\\1\\n        manuallyConfirmed: part.manuallyConfirmed,\\2")
+
+          # Preserve the new optional rollout fields through sync decoding.'''
+          updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'runner block match count={count}')
+          path.write_text(updated)
+          PY
+      - name: Remove patcher and commit
+        run: |
+          git rm .github/workflows/tmp-fix-green-runner.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/tmp-plan2-green-patch.yml
+          git commit -m "chore(plan2): harden green patch matcher"
+          git push origin HEAD:tmp/admin-plan2-final-review-2-fixes
