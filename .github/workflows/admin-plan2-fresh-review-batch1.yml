@@ -1,10 +1,9 @@
 name: Admin Plan 2 Fresh Review Batch 1
-# retrigger after workflow registration
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/admin-02-catalog-settings
+      - main
     paths:
       - '.github/workflows/admin-plan2-fresh-review-batch1.yml'
 
@@ -13,12 +12,13 @@ permissions:
 
 jobs:
   verified-fix:
+    if: github.head_ref == 'feat/admin-02-catalog-settings'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: feat/admin-02-catalog-settings
-          fetch-depth: 3
+          fetch-depth: 4
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^^)" = "275a6e40ac04a3706eb963fcc146b24b0557a006"
+          test "$(git rev-parse HEAD^^^)" = "275a6e40ac04a3706eb963fcc146b24b0557a006"
       - name: Install locked dependencies
         run: npm ci
       - name: Apply deterministic batch
