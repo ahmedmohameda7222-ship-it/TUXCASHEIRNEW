@@ -1,4 +1,5 @@
 name: Admin Plan 2 Fresh Review Batch 1
+# retrigger after workflow registration
 
 on:
   push:
@@ -17,16 +18,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: feat/admin-02-catalog-settings
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - name: Verify known-good parent
+      - name: Verify known-good ancestry
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "275a6e40ac04a3706eb963fcc146b24b0557a006"
+          test "$(git rev-parse HEAD^^)" = "275a6e40ac04a3706eb963fcc146b24b0557a006"
       - name: Install locked dependencies
         run: npm ci
       - name: Apply deterministic batch
@@ -42,7 +43,6 @@ jobs:
                   raise SystemExit(f"{path}: expected exactly one match, found {count}")
               p.write_text(text.replace(old, new, 1))
 
-          # 1) Preserve pickup phone through ONLINE acceptance.
           replace_once(
               'packages/application/src/onlineOrderAcceptance.ts',
               """    delivery = {\n      displayPhone: '',\n      normalizedPhone: '',\n      customerName: '',\n""",
@@ -85,7 +85,6 @@ jobs:
 '''
           test_path.write_text(test_text.replace(marker, regression + marker, 1))
 
-          # 2) Generate stable unique public slugs for newly-created Admin products.
           helper = Path('apps/admin/src/catalog/catalogProductSlug.ts')
           if helper.exists():
               raise SystemExit('catalogProductSlug.ts already exists')
@@ -133,7 +132,6 @@ export function createCatalogProductSlug(productId: string): string {
 '''
           product_test.write_text(product_text.replace(product_marker, slug_test + product_marker, 1))
 
-          # 3) Remove unsupported scheduled-order setting from Admin UI + trusted BFF schema.
           scheduled_block = """        <SettingOverrideEditor\n          workspace={workspace}\n          settingKey=\"checkout.allowScheduledOrders\"\n          label=\"Scheduled orders\"\n          kind=\"boolean\"\n          updating={updating}\n          onUpdate={onUpdate}\n        />\n"""
           replace_once('apps/admin/src/settings/CheckoutPage.tsx', scheduled_block, '')
           replace_once(
