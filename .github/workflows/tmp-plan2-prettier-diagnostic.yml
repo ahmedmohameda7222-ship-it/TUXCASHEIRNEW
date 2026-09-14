@@ -1,0 +1,21 @@
+name: Temporary Plan 2 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-3-fixes
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Print exact Prettier diff
+        run: |
+          npx prettier --write apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts
+          git diff -- apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts
