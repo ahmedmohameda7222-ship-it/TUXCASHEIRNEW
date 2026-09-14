@@ -116,15 +116,21 @@ export function returnFailedDelivery(
     readonly workerId: WorkerId;
     readonly workerName: string;
     readonly reason: string;
+    readonly reasonCode?: OrderReasonCodeSnapshot;
+    readonly note?: string;
   },
 ): OrderSnapshot {
   if (order.status !== 'DONE' || order.fulfillment.behavior !== 'DELIVERY') {
     throw new DomainInvariantError('Only a DONE Delivery order can be marked Delivery Failed.');
   }
-  const reason = input.reason.trim();
+  if (input.reasonCode !== undefined && input.reasonCode.family !== 'REFUND_RETURN') {
+    throw new DomainInvariantError('Configured return reason must belong to REFUND_RETURN.');
+  }
+  const reason = (input.reasonCode?.label ?? input.reason).trim();
   if (reason.length === 0) {
     throw new DomainInvariantError('Delivery Failed reason is required.');
   }
+  const note = input.note?.trim() ?? '';
   const current = orderLifecycle(order);
   return {
     ...order,
@@ -138,6 +144,8 @@ export function returnFailedDelivery(
         workerId: input.workerId,
         workerName: input.workerName,
         reason,
+        ...(input.reasonCode !== undefined ? { reasonCode: input.reasonCode } : {}),
+        ...(note.length > 0 ? { note } : {}),
       },
     },
   };
