@@ -221,7 +221,7 @@ export function createSupabaseCatalogSchedulerExecutors(client: CatalogScheduler
       if (change.targetBasePublishVersion === null) {
         throw new Error('catalog_scheduler_publish_version_required');
       }
-      return client.rpc<unknown>('publish_catalog_draft_v1', {
+      return client.rpc<unknown>('publish_catalog_draft_scheduled_v1', {
         p_employee_id: change.createdByEmployeeId,
         p_draft_id: draftId,
         p_expected_draft_revision: expectedDraftRevision,
