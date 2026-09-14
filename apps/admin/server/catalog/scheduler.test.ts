@@ -150,6 +150,29 @@ describe('catalog scheduler', () => {
     expect(events).toEqual(['materialize:2026-09-11T18:00:00.000Z', 'claim']);
   });
 
+  it('routes scheduled publication through the replay-safe trusted RPC', async () => {
+    const rpc = vi.fn(async () => ({ ok: true, publishVersion: 49, replayed: true }));
+    const client: CatalogSchedulerRpcClient = {
+      async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
+        return (await rpc(name, payload)) as T;
+      },
+    };
+    const executors = createSupabaseCatalogSchedulerExecutors(client);
+    const change = scheduledPublish('replay', 2);
+
+    await expect(executors.publish(change)).resolves.toEqual({
+      ok: true,
+      publishVersion: 49,
+      replayed: true,
+    });
+    expect(rpc).toHaveBeenCalledWith('publish_catalog_draft_scheduled_v1', {
+      p_employee_id: 'employee-1',
+      p_draft_id: 'draft-replay',
+      p_expected_draft_revision: 3,
+      p_expected_base_publish_version: 48,
+    });
+  });
+
   it('routes recurring availability jobs through the dedicated baseline-preserving RPC', async () => {
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
       void name;
