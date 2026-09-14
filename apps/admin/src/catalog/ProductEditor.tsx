@@ -412,7 +412,9 @@ export function ProductEditor({
             <h2>Recipe / Inventory</h2>
             {advancedModel ? (
               advancedModel.inventoryItems.length === 0 ? (
-                <p className="admin-field__help">No recipe-tracked inventory items are available.</p>
+                <p className="admin-field__help">
+                  No recipe-tracked inventory items are available.
+                </p>
               ) : (
                 <div className="admin-catalog-advanced-list">
                   {advancedModel.inventoryItems.map((item) => {

@@ -252,15 +252,11 @@ async function mockAdvancedCatalog(page: Page) {
           sortOrder: 0,
         },
       ],
-      productModifierLinks: [
-        { shopId, productId, modifierId, maxQuantity: 2, sortOrder: 0 },
-      ],
+      productModifierLinks: [{ shopId, productId, modifierId, maxQuantity: 2, sortOrder: 0 }],
       comboBeverageOptions: [
         { shopId, comboProductId: productId, beverageProductId: beverageId, sortOrder: 0 },
       ],
-      recipeLines: [
-        { shopId, productId, inventoryItemId, quantityMicros: 250000 },
-      ],
+      recipeLines: [{ shopId, productId, inventoryItemId, quantityMicros: 250000 }],
     },
     inventoryItems: [
       {
@@ -408,9 +404,9 @@ test('advanced product controls load from a version-fenced draft and save canoni
   await page.getByLabel('Meat quantity micro-units').fill('750000');
   await page.getByRole('button', { name: 'Save draft' }).click();
 
-  await expect.poll(() => fixture.commands.some((command) => command.type === 'draft.save')).toBe(
-    true,
-  );
+  await expect
+    .poll(() => fixture.commands.some((command) => command.type === 'draft.save'))
+    .toBe(true);
   const save = fixture.commands.find((command) => command.type === 'draft.save');
   expect(save).toBeTruthy();
   const changes = save?.changes as Array<Record<string, unknown>>;
@@ -421,7 +417,11 @@ test('advanced product controls load from a version-fenced draft and save canoni
   const savedBundle = change.bundleJson as Record<string, unknown>;
   const snapshot = savedBundle.snapshot as Record<string, unknown>;
   expect(snapshot.productModifierLinks).toContainEqual(
-    expect.objectContaining({ productId: fixture.productId, modifierId: fixture.modifierId, maxQuantity: 4 }),
+    expect.objectContaining({
+      productId: fixture.productId,
+      modifierId: fixture.modifierId,
+      maxQuantity: 4,
+    }),
   );
   expect(snapshot.comboBeverageOptions).toContainEqual(
     expect.objectContaining({

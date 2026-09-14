@@ -190,7 +190,9 @@ export function readProductAdvancedModel(
         linked: link !== undefined,
         maxQuantity: link === undefined ? null : nullablePositiveIntegerField(link, 'maxQuantity'),
         sortOrder:
-          link === undefined ? integerField(modifier, 'sortOrder') : integerField(link, 'sortOrder'),
+          link === undefined
+            ? integerField(modifier, 'sortOrder')
+            : integerField(link, 'sortOrder'),
       };
     })
     .filter((modifier) => modifier.active || modifier.linked)
@@ -209,7 +211,9 @@ export function readProductAdvancedModel(
         active,
         selected: option !== undefined,
         sortOrder:
-          option === undefined ? integerField(product, 'sortOrder') : integerField(option, 'sortOrder'),
+          option === undefined
+            ? integerField(product, 'sortOrder')
+            : integerField(option, 'sortOrder'),
       };
     })
     .filter(
@@ -242,16 +246,19 @@ export function readProductAdvancedModel(
   };
 }
 
-export function buildProductAdvancedDraft(input: {
-  shopId: string;
-  productId: string;
-  model: ProductAdvancedModel;
-} & ProductAdvancedControlState): ProductAdvancedDraft {
+export function buildProductAdvancedDraft(
+  input: {
+    shopId: string;
+    productId: string;
+    model: ProductAdvancedModel;
+  } & ProductAdvancedControlState,
+): ProductAdvancedDraft {
   const modifierLinks = input.model.modifiers.flatMap((modifier) => {
     const state = input.modifierState[modifier.id];
     const linked = state?.linked ?? modifier.linked;
     if (!linked) return [];
-    const rawMaxQuantity = state?.maxQuantity ?? (modifier.maxQuantity === null ? '' : String(modifier.maxQuantity));
+    const rawMaxQuantity =
+      state?.maxQuantity ?? (modifier.maxQuantity === null ? '' : String(modifier.maxQuantity));
     const maxQuantity =
       rawMaxQuantity.trim() === ''
         ? null
