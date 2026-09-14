@@ -1,11 +1,16 @@
 import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
-import { readProductAdvancedModel } from './catalogAdvancedDraft';
+import {
+  buildProductAdvancedDraft,
+  readProductAdvancedModel,
+  type ProductAdvancedDraft,
+} from './catalogAdvancedDraft';
 
 export type ProductEditorDraft = {
   product: CatalogProductDetail;
   changedPaths: string[];
+  advanced?: ProductAdvancedDraft;
 };
 
 export type ProductEditorProps = {
@@ -145,7 +150,21 @@ export function ProductEditor({
       priceMinor: canPrice ? parseEgpToMinor(price) : product.priceMinor,
     };
     if (!next.name) throw new Error('invalid_product_name');
-    await onSaveDraft({ product: next, changedPaths: changedPathsFor(product, next) });
+    const advanced = advancedModel
+      ? buildProductAdvancedDraft({
+          shopId: product.shopId,
+          productId: product.id,
+          model: advancedModel,
+          modifierState,
+          comboState,
+          recipeState,
+        })
+      : undefined;
+    await onSaveDraft({
+      product: next,
+      changedPaths: changedPathsFor(product, next),
+      ...(advanced === undefined ? {} : { advanced }),
+    });
   }
 
   async function archiveProduct() {
@@ -453,7 +472,10 @@ export function ProductEditor({
             <p className="admin-field__help">
               Published versions are immutable. Restore creates a new version.
             </p>
-            <a className="admin-secondary-button admin-catalog-history-link" href="/catalog/products/publishing">
+            <a
+              className="admin-secondary-button admin-catalog-history-link"
+              href="/catalog/products/publishing"
+            >
               Open version history
             </a>
           </section>
