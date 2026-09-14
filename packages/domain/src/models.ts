@@ -86,6 +86,8 @@ export type CashPaymentPart = {
   readonly changeMinor: MoneyMinor;
   /** Present on new payments; omitted by legacy persisted snapshots. */
   readonly reference?: string | null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly manuallyConfirmed?: boolean;
 };
 
 export type NonCashPaymentPart = {
@@ -98,6 +100,8 @@ export type NonCashPaymentPart = {
   readonly changeMinor: null;
   /** Present on new payments; omitted by legacy persisted snapshots. */
   readonly reference?: string | null;
+  /** Present on new payments; omitted by legacy persisted snapshots. */
+  readonly manuallyConfirmed?: boolean;
 };
 
 export type PaymentPart = CashPaymentPart | NonCashPaymentPart;
@@ -135,6 +139,8 @@ interface FulfillmentBase {
 export type OrderFulfillmentSnapshot =
   | (FulfillmentBase & {
       readonly behavior: Exclude<OrderTypeBehavior, 'DELIVERY'>;
+      /** Present for new non-delivery orders when customer phone is required/captured. */
+      readonly customerPhone?: string;
       readonly delivery: null;
     })
   | (FulfillmentBase & {
@@ -184,6 +190,10 @@ export interface OrderReturnSnapshot {
   readonly workerId: WorkerId;
   readonly workerName: string;
   readonly reason: string;
+  /** Present for configured future mutations; absent on legacy returns. */
+  readonly reasonCode?: OrderReasonCodeSnapshot;
+  /** Optional operator context; never the reason authority. */
+  readonly note?: string;
 }
 
 export interface OrderLifecycleSnapshot {
