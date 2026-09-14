@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProductEditor, formatEgpMinor, parseEgpToMinor } from './ProductEditor';
-import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
+import {
+  applyProductAdvancedDraft,
+  buildProductAdvancedDraft,
+  readProductAdvancedModel,
+} from './catalogAdvancedDraft';
 
 const fixtureProduct: CatalogProductDetail = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -161,6 +165,48 @@ describe('ProductEditor', () => {
     expect(parseEgpToMinor('15.5')).toBe(1550);
     expect(() => parseEgpToMinor('-1')).toThrow(/invalid_price/);
     expect(() => parseEgpToMinor('12.345')).toThrow(/invalid_price/);
+  });
+
+  it('serializes advanced control state into canonical catalog relations', () => {
+    const model = readProductAdvancedModel(advancedBundle, fixtureProduct.id);
+    expect(
+      buildProductAdvancedDraft({
+        shopId: fixtureProduct.shopId,
+        productId: fixtureProduct.id,
+        model,
+        modifierState: {
+          '44444444-4444-4444-8444-444444444444': { linked: true, maxQuantity: '3' },
+        },
+        comboState: { '55555555-5555-4555-8555-555555555555': true },
+        recipeState: { '66666666-6666-4666-8666-666666666666': '500000' },
+      }),
+    ).toEqual({
+      modifierLinks: [
+        {
+          shopId: fixtureProduct.shopId,
+          productId: fixtureProduct.id,
+          modifierId: '44444444-4444-4444-8444-444444444444',
+          maxQuantity: 3,
+          sortOrder: 0,
+        },
+      ],
+      comboBeverageOptions: [
+        {
+          shopId: fixtureProduct.shopId,
+          comboProductId: fixtureProduct.id,
+          beverageProductId: '55555555-5555-4555-8555-555555555555',
+          sortOrder: 0,
+        },
+      ],
+      recipeLines: [
+        {
+          shopId: fixtureProduct.shopId,
+          productId: fixtureProduct.id,
+          inventoryItemId: '66666666-6666-4666-8666-666666666666',
+          quantityMicros: 500000,
+        },
+      ],
+    });
   });
 
   it('replaces only this product advanced relations in the draft bundle', () => {
