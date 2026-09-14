@@ -1,7 +1,10 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 
-import { buildOrderTypeUpdateCommand, buildPaymentMethodUpdateCommand } from './useSettings';
+import {
+  buildOrderTypeUpdateCommand,
+  buildPaymentMethodUpdateCommand,
+} from './useSettings';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 
@@ -61,46 +64,52 @@ function workspace(
 }
 
 describe('canonical settings form-captured CAS', () => {
-  it('preserves order-type CAS tokens captured when editing began after the workspace refreshes', () => {
-    const refreshed = workspace(8, 4, 6);
-    const command = buildOrderTypeUpdateCommand(
-      shopId,
-      refreshed,
-      {
-        orderTypeId: refreshed.orderTypes[0]!.id,
-        name: 'Local edit',
-        behavior: 'TAKE_AWAY',
-        active: true,
-        sortOrder: 20,
-        expectedSettingsVersion: 7,
-        expectedEditVersion: 3,
-      } as never,
-    );
+  it(
+    'preserves order-type CAS tokens captured when editing began after the workspace refreshes',
+    () => {
+      const refreshed = workspace(8, 4, 6);
+      const command = buildOrderTypeUpdateCommand(
+        shopId,
+        refreshed,
+        {
+          orderTypeId: refreshed.orderTypes[0]!.id,
+          name: 'Local edit',
+          behavior: 'TAKE_AWAY',
+          active: true,
+          sortOrder: 20,
+          expectedSettingsVersion: 7,
+          expectedEditVersion: 3,
+        } as never,
+      );
 
-    expect(command.expectedSettingsVersion).toBe(7);
-    expect(command.expectedEditVersion).toBe(3);
-  });
+      expect(command.expectedSettingsVersion).toBe(7);
+      expect(command.expectedEditVersion).toBe(3);
+    },
+  );
 
-  it('preserves payment-method CAS tokens captured when editing began after the workspace refreshes', () => {
-    const refreshed = workspace(8, 4, 6);
-    const command = buildPaymentMethodUpdateCommand(
-      shopId,
-      refreshed,
-      {
-        paymentMethodId: refreshed.paymentMethods[0]!.id,
-        displayName: 'Local Cash',
-        active: true,
-        sortOrder: 20,
-        channel: 'BOTH',
-        requiresReference: false,
-        manualConfirmationRequired: false,
-        refundAllowed: true,
-        expectedSettingsVersion: 7,
-        expectedEditVersion: 5,
-      } as never,
-    );
+  it(
+    'preserves payment-method CAS tokens captured when editing began after the workspace refreshes',
+    () => {
+      const refreshed = workspace(8, 4, 6);
+      const command = buildPaymentMethodUpdateCommand(
+        shopId,
+        refreshed,
+        {
+          paymentMethodId: refreshed.paymentMethods[0]!.id,
+          displayName: 'Local Cash',
+          active: true,
+          sortOrder: 20,
+          channel: 'BOTH',
+          requiresReference: false,
+          manualConfirmationRequired: false,
+          refundAllowed: true,
+          expectedSettingsVersion: 7,
+          expectedEditVersion: 5,
+        } as never,
+      );
 
-    expect(command.expectedSettingsVersion).toBe(7);
-    expect(command.expectedEditVersion).toBe(5);
-  });
+      expect(command.expectedSettingsVersion).toBe(7);
+      expect(command.expectedEditVersion).toBe(5);
+    },
+  );
 });
