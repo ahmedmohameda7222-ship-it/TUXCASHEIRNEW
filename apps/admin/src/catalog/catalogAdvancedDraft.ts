@@ -53,6 +53,12 @@ export type ProductAdvancedModel = {
   }>;
 };
 
+export type ProductAdvancedControlState = {
+  modifierState: Record<string, { linked: boolean; maxQuantity: string }>;
+  comboState: Record<string, boolean>;
+  recipeState: Record<string, string>;
+};
+
 function isJsonObject(value: CatalogJsonValue | undefined): value is CatalogJsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -95,6 +101,13 @@ function nullablePositiveIntegerField(source: CatalogJsonObject, key: string): n
 function objectValue(value: CatalogJsonValue): CatalogJsonObject {
   if (!isJsonObject(value)) throw new Error('catalog_bundle_invalid');
   return value;
+}
+
+function positiveControlInteger(value: string, code: string): number {
+  if (!/^[1-9]\d*$/.test(value.trim())) throw new Error(code);
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error(code);
+  return parsed;
 }
 
 function belongsToProduct(value: CatalogJsonValue, key: string, productId: string): boolean {
@@ -176,7 +189,8 @@ export function readProductAdvancedModel(
         active,
         linked: link !== undefined,
         maxQuantity: link === undefined ? null : nullablePositiveIntegerField(link, 'maxQuantity'),
-        sortOrder: link === undefined ? integerField(modifier, 'sortOrder') : integerField(link, 'sortOrder'),
+        sortOrder:
+          link === undefined ? integerField(modifier, 'sortOrder') : integerField(link, 'sortOrder'),
       };
     })
     .filter((modifier) => modifier.active || modifier.linked)
@@ -194,7 +208,8 @@ export function readProductAdvancedModel(
         name: stringField(product, 'name'),
         active,
         selected: option !== undefined,
-        sortOrder: option === undefined ? integerField(product, 'sortOrder') : integerField(option, 'sortOrder'),
+        sortOrder:
+          option === undefined ? integerField(product, 'sortOrder') : integerField(option, 'sortOrder'),
       };
     })
     .filter(
@@ -225,6 +240,62 @@ export function readProductAdvancedModel(
     comboOptions: comboModel,
     inventoryItems: inventoryModel,
   };
+}
+
+export function buildProductAdvancedDraft(input: {
+  shopId: string;
+  productId: string;
+  model: ProductAdvancedModel;
+} & ProductAdvancedControlState): ProductAdvancedDraft {
+  const modifierLinks = input.model.modifiers.flatMap((modifier) => {
+    const state = input.modifierState[modifier.id];
+    const linked = state?.linked ?? modifier.linked;
+    if (!linked) return [];
+    const rawMaxQuantity = state?.maxQuantity ?? (modifier.maxQuantity === null ? '' : String(modifier.maxQuantity));
+    const maxQuantity =
+      rawMaxQuantity.trim() === ''
+        ? null
+        : positiveControlInteger(rawMaxQuantity, 'invalid_modifier_max_quantity');
+    return [
+      {
+        shopId: input.shopId,
+        productId: input.productId,
+        modifierId: modifier.id,
+        maxQuantity,
+        sortOrder: modifier.sortOrder,
+      },
+    ];
+  });
+
+  const comboBeverageOptions = input.model.comboOptions.flatMap((option) => {
+    const selected = input.comboState[option.productId] ?? option.selected;
+    if (!selected) return [];
+    return [
+      {
+        shopId: input.shopId,
+        comboProductId: input.productId,
+        beverageProductId: option.productId,
+        sortOrder: option.sortOrder,
+      },
+    ];
+  });
+
+  const recipeLines = input.model.inventoryItems.flatMap((item) => {
+    const rawQuantity =
+      input.recipeState[item.inventoryItemId] ??
+      (item.quantityMicros === null ? '' : String(item.quantityMicros));
+    if (rawQuantity.trim() === '') return [];
+    return [
+      {
+        shopId: input.shopId,
+        productId: input.productId,
+        inventoryItemId: item.inventoryItemId,
+        quantityMicros: positiveControlInteger(rawQuantity, 'invalid_recipe_quantity'),
+      },
+    ];
+  });
+
+  return { modifierLinks, comboBeverageOptions, recipeLines };
 }
 
 export function applyProductAdvancedDraft(
