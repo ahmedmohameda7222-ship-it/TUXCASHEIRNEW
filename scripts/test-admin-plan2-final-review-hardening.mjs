@@ -13,8 +13,12 @@ for (const fragment of [
   'storage.objects',
   'publish_catalog_draft_scheduled_v1',
   "'replayed', true",
+  'validate_admin_setting_value_v1',
 ]) {
   if (!sql.includes(fragment)) throw new Error(`Plan 2 final review hardening missing ${fragment}`);
+}
+if (sql.includes("'checkout.allowscheduledorders'")) {
+  throw new Error('Plan 2 final review hardening must not retain unsupported scheduled-order setting authority.');
 }
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -81,6 +85,14 @@ declare
   v_missing_rejected boolean := false;
   v_bundle jsonb;
 begin
+  if private.validate_admin_setting_value_v1('checkout.allowScheduledOrders', 'true'::jsonb) then
+    raise exception 'unsupported scheduled-order setting remains writable through trusted SQL';
+  end if;
+  if not private.validate_admin_setting_value_v1('checkout.allowDiscountStacking', 'true'::jsonb)
+     or not private.validate_admin_setting_value_v1('checkout.allowDeliveryFeeOverride', 'false'::jsonb) then
+    raise exception 'supported checkout boolean settings were accidentally removed';
+  end if;
+
   v_result := public.publish_catalog_draft_scheduled_v1(
     '${employeeId}', '${draftId}', 3, 48
   );
