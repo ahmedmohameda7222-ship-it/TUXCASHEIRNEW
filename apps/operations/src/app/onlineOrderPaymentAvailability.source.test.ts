@@ -11,7 +11,7 @@ describe('online-order payment availability', () => {
   it('shares the trusted channel and delivery-zone predicates from the payment domain', () => {
     expect(paymentSource).toContain('export function paymentMethodSupportsChannel');
     expect(paymentSource).toContain('export function paymentMethodAllowedForDeliveryZone');
-    expect(paymentSource).toContain("zoneRule?.allowed !== false");
+    expect(paymentSource).toContain('zoneRule?.allowed !== false');
   });
 
   it('only offers active payment methods that the ONLINE acceptance authority can accept', () => {
