@@ -1,0 +1,29 @@
+name: Temporary Plan 2 RED Format
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-2-fixes
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Format RED tests
+        run: >-
+          npx prettier --write
+          apps/admin/src/settings/useSettings.casCapture.test.ts
+          packages/application/src/nonDeliveryPhonePersistence.test.ts
+      - name: Show exact formatter diff
+        run: git diff -- apps/admin/src/settings/useSettings.casCapture.test.ts packages/application/src/nonDeliveryPhonePersistence.test.ts
