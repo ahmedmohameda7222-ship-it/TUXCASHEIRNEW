@@ -25,4 +25,10 @@ describe('CartDrawer published checkout policy integration', () => {
     expect(source).toContain("setOrderType('');");
     expect(source).toContain("setPaymentMethod('');");
   });
+
+  it('collects and submits pickup phone when the published policy requires it', () => {
+    expect(source).toContain('checkoutPolicy.requireCustomerPhone');
+    expect(source).toContain('isDelivery || checkoutPolicy.requireCustomerPhone');
+    expect(source).toContain('phoneRequiredForCheckout ? customerPhone.trim() : null');
+  });
 });
