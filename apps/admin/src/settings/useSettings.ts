@@ -25,15 +25,9 @@ export class SettingsUiError extends Error {
   }
 }
 
-export type OrderTypeUpdateDraft = Omit<
-  OrderTypeEditInput,
-  'shopId' | 'expectedSettingsVersion' | 'expectedEditVersion'
->;
+export type OrderTypeUpdateDraft = Omit<OrderTypeEditInput, 'shopId'>;
 
-export type PaymentMethodUpdateDraft = Omit<
-  PaymentMethodEditInput,
-  'shopId' | 'expectedSettingsVersion' | 'expectedEditVersion'
->;
+export type PaymentMethodUpdateDraft = Omit<PaymentMethodEditInput, 'shopId'>;
 
 export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
 
@@ -77,8 +71,8 @@ export function buildOrderTypeUpdateCommand(
     behavior: draft.behavior,
     active: draft.active,
     sortOrder: draft.sortOrder,
-    expectedSettingsVersion: workspace.settingsVersion,
-    expectedEditVersion: row.editVersion,
+    expectedSettingsVersion: draft.expectedSettingsVersion,
+    expectedEditVersion: draft.expectedEditVersion,
   };
 }
 
@@ -102,8 +96,8 @@ export function buildPaymentMethodUpdateCommand(
     requiresReference: draft.requiresReference,
     manualConfirmationRequired: draft.manualConfirmationRequired,
     refundAllowed: draft.refundAllowed,
-    expectedSettingsVersion: workspace.settingsVersion,
-    expectedEditVersion: row.editVersion,
+    expectedSettingsVersion: draft.expectedSettingsVersion,
+    expectedEditVersion: draft.expectedEditVersion,
   };
 }
 
