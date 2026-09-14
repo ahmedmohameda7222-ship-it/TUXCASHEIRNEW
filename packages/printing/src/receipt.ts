@@ -18,6 +18,14 @@ function formatMoney(value: MoneyMinor): string {
   return `${negative ? '-' : ''}${pounds.toString()}.${cents}`;
 }
 
+function formatBasisPointsPercent(basisPoints: number): string {
+  const wholePercent = Math.floor(basisPoints / 100);
+  const fractional = basisPoints % 100;
+  if (fractional === 0) return `${wholePercent}%`;
+  const fraction = String(fractional).padStart(2, '0').replace(/0$/, '');
+  return `${wholePercent}.${fraction}%`;
+}
+
 function paymentDescription(payment: PaymentPart): string {
   if (payment.receivedMinor !== null && payment.changeMinor !== null) {
     return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)} · received ${formatMoney(payment.receivedMinor)} · change ${formatMoney(payment.changeMinor)}`;
@@ -44,6 +52,16 @@ export function renderOrderReceiptHtml(
     receiptSnapshot?.footer === null || receiptSnapshot?.footer === undefined
       ? ''
       : `<div>${escapeHtml(receiptSnapshot.footer)}</div>`;
+  const serviceChargeBps = order.checkoutSnapshot?.serviceChargeBps ?? 0;
+  const taxBps = order.checkoutSnapshot?.taxBps ?? 0;
+  const serviceChargeRow =
+    serviceChargeBps > 0 && order.serviceChargeMinor !== undefined
+      ? `<div class="row"><span>Service charge (${formatBasisPointsPercent(serviceChargeBps)})</span><span>${formatMoney(order.serviceChargeMinor)}</span></div>`
+      : '';
+  const taxRow =
+    taxBps > 0 && order.taxMinor !== undefined
+      ? `<div class="row"><span>Tax (${formatBasisPointsPercent(taxBps)})</span><span>${formatMoney(order.taxMinor)}</span></div>`
+      : '';
   const paperWidthMm = options.paperWidthMm ?? 80;
   const contentWidthMm = paperWidthMm - 8;
   const itemRows = order.items
@@ -123,6 +141,8 @@ export function renderOrderReceiptHtml(
     <div class="row"><span>Items</span><span>${formatMoney(order.itemsSubtotalMinor)}</span></div>
     ${order.discountMinor === 0 ? '' : `<div class="row"><span>Discount</span><span>-${formatMoney(order.discountMinor)}</span></div>`}
     ${order.deliveryFeeMinor === 0 ? '' : `<div class="row"><span>Delivery</span><span>${formatMoney(order.deliveryFeeMinor)}</span></div>`}
+    ${serviceChargeRow}
+    ${taxRow}
     <div class="row total"><span>Total EGP</span><span>${formatMoney(order.totalMinor)}</span></div>
   </section>
   <section class="block">${paymentRows}</section>
