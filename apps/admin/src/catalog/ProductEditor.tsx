@@ -1,5 +1,7 @@
-import type { CatalogProductDetail } from '@tux/admin-contracts';
-import { useMemo, useState, type FormEvent } from 'react';
+import type { CatalogJsonObject, CatalogProductDetail } from '@tux/admin-contracts';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+
+import { readProductAdvancedModel } from './catalogAdvancedDraft';
 
 export type ProductEditorDraft = {
   product: CatalogProductDetail;
@@ -11,7 +13,9 @@ export type ProductEditorProps = {
   canEdit: boolean;
   canPrice: boolean;
   initialAdvancedOpen?: boolean;
+  advancedBundle?: CatalogJsonObject | null;
   busy?: boolean;
+  onRequestAdvanced?(): void | Promise<void>;
   onSaveDraft(draft: ProductEditorDraft): void | Promise<void>;
   onSetAvailability(soldOut: boolean): void | Promise<void>;
 };
@@ -58,7 +62,9 @@ export function ProductEditor({
   canEdit,
   canPrice,
   initialAdvancedOpen = false,
+  advancedBundle = null,
   busy = false,
+  onRequestAdvanced,
   onSaveDraft,
   onSetAvailability,
 }: ProductEditorProps) {
@@ -68,11 +74,50 @@ export function ProductEditor({
   const [price, setPrice] = useState(() => formatEgpMinor(product.priceMinor));
   const [imageKey, setImageKey] = useState(product.imageKey ?? '');
   const [bestSeller, setBestSeller] = useState(product.bestSeller);
+  const [visible, setVisible] = useState(product.active);
+  const [modifierState, setModifierState] = useState<
+    Record<string, { linked: boolean; maxQuantity: string }>
+  >({});
+  const [comboState, setComboState] = useState<Record<string, boolean>>({});
+  const [recipeState, setRecipeState] = useState<Record<string, string>>({});
 
   const readOnly = !canEdit || busy;
   const priceReadOnly = readOnly || !canPrice;
   const statusCopy = product.soldOut ? 'Mark available' : 'Mark sold out';
   const nextSoldOut = !product.soldOut;
+
+  const advancedModel = useMemo(
+    () => (advancedBundle ? readProductAdvancedModel(advancedBundle, product.id) : null),
+    [advancedBundle, product.id],
+  );
+
+  useEffect(() => {
+    if (!advancedModel) return;
+    setModifierState(
+      Object.fromEntries(
+        advancedModel.modifiers.map((modifier) => [
+          modifier.id,
+          {
+            linked: modifier.linked,
+            maxQuantity: modifier.maxQuantity === null ? '' : String(modifier.maxQuantity),
+          },
+        ]),
+      ),
+    );
+    setComboState(
+      Object.fromEntries(
+        advancedModel.comboOptions.map((option) => [option.productId, option.selected]),
+      ),
+    );
+    setRecipeState(
+      Object.fromEntries(
+        advancedModel.inventoryItems.map((item) => [
+          item.inventoryItemId,
+          item.quantityMicros === null ? '' : String(item.quantityMicros),
+        ]),
+      ),
+    );
+  }, [advancedModel]);
 
   const draftPreview = useMemo(() => {
     let priceMinor = product.priceMinor;
@@ -88,8 +133,9 @@ export function ProductEditor({
       priceMinor,
       imageKey: imageKey.trim() || null,
       bestSeller,
+      active: visible,
     };
-  }, [bestSeller, canPrice, description, imageKey, name, price, product]);
+  }, [bestSeller, canPrice, description, imageKey, name, price, product, visible]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +152,12 @@ export function ProductEditor({
     if (readOnly) return;
     const next = { ...draftPreview, active: false };
     await onSaveDraft({ product: next, changedPaths: changedPathsFor(product, next) });
+  }
+
+  function toggleAdvanced() {
+    const opening = !advancedOpen;
+    setAdvancedOpen(opening);
+    if (opening && advancedBundle === null) void onRequestAdvanced?.();
   }
 
   return (
@@ -216,10 +268,13 @@ export function ProductEditor({
             value={imageKey}
             disabled={readOnly}
             maxLength={500}
-            placeholder="products/example.png"
+            placeholder={`${product.shopId}/${product.id}.png`}
             onChange={(event) => setImageKey(event.currentTarget.value)}
           />
         </label>
+        <p className="admin-field__help">
+          Image keys are validated against this shop&apos;s catalog image bucket before draft save.
+        </p>
         <label className="admin-check-field">
           <input
             type="checkbox"
@@ -235,7 +290,7 @@ export function ProductEditor({
         className="admin-disclosure-button"
         type="button"
         aria-expanded={advancedOpen}
-        onClick={() => setAdvancedOpen((current) => !current)}
+        onClick={toggleAdvanced}
       >
         <span>More</span>
         <span aria-hidden="true">{advancedOpen ? '−' : '+'}</span>
@@ -243,21 +298,165 @@ export function ProductEditor({
 
       {advancedOpen ? (
         <div className="admin-catalog-editor__advanced" data-catalog-advanced>
-          {[
-            'Extras / Modifiers',
-            'Combo Options',
-            'Recipe / Inventory',
-            'Shop Overrides',
-            'History',
-          ].map((title) => (
-            <section className="admin-catalog-editor__section is-compact" key={title}>
-              <h2>{title}</h2>
-              <p className="admin-field__help">
-                This panel uses the canonical catalog authority and is expanded in the next catalog
-                workflow tasks.
-              </p>
-            </section>
-          ))}
+          <section className="admin-catalog-editor__section is-compact">
+            <h2>Extras / Modifiers</h2>
+            {advancedModel ? (
+              advancedModel.modifiers.length === 0 ? (
+                <p className="admin-field__help">No modifiers are configured for this shop.</p>
+              ) : (
+                <div className="admin-catalog-advanced-list">
+                  {advancedModel.modifiers.map((modifier) => {
+                    const current = modifierState[modifier.id];
+                    const linked = current?.linked ?? modifier.linked;
+                    const maxQuantity =
+                      current?.maxQuantity ??
+                      (modifier.maxQuantity === null ? '' : String(modifier.maxQuantity));
+                    return (
+                      <div className="admin-catalog-advanced-row" key={modifier.id}>
+                        <label className="admin-check-field">
+                          <input
+                            type="checkbox"
+                            checked={linked}
+                            disabled={readOnly || !modifier.active}
+                            onChange={(event) =>
+                              setModifierState((state) => ({
+                                ...state,
+                                [modifier.id]: {
+                                  linked: event.currentTarget.checked,
+                                  maxQuantity,
+                                },
+                              }))
+                            }
+                          />
+                          <span>{modifier.name}</span>
+                        </label>
+                        <label className="admin-field">
+                          <span>Max quantity</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputMode="numeric"
+                            value={maxQuantity}
+                            placeholder="No limit"
+                            disabled={readOnly || !linked}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              setModifierState((state) => ({
+                                ...state,
+                                [modifier.id]: { linked, maxQuantity: value },
+                              }));
+                            }}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              <p className="admin-field__help">Loading editable catalog relationships…</p>
+            )}
+          </section>
+
+          <section className="admin-catalog-editor__section is-compact">
+            <h2>Combo Options</h2>
+            {advancedModel ? (
+              advancedModel.comboOptions.length === 0 ? (
+                <p className="admin-field__help">No products are available as combo options.</p>
+              ) : (
+                <div className="admin-catalog-advanced-list">
+                  {advancedModel.comboOptions.map((option) => (
+                    <label className="admin-check-field" key={option.productId}>
+                      <input
+                        type="checkbox"
+                        checked={comboState[option.productId] ?? option.selected}
+                        disabled={readOnly || !option.active}
+                        onChange={(event) =>
+                          setComboState((state) => ({
+                            ...state,
+                            [option.productId]: event.currentTarget.checked,
+                          }))
+                        }
+                      />
+                      <span>{option.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )
+            ) : (
+              <p className="admin-field__help">Loading combo options…</p>
+            )}
+          </section>
+
+          <section className="admin-catalog-editor__section is-compact">
+            <h2>Recipe / Inventory</h2>
+            {advancedModel ? (
+              advancedModel.inventoryItems.length === 0 ? (
+                <p className="admin-field__help">No recipe-tracked inventory items are available.</p>
+              ) : (
+                <div className="admin-catalog-advanced-list">
+                  {advancedModel.inventoryItems.map((item) => {
+                    const quantity =
+                      recipeState[item.inventoryItemId] ??
+                      (item.quantityMicros === null ? '' : String(item.quantityMicros));
+                    return (
+                      <label className="admin-field" key={item.inventoryItemId}>
+                        <span>
+                          {item.name} · {item.unitLabel}
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          inputMode="numeric"
+                          value={quantity}
+                          placeholder="Not in recipe"
+                          disabled={readOnly || !item.active}
+                          aria-label={`${item.name} quantity micro-units`}
+                          onChange={(event) => {
+                            const value = event.currentTarget.value;
+                            setRecipeState((state) => ({
+                              ...state,
+                              [item.inventoryItemId]: value,
+                            }));
+                          }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              <p className="admin-field__help">Loading recipe inventory…</p>
+            )}
+          </section>
+
+          <section className="admin-catalog-editor__section is-compact">
+            <h2>Shop Overrides</h2>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={visible}
+                disabled={readOnly}
+                onChange={(event) => setVisible(event.currentTarget.checked)}
+              />
+              <span>Visible in this shop</span>
+            </label>
+            <p className="admin-field__help">
+              Price is edited above for this shop. Sold-out state stays an immediate live control.
+            </p>
+          </section>
+
+          <section className="admin-catalog-editor__section is-compact">
+            <h2>History</h2>
+            <p className="admin-field__help">
+              Published versions are immutable. Restore creates a new version.
+            </p>
+            <a className="admin-secondary-button admin-catalog-history-link" href="/catalog/products/publishing">
+              Open version history
+            </a>
+          </section>
         </div>
       ) : null}
 
