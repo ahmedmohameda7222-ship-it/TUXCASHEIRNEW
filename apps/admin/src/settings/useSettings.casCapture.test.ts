@@ -1,10 +1,15 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
+
 import { buildOrderTypeUpdateCommand, buildPaymentMethodUpdateCommand } from './useSettings';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 
-function workspace(settingsVersion: number, orderEditVersion: number, paymentEditVersion: number): AdminSettingsWorkspace {
+function workspace(
+  settingsVersion: number,
+  orderEditVersion: number,
+  paymentEditVersion: number,
+): AdminSettingsWorkspace {
   return {
     shop: {
       id: shopId,
