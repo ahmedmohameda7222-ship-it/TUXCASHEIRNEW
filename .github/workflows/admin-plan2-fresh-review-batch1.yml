@@ -1,0 +1,192 @@
+name: Admin Plan 2 Fresh Review Batch 1
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/admin-plan2-fresh-review-batch1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verified-fix:
+    if: github.head_ref == 'feat/admin-02-catalog-settings'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-02-catalog-settings
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify known-good source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 275a6e40ac04a3706eb963fcc146b24b0557a006 HEAD
+          test -z "$(git diff --name-only 275a6e40ac04a3706eb963fcc146b24b0557a006..HEAD -- . ':(exclude).github/workflows/admin-plan2-fresh-review-batch1.yml')"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply deterministic batch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'packages/application/src/onlineOrderAcceptance.ts',
+              """    delivery = {\n      displayPhone: '',\n      normalizedPhone: '',\n      customerName: '',\n""",
+              """    delivery = {\n      displayPhone: request.normalizedPhone ?? '',\n      normalizedPhone: request.normalizedPhone ?? '',\n      customerName: '',\n""",
+          )
+
+          test_path = Path('packages/application/src/onlineOrderAcceptance.test.ts')
+          test_text = test_path.read_text()
+          marker = "\n});\n\ndescribe('OperationsOnlineOrderAcceptanceService'"
+          if test_text.count(marker) != 1:
+              raise SystemExit('onlineOrderAcceptance.test.ts: service describe marker mismatch')
+          regression = r'''
+
+  it('preserves pickup phone when published policy requires customer phone', () => {
+    const draft = prepareOnlineOrderAcceptanceDraft({
+      request: request({
+        fulfillmentPreference: 'PICKUP',
+        deliveryAddress: null,
+        normalizedPhone: '01012345678',
+      }),
+      workspace: workspace(
+        configurationWithCheckout({ 'checkout.requireCustomerPhone': true }),
+      ),
+      confirmation: {
+        orderTypeId: TAKE_AWAY_ID,
+        deliveryZoneId: null,
+        finalDeliveryFeeMinor: null,
+        payment: {
+          mode: 'SINGLE',
+          methodId: CASH_ID,
+          cashReceivedMinor: moneyMinor(19_000),
+        },
+      },
+      runtime,
+    });
+
+    expect(draft.delivery.displayPhone).toBe('01012345678');
+    expect(draft.delivery.normalizedPhone).toBe('01012345678');
+  });
+'''
+          test_path.write_text(test_text.replace(marker, regression + marker, 1))
+
+          helper = Path('apps/admin/src/catalog/catalogProductSlug.ts')
+          if helper.exists():
+              raise SystemExit('catalogProductSlug.ts already exists')
+          helper.write_text(r'''const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function createCatalogProductSlug(productId: string): string {
+  const normalized = productId.trim().toLowerCase();
+  if (!UUID_PATTERN.test(normalized)) throw new Error('invalid_product_id');
+  return `product-${normalized}`;
+}
+''')
+
+          replace_once(
+              'apps/admin/src/catalog/CatalogPage.tsx',
+              "import './catalog.css';\nimport { ProductInspector } from './ProductInspector';",
+              "import './catalog.css';\nimport { createCatalogProductSlug } from './catalogProductSlug';\nimport { ProductInspector } from './ProductInspector';",
+          )
+          replace_once(
+              'apps/admin/src/catalog/CatalogPage.tsx',
+              """  const maxSortOrder = products.reduce((max, product) => Math.max(max, product.sortOrder), 0);\n  return {\n    id: crypto.randomUUID(),\n    shopId,\n    categoryId,\n    slug: null,\n""",
+              """  const maxSortOrder = products.reduce((max, product) => Math.max(max, product.sortOrder), 0);\n  const id = crypto.randomUUID();\n  return {\n    id,\n    shopId,\n    categoryId,\n    slug: createCatalogProductSlug(id),\n""",
+          )
+
+          replace_once(
+              'apps/admin/src/catalog/ProductEditor.test.tsx',
+              "import { ProductEditor, formatEgpMinor, parseEgpToMinor } from './ProductEditor';",
+              "import { ProductEditor, formatEgpMinor, parseEgpToMinor } from './ProductEditor';\nimport { createCatalogProductSlug } from './catalogProductSlug';",
+          )
+          product_test = Path('apps/admin/src/catalog/ProductEditor.test.tsx')
+          product_text = product_test.read_text()
+          product_marker = "\n  it('converts displayed EGP values to integer minor units without float drift', () => {"
+          if product_text.count(product_marker) != 1:
+              raise SystemExit('ProductEditor.test.tsx: insertion marker mismatch')
+          slug_test = r'''
+
+  it('creates a stable unique public slug for a new product id', () => {
+    const first = createCatalogProductSlug('11111111-1111-4111-8111-111111111111');
+    const second = createCatalogProductSlug('22222222-2222-4222-8222-222222222222');
+    expect(first).toBe('product-11111111-1111-4111-8111-111111111111');
+    expect(first).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    expect(second).not.toBe(first);
+    expect(() => createCatalogProductSlug('not-a-uuid')).toThrow(/invalid_product_id/);
+  });
+'''
+          product_test.write_text(product_text.replace(product_marker, slug_test + product_marker, 1))
+
+          scheduled_block = """        <SettingOverrideEditor\n          workspace={workspace}\n          settingKey=\"checkout.allowScheduledOrders\"\n          label=\"Scheduled orders\"\n          kind=\"boolean\"\n          updating={updating}\n          onUpdate={onUpdate}\n        />\n"""
+          replace_once('apps/admin/src/settings/CheckoutPage.tsx', scheduled_block, '')
+          replace_once(
+              'apps/admin/api/admin/settings.ts',
+              "  'checkout.allowScheduledOrders': z.boolean(),\n",
+              '',
+          )
+
+          settings_test = Path('apps/admin/api/admin/settings.test.ts')
+          settings_text = settings_test.read_text()
+          settings_marker = """    expect(\n      settingsCommandSchema.safeParse({\n        ...base,\n        settingKey: 'checkout.futureUnreviewedFlag',\n        value: true,\n      }).success,\n    ).toBe(false);\n"""
+          if settings_text.count(settings_marker) != 1:
+              raise SystemExit('settings.test.ts: unknown-key assertion marker mismatch')
+          settings_extra = settings_marker + """    expect(\n      settingsCommandSchema.safeParse({\n        ...base,\n        settingKey: 'checkout.allowScheduledOrders',\n        value: true,\n      }).success,\n    ).toBe(false);\n"""
+          settings_test.write_text(settings_text.replace(settings_marker, settings_extra, 1))
+      - name: Format touched files
+        run: >-
+          npx prettier --write
+          packages/application/src/onlineOrderAcceptance.ts
+          packages/application/src/onlineOrderAcceptance.test.ts
+          apps/admin/src/catalog/catalogProductSlug.ts
+          apps/admin/src/catalog/CatalogPage.tsx
+          apps/admin/src/catalog/ProductEditor.test.tsx
+          apps/admin/src/settings/CheckoutPage.tsx
+          apps/admin/api/admin/settings.ts
+          apps/admin/api/admin/settings.test.ts
+      - name: Focused regression tests
+        run: >-
+          npx vitest run
+          packages/application/src/onlineOrderAcceptance.test.ts
+          apps/admin/src/catalog/ProductEditor.test.tsx
+          apps/admin/api/admin/settings.test.ts
+      - name: Focused typechecks
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck -w @tux/application
+          npm run typecheck -w @tux/admin
+          npx tsc --noEmit -p tsconfig.api.json
+      - name: Commit verified batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "tux-plan2-verifier"
+          git config user.email "tux-plan2-verifier@users.noreply.github.com"
+          git add \
+            packages/application/src/onlineOrderAcceptance.ts \
+            packages/application/src/onlineOrderAcceptance.test.ts \
+            apps/admin/src/catalog/catalogProductSlug.ts \
+            apps/admin/src/catalog/CatalogPage.tsx \
+            apps/admin/src/catalog/ProductEditor.test.tsx \
+            apps/admin/src/settings/CheckoutPage.tsx \
+            apps/admin/api/admin/settings.ts \
+            apps/admin/api/admin/settings.test.ts
+          git diff --cached --check
+          git commit -m "fix(admin): address deterministic final review gaps"
+          git push origin HEAD:feat/admin-02-catalog-settings
