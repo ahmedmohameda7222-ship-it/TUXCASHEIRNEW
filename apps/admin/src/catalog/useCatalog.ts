@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 import type { ProductEditorDraft } from './ProductEditor';
+import { applyProductAdvancedDraft } from './catalogAdvancedDraft';
 
 export type ActiveCatalogDraft = {
   draftId: string;
@@ -95,6 +96,22 @@ export function upsertProductInBundle(
   };
 }
 
+export function buildProductDraftBundle(
+  bundleJson: CatalogJsonObject,
+  input: ProductEditorDraft,
+): { bundleJson: CatalogJsonObject; changedPaths: string[] } {
+  let nextBundle = upsertProductInBundle(bundleJson, input.product);
+  let changedPaths = [...input.changedPaths];
+
+  if (input.advanced !== undefined) {
+    const advancedResult = applyProductAdvancedDraft(nextBundle, input.product.id, input.advanced);
+    nextBundle = advancedResult.bundleJson;
+    changedPaths = [...new Set([...changedPaths, ...advancedResult.changedPaths])];
+  }
+
+  return { bundleJson: nextBundle, changedPaths };
+}
+
 function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new CatalogUiError('session_required');
   return session.state.session.csrfToken;
@@ -147,7 +164,8 @@ export function useCatalog(shopId: string | undefined) {
   }, [draftProducts, workspaceQuery.data?.products]);
 
   const saveProduct = useMutation({
-    mutationFn: async ({ product, changedPaths }: ProductEditorDraft) => {
+    mutationFn: async (input: ProductEditorDraft) => {
+      const { product } = input;
       if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
       const workspace = currentWorkspace(queryClient, shopId) ?? workspaceQuery.data;
       if (!workspace) throw new CatalogUiError('catalog_not_loaded');
@@ -177,7 +195,7 @@ export function useCatalog(shopId: string | undefined) {
         };
       }
 
-      const bundleJson = upsertProductInBundle(draft.bundleJson, product);
+      const built = buildProductDraftBundle(draft.bundleJson, input);
       const saved = await adminFetch<CatalogDraftSaveResult>(
         '/api/admin/catalog',
         {
@@ -187,7 +205,13 @@ export function useCatalog(shopId: string | undefined) {
             draftId: draft.draftId,
             shopId,
             expectedDraftRevision: draft.draftRevision,
-            changes: [{ kind: 'bundle.replace', bundleJson, changedPaths }],
+            changes: [
+              {
+                kind: 'bundle.replace',
+                bundleJson: built.bundleJson,
+                changedPaths: built.changedPaths,
+              },
+            ],
           }),
         },
         csrfToken,
@@ -198,7 +222,7 @@ export function useCatalog(shopId: string | undefined) {
         draftId: draft.draftId,
         draftRevision: saved.draftRevision,
         basePublishVersion: saved.basePublishVersion,
-        bundleJson,
+        bundleJson: built.bundleJson,
       };
       activeDraftRef.current = nextDraft;
       return { draft: nextDraft, product };
