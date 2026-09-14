@@ -22,6 +22,8 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
       requiresReference: method.requiresReference,
       manualConfirmationRequired: method.manualConfirmationRequired,
       refundAllowed: method.refundAllowed,
+      expectedSettingsVersion: workspace.settingsVersion,
+      expectedEditVersion: method.editVersion,
     });
   }
 
