@@ -56,7 +56,6 @@ const settingValueSchemas = {
   'checkout.allowDiscountStacking': z.boolean(),
   'checkout.allowDeliveryFeeOverride': z.boolean(),
   'checkout.requireCustomerPhone': z.boolean(),
-  'checkout.allowScheduledOrders': z.boolean(),
   'receipt.orderPrefix': z.string().max(64),
   'receipt.footer': z.string().max(1_000),
   'receipt.sequenceStart': z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
