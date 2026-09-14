@@ -23,7 +23,7 @@ const fixtureProduct: CatalogProductDetail = {
   bestSeller: true,
   active: true,
   soldOut: false,
-  isCombo: false,
+  isCombo: true,
   sortOrder: 10,
 };
 
