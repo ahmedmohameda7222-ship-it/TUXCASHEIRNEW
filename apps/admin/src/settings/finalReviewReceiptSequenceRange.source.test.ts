@@ -23,6 +23,8 @@ describe('Plan 2 receipt sequence storage range', () => {
 
     expect(migration).toContain("when 'receipt.sequenceStart' then");
     expect(migration).toMatch(/between\s+1\s+and\s+2147483647/i);
-    expect(migration).toContain('create or replace function private.validate_admin_setting_value_v1');
+    expect(migration).toContain(
+      'create or replace function private.validate_admin_setting_value_v1',
+    );
   });
 });
