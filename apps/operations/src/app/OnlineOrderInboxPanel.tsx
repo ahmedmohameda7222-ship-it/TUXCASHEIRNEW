@@ -251,7 +251,7 @@ function OnlineOrderAcceptanceForm({
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [cashReceived, setCashReceived] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
-  const [manuallyConfirmed, setManuallyConfirmed] = useState(false);
+  const [manualConfirmed, setManuallyConfirmed] = useState(false);
 
   const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
   const orderTypes = workspace.configuration.orderTypes.filter(
@@ -275,7 +275,7 @@ function OnlineOrderAcceptanceForm({
     selectedPayment !== null &&
     (selectedPayment.logicType !== 'CASH' || cashReceivedMinor !== null) &&
     (!selectedPayment.requiresReference || paymentReference.trim().length > 0) &&
-    (!selectedPayment.manualConfirmationRequired || manuallyConfirmed);
+    (!selectedPayment.manualConfirmationRequired || manualConfirmed);
   const canSubmit = selectedOrderType !== null && deliveryReady && paymentReady && !busy;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
@@ -291,7 +291,7 @@ function OnlineOrderAcceptanceForm({
         methodId: selectedPayment.id,
         cashReceivedMinor: selectedPayment.logicType === 'CASH' ? cashReceivedMinor : null,
         reference: selectedPayment.requiresReference ? paymentReference : null,
-        manuallyConfirmed: selectedPayment.manualConfirmationRequired ? manuallyConfirmed : false,
+        manualConfirmed: selectedPayment.manualConfirmationRequired ? manualConfirmed : false,
       },
     };
     void onAccept(request, confirmation);
@@ -402,7 +402,7 @@ function OnlineOrderAcceptanceForm({
           <label className="payment-confirmation">
             <input
               type="checkbox"
-              checked={manuallyConfirmed}
+              checked={manualConfirmed}
               onChange={(event) => setManuallyConfirmed(event.currentTarget.checked)}
             />
             <span>Payment manually confirmed</span>
