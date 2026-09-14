@@ -110,9 +110,11 @@ export function ProductEditor({
       ),
     );
     setComboState(
-      Object.fromEntries(
-        advancedModel.comboOptions.map((option) => [option.productId, option.selected]),
-      ),
+      product.isCombo
+        ? Object.fromEntries(
+            advancedModel.comboOptions.map((option) => [option.productId, option.selected]),
+          )
+        : {},
     );
     setRecipeState(
       Object.fromEntries(
@@ -122,7 +124,7 @@ export function ProductEditor({
         ]),
       ),
     );
-  }, [advancedModel]);
+  }, [advancedModel, product.isCombo]);
 
   const draftPreview = useMemo(() => {
     let priceMinor = product.priceMinor;
@@ -154,9 +156,9 @@ export function ProductEditor({
       ? buildProductAdvancedDraft({
           shopId: product.shopId,
           productId: product.id,
-          model: advancedModel,
+          model: product.isCombo ? advancedModel : { ...advancedModel, comboOptions: [] },
           modifierState,
-          comboState,
+          comboState: product.isCombo ? comboState : {},
           recipeState,
         })
       : undefined;
@@ -378,35 +380,37 @@ export function ProductEditor({
             )}
           </section>
 
-          <section className="admin-catalog-editor__section is-compact">
-            <h2>Combo Options</h2>
-            {advancedModel ? (
-              advancedModel.comboOptions.length === 0 ? (
-                <p className="admin-field__help">No products are available as combo options.</p>
+          {product.isCombo ? (
+            <section className="admin-catalog-editor__section is-compact">
+              <h2>Combo Options</h2>
+              {advancedModel ? (
+                advancedModel.comboOptions.length === 0 ? (
+                  <p className="admin-field__help">No products are available as combo options.</p>
+                ) : (
+                  <div className="admin-catalog-advanced-list">
+                    {advancedModel.comboOptions.map((option) => (
+                      <label className="admin-check-field" key={option.productId}>
+                        <input
+                          type="checkbox"
+                          checked={comboState[option.productId] ?? option.selected}
+                          disabled={readOnly || !option.active}
+                          onChange={(event) =>
+                            setComboState((state) => ({
+                              ...state,
+                              [option.productId]: event.currentTarget.checked,
+                            }))
+                          }
+                        />
+                        <span>{option.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )
               ) : (
-                <div className="admin-catalog-advanced-list">
-                  {advancedModel.comboOptions.map((option) => (
-                    <label className="admin-check-field" key={option.productId}>
-                      <input
-                        type="checkbox"
-                        checked={comboState[option.productId] ?? option.selected}
-                        disabled={readOnly || !option.active}
-                        onChange={(event) =>
-                          setComboState((state) => ({
-                            ...state,
-                            [option.productId]: event.currentTarget.checked,
-                          }))
-                        }
-                      />
-                      <span>{option.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )
-            ) : (
-              <p className="admin-field__help">Loading combo options…</p>
-            )}
-          </section>
+                <p className="admin-field__help">Loading combo options…</p>
+              )}
+            </section>
+          ) : null}
 
           <section className="admin-catalog-editor__section is-compact">
             <h2>Recipe / Inventory</h2>
