@@ -73,8 +73,7 @@ function parseVarianceReasons(value: unknown) {
     if (
       typeof entry['paymentMethodId'] !== 'string' ||
       (entry['reason'] !== null && typeof entry['reason'] !== 'string') ||
-      (entry['reasonCodeId'] !== undefined &&
-        typeof entry['reasonCodeId'] !== 'string')
+      (entry['reasonCodeId'] !== undefined && typeof entry['reasonCodeId'] !== 'string')
     ) {
       throw new TypeError(`End Day variance reason ${index + 1} is invalid.`);
     }
