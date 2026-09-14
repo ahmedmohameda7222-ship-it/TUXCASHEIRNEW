@@ -15,6 +15,7 @@ export interface PreparedPaymentPart {
   readonly receivedMinor: MoneyMinor | null;
   readonly changeMinor: MoneyMinor | null;
   readonly reference: string | null;
+  readonly manualConfirmed: boolean;
 }
 
 export interface PaymentPreparationContext {
@@ -76,11 +77,25 @@ function normalizePaymentReference(
   return reference.length === 0 ? null : reference;
 }
 
+function requireManualConfirmation(
+  method: PaymentMethod,
+  manualConfirmed: boolean | undefined,
+): boolean {
+  const confirmed = manualConfirmed === true;
+  if ((method.manualConfirmationRequired ?? false) && !confirmed) {
+    throw new DomainInvariantError(
+      'Manual confirmation is required for the selected payment method.',
+    );
+  }
+  return confirmed;
+}
+
 function preparePart(
   method: PaymentMethod,
   allocatedMinor: MoneyMinor,
   cashReceivedMinor: MoneyMinor | null,
   rawReference: string | null | undefined,
+  manualConfirmed: boolean | undefined,
 ): PreparedPaymentPart {
   if (allocatedMinor < 0) {
     throw new DomainInvariantError('Payment allocation cannot be negative.');
@@ -95,6 +110,7 @@ function preparePart(
     refundAllowed: method.refundAllowed ?? true,
   };
   const reference = normalizePaymentReference(method, rawReference);
+  const confirmed = requireManualConfirmation(method, manualConfirmed);
   if (method.logicType !== 'CASH') {
     return {
       method: snapshot,
@@ -102,6 +118,7 @@ function preparePart(
       receivedMinor: null,
       changeMinor: null,
       reference,
+      manualConfirmed: confirmed,
     };
   }
   const effectiveReceived = cashReceivedMinor ?? allocatedMinor;
@@ -114,6 +131,7 @@ function preparePart(
     receivedMinor: effectiveReceived,
     changeMinor: subtractMoney(effectiveReceived, allocatedMinor),
     reference,
+    manualConfirmed: confirmed,
   };
 }
 
@@ -134,7 +152,15 @@ export function preparePaymentParts(
   }
   if (draft.mode === 'SINGLE') {
     const method = activeMethod(methods, draft.methodId, context);
-    return [preparePart(method, totalMinor, draft.cashReceivedMinor, draft.reference)];
+    return [
+      preparePart(
+        method,
+        totalMinor,
+        draft.cashReceivedMinor,
+        draft.reference,
+        draft.manualConfirmed,
+      ),
+    ];
   }
 
   if (draft.methodAId === draft.methodBId) {
@@ -147,8 +173,8 @@ export function preparePaymentParts(
   const methodA = activeMethod(methods, draft.methodAId, context);
   const methodB = activeMethod(methods, draft.methodBId, context);
   return [
-    preparePart(methodA, draft.amountAMinor, null, draft.referenceA),
-    preparePart(methodB, remainder, null, draft.referenceB),
+    preparePart(methodA, draft.amountAMinor, null, draft.referenceA, draft.manualConfirmedA),
+    preparePart(methodB, remainder, null, draft.referenceB, draft.manualConfirmedB),
   ];
 }
 
