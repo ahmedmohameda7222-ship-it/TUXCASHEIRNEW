@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import './catalog.css';
+import { createCatalogProductSlug } from './catalogProductSlug';
 import { ProductInspector } from './ProductInspector';
 import { ProductList, type CatalogStatusFilter } from './ProductList';
 import { CatalogUiError, useCatalog } from './useCatalog';
@@ -33,11 +34,12 @@ function newProductForShop(
   products: readonly CatalogProductDetail[],
 ): CatalogProductDetail {
   const maxSortOrder = products.reduce((max, product) => Math.max(max, product.sortOrder), 0);
+  const id = crypto.randomUUID();
   return {
-    id: crypto.randomUUID(),
+    id,
     shopId,
     categoryId,
-    slug: null,
+    slug: createCatalogProductSlug(id),
     name: 'New product',
     description: null,
     priceMinor: 0,
