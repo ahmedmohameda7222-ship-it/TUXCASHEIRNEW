@@ -5,6 +5,9 @@ on:
     branches:
       - tmp/admin-plan2-final-review-3-fixes
 
+permissions:
+  contents: write
+
 jobs:
   prettier-diff:
     runs-on: ubuntu-latest
@@ -15,7 +18,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Print exact Prettier diff
+      - name: Apply exact Prettier output
         run: |
           npx prettier --write apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts
-          git diff -- apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts
+          if git diff --quiet -- apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operations-desktop/src/main/endDayIpc.ts apps/operations-desktop/src/main/index.ts
+          git commit -m "style(plan2): apply exact prettier output"
+          git push origin HEAD:tmp/admin-plan2-final-review-3-fixes
