@@ -1,4 +1,5 @@
 name: Admin Plan 2 Fresh Review Batch 1
+# registered; this commit triggers the pull-request workflow
 
 on:
   pull_request:
