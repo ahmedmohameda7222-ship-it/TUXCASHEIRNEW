@@ -81,6 +81,8 @@ export type CatalogScheduledChangeSummary = {
   scheduledFor: string;
   targetBasePublishVersion: number | null;
   attemptCount: number;
+  terminalFailure: boolean;
+  nextAttemptAt: string | null;
   lastError: string | null;
 };
 
@@ -255,8 +257,14 @@ export type CatalogDraftSaveResult =
     }
   | {
       ok: false;
-      code: 'draft_not_found' | 'draft_not_editable' | 'stale_draft_revision' | 'invalid_change';
+      code:
+        | 'draft_not_found'
+        | 'draft_not_editable'
+        | 'stale_draft_revision'
+        | 'invalid_change'
+        | 'schedule_claimed';
       currentDraftRevision?: number;
+      scheduleId?: string;
     };
 
 export type CatalogPublishResult =
