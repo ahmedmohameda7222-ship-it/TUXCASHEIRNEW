@@ -125,6 +125,8 @@ function renderSection(section: SettingsSection): string {
       publishing={false}
       onDeleteOrArchiveShop={noop}
       deletingOrArchivingShop={false}
+      onUpdateOperationalState={noop}
+      operationalStateUpdating={false}
       onUpdateSettingOverride={noop}
       settingOverrideUpdating={false}
       onUpsertReasonCode={noop}
@@ -163,7 +165,8 @@ describe('Settings workspace', () => {
       expect(html).toContain(label);
     }
     expect(html).toContain('Publish settings');
-    expect(html).toContain('Changes become live only after publishing');
+    expect(html).toContain('Configuration edits publish here');
+    expect(html).toContain('Emergency shop controls publish immediately');
   });
 
   it('shows editable receipt inheritance without hiding the source layer', () => {
@@ -195,6 +198,8 @@ describe('Settings workspace', () => {
     expect(shop).toContain('Road 9, Maadi');
     expect(shop).toContain('10:00');
     expect(shop).toContain('23:00');
+    expect(shop).toContain('Temporarily close shop');
+    expect(shop).toContain('Pause online orders');
     expect(shop).toContain('Archive / delete unused shop');
 
     const orderTypes = renderSection('order-types');
