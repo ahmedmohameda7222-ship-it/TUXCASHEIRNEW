@@ -415,7 +415,7 @@ begin
   );
   perform private.validate_admin_catalog_bundle_v1(v_draft.shop_id, v_bundle);
 
-  perform public.publish_tux_operations_configuration(
+  perform private.publish_admin_catalog_configuration_v1(
     v_draft.shop_id,
     v_new_operations_version,
     v_bundle,
