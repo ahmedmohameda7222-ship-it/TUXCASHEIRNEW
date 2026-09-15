@@ -16,10 +16,17 @@ import {
   type PaymentMethodUpdateDraft,
   type ReasonCodeUpdateDraft,
   type SettingOverrideUpdateDraft,
+  type ShopOperationalStateUpdateDraft,
 } from './useSettings';
 
 export type SettingsSection =
-  'overview' | 'shop' | 'order-types' | 'payments' | 'checkout' | 'receipts' | 'reason-codes';
+  | 'overview'
+  | 'shop'
+  | 'order-types'
+  | 'payments'
+  | 'checkout'
+  | 'receipts'
+  | 'reason-codes';
 
 export type SettingsWorkspaceViewProps = {
   workspace: AdminSettingsWorkspace;
@@ -27,6 +34,8 @@ export type SettingsWorkspaceViewProps = {
   onSectionChange(section: SettingsSection): void;
   onPublish(): void | Promise<void>;
   publishing: boolean;
+  onUpdateOperationalState(draft: ShopOperationalStateUpdateDraft): void | Promise<void>;
+  operationalStateUpdating: boolean;
   onDeleteOrArchiveShop(): void | Promise<void>;
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
@@ -119,6 +128,8 @@ function Overview({ workspace }: { workspace: AdminSettingsWorkspace }) {
 function SectionContent({
   section,
   workspace,
+  onUpdateOperationalState,
+  operationalStateUpdating,
   onDeleteOrArchiveShop,
   deletingOrArchivingShop,
   onUpdateSettingOverride,
@@ -132,6 +143,8 @@ function SectionContent({
 }: {
   section: SettingsSection;
   workspace: AdminSettingsWorkspace;
+  onUpdateOperationalState(draft: ShopOperationalStateUpdateDraft): void | Promise<void>;
+  operationalStateUpdating: boolean;
   onDeleteOrArchiveShop(): void | Promise<void>;
   deletingOrArchivingShop: boolean;
   onUpdateSettingOverride(draft: SettingOverrideUpdateDraft): void | Promise<void>;
@@ -150,8 +163,9 @@ function SectionContent({
       return (
         <ShopsPage
           workspace={workspace}
+          onUpdateOperationalState={(draft) => void onUpdateOperationalState(draft)}
           onDeleteOrArchive={() => void onDeleteOrArchiveShop()}
-          busy={deletingOrArchivingShop}
+          busy={operationalStateUpdating || deletingOrArchivingShop}
         />
       );
     case 'order-types':
@@ -203,6 +217,8 @@ export function SettingsWorkspaceView({
   onSectionChange,
   onPublish,
   publishing,
+  onUpdateOperationalState,
+  operationalStateUpdating,
   onDeleteOrArchiveShop,
   deletingOrArchivingShop,
   onUpdateSettingOverride,
@@ -231,7 +247,9 @@ export function SettingsWorkspaceView({
           >
             {publishing ? 'Publishing…' : 'Publish settings'}
           </button>
-          <p className="admin-field__help">Changes become live only after publishing.</p>
+          <p className="admin-field__help">
+            Configuration edits publish here. Emergency shop controls publish immediately.
+          </p>
         </div>
       </header>
 
@@ -258,6 +276,8 @@ export function SettingsWorkspaceView({
       <SectionContent
         section={section}
         workspace={workspace}
+        onUpdateOperationalState={onUpdateOperationalState}
+        operationalStateUpdating={operationalStateUpdating}
         onDeleteOrArchiveShop={onDeleteOrArchiveShop}
         deletingOrArchivingShop={deletingOrArchivingShop}
         onUpdateSettingOverride={onUpdateSettingOverride}
@@ -323,6 +343,8 @@ export function SettingsPage() {
       onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
       onPublish={() => settings.publish.mutateAsync()}
       publishing={settings.publish.isPending}
+      onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
+      operationalStateUpdating={settings.updateOperationalState.isPending}
       onDeleteOrArchiveShop={deleteOrArchiveShop}
       deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
       onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
