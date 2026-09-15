@@ -1,7 +1,7 @@
 -- TUX Admin Plan 2 final review round 12 hardening.
 -- Additive only: preserve schedule-time authorization for durable catalog publications.
--- The employee that created the schedule remains immutable audit attribution, while execution is
--- performed by the trusted scheduler RPC and no longer depends on that employee's current access.
+-- The employee that created the schedule remains immutable audit attribution, while execution no
+-- longer depends on that employee retaining live Admin access after the schedule was accepted.
 
 create or replace function public.publish_catalog_draft_scheduled_v1(
   p_employee_id uuid,
@@ -23,6 +23,7 @@ declare
   v_new_operations_version integer;
   v_bundle jsonb;
   v_rebase jsonb;
+  v_result jsonb;
 begin
   select * into v_draft
   from public.catalog_drafts d
@@ -131,9 +132,29 @@ begin
     );
   end if;
 
+  -- Keep the strict publish handoff for an employee who still has current authority. Besides
+  -- preserving the existing strict-publish contract, this keeps all manual publish validation in a
+  -- single path. A live authorization failure is the one condition that must not strand an already
+  -- authorized durable schedule, so the trusted scheduler falls through to its own publication path.
+  begin
+    v_result := public.publish_catalog_draft_v1(
+      p_employee_id,
+      p_draft_id,
+      p_expected_draft_revision,
+      v_draft.base_publish_version
+    );
+    return v_result;
+  exception
+    when others then
+      if sqlerrm not like 'TUX_ADMIN_CATALOG_FORBIDDEN:%'
+         and sqlerrm <> 'TUX_ADMIN_CATALOG_BUSINESS_MISMATCH' then
+        raise;
+      end if;
+  end;
+
   -- Authorization was captured when schedule_catalog_draft_v1 accepted this durable job. From this
-  -- point the trusted scheduler is the execution authority. Do not re-run employee publish/pricing
-  -- permissions here; p_employee_id is retained solely as the original audit attribution.
+  -- point the trusted scheduler is the execution authority. p_employee_id is retained solely as the
+  -- original audit attribution; no current employee publish/pricing permission is required.
   select coalesce(max(s.version), 0)
     into v_current_operations_version
   from public.operations_configuration_snapshots s
