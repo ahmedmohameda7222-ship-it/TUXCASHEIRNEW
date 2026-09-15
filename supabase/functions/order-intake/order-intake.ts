@@ -471,7 +471,7 @@ const CAIRO_WEEKDAY: Readonly<Record<string, number>> = {
 interface CairoLocalClock {
   serviceDate: string;
   dayOfWeek: number;
-  minuteOfDay: number;
+  secondOfDay: number;
 }
 
 function cairoLocalClock(now: Date): CairoLocalClock {
@@ -483,6 +483,7 @@ function cairoLocalClock(now: Date): CairoLocalClock {
     weekday: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(now);
   const value = (type: Intl.DateTimeFormatPartTypes): string =>
@@ -490,13 +491,19 @@ function cairoLocalClock(now: Date): CairoLocalClock {
   const dayOfWeek = CAIRO_WEEKDAY[value('weekday')];
   const hour = Number(value('hour'));
   const minute = Number(value('minute'));
-  if (dayOfWeek === undefined || !Number.isInteger(hour) || !Number.isInteger(minute)) {
+  const second = Number(value('second'));
+  if (
+    dayOfWeek === undefined ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second)
+  ) {
     throw new Error('failed to resolve Africa/Cairo online-order clock');
   }
   return {
     serviceDate: `${value('year')}-${value('month')}-${value('day')}`,
     dayOfWeek,
-    minuteOfDay: hour * 60 + minute,
+    secondOfDay: hour * 3600 + minute * 60 + second + now.getUTCMilliseconds() / 1000,
   };
 }
 
@@ -508,33 +515,36 @@ function adjacentServiceDate(serviceDate: string, deltaDays: number): string {
     .padStart(2, '0')}-${value.getUTCDate().toString().padStart(2, '0')}`;
 }
 
-function localTimeMinute(value: string): number {
-  const match = /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value);
+function localTimeSecond(value: string): number {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d+)?))?$/.exec(value);
   if (!match) throw new Error('published online ordering hour is invalid');
   const hour = Number(match[1]);
   const minute = Number(match[2]);
-  if (hour > 23 || minute > 59) throw new Error('published online ordering hour is invalid');
-  return hour * 60 + minute;
+  const second = Number(match[3] ?? '0');
+  if (hour > 23 || minute > 59 || second < 0 || second >= 60) {
+    throw new Error('published online ordering hour is invalid');
+  }
+  return hour * 3600 + minute * 60 + second;
 }
 
 function startsOnServiceDate(
   opensLocal: string,
   closesLocal: string,
-  minuteOfDay: number,
+  secondOfDay: number,
 ): boolean {
-  const opens = localTimeMinute(opensLocal);
-  const closes = localTimeMinute(closesLocal);
-  return opens < closes ? minuteOfDay >= opens && minuteOfDay < closes : minuteOfDay >= opens;
+  const opens = localTimeSecond(opensLocal);
+  const closes = localTimeSecond(closesLocal);
+  return opens < closes ? secondOfDay >= opens && secondOfDay < closes : secondOfDay >= opens;
 }
 
 function carriesIntoNextDate(
   opensLocal: string,
   closesLocal: string,
-  minuteOfDay: number,
+  secondOfDay: number,
 ): boolean {
-  const opens = localTimeMinute(opensLocal);
-  const closes = localTimeMinute(closesLocal);
-  return closes < opens && minuteOfDay < closes;
+  const opens = localTimeSecond(opensLocal);
+  const closes = localTimeSecond(closesLocal);
+  return closes < opens && secondOfDay < closes;
 }
 
 export function isPublishedOnlineOrderingOpenAt(
@@ -558,7 +568,7 @@ export function isPublishedOnlineOrderingOpenAt(
     return startsOnServiceDate(
       currentSpecial.opensLocal,
       currentSpecial.closesLocal,
-      clock.minuteOfDay,
+      clock.secondOfDay,
     );
   }
 
@@ -572,7 +582,7 @@ export function isPublishedOnlineOrderingOpenAt(
       carriesIntoNextDate(
         previousSpecial.opensLocal,
         previousSpecial.closesLocal,
-        clock.minuteOfDay,
+        clock.secondOfDay,
       )
     ) {
       return true;
@@ -583,7 +593,7 @@ export function isPublishedOnlineOrderingOpenAt(
       weeklyHours.some(
         (hours) =>
           hours.dayOfWeek === previousDay &&
-          carriesIntoNextDate(hours.opensLocal, hours.closesLocal, clock.minuteOfDay),
+          carriesIntoNextDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
       )
     ) {
       return true;
@@ -593,7 +603,7 @@ export function isPublishedOnlineOrderingOpenAt(
   return weeklyHours.some(
     (hours) =>
       hours.dayOfWeek === clock.dayOfWeek &&
-      startsOnServiceDate(hours.opensLocal, hours.closesLocal, clock.minuteOfDay),
+      startsOnServiceDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
   );
 }
 
