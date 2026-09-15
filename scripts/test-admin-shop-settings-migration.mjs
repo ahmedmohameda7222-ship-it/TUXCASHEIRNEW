@@ -140,6 +140,7 @@ declare
   v_reason_failed boolean := false;
   v_logic_type text;
   v_requires_reconciliation boolean;
+  v_refund_allowed boolean;
 begin
   v_order_edit := public.update_admin_order_type_v1(
     '${employeeId}', '${shopId}', '${orderTypeId}', 'Pick up', 'TAKE_AWAY', true, 1, 0, 1
@@ -157,21 +158,30 @@ begin
     raise exception 'stale order type row edit was not rejected: %', v_order_edit;
   end if;
 
+  -- refundAllowed is canonical but not editable until the trusted refund boundary enforces it.
   v_payment_edit := public.update_admin_payment_method_v1(
     '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
     'BOTH', true, true, false, 0, 1
   );
-  if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
-     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
-    raise exception 'payment method edit failed: %', v_payment_edit;
+  if v_payment_edit ->> 'code' <> 'refund_policy_not_editable_until_enforced' then
+    raise exception 'unenforced refund policy mutation was not rejected: %', v_payment_edit;
   end if;
 
-  select p.logic_type, p.requires_reconciliation
-    into v_logic_type, v_requires_reconciliation
+  v_payment_edit := public.update_admin_payment_method_v1(
+    '${employeeId}', '${shopId}', '${paymentMethodId}', 'Front Cash', true, 1,
+    'BOTH', true, true, true, 0, 1
+  );
+  if coalesce((v_payment_edit ->> 'ok')::boolean, false) is not true
+     or (v_payment_edit ->> 'editVersion')::bigint <> 2 then
+    raise exception 'payment method edit failed while preserving refund policy: %', v_payment_edit;
+  end if;
+
+  select p.logic_type, p.requires_reconciliation, p.refund_allowed
+    into v_logic_type, v_requires_reconciliation, v_refund_allowed
   from public.payment_methods p
   where p.id = '${paymentMethodId}' and p.shop_id = '${shopId}';
-  if v_logic_type <> 'CASH' or v_requires_reconciliation is not true then
-    raise exception 'Admin payment edit changed protected operational semantics';
+  if v_logic_type <> 'CASH' or v_requires_reconciliation is not true or v_refund_allowed is not true then
+    raise exception 'Admin payment edit changed protected operational/refund semantics';
   end if;
 
   v_resolved := public.resolve_effective_shop_setting_v1(
