@@ -1,15 +1,24 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
 
+type OperationalStateUpdate = {
+  temporaryClosed: boolean;
+  onlineOrdersPaused: boolean;
+  expectedSettingsVersion: number;
+};
+
 export function ShopsPage({
   workspace,
+  onUpdateOperationalState,
   onDeleteOrArchive,
   busy = false,
 }: {
   workspace: AdminSettingsWorkspace;
+  onUpdateOperationalState?: (state: OperationalStateUpdate) => void;
   onDeleteOrArchive?: () => void;
   busy?: boolean;
 }) {
   const shop = workspace.shop;
+  const operationalStateDisabled = busy || !onUpdateOperationalState;
   return (
     <section className="admin-settings-section" aria-labelledby="settings-shop-title">
       <div className="admin-settings-section__header">
@@ -38,6 +47,37 @@ export function ShopsPage({
               ? 'Shop is temporarily closed.'
               : 'Shop is not temporarily closed.'}
           </small>
+          <label className="admin-check-field">
+            <input
+              type="checkbox"
+              checked={shop.temporaryClosed}
+              disabled={operationalStateDisabled}
+              onChange={(event) =>
+                onUpdateOperationalState?.({
+                  temporaryClosed: event.currentTarget.checked,
+                  onlineOrdersPaused: shop.onlineOrdersPaused,
+                  expectedSettingsVersion: workspace.settingsVersion,
+                })
+              }
+            />
+            <span>Temporarily close shop</span>
+          </label>
+          <label className="admin-check-field">
+            <input
+              type="checkbox"
+              checked={shop.onlineOrdersPaused}
+              disabled={operationalStateDisabled}
+              onChange={(event) =>
+                onUpdateOperationalState?.({
+                  temporaryClosed: shop.temporaryClosed,
+                  onlineOrdersPaused: event.currentTarget.checked,
+                  expectedSettingsVersion: workspace.settingsVersion,
+                })
+              }
+            />
+            <span>Pause online orders</span>
+          </label>
+          <small>These emergency controls publish immediately.</small>
         </article>
         <article className="admin-settings-card">
           <span>Coordinates</span>
