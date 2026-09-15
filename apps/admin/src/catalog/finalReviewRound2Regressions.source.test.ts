@@ -46,7 +46,7 @@ describe('Plan 2 fresh final review regressions', () => {
     expect(intake).toContain('Africa/Cairo');
     expect(publicAvailabilityMigration).toContain('catalog_public_online_ordering_open_v1');
     expect(publicAvailabilityMigration).toContain("'Africa/Cairo'");
-    expect(publicAvailabilityMigration).toContain("serviceKind");
+    expect(publicAvailabilityMigration).toContain('serviceKind');
     expect(publicAvailabilityMigration).toContain(
       'private.catalog_public_online_ordering_open_v1(v_settings, now())',
     );
