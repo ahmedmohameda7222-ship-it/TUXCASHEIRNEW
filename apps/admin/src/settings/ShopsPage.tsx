@@ -47,6 +47,10 @@ function timeInput(value: string | null): string {
   return value ? value.slice(0, 8) : '';
 }
 
+function canonicalExpectedTime(value: string): string {
+  return /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+}
+
 function WeeklyHoursRowEditor({
   hours,
   settingsVersion,
@@ -55,7 +59,7 @@ function WeeklyHoursRowEditor({
 }: {
   hours: AdminSettingsWorkspace['weeklyHours'][number];
   settingsVersion: number;
-  onUpsert?: (draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>;
+  onUpsert: ((draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
   const [expectedSettingsVersion] = useState(settingsVersion);
@@ -80,8 +84,8 @@ function WeeklyHoursRowEditor({
     const nextRow: WeeklyHoursExpectedRow = {
       serviceKind: form.serviceKind,
       dayOfWeek: form.dayOfWeek,
-      opensLocal: form.opensLocal,
-      closesLocal: form.closesLocal,
+      opensLocal: canonicalExpectedTime(form.opensLocal),
+      closesLocal: canonicalExpectedTime(form.closesLocal),
       active: form.active,
     };
     await onUpsert({
@@ -168,7 +172,7 @@ function SpecialHoursRowEditor({
 }: {
   hours: AdminSettingsWorkspace['specialHours'][number];
   settingsVersion: number;
-  onUpsert?: (draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>;
+  onUpsert: ((draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
   const [expectedSettingsVersion] = useState(settingsVersion);
@@ -194,8 +198,8 @@ function SpecialHoursRowEditor({
       serviceDate,
       serviceKind,
       closed,
-      opensLocal: closed ? null : opensLocal,
-      closesLocal: closed ? null : closesLocal,
+      opensLocal: closed ? null : canonicalExpectedTime(opensLocal),
+      closesLocal: closed ? null : canonicalExpectedTime(closesLocal),
       note: note.trim() || null,
     };
     await onUpsert({
