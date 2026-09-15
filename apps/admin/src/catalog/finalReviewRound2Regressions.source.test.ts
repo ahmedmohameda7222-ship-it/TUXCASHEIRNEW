@@ -30,25 +30,36 @@ describe('Plan 2 fresh final review regressions', () => {
     );
   });
 
-  it('enforces published ONLINE weekly and special hours at trusted online intake', () => {
+  it('enforces published ONLINE weekly and special hours in public availability and trusted intake', () => {
     const authority = source(
       '../../../../supabase/functions/order-intake/published-checkout-authority.ts',
     );
     const intake = source('../../../../supabase/functions/order-intake/order-intake.ts');
+    const publicAvailabilityMigration = sourceOrEmpty(
+      '../../../../supabase/migrations/20260910121600_catalog_public_online_hours_projection.sql',
+    );
 
     expect(authority).toContain('weeklyHours');
     expect(authority).toContain('specialHours');
     expect(intake).toContain('ONLINE_ORDERING_OUTSIDE_HOURS');
     expect(intake).toContain("serviceKind === 'ONLINE'");
     expect(intake).toContain('Africa/Cairo');
+    expect(publicAvailabilityMigration).toContain('catalog_public_online_ordering_open_v1');
+    expect(publicAvailabilityMigration).toContain("'Africa/Cairo'");
+    expect(publicAvailabilityMigration).toContain("serviceKind");
+    expect(publicAvailabilityMigration).toContain(
+      'private.catalog_public_online_ordering_open_v1(v_settings, now())',
+    );
   });
 
-  it('requires an explicit category selection when creating a product', () => {
+  it('requires an explicit category selection and defaults it from the product-list category filter', () => {
     const catalogPage = source('./CatalogPage.tsx');
 
     expect(catalogPage).not.toContain('const category = snapshot.categories[0]');
     expect(catalogPage).toContain('New product category');
     expect(catalogPage).toContain('newProductCategoryId');
     expect(catalogPage).toMatch(/newProductForShop\(shopId,\s*newProductCategoryId/);
+    expect(catalogPage).toContain('setNewProductCategoryId(nextCategoryId)');
+    expect(catalogPage).toMatch(/onCategoryChange=\{handleCategoryFilterChange\}/);
   });
 });
