@@ -170,7 +170,7 @@ insert into public.catalog_publish_versions(
   business_id, shop_id, publish_version, operations_configuration_version,
   source_kind, bundle_json, published_at
 ) values (
-  '${businessId}', '${shopId}', 3, 3, 'ROLLBACK', '{}'::jsonb, now()
+  '${businessId}', '${shopId}', 3, 3, 'IMMEDIATE_AVAILABILITY', '{}'::jsonb, now()
 );
 
 do $$

@@ -1,6 +1,18 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
+const round4Result = spawnSync(
+  process.execPath,
+  ['scripts/test-admin-plan2-round4-hardening.mjs'],
+  { env: process.env, encoding: 'utf8' },
+);
+if (round4Result.status !== 0) {
+  process.stderr.write(round4Result.stdout ?? '');
+  process.stderr.write(round4Result.stderr ?? '');
+  process.exit(round4Result.status ?? 1);
+}
+process.stdout.write(round4Result.stdout ?? '');
+
 const baseMigrationPath = 'supabase/migrations/20260910111000_admin_catalog_scheduler.sql';
 const hardeningMigrationPath =
   'supabase/migrations/20260910120630_admin_scheduler_retry_hardening.sql';
