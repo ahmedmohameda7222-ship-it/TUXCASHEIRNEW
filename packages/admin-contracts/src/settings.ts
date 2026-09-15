@@ -5,23 +5,15 @@ export const PAYMENT_METHOD_CHANNELS = ['POS', 'ONLINE', 'BOTH'] as const;
 export type PaymentMethodChannel = (typeof PAYMENT_METHOD_CHANNELS)[number];
 
 export const ADMIN_REASON_FAMILIES = [
-  'CANCELLATION',
-  'REFUND_RETURN',
-  'DISCOUNT_COMP',
-  'WASTE',
-  'STOCK_ADJUSTMENT',
-  'CASH_VARIANCE',
-  'PAY_IN',
-  'PAY_OUT',
+  'CANCELLATION', 'REFUND_RETURN', 'DISCOUNT_COMP', 'WASTE',
+  'STOCK_ADJUSTMENT', 'CASH_VARIANCE', 'PAY_IN', 'PAY_OUT',
 ] as const;
 export type AdminReasonFamily = (typeof ADMIN_REASON_FAMILIES)[number];
 
 export const SHOP_HOURS_SERVICE_KINDS = ['OPEN', 'DELIVERY', 'ONLINE'] as const;
 export type ShopHoursServiceKind = (typeof SHOP_HOURS_SERVICE_KINDS)[number];
 
-export type SettingsChannelContext = {
-  channel: Exclude<PaymentMethodChannel, 'BOTH'>;
-};
+export type SettingsChannelContext = { channel: Exclude<PaymentMethodChannel, 'BOTH'> };
 
 export type AdminPaymentMethodConfiguration = {
   id: string;
@@ -55,11 +47,7 @@ export type AdminShopSettingsSummary = {
   onlineOrdersPaused: boolean;
 };
 
-export type AdminSettingValue = {
-  key: string;
-  value: unknown;
-  version: number;
-};
+export type AdminSettingValue = { key: string; value: unknown; version: number };
 
 export type AdminOrderTypeConfiguration = {
   id: string;
@@ -128,14 +116,12 @@ export type ResolvedSetting<T = unknown> =
   | { source: 'unset'; value: null };
 
 export type ShopDeleteOrArchiveResult =
-  { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
+  | { ok: true; action: 'ARCHIVED' }
+  | { ok: true; action: 'DELETED' }
+  | { ok: false; code: string };
 
 export type SettingsPublishResult =
-  | {
-      ok: true;
-      settingsVersion: number;
-      operationsConfigurationVersion: number;
-    }
+  | { ok: true; settingsVersion: number; operationsConfigurationVersion: number }
   | { ok: false; code: 'stale_settings_version'; currentVersion: number }
   | { ok: false; code: string };
 
@@ -155,6 +141,11 @@ export type CanonicalSettingsRowEditResult =
   | { ok: false; code: 'stale_edit_version'; currentVersion: number }
   | { ok: false; code: string };
 
+export type ShopManagementWriteResult =
+  | { ok: true; hoursId?: string; deactivated?: boolean }
+  | { ok: false; code: 'stale_settings_version'; currentVersion: number }
+  | { ok: false; code: string };
+
 export type SettingWriteInput = {
   shopId: string;
   settingKey: string;
@@ -167,6 +158,66 @@ export type ShopOperationalStateUpdateInput = {
   temporaryClosed: boolean;
   onlineOrdersPaused: boolean;
   expectedSettingsVersion: number;
+};
+
+export type ShopIdentityUpdateInput = {
+  shopId: string;
+  name: string;
+  address: string | null;
+  contactPhone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  expectedSettingsVersion: number;
+  expectedIdentity: {
+    name: string;
+    address: string | null;
+    contactPhone: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  };
+};
+
+export type WeeklyHoursExpectedRow = {
+  serviceKind: ShopHoursServiceKind;
+  dayOfWeek: number;
+  opensLocal: string;
+  closesLocal: string;
+  active: boolean;
+};
+
+export type ShopWeeklyHoursUpsertInput = {
+  shopId: string;
+  hoursId: string | null;
+  serviceKind: ShopHoursServiceKind;
+  dayOfWeek: number;
+  opensLocal: string;
+  closesLocal: string;
+  active: boolean;
+  expectedSettingsVersion: number;
+  expectedRow: WeeklyHoursExpectedRow | null;
+};
+
+export type SpecialHoursExpectedRow = {
+  serviceDate: string;
+  serviceKind: ShopHoursServiceKind;
+  closed: boolean;
+  opensLocal: string | null;
+  closesLocal: string | null;
+  note: string | null;
+};
+
+export type ShopSpecialHoursUpsertInput = {
+  shopId: string;
+  hoursId: string | null;
+  serviceDate: string;
+  serviceKind: ShopHoursServiceKind;
+  closed: boolean;
+  opensLocal: string | null;
+  closesLocal: string | null;
+  note: string | null;
+  active: boolean;
+  expectedSettingsVersion: number;
+  expectedRow: SpecialHoursExpectedRow | null;
 };
 
 export type ReasonCodeWriteInput = {
@@ -199,17 +250,18 @@ export type PaymentMethodEditInput = {
   channel: PaymentMethodChannel;
   requiresReference: boolean;
   manualConfirmationRequired: boolean;
+  /** Canonical final-product policy. Editing remains locked until the trusted refund boundary enforces it. */
   refundAllowed: boolean;
   expectedSettingsVersion: number;
   expectedEditVersion: number;
 };
 
 export type SettingsCommand =
-  | ({ type: 'settings.publish' } & {
-      shopId: string;
-      expectedSettingsVersion: number;
-    })
+  | ({ type: 'settings.publish' } & { shopId: string; expectedSettingsVersion: number })
   | ({ type: 'shop.operational-state.update' } & ShopOperationalStateUpdateInput)
+  | ({ type: 'shop.identity.update' } & ShopIdentityUpdateInput)
+  | ({ type: 'shop.weekly-hours.upsert' } & ShopWeeklyHoursUpsertInput)
+  | ({ type: 'shop.special-hours.upsert' } & ShopSpecialHoursUpsertInput)
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
