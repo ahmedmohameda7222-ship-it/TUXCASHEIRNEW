@@ -338,7 +338,7 @@ export function ProductEditor({
                           <input
                             type="checkbox"
                             checked={linked}
-                            disabled={readOnly || !modifier.active}
+                            disabled={readOnly || (!modifier.active && !linked)}
                             onChange={(event) =>
                               setModifierState((state) => ({
                                 ...state,
@@ -360,7 +360,7 @@ export function ProductEditor({
                             inputMode="numeric"
                             value={maxQuantity}
                             placeholder="No limit"
-                            disabled={readOnly || !linked}
+                            disabled={readOnly || !linked || !modifier.active}
                             onChange={(event) => {
                               const value = event.currentTarget.value;
                               setModifierState((state) => ({
@@ -388,22 +388,25 @@ export function ProductEditor({
                   <p className="admin-field__help">No products are available as combo options.</p>
                 ) : (
                   <div className="admin-catalog-advanced-list">
-                    {advancedModel.comboOptions.map((option) => (
-                      <label className="admin-check-field" key={option.productId}>
-                        <input
-                          type="checkbox"
-                          checked={comboState[option.productId] ?? option.selected}
-                          disabled={readOnly || !option.active}
-                          onChange={(event) =>
-                            setComboState((state) => ({
-                              ...state,
-                              [option.productId]: event.currentTarget.checked,
-                            }))
-                          }
-                        />
-                        <span>{option.name}</span>
-                      </label>
-                    ))}
+                    {advancedModel.comboOptions.map((option) => {
+                      const selected = comboState[option.productId] ?? option.selected;
+                      return (
+                        <label className="admin-check-field" key={option.productId}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={readOnly || (!option.active && !selected)}
+                            onChange={(event) =>
+                              setComboState((state) => ({
+                                ...state,
+                                [option.productId]: event.currentTarget.checked,
+                              }))
+                            }
+                          />
+                          <span>{option.name}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -437,10 +440,11 @@ export function ProductEditor({
                           inputMode="numeric"
                           value={quantity}
                           placeholder="Not in recipe"
-                          disabled={readOnly || !item.active}
+                          disabled={readOnly || (!item.active && quantity === '')}
                           aria-label={`${item.name} quantity micro-units`}
                           onChange={(event) => {
                             const value = event.currentTarget.value;
+                            if (!item.active && value !== '') return;
                             setRecipeState((state) => ({
                               ...state,
                               [item.inventoryItemId]: value,
