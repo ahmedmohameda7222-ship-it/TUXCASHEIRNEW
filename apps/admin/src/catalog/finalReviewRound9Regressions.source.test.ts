@@ -39,7 +39,9 @@ describe('Plan 2 final review round 9 regressions', () => {
 
   it('widens remote display-order storage beyond PostgreSQL int4', () => {
     expect(receiptSequenceStorageMigration).toContain('alter table public.business_days');
-    expect(receiptSequenceStorageMigration).toContain('last_allocated_display_order_no type bigint');
+    expect(receiptSequenceStorageMigration).toContain(
+      'last_allocated_display_order_no type bigint',
+    );
     expect(receiptSequenceStorageMigration).toContain('alter table public.orders');
     expect(receiptSequenceStorageMigration).toContain('display_order_no type bigint');
   });
