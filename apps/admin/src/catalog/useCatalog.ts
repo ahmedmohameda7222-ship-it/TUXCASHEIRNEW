@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import type {
   CatalogCancelScheduleResult,
   CatalogDraftCreateResult,
+  CatalogDraftResumeResult,
   CatalogDraftSaveResult,
   CatalogImmediateAvailabilityResult,
   CatalogJsonObject,
@@ -49,6 +50,57 @@ function isJsonObject(value: CatalogJsonValue | undefined): value is CatalogJson
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function readProduct(value: CatalogJsonValue): CatalogProductDetail | null {
+  if (!isJsonObject(value)) return null;
+  const id = value['id'];
+  const shopId = value['shopId'];
+  const categoryId = value['categoryId'];
+  const name = value['name'];
+  const priceMinor = value['priceMinor'];
+  const active = value['active'];
+  const soldOut = value['soldOut'];
+  const isCombo = value['isCombo'];
+  const sortOrder = value['sortOrder'];
+  if (
+    typeof id !== 'string' ||
+    typeof shopId !== 'string' ||
+    typeof categoryId !== 'string' ||
+    typeof name !== 'string' ||
+    typeof priceMinor !== 'number' ||
+    typeof active !== 'boolean' ||
+    typeof soldOut !== 'boolean' ||
+    typeof isCombo !== 'boolean' ||
+    typeof sortOrder !== 'number'
+  ) return null;
+  return {
+    id,
+    shopId,
+    categoryId,
+    slug: typeof value['slug'] === 'string' ? value['slug'] : null,
+    name,
+    description: typeof value['description'] === 'string' ? value['description'] : null,
+    priceMinor,
+    imageKey: typeof value['imageKey'] === 'string' ? value['imageKey'] : null,
+    family: typeof value['family'] === 'string' ? value['family'] : null,
+    bestSeller: value['bestSeller'] === true,
+    active,
+    soldOut,
+    isCombo,
+    sortOrder,
+  };
+}
+
+function productsFromBundle(bundleJson: CatalogJsonObject): Record<string, CatalogProductDetail> {
+  const snapshot = bundleJson['snapshot'];
+  if (!isJsonObject(snapshot) || !Array.isArray(snapshot['products'])) return {};
+  const products: Record<string, CatalogProductDetail> = {};
+  for (const candidate of snapshot['products']) {
+    const product = readProduct(candidate);
+    if (product) products[product.id] = product;
+  }
+  return products;
+}
+
 function productJson(product: CatalogProductDetail): CatalogJsonObject {
   return {
     id: product.id,
@@ -87,13 +139,7 @@ export function upsertProductInBundle(
   });
   if (!replaced) nextProducts.push(productJson(product));
 
-  return {
-    ...bundleJson,
-    snapshot: {
-      ...snapshot,
-      products: nextProducts,
-    },
-  };
+  return { ...bundleJson, snapshot: { ...snapshot, products: nextProducts } };
 }
 
 export function buildProductDraftBundle(
@@ -102,13 +148,11 @@ export function buildProductDraftBundle(
 ): { bundleJson: CatalogJsonObject; changedPaths: string[] } {
   let nextBundle = upsertProductInBundle(bundleJson, input.product);
   let changedPaths = [...input.changedPaths];
-
   if (input.advanced !== undefined) {
     const advancedResult = applyProductAdvancedDraft(nextBundle, input.product.id, input.advanced);
     nextBundle = advancedResult.bundleJson;
     changedPaths = [...new Set([...changedPaths, ...advancedResult.changedPaths])];
   }
-
   return { bundleJson: nextBundle, changedPaths };
 }
 
@@ -148,11 +192,17 @@ export function useCatalog(shopId: string | undefined) {
     enabled: Boolean(shopId),
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
-      return adminFetch<CatalogWorkspace>(
-        `/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`,
-      );
+      return adminFetch<CatalogWorkspace>(`/api/admin/catalog?shopId=${encodeURIComponent(shopId)}`);
     },
   });
+
+  const compatibleDrafts = useMemo(() => {
+    const workspace = workspaceQuery.data;
+    if (!workspace) return [];
+    return workspace.drafts.filter(
+      (draft) => draft.status === 'DRAFT' && draft.basePublishVersion === workspace.currentPublishVersion,
+    );
+  }, [workspaceQuery.data]);
 
   const products = useMemo(() => {
     const merged = new Map<string, CatalogProductDetail>();
@@ -163,15 +213,50 @@ export function useCatalog(shopId: string | undefined) {
     );
   }, [draftProducts, workspaceQuery.data?.products]);
 
+  async function resumePersistedDraft(
+    draftId: string,
+    expectedVersion: number,
+  ): Promise<ActiveCatalogDraft> {
+    if (!shopId) throw new CatalogUiError('concrete_shop_required');
+    const resumed = await adminFetch<CatalogDraftResumeResult>(
+      '/api/admin/catalog',
+      {
+        method: 'POST',
+        body: JSON.stringify({ type: 'draft.resume', draftId, shopId, expectedVersion }),
+      },
+      csrfTokenForMutation(session),
+    );
+    if (!resumed.ok) {
+      throw new CatalogUiError(
+        resumed.code,
+        'currentVersion' in resumed ? resumed.currentVersion : undefined,
+      );
+    }
+    const draft: ActiveCatalogDraft = {
+      draftId: resumed.draftId,
+      draftRevision: resumed.draftRevision,
+      basePublishVersion: resumed.basePublishVersion,
+      bundleJson: resumed.bundleJson,
+    };
+    activeDraftRef.current = draft;
+    return draft;
+  }
+
   async function loadOrCreateDraft(product: CatalogProductDetail): Promise<ActiveCatalogDraft> {
     if (!shopId || product.shopId !== shopId) throw new CatalogUiError('concrete_shop_required');
     const workspace = currentWorkspace(queryClient, shopId) ?? workspaceQuery.data;
     if (!workspace) throw new CatalogUiError('catalog_not_loaded');
 
     const existing = activeDraftRef.current;
-    if (existing && existing.basePublishVersion === workspace.currentPublishVersion) {
-      return existing;
+    if (existing && existing.basePublishVersion === workspace.currentPublishVersion) return existing;
+
+    const persisted = workspace.drafts.filter(
+      (draft) => draft.status === 'DRAFT' && draft.basePublishVersion === workspace.currentPublishVersion,
+    );
+    if (persisted.length === 1 && persisted[0]) {
+      return resumePersistedDraft(persisted[0].id, workspace.currentPublishVersion);
     }
+    if (persisted.length > 1) throw new CatalogUiError('draft_selection_required');
 
     const created = await adminFetch<CatalogDraftCreateResult>(
       '/api/admin/catalog',
@@ -198,10 +283,27 @@ export function useCatalog(shopId: string | undefined) {
     return draft;
   }
 
+  const resumeDraft = useMutation({
+    mutationFn: async (draftId: string) => {
+      const workspace = workspaceQuery.data;
+      if (!workspace) throw new CatalogUiError('catalog_not_loaded');
+      if (!compatibleDrafts.some((draft) => draft.id === draftId)) {
+        throw new CatalogUiError('draft_not_editable');
+      }
+      return resumePersistedDraft(draftId, workspace.currentPublishVersion);
+    },
+    onSuccess(draft) {
+      setActiveDraft(draft);
+      setDraftProducts(productsFromBundle(draft.bundleJson));
+      setDraftInvalidatedByLiveChange(false);
+    },
+  });
+
   const prepareProductDraft = useMutation({
     mutationFn: loadOrCreateDraft,
     onSuccess(draft) {
       setActiveDraft(draft);
+      setDraftProducts(productsFromBundle(draft.bundleJson));
       setDraftInvalidatedByLiveChange(false);
     },
   });
@@ -220,19 +322,12 @@ export function useCatalog(shopId: string | undefined) {
             draftId: draft.draftId,
             shopId,
             expectedDraftRevision: draft.draftRevision,
-            changes: [
-              {
-                kind: 'bundle.replace',
-                bundleJson: built.bundleJson,
-                changedPaths: built.changedPaths,
-              },
-            ],
+            changes: [{ kind: 'bundle.replace', bundleJson: built.bundleJson, changedPaths: built.changedPaths }],
           }),
         },
         csrfTokenForMutation(session),
       );
       if (!saved.ok) throw new CatalogUiError(saved.code);
-
       const nextDraft: ActiveCatalogDraft = {
         draftId: draft.draftId,
         draftRevision: saved.draftRevision,
@@ -254,10 +349,7 @@ export function useCatalog(shopId: string | undefined) {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       const result = await adminFetch<CatalogImmediateAvailabilityResult>(
         '/api/admin/catalog',
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'availability.set', shopId, productId, soldOut }),
-        },
+        { method: 'POST', body: JSON.stringify({ type: 'availability.set', shopId, productId, soldOut }) },
         csrfTokenForMutation(session),
       );
       if (!result.ok) throw new CatalogUiError(result.code);
@@ -277,7 +369,9 @@ export function useCatalog(shopId: string | undefined) {
     workspaceQuery,
     products,
     activeDraft,
+    compatibleDrafts,
     draftInvalidatedByLiveChange,
+    resumeDraft,
     prepareProductDraft,
     saveProduct,
     setAvailability,
@@ -289,9 +383,7 @@ export function useCatalogPublishing(shopId: string | undefined) {
   const queryClient = useQueryClient();
 
   const publishingQuery = useQuery({
-    queryKey: shopId
-      ? catalogPublishingQueryKey(shopId)
-      : ['admin', 'catalog', 'no-shop', 'publishing'],
+    queryKey: shopId ? catalogPublishingQueryKey(shopId) : ['admin', 'catalog', 'no-shop', 'publishing'],
     enabled: Boolean(shopId),
     queryFn: async () => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
@@ -302,60 +394,35 @@ export function useCatalogPublishing(shopId: string | undefined) {
   });
 
   const publishDraft = useMutation({
-    mutationFn: async (input: {
-      draftId: string;
-      expectedDraftRevision: number;
-      expectedVersion: number;
-    }) => {
+    mutationFn: async (input: { draftId: string; expectedDraftRevision: number; expectedVersion: number }) => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       const result = await adminFetch<CatalogPublishResult>(
         '/api/admin/catalog',
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'draft.publish', shopId, ...input }),
-        },
+        { method: 'POST', body: JSON.stringify({ type: 'draft.publish', shopId, ...input }) },
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(
-          result.code,
-          'currentVersion' in result ? result.currentVersion : undefined,
-        );
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
       }
       return result;
     },
-    async onSuccess() {
-      if (shopId) await invalidateCatalogState(queryClient, shopId);
-    },
+    async onSuccess() { if (shopId) await invalidateCatalogState(queryClient, shopId); },
   });
 
   const scheduleDraft = useMutation({
-    mutationFn: async (input: {
-      draftId: string;
-      expectedDraftRevision: number;
-      expectedVersion: number;
-      localScheduledAt: string;
-    }) => {
+    mutationFn: async (input: { draftId: string; expectedDraftRevision: number; expectedVersion: number; localScheduledAt: string }) => {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       const result = await adminFetch<CatalogScheduleResult>(
         '/api/admin/catalog',
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'draft.schedule', shopId, ...input }),
-        },
+        { method: 'POST', body: JSON.stringify({ type: 'draft.schedule', shopId, ...input }) },
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(
-          result.code,
-          'currentVersion' in result ? result.currentVersion : undefined,
-        );
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
       }
       return result;
     },
-    async onSuccess() {
-      if (shopId) await invalidateCatalogState(queryClient, shopId);
-    },
+    async onSuccess() { if (shopId) await invalidateCatalogState(queryClient, shopId); },
   });
 
   const restoreVersion = useMutation({
@@ -363,23 +430,15 @@ export function useCatalogPublishing(shopId: string | undefined) {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       const result = await adminFetch<CatalogRestoreVersionResult>(
         '/api/admin/catalog',
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'version.restore', shopId, ...input }),
-        },
+        { method: 'POST', body: JSON.stringify({ type: 'version.restore', shopId, ...input }) },
         csrfTokenForMutation(session),
       );
       if (!result.ok) {
-        throw new CatalogUiError(
-          result.code,
-          'currentVersion' in result ? result.currentVersion : undefined,
-        );
+        throw new CatalogUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
       }
       return result;
     },
-    async onSuccess() {
-      if (shopId) await invalidateCatalogState(queryClient, shopId);
-    },
+    async onSuccess() { if (shopId) await invalidateCatalogState(queryClient, shopId); },
   });
 
   const cancelSchedule = useMutation({
@@ -387,18 +446,13 @@ export function useCatalogPublishing(shopId: string | undefined) {
       if (!shopId) throw new CatalogUiError('concrete_shop_required');
       const result = await adminFetch<CatalogCancelScheduleResult>(
         '/api/admin/catalog',
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'schedule.cancel', shopId, scheduleId }),
-        },
+        { method: 'POST', body: JSON.stringify({ type: 'schedule.cancel', shopId, scheduleId }) },
         csrfTokenForMutation(session),
       );
       if (!result.ok) throw new CatalogUiError(result.code);
       return result;
     },
-    async onSuccess() {
-      if (shopId) await invalidateCatalogState(queryClient, shopId);
-    },
+    async onSuccess() { if (shopId) await invalidateCatalogState(queryClient, shopId); },
   });
 
   return { publishingQuery, publishDraft, scheduleDraft, restoreVersion, cancelSchedule };
