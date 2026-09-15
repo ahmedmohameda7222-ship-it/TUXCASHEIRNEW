@@ -99,6 +99,13 @@ export function CatalogPage() {
     setMobileEditing(true);
   }
 
+  function handleCategoryFilterChange(nextCategoryId: string) {
+    setCategoryId(nextCategoryId);
+    if (activeCategories.some((category) => category.id === nextCategoryId)) {
+      setNewProductCategoryId(nextCategoryId);
+    }
+  }
+
   function startNewProduct() {
     if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
     const product = newProductForShop(shopId, newProductCategoryId, catalog.products);
@@ -239,7 +246,7 @@ export function CatalogPage() {
             categoryId={categoryId}
             onSearchChange={setSearch}
             onStatusChange={setStatus}
-            onCategoryChange={setCategoryId}
+            onCategoryChange={handleCategoryFilterChange}
             onSelectProduct={openProduct}
           />
         </div>
