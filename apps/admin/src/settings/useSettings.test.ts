@@ -84,7 +84,7 @@ describe('Settings client CAS command builders', () => {
     });
   });
 
-  it('uses form-captured payment CAS versions while dropping protected operational semantics', () => {
+  it('preserves canonical refund policy and drops protected operational semantics', () => {
     const command = buildPaymentMethodUpdateCommand(shopId, workspace, {
       paymentMethodId: workspace.paymentMethods[0]!.id,
       displayName: 'Front Cash',
@@ -110,7 +110,7 @@ describe('Settings client CAS command builders', () => {
       channel: 'POS',
       requiresReference: true,
       manualConfirmationRequired: true,
-      refundAllowed: false,
+      refundAllowed: true,
       expectedSettingsVersion: 7,
       expectedEditVersion: 5,
     });
