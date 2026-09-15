@@ -1,6 +1,8 @@
 import type {
   AdminSessionPrincipal,
   CatalogDraftResumeResult,
+  CatalogJsonObject,
+  CatalogJsonValue,
   CatalogResumeDraftInput,
 } from '@tux/admin-contracts';
 
@@ -9,6 +11,24 @@ import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCatalogJsonValue(value: unknown): value is CatalogJsonValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    typeof value === 'number'
+  ) {
+    return true;
+  }
+  if (Array.isArray(value)) return value.every(isCatalogJsonValue);
+  if (!isRecord(value)) return false;
+  return Object.values(value).every(isCatalogJsonValue);
+}
+
+function isCatalogJsonObject(value: unknown): value is CatalogJsonObject {
+  return isRecord(value) && Object.values(value).every(isCatalogJsonValue);
 }
 
 function parseResult(value: unknown): CatalogDraftResumeResult {
@@ -20,7 +40,7 @@ function parseResult(value: unknown): CatalogDraftResumeResult {
       typeof value['draftId'] !== 'string' ||
       typeof value['draftRevision'] !== 'number' ||
       typeof value['basePublishVersion'] !== 'number' ||
-      !isRecord(value['bundleJson'])
+      !isCatalogJsonObject(value['bundleJson'])
     ) {
       return { ok: false, code: 'invalid_request' };
     }
