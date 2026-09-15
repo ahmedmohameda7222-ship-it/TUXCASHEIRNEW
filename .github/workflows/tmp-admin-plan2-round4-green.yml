@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - tmp/admin-plan2-final-review-3-fixes
-    paths:
-      - '.github/workflows/tmp-admin-plan2-round4-green.yml'
 
 permissions:
   contents: write
@@ -66,8 +64,10 @@ jobs:
       - name: Format changed files
         run: >-
           npx prettier --write
+          apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts
           apps/admin/src/settings/SettingsPage.tsx
           apps/admin/src/settings/SettingsPage.test.tsx
+          apps/admin/server/settings/settingsOperationalState.ts
           packages/admin-contracts/src/settings.ts
           .github/workflows/admin-catalog-settings-tdd.yml
       - name: Focused Round 4 regressions
@@ -77,6 +77,7 @@ jobs:
           apps/admin/src/catalog/ProductEditor.test.tsx
           apps/admin/src/settings/SettingsPage.test.tsx
           apps/admin/src/settings/useSettings.test.ts
+          apps/admin/server/settings/settingsOperationalState.test.ts
           apps/admin/server/settings/settingsService.test.ts
           apps/admin/api/admin/settings.test.ts
       - name: Admin contracts typecheck
@@ -96,7 +97,7 @@ jobs:
       - name: Commit verified patch and self-delete
         run: |
           git rm .github/workflows/tmp-admin-plan2-round4-green.yml
-          git add apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx packages/admin-contracts/src/settings.ts .github/workflows/admin-catalog-settings-tdd.yml
+          git add apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx apps/admin/server/settings/settingsOperationalState.ts packages/admin-contracts/src/settings.ts .github/workflows/admin-catalog-settings-tdd.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix(admin): verify final Codex round 4 hardening"
