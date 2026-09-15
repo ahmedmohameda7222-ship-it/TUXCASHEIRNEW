@@ -127,6 +127,10 @@ function renderSection(section: SettingsSection): string {
       deletingOrArchivingShop={false}
       onUpdateOperationalState={noop}
       operationalStateUpdating={false}
+      onUpdateShopIdentity={noop}
+      onUpsertWeeklyHours={noop}
+      onUpsertSpecialHours={noop}
+      shopManagementUpdating={false}
       onUpdateSettingOverride={noop}
       settingOverrideUpdating={false}
       onUpsertReasonCode={noop}
