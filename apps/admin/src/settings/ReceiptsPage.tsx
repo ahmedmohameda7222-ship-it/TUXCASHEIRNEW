@@ -4,6 +4,8 @@ import { SettingOverrideEditor } from './SettingOverrideEditor';
 import { displaySettingValue, resolveWorkspaceSetting, settingSourceLabel } from './settingsModel';
 import type { SettingOverrideUpdateDraft } from './useSettings';
 
+const RECEIPT_SEQUENCE_MAX = 2_147_483_647;
+
 export function ReceiptsPage({
   workspace,
   onUpdate,
@@ -52,7 +54,7 @@ export function ReceiptsPage({
           label="Sequence start"
           kind="integer"
           min={1}
-          max={Number.MAX_SAFE_INTEGER}
+          max={RECEIPT_SEQUENCE_MAX}
           help="The Operations allocator applies sequence changes at a safe business-day boundary."
           updating={updating}
           onUpdate={onUpdate}
