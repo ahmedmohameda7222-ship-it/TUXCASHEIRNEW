@@ -4,7 +4,12 @@ import {
   type OnlineOrderAcceptanceConfirmation,
   type OrdersWorkspace,
 } from '@tux/application';
-import { moneyMinor, type MoneyMinor } from '@tux/domain';
+import {
+  moneyMinor,
+  paymentMethodAllowedForDeliveryZone,
+  paymentMethodSupportsChannel,
+  type MoneyMinor,
+} from '@tux/domain';
 import type { CachedOnlineOrderRequest } from '@tux/persistence';
 import { IndexedDbOnlineOrderInboxStore } from '@tux/persistence/browser';
 import type { TuxOnlineOrdersApi } from '@tux/platform-contracts';
@@ -258,9 +263,17 @@ function OnlineOrderAcceptanceForm({
     (orderType) => orderType.active && orderType.behavior === requiredBehavior,
   );
   const deliveryZones = workspace.configuration.deliveryZones.filter((zone) => zone.active);
-  const paymentMethods = workspace.configuration.paymentMethods.filter((method) => method.active);
   const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;
+  const paymentMethodZoneRules = workspace.configuration.settings?.paymentMethodZoneRules;
+  const paymentDeliveryZoneId =
+    request.fulfillmentPreference === 'DELIVERY' ? selectedZone?.id : null;
+  const paymentMethods = workspace.configuration.paymentMethods.filter(
+    (method) =>
+      method.active &&
+      paymentMethodSupportsChannel(method, 'ONLINE') &&
+      paymentMethodAllowedForDeliveryZone(method, paymentDeliveryZoneId, paymentMethodZoneRules),
+  );
   const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;
   const allowDeliveryFeeOverride =
     workspace.configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;

@@ -24,6 +24,7 @@ import {
 } from '../../server/settings/settingsService';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
 const uuidSchema = z.string().uuid();
 const expectedRowVersionSchema = z.number().int().positive().nullable();
 const expectedSettingsVersionSchema = z.number().int().nonnegative();
@@ -58,7 +59,7 @@ const settingValueSchemas = {
   'checkout.requireCustomerPhone': z.boolean(),
   'receipt.orderPrefix': z.string().max(64),
   'receipt.footer': z.string().max(1_000),
-  'receipt.sequenceStart': z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  'receipt.sequenceStart': z.number().int().positive().max(POSTGRES_INTEGER_MAX),
   'receipt.sequenceResetPolicy': z.literal('BUSINESS_DAY'),
 } as const;
 

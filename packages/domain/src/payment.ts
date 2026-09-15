@@ -24,6 +24,27 @@ export interface PaymentPreparationContext {
   readonly paymentMethodZoneRules?: readonly PaymentMethodZoneRuleSetting[] | undefined;
 }
 
+export function paymentMethodSupportsChannel(
+  method: PaymentMethod,
+  channel: CheckoutChannel,
+): boolean {
+  const configuredChannel = method.channel ?? 'BOTH';
+  return configuredChannel === 'BOTH' || configuredChannel === channel;
+}
+
+export function paymentMethodAllowedForDeliveryZone(
+  method: PaymentMethod,
+  deliveryZoneId: DeliveryZoneId | null | undefined,
+  paymentMethodZoneRules: readonly PaymentMethodZoneRuleSetting[] | undefined,
+): boolean {
+  if (deliveryZoneId === undefined || deliveryZoneId === null) return true;
+  const zoneRule = paymentMethodZoneRules?.find(
+    (candidate) =>
+      candidate.paymentMethodId === method.id && candidate.deliveryZoneId === deliveryZoneId,
+  );
+  return zoneRule?.allowed !== false;
+}
+
 function activeMethod(
   methods: readonly PaymentMethod[],
   id: PaymentMethod['id'],
@@ -34,28 +55,22 @@ function activeMethod(
     throw new DomainInvariantError('Selected payment method is unavailable.');
   }
 
-  const configuredChannel = method.channel ?? 'BOTH';
-  if (
-    context.channel !== undefined &&
-    configuredChannel !== 'BOTH' &&
-    configuredChannel !== context.channel
-  ) {
+  if (context.channel !== undefined && !paymentMethodSupportsChannel(method, context.channel)) {
     throw new DomainInvariantError(
       `Selected payment method is unavailable for ${context.channel} checkout.`,
     );
   }
 
-  if (context.deliveryZoneId !== undefined && context.deliveryZoneId !== null) {
-    const zoneRule = context.paymentMethodZoneRules?.find(
-      (candidate) =>
-        candidate.paymentMethodId === method.id &&
-        candidate.deliveryZoneId === context.deliveryZoneId,
+  if (
+    !paymentMethodAllowedForDeliveryZone(
+      method,
+      context.deliveryZoneId,
+      context.paymentMethodZoneRules,
+    )
+  ) {
+    throw new DomainInvariantError(
+      'Selected payment method is unavailable for this delivery zone.',
     );
-    if (zoneRule?.allowed === false) {
-      throw new DomainInvariantError(
-        'Selected payment method is unavailable for this delivery zone.',
-      );
-    }
   }
 
   return method;

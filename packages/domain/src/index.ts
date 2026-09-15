@@ -101,6 +101,8 @@ export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
 export {
   parsePoundsToMinor,
   parseWholePoundsToMinor,
+  paymentMethodAllowedForDeliveryZone,
+  paymentMethodSupportsChannel,
   preparePaymentParts,
   type PreparedPaymentPart,
   type PaymentPreparationContext,
