@@ -53,7 +53,7 @@ function EditableReasonCode({
       family: reason.family,
       label: label.trim(),
       active,
-      expectedVersion,
+      expectedVersion: expectedVersion,
     });
     setDirty(false);
   }
