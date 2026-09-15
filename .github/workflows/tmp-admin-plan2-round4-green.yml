@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - tmp/admin-plan2-final-review-3-fixes
+    paths:
+      - '.github/workflows/tmp-admin-plan2-round4-green.yml'
 
 permissions:
   contents: write
@@ -49,28 +51,18 @@ jobs:
           text = text.replace(from, to);
           fs.writeFileSync(path, text);
           NODE
-      - name: Wire permanent Round 4 behavior gate
+      - name: Wire Round 4 behavior into permanent scheduler gate
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const path = '.github/workflows/admin-catalog-settings-tdd.yml';
+          const path = 'scripts/test-admin-catalog-scheduler-migration.mjs';
           let text = fs.readFileSync(path, 'utf8');
-          function replaceOnce(from, to) {
-            if (!text.includes(from)) throw new Error(`missing workflow anchor: ${from}`);
-            text = text.replace(from, to);
+          const anchor = "const baseMigrationPath = 'supabase/migrations/20260910111000_admin_catalog_scheduler.sql';";
+          if (!text.includes(anchor)) throw new Error('scheduler permanent-gate anchor missing');
+          if (!text.includes('test-admin-plan2-round4-hardening.mjs')) {
+            const wiring = `const round4Result = spawnSync(\n  process.execPath,\n  ['scripts/test-admin-plan2-round4-hardening.mjs'],\n  { env: process.env, encoding: 'utf8' },\n);\nif (round4Result.status !== 0) {\n  process.stderr.write(round4Result.stdout ?? '');\n  process.stderr.write(round4Result.stderr ?? '');\n  process.exit(round4Result.status ?? 1);\n}\nprocess.stdout.write(round4Result.stdout ?? '');\n\n`;
+            text = text.replace(anchor, wiring + anchor);
           }
-          replaceOnce(
-            "      - 'scripts/test-admin-plan2-review-hardening.mjs'\n      - 'scripts/test-admin-settings-schema-hardening.mjs'",
-            "      - 'scripts/test-admin-plan2-review-hardening.mjs'\n      - 'scripts/test-admin-plan2-round4-hardening.mjs'\n      - 'scripts/test-admin-settings-schema-hardening.mjs'",
-          );
-          replaceOnce(
-            "      - name: Plan 2 review hardening invariant\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Settings schema hardening invariant",
-            "      - name: Plan 2 review hardening invariant\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Plan 2 round 4 hardening invariant\n        run: node scripts/test-admin-plan2-round4-hardening.mjs\n      - name: Settings schema hardening invariant",
-          );
-          replaceOnce(
-            "      - name: Plan 2 review hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Settings schema hardening PostgreSQL behavior",
-            "      - name: Plan 2 review hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Plan 2 round 4 hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-round4-hardening.mjs\n      - name: Settings schema hardening PostgreSQL behavior",
-          );
           fs.writeFileSync(path, text);
           NODE
       - name: Format changed files
@@ -82,7 +74,7 @@ jobs:
           apps/admin/server/settings/settingsOperationalState.ts
           packages/admin-contracts/src/settings.ts
           scripts/test-admin-plan2-round4-hardening.mjs
-          .github/workflows/admin-catalog-settings-tdd.yml
+          scripts/test-admin-catalog-scheduler-migration.mjs
       - name: Focused Round 4 regressions
         run: >-
           npx vitest run
@@ -105,12 +97,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Fresh migration chain
         run: node scripts/test-migrations.mjs
-      - name: Round 4 PostgreSQL behavior
-        run: node scripts/test-admin-plan2-round4-hardening.mjs
-      - name: Commit verified patch and self-delete
+      - name: Permanent scheduler gate including Round 4 behavior
+        run: node scripts/test-admin-catalog-scheduler-migration.mjs
+      - name: Commit verified non-workflow patch
         run: |
-          git rm .github/workflows/tmp-admin-plan2-round4-green.yml
-          git add apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx apps/admin/server/settings/settingsOperationalState.ts packages/admin-contracts/src/settings.ts scripts/test-admin-plan2-round4-hardening.mjs .github/workflows/admin-catalog-settings-tdd.yml
+          git add apps/admin/src/settings/SettingsPage.tsx packages/admin-contracts/src/settings.ts scripts/test-admin-plan2-round4-hardening.mjs scripts/test-admin-catalog-scheduler-migration.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix(admin): verify final Codex round 4 hardening"
