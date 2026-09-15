@@ -3,7 +3,7 @@ import type {
   AdminReasonFamily,
   AdminSettingsWorkspace,
 } from '@tux/admin-contracts';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 import type { ReasonCodeUpdateDraft } from './useSettings';
 
@@ -35,7 +35,15 @@ function EditableReasonCode({
 }) {
   const [label, setLabel] = useState(reason.label);
   const [active, setActive] = useState(reason.active);
-  const [expectedVersion] = useState(reason.version);
+  const [expectedVersion, setExpectedVersion] = useState(reason.version);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dirty) return;
+    setLabel(reason.label);
+    setActive(reason.active);
+    setExpectedVersion(reason.version);
+  }, [dirty, reason.active, reason.label, reason.version]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,8 +53,9 @@ function EditableReasonCode({
       family: reason.family,
       label: label.trim(),
       active,
-      expectedVersion: expectedVersion,
+      expectedVersion,
     });
+    setDirty(false);
   }
 
   return (
@@ -72,7 +81,10 @@ function EditableReasonCode({
           value={label}
           maxLength={240}
           disabled={updating}
-          onChange={(event) => setLabel(event.target.value)}
+          onChange={(event) => {
+            setLabel(event.target.value);
+            setDirty(true);
+          }}
         />
       </label>
       <label className="admin-field">
@@ -81,7 +93,10 @@ function EditableReasonCode({
           aria-label={`${reason.key} reason status`}
           value={active ? 'active' : 'inactive'}
           disabled={updating}
-          onChange={(event) => setActive(event.target.value === 'active')}
+          onChange={(event) => {
+            setActive(event.target.value === 'active');
+            setDirty(true);
+          }}
         >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
