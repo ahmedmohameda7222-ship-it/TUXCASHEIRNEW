@@ -1,0 +1,39 @@
+name: Round 8 Prettier Helper
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-round8-prettier-helper
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-round8-prettier-helper
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Format round 8 files
+        run: >-
+          npx prettier --write
+          apps/admin/server/catalog/catalogService.ts
+          apps/admin/src/catalog/PublishReviewPage.tsx
+      - name: Commit formatted files
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/admin/server/catalog/catalogService.ts apps/admin/src/catalog/PublishReviewPage.tsx
+          git commit -m "style(admin): format round 8 files"
+          git push origin HEAD:tmp/admin-plan2-round8-prettier-helper
