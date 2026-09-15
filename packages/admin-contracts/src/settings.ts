@@ -128,7 +128,9 @@ export type ResolvedSetting<T = unknown> =
   | { source: 'unset'; value: null };
 
 export type ShopDeleteOrArchiveResult =
-  { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
+  | { ok: true; action: 'ARCHIVED' }
+  | { ok: true; action: 'DELETED' }
+  | { ok: false; code: string };
 
 export type SettingsPublishResult =
   | {
@@ -160,6 +162,13 @@ export type SettingWriteInput = {
   settingKey: string;
   value: unknown;
   expectedVersion: number | null;
+};
+
+export type ShopOperationalStateUpdateInput = {
+  shopId: string;
+  temporaryClosed: boolean;
+  onlineOrdersPaused: boolean;
+  expectedSettingsVersion: number;
 };
 
 export type ReasonCodeWriteInput = {
@@ -202,6 +211,7 @@ export type SettingsCommand =
       shopId: string;
       expectedSettingsVersion: number;
     })
+  | ({ type: 'shop.operational-state.update' } & ShopOperationalStateUpdateInput)
   | ({ type: 'shop.delete-or-archive' } & { shopId: string })
   | ({ type: 'setting.default.upsert' } & SettingWriteInput)
   | ({ type: 'setting.override.upsert' } & SettingWriteInput)
