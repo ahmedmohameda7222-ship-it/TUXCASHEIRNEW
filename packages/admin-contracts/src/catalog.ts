@@ -153,6 +153,12 @@ export type CatalogCreateDraftInput = {
   title?: string;
 };
 
+export type CatalogResumeDraftInput = {
+  draftId: string;
+  shopId: string;
+  expectedVersion: number;
+};
+
 export type CatalogSaveDraftInput = {
   draftId: string;
   shopId: string;
@@ -225,6 +231,20 @@ export type CatalogDraftCreateResult =
       bundleJson: CatalogJsonObject;
     }
   | CatalogStaleVersionResult;
+
+export type CatalogDraftResumeResult =
+  | {
+      ok: true;
+      draftId: string;
+      draftRevision: number;
+      basePublishVersion: number;
+      bundleJson: CatalogJsonObject;
+    }
+  | CatalogStaleVersionResult
+  | {
+      ok: false;
+      code: 'invalid_request' | 'draft_not_found' | 'draft_not_editable';
+    };
 
 export type CatalogDraftSaveResult =
   | {
@@ -336,6 +356,7 @@ export type CatalogSaveRecurringAvailabilityRuleResult =
 
 export type CatalogCommand =
   | ({ type: 'draft.create' } & CatalogCreateDraftInput)
+  | ({ type: 'draft.resume' } & CatalogResumeDraftInput)
   | ({ type: 'draft.save' } & CatalogSaveDraftInput)
   | ({ type: 'draft.publish' } & CatalogPublishDraftInput)
   | ({ type: 'availability.set' } & CatalogImmediateAvailabilityInput)
