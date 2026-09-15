@@ -1,10 +1,16 @@
 import type { OperationsConfigurationSnapshot, OrderType } from './catalog';
+import {
+  calculateCheckoutPricing,
+  resolveEffectiveCheckoutPolicy,
+  type CheckoutChannel,
+  type CheckoutPricing,
+  type EffectiveCheckoutPolicy,
+} from './checkoutPolicy';
 import { DomainInvariantError } from './errors';
 import { ZERO_MONEY } from './money';
 import type { OrderDraft } from './orderDraft';
 import { preparePaymentParts } from './payment';
 import { normalizeEgyptianPhone } from './phone';
-import { calculateOrderPricing, type OrderPricing } from './pricing';
 
 export type OrderValidationPath =
   | 'businessDay'
@@ -16,6 +22,7 @@ export type OrderValidationPath =
   | 'delivery.name'
   | 'delivery.zone'
   | 'delivery.address'
+  | 'delivery.fee'
   | 'discount'
   | 'payment';
 
@@ -27,7 +34,8 @@ export interface OrderValidationIssue {
 
 export interface ValidatedOrderDraft {
   readonly orderType: OrderType;
-  readonly pricing: OrderPricing;
+  readonly pricing: CheckoutPricing;
+  readonly checkoutPolicy: EffectiveCheckoutPolicy;
   readonly normalizedDeliveryPhone: string | null;
 }
 
@@ -38,6 +46,7 @@ export type OrderDraftValidationResult =
 export function validateOrderDraft(
   draft: OrderDraft,
   configuration: OperationsConfigurationSnapshot,
+  channel: CheckoutChannel = 'POS',
 ): OrderDraftValidationResult {
   const issues: OrderValidationIssue[] = [];
 
@@ -108,6 +117,12 @@ export function validateOrderDraft(
   }
 
   let normalizedDeliveryPhone: string | null = null;
+  const activeDeliveryZone =
+    orderType?.behavior === 'DELIVERY' && draft.delivery.zoneId !== null
+      ? configuration.deliveryZones.find(
+          (candidate) => candidate.id === draft.delivery.zoneId && candidate.active,
+        )
+      : undefined;
   if (orderType?.behavior === 'DELIVERY') {
     const normalized = normalizeEgyptianPhone(draft.delivery.displayPhone);
     if (!normalized.valid) {
@@ -132,6 +147,18 @@ export function validateOrderDraft(
         code: 'DELIVERY_ZONE_REQUIRED',
         message: 'Delivery Zone is required.',
       });
+    } else if (activeDeliveryZone === undefined) {
+      issues.push({
+        path: 'delivery.zone',
+        code: 'DELIVERY_ZONE_UNAVAILABLE',
+        message: 'Choose an available delivery zone.',
+      });
+    } else if (draft.delivery.configuredFeeMinor !== activeDeliveryZone.feeMinor) {
+      issues.push({
+        path: 'delivery.fee',
+        code: 'DELIVERY_ZONE_FEE_STALE',
+        message: 'The delivery zone fee changed. Re-select the delivery zone.',
+      });
     }
     if (draft.delivery.address.trim().length === 0) {
       issues.push({
@@ -144,12 +171,39 @@ export function validateOrderDraft(
 
   const deliveryFeeMinor =
     orderType?.behavior === 'DELIVERY' ? draft.delivery.finalFeeMinor : ZERO_MONEY;
-  let pricing: OrderPricing | null = null;
+  let pricing: CheckoutPricing | null = null;
+  let checkoutPolicy: EffectiveCheckoutPolicy | null = null;
   try {
-    pricing = calculateOrderPricing({
+    checkoutPolicy = resolveEffectiveCheckoutPolicy(configuration);
+    if (orderType?.behavior !== 'DELIVERY' && checkoutPolicy.requireCustomerPhone) {
+      const normalized = normalizeEgyptianPhone(draft.delivery.displayPhone);
+      if (!normalized.valid) {
+        issues.push({
+          path: 'delivery.phone',
+          code: 'CUSTOMER_PHONE_REQUIRED',
+          message: 'Enter a valid Egyptian mobile number.',
+        });
+      } else {
+        normalizedDeliveryPhone = normalized.normalizedPhone;
+      }
+    }
+    if (
+      orderType?.behavior === 'DELIVERY' &&
+      activeDeliveryZone !== undefined &&
+      !checkoutPolicy.allowDeliveryFeeOverride &&
+      draft.delivery.finalFeeMinor !== activeDeliveryZone.feeMinor
+    ) {
+      issues.push({
+        path: 'delivery.fee',
+        code: 'DELIVERY_FEE_OVERRIDE_NOT_ALLOWED',
+        message: 'The published checkout policy requires the configured delivery zone fee.',
+      });
+    }
+    pricing = calculateCheckoutPricing({
       lines: draft.lines,
       discountMinor: draft.discountMinor,
       deliveryFeeMinor,
+      policy: checkoutPolicy,
     });
   } catch (error) {
     issues.push({
@@ -159,9 +213,27 @@ export function validateOrderDraft(
     });
   }
 
+  if (
+    pricing !== null &&
+    checkoutPolicy !== null &&
+    pricing.itemsSubtotalMinor < checkoutPolicy.minimumOrderMinor
+  ) {
+    issues.push({
+      path: 'cart',
+      code: 'MINIMUM_ORDER_NOT_MET',
+      message: 'The order does not meet the published minimum order amount.',
+    });
+  }
+
   if (pricing !== null) {
     try {
-      preparePaymentParts(draft.payment, configuration.paymentMethods, pricing.totalMinor);
+      preparePaymentParts(draft.payment, configuration.paymentMethods, pricing.totalMinor, {
+        channel,
+        deliveryZoneId: orderType?.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+        ...(configuration.settings?.paymentMethodZoneRules === undefined
+          ? {}
+          : { paymentMethodZoneRules: configuration.settings.paymentMethodZoneRules }),
+      });
     } catch (error) {
       issues.push({
         path: 'payment',
@@ -171,13 +243,13 @@ export function validateOrderDraft(
     }
   }
 
-  if (issues.length > 0 || orderType === undefined || pricing === null) {
+  if (issues.length > 0 || orderType === undefined || pricing === null || checkoutPolicy === null) {
     return { valid: false, issues };
   }
 
   return {
     valid: true,
-    value: { orderType, pricing, normalizedDeliveryPhone },
+    value: { orderType, pricing, checkoutPolicy, normalizedDeliveryPhone },
     issues: [],
   };
 }

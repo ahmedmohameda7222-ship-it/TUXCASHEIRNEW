@@ -43,12 +43,24 @@ export type PaymentDraft =
       readonly mode: 'SINGLE';
       readonly methodId: PaymentMethodId;
       readonly cashReceivedMinor: MoneyMinor | null;
+      /** Operator/provider reference when required by the selected method. */
+      readonly reference?: string | null;
+      /** Explicit operator acknowledgement when the selected method requires it. */
+      readonly manualConfirmed?: boolean;
     }
   | {
       readonly mode: 'SPLIT';
       readonly methodAId: PaymentMethodId;
       readonly amountAMinor: MoneyMinor;
       readonly methodBId: PaymentMethodId;
+      /** Independent reference for split leg A. */
+      readonly referenceA?: string | null;
+      /** Independent reference for split leg B. */
+      readonly referenceB?: string | null;
+      /** Independent manual-confirmation evidence for split leg A. */
+      readonly manualConfirmedA?: boolean;
+      /** Independent manual-confirmation evidence for split leg B. */
+      readonly manualConfirmedB?: boolean;
     };
 
 export interface OrderDraft {

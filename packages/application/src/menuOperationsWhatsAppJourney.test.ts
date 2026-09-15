@@ -152,6 +152,30 @@ class MemoryIntakeStore implements OnlineOrderIntakeStore {
     return shopId === SHOP_ID ? this.catalog : null;
   }
 
+  async loadPublishedCheckoutAuthority(shopId: string) {
+    if (shopId !== SHOP_ID) return null;
+    return {
+      shopId: SHOP_ID,
+      configurationVersion: 1,
+      settingsVersion: null,
+      lifecycleState: 'ACTIVE' as const,
+      temporaryClosed: false,
+      onlineOrdersPaused: false,
+      minimumOrderMinor: 0,
+      orderTypes: [{ behavior: 'DELIVERY' as const, active: true }],
+      paymentMethods: [
+        {
+          id: CASH_ID,
+          displayName: 'Cash',
+          logicType: 'CASH' as const,
+          active: true,
+          channel: 'BOTH' as const,
+          integrationReference: null,
+        },
+      ],
+    };
+  }
+
   async findByIdempotency(
     shopId: string,
     idempotencyKey: string,

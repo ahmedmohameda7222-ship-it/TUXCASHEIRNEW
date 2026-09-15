@@ -1,8 +1,11 @@
 import {
   isCanonicalUuid,
   parsePublicCatalogSnapshotV1,
+  parsePublicCatalogSnapshotV2,
   type PublicCatalogSnapshotV1,
+  type PublicCatalogSnapshotV2,
 } from '../../../packages/catalog-contracts/src/index.ts';
+import type { PublishedPublicOrderingProjection } from './published-ordering.ts';
 
 type Row = Readonly<Record<string, unknown>>;
 
@@ -70,6 +73,9 @@ export interface PublicCatalogStore {
   ) => Promise<readonly PublicProductModifierRow[]>;
   readonly listComboBeverageOptions: (shopId: string) => Promise<readonly PublicComboBeverageRow[]>;
   readonly resolveImageUrl: (imageKey: string | null) => string | null;
+  readonly getPublishedOrderingProjection?: (
+    shopId: string,
+  ) => Promise<PublishedPublicOrderingProjection | null>;
 }
 
 const corsHeaders = {
@@ -258,6 +264,35 @@ export async function buildPublicCatalogSnapshot(
   return parsePublicCatalogSnapshotV1({ ...canonicalProjection, revision });
 }
 
+export async function buildPublicCatalogSnapshotV2(
+  shopId: string,
+  store: PublicCatalogStore,
+): Promise<PublicCatalogSnapshotV2> {
+  const v1 = await buildPublicCatalogSnapshot(shopId, store);
+  const loadProjection = store.getPublishedOrderingProjection;
+  if (!loadProjection) {
+    throw new CatalogUnavailableError('published ordering projection is unavailable');
+  }
+  const projection = await loadProjection.call(store, shopId);
+  if (projection === null) {
+    throw new CatalogUnavailableError('published ordering projection is unavailable');
+  }
+
+  const canonicalProjection = {
+    schemaVersion: 2 as const,
+    shopId: v1.shopId,
+    categories: v1.categories,
+    products: v1.products,
+    modifiers: v1.modifiers,
+    productModifierLinks: v1.productModifierLinks,
+    comboBeverageOptions: v1.comboBeverageOptions,
+    shop: projection.shop,
+    ordering: projection.ordering,
+  };
+  const revision = await sha256Hex(JSON.stringify(canonicalProjection));
+  return parsePublicCatalogSnapshotV2({ ...canonicalProjection, revision });
+}
+
 export async function handleCatalogPublicRequest(
   request: Request,
   store: PublicCatalogStore,
@@ -266,15 +301,24 @@ export async function handleCatalogPublicRequest(
     return new Response(null, { status: 204, headers: corsHeaders });
   if (request.method !== 'GET') return errorResponse(405, 'method_not_allowed');
 
-  const shopId = new URL(request.url).searchParams.get('shopId')?.trim() ?? '';
+  const url = new URL(request.url);
+  const shopId = url.searchParams.get('shopId')?.trim() ?? '';
   if (!isCanonicalUuid(shopId)) return errorResponse(400, 'invalid_shop_id');
+
+  const schemaVersion = url.searchParams.get('schemaVersion')?.trim() ?? null;
+  if (schemaVersion !== null && schemaVersion !== '1' && schemaVersion !== '2') {
+    return errorResponse(400, 'invalid_request');
+  }
 
   try {
     const shop = await store.getShop(shopId);
     if (shop === null || shop.active === false) return errorResponse(404, 'shop_not_found');
     if (shop.id !== shopId) throw new Error('catalog store returned different shop');
 
-    const snapshot = await buildPublicCatalogSnapshot(shopId, store);
+    const snapshot =
+      schemaVersion === '2'
+        ? await buildPublicCatalogSnapshotV2(shopId, store)
+        : await buildPublicCatalogSnapshot(shopId, store);
     return jsonResponse(200, snapshot, { etag: `"${snapshot.revision}"` });
   } catch (error) {
     if (error instanceof CatalogUnavailableError) return errorResponse(503, 'catalog_unavailable');

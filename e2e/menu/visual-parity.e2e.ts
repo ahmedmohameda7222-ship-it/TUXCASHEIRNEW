@@ -60,7 +60,7 @@ const productRows = [
 ];
 
 const catalogFixture = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   shopId: SHOP_ID,
   revision: 'a'.repeat(64),
   categories: categoryRows.map(([id, slug, name], sortOrder) => ({
@@ -75,6 +75,21 @@ const catalogFixture = {
   modifiers: [],
   productModifierLinks: [],
   comboBeverageOptions: [],
+  shop: {
+    displayName: 'TUX Test Shop',
+    address: 'Road 9, Maadi',
+    phone: '+201000000000',
+    latitude: 29.9602,
+    longitude: 31.2569,
+  },
+  ordering: {
+    available: true,
+    temporaryClosed: false,
+    onlineOrdersPaused: false,
+    minimumOrderMinor: 0,
+    fulfillmentPreferences: ['PICKUP', 'DELIVERY'],
+    paymentPreferences: ['CASH', 'INSTAPAY', 'MIXED'],
+  },
 };
 
 async function installCatalog(page: Page): Promise<void> {
