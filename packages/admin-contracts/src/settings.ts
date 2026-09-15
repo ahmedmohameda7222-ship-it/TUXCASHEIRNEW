@@ -5,8 +5,14 @@ export const PAYMENT_METHOD_CHANNELS = ['POS', 'ONLINE', 'BOTH'] as const;
 export type PaymentMethodChannel = (typeof PAYMENT_METHOD_CHANNELS)[number];
 
 export const ADMIN_REASON_FAMILIES = [
-  'CANCELLATION', 'REFUND_RETURN', 'DISCOUNT_COMP', 'WASTE',
-  'STOCK_ADJUSTMENT', 'CASH_VARIANCE', 'PAY_IN', 'PAY_OUT',
+  'CANCELLATION',
+  'REFUND_RETURN',
+  'DISCOUNT_COMP',
+  'WASTE',
+  'STOCK_ADJUSTMENT',
+  'CASH_VARIANCE',
+  'PAY_IN',
+  'PAY_OUT',
 ] as const;
 export type AdminReasonFamily = (typeof ADMIN_REASON_FAMILIES)[number];
 
@@ -116,9 +122,7 @@ export type ResolvedSetting<T = unknown> =
   | { source: 'unset'; value: null };
 
 export type ShopDeleteOrArchiveResult =
-  | { ok: true; action: 'ARCHIVED' }
-  | { ok: true; action: 'DELETED' }
-  | { ok: false; code: string };
+  { ok: true; action: 'ARCHIVED' } | { ok: true; action: 'DELETED' } | { ok: false; code: string };
 
 export type SettingsPublishResult =
   | { ok: true; settingsVersion: number; operationsConfigurationVersion: number }

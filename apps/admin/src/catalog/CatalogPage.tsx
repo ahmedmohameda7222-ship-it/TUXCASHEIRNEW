@@ -147,7 +147,9 @@ export function CatalogPage() {
   if (catalog.workspaceQuery.isLoading) {
     return (
       <PageScaffold eyebrow="Catalog control" title="Catalog" description="Loading live catalog…">
-        <div className="admin-catalog-loading" aria-busy="true">Loading products…</div>
+        <div className="admin-catalog-loading" aria-busy="true">
+          Loading products…
+        </div>
       </PageScaffold>
     );
   }
@@ -159,7 +161,11 @@ export function CatalogPage() {
         title="Catalog"
         description="The live catalog could not be loaded."
         primaryAction={
-          <button className="admin-primary-button" type="button" onClick={() => void catalog.workspaceQuery.refetch()}>
+          <button
+            className="admin-primary-button"
+            type="button"
+            onClick={() => void catalog.workspaceQuery.refetch()}
+          >
             Retry
           </button>
         }
@@ -188,7 +194,9 @@ export function CatalogPage() {
               onChange={(event) => setNewProductCategoryId(event.target.value)}
             >
               {activeCategories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
               ))}
             </select>
           </label>
@@ -222,7 +230,8 @@ export function CatalogPage() {
                   disabled={busy}
                   onClick={() => void catalog.resumeDraft.mutateAsync(draft.id)}
                 >
-                  Resume {draft.title ?? `draft ${draft.id.slice(0, 8)}`} · rev {draft.draftRevision}
+                  Resume {draft.title ?? `draft ${draft.id.slice(0, 8)}`} · rev{' '}
+                  {draft.draftRevision}
                 </button>
               ))}
             </div>
@@ -234,7 +243,10 @@ export function CatalogPage() {
         <div className="admin-catalog-draft-banner" role="status">
           <div>
             <strong>Draft in progress</strong>
-            <span>Base v{catalog.activeDraft.basePublishVersion} · revision {catalog.activeDraft.draftRevision}</span>
+            <span>
+              Base v{catalog.activeDraft.basePublishVersion} · revision{' '}
+              {catalog.activeDraft.draftRevision}
+            </span>
           </div>
           <span className="admin-status-pill">Not live</span>
         </div>
@@ -243,7 +255,10 @@ export function CatalogPage() {
       {catalog.draftInvalidatedByLiveChange ? (
         <div className="admin-callout is-warning" role="status">
           <strong>Live availability changed.</strong>
-          <span>The previous unscheduled editing session was cleared. Persisted compatible work remains available for explicit resume.</span>
+          <span>
+            The previous unscheduled editing session was cleared. Persisted compatible work remains
+            available for explicit resume.
+          </span>
         </div>
       ) : null}
 
@@ -280,14 +295,19 @@ export function CatalogPage() {
               draftRevision={catalog.activeDraft?.draftRevision ?? null}
               advancedBundle={catalog.activeDraft?.bundleJson ?? null}
               onClose={closeEditor}
-              onRequestAdvanced={async () => { await catalog.prepareProductDraft.mutateAsync(selectedProduct); }}
+              onRequestAdvanced={async () => {
+                await catalog.prepareProductDraft.mutateAsync(selectedProduct);
+              }}
               onSaveDraft={async (draft) => {
                 await catalog.saveProduct.mutateAsync(draft);
                 setUnsavedProduct(null);
                 setSelectedProductId(draft.product.id);
               }}
               onSetAvailability={async (soldOut) => {
-                await catalog.setAvailability.mutateAsync({ productId: selectedProduct.id, soldOut });
+                await catalog.setAvailability.mutateAsync({
+                  productId: selectedProduct.id,
+                  soldOut,
+                });
               }}
             />
           ) : (
