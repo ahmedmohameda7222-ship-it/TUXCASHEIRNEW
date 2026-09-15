@@ -38,7 +38,7 @@ describe('Plan 2 final Codex review regressions', () => {
 
   it('provides trusted immediate Admin controls for temporary closure and online-order pause', () => {
     const contracts = source('../../../../packages/admin-contracts/src/settings.ts');
-    const service = source('../../server/settings/settingsService.ts');
+    const operationalStateService = source('../../server/settings/settingsOperationalState.ts');
     const hook = source('../settings/useSettings.ts');
     const shopsPage = source('../settings/ShopsPage.tsx');
     const migration = sourceOrEmpty(
@@ -46,7 +46,8 @@ describe('Plan 2 final Codex review regressions', () => {
     );
 
     expect(contracts).toContain("type: 'shop.operational-state.update'");
-    expect(service).toContain('updateShopOperationalState');
+    expect(operationalStateService).toContain('updateShopOperationalState');
+    expect(operationalStateService).toContain('update_admin_shop_operational_state_v1');
     expect(hook).toContain('updateOperationalState');
     expect(shopsPage).toContain('Temporarily close shop');
     expect(shopsPage).toContain('Pause online orders');
