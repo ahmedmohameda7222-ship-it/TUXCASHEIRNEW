@@ -7,6 +7,7 @@ import {
   requireSessionCsrf,
 } from '../../server/adminAuthService';
 import { AdminAuthorizationError } from '../../server/authorization';
+import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume';
 import {
   CatalogServiceError,
   createCatalogService,
@@ -51,6 +52,14 @@ export const catalogCommandSchema = z.discriminatedUnion('type', [
       shopId: uuidSchema,
       expectedVersion: z.number().int().nonnegative(),
       title: z.string().trim().min(1).max(120).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('draft.resume'),
+      draftId: uuidSchema,
+      shopId: uuidSchema,
+      expectedVersion: z.number().int().nonnegative(),
     })
     .strict(),
   z
@@ -224,6 +233,9 @@ export default async function handler(
     switch (command.type) {
       case 'draft.create':
         sendJson(response, 200, { ...(await service.createCatalogDraft(command, principal)) });
+        return;
+      case 'draft.resume':
+        sendJson(response, 200, { ...(await resumeCatalogDraft(client, command, principal)) });
         return;
       case 'draft.save':
         sendJson(response, 200, { ...(await service.saveCatalogDraftChange(command, principal)) });
