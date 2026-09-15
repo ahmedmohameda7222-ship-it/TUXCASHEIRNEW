@@ -202,10 +202,8 @@ export function useCatalog(shopId: string | undefined) {
   const compatibleDrafts = useMemo(() => {
     const workspace = workspaceQuery.data;
     if (!workspace) return [];
-    return workspace.drafts.filter(
-      (draft) =>
-        draft.status === 'DRAFT' && draft.basePublishVersion === workspace.currentPublishVersion,
-    );
+    // The trusted resume RPC decides whether version drift is transient-only and therefore rebasable.
+    return workspace.drafts.filter((draft) => draft.status === 'DRAFT');
   }, [workspaceQuery.data]);
 
   const products = useMemo(() => {
@@ -252,13 +250,12 @@ export function useCatalog(shopId: string | undefined) {
     if (!workspace) throw new CatalogUiError('catalog_not_loaded');
 
     const existing = activeDraftRef.current;
-    if (existing && existing.basePublishVersion === workspace.currentPublishVersion)
-      return existing;
+    if (existing) {
+      if (existing.basePublishVersion === workspace.currentPublishVersion) return existing;
+      return resumePersistedDraft(existing.draftId, workspace.currentPublishVersion);
+    }
 
-    const persisted = workspace.drafts.filter(
-      (draft) =>
-        draft.status === 'DRAFT' && draft.basePublishVersion === workspace.currentPublishVersion,
-    );
+    const persisted = workspace.drafts.filter((draft) => draft.status === 'DRAFT');
     if (persisted.length === 1 && persisted[0]) {
       return resumePersistedDraft(persisted[0].id, workspace.currentPublishVersion);
     }
