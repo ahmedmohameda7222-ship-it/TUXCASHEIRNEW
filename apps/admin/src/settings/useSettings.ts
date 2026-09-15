@@ -10,6 +10,7 @@ import type {
   SettingsPublishResult,
   SettingWriteResult,
   ShopDeleteOrArchiveResult,
+  ShopOperationalStateUpdateInput,
 } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
@@ -30,6 +31,8 @@ export type OrderTypeUpdateDraft = Omit<OrderTypeEditInput, 'shopId'>;
 export type PaymentMethodUpdateDraft = Omit<PaymentMethodEditInput, 'shopId'>;
 
 export type ReasonCodeUpdateDraft = Omit<ReasonCodeWriteInput, 'shopId'>;
+
+export type ShopOperationalStateUpdateDraft = Omit<ShopOperationalStateUpdateInput, 'shopId'>;
 
 export type SettingOverrideUpdateDraft = {
   settingKey: string;
@@ -140,6 +143,14 @@ function requireReasonCodeWriteSuccess(result: ReasonCodeWriteResult): void {
   );
 }
 
+function requirePublishSuccess(result: SettingsPublishResult): void {
+  if (result.ok) return;
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
+}
+
 export function useSettings(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
@@ -188,12 +199,28 @@ export function useSettings(shopId: string | undefined) {
         csrfTokenForMutation(session),
       );
 
-      if (!result.ok) {
-        throw new SettingsUiError(
-          result.code,
-          'currentVersion' in result ? result.currentVersion : undefined,
-        );
-      }
+      requirePublishSuccess(result);
+    },
+    onSuccess: invalidateWorkspace,
+  });
+
+  const updateOperationalState = useMutation({
+    mutationFn: async (draft: ShopOperationalStateUpdateDraft): Promise<void> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      requireWorkspaceShop(shopId, latestWorkspace());
+      const result = await adminFetch<SettingsPublishResult>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'shop.operational-state.update',
+            shopId,
+            ...draft,
+          }),
+        },
+        csrfTokenForMutation(session),
+      );
+      requirePublishSuccess(result);
     },
     onSuccess: invalidateWorkspace,
   });
@@ -278,6 +305,7 @@ export function useSettings(shopId: string | undefined) {
   return {
     workspaceQuery,
     publish,
+    updateOperationalState,
     updateSettingOverride,
     upsertReasonCode,
     updateOrderType,
