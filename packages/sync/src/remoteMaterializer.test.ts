@@ -125,6 +125,49 @@ describe('buildRemoteMaterializationPlanV1', () => {
     expect(plan.mutations.every((entry) => entry.row['shop_id'] === shopId)).toBe(true);
   });
 
+  it('materializes persisted service charge and tax components for charged orders', () => {
+    const chargedOrder: OrderSnapshot = {
+      ...order,
+      serviceChargeMinor: moneyMinor(500),
+      taxMinor: moneyMinor(1_470),
+      totalMinor: moneyMinor(11_970),
+      payments: [
+        {
+          id: parseEntityId<PaymentId>('99999999-9999-4999-8999-999999999999'),
+          method: {
+            id: parseEntityId<PaymentMethodId>('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+            label: 'Cash',
+            logicType: 'CASH',
+          },
+          allocatedMinor: moneyMinor(11_970),
+          receivedMinor: moneyMinor(11_970),
+          changeMinor: moneyMinor(0),
+        },
+      ],
+    };
+    const event = outbox(
+      'abababab-abab-4bab-8bab-abababababab',
+      'ORDER_PLACED',
+      operationsSyncPayloadJson({
+        eventType: 'ORDER_PLACED',
+        version: 1,
+        order: chargedOrder,
+        customerContactUpsert: null,
+        inventoryMovements: [],
+        configurationVersion: 42,
+      }),
+    );
+
+    const plan = buildRemoteMaterializationPlanV1(toOperationsSyncEnvelopeV1(event));
+    const orderMutation = plan.mutations.find((entry) => entry.table === 'orders');
+
+    expect(orderMutation?.row).toMatchObject({
+      service_charge_minor: 500,
+      tax_minor: 1_470,
+      total_minor: 11_970,
+    });
+  });
+
   it('does not erase placement-only configuration version on later lifecycle updates', () => {
     const doneOrder: OrderSnapshot = {
       ...order,

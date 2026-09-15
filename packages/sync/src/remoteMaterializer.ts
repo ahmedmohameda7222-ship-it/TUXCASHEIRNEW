@@ -285,6 +285,8 @@ function orderPlacementMutations(
         final_delivery_fee_minor: delivery?.finalFeeMinor ?? 0,
         items_subtotal_minor: order.itemsSubtotalMinor,
         discount_minor: order.discountMinor,
+        service_charge_minor: order.serviceChargeMinor ?? 0,
+        tax_minor: order.taxMinor ?? 0,
         total_minor: order.totalMinor,
         order_note: order.orderNote,
         created_at: order.createdAt,
@@ -401,6 +403,7 @@ function orderLifecycleMutation(order: OrderSnapshot): RemoteTableMutation {
       returned_by_worker_id: lifecycle.returned?.workerId ?? null,
       returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
       return_reason: lifecycle.returned?.reason ?? null,
+      snapshot_json: order,
     },
     {
       mode: 'UPDATE',
@@ -436,6 +439,7 @@ function reconciliationMutations(reconciliation: Reconciliation): RemoteTableMut
         actual_minor: line.actualMinor,
         difference_minor: line.differenceMinor,
         variance_reason: line.varianceReason,
+        variance_reason_code_snapshot: line.varianceReasonCode ?? null,
       }),
     );
   });

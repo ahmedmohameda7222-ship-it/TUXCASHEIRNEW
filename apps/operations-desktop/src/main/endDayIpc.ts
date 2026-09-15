@@ -72,13 +72,15 @@ function parseVarianceReasons(value: unknown) {
     assertObjectPayload(entry, `End Day variance reason ${index + 1}`);
     if (
       typeof entry['paymentMethodId'] !== 'string' ||
-      (entry['reason'] !== null && typeof entry['reason'] !== 'string')
+      (entry['reason'] !== null && typeof entry['reason'] !== 'string') ||
+      (entry['reasonCodeId'] !== undefined && typeof entry['reasonCodeId'] !== 'string')
     ) {
       throw new TypeError(`End Day variance reason ${index + 1} is invalid.`);
     }
     return {
       paymentMethodId: parseEntityId<PaymentMethodId>(entry['paymentMethodId']),
       reason: entry['reason'] as string | null,
+      ...(typeof entry['reasonCodeId'] === 'string' ? { reasonCodeId: entry['reasonCodeId'] } : {}),
     };
   });
 }
