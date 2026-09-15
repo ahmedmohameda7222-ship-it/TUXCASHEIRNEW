@@ -42,6 +42,7 @@ function errorMessage(error: unknown): string {
 }
 
 function scheduleStatusLabel(schedule: CatalogScheduledChangeSummary): string {
+  if (schedule.status === 'FAILED' && schedule.terminalFailure) return 'Failed — action required';
   if (schedule.status === 'FAILED') return 'Retry queued';
   if (schedule.status === 'CLAIMED') return 'Executing';
   return schedule.status === 'PENDING' ? 'Pending' : schedule.status;
@@ -348,6 +349,12 @@ export function PublishReviewPage() {
                       </div>
                       <span>Cairo timezone</span>
                       <span>Target base version {schedule.targetBasePublishVersion ?? '—'}</span>
+                      {schedule.status === 'FAILED' && !schedule.terminalFailure ? (
+                        <span>Next retry {schedule.nextAttemptAt ?? 'pending scheduler assignment'}</span>
+                      ) : null}
+                      {schedule.status === 'FAILED' && schedule.terminalFailure && schedule.lastError ? (
+                        <span>Failure: {schedule.lastError}</span>
+                      ) : null}
                     </div>
                     <button
                       className="admin-danger-link"
