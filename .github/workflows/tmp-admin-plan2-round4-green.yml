@@ -1,0 +1,103 @@
+name: Temporary Admin Plan 2 Round 4 GREEN
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-3-fixes
+    paths:
+      - '.github/workflows/tmp-admin-plan2-round4-green.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-final-review-3-fixes
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Wire permanent Round 4 behavior gate
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = '.github/workflows/admin-catalog-settings-tdd.yml';
+          let text = fs.readFileSync(path, 'utf8');
+          function replaceOnce(from, to) {
+            if (!text.includes(from)) throw new Error(`missing workflow anchor: ${from}`);
+            text = text.replace(from, to);
+          }
+          replaceOnce(
+            "      - 'scripts/test-admin-plan2-review-hardening.mjs'\n      - 'scripts/test-admin-settings-schema-hardening.mjs'",
+            "      - 'scripts/test-admin-plan2-review-hardening.mjs'\n      - 'scripts/test-admin-plan2-round4-hardening.mjs'\n      - 'scripts/test-admin-settings-schema-hardening.mjs'",
+          );
+          replaceOnce(
+            "      - name: Plan 2 review hardening invariant\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Settings schema hardening invariant",
+            "      - name: Plan 2 review hardening invariant\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Plan 2 round 4 hardening invariant\n        run: node scripts/test-admin-plan2-round4-hardening.mjs\n      - name: Settings schema hardening invariant",
+          );
+          replaceOnce(
+            "      - name: Plan 2 review hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Settings schema hardening PostgreSQL behavior",
+            "      - name: Plan 2 review hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-review-hardening.mjs\n      - name: Plan 2 round 4 hardening PostgreSQL behavior\n        run: node scripts/test-admin-plan2-round4-hardening.mjs\n      - name: Settings schema hardening PostgreSQL behavior",
+          );
+          fs.writeFileSync(path, text);
+          NODE
+      - name: Format changed files
+        run: >-
+          npx prettier --write
+          apps/admin/src/settings/SettingsPage.tsx
+          apps/admin/src/settings/SettingsPage.test.tsx
+          packages/admin-contracts/src/settings.ts
+          .github/workflows/admin-catalog-settings-tdd.yml
+      - name: Focused Round 4 regressions
+        run: >-
+          npx vitest run
+          apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts
+          apps/admin/src/catalog/ProductEditor.test.tsx
+          apps/admin/src/settings/SettingsPage.test.tsx
+          apps/admin/src/settings/useSettings.test.ts
+          apps/admin/server/settings/settingsService.test.ts
+          apps/admin/api/admin/settings.test.ts
+      - name: Admin contracts typecheck
+        run: npm run typecheck -w @tux/admin-contracts
+      - name: Admin API and server typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Admin UI typecheck
+        run: npm run typecheck -w @tux/admin
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Fresh migration chain
+        run: node scripts/test-migrations.mjs
+      - name: Round 4 PostgreSQL behavior
+        run: node scripts/test-admin-plan2-round4-hardening.mjs
+      - name: Commit verified patch and self-delete
+        run: |
+          git rm .github/workflows/tmp-admin-plan2-round4-green.yml
+          git add apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx packages/admin-contracts/src/settings.ts .github/workflows/admin-catalog-settings-tdd.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(admin): verify final Codex round 4 hardening"
+          git push origin HEAD:tmp/admin-plan2-final-review-3-fixes
