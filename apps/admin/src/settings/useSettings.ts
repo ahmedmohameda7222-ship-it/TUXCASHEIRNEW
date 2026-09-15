@@ -61,7 +61,21 @@ export function buildPaymentMethodUpdateCommand(shopId: string, workspace: Admin
   if (!row) throw new SettingsUiError('payment_method_not_loaded');
   // refundAllowed is an approved canonical policy but is deliberately preserved, not edited,
   // until the trusted refund boundary consumes the transaction's immutable payment snapshot.
-  return { type: 'payment-method.update', shopId, ...draft, refundAllowed: row.refundAllowed };
+  // Build the command explicitly so hostile/legacy callers cannot smuggle protected semantics.
+  return {
+    type: 'payment-method.update',
+    shopId,
+    paymentMethodId: draft.paymentMethodId,
+    displayName: draft.displayName,
+    active: draft.active,
+    sortOrder: draft.sortOrder,
+    channel: draft.channel,
+    requiresReference: draft.requiresReference,
+    manualConfirmationRequired: draft.manualConfirmationRequired,
+    refundAllowed: row.refundAllowed,
+    expectedSettingsVersion: draft.expectedSettingsVersion,
+    expectedEditVersion: draft.expectedEditVersion,
+  };
 }
 
 export function buildSettingOverrideCommand(shopId: string, workspace: AdminSettingsWorkspace, draft: SettingOverrideUpdateDraft): SettingOverrideUpdateCommand {
