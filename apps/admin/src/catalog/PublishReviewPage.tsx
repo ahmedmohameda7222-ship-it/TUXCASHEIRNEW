@@ -350,9 +350,13 @@ export function PublishReviewPage() {
                       <span>Cairo timezone</span>
                       <span>Target base version {schedule.targetBasePublishVersion ?? '—'}</span>
                       {schedule.status === 'FAILED' && !schedule.terminalFailure ? (
-                        <span>Next retry {schedule.nextAttemptAt ?? 'pending scheduler assignment'}</span>
+                        <span>
+                          Next retry {schedule.nextAttemptAt ?? 'pending scheduler assignment'}
+                        </span>
                       ) : null}
-                      {schedule.status === 'FAILED' && schedule.terminalFailure && schedule.lastError ? (
+                      {schedule.status === 'FAILED' &&
+                      schedule.terminalFailure &&
+                      schedule.lastError ? (
                         <span>Failure: {schedule.lastError}</span>
                       ) : null}
                     </div>
