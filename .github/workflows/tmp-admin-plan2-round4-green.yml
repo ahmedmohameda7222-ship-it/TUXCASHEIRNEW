@@ -37,6 +37,18 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Correct non-recurring fixture source
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'scripts/test-admin-plan2-round4-hardening.mjs';
+          let text = fs.readFileSync(path, 'utf8');
+          const from = "'${businessId}', '${shopId}', 3, 3, 'ROLLBACK', '{}'::jsonb, now()";
+          const to = "'${businessId}', '${shopId}', 3, 3, 'IMMEDIATE_AVAILABILITY', '{}'::jsonb, now()";
+          if (!text.includes(from)) throw new Error('round4 non-recurring fixture anchor missing');
+          text = text.replace(from, to);
+          fs.writeFileSync(path, text);
+          NODE
       - name: Wire permanent Round 4 behavior gate
         run: |
           node <<'NODE'
@@ -69,6 +81,7 @@ jobs:
           apps/admin/src/settings/SettingsPage.test.tsx
           apps/admin/server/settings/settingsOperationalState.ts
           packages/admin-contracts/src/settings.ts
+          scripts/test-admin-plan2-round4-hardening.mjs
           .github/workflows/admin-catalog-settings-tdd.yml
       - name: Focused Round 4 regressions
         run: >-
@@ -97,7 +110,7 @@ jobs:
       - name: Commit verified patch and self-delete
         run: |
           git rm .github/workflows/tmp-admin-plan2-round4-green.yml
-          git add apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx apps/admin/server/settings/settingsOperationalState.ts packages/admin-contracts/src/settings.ts .github/workflows/admin-catalog-settings-tdd.yml
+          git add apps/admin/src/catalog/finalReviewRound4Regressions.source.test.ts apps/admin/src/settings/SettingsPage.tsx apps/admin/src/settings/SettingsPage.test.tsx apps/admin/server/settings/settingsOperationalState.ts packages/admin-contracts/src/settings.ts scripts/test-admin-plan2-round4-hardening.mjs .github/workflows/admin-catalog-settings-tdd.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix(admin): verify final Codex round 4 hardening"
