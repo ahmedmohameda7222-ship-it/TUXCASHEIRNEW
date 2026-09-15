@@ -5,6 +5,8 @@ import {
   calculateCheckoutPricing,
   calculateDraftLineTotal,
   parseEntityId,
+  paymentMethodAllowedForDeliveryZone,
+  paymentMethodSupportsChannel,
   preparePaymentParts,
   resolveEffectiveCheckoutPolicy,
   subtractMoney,
@@ -86,9 +88,20 @@ function SectionIssues({
 
 function activePaymentMethods(
   configuration: OperationsConfigurationSnapshot,
+  deliveryZoneId: OrderDraft['delivery']['zoneId'],
 ): readonly PaymentMethod[] {
   return configuration.paymentMethods
-    .filter((method) => method.active && method.logicType !== 'CARD')
+    .filter(
+      (method) =>
+        method.active &&
+        method.logicType !== 'CARD' &&
+        paymentMethodSupportsChannel(method, 'POS') &&
+        paymentMethodAllowedForDeliveryZone(
+          method,
+          deliveryZoneId,
+          configuration.settings?.paymentMethodZoneRules,
+        ),
+    )
     .sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
@@ -196,7 +209,7 @@ export function OrdersCart({
     configuration.settings?.values['checkout.requireCustomerPhone'] === true;
   const allowDeliveryFeeOverride =
     configuration.settings?.values['checkout.allowDeliveryFeeOverride'] === true;
-  const methods = activePaymentMethods(configuration);
+  const methods = activePaymentMethods(configuration, delivery ? draft.delivery.zoneId : null);
   const itemsSubtotalMinor = useMemo(
     () => addMoney(...draft.lines.map(calculateDraftLineTotal)),
     [draft.lines],
@@ -225,11 +238,22 @@ export function OrdersCart({
   const preparedPayments = useMemo(() => {
     if (pricing === null) return null;
     try {
-      return preparePaymentParts(draft.payment, methods, pricing.totalMinor);
+      return preparePaymentParts(draft.payment, methods, pricing.totalMinor, {
+        channel: 'POS',
+        deliveryZoneId: delivery ? draft.delivery.zoneId : null,
+        paymentMethodZoneRules: configuration.settings?.paymentMethodZoneRules,
+      });
     } catch {
       return null;
     }
-  }, [draft.payment, methods, pricing]);
+  }, [
+    configuration.settings?.paymentMethodZoneRules,
+    delivery,
+    draft.delivery.zoneId,
+    draft.payment,
+    methods,
+    pricing,
+  ]);
 
   const totalQuantity = draft.lines.reduce((total, line) => total + line.quantity, 0);
   const discountHasIssue = issues.some((issue) => issue.path === 'discount');
