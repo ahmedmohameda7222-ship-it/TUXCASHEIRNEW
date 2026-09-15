@@ -194,6 +194,30 @@ begin
      or v_schedule ->> 'status' <> 'PENDING' then
     raise exception 'authorized modifier pricing schedule failed: %', v_schedule;
   end if;
+
+  -- Once a durable schedule has been authorized, execution belongs to the scheduler. Revoking the
+  -- creating employee must not strand the job, but the original employee remains audit attribution.
+  update public.business_employees
+  set active = false
+  where id = '${ownerId}';
+
+  v_publish := public.publish_catalog_draft_scheduled_v1(
+    '${ownerId}', v_pricing_draft_id, 2, 2
+  );
+  if coalesce((v_publish ->> 'ok')::boolean, false) is not true
+     or (v_publish ->> 'publishVersion')::bigint <> 3 then
+    raise exception 'scheduled publish still depended on revoked creator authority: %', v_publish;
+  end if;
+  if not exists (
+    select 1
+    from public.catalog_publish_versions published
+    where published.shop_id = '${shopId}'
+      and published.publish_version = 3
+      and published.draft_id = v_pricing_draft_id
+      and published.published_by_employee_id = '${ownerId}'
+  ) then
+    raise exception 'scheduled publish lost creator audit attribution';
+  end if;
 end $$;
 
 rollback;
