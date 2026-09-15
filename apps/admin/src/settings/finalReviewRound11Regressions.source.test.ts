@@ -23,7 +23,9 @@ const migration = sourceOrEmpty(
 describe('Plan 2 final review round 11 regressions', () => {
   it('refreshes a pristine reason editor and its CAS token without rebasing dirty edits', () => {
     expect(reasonCodes).toContain("import { useEffect, useState, type FormEvent } from 'react'");
-    expect(reasonCodes).toContain('const [expectedVersion, setExpectedVersion] = useState(reason.version)');
+    expect(reasonCodes).toContain(
+      'const [expectedVersion, setExpectedVersion] = useState(reason.version)',
+    );
     expect(reasonCodes).toContain('const [dirty, setDirty] = useState(false)');
     expect(reasonCodes).toContain('if (dirty) return');
     expect(reasonCodes).toContain('setExpectedVersion(reason.version)');
