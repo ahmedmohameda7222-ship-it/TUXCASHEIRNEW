@@ -4,14 +4,17 @@ import fs from 'node:fs';
 const baseMigrationPath = 'supabase/migrations/20260910120200_catalog_public_settings_projection.sql';
 const checkoutPolicyMigrationPath =
   'supabase/migrations/20260910121100_catalog_public_checkout_policy_projection.sql';
+const onlineHoursMigrationPath =
+  'supabase/migrations/20260910121600_catalog_public_online_hours_projection.sql';
 for (const [path, label] of [
   [baseMigrationPath, 'catalog public settings projection'],
   [checkoutPolicyMigrationPath, 'catalog public checkout policy projection'],
+  [onlineHoursMigrationPath, 'catalog public online hours projection'],
 ]) {
   if (!fs.existsSync(path)) throw new Error(`${label} migration is missing`);
 }
 
-const sql = [baseMigrationPath, checkoutPolicyMigrationPath]
+const sql = [baseMigrationPath, checkoutPolicyMigrationPath, onlineHoursMigrationPath]
   .map((path) => fs.readFileSync(path, 'utf8').toLowerCase())
   .join('\n');
 for (const fragment of [
@@ -25,6 +28,11 @@ for (const fragment of [
   'checkout.taxbps',
   'checkout.allowdiscountstacking',
   'checkout.requirecustomerphone',
+  'catalog_public_online_ordering_open_v1',
+  'africa/cairo',
+  'weeklyhours',
+  'specialhours',
+  'servicekind',
   'grant execute',
   'anon',
   'authenticated',
@@ -177,6 +185,7 @@ declare
   v_result jsonb;
   v_missing jsonb;
   v_malformed jsonb;
+  v_hours_settings jsonb;
 begin
   v_result := public.read_catalog_public_ordering_v2('${shopId}');
   if v_result is null then
@@ -226,6 +235,69 @@ begin
      or v_result::text like '%lifecycleState%'
      or v_result::text like '%bundle_json%' then
     raise exception 'public ordering projection leaked internal published configuration: %', v_result;
+  end if;
+
+  v_hours_settings := jsonb_build_object(
+    'weeklyHours', jsonb_build_array(
+      jsonb_build_object(
+        'serviceKind', 'ONLINE', 'dayOfWeek', 1, 'timezone', 'Africa/Cairo',
+        'opensLocal', '12:00', 'closesLocal', '13:00', 'active', true
+      ),
+      jsonb_build_object(
+        'serviceKind', 'ONLINE', 'dayOfWeek', 1, 'timezone', 'Africa/Cairo',
+        'opensLocal', '22:00', 'closesLocal', '02:00', 'active', true
+      )
+    ),
+    'specialHours', '[]'::jsonb
+  );
+  if private.catalog_public_online_ordering_open_v1(
+       v_hours_settings, timestamptz '2026-01-05 10:30:00+00'
+     ) is not true then
+    raise exception 'Cairo weekly ONLINE interval was not opened';
+  end if;
+  if private.catalog_public_online_ordering_open_v1(
+       v_hours_settings, timestamptz '2026-01-05 13:00:00+00'
+     ) is not false then
+    raise exception 'Cairo closed weekly ONLINE interval was not rejected';
+  end if;
+  if private.catalog_public_online_ordering_open_v1(
+       v_hours_settings, timestamptz '2026-01-05 23:30:00+00'
+     ) is not true then
+    raise exception 'previous-day overnight ONLINE interval did not carry into Cairo next date';
+  end if;
+
+  v_hours_settings := jsonb_set(
+    v_hours_settings,
+    '{specialHours}',
+    '[{"serviceDate":"2026-01-05","serviceKind":"ONLINE","timezone":"Africa/Cairo","closed":true,"opensLocal":null,"closesLocal":null}]'::jsonb
+  );
+  if private.catalog_public_online_ordering_open_v1(
+       v_hours_settings, timestamptz '2026-01-05 10:30:00+00'
+     ) is not false then
+    raise exception 'same-date ONLINE special closure did not override weekly hours';
+  end if;
+
+  update public.operations_configuration_snapshots
+  set bundle_json = jsonb_set(
+    bundle_json,
+    '{snapshot,settings,specialHours}',
+    jsonb_build_array(
+      jsonb_build_object(
+        'serviceDate', to_char(now() at time zone 'Africa/Cairo', 'YYYY-MM-DD'),
+        'serviceKind', 'ONLINE',
+        'timezone', 'Africa/Cairo',
+        'closed', true,
+        'opensLocal', null,
+        'closesLocal', null
+      )
+    ),
+    true
+  )
+  where shop_id = '${shopId}' and version = 2;
+
+  v_result := public.read_catalog_public_ordering_v2('${shopId}');
+  if (v_result #>> '{ordering,available}')::boolean is not false then
+    raise exception 'public ordering availability ignored current published ONLINE special closure: %', v_result;
   end if;
 
   v_missing := public.read_catalog_public_ordering_v2('${noSnapshotShopId}');
