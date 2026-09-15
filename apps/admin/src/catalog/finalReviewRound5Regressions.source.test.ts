@@ -26,9 +26,7 @@ describe('Plan 2 final review round 5 regressions', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    expect(sql).toContain(
-      'create or replace function public.claim_due_admin_config_changes_v1',
-    );
+    expect(sql).toContain('create or replace function public.claim_due_admin_config_changes_v1');
     expect(sql).toContain("blocker.payload_json ->> 'masterProductId'");
     expect(sql).toContain("blocker.payload_json ->> 'transition' = 'EXIT'");
     expect(sql).toContain("blocker.status not in ('APPLIED', 'CANCELLED')");
@@ -38,9 +36,7 @@ describe('Plan 2 final review round 5 regressions', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    expect(sql).toContain(
-      'create or replace function public.schedule_catalog_draft_v1',
-    );
+    expect(sql).toContain('create or replace function public.schedule_catalog_draft_v1');
     expect(sql).toContain("s.payload_json ->> 'draftId' = v_draft.id::text");
     expect(sql).toContain(
       "s.payload_json ->> 'expectedDraftRevision' = v_draft.draft_revision::text",
