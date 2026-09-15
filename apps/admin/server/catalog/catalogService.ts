@@ -362,8 +362,7 @@ function mapScheduledChange(row: ScheduledChangeRow): CatalogScheduledChangeSumm
         : readVersion(row.target_base_publish_version),
     attemptCount: readVersion(row.attempt_count),
     terminalFailure: readBoolean(row.terminal_failure),
-    nextAttemptAt:
-      row.next_attempt_at === null ? null : readNonemptyString(row.next_attempt_at),
+    nextAttemptAt: row.next_attempt_at === null ? null : readNonemptyString(row.next_attempt_at),
     lastError: row.last_error,
   };
 }
@@ -825,63 +824,69 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
     },
 
     async loadPublishing(shopId, businessId) {
-      const [currentPublishVersion, versionRows, schedules, drafts, productRows, publishedBundleRows] =
-        await Promise.all([
-          loadCurrentPublishVersion(client, shopId),
-          client.select<PublishVersionRow[]>(
-            'catalog_publish_versions',
-            new URLSearchParams({
-              select:
-                'shop_id,publish_version,operations_configuration_version,source_kind,draft_id,published_by_employee_id,restored_from_publish_version,published_at',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              order: 'publish_version.desc',
-              limit: '100',
-            }),
-          ),
-          client.select<ScheduledChangeRow[]>(
-            'scheduled_config_changes',
-            new URLSearchParams({
-              select:
-                'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,terminal_failure,next_attempt_at,last_error',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              change_kind: 'eq.CATALOG_PUBLISH',
-              order: 'scheduled_for.desc',
-              limit: '100',
-            }),
-          ),
-          client.select<PublishingDraftRow[]>(
-            'catalog_drafts',
-            new URLSearchParams({
-              select: 'id,shop_id,base_publish_version,draft_revision,working_bundle_json',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              status: 'eq.DRAFT',
-              order: 'updated_at.desc',
-              limit: '50',
-            }),
-          ),
-          client.select<ProductRow[]>(
-            'products',
-            new URLSearchParams({
-              select:
-                'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',
-              shop_id: `eq.${shopId}`,
-              order: 'sort_order.asc,id.asc',
-            }),
-          ),
-          client.select<PublishedBundleRow[]>(
-            'catalog_publish_versions',
-            new URLSearchParams({
-              select: 'bundle_json',
-              business_id: `eq.${businessId}`,
-              shop_id: `eq.${shopId}`,
-              order: 'publish_version.desc',
-              limit: '1',
-            }),
-          ),
-        ]);
+      const [
+        currentPublishVersion,
+        versionRows,
+        schedules,
+        drafts,
+        productRows,
+        publishedBundleRows,
+      ] = await Promise.all([
+        loadCurrentPublishVersion(client, shopId),
+        client.select<PublishVersionRow[]>(
+          'catalog_publish_versions',
+          new URLSearchParams({
+            select:
+              'shop_id,publish_version,operations_configuration_version,source_kind,draft_id,published_by_employee_id,restored_from_publish_version,published_at',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'publish_version.desc',
+            limit: '100',
+          }),
+        ),
+        client.select<ScheduledChangeRow[]>(
+          'scheduled_config_changes',
+          new URLSearchParams({
+            select:
+              'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,terminal_failure,next_attempt_at,last_error',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            change_kind: 'eq.CATALOG_PUBLISH',
+            order: 'scheduled_for.desc',
+            limit: '100',
+          }),
+        ),
+        client.select<PublishingDraftRow[]>(
+          'catalog_drafts',
+          new URLSearchParams({
+            select: 'id,shop_id,base_publish_version,draft_revision,working_bundle_json',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            status: 'eq.DRAFT',
+            order: 'updated_at.desc',
+            limit: '50',
+          }),
+        ),
+        client.select<ProductRow[]>(
+          'products',
+          new URLSearchParams({
+            select:
+              'id,shop_id,category_id,slug,name,description,price_minor,image_key,family,best_seller,active,sold_out,is_combo,sort_order',
+            shop_id: `eq.${shopId}`,
+            order: 'sort_order.asc,id.asc',
+          }),
+        ),
+        client.select<PublishedBundleRow[]>(
+          'catalog_publish_versions',
+          new URLSearchParams({
+            select: 'bundle_json',
+            business_id: `eq.${businessId}`,
+            shop_id: `eq.${shopId}`,
+            order: 'publish_version.desc',
+            limit: '1',
+          }),
+        ),
+      ]);
 
       const liveProducts = productRows.map(mapProduct);
       const versions = versionRows.map(mapPublishVersion);
@@ -893,7 +898,13 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
         currentPublishVersion,
         versions,
         draftPreviews: drafts.map((draft) =>
-          buildPublishPreview(draft, currentPublishVersion, liveProducts, publishedBundle, versions),
+          buildPublishPreview(
+            draft,
+            currentPublishVersion,
+            liveProducts,
+            publishedBundle,
+            versions,
+          ),
         ),
         schedules: schedules.map(mapScheduledChange),
       };
