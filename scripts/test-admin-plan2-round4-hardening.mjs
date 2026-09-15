@@ -208,9 +208,9 @@ end $$;
 -- A true content publication remains a stale-version boundary.
 insert into public.catalog_publish_versions(
   business_id, shop_id, publish_version, operations_configuration_version,
-  source_kind, bundle_json, published_at
+  source_kind, draft_id, bundle_json, published_at
 ) values (
-  '${businessId}', '${shopId}', 4, 4, 'DRAFT', '{}'::jsonb, now()
+  '${businessId}', '${shopId}', 4, 4, 'DRAFT', '${draftId}', '{}'::jsonb, now()
 );
 
 do $$
