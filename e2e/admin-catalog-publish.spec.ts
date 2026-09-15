@@ -402,7 +402,7 @@ test('advanced product controls load from a version-fenced draft and save canoni
   await page.getByRole('button', { name: /Classic Smash/ }).click();
   await page.getByRole('button', { name: /More/ }).click();
   await expect(page.getByText('Bacon')).toBeVisible();
-  await expect(page.getByText('Water')).toBeVisible();
+  await expect(page.locator('form').getByText('Water', { exact: true })).toBeVisible();
   await expect(page.getByText(/Meat/)).toBeVisible();
 
   await page.getByLabel('Max quantity').fill('4');
