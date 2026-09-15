@@ -166,6 +166,7 @@ begin
   end if;
 end $$;
 
+-- Final acceptance extends the transient rebase contract to immediate human availability too.
 insert into public.catalog_publish_versions(
   business_id, shop_id, publish_version, operations_configuration_version,
   source_kind, bundle_json, published_at
@@ -176,19 +177,58 @@ insert into public.catalog_publish_versions(
 do $$
 declare
   v_result jsonb;
+  v_base bigint;
+  v_sold_out boolean;
   v_call_count integer;
 begin
   v_result := public.publish_catalog_draft_scheduled_v1(
     '${employeeId}', '${draftId}', 1, 2
   );
-  if v_result ->> 'code' <> 'stale_version'
-     or (v_result ->> 'currentVersion')::bigint <> 3 then
-    raise exception 'non-recurring intervening version was not rejected: %', v_result;
+  if coalesce((v_result ->> 'ok')::boolean, false) is not true then
+    raise exception 'immediate-availability scheduled rebase did not publish: %', v_result;
+  end if;
+
+  select
+    d.base_publish_version,
+    (d.working_bundle_json #>> '{snapshot,products,0,soldOut}')::boolean
+  into v_base, v_sold_out
+  from public.catalog_drafts d
+  where d.id = '${draftId}';
+  if v_base <> 3 or v_sold_out is not true then
+    raise exception 'immediate-availability rebase lost live soldOut/base: base %, soldOut %',
+      v_base, v_sold_out;
   end if;
 
   select count(*) into v_call_count from pg_temp.round4_catalog_publish_calls;
-  if v_call_count <> 1 then
-    raise exception 'strict publish ran despite non-recurring stale version';
+  if v_call_count <> 2 then
+    raise exception 'strict publish did not run exactly once for immediate-availability rebase';
+  end if;
+end $$;
+
+-- A true content publication remains a stale-version boundary.
+insert into public.catalog_publish_versions(
+  business_id, shop_id, publish_version, operations_configuration_version,
+  source_kind, bundle_json, published_at
+) values (
+  '${businessId}', '${shopId}', 4, 4, 'DRAFT', '{}'::jsonb, now()
+);
+
+do $$
+declare
+  v_result jsonb;
+  v_call_count integer;
+begin
+  v_result := public.publish_catalog_draft_scheduled_v1(
+    '${employeeId}', '${draftId}', 1, 3
+  );
+  if v_result ->> 'code' <> 'stale_version'
+     or (v_result ->> 'currentVersion')::bigint <> 4 then
+    raise exception 'content intervening version was not rejected: %', v_result;
+  end if;
+
+  select count(*) into v_call_count from pg_temp.round4_catalog_publish_calls;
+  if v_call_count <> 2 then
+    raise exception 'strict publish ran despite content stale version';
   end if;
 end $$;
 
