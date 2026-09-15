@@ -65,6 +65,20 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[], labe
   }
 }
 
+function requiredAndOptionalKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[],
+  label: string,
+): void {
+  const allowed = new Set([...required, ...optional]);
+  const missingRequired = required.some((key) => !Object.prototype.hasOwnProperty.call(value, key));
+  const hasUnexpected = Object.keys(value).some((key) => !allowed.has(key));
+  if (missingRequired || hasUnexpected) {
+    throw new TypeError(`${label} IPC payload contains unexpected fields.`);
+  }
+}
+
 function uuid(value: unknown, label: string): string {
   if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
     throw new TypeError(`${label} must be a UUID.`);
@@ -87,6 +101,18 @@ function nullableMoney(value: unknown, label: string): MoneyMinor | null {
   return moneyMinor(value);
 }
 
+function optionalNullableString(value: unknown, label: string): string | null | undefined {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'string') throw new TypeError(`${label} must be a string or null.`);
+  return value;
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean.`);
+  return value;
+}
+
 function paymentDraft(value: unknown): PaymentDraft {
   const payment = objectPayload(value, 'Online-order payment confirmation');
   const mode = payment['mode'];
@@ -95,10 +121,19 @@ function paymentDraft(value: unknown): PaymentDraft {
     return { mode: 'NONE' };
   }
   if (mode === 'SINGLE') {
-    exactKeys(
+    requiredAndOptionalKeys(
       payment,
       ['mode', 'methodId', 'cashReceivedMinor'],
+      ['reference', 'manualConfirmed'],
       'Online-order payment confirmation',
+    );
+    const reference = optionalNullableString(
+      payment['reference'],
+      'Online-order payment reference',
+    );
+    const manualConfirmed = optionalBoolean(
+      payment['manualConfirmed'],
+      'Online-order manual payment confirmation',
     );
     return {
       mode: 'SINGLE',
@@ -106,18 +141,37 @@ function paymentDraft(value: unknown): PaymentDraft {
         uuid(payment['methodId'], 'Online-order payment method ID'),
       ),
       cashReceivedMinor: nullableMoney(payment['cashReceivedMinor'], 'Online-order cash received'),
+      ...(reference === undefined ? {} : { reference }),
+      ...(manualConfirmed === undefined ? {} : { manualConfirmed }),
     };
   }
   if (mode === 'SPLIT') {
-    exactKeys(
+    requiredAndOptionalKeys(
       payment,
       ['mode', 'methodAId', 'amountAMinor', 'methodBId'],
+      ['referenceA', 'referenceB', 'manualConfirmedA', 'manualConfirmedB'],
       'Online-order payment confirmation',
     );
     const amountAMinor = nullableMoney(payment['amountAMinor'], 'Online-order split amount A');
     if (amountAMinor === null) {
       throw new TypeError('Online-order split amount A cannot be null.');
     }
+    const referenceA = optionalNullableString(
+      payment['referenceA'],
+      'Online-order payment reference A',
+    );
+    const referenceB = optionalNullableString(
+      payment['referenceB'],
+      'Online-order payment reference B',
+    );
+    const manualConfirmedA = optionalBoolean(
+      payment['manualConfirmedA'],
+      'Online-order manual payment confirmation A',
+    );
+    const manualConfirmedB = optionalBoolean(
+      payment['manualConfirmedB'],
+      'Online-order manual payment confirmation B',
+    );
     return {
       mode: 'SPLIT',
       methodAId: parseEntityId<PaymentMethodId>(
@@ -127,6 +181,10 @@ function paymentDraft(value: unknown): PaymentDraft {
       methodBId: parseEntityId<PaymentMethodId>(
         uuid(payment['methodBId'], 'Online-order payment method B ID'),
       ),
+      ...(referenceA === undefined ? {} : { referenceA }),
+      ...(referenceB === undefined ? {} : { referenceB }),
+      ...(manualConfirmedA === undefined ? {} : { manualConfirmedA }),
+      ...(manualConfirmedB === undefined ? {} : { manualConfirmedB }),
     };
   }
   throw new TypeError('Online-order payment confirmation mode is invalid.');

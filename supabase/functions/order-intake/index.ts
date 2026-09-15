@@ -9,8 +9,10 @@ import {
   type OnlineOrderIntakeStore,
   type OnlineOrderPendingInsert,
   type OnlineOrderProductModifierLink,
+  type OnlineOrderPublishedCheckoutAuthority,
   type OnlineOrderStoredRequest,
 } from './order-intake.ts';
+import { projectPublishedCheckoutAuthority } from './published-checkout-authority.ts';
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -46,27 +48,33 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
   constructor(private readonly client: SupabaseClient) {}
 
   async loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null> {
-    const [shopResult, categoriesResult, productsResult, modifiersResult, linksResult, combosResult] =
-      await Promise.all([
-        this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
-        this.client.from('menu_categories').select('id,shop_id,active').eq('shop_id', shopId),
-        this.client
-          .from('products')
-          .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
-          .eq('shop_id', shopId),
-        this.client
-          .from('modifiers')
-          .select('id,shop_id,name,price_minor,active,standalone_product_id')
-          .eq('shop_id', shopId),
-        this.client
-          .from('product_modifiers')
-          .select('product_id,modifier_id,max_quantity')
-          .eq('shop_id', shopId),
-        this.client
-          .from('combo_beverage_options')
-          .select('combo_product_id,beverage_product_id')
-          .eq('shop_id', shopId),
-      ]);
+    const [
+      shopResult,
+      categoriesResult,
+      productsResult,
+      modifiersResult,
+      linksResult,
+      combosResult,
+    ] = await Promise.all([
+      this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
+      this.client.from('menu_categories').select('id,shop_id,active').eq('shop_id', shopId),
+      this.client
+        .from('products')
+        .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
+        .eq('shop_id', shopId),
+      this.client
+        .from('modifiers')
+        .select('id,shop_id,name,price_minor,active,standalone_product_id')
+        .eq('shop_id', shopId),
+      this.client
+        .from('product_modifiers')
+        .select('product_id,modifier_id,max_quantity')
+        .eq('shop_id', shopId),
+      this.client
+        .from('combo_beverage_options')
+        .select('combo_product_id,beverage_product_id')
+        .eq('shop_id', shopId),
+    ]);
 
     for (const result of [
       shopResult,
@@ -133,7 +141,10 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       (value) => {
         const row = record(value, 'combo beverage option');
         return {
-          comboProductId: stringField(row.combo_product_id, 'combo beverage option.combo_product_id'),
+          comboProductId: stringField(
+            row.combo_product_id,
+            'combo beverage option.combo_product_id',
+          ),
           beverageProductId: stringField(
             row.beverage_product_id,
             'combo beverage option.beverage_product_id',
@@ -153,6 +164,22 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       productModifierLinks,
       comboBeverageOptions,
     };
+  }
+
+  async loadPublishedCheckoutAuthority(
+    shopId: string,
+  ): Promise<OnlineOrderPublishedCheckoutAuthority | null> {
+    const { data, error } = await this.client
+      .from('operations_configuration_snapshots')
+      .select('bundle_json')
+      .eq('shop_id', shopId)
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = record(data, 'published Operations configuration');
+    return projectPublishedCheckoutAuthority(row.bundle_json, shopId);
   }
 
   async findByIdempotency(
@@ -225,13 +252,16 @@ const client =
 
 Deno.serve((request) => {
   if (!client) {
-    return new Response(JSON.stringify({ schemaVersion: 1, error: { code: 'intake_not_configured' } }), {
-      status: 500,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'access-control-allow-origin': '*',
+    return new Response(
+      JSON.stringify({ schemaVersion: 1, error: { code: 'intake_not_configured' } }),
+      {
+        status: 500,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'access-control-allow-origin': '*',
+        },
       },
-    });
+    );
   }
   return handleOrderIntakeRequest(request, new SupabaseOnlineOrderIntakeStore(client));
 });

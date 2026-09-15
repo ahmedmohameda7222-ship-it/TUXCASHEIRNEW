@@ -539,7 +539,7 @@ describe('OperationsOrdersService with SQLite', () => {
         zoneId: ZONE_ID,
         zoneLabel: 'Zone A',
         configuredFeeMinor: moneyMinor(3_000),
-        finalFeeMinor: moneyMinor(2_500),
+        finalFeeMinor: moneyMinor(3_000),
       },
       payment: { mode: 'SINGLE', methodId: DIGITAL_ID, cashReceivedMinor: null },
     };
@@ -559,8 +559,8 @@ describe('OperationsOrdersService with SQLite', () => {
     }
     expect(result.value.order.fulfillment.delivery.normalizedPhone).toBe('01001234567');
     expect(result.value.order.fulfillment.delivery.configuredFeeMinor).toBe(moneyMinor(3_000));
-    expect(result.value.order.fulfillment.delivery.finalFeeMinor).toBe(moneyMinor(2_500));
-    expect(result.value.order.totalMinor).toBe(moneyMinor(18_500));
+    expect(result.value.order.fulfillment.delivery.finalFeeMinor).toBe(moneyMinor(3_000));
+    expect(result.value.order.totalMinor).toBe(moneyMinor(19_000));
 
     const contact = await database.transaction((transaction) =>
       transaction.customerContacts.getByNormalizedPhone(SHOP_ID, '01001234567'),

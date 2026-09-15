@@ -285,6 +285,8 @@ function orderPlacementMutations(
         final_delivery_fee_minor: delivery?.finalFeeMinor ?? 0,
         items_subtotal_minor: order.itemsSubtotalMinor,
         discount_minor: order.discountMinor,
+        service_charge_minor: order.serviceChargeMinor ?? 0,
+        tax_minor: order.taxMinor ?? 0,
         total_minor: order.totalMinor,
         order_note: order.orderNote,
         created_at: order.createdAt,

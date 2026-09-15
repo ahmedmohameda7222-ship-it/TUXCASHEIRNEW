@@ -74,6 +74,26 @@ describe('order-intake accepted idempotency replay', () => {
     });
     const store: OnlineOrderIntakeStore = {
       loadCatalog: vi.fn().mockResolvedValue(catalog()),
+      loadPublishedCheckoutAuthority: vi.fn().mockResolvedValue({
+        shopId: SHOP_ID,
+        configurationVersion: 1,
+        settingsVersion: null,
+        lifecycleState: 'ACTIVE',
+        temporaryClosed: false,
+        onlineOrdersPaused: false,
+        minimumOrderMinor: 0,
+        orderTypes: [{ behavior: 'TAKE_AWAY', active: true }],
+        paymentMethods: [
+          {
+            id: '55555555-5555-4555-8555-555555555555',
+            displayName: 'Cash',
+            logicType: 'CASH',
+            active: true,
+            channel: 'BOTH',
+            integrationReference: null,
+          },
+        ],
+      }),
       findByIdempotency: vi.fn(async () => stored),
       insertPending,
     };

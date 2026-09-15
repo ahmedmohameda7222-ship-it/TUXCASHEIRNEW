@@ -103,6 +103,29 @@ const configuration: OperationsConfigurationSnapshot = {
   recipeLines: [
     { shopId, productId, inventoryItemId, quantityMicros: stockQuantityMicros(1_000_000) },
   ],
+  settings: {
+    version: 7,
+    values: {
+      'receipt.orderPrefix': 'MD-',
+      'receipt.footer': 'Thank you',
+    },
+    shopIdentity: {
+      shopId,
+      displayName: 'TUX Maadi',
+      address: 'Road 9',
+      phone: '+201000000000',
+      latitude: null,
+      longitude: null,
+      timezone: 'Africa/Cairo',
+      lifecycleState: 'ACTIVE',
+      temporaryClosed: false,
+      onlineOrdersPaused: false,
+    },
+    weeklyHours: [],
+    specialHours: [],
+    paymentMethodZoneRules: [],
+  },
+  reasonCodes: [],
   updatedAt: createdAt,
 };
 
@@ -252,6 +275,66 @@ function scalar(path: string, sql: string): number {
 }
 
 describe('Delivery customer learning checkout atomicity', () => {
+  it('snapshots configured receipt identity into the durable order at checkout', async () => {
+    const test = await fixture();
+    const result = await test.service.placeOrder(draft());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.order as unknown).toEqual(
+      expect.objectContaining({
+        displayOrderLabel: 'MD-1',
+        receiptSnapshot: {
+          configurationVersion: 7,
+          shopDisplayName: 'TUX Maadi',
+          address: 'Road 9',
+          contactPhone: '+201000000000',
+          footer: 'Thank you',
+          orderNumberPrefix: 'MD-',
+        },
+      }),
+    );
+
+    await test.database.transaction((transaction) =>
+      transaction.configuration.put({
+        ...configuration,
+        version: 8,
+        settings: {
+          ...configuration.settings!,
+          version: 8,
+          values: {
+            ...configuration.settings!.values,
+            'receipt.orderPrefix': 'NEW-',
+            'receipt.footer': 'Changed later',
+          },
+          shopIdentity: {
+            ...configuration.settings!.shopIdentity,
+            displayName: 'TUX Changed',
+            address: 'Changed address',
+            phone: '+202000000000',
+          },
+        },
+      }),
+    );
+
+    const persisted = await test.database.transaction((transaction) =>
+      transaction.orders.getById(result.value.order.id),
+    );
+    expect(persisted as unknown).toEqual(
+      expect.objectContaining({
+        displayOrderLabel: 'MD-1',
+        receiptSnapshot: {
+          configurationVersion: 7,
+          shopDisplayName: 'TUX Maadi',
+          address: 'Road 9',
+          contactPhone: '+201000000000',
+          footer: 'Thank you',
+          orderNumberPrefix: 'MD-',
+        },
+      }),
+    );
+  });
+
   it('links a first-time Delivery Order to the exact contact and replay does not duplicate it', async () => {
     const test = await fixture();
     const input = draft();

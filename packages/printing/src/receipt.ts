@@ -18,6 +18,14 @@ function formatMoney(value: MoneyMinor): string {
   return `${negative ? '-' : ''}${pounds.toString()}.${cents}`;
 }
 
+function formatBasisPointsPercent(basisPoints: number): string {
+  const wholePercent = Math.floor(basisPoints / 100);
+  const fractional = basisPoints % 100;
+  if (fractional === 0) return `${wholePercent}%`;
+  const fraction = String(fractional).padStart(2, '0').replace(/0$/, '');
+  return `${wholePercent}.${fraction}%`;
+}
+
 function paymentDescription(payment: PaymentPart): string {
   if (payment.receivedMinor !== null && payment.changeMinor !== null) {
     return `${payment.method.label}: ${formatMoney(payment.allocatedMinor)} · received ${formatMoney(payment.receivedMinor)} · change ${formatMoney(payment.changeMinor)}`;
@@ -33,6 +41,27 @@ export function renderOrderReceiptHtml(
   order: OrderSnapshot,
   options: ReceiptRenderOptions = {},
 ): string {
+  const receiptSnapshot = order.receiptSnapshot;
+  const orderLabel = order.displayOrderLabel ?? `#${order.displayOrderNo}`;
+  const shopDisplayName = receiptSnapshot?.shopDisplayName ?? 'TUX';
+  const receiptIdentity = [receiptSnapshot?.address, receiptSnapshot?.contactPhone]
+    .filter((value): value is string => value !== null && value !== undefined && value.length > 0)
+    .map((value) => `<div>${escapeHtml(value)}</div>`)
+    .join('');
+  const configuredFooter =
+    receiptSnapshot?.footer === null || receiptSnapshot?.footer === undefined
+      ? ''
+      : `<div>${escapeHtml(receiptSnapshot.footer)}</div>`;
+  const serviceChargeBps = order.checkoutSnapshot?.serviceChargeBps ?? 0;
+  const taxBps = order.checkoutSnapshot?.taxBps ?? 0;
+  const serviceChargeRow =
+    serviceChargeBps > 0 && order.serviceChargeMinor !== undefined
+      ? `<div class="row"><span>Service charge (${formatBasisPointsPercent(serviceChargeBps)})</span><span>${formatMoney(order.serviceChargeMinor)}</span></div>`
+      : '';
+  const taxRow =
+    taxBps > 0 && order.taxMinor !== undefined
+      ? `<div class="row"><span>Tax (${formatBasisPointsPercent(taxBps)})</span><span>${formatMoney(order.taxMinor)}</span></div>`
+      : '';
   const paperWidthMm = options.paperWidthMm ?? 80;
   const contentWidthMm = paperWidthMm - 8;
   const itemRows = order.items
@@ -79,7 +108,7 @@ export function renderOrderReceiptHtml(
 <html>
 <head>
 <meta charset="utf-8" />
-<title>TUX Order #${order.displayOrderNo}</title>
+<title>${escapeHtml(shopDisplayName)} Order ${escapeHtml(orderLabel)}</title>
 <style>
   @page { margin: 4mm; }
   * { box-sizing: border-box; }
@@ -98,9 +127,10 @@ export function renderOrderReceiptHtml(
 </style>
 </head>
 <body>
-  <h1>TUX</h1>
+  <h1>${escapeHtml(shopDisplayName)}</h1>
   <div class="meta">
-    <div><strong>Order #${order.displayOrderNo}</strong> · ${escapeHtml(order.fulfillment.orderTypeLabel)}</div>
+    <div><strong>Order ${escapeHtml(orderLabel)}</strong> · ${escapeHtml(order.fulfillment.orderTypeLabel)}</div>
+    ${receiptIdentity}
     <div>${escapeHtml(order.createdAt)}</div>
     <div>Operator: ${escapeHtml(order.operatorName)}</div>
   </div>
@@ -111,10 +141,12 @@ export function renderOrderReceiptHtml(
     <div class="row"><span>Items</span><span>${formatMoney(order.itemsSubtotalMinor)}</span></div>
     ${order.discountMinor === 0 ? '' : `<div class="row"><span>Discount</span><span>-${formatMoney(order.discountMinor)}</span></div>`}
     ${order.deliveryFeeMinor === 0 ? '' : `<div class="row"><span>Delivery</span><span>${formatMoney(order.deliveryFeeMinor)}</span></div>`}
+    ${serviceChargeRow}
+    ${taxRow}
     <div class="row total"><span>Total EGP</span><span>${formatMoney(order.totalMinor)}</span></div>
   </section>
   <section class="block">${paymentRows}</section>
-  <div class="footer">Saved locally before printing · ${escapeHtml(order.id)}</div>
+  <div class="footer">${configuredFooter}<div>Saved locally before printing · ${escapeHtml(order.id)}</div></div>
 </body>
 </html>`;
 }

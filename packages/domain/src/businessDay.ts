@@ -1,8 +1,8 @@
-import { DomainInvariantError } from './errors';
-import type { BusinessDayId, ShopId, WorkerId } from './ids';
-import type { Instant } from './time';
+import { DomainInvariantError } from './errors.ts';
+import type { BusinessDayId, ShopId, WorkerId } from './ids.ts';
+import type { Instant } from './time.ts';
 
-export type { BusinessDayId } from './ids';
+export type { BusinessDayId } from './ids.ts';
 
 interface BusinessDayBase {
   readonly id: BusinessDayId;
@@ -31,13 +31,20 @@ export function createOpenBusinessDay(
     OpenBusinessDay,
     'status' | 'endedAt' | 'endedByWorkerId' | 'lastAllocatedDisplayOrderNo'
   >,
+  options: { readonly sequenceStart: number } = { sequenceStart: 1 },
 ): OpenBusinessDay {
+  if (!Number.isSafeInteger(options.sequenceStart) || options.sequenceStart <= 0) {
+    throw new RangeError(
+      'Business Day display order sequence start must be a positive safe integer.',
+    );
+  }
+
   return {
     ...input,
     status: 'OPEN',
     endedAt: null,
     endedByWorkerId: null,
-    lastAllocatedDisplayOrderNo: 0,
+    lastAllocatedDisplayOrderNo: options.sequenceStart - 1,
   };
 }
 

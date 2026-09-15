@@ -44,6 +44,9 @@ export function EndDayFlow({
   const [methodIndex, setMethodIndex] = useState(0);
   const [actuals, setActuals] = useState<ReadonlyMap<PaymentMethodId, MoneyMinor>>(new Map());
   const [reasons, setReasons] = useState<ReadonlyMap<PaymentMethodId, string>>(new Map());
+  const [reasonCodeIds, setReasonCodeIds] = useState<ReadonlyMap<PaymentMethodId, string>>(
+    new Map(),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,14 +104,27 @@ export function EndDayFlow({
           .map((line) => [line.paymentMethod.id, '']),
       ),
     );
+    setReasonCodeIds(
+      new Map(
+        result.value.lines
+          .filter((line) => line.differenceMinor !== ZERO_MONEY)
+          .map((line) => [line.paymentMethod.id, '']),
+      ),
+    );
     setStage({ kind: 'SUMMARY', preview: result.value });
   }
 
   async function closeBusinessDay(preview: EndDayPreview): Promise<void> {
+    const configuredReasonAuthority = preview.cashVarianceReasons.length > 0;
     const varianceReasons: EndDayVarianceInput[] = preview.lines.map((line) => ({
       paymentMethodId: line.paymentMethod.id,
       reason:
-        line.differenceMinor === ZERO_MONEY ? null : (reasons.get(line.paymentMethod.id) ?? ''),
+        line.differenceMinor === ZERO_MONEY || configuredReasonAuthority
+          ? null
+          : (reasons.get(line.paymentMethod.id) ?? ''),
+      ...(line.differenceMinor !== ZERO_MONEY && configuredReasonAuthority
+        ? { reasonCodeId: reasonCodeIds.get(line.paymentMethod.id) ?? '' }
+        : {}),
     }));
     setBusy(true);
     setError(null);
@@ -326,7 +342,32 @@ export function EndDayFlow({
                         <dd>{formatMoneyMinor(line.differenceMinor)}</dd>
                       </div>
                     </dl>
-                    {line.differenceMinor === ZERO_MONEY ? null : (
+                    {line.differenceMinor === ZERO_MONEY ? null : stage.preview.cashVarianceReasons
+                        .length > 0 ? (
+                      <label htmlFor={`end-day-reason-${line.paymentMethod.id}`}>
+                        Variance reason
+                        <select
+                          id={`end-day-reason-${line.paymentMethod.id}`}
+                          value={reasonCodeIds.get(line.paymentMethod.id) ?? ''}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setReasonCodeIds((current) => {
+                              const next = new Map(current);
+                              next.set(line.paymentMethod.id, value);
+                              return next;
+                            });
+                          }}
+                        >
+                          <option value="">Select reason</option>
+                          {stage.preview.cashVarianceReasons.map((reason) => (
+                            <option key={reason.id} value={reason.id}>
+                              {reason.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
                       <label htmlFor={`end-day-reason-${line.paymentMethod.id}`}>
                         Variance reason
                         <textarea
@@ -387,11 +428,13 @@ export function EndDayFlow({
                 className="primary-action"
                 disabled={
                   busy ||
-                  stage.preview.lines.some(
-                    (line) =>
-                      line.differenceMinor !== ZERO_MONEY &&
-                      (reasons.get(line.paymentMethod.id)?.trim().length ?? 0) === 0,
-                  )
+                  stage.preview.lines.some((line) => {
+                    if (line.differenceMinor === ZERO_MONEY) return false;
+                    if (stage.preview.cashVarianceReasons.length > 0) {
+                      return (reasonCodeIds.get(line.paymentMethod.id)?.trim().length ?? 0) === 0;
+                    }
+                    return (reasons.get(line.paymentMethod.id)?.trim().length ?? 0) === 0;
+                  })
                 }
                 onClick={() => void closeBusinessDay(stage.preview)}
               >
