@@ -241,7 +241,8 @@ begin
   end if;
 
   v_weekly := public.upsert_admin_shop_weekly_hours_v1(
-    '${employeeId}', '${shopId}', null, 'ONLINE', 2, time '09:00', time '22:00', true, 0, null
+    '${employeeId}'::uuid, '${shopId}'::uuid, null::uuid, 'ONLINE'::text, 2::smallint,
+    time '09:00', time '22:00', true, 0::bigint, null::jsonb
   );
   if coalesce((v_weekly ->> 'ok')::boolean, false) is not true then
     raise exception 'weekly hours create failed: %', v_weekly;
@@ -249,7 +250,8 @@ begin
   v_weekly_id := (v_weekly ->> 'hoursId')::uuid;
 
   v_weekly_stale := public.upsert_admin_shop_weekly_hours_v1(
-    '${employeeId}', '${shopId}', v_weekly_id, 'ONLINE', 2, time '10:00', time '22:00', true, 0,
+    '${employeeId}'::uuid, '${shopId}'::uuid, v_weekly_id, 'ONLINE'::text, 2::smallint,
+    time '10:00', time '22:00', true, 0::bigint,
     jsonb_build_object(
       'serviceKind', 'ONLINE', 'dayOfWeek', 2,
       'opensLocal', '08:00:00', 'closesLocal', '22:00:00', 'active', true
@@ -260,7 +262,8 @@ begin
   end if;
 
   v_weekly := public.upsert_admin_shop_weekly_hours_v1(
-    '${employeeId}', '${shopId}', v_weekly_id, 'ONLINE', 2, time '10:00', time '22:00', true, 0,
+    '${employeeId}'::uuid, '${shopId}'::uuid, v_weekly_id, 'ONLINE'::text, 2::smallint,
+    time '10:00', time '22:00', true, 0::bigint,
     jsonb_build_object(
       'serviceKind', 'ONLINE', 'dayOfWeek', 2,
       'opensLocal', '09:00:00', 'closesLocal', '22:00:00', 'active', true
@@ -271,8 +274,8 @@ begin
   end if;
 
   v_special := public.upsert_admin_shop_special_hours_v1(
-    '${employeeId}', '${shopId}', null, date '2026-12-31', 'ONLINE', true,
-    null, null, 'Year end', true, 0, null
+    '${employeeId}'::uuid, '${shopId}'::uuid, null::uuid, date '2026-12-31', 'ONLINE'::text,
+    true, null::time, null::time, 'Year end'::text, true, 0::bigint, null::jsonb
   );
   if coalesce((v_special ->> 'ok')::boolean, false) is not true then
     raise exception 'special hours create failed: %', v_special;
@@ -280,8 +283,8 @@ begin
   v_special_id := (v_special ->> 'hoursId')::uuid;
 
   v_special_remove := public.upsert_admin_shop_special_hours_v1(
-    '${employeeId}', '${shopId}', v_special_id, date '2026-12-31', 'ONLINE', true,
-    null, null, 'Year end', false, 0,
+    '${employeeId}'::uuid, '${shopId}'::uuid, v_special_id, date '2026-12-31', 'ONLINE'::text,
+    true, null::time, null::time, 'Year end'::text, false, 0::bigint,
     jsonb_build_object(
       'serviceDate', '2026-12-31', 'serviceKind', 'ONLINE', 'closed', true,
       'opensLocal', null, 'closesLocal', null, 'note', 'Year end'
