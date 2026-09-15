@@ -25,6 +25,7 @@ on:
       - 'scripts/test-admin-shop-settings-migration.mjs'
       - 'scripts/test-admin-plan2-review-hardening.mjs'
       - 'scripts/test-admin-plan2-final-acceptance-hardening.mjs'
+      - 'scripts/test-admin-plan2-round7-hardening.mjs'
       - 'scripts/test-admin-settings-schema-hardening.mjs'
       - 'scripts/test-catalog-public-ordering-projection.mjs'
       - 'scripts/test-admin-deployment-contract.mjs'
@@ -159,6 +160,7 @@ jobs:
         run: >-
           npx vitest run
           supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts
+          supabase/functions/order-intake/order-intakeServiceHoursSecondPrecision.test.ts
           supabase/functions/order-intake/order-intakeRateLimit.test.ts
           supabase/functions/order-intake/order-intakeAcceptedReplay.test.ts
           packages/application/src/menuOperationsWhatsAppJourney.test.ts
@@ -213,6 +215,7 @@ jobs:
           apps/admin/src/settings/SettingsPage.test.tsx
           apps/admin/src/settings/SettingOverrideEditor.test.tsx
           apps/admin/src/settings/useSettings.test.ts
+          apps/admin/src/settings/finalReviewRound7Regressions.source.test.ts
       - name: Menu catalog rollout compatibility
         run: npx vitest run apps/menu/src/lib/catalog-public.test.ts
       - name: Admin UI typecheck
@@ -259,6 +262,8 @@ jobs:
         run: node scripts/test-admin-plan2-review-hardening.mjs
       - name: Plan 2 final acceptance invariant
         run: node scripts/test-admin-plan2-final-acceptance-hardening.mjs
+      - name: Plan 2 round 7 hardening invariant
+        run: node scripts/test-admin-plan2-round7-hardening.mjs
       - name: Settings schema hardening invariant
         run: node scripts/test-admin-settings-schema-hardening.mjs
       - name: Public catalog ordering projection invariant
@@ -309,6 +314,8 @@ jobs:
         run: node scripts/test-admin-plan2-review-hardening.mjs
       - name: Plan 2 final acceptance PostgreSQL behavior
         run: node scripts/test-admin-plan2-final-acceptance-hardening.mjs
+      - name: Plan 2 round 7 PostgreSQL behavior
+        run: node scripts/test-admin-plan2-round7-hardening.mjs
       - name: Settings schema hardening PostgreSQL behavior
         run: node scripts/test-admin-settings-schema-hardening.mjs
       - name: Public catalog ordering projection PostgreSQL behavior
