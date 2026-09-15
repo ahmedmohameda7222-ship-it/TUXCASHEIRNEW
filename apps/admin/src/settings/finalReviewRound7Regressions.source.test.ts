@@ -23,7 +23,9 @@ describe('Plan 2 final review round 7 regressions', () => {
 
     expect(shops).toContain('function WeeklyHoursRowEditor');
     expect(shops).toContain('function SpecialHoursRowEditor');
-    expect(shops.match(/const \[expectedSettingsVersion\] = useState\(settingsVersion\);/g)).toHaveLength(2);
+    expect(
+      shops.match(/const \[expectedSettingsVersion\] = useState\(settingsVersion\);/g),
+    ).toHaveLength(2);
     expect(shops).toContain('const [expectedRow] = useState<WeeklyHoursExpectedRow>');
     expect(shops).toContain('const [expectedRow] = useState<SpecialHoursExpectedRow>');
   });
@@ -34,7 +36,9 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(shops).toContain('const [closed, setClosed] = useState(hours.closed);');
     expect(shops).toContain('checked={closed}');
     expect(shops).toContain('onChange={(event) => setClosed(event.currentTarget.checked)}');
-    expect(shops.match(/disabled=\{busy \|\| closed\}/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(shops.match(/disabled=\{busy \|\| closed\}/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 
   it('adds a second-precision public service-hours migration instead of truncating to minutes', () => {
