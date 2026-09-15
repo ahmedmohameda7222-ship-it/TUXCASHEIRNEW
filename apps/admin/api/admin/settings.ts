@@ -17,6 +17,7 @@ import {
   type AdminResponse,
 } from '../../server/http';
 import { readAdminSessionToken } from '../../server/session';
+import { updateShopOperationalState } from '../../server/settings/settingsOperationalState';
 import {
   createSettingsService,
   createSupabaseSettingsStore,
@@ -268,7 +269,7 @@ export default async function handler(
         return;
       case 'shop.operational-state.update':
         sendJson(response, 200, {
-          ...(await service.updateShopOperationalState(command, principal)),
+          ...(await updateShopOperationalState(client, command, principal)),
         });
         return;
       case 'shop.delete-or-archive':
