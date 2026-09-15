@@ -130,6 +130,15 @@ export const settingsCommandSchema = z.union([
     .strict(),
   z
     .object({
+      type: z.literal('shop.operational-state.update'),
+      shopId: uuidSchema,
+      temporaryClosed: z.boolean(),
+      onlineOrdersPaused: z.boolean(),
+      expectedSettingsVersion: expectedSettingsVersionSchema,
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('shop.delete-or-archive'),
       shopId: uuidSchema,
     })
@@ -255,6 +264,11 @@ export default async function handler(
             command.expectedSettingsVersion,
             principal,
           )),
+        });
+        return;
+      case 'shop.operational-state.update':
+        sendJson(response, 200, {
+          ...(await service.updateShopOperationalState(command, principal)),
         });
         return;
       case 'shop.delete-or-archive':
