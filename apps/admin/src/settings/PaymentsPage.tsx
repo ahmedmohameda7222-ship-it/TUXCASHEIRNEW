@@ -86,7 +86,8 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       value={draft.channel}
                       disabled={updating}
                       onChange={(event) => {
-                        const channel = event.currentTarget.value as PaymentMethodUpdateDraft['channel'];
+                        const channel = event.currentTarget
+                          .value as PaymentMethodUpdateDraft['channel'];
                         setDraft((current) => (current ? { ...current, channel } : current));
                       }}
                     >
@@ -128,7 +129,9 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       disabled={updating}
                       onChange={(event) => {
                         const requiresReference = event.currentTarget.checked;
-                        setDraft((current) => current ? { ...current, requiresReference } : current);
+                        setDraft((current) =>
+                          current ? { ...current, requiresReference } : current,
+                        );
                       }}
                     />
                     <span>Reference required</span>
@@ -140,20 +143,32 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
                       disabled={updating}
                       onChange={(event) => {
                         const manualConfirmationRequired = event.currentTarget.checked;
-                        setDraft((current) => current ? { ...current, manualConfirmationRequired } : current);
+                        setDraft((current) =>
+                          current ? { ...current, manualConfirmationRequired } : current,
+                        );
                       }}
                     />
                     <span>Manual confirmation</span>
                   </label>
                 </div>
                 <p className="admin-field__help">
-                  Operational type: {method.logicType} · {method.requiresReconciliation ? 'Reconciliation required' : 'No reconciliation required'}
+                  Operational type: {method.logicType} ·{' '}
+                  {method.requiresReconciliation
+                    ? 'Reconciliation required'
+                    : 'No reconciliation required'}
                 </p>
                 <div className="admin-settings-row__main">
                   <button className="admin-primary-button" type="submit" disabled={updating}>
                     {updating ? 'Saving…' : 'Save payment method'}
                   </button>
-                  <button className="admin-secondary-button" type="button" disabled={updating} onClick={() => setDraft(null)}>Cancel</button>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={updating}
+                    onClick={() => setDraft(null)}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </form>
             );
@@ -164,11 +179,24 @@ export function PaymentsPage({ workspace, updating, onUpdate }: PaymentsPageProp
               <div className="admin-settings-row__main">
                 <div>
                   <strong>{method.displayName}</strong>
-                  <span>{method.logicType} · {method.channel} · sort {method.sortOrder}</span>
+                  <span>
+                    {method.logicType} · {method.channel} · sort {method.sortOrder}
+                  </span>
                 </div>
                 <div className="admin-settings-row__main">
-                  <span className={method.active ? 'admin-status-pill' : 'admin-status-pill is-muted'}>{method.active ? 'Active' : 'Inactive'}</span>
-                  <button className="admin-secondary-button" type="button" disabled={updating} onClick={() => beginEdit(method)}>Edit {method.displayName}</button>
+                  <span
+                    className={method.active ? 'admin-status-pill' : 'admin-status-pill is-muted'}
+                  >
+                    {method.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    disabled={updating}
+                    onClick={() => beginEdit(method)}
+                  >
+                    Edit {method.displayName}
+                  </button>
                 </div>
               </div>
               <div className="admin-settings-tags">

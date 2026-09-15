@@ -68,10 +68,19 @@ export function ShopsPage({
     longitude: shop.longitude?.toString() ?? '',
   });
   const [weeklyNew, setWeeklyNew] = useState<WeeklyForm>({
-    serviceKind: 'ONLINE', dayOfWeek: 0, opensLocal: '09:00', closesLocal: '22:00', active: true,
+    serviceKind: 'ONLINE',
+    dayOfWeek: 0,
+    opensLocal: '09:00',
+    closesLocal: '22:00',
+    active: true,
   });
   const [specialNew, setSpecialNew] = useState<SpecialForm>({
-    serviceDate: '', serviceKind: 'ONLINE', closed: true, opensLocal: '', closesLocal: '', note: '',
+    serviceDate: '',
+    serviceKind: 'ONLINE',
+    closed: true,
+    opensLocal: '',
+    closesLocal: '',
+    note: '',
   });
 
   useEffect(() => {
@@ -151,40 +160,113 @@ export function ShopsPage({
         <div className="admin-settings-grid">
           <label className="admin-field">
             <span>Display name</span>
-            <input value={identity.name} maxLength={160} required disabled={busy} onChange={(event) => setIdentity((current) => ({ ...current, name: event.currentTarget.value }))} />
+            <input
+              value={identity.name}
+              maxLength={160}
+              required
+              disabled={busy}
+              onChange={(event) =>
+                setIdentity((current) => ({ ...current, name: event.currentTarget.value }))
+              }
+            />
           </label>
           <label className="admin-field">
             <span>Address</span>
-            <input value={identity.address} maxLength={500} disabled={busy} onChange={(event) => setIdentity((current) => ({ ...current, address: event.currentTarget.value }))} />
+            <input
+              value={identity.address}
+              maxLength={500}
+              disabled={busy}
+              onChange={(event) =>
+                setIdentity((current) => ({ ...current, address: event.currentTarget.value }))
+              }
+            />
           </label>
           <label className="admin-field">
             <span>Contact phone</span>
-            <input value={identity.contactPhone} maxLength={80} disabled={busy} onChange={(event) => setIdentity((current) => ({ ...current, contactPhone: event.currentTarget.value }))} />
+            <input
+              value={identity.contactPhone}
+              maxLength={80}
+              disabled={busy}
+              onChange={(event) =>
+                setIdentity((current) => ({ ...current, contactPhone: event.currentTarget.value }))
+              }
+            />
           </label>
           <label className="admin-field">
             <span>Latitude</span>
-            <input type="number" min={-90} max={90} step="any" value={identity.latitude} disabled={busy} onChange={(event) => setIdentity((current) => ({ ...current, latitude: event.currentTarget.value }))} />
+            <input
+              type="number"
+              min={-90}
+              max={90}
+              step="any"
+              value={identity.latitude}
+              disabled={busy}
+              onChange={(event) =>
+                setIdentity((current) => ({ ...current, latitude: event.currentTarget.value }))
+              }
+            />
           </label>
           <label className="admin-field">
             <span>Longitude</span>
-            <input type="number" min={-180} max={180} step="any" value={identity.longitude} disabled={busy} onChange={(event) => setIdentity((current) => ({ ...current, longitude: event.currentTarget.value }))} />
+            <input
+              type="number"
+              min={-180}
+              max={180}
+              step="any"
+              value={identity.longitude}
+              disabled={busy}
+              onChange={(event) =>
+                setIdentity((current) => ({ ...current, longitude: event.currentTarget.value }))
+              }
+            />
           </label>
         </div>
-        <p className="admin-field__help">One canonical contact/location authority feeds Menu, delivery, receipts and store-location surfaces. Changes become live only after Publish settings.</p>
-        <button className="admin-primary-button" type="submit" disabled={busy || !onUpdateIdentity}>Save shop identity</button>
+        <p className="admin-field__help">
+          One canonical contact/location authority feeds Menu, delivery, receipts and store-location
+          surfaces. Changes become live only after Publish settings.
+        </p>
+        <button className="admin-primary-button" type="submit" disabled={busy || !onUpdateIdentity}>
+          Save shop identity
+        </button>
       </form>
 
       <div className="admin-settings-grid">
         <article className="admin-settings-card">
           <span>Online orders</span>
           <strong>{shop.onlineOrdersPaused ? 'Paused' : 'Accepting orders'}</strong>
-          <small>{shop.temporaryClosed ? 'Shop is temporarily closed.' : 'Shop is not temporarily closed.'}</small>
+          <small>
+            {shop.temporaryClosed
+              ? 'Shop is temporarily closed.'
+              : 'Shop is not temporarily closed.'}
+          </small>
           <label className="admin-check-field">
-            <input type="checkbox" checked={shop.temporaryClosed} disabled={operationalStateDisabled} onChange={(event) => onUpdateOperationalState?.({ temporaryClosed: event.currentTarget.checked, onlineOrdersPaused: shop.onlineOrdersPaused, expectedSettingsVersion: workspace.settingsVersion })} />
+            <input
+              type="checkbox"
+              checked={shop.temporaryClosed}
+              disabled={operationalStateDisabled}
+              onChange={(event) =>
+                onUpdateOperationalState?.({
+                  temporaryClosed: event.currentTarget.checked,
+                  onlineOrdersPaused: shop.onlineOrdersPaused,
+                  expectedSettingsVersion: workspace.settingsVersion,
+                })
+              }
+            />
             <span>Temporarily close shop</span>
           </label>
           <label className="admin-check-field">
-            <input type="checkbox" checked={shop.onlineOrdersPaused} disabled={operationalStateDisabled} onChange={(event) => onUpdateOperationalState?.({ temporaryClosed: shop.temporaryClosed, onlineOrdersPaused: event.currentTarget.checked, expectedSettingsVersion: workspace.settingsVersion })} />
+            <input
+              type="checkbox"
+              checked={shop.onlineOrdersPaused}
+              disabled={operationalStateDisabled}
+              onChange={(event) =>
+                onUpdateOperationalState?.({
+                  temporaryClosed: shop.temporaryClosed,
+                  onlineOrdersPaused: event.currentTarget.checked,
+                  expectedSettingsVersion: workspace.settingsVersion,
+                })
+              }
+            />
             <span>Pause online orders</span>
           </label>
           <small>These emergency controls publish immediately.</small>
@@ -225,25 +307,107 @@ export function ShopsPage({
               }}
             >
               <div className="admin-settings-grid">
-                <select name="serviceKind" defaultValue={hours.serviceKind} disabled={busy}><option value="OPEN">Open</option><option value="DELIVERY">Delivery</option><option value="ONLINE">Online</option></select>
-                <input name="dayOfWeek" type="number" min={0} max={6} defaultValue={hours.dayOfWeek} disabled={busy} />
-                <input name="opensLocal" type="time" step={1} defaultValue={timeInput(hours.opensLocal)} disabled={busy} />
-                <input name="closesLocal" type="time" step={1} defaultValue={timeInput(hours.closesLocal)} disabled={busy} />
-                <label className="admin-check-field"><input name="active" type="checkbox" defaultChecked={hours.active} disabled={busy} /><span>Active</span></label>
+                <select name="serviceKind" defaultValue={hours.serviceKind} disabled={busy}>
+                  <option value="OPEN">Open</option>
+                  <option value="DELIVERY">Delivery</option>
+                  <option value="ONLINE">Online</option>
+                </select>
+                <input
+                  name="dayOfWeek"
+                  type="number"
+                  min={0}
+                  max={6}
+                  defaultValue={hours.dayOfWeek}
+                  disabled={busy}
+                />
+                <input
+                  name="opensLocal"
+                  type="time"
+                  step={1}
+                  defaultValue={timeInput(hours.opensLocal)}
+                  disabled={busy}
+                />
+                <input
+                  name="closesLocal"
+                  type="time"
+                  step={1}
+                  defaultValue={timeInput(hours.closesLocal)}
+                  disabled={busy}
+                />
+                <label className="admin-check-field">
+                  <input
+                    name="active"
+                    type="checkbox"
+                    defaultChecked={hours.active}
+                    disabled={busy}
+                  />
+                  <span>Active</span>
+                </label>
               </div>
-              <button className="admin-secondary-button" type="submit" disabled={busy || !onUpsertWeeklyHours}>Save weekly hours</button>
+              <button
+                className="admin-secondary-button"
+                type="submit"
+                disabled={busy || !onUpsertWeeklyHours}
+              >
+                Save weekly hours
+              </button>
             </form>
           ))}
         </div>
         <form className="admin-settings-card" onSubmit={(event) => void createWeekly(event)}>
           <strong>Add weekly window</strong>
           <div className="admin-settings-grid">
-            <select value={weeklyNew.serviceKind} disabled={busy} onChange={(event) => setWeeklyNew((current) => ({ ...current, serviceKind: event.currentTarget.value as ShopHoursServiceKind }))}><option value="OPEN">Open</option><option value="DELIVERY">Delivery</option><option value="ONLINE">Online</option></select>
-            <input type="number" min={0} max={6} value={weeklyNew.dayOfWeek} disabled={busy} onChange={(event) => setWeeklyNew((current) => ({ ...current, dayOfWeek: Number(event.currentTarget.value) }))} />
-            <input type="time" value={weeklyNew.opensLocal} disabled={busy} onChange={(event) => setWeeklyNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))} />
-            <input type="time" value={weeklyNew.closesLocal} disabled={busy} onChange={(event) => setWeeklyNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))} />
+            <select
+              value={weeklyNew.serviceKind}
+              disabled={busy}
+              onChange={(event) =>
+                setWeeklyNew((current) => ({
+                  ...current,
+                  serviceKind: event.currentTarget.value as ShopHoursServiceKind,
+                }))
+              }
+            >
+              <option value="OPEN">Open</option>
+              <option value="DELIVERY">Delivery</option>
+              <option value="ONLINE">Online</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              max={6}
+              value={weeklyNew.dayOfWeek}
+              disabled={busy}
+              onChange={(event) =>
+                setWeeklyNew((current) => ({
+                  ...current,
+                  dayOfWeek: Number(event.currentTarget.value),
+                }))
+              }
+            />
+            <input
+              type="time"
+              value={weeklyNew.opensLocal}
+              disabled={busy}
+              onChange={(event) =>
+                setWeeklyNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))
+              }
+            />
+            <input
+              type="time"
+              value={weeklyNew.closesLocal}
+              disabled={busy}
+              onChange={(event) =>
+                setWeeklyNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))
+              }
+            />
           </div>
-          <button className="admin-primary-button" type="submit" disabled={busy || !onUpsertWeeklyHours}>Save weekly hours</button>
+          <button
+            className="admin-primary-button"
+            type="submit"
+            disabled={busy || !onUpsertWeeklyHours}
+          >
+            Save weekly hours
+          </button>
         </form>
       </div>
 
@@ -268,37 +432,96 @@ export function ShopsPage({
                   note: String(form.get('note') ?? '').trim() || null,
                   active: true,
                   expectedSettingsVersion: workspace.settingsVersion,
-                  expectedRow: { serviceDate: hours.serviceDate, serviceKind: hours.serviceKind, closed: hours.closed, opensLocal: hours.opensLocal, closesLocal: hours.closesLocal, note: hours.note },
-                });
-              }}
-            >
-              <div className="admin-settings-grid">
-                <input name="serviceDate" type="date" defaultValue={hours.serviceDate} disabled={busy} />
-                <select name="serviceKind" defaultValue={hours.serviceKind} disabled={busy}><option value="OPEN">Open</option><option value="DELIVERY">Delivery</option><option value="ONLINE">Online</option></select>
-                <label className="admin-check-field"><input name="closed" type="checkbox" defaultChecked={hours.closed} disabled={busy} /><span>Closed all day</span></label>
-                <input name="opensLocal" type="time" step={1} defaultValue={timeInput(hours.opensLocal)} disabled={busy || hours.closed} />
-                <input name="closesLocal" type="time" step={1} defaultValue={timeInput(hours.closesLocal)} disabled={busy || hours.closed} />
-                <input name="note" defaultValue={hours.note ?? ''} maxLength={500} disabled={busy} placeholder="Note" />
-              </div>
-              <div className="admin-settings-row__main">
-                <button className="admin-secondary-button" type="submit" disabled={busy || !onUpsertSpecialHours}>Save special hours</button>
-                <button
-                  className="admin-secondary-button"
-                  type="button"
-                  disabled={busy || !onUpsertSpecialHours}
-                  onClick={() => void onUpsertSpecialHours?.({
-                    hoursId: hours.id,
+                  expectedRow: {
                     serviceDate: hours.serviceDate,
                     serviceKind: hours.serviceKind,
                     closed: hours.closed,
                     opensLocal: hours.opensLocal,
                     closesLocal: hours.closesLocal,
                     note: hours.note,
-                    active: false,
-                    expectedSettingsVersion: workspace.settingsVersion,
-                    expectedRow: { serviceDate: hours.serviceDate, serviceKind: hours.serviceKind, closed: hours.closed, opensLocal: hours.opensLocal, closesLocal: hours.closesLocal, note: hours.note },
-                  })}
-                >Deactivate special override</button>
+                  },
+                });
+              }}
+            >
+              <div className="admin-settings-grid">
+                <input
+                  name="serviceDate"
+                  type="date"
+                  defaultValue={hours.serviceDate}
+                  disabled={busy}
+                />
+                <select name="serviceKind" defaultValue={hours.serviceKind} disabled={busy}>
+                  <option value="OPEN">Open</option>
+                  <option value="DELIVERY">Delivery</option>
+                  <option value="ONLINE">Online</option>
+                </select>
+                <label className="admin-check-field">
+                  <input
+                    name="closed"
+                    type="checkbox"
+                    defaultChecked={hours.closed}
+                    disabled={busy}
+                  />
+                  <span>Closed all day</span>
+                </label>
+                <input
+                  name="opensLocal"
+                  type="time"
+                  step={1}
+                  defaultValue={timeInput(hours.opensLocal)}
+                  disabled={busy || hours.closed}
+                />
+                <input
+                  name="closesLocal"
+                  type="time"
+                  step={1}
+                  defaultValue={timeInput(hours.closesLocal)}
+                  disabled={busy || hours.closed}
+                />
+                <input
+                  name="note"
+                  defaultValue={hours.note ?? ''}
+                  maxLength={500}
+                  disabled={busy}
+                  placeholder="Note"
+                />
+              </div>
+              <div className="admin-settings-row__main">
+                <button
+                  className="admin-secondary-button"
+                  type="submit"
+                  disabled={busy || !onUpsertSpecialHours}
+                >
+                  Save special hours
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={busy || !onUpsertSpecialHours}
+                  onClick={() =>
+                    void onUpsertSpecialHours?.({
+                      hoursId: hours.id,
+                      serviceDate: hours.serviceDate,
+                      serviceKind: hours.serviceKind,
+                      closed: hours.closed,
+                      opensLocal: hours.opensLocal,
+                      closesLocal: hours.closesLocal,
+                      note: hours.note,
+                      active: false,
+                      expectedSettingsVersion: workspace.settingsVersion,
+                      expectedRow: {
+                        serviceDate: hours.serviceDate,
+                        serviceKind: hours.serviceKind,
+                        closed: hours.closed,
+                        opensLocal: hours.opensLocal,
+                        closesLocal: hours.closesLocal,
+                        note: hours.note,
+                      },
+                    })
+                  }
+                >
+                  Deactivate special override
+                </button>
               </div>
             </form>
           ))}
@@ -306,21 +529,90 @@ export function ShopsPage({
         <form className="admin-settings-card" onSubmit={(event) => void createSpecial(event)}>
           <strong>Add special-date override</strong>
           <div className="admin-settings-grid">
-            <input type="date" required value={specialNew.serviceDate} disabled={busy} onChange={(event) => setSpecialNew((current) => ({ ...current, serviceDate: event.currentTarget.value }))} />
-            <select value={specialNew.serviceKind} disabled={busy} onChange={(event) => setSpecialNew((current) => ({ ...current, serviceKind: event.currentTarget.value as ShopHoursServiceKind }))}><option value="OPEN">Open</option><option value="DELIVERY">Delivery</option><option value="ONLINE">Online</option></select>
-            <label className="admin-check-field"><input type="checkbox" checked={specialNew.closed} disabled={busy} onChange={(event) => setSpecialNew((current) => ({ ...current, closed: event.currentTarget.checked }))} /><span>Closed all day</span></label>
-            <input type="time" value={specialNew.opensLocal} disabled={busy || specialNew.closed} onChange={(event) => setSpecialNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))} />
-            <input type="time" value={specialNew.closesLocal} disabled={busy || specialNew.closed} onChange={(event) => setSpecialNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))} />
-            <input value={specialNew.note} maxLength={500} disabled={busy} placeholder="Note" onChange={(event) => setSpecialNew((current) => ({ ...current, note: event.currentTarget.value }))} />
+            <input
+              type="date"
+              required
+              value={specialNew.serviceDate}
+              disabled={busy}
+              onChange={(event) =>
+                setSpecialNew((current) => ({ ...current, serviceDate: event.currentTarget.value }))
+              }
+            />
+            <select
+              value={specialNew.serviceKind}
+              disabled={busy}
+              onChange={(event) =>
+                setSpecialNew((current) => ({
+                  ...current,
+                  serviceKind: event.currentTarget.value as ShopHoursServiceKind,
+                }))
+              }
+            >
+              <option value="OPEN">Open</option>
+              <option value="DELIVERY">Delivery</option>
+              <option value="ONLINE">Online</option>
+            </select>
+            <label className="admin-check-field">
+              <input
+                type="checkbox"
+                checked={specialNew.closed}
+                disabled={busy}
+                onChange={(event) =>
+                  setSpecialNew((current) => ({ ...current, closed: event.currentTarget.checked }))
+                }
+              />
+              <span>Closed all day</span>
+            </label>
+            <input
+              type="time"
+              value={specialNew.opensLocal}
+              disabled={busy || specialNew.closed}
+              onChange={(event) =>
+                setSpecialNew((current) => ({ ...current, opensLocal: event.currentTarget.value }))
+              }
+            />
+            <input
+              type="time"
+              value={specialNew.closesLocal}
+              disabled={busy || specialNew.closed}
+              onChange={(event) =>
+                setSpecialNew((current) => ({ ...current, closesLocal: event.currentTarget.value }))
+              }
+            />
+            <input
+              value={specialNew.note}
+              maxLength={500}
+              disabled={busy}
+              placeholder="Note"
+              onChange={(event) =>
+                setSpecialNew((current) => ({ ...current, note: event.currentTarget.value }))
+              }
+            />
           </div>
-          <button className="admin-primary-button" type="submit" disabled={busy || !onUpsertSpecialHours}>Save special hours</button>
+          <button
+            className="admin-primary-button"
+            type="submit"
+            disabled={busy || !onUpsertSpecialHours}
+          >
+            Save special hours
+          </button>
         </form>
       </div>
 
       {onDeleteOrArchive ? (
         <div className="admin-settings-danger-zone">
-          <div><strong>Archive shop</strong><span>Used shops are archived instead of deleting historical authority.</span></div>
-          <button className="admin-secondary-button" type="button" disabled={busy} onClick={onDeleteOrArchive}>Archive / delete unused shop</button>
+          <div>
+            <strong>Archive shop</strong>
+            <span>Used shops are archived instead of deleting historical authority.</span>
+          </div>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={busy}
+            onClick={onDeleteOrArchive}
+          >
+            Archive / delete unused shop
+          </button>
         </div>
       ) : null}
     </section>

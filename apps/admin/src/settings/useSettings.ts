@@ -21,7 +21,10 @@ import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
 
 export class SettingsUiError extends Error {
-  constructor(readonly code: string, readonly currentVersion?: number) {
+  constructor(
+    readonly code: string,
+    readonly currentVersion?: number,
+  ) {
     super(code);
     this.name = 'SettingsUiError';
   }
@@ -34,13 +37,19 @@ export type ShopOperationalStateUpdateDraft = Omit<ShopOperationalStateUpdateInp
 export type ShopIdentityUpdateDraft = Omit<ShopIdentityUpdateInput, 'shopId'>;
 export type ShopWeeklyHoursUpdateDraft = Omit<ShopWeeklyHoursUpsertInput, 'shopId'>;
 export type ShopSpecialHoursUpdateDraft = Omit<ShopSpecialHoursUpsertInput, 'shopId'>;
-export type SettingOverrideUpdateDraft = { settingKey: string; value: unknown; expectedVersion: number | null };
+export type SettingOverrideUpdateDraft = {
+  settingKey: string;
+  value: unknown;
+  expectedVersion: number | null;
+};
 
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
 type SettingOverrideUpdateCommand = Extract<SettingsCommand, { type: 'setting.override.upsert' }>;
 
-function settingsQueryKey(shopId: string) { return ['admin', 'settings', shopId] as const; }
+function settingsQueryKey(shopId: string) {
+  return ['admin', 'settings', shopId] as const;
+}
 function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new SettingsUiError('session_required');
   return session.state.session.csrfToken;
@@ -49,13 +58,22 @@ function requireWorkspaceShop(shopId: string, workspace: AdminSettingsWorkspace)
   if (workspace.shop.id !== shopId) throw new SettingsUiError('settings_shop_mismatch');
 }
 
-export function buildOrderTypeUpdateCommand(shopId: string, workspace: AdminSettingsWorkspace, draft: OrderTypeUpdateDraft): OrderTypeUpdateCommand {
+export function buildOrderTypeUpdateCommand(
+  shopId: string,
+  workspace: AdminSettingsWorkspace,
+  draft: OrderTypeUpdateDraft,
+): OrderTypeUpdateCommand {
   requireWorkspaceShop(shopId, workspace);
-  if (!workspace.orderTypes.some((row) => row.id === draft.orderTypeId)) throw new SettingsUiError('order_type_not_loaded');
+  if (!workspace.orderTypes.some((row) => row.id === draft.orderTypeId))
+    throw new SettingsUiError('order_type_not_loaded');
   return { type: 'order-type.update', shopId, ...draft };
 }
 
-export function buildPaymentMethodUpdateCommand(shopId: string, workspace: AdminSettingsWorkspace, draft: PaymentMethodUpdateDraft): PaymentMethodUpdateCommand {
+export function buildPaymentMethodUpdateCommand(
+  shopId: string,
+  workspace: AdminSettingsWorkspace,
+  draft: PaymentMethodUpdateDraft,
+): PaymentMethodUpdateCommand {
   requireWorkspaceShop(shopId, workspace);
   const row = workspace.paymentMethods.find((method) => method.id === draft.paymentMethodId);
   if (!row) throw new SettingsUiError('payment_method_not_loaded');
@@ -78,30 +96,49 @@ export function buildPaymentMethodUpdateCommand(shopId: string, workspace: Admin
   };
 }
 
-export function buildSettingOverrideCommand(shopId: string, workspace: AdminSettingsWorkspace, draft: SettingOverrideUpdateDraft): SettingOverrideUpdateCommand {
+export function buildSettingOverrideCommand(
+  shopId: string,
+  workspace: AdminSettingsWorkspace,
+  draft: SettingOverrideUpdateDraft,
+): SettingOverrideUpdateCommand {
   requireWorkspaceShop(shopId, workspace);
   return { type: 'setting.override.upsert', shopId, ...draft };
 }
 
 function requireCanonicalEditSuccess(result: CanonicalSettingsRowEditResult): void {
   if (result.ok) return;
-  throw new SettingsUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
 }
 function requireSettingWriteSuccess(result: SettingWriteResult): void {
   if (result.ok) return;
-  throw new SettingsUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
 }
 function requireReasonCodeWriteSuccess(result: ReasonCodeWriteResult): void {
   if (result.ok) return;
-  throw new SettingsUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
 }
 function requirePublishSuccess(result: SettingsPublishResult): void {
   if (result.ok) return;
-  throw new SettingsUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
 }
 function requireShopManagementSuccess(result: ShopManagementWriteResult): void {
   if (result.ok) return;
-  throw new SettingsUiError(result.code, 'currentVersion' in result ? result.currentVersion : undefined);
+  throw new SettingsUiError(
+    result.code,
+    'currentVersion' in result ? result.currentVersion : undefined,
+  );
 }
 
 export function useSettings(shopId: string | undefined) {
@@ -113,13 +150,17 @@ export function useSettings(shopId: string | undefined) {
     enabled: Boolean(shopId),
     queryFn: async () => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
-      return adminFetch<AdminSettingsWorkspace>(`/api/admin/settings?shopId=${encodeURIComponent(shopId)}&view=workspace`);
+      return adminFetch<AdminSettingsWorkspace>(
+        `/api/admin/settings?shopId=${encodeURIComponent(shopId)}&view=workspace`,
+      );
     },
   });
 
   function latestWorkspace(): AdminSettingsWorkspace {
     if (!shopId) throw new SettingsUiError('concrete_shop_required');
-    const workspace = queryClient.getQueryData<AdminSettingsWorkspace>(settingsQueryKey(shopId)) ?? workspaceQuery.data;
+    const workspace =
+      queryClient.getQueryData<AdminSettingsWorkspace>(settingsQueryKey(shopId)) ??
+      workspaceQuery.data;
     if (!workspace) throw new SettingsUiError('settings_not_loaded');
     requireWorkspaceShop(shopId, workspace);
     return workspace;
@@ -141,7 +182,14 @@ export function useSettings(shopId: string | undefined) {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const result = await adminFetch<SettingsPublishResult>(
         '/api/admin/settings',
-        { method: 'POST', body: JSON.stringify({ type: 'settings.publish', shopId, expectedSettingsVersion: latestWorkspace().settingsVersion }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'settings.publish',
+            shopId,
+            expectedSettingsVersion: latestWorkspace().settingsVersion,
+          }),
+        },
         csrfTokenForMutation(session),
       );
       requirePublishSuccess(result);
@@ -155,7 +203,10 @@ export function useSettings(shopId: string | undefined) {
       requireWorkspaceShop(shopId, latestWorkspace());
       const result = await adminFetch<SettingsPublishResult>(
         '/api/admin/settings',
-        { method: 'POST', body: JSON.stringify({ type: 'shop.operational-state.update', shopId, ...draft }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'shop.operational-state.update', shopId, ...draft }),
+        },
         csrfTokenForMutation(session),
       );
       requirePublishSuccess(result);
@@ -195,7 +246,10 @@ export function useSettings(shopId: string | undefined) {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const result = await adminFetch<SettingWriteResult>(
         '/api/admin/settings',
-        { method: 'POST', body: JSON.stringify(buildSettingOverrideCommand(shopId, latestWorkspace(), draft)) },
+        {
+          method: 'POST',
+          body: JSON.stringify(buildSettingOverrideCommand(shopId, latestWorkspace(), draft)),
+        },
         csrfTokenForMutation(session),
       );
       requireSettingWriteSuccess(result);
@@ -221,7 +275,10 @@ export function useSettings(shopId: string | undefined) {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const result = await adminFetch<CanonicalSettingsRowEditResult>(
         '/api/admin/settings',
-        { method: 'POST', body: JSON.stringify(buildOrderTypeUpdateCommand(shopId, latestWorkspace(), draft)) },
+        {
+          method: 'POST',
+          body: JSON.stringify(buildOrderTypeUpdateCommand(shopId, latestWorkspace(), draft)),
+        },
         csrfTokenForMutation(session),
       );
       requireCanonicalEditSuccess(result);
@@ -234,7 +291,10 @@ export function useSettings(shopId: string | undefined) {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
       const result = await adminFetch<CanonicalSettingsRowEditResult>(
         '/api/admin/settings',
-        { method: 'POST', body: JSON.stringify(buildPaymentMethodUpdateCommand(shopId, latestWorkspace(), draft)) },
+        {
+          method: 'POST',
+          body: JSON.stringify(buildPaymentMethodUpdateCommand(shopId, latestWorkspace(), draft)),
+        },
         csrfTokenForMutation(session),
       );
       requireCanonicalEditSuccess(result);
