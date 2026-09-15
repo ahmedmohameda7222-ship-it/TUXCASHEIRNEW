@@ -1,0 +1,111 @@
+name: Temporary Plan 2 Final Review GREEN Patch
+
+on:
+  push:
+    branches:
+      - tmp/admin-plan2-final-review-3-fixes
+    paths:
+      - .github/workflows/tmp-plan2-final-review-green.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/admin-plan2-final-review-3-fixes
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Apply deterministic GREEN patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "apps/admin/api/admin/settings.ts",
+              "const uuidSchema = z.string().uuid();\n",
+              "const POSTGRES_INTEGER_MAX = 2_147_483_647;\nconst uuidSchema = z.string().uuid();\n",
+          )
+          replace_once(
+              "apps/admin/api/admin/settings.ts",
+              "  'receipt.sequenceStart': z.number().int().positive().max(Number.MAX_SAFE_INTEGER),\n",
+              "  'receipt.sequenceStart': z.number().int().positive().max(POSTGRES_INTEGER_MAX),\n",
+          )
+
+          payment_path = "packages/domain/src/payment.ts"
+          payment_marker = "function activeMethod(\n"
+          payment_helpers = """export function paymentMethodSupportsChannel(\n  method: PaymentMethod,\n  channel: CheckoutChannel,\n): boolean {\n  const configuredChannel = method.channel ?? 'BOTH';\n  return configuredChannel === 'BOTH' || configuredChannel === channel;\n}\n\nexport function paymentMethodAllowedForDeliveryZone(\n  method: PaymentMethod,\n  deliveryZoneId: DeliveryZoneId | null | undefined,\n  paymentMethodZoneRules: readonly PaymentMethodZoneRuleSetting[] | undefined,\n): boolean {\n  if (deliveryZoneId === undefined || deliveryZoneId === null) return true;\n  const zoneRule = paymentMethodZoneRules?.find(\n    (candidate) =>\n      candidate.paymentMethodId === method.id && candidate.deliveryZoneId === deliveryZoneId,\n  );\n  return zoneRule?.allowed !== false;\n}\n\n"""
+          replace_once(payment_path, payment_marker, payment_helpers + payment_marker)
+
+          replace_once(
+              payment_path,
+              """  const configuredChannel = method.channel ?? 'BOTH';\n  if (\n    context.channel !== undefined &&\n    configuredChannel !== 'BOTH' &&\n    configuredChannel !== context.channel\n  ) {\n    throw new DomainInvariantError(\n      `Selected payment method is unavailable for ${context.channel} checkout.`,\n    );\n  }\n\n  if (context.deliveryZoneId !== undefined && context.deliveryZoneId !== null) {\n    const zoneRule = context.paymentMethodZoneRules?.find(\n      (candidate) =>\n        candidate.paymentMethodId === method.id &&\n        candidate.deliveryZoneId === context.deliveryZoneId,\n    );\n    if (zoneRule?.allowed === false) {\n      throw new DomainInvariantError(\n        'Selected payment method is unavailable for this delivery zone.',\n      );\n    }\n  }\n""",
+              """  if (context.channel !== undefined && !paymentMethodSupportsChannel(method, context.channel)) {\n    throw new DomainInvariantError(\n      `Selected payment method is unavailable for ${context.channel} checkout.`,\n    );\n  }\n\n  if (\n    !paymentMethodAllowedForDeliveryZone(\n      method,\n      context.deliveryZoneId,\n      context.paymentMethodZoneRules,\n    )\n  ) {\n    throw new DomainInvariantError(\n      'Selected payment method is unavailable for this delivery zone.',\n    );\n  }\n""",
+          )
+
+          replace_once(
+              "packages/domain/src/index.ts",
+              """export {\n  parsePoundsToMinor,\n  parseWholePoundsToMinor,\n  preparePaymentParts,\n""",
+              """export {\n  parsePoundsToMinor,\n  parseWholePoundsToMinor,\n  paymentMethodAllowedForDeliveryZone,\n  paymentMethodSupportsChannel,\n  preparePaymentParts,\n""",
+          )
+
+          panel_path = "apps/operations/src/app/OnlineOrderInboxPanel.tsx"
+          replace_once(
+              panel_path,
+              "import { moneyMinor, type MoneyMinor } from '@tux/domain';\n",
+              """import {\n  moneyMinor,\n  paymentMethodAllowedForDeliveryZone,\n  paymentMethodSupportsChannel,\n  type MoneyMinor,\n} from '@tux/domain';\n""",
+          )
+          replace_once(
+              panel_path,
+              """  const deliveryZones = workspace.configuration.deliveryZones.filter((zone) => zone.active);\n  const paymentMethods = workspace.configuration.paymentMethods.filter((method) => method.active);\n  const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;\n  const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;\n  const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;\n""",
+              """  const deliveryZones = workspace.configuration.deliveryZones.filter((zone) => zone.active);\n  const selectedOrderType = orderTypes.find((orderType) => orderType.id === orderTypeId) ?? null;\n  const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId) ?? null;\n  const paymentMethodZoneRules = workspace.configuration.settings?.paymentMethodZoneRules;\n  const paymentDeliveryZoneId =\n    request.fulfillmentPreference === 'DELIVERY' ? selectedZone?.id : null;\n  const paymentMethods = workspace.configuration.paymentMethods.filter(\n    (method) =>\n      method.active &&\n      paymentMethodSupportsChannel(method, 'ONLINE') &&\n      paymentMethodAllowedForDeliveryZone(method, paymentDeliveryZoneId, paymentMethodZoneRules),\n  );\n  const selectedPayment = paymentMethods.find((method) => method.id === paymentMethodId) ?? null;\n""",
+          )
+
+          migration = Path(
+              "supabase/migrations/20260910121400_admin_receipt_sequence_range_hardening.sql"
+          )
+          if migration.exists():
+              raise SystemExit(f"{migration}: already exists")
+          migration.write_text("""-- TUX Admin Plan 2 receipt sequence storage-range hardening.\n-- The downstream receipt/order sequence columns are PostgreSQL int4, so trusted settings\n-- must reject values that cannot be materialized by Operations.\n\ncreate or replace function private.validate_admin_setting_value_v1(\n  p_setting_key text,\n  p_value_json jsonb\n)\nreturns boolean\nlanguage plpgsql\nimmutable\nset search_path = pg_catalog\nas $$\ndeclare\n  v_number numeric;\n  v_text text;\nbegin\n  if p_setting_key is null or p_value_json is null then\n    return false;\n  end if;\n\n  case p_setting_key\n    when 'checkout.minimumOrderMinor' then\n      if jsonb_typeof(p_value_json) <> 'number' then return false; end if;\n      v_number := (p_value_json #>> '{}')::numeric;\n      return v_number = trunc(v_number) and v_number between 0 and 9007199254740991;\n\n    when 'checkout.serviceChargeBps', 'checkout.taxBps' then\n      if jsonb_typeof(p_value_json) <> 'number' then return false; end if;\n      v_number := (p_value_json #>> '{}')::numeric;\n      return v_number = trunc(v_number) and v_number between 0 and 10000;\n\n    when 'checkout.requireCustomerPhone',\n         'checkout.allowDiscountStacking',\n         'checkout.allowDeliveryFeeOverride' then\n      return jsonb_typeof(p_value_json) = 'boolean';\n\n    when 'receipt.orderPrefix' then\n      if jsonb_typeof(p_value_json) <> 'string' then return false; end if;\n      v_text := p_value_json #>> '{}';\n      return char_length(v_text) <= 64;\n\n    when 'receipt.footer' then\n      if jsonb_typeof(p_value_json) <> 'string' then return false; end if;\n      v_text := p_value_json #>> '{}';\n      return char_length(v_text) <= 1000;\n\n    when 'receipt.sequenceStart' then\n      if jsonb_typeof(p_value_json) <> 'number' then return false; end if;\n      v_number := (p_value_json #>> '{}')::numeric;\n      return v_number = trunc(v_number) and v_number between 1 and 2147483647;\n\n    when 'receipt.sequenceResetPolicy' then\n      return jsonb_typeof(p_value_json) = 'string'\n        and (p_value_json #>> '{}') = 'BUSINESS_DAY';\n\n    else\n      return false;\n  end case;\nexception\n  when numeric_value_out_of_range or invalid_text_representation then\n    return false;\nend;\n$$;\n\nrevoke all on function private.validate_admin_setting_value_v1(text, jsonb)\n  from public, anon, authenticated;\n\ndo $$\nbegin\n  if to_regrole('service_role') is not null then\n    grant execute on function private.validate_admin_setting_value_v1(text, jsonb)\n      to service_role;\n  end if;\nend $$;\n""")
+
+      - name: Install locked dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Format patch
+        run: npx prettier --write apps/admin/api/admin/settings.ts apps/admin/src/settings/finalReviewReceiptSequenceRange.source.test.ts apps/operations/src/app/OnlineOrderInboxPanel.tsx apps/operations/src/app/onlineOrderPaymentAvailability.source.test.ts packages/domain/src/payment.ts packages/domain/src/index.ts supabase/migrations/20260910121400_admin_receipt_sequence_range_hardening.sql
+
+      - name: Focused GREEN regressions
+        run: npx vitest run apps/admin/src/settings/finalReviewReceiptSequenceRange.source.test.ts apps/operations/src/app/onlineOrderPaymentAvailability.source.test.ts packages/domain/src/payment.test.ts packages/application/src/onlineOrderAcceptance.test.ts packages/application/src/onlineOrderAcceptance.review.test.ts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Commit verified patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/admin/api/admin/settings.ts apps/operations/src/app/OnlineOrderInboxPanel.tsx packages/domain/src/payment.ts packages/domain/src/index.ts supabase/migrations/20260910121400_admin_receipt_sequence_range_hardening.sql
+          git diff --cached --check
+          git commit -m "fix: close final Plan 2 review blockers"
+          git push origin HEAD:tmp/admin-plan2-final-review-3-fixes
