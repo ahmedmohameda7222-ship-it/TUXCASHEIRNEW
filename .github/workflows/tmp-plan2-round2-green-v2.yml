@@ -1,3 +1,4 @@
+# Temporary isolation-only GREEN runner. Delete before candidate verification.
 name: Temporary Plan 2 Round 2 GREEN v2
 
 on:
