@@ -44,6 +44,8 @@ export function projectPublishedCheckoutAuthority(
     lifecycleState: settings?.shopIdentity.lifecycleState ?? 'ACTIVE',
     temporaryClosed: settings?.shopIdentity.temporaryClosed ?? false,
     onlineOrdersPaused: settings?.shopIdentity.onlineOrdersPaused ?? false,
+    weeklyHours: settings?.weeklyHours ?? [],
+    specialHours: settings?.specialHours ?? [],
     minimumOrderMinor: nonNegativeIntegerSetting(
       settings?.values ?? {},
       'checkout.minimumOrderMinor',

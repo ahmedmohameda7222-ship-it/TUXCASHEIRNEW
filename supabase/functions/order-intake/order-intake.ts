@@ -96,6 +96,24 @@ export interface OnlineOrderPublishedPaymentMethod {
   integrationReference: string | null;
 }
 
+export interface OnlineOrderPublishedWeeklyHours {
+  serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+  dayOfWeek: number;
+  timezone: 'Africa/Cairo';
+  opensLocal: string;
+  closesLocal: string;
+  active: boolean;
+}
+
+export interface OnlineOrderPublishedSpecialHours {
+  serviceDate: string;
+  serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+  timezone: 'Africa/Cairo';
+  closed: boolean;
+  opensLocal: string | null;
+  closesLocal: string | null;
+}
+
 export interface OnlineOrderPublishedCheckoutAuthority {
   shopId: string;
   configurationVersion: number;
@@ -107,6 +125,8 @@ export interface OnlineOrderPublishedCheckoutAuthority {
   serviceChargeBps?: number;
   taxBps?: number;
   requireCustomerPhone?: boolean;
+  weeklyHours?: readonly OnlineOrderPublishedWeeklyHours[];
+  specialHours?: readonly OnlineOrderPublishedSpecialHours[];
   orderTypes: readonly OnlineOrderPublishedOrderType[];
   paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
 }
@@ -436,6 +456,147 @@ function isPublishedInstaPayMethod(method: OnlineOrderPublishedPaymentMethod): b
   return method.displayName.replace(/\s+/g, '').toUpperCase() === 'INSTAPAY';
 }
 
+const ONLINE_ORDERING_OUTSIDE_HOURS = 'online_ordering_outside_hours';
+const ONLINE_ORDERING_TIMEZONE = 'Africa/Cairo';
+const CAIRO_WEEKDAY: Readonly<Record<string, number>> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+interface CairoLocalClock {
+  serviceDate: string;
+  dayOfWeek: number;
+  minuteOfDay: number;
+}
+
+function cairoLocalClock(now: Date): CairoLocalClock {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+    timeZone: ONLINE_ORDERING_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  const dayOfWeek = CAIRO_WEEKDAY[value('weekday')];
+  const hour = Number(value('hour'));
+  const minute = Number(value('minute'));
+  if (dayOfWeek === undefined || !Number.isInteger(hour) || !Number.isInteger(minute)) {
+    throw new Error('failed to resolve Africa/Cairo online-order clock');
+  }
+  return {
+    serviceDate: `${value('year')}-${value('month')}-${value('day')}`,
+    dayOfWeek,
+    minuteOfDay: hour * 60 + minute,
+  };
+}
+
+function adjacentServiceDate(serviceDate: string, deltaDays: number): string {
+  const [year, month, day] = serviceDate.split('-').map(Number);
+  const value = new Date(Date.UTC(year!, month! - 1, day! + deltaDays));
+  return `${value.getUTCFullYear().toString().padStart(4, '0')}-${(value.getUTCMonth() + 1)
+    .toString()
+    .padStart(2, '0')}-${value.getUTCDate().toString().padStart(2, '0')}`;
+}
+
+function localTimeMinute(value: string): number {
+  const match = /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value);
+  if (!match) throw new Error('published online ordering hour is invalid');
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) throw new Error('published online ordering hour is invalid');
+  return hour * 60 + minute;
+}
+
+function startsOnServiceDate(
+  opensLocal: string,
+  closesLocal: string,
+  minuteOfDay: number,
+): boolean {
+  const opens = localTimeMinute(opensLocal);
+  const closes = localTimeMinute(closesLocal);
+  return opens < closes ? minuteOfDay >= opens && minuteOfDay < closes : minuteOfDay >= opens;
+}
+
+function carriesIntoNextDate(
+  opensLocal: string,
+  closesLocal: string,
+  minuteOfDay: number,
+): boolean {
+  const opens = localTimeMinute(opensLocal);
+  const closes = localTimeMinute(closesLocal);
+  return closes < opens && minuteOfDay < closes;
+}
+
+export function isPublishedOnlineOrderingOpenAt(
+  authority: OnlineOrderPublishedCheckoutAuthority,
+  now: Date,
+): boolean {
+  const weeklyHours = (authority.weeklyHours ?? []).filter(
+    (hours) => hours.serviceKind === 'ONLINE' && hours.active,
+  );
+  const specialHours = (authority.specialHours ?? []).filter(
+    (hours) => hours.serviceKind === 'ONLINE',
+  );
+  if (weeklyHours.length === 0 && specialHours.length === 0) return true;
+
+  const clock = cairoLocalClock(now);
+  const currentSpecial = specialHours.find((hours) => hours.serviceDate === clock.serviceDate);
+  if (currentSpecial) {
+    if (currentSpecial.closed || !currentSpecial.opensLocal || !currentSpecial.closesLocal) {
+      return false;
+    }
+    return startsOnServiceDate(
+      currentSpecial.opensLocal,
+      currentSpecial.closesLocal,
+      clock.minuteOfDay,
+    );
+  }
+
+  const previousDate = adjacentServiceDate(clock.serviceDate, -1);
+  const previousSpecial = specialHours.find((hours) => hours.serviceDate === previousDate);
+  if (previousSpecial) {
+    if (
+      !previousSpecial.closed &&
+      previousSpecial.opensLocal &&
+      previousSpecial.closesLocal &&
+      carriesIntoNextDate(
+        previousSpecial.opensLocal,
+        previousSpecial.closesLocal,
+        clock.minuteOfDay,
+      )
+    ) {
+      return true;
+    }
+  } else {
+    const previousDay = (clock.dayOfWeek + 6) % 7;
+    if (
+      weeklyHours.some(
+        (hours) =>
+          hours.dayOfWeek === previousDay &&
+          carriesIntoNextDate(hours.opensLocal, hours.closesLocal, clock.minuteOfDay),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return weeklyHours.some(
+    (hours) =>
+      hours.dayOfWeek === clock.dayOfWeek &&
+      startsOnServiceDate(hours.opensLocal, hours.closesLocal, clock.minuteOfDay),
+  );
+}
+
 function publishedCheckoutPolicyError(
   request: OnlineOrderRequestV1,
   itemsSubtotalMinor: number,
@@ -451,6 +612,9 @@ function publishedCheckoutPolicyError(
   if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
   if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
   if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
+  if (!isPublishedOnlineOrderingOpenAt(authority, new Date())) {
+    return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+  }
   if (authority.requireCustomerPhone === true && normalizedPhone === null) {
     return errorResponse(409, 'customer_phone_required');
   }

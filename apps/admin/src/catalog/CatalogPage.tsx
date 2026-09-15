@@ -1,5 +1,5 @@
 import type { CatalogProductDetail } from '@tux/admin-contracts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
 import { useShopScope } from '../shops/ShopScopeProvider';
@@ -60,6 +60,7 @@ export function CatalogPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CatalogStatusFilter>('all');
   const [categoryId, setCategoryId] = useState('');
+  const [newProductCategoryId, setNewProductCategoryId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [mobileEditing, setMobileEditing] = useState(false);
   const [unsavedProduct, setUnsavedProduct] = useState<CatalogProductDetail | null>(null);
@@ -67,7 +68,14 @@ export function CatalogPage() {
   const canEdit = permission(principal, 'catalog.edit');
   const canPrice = permission(principal, 'catalog.pricing');
   const categories = catalog.workspaceQuery.data?.categories ?? [];
-  const firstActiveCategory = categories.find((category) => category.active) ?? categories[0];
+  const activeCategories = categories.filter((category) => category.active);
+  const firstActiveCategory = activeCategories[0];
+
+  useEffect(() => {
+    if (activeCategories.some((category) => category.id === newProductCategoryId)) return;
+    setNewProductCategoryId(firstActiveCategory?.id ?? '');
+  }, [activeCategories, firstActiveCategory?.id, newProductCategoryId]);
+
   const selectedProduct = useMemo(() => {
     if (unsavedProduct) return unsavedProduct;
     if (selectedProductId) {
@@ -92,8 +100,8 @@ export function CatalogPage() {
   }
 
   function startNewProduct() {
-    if (!shopId || !firstActiveCategory || !canEdit || !canPrice) return;
-    const product = newProductForShop(shopId, firstActiveCategory.id, catalog.products);
+    if (!shopId || !newProductCategoryId || !canEdit || !canPrice) return;
+    const product = newProductForShop(shopId, newProductCategoryId, catalog.products);
     setUnsavedProduct(product);
     setSelectedProductId(product.id);
     setMobileEditing(true);
@@ -162,15 +170,32 @@ export function CatalogPage() {
       title="Catalog"
       description={`Live version ${catalog.workspaceQuery.data.currentPublishVersion}. Normal edits stay in a draft until published.`}
       primaryAction={
-        <button
-          className="admin-primary-button"
-          type="button"
-          disabled={!canEdit || !canPrice || !firstActiveCategory || busy}
-          title={!canPrice ? 'Creating a product requires catalog.pricing access.' : undefined}
-          onClick={startNewProduct}
-        >
-          New product
-        </button>
+        <div className="admin-catalog-new-product-controls">
+          <label>
+            <span>New product category</span>
+            <select
+              aria-label="New product category"
+              value={newProductCategoryId}
+              disabled={!canEdit || !canPrice || activeCategories.length === 0 || busy}
+              onChange={(event) => setNewProductCategoryId(event.target.value)}
+            >
+              {activeCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={!canEdit || !canPrice || !newProductCategoryId || busy}
+            title={!canPrice ? 'Creating a product requires catalog.pricing access.' : undefined}
+            onClick={startNewProduct}
+          >
+            New product
+          </button>
+        </div>
       }
     >
       {catalog.activeDraft ? (

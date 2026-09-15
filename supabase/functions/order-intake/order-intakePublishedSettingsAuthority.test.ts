@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   calculatePublishedCheckoutPricing,
   handleOrderIntakeRequest,
+  isPublishedOnlineOrderingOpenAt,
   type OnlineOrderCatalogAuthority,
   type OnlineOrderIntakeStore,
   type OnlineOrderPendingInsert,
@@ -26,6 +27,22 @@ type PublishedCheckoutAuthority = {
   serviceChargeBps: number;
   taxBps: number;
   requireCustomerPhone: boolean;
+  weeklyHours: ReadonlyArray<{
+    serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+    dayOfWeek: number;
+    timezone: 'Africa/Cairo';
+    opensLocal: string;
+    closesLocal: string;
+    active: boolean;
+  }>;
+  specialHours: ReadonlyArray<{
+    serviceDate: string;
+    serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+    timezone: 'Africa/Cairo';
+    closed: boolean;
+    opensLocal: string | null;
+    closesLocal: string | null;
+  }>;
   orderTypes: ReadonlyArray<{
     behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
     active: boolean;
@@ -76,6 +93,8 @@ function publishedAuthority(
     serviceChargeBps: 0,
     taxBps: 0,
     requireCustomerPhone: false,
+    weeklyHours: [],
+    specialHours: [],
     orderTypes: [
       { behavior: 'TAKE_AWAY', active: true },
       { behavior: 'DELIVERY', active: true },
@@ -188,6 +207,84 @@ describe('order-intake published checkout settings authority', () => {
       expect(store.inserted).toHaveLength(0);
     },
   );
+
+  it('enforces published ONLINE weekly hours before persistence', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T10:30:00.000Z')); // Monday 12:30 in Cairo.
+    try {
+      const store = new MemoryStore(
+        publishedAuthority({
+          weeklyHours: [
+            {
+              serviceKind: 'ONLINE',
+              dayOfWeek: 1,
+              timezone: 'Africa/Cairo',
+              opensLocal: '13:00',
+              closesLocal: '14:00',
+              active: true,
+            },
+          ],
+        }),
+      );
+
+      const response = await handleOrderIntakeRequest(request(), store);
+
+      expect(response.status).toBe(409);
+      await expect(errorCode(response)).resolves.toBe('online_ordering_outside_hours');
+      expect(store.inserted).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('applies Cairo weekly, overnight, and special ONLINE-hour authority deterministically', () => {
+    const weekly = publishedAuthority({
+      weeklyHours: [
+        {
+          serviceKind: 'ONLINE',
+          dayOfWeek: 1,
+          timezone: 'Africa/Cairo',
+          opensLocal: '12:00',
+          closesLocal: '13:00',
+          active: true,
+        },
+        {
+          serviceKind: 'ONLINE',
+          dayOfWeek: 1,
+          timezone: 'Africa/Cairo',
+          opensLocal: '22:00',
+          closesLocal: '02:00',
+          active: true,
+        },
+      ],
+    });
+    expect(isPublishedOnlineOrderingOpenAt(weekly, new Date('2026-01-05T10:30:00.000Z'))).toBe(
+      true,
+    );
+    expect(isPublishedOnlineOrderingOpenAt(weekly, new Date('2026-01-05T13:00:00.000Z'))).toBe(
+      false,
+    );
+    expect(isPublishedOnlineOrderingOpenAt(weekly, new Date('2026-01-05T23:30:00.000Z'))).toBe(
+      true,
+    );
+
+    const specialClosed = publishedAuthority({
+      weeklyHours: weekly.weeklyHours,
+      specialHours: [
+        {
+          serviceDate: '2026-01-05',
+          serviceKind: 'ONLINE',
+          timezone: 'Africa/Cairo',
+          closed: true,
+          opensLocal: null,
+          closesLocal: null,
+        },
+      ],
+    });
+    expect(
+      isPublishedOnlineOrderingOpenAt(specialClosed, new Date('2026-01-05T10:30:00.000Z')),
+    ).toBe(false);
+  });
 
   it('enforces the published minimum order against the server-computed trusted subtotal', async () => {
     const store = new MemoryStore(publishedAuthority({ minimumOrderMinor: 20_000 }));

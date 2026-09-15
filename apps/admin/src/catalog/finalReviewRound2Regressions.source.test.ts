@@ -49,6 +49,6 @@ describe('Plan 2 fresh final review regressions', () => {
     expect(catalogPage).not.toContain('const category = snapshot.categories[0]');
     expect(catalogPage).toContain('New product category');
     expect(catalogPage).toContain('newProductCategoryId');
-    expect(catalogPage).toMatch(/categoryId:\s*newProductCategoryId/);
+    expect(catalogPage).toMatch(/newProductForShop\(shopId,\s*newProductCategoryId/);
   });
 });
