@@ -22,6 +22,9 @@ function mutationMessage(error: unknown): string | null {
     if (error.code === 'stale_draft_revision') {
       return 'This draft changed in another session. Refresh before editing again.';
     }
+    if (error.code === 'draft_selection_required') {
+      return 'More than one compatible saved draft exists. Select the draft you want to resume before editing.';
+    }
     if (error.code === 'permission_forbidden') return 'Your role cannot make this catalog change.';
     return `Catalog action failed: ${error.code}.`;
   }
@@ -86,9 +89,13 @@ export function CatalogPage() {
   }, [catalog.products, selectedProductId, unsavedProduct]);
 
   const actionError = mutationMessage(
-    catalog.prepareProductDraft.error ?? catalog.saveProduct.error ?? catalog.setAvailability.error,
+    catalog.resumeDraft.error ??
+      catalog.prepareProductDraft.error ??
+      catalog.saveProduct.error ??
+      catalog.setAvailability.error,
   );
   const busy =
+    catalog.resumeDraft.isPending ||
     catalog.prepareProductDraft.isPending ||
     catalog.saveProduct.isPending ||
     catalog.setAvailability.isPending;
@@ -140,9 +147,7 @@ export function CatalogPage() {
   if (catalog.workspaceQuery.isLoading) {
     return (
       <PageScaffold eyebrow="Catalog control" title="Catalog" description="Loading live catalog…">
-        <div className="admin-catalog-loading" aria-busy="true">
-          Loading products…
-        </div>
+        <div className="admin-catalog-loading" aria-busy="true">Loading products…</div>
       </PageScaffold>
     );
   }
@@ -154,11 +159,7 @@ export function CatalogPage() {
         title="Catalog"
         description="The live catalog could not be loaded."
         primaryAction={
-          <button
-            className="admin-primary-button"
-            type="button"
-            onClick={() => void catalog.workspaceQuery.refetch()}
-          >
+          <button className="admin-primary-button" type="button" onClick={() => void catalog.workspaceQuery.refetch()}>
             Retry
           </button>
         }
@@ -187,9 +188,7 @@ export function CatalogPage() {
               onChange={(event) => setNewProductCategoryId(event.target.value)}
             >
               {activeCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
+                <option key={category.id} value={category.id}>{category.name}</option>
               ))}
             </select>
           </label>
@@ -205,14 +204,37 @@ export function CatalogPage() {
         </div>
       }
     >
+      {!catalog.activeDraft && catalog.compatibleDrafts.length > 0 ? (
+        <div className="admin-callout" role="status">
+          <strong>Saved draft work is available.</strong>
+          <span>
+            {catalog.compatibleDrafts.length === 1
+              ? 'Your compatible saved draft will resume automatically when you edit.'
+              : 'Multiple compatible drafts exist. Select one explicitly so no saved work is silently replaced.'}
+          </span>
+          {catalog.compatibleDrafts.length > 1 ? (
+            <div className="admin-settings-row__main">
+              {catalog.compatibleDrafts.map((draft) => (
+                <button
+                  key={draft.id}
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void catalog.resumeDraft.mutateAsync(draft.id)}
+                >
+                  Resume {draft.title ?? `draft ${draft.id.slice(0, 8)}`} · rev {draft.draftRevision}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {catalog.activeDraft ? (
         <div className="admin-catalog-draft-banner" role="status">
           <div>
             <strong>Draft in progress</strong>
-            <span>
-              Base v{catalog.activeDraft.basePublishVersion} · revision{' '}
-              {catalog.activeDraft.draftRevision}
-            </span>
+            <span>Base v{catalog.activeDraft.basePublishVersion} · revision {catalog.activeDraft.draftRevision}</span>
           </div>
           <span className="admin-status-pill">Not live</span>
         </div>
@@ -221,10 +243,7 @@ export function CatalogPage() {
       {catalog.draftInvalidatedByLiveChange ? (
         <div className="admin-callout is-warning" role="status">
           <strong>Live availability changed.</strong>
-          <span>
-            The previous draft is now stale by design. The next normal edit starts from the newest
-            live version.
-          </span>
+          <span>The previous unscheduled editing session was cleared. Persisted compatible work remains available for explicit resume.</span>
         </div>
       ) : null}
 
@@ -261,19 +280,14 @@ export function CatalogPage() {
               draftRevision={catalog.activeDraft?.draftRevision ?? null}
               advancedBundle={catalog.activeDraft?.bundleJson ?? null}
               onClose={closeEditor}
-              onRequestAdvanced={async () => {
-                await catalog.prepareProductDraft.mutateAsync(selectedProduct);
-              }}
+              onRequestAdvanced={async () => { await catalog.prepareProductDraft.mutateAsync(selectedProduct); }}
               onSaveDraft={async (draft) => {
                 await catalog.saveProduct.mutateAsync(draft);
                 setUnsavedProduct(null);
                 setSelectedProductId(draft.product.id);
               }}
               onSetAvailability={async (soldOut) => {
-                await catalog.setAvailability.mutateAsync({
-                  productId: selectedProduct.id,
-                  soldOut,
-                });
+                await catalog.setAvailability.mutateAsync({ productId: selectedProduct.id, soldOut });
               }}
             />
           ) : (
