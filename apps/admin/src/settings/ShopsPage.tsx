@@ -62,7 +62,7 @@ function WeeklyHoursRowEditor({
   onUpsert: ((draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion] = useState(settingsVersion);
+  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
   const [expectedRow, setExpectedRow] = useState<WeeklyHoursExpectedRow>(() => ({
     serviceKind: hours.serviceKind,
     dayOfWeek: hours.dayOfWeek,
@@ -77,6 +77,10 @@ function WeeklyHoursRowEditor({
     closesLocal: timeInput(hours.closesLocal),
     active: hours.active,
   }));
+
+  useEffect(() => {
+    setExpectedSettingsVersion(settingsVersion);
+  }, [settingsVersion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -175,7 +179,7 @@ function SpecialHoursRowEditor({
   onUpsert: ((draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion] = useState(settingsVersion);
+  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
   const [expectedRow, setExpectedRow] = useState<SpecialHoursExpectedRow>(() => ({
     serviceDate: hours.serviceDate,
     serviceKind: hours.serviceKind,
@@ -190,6 +194,10 @@ function SpecialHoursRowEditor({
   const [opensLocal, setOpensLocal] = useState(timeInput(hours.opensLocal));
   const [closesLocal, setClosesLocal] = useState(timeInput(hours.closesLocal));
   const [note, setNote] = useState(hours.note ?? '');
+
+  useEffect(() => {
+    setExpectedSettingsVersion(settingsVersion);
+  }, [settingsVersion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
