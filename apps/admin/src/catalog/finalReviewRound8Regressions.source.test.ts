@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import './finalReviewRound9Regressions.source.test';
+
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
 }
