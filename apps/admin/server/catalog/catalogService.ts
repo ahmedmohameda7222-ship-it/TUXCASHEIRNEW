@@ -174,6 +174,8 @@ type ScheduledChangeRow = {
   scheduled_for: string;
   target_base_publish_version: number | string | null;
   attempt_count: number | string;
+  terminal_failure: boolean;
+  next_attempt_at: string | null;
   last_error: string | null;
 };
 
@@ -359,6 +361,9 @@ function mapScheduledChange(row: ScheduledChangeRow): CatalogScheduledChangeSumm
         ? null
         : readVersion(row.target_base_publish_version),
     attemptCount: readVersion(row.attempt_count),
+    terminalFailure: readBoolean(row.terminal_failure),
+    nextAttemptAt:
+      row.next_attempt_at === null ? null : readNonemptyString(row.next_attempt_at),
     lastError: row.last_error,
   };
 }
@@ -499,11 +504,35 @@ function buildRelationChangeCounts(draftBundle: unknown, publishedBundle: unknow
   };
 }
 
+function hasBlockingPublishSinceBase(
+  basePublishVersion: number,
+  currentPublishVersion: number,
+  versions: readonly CatalogPublishVersionSummary[],
+): boolean {
+  if (basePublishVersion === currentPublishVersion) return false;
+  if (basePublishVersion > currentPublishVersion) return true;
+
+  const intervening = versions.filter(
+    (version) =>
+      version.publishVersion > basePublishVersion &&
+      version.publishVersion <= currentPublishVersion,
+  );
+  // History is intentionally capped for the UI. If the gap is larger than the fetched history,
+  // fail closed rather than calling an unknown draft rebasable; the trusted RPC is authoritative.
+  if (intervening.length !== currentPublishVersion - basePublishVersion) return true;
+  return intervening.some(
+    (version) =>
+      version.sourceKind !== 'IMMEDIATE_AVAILABILITY' &&
+      version.sourceKind !== 'RECURRING_AVAILABILITY',
+  );
+}
+
 function buildPublishPreview(
   row: PublishingDraftRow,
   currentPublishVersion: number,
   liveProducts: readonly CatalogProductDetail[],
   publishedBundle: unknown,
+  versions: readonly CatalogPublishVersionSummary[],
 ): CatalogPublishPreview {
   const draftProducts = readDraftBundleProducts(row.working_bundle_json);
   const liveById = new Map(
@@ -527,7 +556,7 @@ function buildPublishPreview(
     basePublishVersion,
     currentPublishVersion,
     draftRevision: readVersion(row.draft_revision),
-    stale: basePublishVersion !== currentPublishVersion,
+    stale: hasBlockingPublishSinceBase(basePublishVersion, currentPublishVersion, versions),
     changedProductIds,
     priceChangedProductIds,
     changedRelationCounts: buildRelationChangeCounts(row.working_bundle_json, publishedBundle),
@@ -796,7 +825,7 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
     },
 
     async loadPublishing(shopId, businessId) {
-      const [currentPublishVersion, versions, schedules, drafts, productRows, publishedBundleRows] =
+      const [currentPublishVersion, versionRows, schedules, drafts, productRows, publishedBundleRows] =
         await Promise.all([
           loadCurrentPublishVersion(client, shopId),
           client.select<PublishVersionRow[]>(
@@ -814,7 +843,7 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
             'scheduled_config_changes',
             new URLSearchParams({
               select:
-                'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,last_error',
+                'id,shop_id,payload_json,status,timezone,local_scheduled_at,scheduled_for,target_base_publish_version,attempt_count,terminal_failure,next_attempt_at,last_error',
               business_id: `eq.${businessId}`,
               shop_id: `eq.${shopId}`,
               change_kind: 'eq.CATALOG_PUBLISH',
@@ -855,15 +884,16 @@ export function createSupabaseCatalogStore(client: AdminSupabaseClient): Catalog
         ]);
 
       const liveProducts = productRows.map(mapProduct);
+      const versions = versionRows.map(mapPublishVersion);
       const publishedBundle = publishedBundleRows[0]?.bundle_json ?? {
         snapshot: { productModifierLinks: [], comboBeverageOptions: [], recipeLines: [] },
       };
       return {
         shopId,
         currentPublishVersion,
-        versions: versions.map(mapPublishVersion),
+        versions,
         draftPreviews: drafts.map((draft) =>
-          buildPublishPreview(draft, currentPublishVersion, liveProducts, publishedBundle),
+          buildPublishPreview(draft, currentPublishVersion, liveProducts, publishedBundle, versions),
         ),
         schedules: schedules.map(mapScheduledChange),
       };
