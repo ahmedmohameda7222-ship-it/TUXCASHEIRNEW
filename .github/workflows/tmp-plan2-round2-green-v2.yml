@@ -26,7 +26,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply deterministic GREEN patch
-        run: python .github/tmp-plan2-round2-green.py
+        run: |
+          python .github/tmp-plan2-round2-green.py
+          python .github/tmp-plan2-round2-green-fix.py
       - name: Format patched TypeScript
         run: >-
           npx prettier --write
