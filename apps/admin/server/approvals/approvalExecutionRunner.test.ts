@@ -42,7 +42,11 @@ describe('approval execution production runner', () => {
         cronSecret: 'configured',
         run,
       }),
-    ).resolves.toEqual({ statusCode: 405, body: { error: 'method_not_allowed' } });
+    ).resolves.toEqual({
+      statusCode: 405,
+      body: { error: 'method_not_allowed' },
+      headers: { allow: 'GET, POST' },
+    });
 
     expect(run).not.toHaveBeenCalled();
   });
