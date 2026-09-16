@@ -224,8 +224,14 @@ export function useSettings(shopId: string | undefined) {
         csrfTokenForMutation(session),
       );
       if (!result.ok) throw new SettingsUiError(result.code, result.currentVersion);
-      const { ok: _ok, ...success } = result;
-      return success;
+      return {
+        scheduleId: result.scheduleId,
+        status: result.status,
+        scheduledFor: result.scheduledFor,
+        localScheduledAt: result.localScheduledAt,
+        timezone: result.timezone,
+        ...(result.idempotentReplay === true ? { idempotentReplay: true } : {}),
+      };
     },
   });
 
