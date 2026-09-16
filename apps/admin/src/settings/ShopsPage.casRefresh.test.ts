@@ -4,10 +4,7 @@ import type {
 } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 
-import {
-  reconcileSpecialHoursEditorState,
-  reconcileWeeklyHoursEditorState,
-} from './ShopsPage';
+import { reconcileSpecialHoursEditorState, reconcileWeeklyHoursEditorState } from './ShopsPage';
 
 const weekly: AdminWeeklyHoursConfiguration = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -51,11 +48,15 @@ describe('service-hours editor reconciliation', () => {
       dirty: false,
     } as const;
 
-    const refreshed = reconcileWeeklyHoursEditorState(state, {
-      ...weekly,
-      opensLocal: '10:30:00',
-      closesLocal: '23:15:00',
-    }, 7);
+    const refreshed = reconcileWeeklyHoursEditorState(
+      state,
+      {
+        ...weekly,
+        opensLocal: '10:30:00',
+        closesLocal: '23:15:00',
+      },
+      7,
+    );
 
     expect(refreshed.expectedSettingsVersion).toBe(7);
     expect(refreshed.expectedRow.opensLocal).toBe('10:30:00');
@@ -83,9 +84,9 @@ describe('service-hours editor reconciliation', () => {
       dirty: true,
     } as const;
 
-    expect(
-      reconcileWeeklyHoursEditorState(state, { ...weekly, opensLocal: '10:30:00' }, 8),
-    ).toBe(state);
+    expect(reconcileWeeklyHoursEditorState(state, { ...weekly, opensLocal: '10:30:00' }, 8)).toBe(
+      state,
+    );
   });
 
   it('refreshes a pristine special-hours editor when its row changes independently', () => {
