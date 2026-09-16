@@ -7,6 +7,7 @@ import {
   requireSessionCsrf,
   type AdminSessionContext,
 } from '../../server/adminAuthService';
+import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit';
 import {
   approveRequest,
   createSupabaseApprovalServiceDependencies,
@@ -16,6 +17,7 @@ import { listApprovalReadModels } from '../../server/approvals/approvalReadServi
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
 import {
+  clientFingerprint,
   firstHeader,
   readJsonObject,
   requireSameOrigin,
@@ -23,6 +25,10 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from '../../server/http';
+import {
+  AdminRateLimitError,
+  createAdminPinRateLimitRpc,
+} from '../../server/loginRateLimit';
 import { readAdminSessionToken } from '../../server/session';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 
@@ -72,6 +78,11 @@ async function loadContext(
 }
 
 function handleFailure(response: AdminResponse, error: unknown): void {
+  if (error instanceof AdminRateLimitError) {
+    response.setHeader('retry-after', String(error.retryAfterSeconds));
+    sendJson(response, 429, { error: error.code });
+    return;
+  }
   if (error instanceof AdminAuthError) {
     sendJson(response, error.status, { error: error.code });
     return;
@@ -115,7 +126,8 @@ export default async function handler(
   }
 
   try {
-    const client = new AdminSupabaseClient(getAdminServerEnv());
+    const env = getAdminServerEnv();
+    const client = new AdminSupabaseClient(env);
     if (request.method === 'GET') {
       const requestUrl = new URL(request.url ?? '/', 'http://admin.local');
       const rawShopId = requestUrl.searchParams.get('shopId');
@@ -145,7 +157,23 @@ export default async function handler(
     const context = await loadContext(request, client, true);
     requireApprovalEndpointAccess(context);
     const actor = buildApprovalActor(context);
-    const deps = createSupabaseApprovalServiceDependencies(client);
+    const baseDeps = createSupabaseApprovalServiceDependencies(client);
+    const limiter = createAdminPinRateLimitRpc(client);
+    const deps = {
+      ...baseDeps,
+      verifyEmployeePin(employeeId: string, pin: string) {
+        return verifyApprovalPinWithRateLimit(
+          {
+            employeeId,
+            sessionId: context.session.id,
+            pin,
+            fingerprint: clientFingerprint(request),
+            rateLimitSecret: env.rateLimitSecret,
+          },
+          { verifyEmployeePin: baseDeps.verifyEmployeePin, limiter },
+        );
+      },
+    };
     const result =
       body.decision === 'APPROVE'
         ? await approveRequest(
