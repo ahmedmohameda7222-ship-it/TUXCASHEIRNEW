@@ -14,9 +14,9 @@ export type ApprovalExecutionHttpResult = {
 };
 
 export type ApprovalExecutionRequestInput = {
-  method?: string;
-  authorization?: string;
-  cronSecret?: string;
+  method?: string | undefined;
+  authorization?: string | undefined;
+  cronSecret?: string | undefined;
   run(): Promise<ApprovalExecutionRunResult>;
 };
 
