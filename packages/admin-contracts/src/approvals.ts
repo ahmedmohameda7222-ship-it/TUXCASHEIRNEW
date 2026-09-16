@@ -61,12 +61,7 @@ export type AdminApprovalRequestSummary = {
   failedAt?: string | null;
 };
 
-export type AdminApprovalExecutionState =
-  | 'READY'
-  | 'CLAIMED'
-  | 'RETRYABLE'
-  | 'EXECUTED'
-  | 'FAILED';
+export type AdminApprovalExecutionState = 'READY' | 'CLAIMED' | 'RETRYABLE' | 'EXECUTED' | 'FAILED';
 
 export type AdminApprovalExecutionClaim = {
   approvalRequestId: string;
