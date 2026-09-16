@@ -25,10 +25,7 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from '../../server/http';
-import {
-  AdminRateLimitError,
-  createAdminPinRateLimitRpc,
-} from '../../server/loginRateLimit';
+import { AdminRateLimitError, createAdminPinRateLimitRpc } from '../../server/loginRateLimit';
 import { readAdminSessionToken } from '../../server/session';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 

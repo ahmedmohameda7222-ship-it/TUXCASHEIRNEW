@@ -51,8 +51,7 @@ export type ApprovalDecisionInput = {
 };
 
 export type ApprovalDecisionResult =
-  | { ok: true; status: 'APPROVED' | 'REJECTED' }
-  | { ok: false; code: string };
+  { ok: true; status: 'APPROVED' | 'REJECTED' } | { ok: false; code: string };
 
 export type ApprovalServiceDependencies = {
   loadRequest(requestId: string): Promise<ApprovalRequestRecord | null>;

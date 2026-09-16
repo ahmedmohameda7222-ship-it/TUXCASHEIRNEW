@@ -133,7 +133,9 @@ export async function listAuditReadModels(
   );
   if (approvalIds) {
     const allowed = new Set(approvalIds);
-    events = events.filter((row) => row.approval_request_id && allowed.has(row.approval_request_id));
+    events = events.filter(
+      (row) => row.approval_request_id && allowed.has(row.approval_request_id),
+    );
   }
   if (events.length === 0) return [];
 
