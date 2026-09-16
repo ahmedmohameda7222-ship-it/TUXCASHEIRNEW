@@ -73,7 +73,7 @@ begin
     return jsonb_build_object('ok', false, 'code', 'scheduled_time_must_be_future');
   end if;
   v_scheduled_for := p_local_scheduled_at at time zone 'Africa/Cairo';
-  v_payload_sha256 := encode(digest(p_settings_payload::text, 'sha256'), 'hex');
+  v_payload_sha256 := encode(extensions.digest(p_settings_payload::text, 'sha256'), 'hex');
   v_idempotency_key := format(
     'shop-config:%s:%s:%s:%s:%s:%s',
     p_shop_id,
