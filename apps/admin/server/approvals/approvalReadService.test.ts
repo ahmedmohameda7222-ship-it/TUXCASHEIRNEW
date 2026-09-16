@@ -65,7 +65,7 @@ describe('approvalReadService', () => {
     const approvalCall = select.mock.calls.find(([table]) => table === 'admin_approval_requests');
     const query = approvalCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
-    expect(query?.toString()).toContain('shop_id');
+    expect(query?.get('shop_id')).toBe(`in.(${principal.shopIds[0]})`);
     expect(query?.get('limit')).toBe('100');
   });
 });
