@@ -86,7 +86,8 @@ export function ApprovalsPage() {
       setSelectedId(null);
       return;
     }
-    if (!selectedId || !rows.some((row) => row.id === selectedId)) setSelectedId(rows[0]?.id ?? null);
+    if (!selectedId || !rows.some((row) => row.id === selectedId))
+      setSelectedId(rows[0]?.id ?? null);
   }, [approvalsQuery.data, selectedId]);
 
   const selected = useMemo(
@@ -137,7 +138,10 @@ export function ApprovalsPage() {
       <div className="admin-approvals-toolbar">
         <label className="admin-field">
           <span>Status</span>
-          <select value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}
+          >
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="APPROVED">Approved</option>
@@ -149,7 +153,9 @@ export function ApprovalsPage() {
         </label>
       </div>
       {approvalsQuery.isLoading ? <p>Loading approvals…</p> : null}
-      {approvalsQuery.isError ? <p className="admin-error-text">Approvals could not be loaded.</p> : null}
+      {approvalsQuery.isError ? (
+        <p className="admin-error-text">Approvals could not be loaded.</p>
+      ) : null}
       {!approvalsQuery.isLoading && (approvalsQuery.data?.approvals.length ?? 0) === 0 ? (
         <p>No approval requests match this filter.</p>
       ) : null}

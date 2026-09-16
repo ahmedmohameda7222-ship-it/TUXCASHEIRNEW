@@ -37,10 +37,7 @@ const decisionSchema = z
   })
   .strict();
 
-export function requireApprovalEndpointAccess(
-  context: AdminSessionContext,
-  shopId?: string,
-): void {
+export function requireApprovalEndpointAccess(context: AdminSessionContext, shopId?: string): void {
   requirePermission(context.principal, 'approvals.review', shopId);
 }
 

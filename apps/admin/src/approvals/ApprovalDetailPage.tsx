@@ -44,7 +44,9 @@ export function ApprovalDetailView({
           <p className="admin-catalog-editor__eyebrow">Approval request</p>
           <h2 id={`approval-${approval.id}`}>{approval.actionLabel}</h2>
         </div>
-        <span className={`admin-approval-status admin-approval-status--${approval.status.toLowerCase()}`}>
+        <span
+          className={`admin-approval-status admin-approval-status--${approval.status.toLowerCase()}`}
+        >
           {approval.status}
         </span>
       </header>
@@ -77,15 +79,27 @@ export function ApprovalDetailView({
       <div className="admin-approval-detail__section" aria-live="polite">
         <strong>Execution</strong>
         <p>{approval.executionLabel}</p>
-        {approval.failureMessage ? <p className="admin-error-text">{approval.failureMessage}</p> : null}
+        {approval.failureMessage ? (
+          <p className="admin-error-text">{approval.failureMessage}</p>
+        ) : null}
         {approval.recoveryMessage ? <p>{approval.recoveryMessage}</p> : null}
       </div>
       {pending ? (
         <div className="admin-approval-actions">
-          <button className="admin-primary-button" type="button" disabled={deciding} onClick={onApprove}>
+          <button
+            className="admin-primary-button"
+            type="button"
+            disabled={deciding}
+            onClick={onApprove}
+          >
             Approve
           </button>
-          <button className="admin-secondary-button" type="button" disabled={deciding} onClick={onReject}>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            disabled={deciding}
+            onClick={onReject}
+          >
             Reject
           </button>
         </div>

@@ -29,7 +29,9 @@ function valueRows(value: unknown): Array<{ label: string; value: string }> {
     return Object.entries(value as Record<string, unknown>).map(([key, item]) => ({
       label: humanizeKey(key),
       value:
-        typeof item === 'object' && item !== null ? 'Structured value changed' : String(item ?? '—'),
+        typeof item === 'object' && item !== null
+          ? 'Structured value changed'
+          : String(item ?? '—'),
     }));
   }
   return [{ label: 'Value', value: String(value) }];

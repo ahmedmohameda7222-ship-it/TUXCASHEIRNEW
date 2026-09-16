@@ -4,12 +4,7 @@ import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService'
 import { listAuditReadModels } from '../../server/audit/auditReadService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
-import {
-  firstHeader,
-  sendJson,
-  type AdminRequest,
-  type AdminResponse,
-} from '../../server/http';
+import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';
 import { readAdminSessionToken } from '../../server/session';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
 

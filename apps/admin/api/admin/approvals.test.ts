@@ -7,7 +7,9 @@ import {
   requireApprovalEndpointAccess,
 } from './approvals';
 
-function context(permissions: AdminSessionContext['principal']['permissions']): AdminSessionContext {
+function context(
+  permissions: AdminSessionContext['principal']['permissions'],
+): AdminSessionContext {
   return {
     session: {
       id: 'session-1',

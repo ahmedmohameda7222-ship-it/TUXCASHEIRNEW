@@ -69,7 +69,14 @@ function summarizeValue(value: unknown): string | null {
 }
 
 function summarizePayload(payload: Readonly<Record<string, unknown>>): string {
-  const preferredKeys = ['amountMinor', 'quantityImpact', 'amount', 'quantity', 'value', 'entityId'];
+  const preferredKeys = [
+    'amountMinor',
+    'quantityImpact',
+    'amount',
+    'quantity',
+    'value',
+    'entityId',
+  ];
   for (const key of preferredKeys) {
     const summary = summarizeValue(payload[key]);
     if (summary !== null) return `${key}: ${summary}`;
@@ -81,10 +88,7 @@ function summarizePayload(payload: Readonly<Record<string, unknown>>): string {
   return 'Persisted command ready for second-person review';
 }
 
-function executionLabel(
-  status: AdminApprovalStatus,
-  execution: ExecutionRow | undefined,
-): string {
+function executionLabel(status: AdminApprovalStatus, execution: ExecutionRow | undefined): string {
   if (status === 'PENDING') return 'Not started';
   if (status === 'REJECTED') return 'Rejected — command will not execute';
   if (status === 'EXECUTED') return 'Executed successfully';

@@ -43,16 +43,26 @@ export function AuditPage() {
       <div className="admin-audit-filters" aria-label="Audit filters">
         <label className="admin-field">
           <span>Action</span>
-          <input value={actionType} onChange={(event) => setActionType(event.currentTarget.value)} />
+          <input
+            value={actionType}
+            onChange={(event) => setActionType(event.currentTarget.value)}
+          />
         </label>
         <label className="admin-field">
           <span>Entity</span>
-          <input value={entityType} onChange={(event) => setEntityType(event.currentTarget.value)} />
+          <input
+            value={entityType}
+            onChange={(event) => setEntityType(event.currentTarget.value)}
+          />
         </label>
       </div>
       {auditQuery.isLoading ? <p>Loading audit history…</p> : null}
-      {auditQuery.isError ? <p className="admin-error-text">Audit history could not be loaded.</p> : null}
-      {!auditQuery.isLoading && events.length === 0 ? <p>No audit events match these filters.</p> : null}
+      {auditQuery.isError ? (
+        <p className="admin-error-text">Audit history could not be loaded.</p>
+      ) : null}
+      {!auditQuery.isLoading && events.length === 0 ? (
+        <p>No audit events match these filters.</p>
+      ) : null}
       <div className="admin-audit-layout">
         <nav className="admin-audit-list" aria-label="Audit events">
           {events.map((event) => (
@@ -71,7 +81,9 @@ export function AuditPage() {
           ))}
         </nav>
         {selected ? (
-          <AuditDetailPage event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }} />
+          <AuditDetailPage
+            event={{ ...selected, createdAtLabel: formatInstant(selected.createdAt) }}
+          />
         ) : null}
       </div>
     </PageScaffold>

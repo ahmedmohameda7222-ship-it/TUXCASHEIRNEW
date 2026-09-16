@@ -18,7 +18,11 @@ const ownerSession = {
 async function mockAdmin(page: Page) {
   approvalDecided = false;
   await page.route('**/api/admin/session', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ownerSession) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ownerSession),
+    });
   });
   await page.route('**/api/admin/approvals*', async (route) => {
     if (route.request().method() === 'POST') {
@@ -97,7 +101,9 @@ for (const viewport of [
   });
 }
 
-test('requires PIN confirmation and preserves recoverable execution state after reload', async ({ page }) => {
+test('requires PIN confirmation and preserves recoverable execution state after reload', async ({
+  page,
+}) => {
   await mockAdmin(page);
   await page.goto('/approvals');
   await page.getByRole('button', { name: 'Approve' }).click();

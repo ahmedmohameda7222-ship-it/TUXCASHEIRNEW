@@ -30,7 +30,12 @@ export function RePinDialog({
 
   return (
     <div className="admin-dialog-backdrop" role="presentation">
-      <section className="admin-dialog" role="dialog" aria-modal="true" aria-labelledby="repin-title">
+      <section
+        className="admin-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="repin-title"
+      >
         <h2 id="repin-title">{approvalDecisionDialogTitle(decision)}</h2>
         <p>
           Confirm with your own PIN. The requester cannot approve their own request, including an
@@ -59,10 +64,21 @@ export function RePinDialog({
           </label>
           {error ? <p className="admin-error-text">{error}</p> : null}
           <div className="admin-approval-actions">
-            <button className="admin-primary-button" type="submit" disabled={busy || pin.trim() === ''}>
-              {busy ? 'Confirming…' : `Confirm ${decision === 'APPROVE' ? 'approval' : 'rejection'}`}
+            <button
+              className="admin-primary-button"
+              type="submit"
+              disabled={busy || pin.trim() === ''}
+            >
+              {busy
+                ? 'Confirming…'
+                : `Confirm ${decision === 'APPROVE' ? 'approval' : 'rejection'}`}
             </button>
-            <button className="admin-secondary-button" type="button" disabled={busy} onClick={onCancel}>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              disabled={busy}
+              onClick={onCancel}
+            >
               Cancel
             </button>
           </div>

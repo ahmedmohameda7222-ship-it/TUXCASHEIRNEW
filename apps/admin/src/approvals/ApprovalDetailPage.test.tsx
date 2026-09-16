@@ -22,12 +22,7 @@ const pending: ApprovalDetailViewModel = {
 
 function render(model: ApprovalDetailViewModel): string {
   return renderToStaticMarkup(
-    <ApprovalDetailView
-      approval={model}
-      deciding={false}
-      onApprove={vi.fn()}
-      onReject={vi.fn()}
-    />,
+    <ApprovalDetailView approval={model} deciding={false} onApprove={vi.fn()} onReject={vi.fn()} />,
   );
 }
 
@@ -67,8 +62,7 @@ describe('ApprovalDetailPage', () => {
       status: 'FAILED',
       executionLabel: 'Execution failed',
       failureMessage: 'The approved command could not be completed safely.',
-      recoveryMessage:
-        'Review the failure and submit a new request if the policy still allows it.',
+      recoveryMessage: 'Review the failure and submit a new request if the policy still allows it.',
     });
 
     expect(html).toContain('Execution failed');
