@@ -12,7 +12,9 @@ describe('durable SHOP_CONFIG schedule outcomes', () => {
     expect(contracts).toContain('shopConfigSchedules');
     expect(scheduleApi).toContain("'scheduled_config_changes'");
     expect(scheduleApi).toContain("change_kind: 'eq.SHOP_CONFIG'");
-    expect(scheduleApi).toContain("requirePermission(context.principal, 'settings.manage', shopId)");
+    expect(scheduleApi).toContain(
+      "requirePermission(context.principal, 'settings.manage', shopId)",
+    );
     expect(scheduleApi).toContain('business_id: `eq.${context.principal.businessId}`');
     expect(scheduleApi).toContain('shop_id: `eq.${shopId}`');
     expect(settingsHook).toContain('/api/admin/settings-schedule?shopId=${encodedShopId}');
