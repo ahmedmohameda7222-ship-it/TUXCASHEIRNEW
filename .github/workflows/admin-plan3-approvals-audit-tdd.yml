@@ -8,11 +8,21 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'apps/admin/server/approvals/**'
+      - 'apps/admin/server/audit/**'
+      - 'packages/admin-contracts/src/approvals.ts'
+      - 'packages/admin-contracts/src/audit.ts'
+      - 'packages/admin-contracts/src/index.ts'
       - '.github/workflows/admin-plan3-approvals-audit-tdd.yml'
   pull_request:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'apps/admin/server/approvals/**'
+      - 'apps/admin/server/audit/**'
+      - 'packages/admin-contracts/src/approvals.ts'
+      - 'packages/admin-contracts/src/audit.ts'
+      - 'packages/admin-contracts/src/index.ts'
       - '.github/workflows/admin-plan3-approvals-audit-tdd.yml'
 
 jobs:
@@ -25,6 +35,22 @@ jobs:
           node-version: 24
       - name: Plan 3 approvals and audit invariant
         run: node scripts/test-admin-approvals-audit-migration.mjs
+
+  approval-services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Plan 3 approval services
+        run: >-
+          npx vitest run
+          apps/admin/server/approvals/approvalService.test.ts
+          apps/admin/server/approvals/approvalExecutionService.test.ts
 
   postgres-behavior:
     needs: static-invariant
