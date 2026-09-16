@@ -631,14 +631,14 @@ function publishedCheckoutPolicyError(
   if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
   if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
   const now = new Date();
-if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
-  return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
-}
-const fulfillmentServiceKind =
-  request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
-if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
-  return errorResponse(409, 'fulfillment_outside_hours');
-}
+  if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
+    return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+  }
+  const fulfillmentServiceKind =
+    request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+  if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
+    return errorResponse(409, 'fulfillment_outside_hours');
+  }
   if (authority.requireCustomerPhone === true && normalizedPhone === null) {
     return errorResponse(409, 'customer_phone_required');
   }
