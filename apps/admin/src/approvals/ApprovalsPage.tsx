@@ -183,7 +183,7 @@ export function ApprovalsPage() {
         <RePinDialog
           decision={decision}
           busy={decisionMutation.isPending}
-          error={decisionError}
+          {...(decisionError ? { error: decisionError } : {})}
           onCancel={() => setDecision(null)}
           onConfirm={(pin, reason) => decisionMutation.mutateAsync({ kind: decision, pin, reason })}
         />
