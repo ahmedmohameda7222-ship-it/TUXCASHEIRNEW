@@ -55,13 +55,16 @@ describe('Plan 2 final review round 7 regressions', () => {
 
   it('keeps durable SHOP_CONFIG outcomes visible in the settings workspace', () => {
     const contracts = source('../../../../packages/admin-contracts/src/settings.ts');
-    const service = source('../../server/settings/settingsService.ts');
+    const scheduleApi = source('../../api/admin/settings-schedule.ts');
+    const settingsHook = source('./useSettings.ts');
     const panel = source('./SettingsSchedulePanel.tsx');
 
     expect(contracts).toContain('AdminShopConfigSchedule');
     expect(contracts).toContain('shopConfigSchedules');
-    expect(service).toContain("'scheduled_config_changes'");
-    expect(service).toContain("change_kind: 'eq.SHOP_CONFIG'");
+    expect(scheduleApi).toContain("'scheduled_config_changes'");
+    expect(scheduleApi).toContain("change_kind: 'eq.SHOP_CONFIG'");
+    expect(settingsHook).toContain('shopConfigSchedules: scheduleList.schedules');
+    expect(settingsHook).toContain('onSuccess: invalidateWorkspace');
     expect(panel).toContain('workspace.shopConfigSchedules');
     expect(panel).toContain('terminalFailure');
     expect(panel).toContain('nextAttemptAt');
