@@ -80,8 +80,6 @@ describe('listAuditReadModels', () => {
 
     const events = await listAuditReadModels(createClient(), principal, filters);
 
-    expect(events.map((event) => event.id)).toEqual([
-      '44444444-4444-4444-8444-444444444444',
-    ]);
+    expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
   });
 });

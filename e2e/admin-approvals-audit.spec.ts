@@ -132,7 +132,15 @@ test('exposes every required audit filter', async ({ page }) => {
   await mockAdmin(page);
   await page.goto('/audit');
 
-  for (const label of ['From date', 'To date', 'Shop', 'Actor', 'Action', 'Entity', 'Approval status']) {
+  for (const label of [
+    'From date',
+    'To date',
+    'Shop',
+    'Actor',
+    'Action',
+    'Entity',
+    'Approval status',
+  ]) {
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
   }
 });

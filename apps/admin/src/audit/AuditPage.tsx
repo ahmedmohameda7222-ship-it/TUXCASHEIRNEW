@@ -78,7 +78,8 @@ export function AuditPage() {
     [events, selectedId],
   );
   const shopNames = useMemo(
-    () => new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
+    () =>
+      new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
     [events],
   );
   const actorOptions = useMemo(() => {
