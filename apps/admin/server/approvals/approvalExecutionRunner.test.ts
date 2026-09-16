@@ -9,7 +9,12 @@ import {
 
 describe('approval execution production runner', () => {
   it('fails closed when CRON_SECRET is missing or the bearer token is invalid', async () => {
-    const run = vi.fn(async () => ({ claimed: 0, executed: 0, retryable: 0, failed: 0 }));
+    const run = vi.fn(async () => ({
+      claimed: 0,
+      executed: 0,
+      retryable: 0,
+      failed: 0,
+    }));
 
     await expect(
       handleApprovalExecutionRequest({
@@ -18,7 +23,10 @@ describe('approval execution production runner', () => {
         cronSecret: undefined,
         run,
       }),
-    ).resolves.toEqual({ statusCode: 503, body: { error: 'cron_secret_not_configured' } });
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: 'cron_secret_not_configured' },
+    });
 
     await expect(
       handleApprovalExecutionRequest({
@@ -33,7 +41,12 @@ describe('approval execution production runner', () => {
   });
 
   it('rejects unsupported methods and never accepts caller command payload', async () => {
-    const run = vi.fn(async () => ({ claimed: 0, executed: 0, retryable: 0, failed: 0 }));
+    const run = vi.fn(async () => ({
+      claimed: 0,
+      executed: 0,
+      retryable: 0,
+      failed: 0,
+    }));
 
     await expect(
       handleApprovalExecutionRequest({
@@ -52,18 +65,28 @@ describe('approval execution production runner', () => {
   });
 
   it('runs one bounded durable batch with server-owned dependencies', async () => {
-    const execute = vi.fn(async () => ({ claimed: 2, executed: 1, retryable: 1, failed: 0 }));
+    const execute = vi.fn(async () => ({
+      claimed: 2,
+      executed: 1,
+      retryable: 1,
+      failed: 0,
+    }));
 
-    await expect(
-      runApprovalExecutionRunner({ execute }),
-    ).resolves.toEqual({ claimed: 2, executed: 1, retryable: 1, failed: 0 });
+    await expect(runApprovalExecutionRunner({ execute })).resolves.toEqual({
+      claimed: 2,
+      executed: 1,
+      retryable: 1,
+      failed: 0,
+    });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledWith();
   });
 
   it('deploys the approval executor every minute through the Admin Vercel contract', async () => {
     const raw = await readFile(new URL('../../vercel.json', import.meta.url), 'utf8');
-    const config = JSON.parse(raw) as { crons?: Array<{ path: string; schedule: string }> };
+    const config = JSON.parse(raw) as {
+      crons?: Array<{ path: string; schedule: string }>;
+    };
 
     expect(config.crons).toContainEqual({
       path: '/api/cron/admin-approval-executor',
