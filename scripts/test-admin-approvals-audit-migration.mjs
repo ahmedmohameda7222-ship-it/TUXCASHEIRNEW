@@ -80,31 +80,36 @@ begin
   end loop;
 end $$;
 
--- Browser roles must not execute trusted approval/audit mutation RPCs.
+-- Every trusted approval/audit RPC must exist exactly once and browser roles must not execute it.
 do $$
 declare
   v_role text;
   v_proc oid;
+  v_proc_count integer;
   v_name text;
 begin
-  foreach v_role in array array['anon', 'authenticated'] loop
-    foreach v_name in array array[
-      'create_admin_approval_request_v1',
-      'decide_admin_approval_request_v1',
-      'claim_admin_approval_execution_v1',
-      'complete_admin_approval_execution_v1',
-      'append_admin_audit_event_v1'
-    ] loop
-      for v_proc in
-        select p.oid
-        from pg_proc p
-        join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public' and p.proname = v_name
-      loop
-        if has_function_privilege(v_role, v_proc, 'EXECUTE') then
-          raise exception 'browser role % can execute trusted RPC %', v_role, v_name;
-        end if;
-      end loop;
+  foreach v_name in array array[
+    'create_admin_approval_request_v1',
+    'decide_admin_approval_request_v1',
+    'claim_admin_approval_execution_v1',
+    'complete_admin_approval_execution_v1',
+    'append_admin_audit_event_v1'
+  ] loop
+    select count(*), min(p.oid)
+      into v_proc_count, v_proc
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = v_name;
+
+    if v_proc_count <> 1 or v_proc is null then
+      raise exception 'trusted RPC % expected exactly once, found %', v_name, v_proc_count;
+    end if;
+
+    foreach v_role in array array['anon', 'authenticated'] loop
+      if has_function_privilege(v_role, v_proc, 'EXECUTE') then
+        raise exception 'browser role % can execute trusted RPC %', v_role, v_name;
+      end if;
     end loop;
   end loop;
 end $$;
@@ -433,12 +438,20 @@ begin
     from pg_index i
     join pg_class c on c.oid = i.indrelid
     join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a
+      on a.attrelid = c.oid
+     and a.attname = 'command_id'
+     and not a.attisdropped
     where n.nspname = 'public'
       and c.relname = 'admin_approval_execution_jobs'
       and i.indisunique
-      and pg_get_indexdef(i.indexrelid) ilike '%command_id%'
+      and i.indisvalid
+      and i.indpred is null
+      and i.indexprs is null
+      and i.indnkeyatts = 1
+      and i.indkey[0] = a.attnum
   ) then
-    raise exception 'admin_approval_execution_jobs.command_id lacks a unique fence';
+    raise exception 'admin_approval_execution_jobs.command_id lacks an unconditional single-key unique fence';
   end if;
 end $$;
 
