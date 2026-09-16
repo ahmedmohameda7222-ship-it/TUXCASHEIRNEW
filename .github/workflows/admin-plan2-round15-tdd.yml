@@ -1,0 +1,59 @@
+name: Admin Plan 2 Round 15 TDD
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-plan2-round15-hardening.mjs'
+      - '.github/workflows/admin-plan2-round15-tdd.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: admin-plan2-round15-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 2 round 15 hardening invariant
+        run: node scripts/test-admin-plan2-round15-hardening.mjs
+
+  postgres-behavior:
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Apply complete repository migration chain
+        run: node scripts/test-migrations.mjs
+      - name: Plan 2 round 15 PostgreSQL behavior
+        run: node scripts/test-admin-plan2-round15-hardening.mjs
