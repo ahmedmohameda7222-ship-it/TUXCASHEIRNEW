@@ -547,15 +547,16 @@ function carriesIntoNextDate(
   return closes < opens && secondOfDay < closes;
 }
 
-export function isPublishedOnlineOrderingOpenAt(
+function isPublishedServiceKindOpenAt(
   authority: OnlineOrderPublishedCheckoutAuthority,
+  serviceKind: OnlineOrderPublishedWeeklyHours['serviceKind'],
   now: Date,
 ): boolean {
   const weeklyHours = (authority.weeklyHours ?? []).filter(
-    (hours) => hours.serviceKind === 'ONLINE' && hours.active,
+    (hours) => hours.serviceKind === serviceKind && hours.active,
   );
   const specialHours = (authority.specialHours ?? []).filter(
-    (hours) => hours.serviceKind === 'ONLINE',
+    (hours) => hours.serviceKind === serviceKind,
   );
   if (weeklyHours.length === 0 && specialHours.length === 0) return true;
 
@@ -607,6 +608,13 @@ export function isPublishedOnlineOrderingOpenAt(
   );
 }
 
+export function isPublishedOnlineOrderingOpenAt(
+  authority: OnlineOrderPublishedCheckoutAuthority,
+  now: Date,
+): boolean {
+  return isPublishedServiceKindOpenAt(authority, 'ONLINE', now);
+}
+
 function publishedCheckoutPolicyError(
   request: OnlineOrderRequestV1,
   itemsSubtotalMinor: number,
@@ -622,8 +630,14 @@ function publishedCheckoutPolicyError(
   if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
   if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
   if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
-  if (!isPublishedOnlineOrderingOpenAt(authority, new Date())) {
+  const now = new Date();
+  if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
     return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+  }
+  const fulfillmentServiceKind =
+    request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+  if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
+    return errorResponse(409, 'fulfillment_outside_hours');
   }
   if (authority.requireCustomerPhone === true && normalizedPhone === null) {
     return errorResponse(409, 'customer_phone_required');

@@ -1,0 +1,75 @@
+name: Admin Plan 2 Round 16 TDD
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/admin-02-catalog-settings
+      - fix/admin-plan2-round16-review
+    paths:
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-plan2-round16-hardening.mjs'
+      - '.github/workflows/admin-plan2-round16-tdd.yml'
+  pull_request:
+    paths:
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-plan2-round16-hardening.mjs'
+      - '.github/workflows/admin-plan2-round16-tdd.yml'
+
+jobs:
+  intake-fulfillment-hours:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Fulfillment-specific service-hour authority
+        run: npx vitest run supabase/functions/order-intake/order-intakeFulfillmentHours.test.ts
+
+  static-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 2 round 16 hardening invariant
+        run: node scripts/test-admin-plan2-round16-hardening.mjs
+
+  postgres-behavior:
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Apply complete repository migration chain
+        run: node scripts/test-migrations.mjs
+      - name: Plan 2 round 16 PostgreSQL behavior
+        run: node scripts/test-admin-plan2-round16-hardening.mjs
