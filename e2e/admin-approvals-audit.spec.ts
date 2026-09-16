@@ -122,7 +122,9 @@ test('renders audit history as human-readable structured changes', async ({ page
   await mockAdmin(page);
   await page.goto('/audit');
   await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
-  await expect(page.getByText('Manager Two').first()).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Audit events' }).getByRole('button').first(),
+  ).toContainText('Manager Two');
   await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
   await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
   await expect(page.getByText('APPROVED', { exact: true })).toBeVisible();
