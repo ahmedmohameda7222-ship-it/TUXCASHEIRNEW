@@ -27,36 +27,36 @@ jobs:
           if ! grep -Fq "$marker" "$ledger"; then
             cat >> "$ledger" <<'EOF'
 
-## Plan 2 final review Round 17 closeout — 2026-09-16
+            ## Plan 2 final review Round 17 closeout — 2026-09-16
 
-A fresh exact-head Codex review on Plan 2 head `b77093e82542594cc16c92ad1453df6b096423fc` identified one valid P2: `read_catalog_public_ordering_v2` still advertised PICKUP and DELIVERY from active order types without applying the same fulfillment-specific OPEN/DELIVERY service-hour authority already enforced by trusted Round 16 order intake. That allowed Menu to advertise a fulfillment option that trusted intake could reject after submit.
+            A fresh exact-head Codex review on Plan 2 head `b77093e82542594cc16c92ad1453df6b096423fc` identified one valid P2: `read_catalog_public_ordering_v2` still advertised PICKUP and DELIVERY from active order types without applying the same fulfillment-specific OPEN/DELIVERY service-hour authority already enforced by trusted Round 16 order intake. That allowed Menu to advertise a fulfillment option that trusted intake could reject after submit.
 
-Round 17 used isolated RED→GREEN execution on PR #79 (`fix/admin-plan2-round17-review`). RED run `35097595576` reproduced the defect with an explicit DELIVERY closure: the public projection returned `["PICKUP","DELIVERY"]` instead of hiding Delivery.
+            Round 17 used isolated RED→GREEN execution on PR #79 (`fix/admin-plan2-round17-review`). RED run `35097595576` reproduced the defect with an explicit DELIVERY closure: the public projection returned `["PICKUP","DELIVERY"]` instead of hiding Delivery.
 
-Additive migration `20260910123300_admin_plan2_final_review_round17_hardening.sql` introduces `private.catalog_public_service_kind_open_v1(p_settings jsonb, p_service_kind text, p_now timestamptz)` for `OPEN`, `DELIVERY`, and `ONLINE`. It preserves Africa/Cairo weekly/special-hours semantics, overnight carry, fractional-second precision through the existing local-second parser, fail-closed handling for malformed configured rows, and rollout-open behavior when no rows exist for that service kind. The prior ONLINE helper now delegates to this generic evaluator. `read_catalog_public_ordering_v2` appends PICKUP only when TAKE_AWAY is active and OPEN is currently open, and appends DELIVERY only when DELIVERY is active and DELIVERY is currently open; global ordering availability still requires lifecycle authority plus ONLINE open.
+            Additive migration `20260910123300_admin_plan2_final_review_round17_hardening.sql` introduces `private.catalog_public_service_kind_open_v1(p_settings jsonb, p_service_kind text, p_now timestamptz)` for `OPEN`, `DELIVERY`, and `ONLINE`. It preserves Africa/Cairo weekly/special-hours semantics, overnight carry, fractional-second precision through the existing local-second parser, fail-closed handling for malformed configured rows, and rollout-open behavior when no rows exist for that service kind. The prior ONLINE helper now delegates to this generic evaluator. `read_catalog_public_ordering_v2` appends PICKUP only when TAKE_AWAY is active and OPEN is currently open, and appends DELIVERY only when DELIVERY is active and DELIVERY is currently open; global ordering availability still requires lifecycle authority plus ONLINE open.
 
-Isolation exact head `e8c6090c79130f04d58b9d2917622f57283a0ddf` passed Foundation `35097853535`, Round15 `35097853536`, Round16 `35097853577`, Round17 `35097853540`, Boundary `35097853602`, and Catalog Settings `35097853595`. PR #79 was promoted into Plan 2 as exact head `4d047acf83b21c9159928ded79f6d3dca2725929`.
+            Isolation exact head `e8c6090c79130f04d58b9d2917622f57283a0ddf` passed Foundation `35097853535`, Round15 `35097853536`, Round16 `35097853577`, Round17 `35097853540`, Boundary `35097853602`, and Catalog Settings `35097853595`. PR #79 was promoted into Plan 2 as exact head `4d047acf83b21c9159928ded79f6d3dca2725929`.
 
-The promoted exact head passed all seven permanent workflows before this ledger mutation:
+            The promoted exact head passed all seven permanent workflows before this ledger mutation:
 
-- `Admin Plan 2 Round 15 TDD` run `35098054213` — SUCCESS.
-- `Admin Plan 2 Round 16 TDD` run `35098054372` — SUCCESS.
-- `Admin Foundation TDD` run `35098054443` — SUCCESS.
-- `Admin Plan 2 Round 17 TDD` run `35098053970` — SUCCESS.
-- `Admin Catalog Settings Boundary TDD` run `35098053969` — SUCCESS.
-- `Admin Catalog Settings TDD` run `35098053959` — SUCCESS.
-- `TUX V2 CI` run `35098053958` — SUCCESS, including Windows package, quality, monorepo architecture, edge security, Menu, Admin, Required quality gate, full unit/integration, typecheck/builds, provisioning/migration/function-auth smoke, Edge typecheck, and rendered browser E2E.
+            - `Admin Plan 2 Round 15 TDD` run `35098054213` — SUCCESS.
+            - `Admin Plan 2 Round 16 TDD` run `35098054372` — SUCCESS.
+            - `Admin Foundation TDD` run `35098054443` — SUCCESS.
+            - `Admin Plan 2 Round 17 TDD` run `35098053970` — SUCCESS.
+            - `Admin Catalog Settings Boundary TDD` run `35098053969` — SUCCESS.
+            - `Admin Catalog Settings TDD` run `35098053959` — SUCCESS.
+            - `TUX V2 CI` run `35098053958` — SUCCESS, including Windows package, quality, monorepo architecture, edge security, Menu, Admin, Required quality gate, full unit/integration, typecheck/builds, provisioning/migration/function-auth smoke, Edge typecheck, and rendered browser E2E.
 
-Canonical Supabase project `awpdcsayuwbsruwvaosg` is synchronized exactly through repository migration `20260910123300 admin_plan2_final_review_round17_hardening`. The generated production migration-history row was guardedly normalized to repository version `20260910123300` without rerunning DDL. Live production readback confirms the generic helper uses Cairo semantics and fractional-second parsing, explicit DELIVERY and OPEN closures evaluate false, no-hours DELIVERY/OPEN remain rollout-open, the ONLINE wrapper delegates to the generic evaluator, and the public projection applies OPEN to PICKUP and DELIVERY to DELIVERY. `anon` and `authenticated` retain intentional EXECUTE on the public ordering read RPC, while neither browser role can execute the new private helper.
+            Canonical Supabase project `awpdcsayuwbsruwvaosg` is synchronized exactly through repository migration `20260910123300 admin_plan2_final_review_round17_hardening`. The generated production migration-history row was guardedly normalized to repository version `20260910123300` without rerunning DDL. Live production readback confirms the generic helper uses Cairo semantics and fractional-second parsing, explicit DELIVERY and OPEN closures evaluate false, no-hours DELIVERY/OPEN remain rollout-open, the ONLINE wrapper delegates to the generic evaluator, and the public projection applies OPEN to PICKUP and DELIVERY to DELIVERY. `anon` and `authenticated` retain intentional EXECUTE on the public ordering read RPC, while neither browser role can execute the new private helper.
 
-Post-DDL Supabase security-advisor output is unchanged at the project baseline: no new Round17-specific private-helper finding was introduced. Existing advisory findings remain, including RLS-enabled/no-policy informational items, intentional public/authenticated SECURITY DEFINER warnings for public catalog and authenticated worker preference/layout functions, and leaked-password protection disabled; this closeout does not claim a fully clean project-wide advisor report.
+            Post-DDL Supabase security-advisor output is unchanged at the project baseline: no new Round17-specific private-helper finding was introduced. Existing advisory findings remain, including RLS-enabled/no-policy informational items, intentional public/authenticated SECURITY DEFINER warnings for public catalog and authenticated worker preference/layout functions, and leaked-password protection disabled; this closeout does not claim a fully clean project-wide advisor report.
 
-The Round 17 Codex thread `PRRT_kwDOT52lwc6i7kKz` is resolved. Because the connector blocked an inline evidence reply, the same acceptance evidence was recorded as top-level PR #62 conversation comment `5698589983` before resolving the thread. All known PR #62 review threads are resolved at this point.
+            The Round 17 Codex thread `PRRT_kwDOT52lwc6i7kKz` is resolved. Because the connector blocked an inline evidence reply, the same acceptance evidence was recorded as top-level PR #62 conversation comment `5698589983` before resolving the thread. All known PR #62 review threads are resolved at this point.
 
-The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
+            The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
 
-Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
-EOF
+            Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
+            EOF
           fi
           git rm .github/workflows/admin-plan2-round17-ledger-append.yml
           git config user.name 'github-actions[bot]'
