@@ -33,6 +33,108 @@ end $$;
 rollback;
 `;
 
+const businessWideAuthorityCheck = String.raw`
+begin;
+insert into public.business_employees(id, business_id, display_name, role, active)
+values
+  (
+    '41000000-0000-4000-8000-000000000021',
+    '00000000-0000-4000-8000-000000000001',
+    'Plan 3 Review Owner',
+    'OWNER',
+    true
+  ),
+  (
+    '41000000-0000-4000-8000-000000000022',
+    '00000000-0000-4000-8000-000000000001',
+    'Plan 3 Review Manager',
+    'MANAGER',
+    true
+  );
+
+insert into public.admin_employee_permissions(business_id, employee_id, permission_key, effect)
+values
+  (
+    '00000000-0000-4000-8000-000000000001',
+    '41000000-0000-4000-8000-000000000022',
+    'approvals.review',
+    'ALLOW'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000001',
+    '41000000-0000-4000-8000-000000000022',
+    'settings.manage',
+    'ALLOW'
+  );
+
+insert into public.admin_approval_rules(
+  id, business_id, action_type, requester_permission, approver_permission,
+  requires_second_person, expires_after_seconds
+) values (
+  '43000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000001',
+  'PLAN3_REVIEW_BUSINESS_WIDE_TEST',
+  'settings.manage',
+  'approvals.review',
+  true,
+  3600
+);
+
+do $$
+declare
+  v_manager_request jsonb;
+  v_owner_request jsonb;
+  v_decision jsonb;
+  v_request_id uuid;
+begin
+  select public.create_admin_approval_request_v1(
+    '00000000-0000-4000-8000-000000000001',
+    null,
+    '41000000-0000-4000-8000-000000000022',
+    null,
+    '43000000-0000-4000-8000-000000000021',
+    'PLAN3_REVIEW_BUSINESS_WIDE_TEST',
+    '42000000-0000-4000-8000-000000000021',
+    '{"safeValue":1}'::jsonb,
+    'manager must not request business-wide'
+  ) into v_manager_request;
+
+  if v_manager_request ->> 'code' <> 'approval_shop_scope_forbidden' then
+    raise exception 'manager business-wide request was not denied: %', v_manager_request;
+  end if;
+
+  select public.create_admin_approval_request_v1(
+    '00000000-0000-4000-8000-000000000001',
+    null,
+    '41000000-0000-4000-8000-000000000021',
+    null,
+    '43000000-0000-4000-8000-000000000021',
+    'PLAN3_REVIEW_BUSINESS_WIDE_TEST',
+    '42000000-0000-4000-8000-000000000022',
+    '{"safeValue":2}'::jsonb,
+    'owner business-wide request'
+  ) into v_owner_request;
+
+  if coalesce((v_owner_request ->> 'ok')::boolean, false) is not true then
+    raise exception 'owner business-wide request failed: %', v_owner_request;
+  end if;
+  v_request_id := (v_owner_request ->> 'requestId')::uuid;
+
+  select public.decide_admin_approval_request_v1(
+    v_request_id,
+    '41000000-0000-4000-8000-000000000022',
+    null,
+    'APPROVE',
+    'manager must not approve business-wide'
+  ) into v_decision;
+
+  if v_decision ->> 'code' <> 'approval_shop_scope_forbidden' then
+    raise exception 'manager business-wide approval was not denied: %', v_decision;
+  end if;
+end $$;
+rollback;
+`;
+
 const finalLeaseCheck = String.raw`
 begin;
 insert into public.business_employees(id, business_id, display_name, role, active)
@@ -153,6 +255,7 @@ rollback;
 
 const results = [
   ['camelCase secret rejection', camelCaseSecretCheck],
+  ['business-wide authority', businessWideAuthorityCheck],
   ['final lease reconciliation', finalLeaseCheck],
 ].map(([label, sql]) => runCheck(label, sql));
 
