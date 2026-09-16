@@ -64,12 +64,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Plan 3 approval services and runner
+      - name: Plan 3 approval and audit services
         run: >-
           npx vitest run
           apps/admin/server/approvals/approvalService.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
           apps/admin/server/approvals/approvalExecutionRunner.test.ts
+          apps/admin/server/audit/auditReadService.test.ts
 
   approval-api-ui:
     runs-on: ubuntu-latest
