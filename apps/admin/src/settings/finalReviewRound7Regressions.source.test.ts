@@ -18,14 +18,19 @@ const migrationPath =
   '../../../../supabase/migrations/20260910122100_admin_plan2_final_review_round7_hardening.sql';
 
 describe('Plan 2 final review round 7 regressions', () => {
-  it('captures service-hour CAS fences inside row editors', () => {
+  it('captures service-hour row CAS while refreshing the settings-version fence when pristine', () => {
     const shops = source('./ShopsPage.tsx');
 
     expect(shops).toContain('WeeklyHoursRowEditor');
     expect(shops).toContain('SpecialHoursRowEditor');
-    expect(shops).toContain('useState(settingsVersion)');
+    expect(shops).toContain(
+      'const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);',
+    );
     expect(shops).toContain('useState<WeeklyHoursExpectedRow>');
     expect(shops).toContain('useState<SpecialHoursExpectedRow>');
+    expect(shops).toContain('const [dirty, setDirty] = useState(false);');
+    expect(shops).toContain('if (dirty) return;');
+    expect(shops).toContain('setExpectedSettingsVersion(settingsVersion);');
   });
 
   it('uses live closed state when reopening a special date', () => {

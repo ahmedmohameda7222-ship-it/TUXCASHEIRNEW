@@ -128,12 +128,18 @@ begin
     raise exception 'round 9 resume unexpectedly removed or retargeted original schedule fixture';
   end if;
 
+  -- Schedule-time authorization is durable. Once accepted, scheduler execution must not
+  -- depend on the creator still being an active employee.
+  update public.business_employees
+  set active = false
+  where id = '${ownerId}' and business_id = '${businessId}';
+
   v_publish := public.publish_catalog_draft_scheduled_v1(
     '${ownerId}', v_scheduled_draft_id, 1, 0
   );
   if coalesce((v_publish ->> 'ok')::boolean, false) is not true
      or (v_publish ->> 'publishVersion')::bigint <> 2 then
-    raise exception 'scheduled publish did not survive ordinary transient rebase: %', v_publish;
+    raise exception 'scheduled publish did not survive creator deactivation: %', v_publish;
   end if;
   if not exists (
     select 1 from public.products p
@@ -141,6 +147,9 @@ begin
   ) then
     raise exception 'scheduled transient rebase resurrected stale soldOut state';
   end if;
+  update public.business_employees
+  set active = true
+  where id = '${ownerId}' and business_id = '${businessId}';
 
   -- Build a modifier-only price change under full owner authority, then prove an employee with
   -- catalog.publish but no catalog.pricing cannot accept that draft for later execution.

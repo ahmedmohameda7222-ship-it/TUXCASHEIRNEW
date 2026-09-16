@@ -51,6 +51,41 @@ function canonicalExpectedTime(value: string): string {
   return /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
 }
 
+function weeklyExpectedRow(
+  hours: AdminSettingsWorkspace['weeklyHours'][number],
+): WeeklyHoursExpectedRow {
+  return {
+    serviceKind: hours.serviceKind,
+    dayOfWeek: hours.dayOfWeek,
+    opensLocal: hours.opensLocal,
+    closesLocal: hours.closesLocal,
+    active: hours.active,
+  };
+}
+
+function weeklyForm(hours: AdminSettingsWorkspace['weeklyHours'][number]): WeeklyForm {
+  return {
+    serviceKind: hours.serviceKind,
+    dayOfWeek: hours.dayOfWeek,
+    opensLocal: timeInput(hours.opensLocal),
+    closesLocal: timeInput(hours.closesLocal),
+    active: hours.active,
+  };
+}
+
+function specialExpectedRow(
+  hours: AdminSettingsWorkspace['specialHours'][number],
+): SpecialHoursExpectedRow {
+  return {
+    serviceDate: hours.serviceDate,
+    serviceKind: hours.serviceKind,
+    closed: hours.closed,
+    opensLocal: hours.opensLocal,
+    closesLocal: hours.closesLocal,
+    note: hours.note,
+  };
+}
+
 function WeeklyHoursRowEditor({
   hours,
   settingsVersion,
@@ -62,21 +97,29 @@ function WeeklyHoursRowEditor({
   onUpsert: ((draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion] = useState(settingsVersion);
-  const [expectedRow, setExpectedRow] = useState<WeeklyHoursExpectedRow>(() => ({
-    serviceKind: hours.serviceKind,
-    dayOfWeek: hours.dayOfWeek,
-    opensLocal: hours.opensLocal,
-    closesLocal: hours.closesLocal,
-    active: hours.active,
-  }));
-  const [form, setForm] = useState<WeeklyForm>(() => ({
-    serviceKind: hours.serviceKind,
-    dayOfWeek: hours.dayOfWeek,
-    opensLocal: timeInput(hours.opensLocal),
-    closesLocal: timeInput(hours.closesLocal),
-    active: hours.active,
-  }));
+  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
+  const [expectedRow, setExpectedRow] = useState<WeeklyHoursExpectedRow>(() =>
+    weeklyExpectedRow(hours),
+  );
+  const [form, setForm] = useState<WeeklyForm>(() => weeklyForm(hours));
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dirty) return;
+    if (settingsVersion === expectedSettingsVersion) return;
+    setExpectedSettingsVersion(settingsVersion);
+    setExpectedRow(weeklyExpectedRow(hours));
+    setForm(weeklyForm(hours));
+  }, [
+    dirty,
+    expectedSettingsVersion,
+    hours.active,
+    hours.closesLocal,
+    hours.dayOfWeek,
+    hours.opensLocal,
+    hours.serviceKind,
+    settingsVersion,
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,6 +138,7 @@ function WeeklyHoursRowEditor({
       expectedRow,
     });
     setExpectedRow(nextRow);
+    setDirty(false);
   }
 
   return (
@@ -106,12 +150,13 @@ function WeeklyHoursRowEditor({
         <select
           value={form.serviceKind}
           disabled={busy}
-          onChange={(event) =>
+          onChange={(event) => {
+            setDirty(true);
             setForm((current) => ({
               ...current,
               serviceKind: event.currentTarget.value as ShopHoursServiceKind,
-            }))
-          }
+            }));
+          }}
         >
           <option value="OPEN">Open</option>
           <option value="DELIVERY">Delivery</option>
@@ -123,36 +168,40 @@ function WeeklyHoursRowEditor({
           max={6}
           value={form.dayOfWeek}
           disabled={busy}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, dayOfWeek: Number(event.currentTarget.value) }))
-          }
+          onChange={(event) => {
+            setDirty(true);
+            setForm((current) => ({ ...current, dayOfWeek: Number(event.currentTarget.value) }));
+          }}
         />
         <input
           type="time"
           step={1}
           value={form.opensLocal}
           disabled={busy}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, opensLocal: event.currentTarget.value }))
-          }
+          onChange={(event) => {
+            setDirty(true);
+            setForm((current) => ({ ...current, opensLocal: event.currentTarget.value }));
+          }}
         />
         <input
           type="time"
           step={1}
           value={form.closesLocal}
           disabled={busy}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, closesLocal: event.currentTarget.value }))
-          }
+          onChange={(event) => {
+            setDirty(true);
+            setForm((current) => ({ ...current, closesLocal: event.currentTarget.value }));
+          }}
         />
         <label className="admin-check-field">
           <input
             type="checkbox"
             checked={form.active}
             disabled={busy}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, active: event.currentTarget.checked }))
-            }
+            onChange={(event) => {
+              setDirty(true);
+              setForm((current) => ({ ...current, active: event.currentTarget.checked }));
+            }}
           />
           <span>Active</span>
         </label>
@@ -175,21 +224,40 @@ function SpecialHoursRowEditor({
   onUpsert: ((draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion] = useState(settingsVersion);
-  const [expectedRow, setExpectedRow] = useState<SpecialHoursExpectedRow>(() => ({
-    serviceDate: hours.serviceDate,
-    serviceKind: hours.serviceKind,
-    closed: hours.closed,
-    opensLocal: hours.opensLocal,
-    closesLocal: hours.closesLocal,
-    note: hours.note,
-  }));
+  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
+  const [expectedRow, setExpectedRow] = useState<SpecialHoursExpectedRow>(() =>
+    specialExpectedRow(hours),
+  );
   const [serviceDate, setServiceDate] = useState(hours.serviceDate);
   const [serviceKind, setServiceKind] = useState(hours.serviceKind);
   const [closed, setClosed] = useState(hours.closed);
   const [opensLocal, setOpensLocal] = useState(timeInput(hours.opensLocal));
   const [closesLocal, setClosesLocal] = useState(timeInput(hours.closesLocal));
   const [note, setNote] = useState(hours.note ?? '');
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dirty) return;
+    if (settingsVersion === expectedSettingsVersion) return;
+    setExpectedSettingsVersion(settingsVersion);
+    setExpectedRow(specialExpectedRow(hours));
+    setServiceDate(hours.serviceDate);
+    setServiceKind(hours.serviceKind);
+    setClosed(hours.closed);
+    setOpensLocal(timeInput(hours.opensLocal));
+    setClosesLocal(timeInput(hours.closesLocal));
+    setNote(hours.note ?? '');
+  }, [
+    dirty,
+    expectedSettingsVersion,
+    hours.closed,
+    hours.closesLocal,
+    hours.note,
+    hours.opensLocal,
+    hours.serviceDate,
+    hours.serviceKind,
+    settingsVersion,
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -210,6 +278,7 @@ function SpecialHoursRowEditor({
       expectedRow,
     });
     setExpectedRow(nextRow);
+    setDirty(false);
   }
 
   async function deactivate() {
@@ -221,6 +290,7 @@ function SpecialHoursRowEditor({
       expectedSettingsVersion,
       expectedRow,
     });
+    setDirty(false);
   }
 
   return (
@@ -233,12 +303,18 @@ function SpecialHoursRowEditor({
           type="date"
           value={serviceDate}
           disabled={busy}
-          onChange={(event) => setServiceDate(event.currentTarget.value)}
+          onChange={(event) => {
+            setDirty(true);
+            setServiceDate(event.currentTarget.value);
+          }}
         />
         <select
           value={serviceKind}
           disabled={busy}
-          onChange={(event) => setServiceKind(event.currentTarget.value as ShopHoursServiceKind)}
+          onChange={(event) => {
+            setDirty(true);
+            setServiceKind(event.currentTarget.value as ShopHoursServiceKind);
+          }}
         >
           <option value="OPEN">Open</option>
           <option value="DELIVERY">Delivery</option>
@@ -249,7 +325,10 @@ function SpecialHoursRowEditor({
             type="checkbox"
             checked={closed}
             disabled={busy}
-            onChange={(event) => setClosed(event.currentTarget.checked)}
+            onChange={(event) => {
+              setDirty(true);
+              setClosed(event.currentTarget.checked);
+            }}
           />
           <span>Closed all day</span>
         </label>
@@ -258,21 +337,30 @@ function SpecialHoursRowEditor({
           step={1}
           value={opensLocal}
           disabled={busy || closed}
-          onChange={(event) => setOpensLocal(event.currentTarget.value)}
+          onChange={(event) => {
+            setDirty(true);
+            setOpensLocal(event.currentTarget.value);
+          }}
         />
         <input
           type="time"
           step={1}
           value={closesLocal}
           disabled={busy || closed}
-          onChange={(event) => setClosesLocal(event.currentTarget.value)}
+          onChange={(event) => {
+            setDirty(true);
+            setClosesLocal(event.currentTarget.value);
+          }}
         />
         <input
           value={note}
           maxLength={500}
           disabled={busy}
           placeholder="Note"
-          onChange={(event) => setNote(event.currentTarget.value)}
+          onChange={(event) => {
+            setDirty(true);
+            setNote(event.currentTarget.value);
+          }}
         />
       </div>
       <div className="admin-settings-row__main">
