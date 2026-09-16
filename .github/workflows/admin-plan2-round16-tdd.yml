@@ -1,6 +1,7 @@
 name: Admin Plan 2 Round 16 TDD
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/admin-02-catalog-settings
