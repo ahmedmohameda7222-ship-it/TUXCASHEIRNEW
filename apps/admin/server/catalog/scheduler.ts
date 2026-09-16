@@ -1,7 +1,4 @@
-export type CatalogScheduledChangeKind =
-  | 'CATALOG_PUBLISH'
-  | 'PRODUCT_AVAILABILITY'
-  | 'SHOP_CONFIG';
+export type CatalogScheduledChangeKind = 'CATALOG_PUBLISH' | 'PRODUCT_AVAILABILITY' | 'SHOP_CONFIG';
 
 export type CatalogScheduledChange = {
   id: string;
@@ -105,11 +102,7 @@ function optionalNonnegativeInteger(value: unknown): number | null {
 }
 
 function readChangeKind(value: unknown): CatalogScheduledChangeKind {
-  if (
-    value === 'CATALOG_PUBLISH' ||
-    value === 'PRODUCT_AVAILABILITY' ||
-    value === 'SHOP_CONFIG'
-  ) {
+  if (value === 'CATALOG_PUBLISH' || value === 'PRODUCT_AVAILABILITY' || value === 'SHOP_CONFIG') {
     return value;
   }
   throw new Error('catalog_scheduler_backend_contract_invalid');
