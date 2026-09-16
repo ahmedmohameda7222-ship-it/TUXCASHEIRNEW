@@ -99,10 +99,10 @@ jobs:
           '''
           text = text[:start] + replacement + text[end:]
 
-          old_policy = '''  if (!isPublishedOnlineOrderingOpenAt(authority, new Date())) {
-            return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
-          }
-          '''
+          policy_start_marker = '  if (!isPublishedOnlineOrderingOpenAt(authority, new Date())) {'
+          policy_end_marker = '  if (authority.requireCustomerPhone === true && normalizedPhone === null) {'
+          policy_start = text.index(policy_start_marker)
+          policy_end = text.index(policy_end_marker, policy_start)
           new_policy = '''  const now = new Date();
           if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
             return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
@@ -113,9 +113,7 @@ jobs:
             return errorResponse(409, 'fulfillment_outside_hours');
           }
           '''
-          if text.count(old_policy) != 1:
-            raise SystemExit(f'expected one checkout hours block, found {text.count(old_policy)}')
-          text = text.replace(old_policy, new_policy)
+          text = text[:policy_start] + new_policy + text[policy_end:]
           intake_path.write_text(text)
 
           workflow_path = Path('.github/workflows/admin-catalog-settings-tdd.yml')
