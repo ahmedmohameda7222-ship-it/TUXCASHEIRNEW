@@ -1,4 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
+import {
+  createContext,
+  useContext,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 
 export type SettingsScheduleMode = 'PUBLISH_SETTINGS' | 'PAUSE_ONLINE' | 'RESUME_ONLINE';
 
@@ -16,24 +23,47 @@ export type SettingsScheduleSuccess = {
   idempotentReplay?: boolean;
 };
 
+type SettingsScheduleAction = {
+  schedule(draft: SettingsScheduleDraft): Promise<SettingsScheduleSuccess>;
+  busy: boolean;
+};
+
+const SettingsScheduleActionContext = createContext<SettingsScheduleAction | null>(null);
+
+export function SettingsScheduleActionProvider({
+  action,
+  children,
+}: {
+  action: SettingsScheduleAction;
+  children: ReactNode;
+}) {
+  return (
+    <SettingsScheduleActionContext.Provider value={action}>
+      {children}
+    </SettingsScheduleActionContext.Provider>
+  );
+}
+
 export function SettingsSchedulePanel({
-  onSchedule,
+  workspace,
   busy = false,
 }: {
-  onSchedule: (draft: SettingsScheduleDraft) => Promise<SettingsScheduleSuccess>;
+  workspace: AdminSettingsWorkspace;
   busy?: boolean;
 }) {
+  const action = useContext(SettingsScheduleActionContext);
   const [mode, setMode] = useState<SettingsScheduleMode>('PUBLISH_SETTINGS');
   const [localScheduledAt, setLocalScheduledAt] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const disabled = busy || action === null || action.busy;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || localScheduledAt === '') return;
+    if (disabled || localScheduledAt === '' || action === null) return;
 
     setMessage(null);
     try {
-      const result = await onSchedule({ mode, localScheduledAt });
+      const result = await action.schedule({ mode, localScheduledAt });
       setMessage(
         `${result.idempotentReplay ? 'Existing schedule confirmed' : 'Scheduled'} for ${result.localScheduledAt} Africa/Cairo.`,
       );
@@ -43,7 +73,11 @@ export function SettingsSchedulePanel({
   }
 
   return (
-    <form className="admin-settings-card" onSubmit={(event) => void submit(event)}>
+    <form
+      className="admin-settings-card"
+      data-settings-schedule-shop={workspace.shop.id}
+      onSubmit={(event) => void submit(event)}
+    >
       <div>
         <span>Scheduled configuration</span>
         <strong>Activate later in Egypt local time</strong>
@@ -57,7 +91,7 @@ export function SettingsSchedulePanel({
           <span>Change</span>
           <select
             value={mode}
-            disabled={busy}
+            disabled={disabled}
             onChange={(event) => setMode(event.currentTarget.value as SettingsScheduleMode)}
           >
             <option value="PUBLISH_SETTINGS">Publish current staged settings</option>
@@ -72,7 +106,7 @@ export function SettingsSchedulePanel({
             step={1}
             required
             value={localScheduledAt}
-            disabled={busy}
+            disabled={disabled}
             onChange={(event) => setLocalScheduledAt(event.currentTarget.value)}
           />
         </label>
@@ -80,9 +114,9 @@ export function SettingsSchedulePanel({
       <button
         className="admin-primary-button"
         type="submit"
-        disabled={busy || localScheduledAt === ''}
+        disabled={disabled || localScheduledAt === ''}
       >
-        {busy ? 'Scheduling…' : 'Schedule change'}
+        {action?.busy ? 'Scheduling…' : 'Schedule change'}
       </button>
       <small>
         Publishing staged settings covers configured opening/delivery/online hours and other settings
