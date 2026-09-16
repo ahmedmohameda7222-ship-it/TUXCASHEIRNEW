@@ -28,6 +28,7 @@ on:
       - 'scripts/test-admin-plan2-round7-hardening.mjs'
       - 'scripts/test-admin-plan2-round8-hardening.mjs'
       - 'scripts/test-admin-plan2-round9-hardening.mjs'
+      - 'scripts/test-admin-plan2-round14-hardening.mjs'
       - 'scripts/test-admin-settings-schema-hardening.mjs'
       - 'scripts/test-catalog-public-ordering-projection.mjs'
       - 'scripts/test-admin-deployment-contract.mjs'
@@ -274,6 +275,8 @@ jobs:
         run: node scripts/test-admin-plan2-round8-hardening.mjs
       - name: Plan 2 round 9 hardening invariant
         run: node scripts/test-admin-plan2-round9-hardening.mjs
+      - name: Plan 2 round 14 hardening invariant
+        run: node scripts/test-admin-plan2-round14-hardening.mjs
       - name: Settings schema hardening invariant
         run: node scripts/test-admin-settings-schema-hardening.mjs
       - name: Public catalog ordering projection invariant
@@ -330,6 +333,8 @@ jobs:
         run: node scripts/test-admin-plan2-round8-hardening.mjs
       - name: Plan 2 round 9 PostgreSQL behavior
         run: node scripts/test-admin-plan2-round9-hardening.mjs
+      - name: Plan 2 round 14 PostgreSQL behavior
+        run: node scripts/test-admin-plan2-round14-hardening.mjs
       - name: Settings schema hardening PostgreSQL behavior
         run: node scripts/test-admin-settings-schema-hardening.mjs
       - name: Public catalog ordering projection PostgreSQL behavior
