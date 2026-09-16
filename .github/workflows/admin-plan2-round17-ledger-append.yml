@@ -20,13 +20,8 @@ jobs:
           fetch-depth: 0
       - name: Append Round 17 closeout and remove temporary workflow
         shell: bash
-        run: |
-          set -euo pipefail
-          ledger='docs/superpowers/execution/2026-09-10-tux-admin-execution.md'
-          marker='## Plan 2 final review Round 17 closeout — 2026-09-16'
-          if ! grep -Fq "$marker" "$ledger"; then
-            cat >> "$ledger" <<'EOF'
-
+        env:
+          ROUND17_LEDGER: |
             ## Plan 2 final review Round 17 closeout — 2026-09-16
 
             A fresh exact-head Codex review on Plan 2 head `b77093e82542594cc16c92ad1453df6b096423fc` identified one valid P2: `read_catalog_public_ordering_v2` still advertised PICKUP and DELIVERY from active order types without applying the same fulfillment-specific OPEN/DELIVERY service-hour authority already enforced by trusted Round 16 order intake. That allowed Menu to advertise a fulfillment option that trusted intake could reject after submit.
@@ -56,11 +51,12 @@ jobs:
             The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
 
             Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
-            EOF
-          fi
+        run: |
+          set -euo pipefail
+          python -c 'import os; from pathlib import Path; p=Path("docs/superpowers/execution/2026-09-10-tux-admin-execution.md"); current=p.read_text(); payload=os.environ["ROUND17_LEDGER"].strip(); marker="## Plan 2 final review Round 17 closeout — 2026-09-16"; p.write_text(current if marker in current else current.rstrip()+"\n\n"+payload+"\n")'
           git rm .github/workflows/admin-plan2-round17-ledger-append.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$ledger"
+          git add docs/superpowers/execution/2026-09-10-tux-admin-execution.md
           git commit -m 'docs(admin): close Plan 2 Round 17 review'
           git push origin HEAD:feat/admin-02-catalog-settings
