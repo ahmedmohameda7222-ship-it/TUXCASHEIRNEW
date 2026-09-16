@@ -106,16 +106,9 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
       let failed = 0;
 
       for (const claim of claims) {
+        let result: ApprovalCommandExecutionResult;
         try {
-          const result = await executeClaimedCommand(claim, deps.registry);
-          await deps.completeClaim({
-            approvalRequestId: claim.approvalRequestId,
-            claimToken: claim.claimToken,
-            outcome: 'EXECUTED',
-            errorCode: null,
-            resultMetadata: { idempotentReplay: result.idempotentReplay },
-          });
-          executed += 1;
+          result = await executeClaimedCommand(claim, deps.registry);
         } catch (error) {
           if (error instanceof ApprovalTerminalCommandError) {
             await deps.completeClaim({
@@ -137,7 +130,21 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
             resultMetadata: null,
           });
           retryable += 1;
+          continue;
         }
+
+        // Completion is deliberately outside the execution catch. If the business command
+        // committed but the completion write has an ambiguous network outcome, do not issue a
+        // second state transition here. Leave the durable claim for lease expiry/recovery; the
+        // registered command must converge by command_id on the next run.
+        await deps.completeClaim({
+          approvalRequestId: claim.approvalRequestId,
+          claimToken: claim.claimToken,
+          outcome: 'EXECUTED',
+          errorCode: null,
+          resultMetadata: { idempotentReplay: result.idempotentReplay },
+        });
+        executed += 1;
       }
 
       return { claimed: claims.length, executed, retryable, failed };
