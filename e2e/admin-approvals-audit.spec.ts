@@ -69,6 +69,7 @@ async function mockAdmin(page: Page) {
             id: '55555555-5555-4555-8555-555555555555',
             shopId,
             shopName: 'TUX',
+            actorEmployeeId: '33333333-3333-4333-8333-333333333333',
             actorLabel: 'Manager Two',
             actorRole: 'MANAGER',
             actionType: 'APPROVAL_APPROVED',
@@ -78,6 +79,7 @@ async function mockAdmin(page: Page) {
             afterValue: { status: 'APPROVED' },
             reason: 'Reviewed on shift',
             approvalRequestId: approvalId,
+            approvalStatus: 'APPROVED',
             createdAt: '2026-09-16T16:40:00.000Z',
           },
         ],
@@ -124,4 +126,13 @@ test('renders audit history as human-readable structured changes', async ({ page
   await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
   await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
   await expect(page.getByText('APPROVED', { exact: true })).toBeVisible();
+});
+
+test('exposes every required audit filter', async ({ page }) => {
+  await mockAdmin(page);
+  await page.goto('/audit');
+
+  for (const label of ['From date', 'To date', 'Shop', 'Actor', 'Action', 'Entity', 'Approval status']) {
+    await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+  }
 });
