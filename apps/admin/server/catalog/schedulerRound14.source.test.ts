@@ -24,6 +24,8 @@ describe('Plan 2 round 14 SHOP_CONFIG hardening', () => {
     const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
     expect(sql).toContain('schedule_admin_shop_config_v1');
     expect(sql).not.toContain("last_error = 'replaced_by_reschedule'");
-    expect(sql).not.toContain("where s.shop_id = p_shop_id\n      and s.change_kind = 'shop_config'\n      and s.status in ('pending', 'failed')");
+    expect(sql).not.toContain(
+      "where s.shop_id = p_shop_id\n      and s.change_kind = 'shop_config'\n      and s.status in ('pending', 'failed')",
+    );
   });
 });
