@@ -8,6 +8,7 @@ import { OrderTypesPage } from './OrderTypesPage';
 import { PaymentsPage } from './PaymentsPage';
 import { ReasonCodesPage } from './ReasonCodesPage';
 import { ReceiptsPage } from './ReceiptsPage';
+import { SettingsScheduleActionProvider } from './SettingsSchedulePanel';
 import { ShopsPage } from './ShopsPage';
 import './settings.css';
 import {
@@ -300,32 +301,39 @@ export function SettingsPage() {
   }
 
   return (
-    <SettingsWorkspaceView
-      workspace={settings.workspaceQuery.data}
-      section={section}
-      onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
-      onPublish={() => settings.publish.mutateAsync()}
-      publishing={settings.publish.isPending}
-      onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
-      operationalStateUpdating={settings.updateOperationalState.isPending}
-      onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
-      onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
-      onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
-      shopManagementUpdating={
-        settings.updateShopIdentity.isPending ||
-        settings.upsertWeeklyHours.isPending ||
-        settings.upsertSpecialHours.isPending
-      }
-      onDeleteOrArchiveShop={deleteOrArchiveShop}
-      deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
-      onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
-      settingOverrideUpdating={settings.updateSettingOverride.isPending}
-      onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
-      reasonCodeUpdating={settings.upsertReasonCode.isPending}
-      onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
-      orderTypeUpdating={settings.updateOrderType.isPending}
-      onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
-      paymentMethodUpdating={settings.updatePaymentMethod.isPending}
-    />
+    <SettingsScheduleActionProvider
+      action={{
+        schedule: (draft) => settings.scheduleSettingsChange.mutateAsync(draft),
+        busy: settings.scheduleSettingsChange.isPending,
+      }}
+    >
+      <SettingsWorkspaceView
+        workspace={settings.workspaceQuery.data}
+        section={section}
+        onSectionChange={(nextSection) => navigate(settingsLocationForSection(nextSection))}
+        onPublish={() => settings.publish.mutateAsync()}
+        publishing={settings.publish.isPending}
+        onUpdateOperationalState={(draft) => settings.updateOperationalState.mutateAsync(draft)}
+        operationalStateUpdating={settings.updateOperationalState.isPending}
+        onUpdateShopIdentity={(draft) => settings.updateShopIdentity.mutateAsync(draft)}
+        onUpsertWeeklyHours={(draft) => settings.upsertWeeklyHours.mutateAsync(draft)}
+        onUpsertSpecialHours={(draft) => settings.upsertSpecialHours.mutateAsync(draft)}
+        shopManagementUpdating={
+          settings.updateShopIdentity.isPending ||
+          settings.upsertWeeklyHours.isPending ||
+          settings.upsertSpecialHours.isPending
+        }
+        onDeleteOrArchiveShop={deleteOrArchiveShop}
+        deletingOrArchivingShop={settings.deleteOrArchiveShop.isPending}
+        onUpdateSettingOverride={(draft) => settings.updateSettingOverride.mutateAsync(draft)}
+        settingOverrideUpdating={settings.updateSettingOverride.isPending}
+        onUpsertReasonCode={(draft) => settings.upsertReasonCode.mutateAsync(draft)}
+        reasonCodeUpdating={settings.upsertReasonCode.isPending}
+        onUpdateOrderType={(draft) => settings.updateOrderType.mutateAsync(draft)}
+        orderTypeUpdating={settings.updateOrderType.isPending}
+        onUpdatePaymentMethod={(draft) => settings.updatePaymentMethod.mutateAsync(draft)}
+        paymentMethodUpdating={settings.updatePaymentMethod.isPending}
+      />
+    </SettingsScheduleActionProvider>
   );
 }
