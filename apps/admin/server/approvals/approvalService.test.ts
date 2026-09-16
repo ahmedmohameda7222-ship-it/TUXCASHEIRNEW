@@ -104,7 +104,7 @@ describe('approvalService', () => {
       {
         actionType: 'SAFE_TEST_COMMAND',
         containsSecretInput: false,
-        serialize: (input: { entityId: string }) => ({ entityId: input.entityId }),
+        serialize: (input: unknown) => ({ entityId: (input as { entityId: string }).entityId }),
       },
     ]);
 
