@@ -162,7 +162,9 @@ export function useSettings(shopId: string | undefined) {
         adminFetch<SettingsWorkspaceBase>(
           `/api/admin/settings?shopId=${encodedShopId}&view=workspace`,
         ),
-        adminFetch<SettingsScheduleListResult>(`/api/admin/settings-schedule?shopId=${encodedShopId}`),
+        adminFetch<SettingsScheduleListResult>(
+          `/api/admin/settings-schedule?shopId=${encodedShopId}`,
+        ),
       ]);
       return { ...workspace, shopConfigSchedules: scheduleList.schedules };
     },
