@@ -45,8 +45,7 @@ export type SettingOverrideUpdateDraft = {
 };
 
 type SettingsScheduleResult =
-  | ({ ok: true } & SettingsScheduleSuccess)
-  | { ok: false; code: string; currentVersion?: number };
+  ({ ok: true } & SettingsScheduleSuccess) | { ok: false; code: string; currentVersion?: number };
 
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
