@@ -16,8 +16,10 @@ function sourceOrEmpty(path: string): string {
 
 const migrationPath =
   '../../../../supabase/migrations/20260910122100_admin_plan2_final_review_round7_hardening.sql';
-const round14MigrationPath =
-  '../../../../supabase/migrations/20260910122900_admin_plan2_final_review_round14_hardening.sql';
+const round14MigrationPaths = [
+  '../../../../supabase/migrations/20260910122900_admin_plan2_final_review_round14_hardening.sql',
+  '../../../../supabase/migrations/20260910123000_admin_plan2_round14_sequence_followup.sql',
+];
 
 describe('Plan 2 final review round 7 regressions', () => {
   it('captures service-hour row CAS while refreshing pristine editors from canonical rows', () => {
@@ -74,7 +76,7 @@ describe('Plan 2 final review round 7 regressions', () => {
   });
 
   it('requires additive round 14 lineage hardening for accepted SHOP_CONFIG schedules', () => {
-    const migration = sourceOrEmpty(round14MigrationPath).toLowerCase();
+    const migration = round14MigrationPaths.map(sourceOrEmpty).join('\n').toLowerCase();
 
     expect(migration).toContain('settings_publication_kind');
     expect(migration).toContain("'emergency_operational_state'");
@@ -82,7 +84,7 @@ describe('Plan 2 final review round 7 regressions', () => {
     expect(migration).toContain("'scheduled_online_orders_state'");
     expect(migration).toContain('apply_scheduled_shop_config_change_v1');
     expect(migration).toContain(
-      "'emergency_operational_state', 'scheduled_settings_publish', 'scheduled_online_orders_state'",
+      "'emergency_operational_state',\n           'scheduled_settings_publish',\n           'scheduled_online_orders_state'",
     );
     expect(migration).not.toContain("last_error = 'replaced_by_reschedule'");
   });
