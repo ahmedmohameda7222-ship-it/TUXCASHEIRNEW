@@ -68,7 +68,8 @@ function parseScheduleResult(value: unknown): ScheduleResult {
     throw new Error('settings_schedule_backend_contract_invalid');
   }
   if (value['ok'] === false) {
-    if (typeof value['code'] !== 'string') throw new Error('settings_schedule_backend_contract_invalid');
+    if (typeof value['code'] !== 'string')
+      throw new Error('settings_schedule_backend_contract_invalid');
     return {
       ok: false,
       code: value['code'],
