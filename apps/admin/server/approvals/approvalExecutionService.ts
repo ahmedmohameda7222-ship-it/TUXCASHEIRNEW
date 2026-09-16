@@ -55,7 +55,12 @@ export class ApprovalTerminalCommandError extends Error {
   }
 }
 
-function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
+function boundedInteger(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
   if (value === undefined) return fallback;
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     throw new Error('approval_executor_configuration_invalid');
