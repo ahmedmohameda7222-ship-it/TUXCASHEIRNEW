@@ -10,8 +10,15 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/admin/approvals.ts'
+      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/api/admin/audit.ts'
       - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/src/approvals/**'
+      - 'apps/admin/src/audit/**'
+      - 'apps/admin/src/app/routes.tsx'
       - 'apps/admin/vercel.json'
+      - 'e2e/admin-approvals-audit.spec.ts'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -22,8 +29,15 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/admin/approvals.ts'
+      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/api/admin/audit.ts'
       - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/src/approvals/**'
+      - 'apps/admin/src/audit/**'
+      - 'apps/admin/src/app/routes.tsx'
       - 'apps/admin/vercel.json'
+      - 'e2e/admin-approvals-audit.spec.ts'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -56,6 +70,44 @@ jobs:
           apps/admin/server/approvals/approvalService.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
           apps/admin/server/approvals/approvalExecutionRunner.test.ts
+
+  approval-api-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Plan 3 BFF and UI tests
+        run: >-
+          npx vitest run
+          apps/admin/api/admin/approvals.test.ts
+          apps/admin/src/approvals/ApprovalDetailPage.test.tsx
+      - name: Admin server and API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Admin app typecheck
+        run: npm run typecheck -w @tux/admin
+      - name: Admin production build
+        run: npm run build -w @tux/admin
+
+  approval-e2e:
+    needs: approval-api-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Approval and audit responsive E2E
+        run: npx playwright test e2e/admin-approvals-audit.spec.ts --config playwright.admin.config.ts
 
   postgres-behavior:
     needs: static-invariant

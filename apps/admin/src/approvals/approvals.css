@@ -1,0 +1,137 @@
+.admin-approvals-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.admin-approvals-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.7fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-approval-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-approval-list__item {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.9rem;
+  border: 1px solid var(--admin-border, #d8d8d8);
+  border-radius: 0.8rem;
+  background: var(--admin-surface, #fff);
+  color: inherit;
+}
+
+.admin-approval-list__item[aria-current='true'] {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.admin-approval-detail {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--admin-border, #d8d8d8);
+  border-radius: 0.9rem;
+  background: var(--admin-surface, #fff);
+}
+
+.admin-approval-detail__header,
+.admin-approval-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.admin-approval-status {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.admin-approval-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.admin-approval-facts div {
+  min-width: 0;
+}
+
+.admin-approval-facts dt {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.admin-approval-facts dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-approval-detail__section p {
+  margin: 0.35rem 0 0;
+}
+
+.admin-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 45%);
+}
+
+.admin-dialog {
+  width: min(30rem, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.1rem;
+  border-radius: 0.9rem;
+  background: var(--admin-surface, #fff);
+}
+
+.admin-dialog form {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (max-width: 767px) {
+  .admin-approvals-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-approval-list {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+  }
+
+  .admin-approval-list__item {
+    min-width: 15rem;
+  }
+
+  .admin-approval-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dialog-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .admin-dialog {
+    width: 100%;
+    border-radius: 1rem 1rem 0 0;
+  }
+}

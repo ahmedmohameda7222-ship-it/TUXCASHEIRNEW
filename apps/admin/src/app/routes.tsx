@@ -1,6 +1,8 @@
 import type { AdminPermission, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { useLocation } from 'wouter';
 
+import { ApprovalsPage } from '../approvals/ApprovalsPage';
+import { AuditPage } from '../audit/AuditPage';
 import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -27,6 +29,7 @@ export const ADMIN_ROUTES: readonly AdminRouteDefinition[] = [
   { path: '/devices', label: 'Devices / Operations', permission: 'devices.view' },
   { path: '/whatsapp', label: 'WhatsApp', permission: 'whatsapp.view' },
   { path: '/settings', label: 'Settings', permission: 'settings.manage' },
+  { path: '/approvals', label: 'Approvals', permission: 'approvals.review' },
   { path: '/audit', label: 'Audit Log', permission: 'audit.view' },
   { path: '/more', label: 'More' },
 ] as const;
@@ -68,13 +71,14 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (location === '/catalog/products/publishing') return <PublishReviewPage />;
   if (route.path === '/catalog/products') return <CatalogPage />;
   if (route.path === '/settings') return <SettingsPage />;
+  if (route.path === '/approvals') return <ApprovalsPage />;
+  if (route.path === '/audit') return <AuditPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(
       (candidate) =>
-        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(
-          candidate.path,
-        ) && routeIsPermitted(principal, candidate.path),
+        !new Set(['/', '/orders', '/catalog/products', '/inventory', '/more']).has(candidate.path) &&
+        routeIsPermitted(principal, candidate.path),
     );
     return (
       <PageScaffold
