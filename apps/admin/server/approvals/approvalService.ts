@@ -51,7 +51,8 @@ export type ApprovalDecisionInput = {
 };
 
 export type ApprovalDecisionResult =
-  { ok: true; status: 'APPROVED' | 'REJECTED' } | { ok: false; code: string };
+  | { ok: true; status: 'APPROVED' | 'REJECTED' }
+  | { ok: false; code: string };
 
 export type ApprovalServiceDependencies = {
   loadRequest(requestId: string): Promise<ApprovalRequestRecord | null>;
@@ -106,7 +107,8 @@ function canonicalizeJson(
 }
 
 function actorCanAccessShop(actor: ApprovalActor, shopId: string | null): boolean {
-  return shopId === null || actor.shopIds.includes(shopId);
+  if (shopId === null) return actor.role === 'OWNER' || actor.role === 'ADMIN';
+  return actor.shopIds.includes(shopId);
 }
 
 function actorHasPermission(actor: ApprovalActor, permission: AdminPermission): boolean {
