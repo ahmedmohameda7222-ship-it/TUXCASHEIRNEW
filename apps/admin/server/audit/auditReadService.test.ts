@@ -82,4 +82,25 @@ describe('listAuditReadModels', () => {
 
     expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
   });
+
+  it('pushes a shop-scoped reviewer boundary into the audit query before its limit', async () => {
+    const manager: AdminSessionPrincipal = {
+      ...principal,
+      role: 'MANAGER',
+      shopIds: ['33333333-3333-4333-8333-333333333333'],
+    };
+    const select = vi.fn(async (table: string) => {
+      if (table === 'admin_audit_events') return [];
+      throw new Error(`unexpected table ${table}`);
+    });
+    const client = { select } as unknown as AdminSupabaseClient;
+
+    await listAuditReadModels(client, manager);
+
+    const auditCall = select.mock.calls.find(([table]) => table === 'admin_audit_events');
+    const query = auditCall?.[1] as URLSearchParams | undefined;
+    expect(query).toBeInstanceOf(URLSearchParams);
+    expect(query?.toString()).toContain('shop_id');
+    expect(query?.get('limit')).toBe('100');
+  });
 });
