@@ -54,6 +54,12 @@ type ExecutionRow = {
   last_error_code: string | null;
 };
 
+const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
+
+function hasBusinessWideAuthority(principal: AdminSessionPrincipal): boolean {
+  return principal.role === 'OWNER' || principal.role === 'ADMIN';
+}
+
 function titleCaseAction(actionType: string): string {
   const normalized = actionType.replace(/[._-]+/g, ' ').trim();
   return normalized === ''
@@ -65,27 +71,32 @@ function summarizeValue(value: unknown): string | null {
   if (typeof value === 'string' && value.trim() !== '') return value.trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (value === null) return 'null';
   return null;
 }
 
+function collectPayloadSummaries(value: unknown, path: string, summaries: string[]): void {
+  const primitive = summarizeValue(value);
+  if (primitive !== null) {
+    summaries.push(`${path}: ${primitive}`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => collectPayloadSummaries(child, `${path}[${index}]`, summaries));
+    return;
+  }
+  if (typeof value !== 'object' || value === null) return;
+  for (const [key, child] of Object.entries(value)) {
+    collectPayloadSummaries(child, path === '' ? key : `${path}.${key}`, summaries);
+  }
+}
+
 function summarizePayload(payload: Readonly<Record<string, unknown>>): string {
-  const preferredKeys = [
-    'amountMinor',
-    'quantityImpact',
-    'amount',
-    'quantity',
-    'value',
-    'entityId',
-  ];
-  for (const key of preferredKeys) {
-    const summary = summarizeValue(payload[key]);
-    if (summary !== null) return `${key}: ${summary}`;
-  }
-  for (const [key, value] of Object.entries(payload)) {
-    const summary = summarizeValue(value);
-    if (summary !== null) return `${key}: ${summary}`;
-  }
-  return 'Persisted command ready for second-person review';
+  const summaries: string[] = [];
+  collectPayloadSummaries(payload, '', summaries);
+  return summaries.length > 0
+    ? summaries.join(' · ')
+    : 'Persisted command contains no scalar change fields';
 }
 
 function executionLabel(status: AdminApprovalStatus, execution: ExecutionRow | undefined): string {
@@ -103,7 +114,22 @@ function executionLabel(status: AdminApprovalStatus, execution: ExecutionRow | u
 }
 
 function visibleToPrincipal(row: ApprovalRequestRow, principal: AdminSessionPrincipal): boolean {
-  return row.shop_id === null || principal.shopIds.includes(row.shop_id);
+  if (row.shop_id === null) return hasBusinessWideAuthority(principal);
+  return principal.shopIds.includes(row.shop_id);
+}
+
+function applyPrincipalShopScope(
+  query: URLSearchParams,
+  principal: AdminSessionPrincipal,
+  explicitShopId: string | undefined,
+): void {
+  if (explicitShopId) {
+    query.set('shop_id', `eq.${explicitShopId}`);
+    return;
+  }
+  if (hasBusinessWideAuthority(principal)) return;
+  const shopIds = principal.shopIds.length > 0 ? principal.shopIds : [EMPTY_SCOPE_SENTINEL];
+  query.set('shop_id', `in.(${shopIds.join(',')})`);
 }
 
 export async function listApprovalReadModels(
@@ -119,7 +145,7 @@ export async function listApprovalReadModels(
     limit: filters.id ? '1' : '100',
   });
   if (filters.id) query.set('id', `eq.${filters.id}`);
-  if (filters.shopId) query.set('shop_id', `eq.${filters.shopId}`);
+  applyPrincipalShopScope(query, principal, filters.shopId);
   if (filters.status) query.set('status', `eq.${filters.status}`);
 
   const requests = (
@@ -139,7 +165,7 @@ export async function listApprovalReadModels(
       'shops',
       new URLSearchParams({
         select: 'id,name',
-        id: `in.(${[...new Set(requests.flatMap((row) => (row.shop_id ? [row.shop_id] : [])))].join(',') || '00000000-0000-0000-0000-000000000000'})`,
+        id: `in.(${[...new Set(requests.flatMap((row) => (row.shop_id ? [row.shop_id] : [])))].join(',') || EMPTY_SCOPE_SENTINEL})`,
       }),
     ),
     client.select<ExecutionRow[]>(
@@ -157,6 +183,8 @@ export async function listApprovalReadModels(
 
   return requests.map((row) => {
     const execution = executionsByRequest.get(row.id);
+    const actionLabel = titleCaseAction(row.action_type);
+    const valueSummary = summarizePayload(row.command_payload);
     const model: ApprovalReadModel = {
       id: row.id,
       requesterName: employeeNames.get(row.requester_employee_id) ?? 'Unknown requester',
@@ -166,11 +194,10 @@ export async function listApprovalReadModels(
         : null,
       shopId: row.shop_id,
       shopName: row.shop_id ? (shopNames.get(row.shop_id) ?? 'Assigned shop') : 'All shops',
-      actionLabel: titleCaseAction(row.action_type),
-      valueSummary: summarizePayload(row.command_payload),
+      actionLabel,
+      valueSummary,
       reason: row.reason,
-      consequence:
-        'If approved, the persisted command will execute through the durable approval executor using its existing idempotency key.',
+      consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
       status: row.status,
       executionLabel: executionLabel(row.status, execution),
       createdAt: row.created_at,
