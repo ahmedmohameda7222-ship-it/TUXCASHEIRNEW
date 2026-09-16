@@ -161,7 +161,9 @@ export function SettingsSchedulePanel({
               <small>
                 {schedule.localScheduledAt} {schedule.timezone} · attempt {schedule.attemptCount}
               </small>
-              {schedule.status === 'FAILED' && !schedule.terminalFailure && schedule.nextAttemptAt ? (
+              {schedule.status === 'FAILED' &&
+              !schedule.terminalFailure &&
+              schedule.nextAttemptAt ? (
                 <small>Retry queued for {schedule.nextAttemptAt}</small>
               ) : null}
               {schedule.lastError ? <small>Last error: {schedule.lastError}</small> : null}
