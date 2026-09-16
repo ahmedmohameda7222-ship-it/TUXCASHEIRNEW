@@ -3,16 +3,34 @@ import type { AppendAdminAuditEventInput } from '@tux/admin-contracts';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 const SECRET_KEY_PATTERN = /(^|_)(pin|password|passcode|verifier|salt|lookup)(_|$)/i;
+const SECRET_KEY_DENYLIST = new Set([
+  'pinhash',
+  'pinlookuphash',
+  'pinverifier',
+  'pinsalt',
+  'passwordhash',
+  'passwordverifier',
+  'claimtoken',
+]);
 
 function normalizeKey(key: string): string {
-  return key.replace(/[-\s]+/g, '_');
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase();
 }
 
 function containsCredentialMaterial(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(containsCredentialMaterial);
   if (typeof value !== 'object' || value === null) return false;
   for (const [key, child] of Object.entries(value)) {
-    if (SECRET_KEY_PATTERN.test(normalizeKey(key))) return true;
+    const normalizedKey = normalizeKey(key);
+    if (
+      SECRET_KEY_PATTERN.test(normalizedKey) ||
+      SECRET_KEY_DENYLIST.has(normalizedKey.replaceAll('_', ''))
+    ) {
+      return true;
+    }
     if (containsCredentialMaterial(child)) return true;
   }
   return false;
