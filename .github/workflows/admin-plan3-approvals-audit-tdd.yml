@@ -10,6 +10,8 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/vercel.json'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -20,6 +22,8 @@ on:
       - 'scripts/test-admin-approvals-audit-migration.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/vercel.json'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -46,11 +50,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Plan 3 approval services
+      - name: Plan 3 approval services and runner
         run: >-
           npx vitest run
           apps/admin/server/approvals/approvalService.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
+          apps/admin/server/approvals/approvalExecutionRunner.test.ts
 
   postgres-behavior:
     needs: static-invariant
