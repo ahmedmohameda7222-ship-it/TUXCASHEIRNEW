@@ -13,7 +13,7 @@ const principal: AdminSessionPrincipal = {
 };
 
 function clientWithRequest() {
-  const select = vi.fn(async (table: string) => {
+  const select = vi.fn(async (table: string, _query?: URLSearchParams) => {
     if (table === 'admin_approval_requests') {
       return [
         {
@@ -63,7 +63,7 @@ describe('approvalReadService', () => {
     await listApprovalReadModels(client, principal);
 
     const approvalCall = select.mock.calls.find(([table]) => table === 'admin_approval_requests');
-    const query = approvalCall?.[1] as URLSearchParams | undefined;
+    const query = approvalCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.toString()).toContain('shop_id');
     expect(query?.get('limit')).toBe('100');
