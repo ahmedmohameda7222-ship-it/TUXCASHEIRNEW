@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AdminSettingsWorkspace,
+  AdminShopConfigSchedule,
   CanonicalSettingsRowEditResult,
   OrderTypeEditInput,
   PaymentMethodEditInput,
@@ -46,6 +47,8 @@ export type SettingOverrideUpdateDraft = {
 
 type SettingsScheduleResult =
   ({ ok: true } & SettingsScheduleSuccess) | { ok: false; code: string; currentVersion?: number };
+type SettingsScheduleListResult = { schedules: AdminShopConfigSchedule[] };
+type SettingsWorkspaceBase = Omit<AdminSettingsWorkspace, 'shopConfigSchedules'>;
 
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
@@ -152,11 +155,16 @@ export function useSettings(shopId: string | undefined) {
   const workspaceQuery = useQuery({
     queryKey: shopId ? settingsQueryKey(shopId) : ['admin', 'settings', 'no-shop'],
     enabled: Boolean(shopId),
-    queryFn: async () => {
+    queryFn: async (): Promise<AdminSettingsWorkspace> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
-      return adminFetch<AdminSettingsWorkspace>(
-        `/api/admin/settings?shopId=${encodeURIComponent(shopId)}&view=workspace`,
-      );
+      const encodedShopId = encodeURIComponent(shopId);
+      const [workspace, scheduleList] = await Promise.all([
+        adminFetch<SettingsWorkspaceBase>(
+          `/api/admin/settings?shopId=${encodedShopId}&view=workspace`,
+        ),
+        adminFetch<SettingsScheduleListResult>(`/api/admin/settings-schedule?shopId=${encodedShopId}`),
+      ]);
+      return { ...workspace, shopConfigSchedules: scheduleList.schedules };
     },
   });
 
@@ -233,6 +241,7 @@ export function useSettings(shopId: string | undefined) {
         ...(result.idempotentReplay === true ? { idempotentReplay: true } : {}),
       };
     },
+    onSuccess: invalidateWorkspace,
   });
 
   const updateOperationalState = useMutation({
