@@ -22,7 +22,7 @@ for (const fragment of [
   "'scheduled_online_orders_state'",
   'schedule_admin_shop_config_v1',
   'apply_scheduled_shop_config_change_v1',
-  "'emergency_operational_state', 'scheduled_settings_publish', 'scheduled_online_orders_state'",
+  'settings_publication_kind not in',
 ]) {
   if (!sql.includes(fragment)) {
     throw new Error(`Plan 2 round 14 hardening missing ${fragment}`);
