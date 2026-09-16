@@ -21,6 +21,14 @@ export {
 } from './businessDay';
 export type * from './catalog';
 export {
+  applyBasisPoints,
+  calculateCheckoutPricing,
+  resolveEffectiveCheckoutPolicy,
+  type CheckoutChannel,
+  type CheckoutPricing,
+  type EffectiveCheckoutPolicy,
+} from './checkoutPolicy';
+export {
   parseOperationsConfigurationBundle,
   type OperationsConfigurationBundle,
 } from './configurationBundle';
@@ -93,8 +101,11 @@ export { InvalidOrderDraftError, parseOrderDraft } from './orderDraftParser';
 export {
   parsePoundsToMinor,
   parseWholePoundsToMinor,
+  paymentMethodAllowedForDeliveryZone,
+  paymentMethodSupportsChannel,
   preparePaymentParts,
   type PreparedPaymentPart,
+  type PaymentPreparationContext,
 } from './payment';
 export { normalizeEgyptianPhone, type EgyptianPhoneNormalization } from './phone';
 export { calculateDraftLineTotal, calculateOrderPricing, type OrderPricing } from './pricing';
@@ -112,6 +123,7 @@ export {
   wholeStockUnits,
 } from './quantity';
 export type { StockQuantityMicros } from './quantity';
+export type * from './settings';
 export {
   OPERATIONS_SYNC_PAYLOAD_VERSION,
   operationsSyncPayloadJson,

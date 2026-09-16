@@ -7,6 +7,12 @@
   "git": {
     "deploymentEnabled": false
   },
+  "crons": [
+    {
+      "path": "/api/cron/admin-config-scheduler",
+      "schedule": "* * * * *"
+    }
+  ],
   "routes": [
     {
       "handle": "filesystem"

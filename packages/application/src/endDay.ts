@@ -27,6 +27,7 @@ import {
   type Reconciliation,
   type ReconciliationId,
   type ReconciliationLine,
+  type ReasonCodeSnapshot,
   type ShopId,
   type Worker,
   type WorkerSession,
@@ -76,7 +77,12 @@ export type EndDayGate =
 export interface EndDayVarianceInput {
   readonly paymentMethodId: PaymentMethodId;
   readonly reason: string | null;
+  readonly reasonCodeId?: string;
 }
+
+export type EndDayCashVarianceReason = ReasonCodeSnapshot & {
+  readonly family: 'CASH_VARIANCE';
+};
 
 export interface EndDayPreviewLine {
   readonly paymentMethod: EndDayPaymentMethod;
@@ -84,6 +90,7 @@ export interface EndDayPreviewLine {
   readonly actualMinor: MoneyMinor;
   readonly differenceMinor: MoneyMinor;
   readonly varianceReason: string | null;
+  readonly varianceReasonCode?: EndDayCashVarianceReason;
 }
 
 export interface EndDayPreview {
@@ -95,6 +102,7 @@ export interface EndDayPreview {
   readonly recognizedSalesMinor: MoneyMinor;
   readonly totalExpensesMinor: MoneyMinor;
   readonly cashExpensesMinor: MoneyMinor;
+  readonly cashVarianceReasons: readonly EndDayCashVarianceReason[];
   readonly lines: readonly EndDayPreviewLine[];
 }
 
@@ -118,6 +126,21 @@ interface EndDayContext {
 
 function persistenceError(message: string, cause: unknown): ApplicationError {
   return { code: 'LOCAL_PERSISTENCE_ERROR', message, cause };
+}
+
+function cashVarianceReasons(
+  configuration: OperationsConfigurationSnapshot,
+): readonly EndDayCashVarianceReason[] {
+  return (configuration.reasonCodes ?? [])
+    .filter((reason) => reason.active && reason.family === 'CASH_VARIANCE')
+    .map((reason) => ({
+      id: reason.id,
+      key: reason.key,
+      family: 'CASH_VARIANCE',
+      label: reason.label,
+      version: reason.version,
+      scope: reason.scope,
+    }));
 }
 
 function normalizedDraftScopeId(value: string): string {
@@ -367,9 +390,10 @@ export class OperationsEndDayService {
       financial.expectedPayments,
       actualPayments,
     );
-    const reasonByMethod = new Map(
-      varianceReasons.map((entry) => [entry.paymentMethodId, entry.reason] as const),
+    const varianceByMethod = new Map(
+      varianceReasons.map((entry) => [entry.paymentMethodId, entry] as const),
     );
+    const configuredCashVarianceReasons = cashVarianceReasons(context.configuration);
     return {
       businessDayId: context.day.id,
       completedCount: orders.filter((order) => order.status === 'DONE').length,
@@ -378,22 +402,44 @@ export class OperationsEndDayService {
       recognizedSalesMinor: financial.recognizedSalesMinor,
       totalExpensesMinor: financial.totalExpensesMinor,
       cashExpensesMinor: financial.cashExpensesMinor,
-      lines: projected.map((line) => ({
-        paymentMethod: {
+      cashVarianceReasons: configuredCashVarianceReasons,
+      lines: projected.map((line): EndDayPreviewLine => {
+        const paymentMethod = {
           id: line.paymentMethodId,
           label: line.label,
           logicType: line.logicType,
-        },
-        expectedMinor: line.expectedMinor,
-        actualMinor: line.actualMinor,
-        differenceMinor: line.differenceMinor,
-        varianceReason: requireReasons
-          ? normalizeEndDayVarianceReason(
-              line.differenceMinor,
-              reasonByMethod.get(line.paymentMethodId),
-            )
-          : null,
-      })),
+        };
+        const base = {
+          paymentMethod,
+          expectedMinor: line.expectedMinor,
+          actualMinor: line.actualMinor,
+          differenceMinor: line.differenceMinor,
+        };
+        if (!requireReasons || line.differenceMinor === 0) {
+          return { ...base, varianceReason: null };
+        }
+        const varianceInput = varianceByMethod.get(line.paymentMethodId);
+        if (configuredCashVarianceReasons.length > 0) {
+          const selected = configuredCashVarianceReasons.find(
+            (reason) => reason.id === varianceInput?.reasonCodeId,
+          );
+          if (selected === undefined) {
+            throw new DomainInvariantError('A configured End Day variance reason is required.');
+          }
+          return {
+            ...base,
+            varianceReason: selected.label,
+            varianceReasonCode: selected,
+          };
+        }
+        return {
+          ...base,
+          varianceReason: normalizeEndDayVarianceReason(
+            line.differenceMinor,
+            varianceInput?.reason,
+          ),
+        };
+      }),
     };
   }
 
@@ -418,6 +464,9 @@ export class OperationsEndDayService {
         actualMinor: line.actualMinor,
         differenceMinor: line.differenceMinor,
         varianceReason: line.varianceReason,
+        ...(line.varianceReasonCode === undefined
+          ? {}
+          : { varianceReasonCode: line.varianceReasonCode }),
       })),
     };
   }

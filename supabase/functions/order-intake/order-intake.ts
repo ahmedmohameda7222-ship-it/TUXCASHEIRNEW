@@ -82,8 +82,60 @@ export interface OnlineOrderPendingInsert {
   acceptedOrderId: null;
 }
 
+export interface OnlineOrderPublishedOrderType {
+  behavior: 'TAKE_AWAY' | 'DINE_IN' | 'DELIVERY' | 'OTHER';
+  active: boolean;
+}
+
+export interface OnlineOrderPublishedPaymentMethod {
+  id: string;
+  displayName: string;
+  logicType: 'CASH' | 'CARD' | 'DIGITAL' | 'OTHER';
+  active: boolean;
+  channel: 'POS' | 'ONLINE' | 'BOTH';
+  integrationReference: string | null;
+}
+
+export interface OnlineOrderPublishedWeeklyHours {
+  serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+  dayOfWeek: number;
+  timezone: 'Africa/Cairo';
+  opensLocal: string;
+  closesLocal: string;
+  active: boolean;
+}
+
+export interface OnlineOrderPublishedSpecialHours {
+  serviceDate: string;
+  serviceKind: 'OPEN' | 'DELIVERY' | 'ONLINE';
+  timezone: 'Africa/Cairo';
+  closed: boolean;
+  opensLocal: string | null;
+  closesLocal: string | null;
+}
+
+export interface OnlineOrderPublishedCheckoutAuthority {
+  shopId: string;
+  configurationVersion: number;
+  settingsVersion: number | null;
+  lifecycleState: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+  temporaryClosed: boolean;
+  onlineOrdersPaused: boolean;
+  minimumOrderMinor: number;
+  serviceChargeBps?: number;
+  taxBps?: number;
+  requireCustomerPhone?: boolean;
+  weeklyHours?: readonly OnlineOrderPublishedWeeklyHours[];
+  specialHours?: readonly OnlineOrderPublishedSpecialHours[];
+  orderTypes: readonly OnlineOrderPublishedOrderType[];
+  paymentMethods: readonly OnlineOrderPublishedPaymentMethod[];
+}
+
 export interface OnlineOrderIntakeStore {
   loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null>;
+  loadPublishedCheckoutAuthority?(
+    shopId: string,
+  ): Promise<OnlineOrderPublishedCheckoutAuthority | null>;
   findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -149,6 +201,41 @@ function assertTrustedMoney(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} is not a trusted non-negative safe integer`);
   }
+}
+
+function assertBasisPoints(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 10_000)
+    throw new Error(`${label} is not a trusted basis-point rate`);
+}
+
+function applyPublishedBasisPoints(baseMinor: number, basisPoints: number): number {
+  assertTrustedMoney(baseMinor, 'published checkout base');
+  assertBasisPoints(basisPoints, 'published checkout rate');
+  const rounded = (BigInt(baseMinor) * BigInt(basisPoints) + 5_000n) / 10_000n;
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('published checkout overflow');
+  return Number(rounded);
+}
+
+export function calculatePublishedCheckoutPricing(
+  itemsSubtotalMinor: number,
+  authority: Pick<OnlineOrderPublishedCheckoutAuthority, 'serviceChargeBps' | 'taxBps'>,
+): {
+  itemsSubtotalMinor: number;
+  serviceChargeMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+} {
+  assertTrustedMoney(itemsSubtotalMinor, 'published checkout items subtotal');
+  const serviceChargeMinor = applyPublishedBasisPoints(
+    itemsSubtotalMinor,
+    authority.serviceChargeBps ?? 0,
+  );
+  const preTaxMinor = itemsSubtotalMinor + serviceChargeMinor;
+  if (!Number.isSafeInteger(preTaxMinor)) throw new Error('published checkout overflow');
+  const taxMinor = applyPublishedBasisPoints(preTaxMinor, authority.taxBps ?? 0);
+  const totalMinor = preTaxMinor + taxMinor;
+  if (!Number.isSafeInteger(totalMinor)) throw new Error('published checkout overflow');
+  return { itemsSubtotalMinor, serviceChargeMinor, taxMinor, totalMinor };
 }
 
 function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string | null): unknown {
@@ -217,7 +304,8 @@ function validateCatalogTenant(catalog: OnlineOrderCatalogAuthority, shopId: str
       (link) => !productIds.has(link.productId) || !modifierIds.has(link.modifierId),
     ) ||
     catalog.comboBeverageOptions.some(
-      (option) => !productIds.has(option.comboProductId) || !productIds.has(option.beverageProductId),
+      (option) =>
+        !productIds.has(option.comboProductId) || !productIds.has(option.beverageProductId),
     )
   ) {
     throw new Error('catalog relationship authority mismatch');
@@ -357,6 +445,230 @@ function buildTrustedItems(
   return { trustedItems, itemsSubtotalMinor };
 }
 
+function isOnlinePaymentMethod(method: OnlineOrderPublishedPaymentMethod): boolean {
+  return method.active && (method.channel === 'ONLINE' || method.channel === 'BOTH');
+}
+
+function isPublishedInstaPayMethod(method: OnlineOrderPublishedPaymentMethod): boolean {
+  if (method.logicType !== 'DIGITAL') return false;
+  const integration = method.integrationReference?.trim().toUpperCase() ?? null;
+  if (integration !== null) return integration === 'INSTAPAY';
+  return method.displayName.replace(/\s+/g, '').toUpperCase() === 'INSTAPAY';
+}
+
+const ONLINE_ORDERING_OUTSIDE_HOURS = 'online_ordering_outside_hours';
+const ONLINE_ORDERING_TIMEZONE = 'Africa/Cairo';
+const CAIRO_WEEKDAY: Readonly<Record<string, number>> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+interface CairoLocalClock {
+  serviceDate: string;
+  dayOfWeek: number;
+  secondOfDay: number;
+}
+
+function cairoLocalClock(now: Date): CairoLocalClock {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+    timeZone: ONLINE_ORDERING_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  const dayOfWeek = CAIRO_WEEKDAY[value('weekday')];
+  const hour = Number(value('hour'));
+  const minute = Number(value('minute'));
+  const second = Number(value('second'));
+  if (
+    dayOfWeek === undefined ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second)
+  ) {
+    throw new Error('failed to resolve Africa/Cairo online-order clock');
+  }
+  return {
+    serviceDate: `${value('year')}-${value('month')}-${value('day')}`,
+    dayOfWeek,
+    secondOfDay: hour * 3600 + minute * 60 + second + now.getUTCMilliseconds() / 1000,
+  };
+}
+
+function adjacentServiceDate(serviceDate: string, deltaDays: number): string {
+  const [year, month, day] = serviceDate.split('-').map(Number);
+  const value = new Date(Date.UTC(year!, month! - 1, day! + deltaDays));
+  return `${value.getUTCFullYear().toString().padStart(4, '0')}-${(value.getUTCMonth() + 1)
+    .toString()
+    .padStart(2, '0')}-${value.getUTCDate().toString().padStart(2, '0')}`;
+}
+
+function localTimeSecond(value: string): number {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}(?:\.\d+)?))?$/.exec(value);
+  if (!match) throw new Error('published online ordering hour is invalid');
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const second = Number(match[3] ?? '0');
+  if (hour > 23 || minute > 59 || second < 0 || second >= 60) {
+    throw new Error('published online ordering hour is invalid');
+  }
+  return hour * 3600 + minute * 60 + second;
+}
+
+function startsOnServiceDate(
+  opensLocal: string,
+  closesLocal: string,
+  secondOfDay: number,
+): boolean {
+  const opens = localTimeSecond(opensLocal);
+  const closes = localTimeSecond(closesLocal);
+  return opens < closes ? secondOfDay >= opens && secondOfDay < closes : secondOfDay >= opens;
+}
+
+function carriesIntoNextDate(
+  opensLocal: string,
+  closesLocal: string,
+  secondOfDay: number,
+): boolean {
+  const opens = localTimeSecond(opensLocal);
+  const closes = localTimeSecond(closesLocal);
+  return closes < opens && secondOfDay < closes;
+}
+
+function isPublishedServiceKindOpenAt(
+  authority: OnlineOrderPublishedCheckoutAuthority,
+  serviceKind: OnlineOrderPublishedWeeklyHours['serviceKind'],
+  now: Date,
+): boolean {
+  const weeklyHours = (authority.weeklyHours ?? []).filter(
+    (hours) => hours.serviceKind === serviceKind && hours.active,
+  );
+  const specialHours = (authority.specialHours ?? []).filter(
+    (hours) => hours.serviceKind === serviceKind,
+  );
+  if (weeklyHours.length === 0 && specialHours.length === 0) return true;
+
+  const clock = cairoLocalClock(now);
+  const currentSpecial = specialHours.find((hours) => hours.serviceDate === clock.serviceDate);
+  if (currentSpecial) {
+    if (currentSpecial.closed || !currentSpecial.opensLocal || !currentSpecial.closesLocal) {
+      return false;
+    }
+    return startsOnServiceDate(
+      currentSpecial.opensLocal,
+      currentSpecial.closesLocal,
+      clock.secondOfDay,
+    );
+  }
+
+  const previousDate = adjacentServiceDate(clock.serviceDate, -1);
+  const previousSpecial = specialHours.find((hours) => hours.serviceDate === previousDate);
+  if (previousSpecial) {
+    if (
+      !previousSpecial.closed &&
+      previousSpecial.opensLocal &&
+      previousSpecial.closesLocal &&
+      carriesIntoNextDate(
+        previousSpecial.opensLocal,
+        previousSpecial.closesLocal,
+        clock.secondOfDay,
+      )
+    ) {
+      return true;
+    }
+  } else {
+    const previousDay = (clock.dayOfWeek + 6) % 7;
+    if (
+      weeklyHours.some(
+        (hours) =>
+          hours.dayOfWeek === previousDay &&
+          carriesIntoNextDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return weeklyHours.some(
+    (hours) =>
+      hours.dayOfWeek === clock.dayOfWeek &&
+      startsOnServiceDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
+  );
+}
+
+export function isPublishedOnlineOrderingOpenAt(
+  authority: OnlineOrderPublishedCheckoutAuthority,
+  now: Date,
+): boolean {
+  return isPublishedServiceKindOpenAt(authority, 'ONLINE', now);
+}
+
+function publishedCheckoutPolicyError(
+  request: OnlineOrderRequestV1,
+  itemsSubtotalMinor: number,
+  normalizedPhone: string | null,
+  authority: OnlineOrderPublishedCheckoutAuthority,
+): Response | null {
+  if (authority.shopId !== request.shopId) {
+    throw new Error('published checkout authority shop mismatch');
+  }
+  assertTrustedMoney(authority.minimumOrderMinor, 'published minimum order');
+  calculatePublishedCheckoutPricing(itemsSubtotalMinor, authority);
+
+  if (authority.lifecycleState !== 'ACTIVE') return errorResponse(409, 'shop_unavailable');
+  if (authority.temporaryClosed) return errorResponse(409, 'shop_temporarily_closed');
+  if (authority.onlineOrdersPaused) return errorResponse(409, 'online_orders_paused');
+  const now = new Date();
+  if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
+    return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+  }
+  const fulfillmentServiceKind =
+    request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+  if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
+    return errorResponse(409, 'fulfillment_outside_hours');
+  }
+  if (authority.requireCustomerPhone === true && normalizedPhone === null) {
+    return errorResponse(409, 'customer_phone_required');
+  }
+
+  const requiredBehavior = request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'TAKE_AWAY';
+  if (
+    !authority.orderTypes.some(
+      (orderType) => orderType.active && orderType.behavior === requiredBehavior,
+    )
+  ) {
+    return errorResponse(409, 'fulfillment_unavailable');
+  }
+
+  if (itemsSubtotalMinor < authority.minimumOrderMinor) {
+    return errorResponse(409, 'minimum_order_not_met');
+  }
+
+  const onlineMethods = authority.paymentMethods.filter(isOnlinePaymentMethod);
+  const cashAvailable = onlineMethods.some((method) => method.logicType === 'CASH');
+  const instaPayAvailable = onlineMethods.some(isPublishedInstaPayMethod);
+  const paymentAvailable =
+    request.paymentPreference === 'CASH'
+      ? cashAvailable
+      : request.paymentPreference === 'INSTAPAY'
+        ? instaPayAvailable
+        : cashAvailable && instaPayAvailable;
+
+  return paymentAvailable ? null : errorResponse(409, 'payment_method_unavailable');
+}
+
 export async function handleOrderIntakeRequest(
   httpRequest: Request,
   store: OnlineOrderIntakeStore,
@@ -389,7 +701,10 @@ export async function handleOrderIntakeRequest(
     if (error instanceof OnlineOrderIntakeContractError || error instanceof SyntaxError) {
       return errorResponse(400, 'invalid_request');
     }
-    console.error('order-intake request parse failed', error instanceof Error ? error.name : 'Error');
+    console.error(
+      'order-intake request parse failed',
+      error instanceof Error ? error.name : 'Error',
+    );
     return errorResponse(500, 'intake_failed');
   }
 
@@ -423,6 +738,21 @@ export async function handleOrderIntakeRequest(
 
     const trusted = buildTrustedItems(parsed, catalog);
     if (trusted instanceof Response) return trusted;
+
+    const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
+    if (!loadPublishedCheckoutAuthority) {
+      return errorResponse(503, 'published_configuration_unavailable');
+    }
+    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
+    if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
+    const policyError = publishedCheckoutPolicyError(
+      parsed,
+      trusted.itemsSubtotalMinor,
+      normalizedPhone,
+      checkoutAuthority,
+    );
+    if (policyError) return policyError;
+
     const catalogRevision = await sha256Hex(canonicalCatalogForRevision(catalog));
     const record: OnlineOrderPendingInsert = {
       id: crypto.randomUUID(),

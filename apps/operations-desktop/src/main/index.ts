@@ -710,7 +710,9 @@ function registerIpcHandlers(window: BrowserWindow): void {
     if (
       typeof input['orderId'] !== 'string' ||
       typeof input['foodPrepared'] !== 'boolean' ||
-      typeof input['reason'] !== 'string'
+      typeof input['reason'] !== 'string' ||
+      (input['reasonCodeId'] !== undefined && typeof input['reasonCodeId'] !== 'string') ||
+      (input['note'] !== undefined && typeof input['note'] !== 'string')
     ) {
       throw new TypeError('Cancel order IPC payload is invalid.');
     }
@@ -718,17 +720,26 @@ function registerIpcHandlers(window: BrowserWindow): void {
       orderId: parseEntityId<OrderId>(input['orderId']),
       foodPrepared: input['foodPrepared'],
       reason: input['reason'],
+      ...(typeof input['reasonCodeId'] === 'string' ? { reasonCodeId: input['reasonCodeId'] } : {}),
+      ...(typeof input['note'] === 'string' ? { note: input['note'] } : {}),
     });
   });
   ipcMain.handle(IPC_BOARD_RETURN, async (event, input: unknown) => {
     assertTrustedIpcSender(event, window.webContents.id);
     assertObjectPayload(input, 'Return Delivery');
-    if (typeof input['orderId'] !== 'string' || typeof input['reason'] !== 'string') {
+    if (
+      typeof input['orderId'] !== 'string' ||
+      typeof input['reason'] !== 'string' ||
+      (input['reasonCodeId'] !== undefined && typeof input['reasonCodeId'] !== 'string') ||
+      (input['note'] !== undefined && typeof input['note'] !== 'string')
+    ) {
       throw new TypeError('Return Delivery IPC payload is invalid.');
     }
     return currentOrdersBoardService().returnDelivery({
       orderId: parseEntityId<OrderId>(input['orderId']),
       reason: input['reason'],
+      ...(typeof input['reasonCodeId'] === 'string' ? { reasonCodeId: input['reasonCodeId'] } : {}),
+      ...(typeof input['note'] === 'string' ? { note: input['note'] } : {}),
     });
   });
 

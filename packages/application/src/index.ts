@@ -21,6 +21,7 @@ export { OperationsEndDayService } from './endDay';
 export type {
   EndDayCloseResult,
   EndDayCloseResultValue,
+  EndDayCashVarianceReason,
   EndDayGate,
   EndDayGateResult,
   EndDayPaymentMethod,

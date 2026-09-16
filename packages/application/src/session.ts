@@ -270,19 +270,48 @@ export class OperationsSessionService {
       }
 
       const currentDay = await transaction.businessDays.getOpenForShop(shop.id);
-      const day: OpenBusinessDay =
-        currentDay === null
-          ? createOpenBusinessDay({
-              id: this.#id<BusinessDayId>(),
-              shopId: shop.id,
-              startedAt: now,
-              startedByWorkerId: worker.id,
-            })
-          : currentDay.status === 'OPEN'
-            ? currentDay
-            : (() => {
-                throw new Error('Closed Business Day returned from open-day query.');
-              })();
+      let day: OpenBusinessDay;
+      if (currentDay === null) {
+        const configuration = await transaction.configuration.getForShop(shop.id);
+        if (
+          configuration === null ||
+          configuration.shopId !== shop.id ||
+          !Number.isSafeInteger(configuration.version) ||
+          configuration.version <= 0
+        ) {
+          throw new Error(
+            'Activated Operations configuration is unavailable while opening the Business Day.',
+          );
+        }
+
+        const resetPolicy = configuration.settings?.values['receipt.sequenceResetPolicy'];
+        if (resetPolicy !== undefined && resetPolicy !== 'BUSINESS_DAY') {
+          throw new Error('Unsupported receipt sequence reset policy.');
+        }
+        const configuredSequenceStart = configuration.settings?.values['receipt.sequenceStart'];
+        const sequenceStart = configuredSequenceStart === undefined ? 1 : configuredSequenceStart;
+        if (
+          typeof sequenceStart !== 'number' ||
+          !Number.isSafeInteger(sequenceStart) ||
+          sequenceStart <= 0
+        ) {
+          throw new RangeError('Receipt sequence start must be a positive safe integer.');
+        }
+
+        day = createOpenBusinessDay(
+          {
+            id: this.#id<BusinessDayId>(),
+            shopId: shop.id,
+            startedAt: now,
+            startedByWorkerId: worker.id,
+          },
+          { sequenceStart },
+        );
+      } else if (currentDay.status === 'OPEN') {
+        day = currentDay;
+      } else {
+        throw new Error('Closed Business Day returned from open-day query.');
+      }
 
       if (currentDay === null) {
         await transaction.businessDays.put(day);
