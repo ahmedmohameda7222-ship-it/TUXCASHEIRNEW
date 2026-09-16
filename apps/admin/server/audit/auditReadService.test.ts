@@ -14,7 +14,7 @@ const principal: AdminSessionPrincipal = {
 
 function createClient(): AdminSupabaseClient {
   return {
-    select: vi.fn(async (table: string) => {
+    select: vi.fn(async (table: string, _query?: URLSearchParams) => {
       if (table === 'admin_audit_events') {
         return [
           {
@@ -89,7 +89,7 @@ describe('listAuditReadModels', () => {
       role: 'MANAGER',
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, _query?: URLSearchParams) => {
       if (table === 'admin_audit_events') return [];
       throw new Error(`unexpected table ${table}`);
     });
@@ -98,7 +98,7 @@ describe('listAuditReadModels', () => {
     await listAuditReadModels(client, manager);
 
     const auditCall = select.mock.calls.find(([table]) => table === 'admin_audit_events');
-    const query = auditCall?.[1] as URLSearchParams | undefined;
+    const query = auditCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.toString()).toContain('shop_id');
     expect(query?.get('limit')).toBe('100');
