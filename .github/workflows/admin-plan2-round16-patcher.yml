@@ -1,0 +1,160 @@
+name: Admin Plan 2 Round 16 Patcher
+
+on:
+  push:
+    branches:
+      - fix/admin-plan2-round16-review
+    paths:
+      - '.github/workflows/admin-plan2-round16-patcher.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/admin-plan2-round16-review
+          fetch-depth: 0
+      - name: Apply guarded Round 16 source patches
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          intake_path = Path('supabase/functions/order-intake/order-intake.ts')
+          text = intake_path.read_text()
+          start_marker = 'export function isPublishedOnlineOrderingOpenAt('
+          end_marker = '\nfunction publishedCheckoutPolicyError('
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = '''function isPublishedServiceKindOpenAt(
+            authority: OnlineOrderPublishedCheckoutAuthority,
+            serviceKind: OnlineOrderPublishedWeeklyHours['serviceKind'],
+            now: Date,
+          ): boolean {
+            const weeklyHours = (authority.weeklyHours ?? []).filter(
+              (hours) => hours.serviceKind === serviceKind && hours.active,
+            );
+            const specialHours = (authority.specialHours ?? []).filter(
+              (hours) => hours.serviceKind === serviceKind,
+            );
+            if (weeklyHours.length === 0 && specialHours.length === 0) return true;
+
+            const clock = cairoLocalClock(now);
+            const currentSpecial = specialHours.find((hours) => hours.serviceDate === clock.serviceDate);
+            if (currentSpecial) {
+              if (currentSpecial.closed || !currentSpecial.opensLocal || !currentSpecial.closesLocal) {
+                return false;
+              }
+              return startsOnServiceDate(
+                currentSpecial.opensLocal,
+                currentSpecial.closesLocal,
+                clock.secondOfDay,
+              );
+            }
+
+            const previousDate = adjacentServiceDate(clock.serviceDate, -1);
+            const previousSpecial = specialHours.find((hours) => hours.serviceDate === previousDate);
+            if (previousSpecial) {
+              if (
+                !previousSpecial.closed &&
+                previousSpecial.opensLocal &&
+                previousSpecial.closesLocal &&
+                carriesIntoNextDate(
+                  previousSpecial.opensLocal,
+                  previousSpecial.closesLocal,
+                  clock.secondOfDay,
+                )
+              ) {
+                return true;
+              }
+            } else {
+              const previousDay = (clock.dayOfWeek + 6) % 7;
+              if (
+                weeklyHours.some(
+                  (hours) =>
+                    hours.dayOfWeek === previousDay &&
+                    carriesIntoNextDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
+                )
+              ) {
+                return true;
+              }
+            }
+
+            return weeklyHours.some(
+              (hours) =>
+                hours.dayOfWeek === clock.dayOfWeek &&
+                startsOnServiceDate(hours.opensLocal, hours.closesLocal, clock.secondOfDay),
+            );
+          }
+
+          export function isPublishedOnlineOrderingOpenAt(
+            authority: OnlineOrderPublishedCheckoutAuthority,
+            now: Date,
+          ): boolean {
+            return isPublishedServiceKindOpenAt(authority, 'ONLINE', now);
+          }
+          '''
+          text = text[:start] + replacement + text[end:]
+
+          old_policy = '''  if (!isPublishedOnlineOrderingOpenAt(authority, new Date())) {
+            return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+          }
+          '''
+          new_policy = '''  const now = new Date();
+          if (!isPublishedOnlineOrderingOpenAt(authority, now)) {
+            return errorResponse(409, ONLINE_ORDERING_OUTSIDE_HOURS);
+          }
+          const fulfillmentServiceKind =
+            request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN';
+          if (!isPublishedServiceKindOpenAt(authority, fulfillmentServiceKind, now)) {
+            return errorResponse(409, 'fulfillment_outside_hours');
+          }
+          '''
+          if text.count(old_policy) != 1:
+            raise SystemExit(f'expected one checkout hours block, found {text.count(old_policy)}')
+          text = text.replace(old_policy, new_policy)
+          intake_path.write_text(text)
+
+          workflow_path = Path('.github/workflows/admin-catalog-settings-tdd.yml')
+          workflow = workflow_path.read_text()
+          replacements = [
+            (
+              '          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts\n',
+              '          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts\n'
+              '          supabase/functions/order-intake/order-intakeFulfillmentHours.test.ts\n',
+            ),
+            (
+              '      - name: Plan 2 round 14 hardening invariant\n'
+              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n',
+              '      - name: Plan 2 round 14 hardening invariant\n'
+              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n'
+              '      - name: Plan 2 round 16 hardening invariant\n'
+              '        run: node scripts/test-admin-plan2-round16-hardening.mjs\n',
+            ),
+            (
+              '      - name: Plan 2 round 14 PostgreSQL behavior\n'
+              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n',
+              '      - name: Plan 2 round 14 PostgreSQL behavior\n'
+              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n'
+              '      - name: Plan 2 round 16 PostgreSQL behavior\n'
+              '        run: node scripts/test-admin-plan2-round16-hardening.mjs\n',
+            ),
+          ]
+          for old, new in replacements:
+            if workflow.count(old) != 1:
+              raise SystemExit(f'expected one workflow insertion anchor, found {workflow.count(old)}: {old!r}')
+            workflow = workflow.replace(old, new)
+          workflow_path.write_text(workflow)
+          PY
+      - name: Commit guarded patch and remove one-shot workflow
+        run: |
+          rm .github/workflows/admin-plan2-round16-patcher.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(admin): implement Plan 2 round 16 intake policy"
+          git push origin HEAD:fix/admin-plan2-round16-review
