@@ -18,7 +18,7 @@ jobs:
         with:
           ref: fix/admin-plan2-round16-review
           fetch-depth: 0
-      - name: Apply guarded Round 16 source patches
+      - name: Apply guarded Round 16 intake patch
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -115,44 +115,12 @@ jobs:
           '''
           text = text[:policy_start] + new_policy + text[policy_end:]
           intake_path.write_text(text)
-
-          workflow_path = Path('.github/workflows/admin-catalog-settings-tdd.yml')
-          workflow = workflow_path.read_text()
-          replacements = [
-            (
-              '          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts\n',
-              '          supabase/functions/order-intake/order-intakePublishedSettingsAuthority.test.ts\n'
-              '          supabase/functions/order-intake/order-intakeFulfillmentHours.test.ts\n',
-            ),
-            (
-              '      - name: Plan 2 round 14 hardening invariant\n'
-              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n',
-              '      - name: Plan 2 round 14 hardening invariant\n'
-              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n'
-              '      - name: Plan 2 round 16 hardening invariant\n'
-              '        run: node scripts/test-admin-plan2-round16-hardening.mjs\n',
-            ),
-            (
-              '      - name: Plan 2 round 14 PostgreSQL behavior\n'
-              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n',
-              '      - name: Plan 2 round 14 PostgreSQL behavior\n'
-              '        run: node scripts/test-admin-plan2-round14-hardening.mjs\n'
-              '      - name: Plan 2 round 16 PostgreSQL behavior\n'
-              '        run: node scripts/test-admin-plan2-round16-hardening.mjs\n',
-            ),
-          ]
-          for old, new in replacements:
-            if workflow.count(old) != 1:
-              raise SystemExit(f'expected one workflow insertion anchor, found {workflow.count(old)}: {old!r}')
-            workflow = workflow.replace(old, new)
-          workflow_path.write_text(workflow)
           PY
-      - name: Commit guarded patch and remove one-shot workflow
+      - name: Commit source patch
         run: |
-          rm .github/workflows/admin-plan2-round16-patcher.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add supabase/functions/order-intake/order-intake.ts
           git diff --cached --check
-          git commit -m "fix(admin): implement Plan 2 round 16 intake policy"
+          git commit -m "fix(admin): enforce fulfillment service hours"
           git push origin HEAD:fix/admin-plan2-round16-review
