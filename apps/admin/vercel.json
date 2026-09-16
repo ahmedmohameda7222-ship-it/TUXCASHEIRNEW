@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/admin-config-scheduler",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/admin-approval-executor",
+      "schedule": "* * * * *"
     }
   ],
   "routes": [
