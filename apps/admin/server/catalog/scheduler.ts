@@ -1,4 +1,7 @@
-export type CatalogScheduledChangeKind = 'CATALOG_PUBLISH' | 'PRODUCT_AVAILABILITY';
+export type CatalogScheduledChangeKind =
+  | 'CATALOG_PUBLISH'
+  | 'PRODUCT_AVAILABILITY'
+  | 'SHOP_CONFIG';
 
 export type CatalogScheduledChange = {
   id: string;
@@ -44,6 +47,7 @@ export type CatalogSchedulerDependencies = {
   store: CatalogSchedulerStore;
   publish(change: CatalogScheduledChange): Promise<unknown>;
   setAvailability(change: CatalogScheduledChange): Promise<unknown>;
+  applyShopConfig(change: CatalogScheduledChange): Promise<unknown>;
   materializeRecurring(now: string): Promise<unknown>;
   now?: () => Date;
   batchSize?: number;
@@ -101,7 +105,13 @@ function optionalNonnegativeInteger(value: unknown): number | null {
 }
 
 function readChangeKind(value: unknown): CatalogScheduledChangeKind {
-  if (value === 'CATALOG_PUBLISH' || value === 'PRODUCT_AVAILABILITY') return value;
+  if (
+    value === 'CATALOG_PUBLISH' ||
+    value === 'PRODUCT_AVAILABILITY' ||
+    value === 'SHOP_CONFIG'
+  ) {
+    return value;
+  }
   throw new Error('catalog_scheduler_backend_contract_invalid');
 }
 
@@ -269,6 +279,17 @@ export function createSupabaseCatalogSchedulerExecutors(client: CatalogScheduler
         p_sold_out: soldOut,
       });
     },
+
+    async applyShopConfig(change: CatalogScheduledChange): Promise<unknown> {
+      if (change.changeKind !== 'SHOP_CONFIG') {
+        throw new Error('catalog_scheduler_change_kind_mismatch');
+      }
+      return client.rpc<unknown>('apply_scheduled_shop_config_change_v1', {
+        p_change_id: change.id,
+        p_idempotency_key: change.idempotencyKey,
+        p_attempt_count: change.attemptCount,
+      });
+    },
   };
 }
 
@@ -302,10 +323,18 @@ export async function runCatalogScheduler(
         throw new Error('catalog_scheduler_claimed_change_not_due');
       }
 
-      const result =
-        change.changeKind === 'CATALOG_PUBLISH'
-          ? await dependencies.publish(change)
-          : await dependencies.setAvailability(change);
+      let result: unknown;
+      switch (change.changeKind) {
+        case 'CATALOG_PUBLISH':
+          result = await dependencies.publish(change);
+          break;
+        case 'PRODUCT_AVAILABILITY':
+          result = await dependencies.setAvailability(change);
+          break;
+        case 'SHOP_CONFIG':
+          result = await dependencies.applyShopConfig(change);
+          break;
+      }
       assertSuccessfulExecution(result);
 
       await dependencies.store.markApplied({

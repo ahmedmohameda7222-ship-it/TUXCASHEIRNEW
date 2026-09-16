@@ -19,6 +19,7 @@ import type {
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import type { SettingsScheduleDraft, SettingsScheduleSuccess } from './SettingsSchedulePanel';
 
 export class SettingsUiError extends Error {
   constructor(
@@ -42,6 +43,10 @@ export type SettingOverrideUpdateDraft = {
   value: unknown;
   expectedVersion: number | null;
 };
+
+type SettingsScheduleResult =
+  | ({ ok: true } & SettingsScheduleSuccess)
+  | { ok: false; code: string; currentVersion?: number };
 
 type OrderTypeUpdateCommand = Extract<SettingsCommand, { type: 'order-type.update' }>;
 type PaymentMethodUpdateCommand = Extract<SettingsCommand, { type: 'payment-method.update' }>;
@@ -197,6 +202,34 @@ export function useSettings(shopId: string | undefined) {
     onSuccess: invalidateWorkspace,
   });
 
+  const scheduleSettingsChange = useMutation({
+    mutationFn: async (draft: SettingsScheduleDraft): Promise<SettingsScheduleSuccess> => {
+      if (!shopId) throw new SettingsUiError('concrete_shop_required');
+      const workspace = latestWorkspace();
+      const common = {
+        shopId,
+        expectedSettingsVersion: workspace.settingsVersion,
+        localScheduledAt: draft.localScheduledAt,
+      };
+      const command =
+        draft.mode === 'PUBLISH_SETTINGS'
+          ? { type: 'settings.schedule-publish' as const, ...common }
+          : {
+              type: 'shop.online-orders.schedule' as const,
+              ...common,
+              onlineOrdersPaused: draft.mode === 'PAUSE_ONLINE',
+            };
+      const result = await adminFetch<SettingsScheduleResult>(
+        '/api/admin/settings-schedule',
+        { method: 'POST', body: JSON.stringify(command) },
+        csrfTokenForMutation(session),
+      );
+      if (!result.ok) throw new SettingsUiError(result.code, result.currentVersion);
+      const { ok: _ok, ...success } = result;
+      return success;
+    },
+  });
+
   const updateOperationalState = useMutation({
     mutationFn: async (draft: ShopOperationalStateUpdateDraft): Promise<void> => {
       if (!shopId) throw new SettingsUiError('concrete_shop_required');
@@ -319,6 +352,7 @@ export function useSettings(shopId: string | undefined) {
   return {
     workspaceQuery,
     publish,
+    scheduleSettingsChange,
     updateOperationalState,
     updateShopIdentity: updateShopIdentityMutation,
     upsertWeeklyHours,

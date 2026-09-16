@@ -18,28 +18,28 @@ const migrationPath =
   '../../../../supabase/migrations/20260910122100_admin_plan2_final_review_round7_hardening.sql';
 
 describe('Plan 2 final review round 7 regressions', () => {
-  it('captures service-hour row CAS while refreshing the settings-version fence when pristine', () => {
+  it('captures service-hour row CAS while refreshing pristine editors from canonical rows', () => {
     const shops = source('./ShopsPage.tsx');
 
     expect(shops).toContain('WeeklyHoursRowEditor');
     expect(shops).toContain('SpecialHoursRowEditor');
-    expect(shops).toContain(
-      'const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);',
-    );
-    expect(shops).toContain('useState<WeeklyHoursExpectedRow>');
-    expect(shops).toContain('useState<SpecialHoursExpectedRow>');
-    expect(shops).toContain('const [dirty, setDirty] = useState(false);');
-    expect(shops).toContain('if (dirty) return;');
-    expect(shops).toContain('setExpectedSettingsVersion(settingsVersion);');
+    expect(shops).toContain('reconcileWeeklyHoursEditorState');
+    expect(shops).toContain('reconcileSpecialHoursEditorState');
+    expect(shops).toContain('if (current.dirty) return current;');
+    expect(shops).toContain('expectedSettingsVersion: settingsVersion');
+    expect(shops).toContain('expectedRow: weeklyExpectedRow(hours)');
+    expect(shops).toContain('expectedRow: specialExpectedRow(hours)');
+    expect(shops).toContain('weeklyRemoteFingerprint(hours, settingsVersion)');
+    expect(shops).toContain('specialRemoteFingerprint(hours, settingsVersion)');
   });
 
   it('uses live closed state when reopening a special date', () => {
     const shops = source('./ShopsPage.tsx');
 
-    expect(shops).toContain('useState(hours.closed)');
-    expect(shops).toContain('checked={closed}');
-    expect(shops).toContain('setClosed(event.currentTarget.checked)');
-    expect(shops).toContain('disabled={busy || closed}');
+    expect(shops).toContain('closed: hours.closed');
+    expect(shops).toContain('checked={editor.closed}');
+    expect(shops).toContain('closed: value');
+    expect(shops).toContain('disabled={busy || editor.closed}');
   });
 
   it('uses second precision in the public hours authority', () => {

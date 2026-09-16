@@ -65,6 +65,7 @@ describe('catalog scheduler', () => {
       store,
       publish,
       setAvailability: vi.fn(),
+      applyShopConfig: vi.fn(),
       materializeRecurring: vi.fn().mockResolvedValue({ ok: true, materialized: 0 }),
       now: () => new Date('2026-09-11T05:00:00.000Z'),
     };
@@ -101,6 +102,7 @@ describe('catalog scheduler', () => {
       store,
       publish,
       setAvailability: vi.fn(),
+      applyShopConfig: vi.fn(),
       materializeRecurring: vi.fn().mockResolvedValue({ ok: true, materialized: 0 }),
       now: () => new Date('2026-09-11T05:00:00.000Z'),
     });
@@ -142,6 +144,7 @@ describe('catalog scheduler', () => {
       store,
       publish: vi.fn(),
       setAvailability: vi.fn(),
+      applyShopConfig: vi.fn(),
       materializeRecurring,
       now: () => new Date('2026-09-11T18:00:00.000Z'),
     });
@@ -218,6 +221,43 @@ describe('catalog scheduler', () => {
       p_rule_id: 'rule-1',
       p_rule_version: 3,
       p_transition: 'EXIT',
+    });
+  });
+
+  it('routes SHOP_CONFIG jobs through the claim-fenced replay-safe trusted RPC', async () => {
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      void name;
+      void payload;
+      return { ok: true, settingsVersion: 13, replayed: true };
+    });
+    const client: CatalogSchedulerRpcClient = {
+      async rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
+        return (await rpc(name, payload)) as T;
+      },
+    };
+    const executors = createSupabaseCatalogSchedulerExecutors(client);
+    const change: CatalogScheduledChange = {
+      id: 'schedule-shop-config-1',
+      businessId: 'business-1',
+      shopId: 'shop-a',
+      createdByEmployeeId: 'employee-1',
+      changeKind: 'SHOP_CONFIG',
+      payload: { kind: 'SETTINGS_SNAPSHOT' },
+      scheduledFor: '2026-09-11T06:00:00.000Z',
+      targetBasePublishVersion: null,
+      idempotencyKey: 'shop-config:shop-a:12:2026-09-11T08:00:00',
+      attemptCount: 2,
+    };
+
+    await expect(executors.applyShopConfig(change)).resolves.toEqual({
+      ok: true,
+      settingsVersion: 13,
+      replayed: true,
+    });
+    expect(rpc).toHaveBeenCalledWith('apply_scheduled_shop_config_change_v1', {
+      p_change_id: 'schedule-shop-config-1',
+      p_idempotency_key: 'shop-config:shop-a:12:2026-09-11T08:00:00',
+      p_attempt_count: 2,
     });
   });
 

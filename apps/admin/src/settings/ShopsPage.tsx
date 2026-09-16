@@ -4,8 +4,9 @@ import type {
   SpecialHoursExpectedRow,
   WeeklyHoursExpectedRow,
 } from '@tux/admin-contracts';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { SettingsSchedulePanel } from './SettingsSchedulePanel';
 import type {
   ShopIdentityUpdateDraft,
   ShopSpecialHoursUpdateDraft,
@@ -41,6 +42,25 @@ type SpecialForm = {
   opensLocal: string;
   closesLocal: string;
   note: string;
+};
+
+export type WeeklyHoursEditorState = {
+  expectedSettingsVersion: number;
+  expectedRow: WeeklyHoursExpectedRow;
+  form: WeeklyForm;
+  dirty: boolean;
+};
+
+export type SpecialHoursEditorState = {
+  expectedSettingsVersion: number;
+  expectedRow: SpecialHoursExpectedRow;
+  serviceDate: string;
+  serviceKind: ShopHoursServiceKind;
+  closed: boolean;
+  opensLocal: string;
+  closesLocal: string;
+  note: string;
+  dirty: boolean;
 };
 
 function timeInput(value: string | null): string {
@@ -86,6 +106,68 @@ function specialExpectedRow(
   };
 }
 
+export function reconcileWeeklyHoursEditorState(
+  current: WeeklyHoursEditorState,
+  hours: AdminSettingsWorkspace['weeklyHours'][number],
+  settingsVersion: number,
+): WeeklyHoursEditorState {
+  if (current.dirty) return current;
+  return {
+    expectedSettingsVersion: settingsVersion,
+    expectedRow: weeklyExpectedRow(hours),
+    form: weeklyForm(hours),
+    dirty: false,
+  };
+}
+
+export function reconcileSpecialHoursEditorState(
+  current: SpecialHoursEditorState,
+  hours: AdminSettingsWorkspace['specialHours'][number],
+  settingsVersion: number,
+): SpecialHoursEditorState {
+  if (current.dirty) return current;
+  return {
+    expectedSettingsVersion: settingsVersion,
+    expectedRow: specialExpectedRow(hours),
+    serviceDate: hours.serviceDate,
+    serviceKind: hours.serviceKind,
+    closed: hours.closed,
+    opensLocal: timeInput(hours.opensLocal),
+    closesLocal: timeInput(hours.closesLocal),
+    note: hours.note ?? '',
+    dirty: false,
+  };
+}
+
+function weeklyRemoteFingerprint(
+  hours: AdminSettingsWorkspace['weeklyHours'][number],
+  settingsVersion: number,
+): string {
+  return JSON.stringify([
+    settingsVersion,
+    hours.serviceKind,
+    hours.dayOfWeek,
+    hours.opensLocal,
+    hours.closesLocal,
+    hours.active,
+  ]);
+}
+
+function specialRemoteFingerprint(
+  hours: AdminSettingsWorkspace['specialHours'][number],
+  settingsVersion: number,
+): string {
+  return JSON.stringify([
+    settingsVersion,
+    hours.serviceDate,
+    hours.serviceKind,
+    hours.closed,
+    hours.opensLocal,
+    hours.closesLocal,
+    hours.note,
+  ]);
+}
+
 function WeeklyHoursRowEditor({
   hours,
   settingsVersion,
@@ -97,48 +179,38 @@ function WeeklyHoursRowEditor({
   onUpsert: ((draft: ShopWeeklyHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
-  const [expectedRow, setExpectedRow] = useState<WeeklyHoursExpectedRow>(() =>
-    weeklyExpectedRow(hours),
-  );
-  const [form, setForm] = useState<WeeklyForm>(() => weeklyForm(hours));
-  const [dirty, setDirty] = useState(false);
+  const [editor, setEditor] = useState<WeeklyHoursEditorState>(() => ({
+    expectedSettingsVersion: settingsVersion,
+    expectedRow: weeklyExpectedRow(hours),
+    form: weeklyForm(hours),
+    dirty: false,
+  }));
+  const remoteFingerprint = weeklyRemoteFingerprint(hours, settingsVersion);
+  const lastRemoteFingerprint = useRef(remoteFingerprint);
 
   useEffect(() => {
-    if (dirty) return;
-    if (settingsVersion === expectedSettingsVersion) return;
-    setExpectedSettingsVersion(settingsVersion);
-    setExpectedRow(weeklyExpectedRow(hours));
-    setForm(weeklyForm(hours));
-  }, [
-    dirty,
-    expectedSettingsVersion,
-    hours.active,
-    hours.closesLocal,
-    hours.dayOfWeek,
-    hours.opensLocal,
-    hours.serviceKind,
-    settingsVersion,
-  ]);
+    if (remoteFingerprint === lastRemoteFingerprint.current) return;
+    lastRemoteFingerprint.current = remoteFingerprint;
+    setEditor((current) => reconcileWeeklyHoursEditorState(current, hours, settingsVersion));
+  }, [hours, remoteFingerprint, settingsVersion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!onUpsert || busy) return;
     const nextRow: WeeklyHoursExpectedRow = {
-      serviceKind: form.serviceKind,
-      dayOfWeek: form.dayOfWeek,
-      opensLocal: canonicalExpectedTime(form.opensLocal),
-      closesLocal: canonicalExpectedTime(form.closesLocal),
-      active: form.active,
+      serviceKind: editor.form.serviceKind,
+      dayOfWeek: editor.form.dayOfWeek,
+      opensLocal: canonicalExpectedTime(editor.form.opensLocal),
+      closesLocal: canonicalExpectedTime(editor.form.closesLocal),
+      active: editor.form.active,
     };
     await onUpsert({
       hoursId: hours.id,
       ...nextRow,
-      expectedSettingsVersion,
-      expectedRow,
+      expectedSettingsVersion: editor.expectedSettingsVersion,
+      expectedRow: editor.expectedRow,
     });
-    setExpectedRow(nextRow);
-    setDirty(false);
+    setEditor((current) => ({ ...current, expectedRow: nextRow, dirty: false }));
   }
 
   return (
@@ -148,13 +220,14 @@ function WeeklyHoursRowEditor({
     >
       <div className="admin-settings-grid">
         <select
-          value={form.serviceKind}
+          value={editor.form.serviceKind}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setForm((current) => ({
+            const value = event.currentTarget.value as ShopHoursServiceKind;
+            setEditor((current) => ({
               ...current,
-              serviceKind: event.currentTarget.value as ShopHoursServiceKind,
+              dirty: true,
+              form: { ...current.form, serviceKind: value },
             }));
           }}
         >
@@ -166,41 +239,57 @@ function WeeklyHoursRowEditor({
           type="number"
           min={0}
           max={6}
-          value={form.dayOfWeek}
+          value={editor.form.dayOfWeek}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setForm((current) => ({ ...current, dayOfWeek: Number(event.currentTarget.value) }));
+            const value = Number(event.currentTarget.value);
+            setEditor((current) => ({
+              ...current,
+              dirty: true,
+              form: { ...current.form, dayOfWeek: value },
+            }));
           }}
         />
         <input
           type="time"
           step={1}
-          value={form.opensLocal}
+          value={editor.form.opensLocal}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setForm((current) => ({ ...current, opensLocal: event.currentTarget.value }));
+            const value = event.currentTarget.value;
+            setEditor((current) => ({
+              ...current,
+              dirty: true,
+              form: { ...current.form, opensLocal: value },
+            }));
           }}
         />
         <input
           type="time"
           step={1}
-          value={form.closesLocal}
+          value={editor.form.closesLocal}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setForm((current) => ({ ...current, closesLocal: event.currentTarget.value }));
+            const value = event.currentTarget.value;
+            setEditor((current) => ({
+              ...current,
+              dirty: true,
+              form: { ...current.form, closesLocal: value },
+            }));
           }}
         />
         <label className="admin-check-field">
           <input
             type="checkbox"
-            checked={form.active}
+            checked={editor.form.active}
             disabled={busy}
             onChange={(event) => {
-              setDirty(true);
-              setForm((current) => ({ ...current, active: event.currentTarget.checked }));
+              const value = event.currentTarget.checked;
+              setEditor((current) => ({
+                ...current,
+                dirty: true,
+                form: { ...current.form, active: value },
+              }));
             }}
           />
           <span>Active</span>
@@ -224,73 +313,57 @@ function SpecialHoursRowEditor({
   onUpsert: ((draft: ShopSpecialHoursUpdateDraft) => void | Promise<void>) | undefined;
   busy: boolean;
 }) {
-  const [expectedSettingsVersion, setExpectedSettingsVersion] = useState(settingsVersion);
-  const [expectedRow, setExpectedRow] = useState<SpecialHoursExpectedRow>(() =>
-    specialExpectedRow(hours),
-  );
-  const [serviceDate, setServiceDate] = useState(hours.serviceDate);
-  const [serviceKind, setServiceKind] = useState(hours.serviceKind);
-  const [closed, setClosed] = useState(hours.closed);
-  const [opensLocal, setOpensLocal] = useState(timeInput(hours.opensLocal));
-  const [closesLocal, setClosesLocal] = useState(timeInput(hours.closesLocal));
-  const [note, setNote] = useState(hours.note ?? '');
-  const [dirty, setDirty] = useState(false);
+  const [editor, setEditor] = useState<SpecialHoursEditorState>(() => ({
+    expectedSettingsVersion: settingsVersion,
+    expectedRow: specialExpectedRow(hours),
+    serviceDate: hours.serviceDate,
+    serviceKind: hours.serviceKind,
+    closed: hours.closed,
+    opensLocal: timeInput(hours.opensLocal),
+    closesLocal: timeInput(hours.closesLocal),
+    note: hours.note ?? '',
+    dirty: false,
+  }));
+  const remoteFingerprint = specialRemoteFingerprint(hours, settingsVersion);
+  const lastRemoteFingerprint = useRef(remoteFingerprint);
 
   useEffect(() => {
-    if (dirty) return;
-    if (settingsVersion === expectedSettingsVersion) return;
-    setExpectedSettingsVersion(settingsVersion);
-    setExpectedRow(specialExpectedRow(hours));
-    setServiceDate(hours.serviceDate);
-    setServiceKind(hours.serviceKind);
-    setClosed(hours.closed);
-    setOpensLocal(timeInput(hours.opensLocal));
-    setClosesLocal(timeInput(hours.closesLocal));
-    setNote(hours.note ?? '');
-  }, [
-    dirty,
-    expectedSettingsVersion,
-    hours.closed,
-    hours.closesLocal,
-    hours.note,
-    hours.opensLocal,
-    hours.serviceDate,
-    hours.serviceKind,
-    settingsVersion,
-  ]);
+    if (remoteFingerprint === lastRemoteFingerprint.current) return;
+    lastRemoteFingerprint.current = remoteFingerprint;
+    setEditor((current) => reconcileSpecialHoursEditorState(current, hours, settingsVersion));
+  }, [hours, remoteFingerprint, settingsVersion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!onUpsert || busy) return;
     const nextRow: SpecialHoursExpectedRow = {
-      serviceDate,
-      serviceKind,
-      closed,
-      opensLocal: closed ? null : canonicalExpectedTime(opensLocal),
-      closesLocal: closed ? null : canonicalExpectedTime(closesLocal),
-      note: note.trim() || null,
+      serviceDate: editor.serviceDate,
+      serviceKind: editor.serviceKind,
+      closed: editor.closed,
+      opensLocal: editor.closed ? null : canonicalExpectedTime(editor.opensLocal),
+      closesLocal: editor.closed ? null : canonicalExpectedTime(editor.closesLocal),
+      note: editor.note.trim() || null,
     };
     await onUpsert({
       hoursId: hours.id,
       ...nextRow,
       active: true,
-      expectedSettingsVersion,
-      expectedRow,
+      expectedSettingsVersion: editor.expectedSettingsVersion,
+      expectedRow: editor.expectedRow,
     });
-    setExpectedRow(nextRow);
-    setDirty(false);
+    setEditor((current) => ({ ...current, expectedRow: nextRow, dirty: false }));
   }
 
   async function deactivate() {
     if (!onUpsert || busy) return;
     await onUpsert({
       hoursId: hours.id,
-      ...expectedRow,
+      ...editor.expectedRow,
       active: false,
-      expectedSettingsVersion,
-      expectedRow,
+      expectedSettingsVersion: editor.expectedSettingsVersion,
+      expectedRow: editor.expectedRow,
     });
-    setDirty(false);
+    setEditor((current) => ({ ...current, dirty: false }));
   }
 
   return (
@@ -301,19 +374,19 @@ function SpecialHoursRowEditor({
       <div className="admin-settings-grid">
         <input
           type="date"
-          value={serviceDate}
+          value={editor.serviceDate}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setServiceDate(event.currentTarget.value);
+            const value = event.currentTarget.value;
+            setEditor((current) => ({ ...current, dirty: true, serviceDate: value }));
           }}
         />
         <select
-          value={serviceKind}
+          value={editor.serviceKind}
           disabled={busy}
           onChange={(event) => {
-            setDirty(true);
-            setServiceKind(event.currentTarget.value as ShopHoursServiceKind);
+            const value = event.currentTarget.value as ShopHoursServiceKind;
+            setEditor((current) => ({ ...current, dirty: true, serviceKind: value }));
           }}
         >
           <option value="OPEN">Open</option>
@@ -323,11 +396,11 @@ function SpecialHoursRowEditor({
         <label className="admin-check-field">
           <input
             type="checkbox"
-            checked={closed}
+            checked={editor.closed}
             disabled={busy}
             onChange={(event) => {
-              setDirty(true);
-              setClosed(event.currentTarget.checked);
+              const value = event.currentTarget.checked;
+              setEditor((current) => ({ ...current, dirty: true, closed: value }));
             }}
           />
           <span>Closed all day</span>
@@ -335,31 +408,31 @@ function SpecialHoursRowEditor({
         <input
           type="time"
           step={1}
-          value={opensLocal}
-          disabled={busy || closed}
+          value={editor.opensLocal}
+          disabled={busy || editor.closed}
           onChange={(event) => {
-            setDirty(true);
-            setOpensLocal(event.currentTarget.value);
+            const value = event.currentTarget.value;
+            setEditor((current) => ({ ...current, dirty: true, opensLocal: value }));
           }}
         />
         <input
           type="time"
           step={1}
-          value={closesLocal}
-          disabled={busy || closed}
+          value={editor.closesLocal}
+          disabled={busy || editor.closed}
           onChange={(event) => {
-            setDirty(true);
-            setClosesLocal(event.currentTarget.value);
+            const value = event.currentTarget.value;
+            setEditor((current) => ({ ...current, dirty: true, closesLocal: value }));
           }}
         />
         <input
-          value={note}
+          value={editor.note}
           maxLength={500}
           disabled={busy}
           placeholder="Note"
           onChange={(event) => {
-            setDirty(true);
-            setNote(event.currentTarget.value);
+            const value = event.currentTarget.value;
+            setEditor((current) => ({ ...current, dirty: true, note: value }));
           }}
         />
       </div>
@@ -615,6 +688,8 @@ export function ShopsPage({
           <small>Service-hours wall-clock authority is fixed to Africa/Cairo.</small>
         </article>
       </div>
+
+      <SettingsSchedulePanel workspace={workspace} busy={busy} />
 
       <div className="admin-settings-subsection">
         <h3>Weekly service hours</h3>
