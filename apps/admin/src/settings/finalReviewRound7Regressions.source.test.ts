@@ -78,9 +78,12 @@ describe('Plan 2 final review round 7 regressions', () => {
 
     expect(migration).toContain('settings_publication_kind');
     expect(migration).toContain("'emergency_operational_state'");
+    expect(migration).toContain("'scheduled_settings_publish'");
     expect(migration).toContain("'scheduled_online_orders_state'");
     expect(migration).toContain('apply_scheduled_shop_config_change_v1');
-    expect(migration).toContain("'emergency_operational_state', 'scheduled_online_orders_state'");
+    expect(migration).toContain(
+      "'emergency_operational_state', 'scheduled_settings_publish', 'scheduled_online_orders_state'",
+    );
     expect(migration).not.toContain("last_error = 'replaced_by_reschedule'");
   });
 });
