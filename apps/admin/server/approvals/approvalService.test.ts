@@ -90,6 +90,51 @@ describe('approvalService', () => {
     expect(deps.decideRequest).not.toHaveBeenCalled();
   });
 
+  it('rejects a shop-scoped manager from approving a business-wide request', async () => {
+    const deps = dependencies({
+      loadRequest: vi.fn(async () => ({ ...pendingRequest, shopId: null })),
+    });
+
+    const result = await approveRequest(
+      { requestId: pendingRequest.id, pin: '482731' },
+      approver,
+      deps,
+    );
+
+    expect(result).toEqual({ ok: false, code: 'approval_shop_scope_forbidden' });
+    expect(deps.verifyEmployeePin).not.toHaveBeenCalled();
+    expect(deps.decideRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a shop-scoped manager from creating a business-wide request', async () => {
+    const deps = dependencies();
+    const registry = createApprovalCommandRegistry([
+      {
+        actionType: 'SAFE_TEST_COMMAND',
+        containsSecretInput: false,
+        serialize: (input: unknown) => ({ entityId: (input as { entityId: string }).entityId }),
+      },
+    ]);
+
+    const result = await requestApproval(
+      {
+        businessId: 'business-1',
+        shopId: null,
+        ruleId: 'rule-1',
+        actionType: 'SAFE_TEST_COMMAND',
+        commandId: 'command-business-wide',
+        commandInput: { entityId: 'entity-1' },
+        requiresRequesterRepin: false,
+      },
+      approver,
+      deps,
+      registry,
+    );
+
+    expect(result).toEqual({ ok: false, code: 'approval_shop_scope_forbidden' });
+    expect(deps.createRequest).not.toHaveBeenCalled();
+  });
+
   it('requires requester re-PIN when the approval rule requires it without persisting the PIN', async () => {
     const sentinelPin = '482731';
     const verifyEmployeePin = vi.fn(async () => true);
