@@ -1,0 +1,1 @@
+Temporary marker used only to obtain a user-authored exact-head pull-request synchronization after the self-cleaning Round 17 ledger commit. It is deleted immediately in the next commit; no product, workflow, or runtime behavior depends on it.
