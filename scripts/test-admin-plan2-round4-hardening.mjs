@@ -94,14 +94,18 @@ insert into public.catalog_publish_versions(
 create temp table round4_catalog_publish_calls(
   expected_base bigint not null,
   observed_base bigint not null,
-  observed_sold_out boolean not null
+  observed_sold_out boolean not null,
+  require_current_employee_authority boolean not null
 ) on commit drop;
 
-create or replace function public.publish_catalog_draft_v1(
+-- Observe the scheduler's actual publish seam. Manual publication has its own current-user
+-- authorization wrapper; accepted scheduled publication must arrive here under scheduler authority.
+create or replace function private.publish_admin_catalog_draft_authorized_v1(
   p_employee_id uuid,
   p_draft_id uuid,
   p_expected_draft_revision bigint,
-  p_expected_base_publish_version bigint
+  p_expected_base_publish_version bigint,
+  p_require_current_employee_authority boolean
 )
 returns jsonb
 language plpgsql
@@ -117,8 +121,11 @@ begin
   from public.catalog_drafts d
   where d.id = p_draft_id;
 
-  insert into pg_temp.round4_catalog_publish_calls(expected_base, observed_base, observed_sold_out)
-  values (p_expected_base_publish_version, v_base, v_sold_out);
+  insert into pg_temp.round4_catalog_publish_calls(
+    expected_base, observed_base, observed_sold_out, require_current_employee_authority
+  ) values (
+    p_expected_base_publish_version, v_base, v_sold_out, p_require_current_employee_authority
+  );
 
   return jsonb_build_object(
     'ok', true,
@@ -160,9 +167,10 @@ begin
   from pg_temp.round4_catalog_publish_calls c
   where c.expected_base = 2
     and c.observed_base = 2
-    and c.observed_sold_out = true;
+    and c.observed_sold_out = true
+    and c.require_current_employee_authority = false;
   if v_call_count <> 1 then
-    raise exception 'strict publish did not receive the rebased recurring-only draft';
+    raise exception 'scheduler-authority publish did not receive the rebased recurring-only draft';
   end if;
 end $$;
 
@@ -199,9 +207,11 @@ begin
       v_base, v_sold_out;
   end if;
 
-  select count(*) into v_call_count from pg_temp.round4_catalog_publish_calls;
+  select count(*) into v_call_count
+  from pg_temp.round4_catalog_publish_calls c
+  where c.require_current_employee_authority = false;
   if v_call_count <> 2 then
-    raise exception 'strict publish did not run exactly once for immediate-availability rebase';
+    raise exception 'scheduler-authority publish did not run exactly once for immediate-availability rebase';
   end if;
 end $$;
 
@@ -228,7 +238,7 @@ begin
 
   select count(*) into v_call_count from pg_temp.round4_catalog_publish_calls;
   if v_call_count <> 2 then
-    raise exception 'strict publish ran despite content stale version';
+    raise exception 'scheduler-authority publish ran despite content stale version';
   end if;
 end $$;
 
