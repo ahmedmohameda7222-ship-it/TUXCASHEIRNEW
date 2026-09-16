@@ -1,10 +1,10 @@
-import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
+  type AdminSessionContext,
 } from '../../server/adminAuthService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
@@ -98,33 +98,33 @@ function parseScheduleResult(value: unknown): ScheduleResult {
   };
 }
 
-async function loadPrincipal(
+async function loadContext(
   request: AdminRequest,
   client: AdminSupabaseClient,
-): Promise<AdminSessionPrincipal> {
+): Promise<AdminSessionContext> {
   const token = readAdminSessionToken(firstHeader(request.headers.cookie));
   if (!token) throw new AdminAuthError('session_required', 401);
   const context = await loadAdminSession(token, client);
   requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
-  return context.principal;
+  return context;
 }
 
 async function executeSchedule(
   client: AdminSupabaseClient,
   command: ScheduleCommand,
-  principal: AdminSessionPrincipal,
+  context: AdminSessionContext,
 ): Promise<ScheduleResult> {
-  requirePermission(principal, 'settings.manage', command.shopId);
+  requirePermission(context.principal, 'settings.manage', command.shopId);
   const result =
     command.type === 'settings.schedule-publish'
       ? await client.rpc<unknown>('schedule_shop_settings_publish_v1', {
-          p_employee_id: principal.employeeId,
+          p_employee_id: context.employee.id,
           p_shop_id: command.shopId,
           p_expected_settings_version: command.expectedSettingsVersion,
           p_local_scheduled_at: command.localScheduledAt,
         })
       : await client.rpc<unknown>('schedule_shop_online_orders_state_v1', {
-          p_employee_id: principal.employeeId,
+          p_employee_id: context.employee.id,
           p_shop_id: command.shopId,
           p_online_orders_paused: command.onlineOrdersPaused,
           p_expected_settings_version: command.expectedSettingsVersion,
@@ -150,8 +150,8 @@ export default async function handler(
       return;
     }
     const client = new AdminSupabaseClient(getAdminServerEnv());
-    const principal = await loadPrincipal(request, client);
-    sendJson(response, 200, await executeSchedule(client, parsed.data, principal));
+    const context = await loadContext(request, client);
+    sendJson(response, 200, await executeSchedule(client, parsed.data, context));
   } catch (error) {
     if (error instanceof AdminAuthError) {
       sendJson(response, error.status, { error: error.code });
