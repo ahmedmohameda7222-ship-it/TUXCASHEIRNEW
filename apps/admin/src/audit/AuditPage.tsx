@@ -103,6 +103,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>From date</span>
           <input
+            aria-label="From date"
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.currentTarget.value)}
@@ -111,6 +112,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>To date</span>
           <input
+            aria-label="To date"
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.currentTarget.value)}
@@ -118,7 +120,11 @@ export function AuditPage() {
         </label>
         <label className="admin-field">
           <span>Shop</span>
-          <select value={shopId} onChange={(event) => setShopId(event.currentTarget.value)}>
+          <select
+            aria-label="Shop"
+            value={shopId}
+            onChange={(event) => setShopId(event.currentTarget.value)}
+          >
             <option value="">All authorized shops</option>
             {principal.shopIds.map((authorizedShopId, index) => (
               <option key={authorizedShopId} value={authorizedShopId}>
@@ -130,6 +136,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>Actor</span>
           <select
+            aria-label="Actor"
             value={actorEmployeeId}
             onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
           >
@@ -144,6 +151,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>Action</span>
           <input
+            aria-label="Action"
             value={actionType}
             onChange={(event) => setActionType(event.currentTarget.value)}
           />
@@ -151,6 +159,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>Entity</span>
           <input
+            aria-label="Entity"
             value={entityType}
             onChange={(event) => setEntityType(event.currentTarget.value)}
           />
@@ -158,6 +167,7 @@ export function AuditPage() {
         <label className="admin-field">
           <span>Approval status</span>
           <select
+            aria-label="Approval status"
             value={approvalStatus}
             onChange={(event) =>
               setApprovalStatus(event.currentTarget.value as AdminApprovalStatus | '')
