@@ -1,11 +1,5 @@
 import type { AdminSettingsWorkspace } from '@tux/admin-contracts';
-import {
-  createContext,
-  useContext,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
 
 export type SettingsScheduleMode = 'PUBLISH_SETTINGS' | 'PAUSE_ONLINE' | 'RESUME_ONLINE';
 
@@ -119,8 +113,8 @@ export function SettingsSchedulePanel({
         {action?.busy ? 'Scheduling…' : 'Schedule change'}
       </button>
       <small>
-        Publishing staged settings covers configured opening/delivery/online hours and other settings
-        owned by this workspace. Emergency controls above remain immediate.
+        Publishing staged settings covers configured opening/delivery/online hours and other
+        settings owned by this workspace. Emergency controls above remain immediate.
       </small>
       {message ? (
         <p className="admin-field__help" aria-live="polite">
