@@ -66,7 +66,7 @@ export async function listAuditReadModels(
 ): Promise<AuditReadModel[]> {
   let statusMatchedApprovals: ApprovalRow[] | null = null;
   if (filters.approvalStatus) {
-    statusMatchedApprovals = await client.select<ApprovalRow[]>(
+    const approvalRows = await client.select<ApprovalRow[]>(
       'admin_approval_requests',
       new URLSearchParams({
         select: 'id,status',
@@ -74,6 +74,9 @@ export async function listAuditReadModels(
         status: `eq.${filters.approvalStatus}`,
         limit: '100',
       }),
+    );
+    statusMatchedApprovals = approvalRows.filter(
+      (approval) => approval.status === filters.approvalStatus,
     );
     if (statusMatchedApprovals.length === 0) return [];
   }
