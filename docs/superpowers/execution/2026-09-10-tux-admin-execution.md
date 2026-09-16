@@ -141,15 +141,15 @@ The final acceptance head is the commit containing this ledger update together w
 
 1. Plan 2 extends the existing canonical catalog and settings authorities; it does not create a second runtime truth. Menu and Operations consume published/effective state only.
 2. Browser code uses the same-origin Admin BFF. Service-role access and canonical settings RPC execution remain inside trusted server boundaries.
-3. Catalog/settings migrations in Plan 2 are repository artifacts only. No Plan 2 migration was applied to production Supabase during implementation.
+3. Plan 2 catalog/settings migrations are additive repository artifacts and are applied to canonical Supabase only after exact-head CI, PostgreSQL behavior, production-safety, and live-readback verification. Canonical production is synchronized through repository migration `20260910123000`.
 4. Settings row edits are optimistic-concurrency writes. `settingsVersion` fences the published settings base and row `editVersion` fences the individual canonical Order Type or Payment Method.
-5. Payment operational semantics are not editable through the normal settings surface. `logicType`, `requiresReconciliation`, and integration identity remain protected/read-only; the editable surface is limited to display name, active state, sort order, channel, reference requirement, manual confirmation requirement, and refund allowance.
+5. Payment operational semantics are not editable through the normal settings surface. `logicType`, `requiresReconciliation`, and integration identity remain protected/read-only; editable fields are limited to policy that has a trusted runtime boundary; unenforced policy remains non-editable.
 6. Order Type edits are limited to name, behavior, active state, and sort order.
-7. Draft/settings changes do not become live merely because an Admin row edit succeeds; the existing publish boundary remains authoritative.
+7. Draft/settings changes do not become live merely because an Admin row edit succeeds; the existing publish boundary remains authoritative. Emergency operational-state publication and approved SHOP_CONFIG schedules use dedicated trusted paths that do not leak unrelated staged edits.
 
 ## Plan 2 Task 5 TDD and hardening evidence
 
-The canonical settings edit boundary was implemented through explicit RED→GREEN cycles across database, service, BFF, client, and rendered UI layers.
+The canonical settings edit boundary was implemented through explicit RED→GREEN cycles across database, service, BFF, client, rendered UI, Operations/Menu consumers, scheduler execution, and canonical PostgreSQL behavior.
 
 ### Canonical row edit schema and migration-chain safety
 
@@ -163,30 +163,64 @@ Service contracts were extended with typed Order Type and Payment Method edit in
 
 ### Workspace and client CAS authority
 
-A RED workspace test proved the management workspace lacked the row-level concurrency token required for safe edits. `editVersion` was then added to the Order Type and Payment Method management contracts plus the canonical database selects/mapping. A follow-up client RED cycle required command builders to derive `expectedSettingsVersion` and `expectedEditVersion` from the latest loaded workspace and fail closed when a shop/row is not loaded. The client mutations invalidate the workspace after a successful edit so the next command uses refreshed row state rather than guessed versions.
+RED workspace/client regressions established that each editable row or form must retain the CAS snapshot captured with the local edit. Order Type, Payment Method, setting override, reason-code, weekly-hours, and special-hours editors preserve dirty snapshots so refreshes produce stale-version conflicts rather than silent overwrites, while pristine editors synchronize to refreshed canonical state. Client mutations invalidate/refetch the workspace after successful edits.
 
 ### Rendered settings management
 
-Rendered E2E was extended before UI implementation to require the actual operator journey: edit an Order Type, save, edit a Payment Method, save, then publish. The first RED failed because the edit controls did not exist. Inline mobile-compatible editors were then added without introducing a second settings state machine or direct browser database writes.
+Rendered E2E requires actual operator workflows for Order Types, Payment Methods, checkout policies, receipt identity/numbering, reason codes, canonical shop identity, emergency state, service hours, scheduled settings publication, and durable schedule outcome visibility. The UI remains a same-origin BFF client and does not introduce direct browser database writes.
 
-The rendered test subsequently exposed an unsafe React handler pattern that read `event.currentTarget` inside a state updater after the event handler returned. Both Order Type and Payment Method editors were corrected to capture input values synchronously before state updates. The final remaining E2E failure was only an ambiguous Playwright text locator after a successful save; the assertion was narrowed to exact row text rather than weakening product behavior.
+### Runtime authority and immutable evidence
 
-### Formatting and regression cleanup
+Published checkout policy reaches trusted POS and ONLINE placement, including minimum order, service charge, tax, discount stacking authority, delivery-fee override, customer-phone requirement, payment channel/zone/reference/manual-confirmation policy, and immutable snapshots. Receipt identity/sequence configuration affects future allocation/printing and persisted historical orders retain their original evidence. Configured cancellation, delivery-return, and cash-variance reason identities are validated and snapshotted through application and remote materialization paths.
 
-Root `format:check` identified only the newly touched settings/E2E files. Exact repository Prettier output was obtained through a temporary test diagnostic, applied verbatim, and the diagnostic was removed before acceptance. No test or production behavior was weakened to satisfy formatting or browser gates.
+Published ONLINE weekly/special hours are evaluated consistently by trusted order intake and public Menu ordering projection in `Africa/Cairo`, including second/fractional-second boundaries. Emergency closure/online-pause publication patches only immutable published state and cannot leak mutable staged settings.
+
+### SHOP_CONFIG scheduling and Round 14 hardening
+
+The approved settings scheduling path supports immutable staged-settings publication plus future online-order pause/resume. Schedule acceptance requires `settings.manage` and the expected published settings version. Execution uses durable claim/idempotency/attempt/replay fences and `shop_settings_versions.scheduled_change_id`.
+
+Round 14 established explicit settings-publication lineage. Accepted SHOP_CONFIG actions may rebase across `EMERGENCY_OPERATIONAL_STATE`, `SCHEDULED_SETTINGS_PUBLISH`, and `SCHEDULED_ONLINE_ORDERS_STATE`; ordinary/manual `SETTINGS_PUBLISH` remains a stale barrier. Full scheduled settings preserve the current emergency `temporaryClosed` and `onlineOrdersPaused` flags at activation time. Distinct future SHOP_CONFIG actions coexist; only an exact idempotency-key match is replay. The durable settings workspace projects PENDING/CLAIMED/APPLIED/CANCELLED, retryable failure, terminal failure, retry timing, attempt count, and stored error details so reload cannot hide a failed advertised activation.
+
+RED evidence for the Round 14 acceptance regressions is Admin Catalog Settings TDD run `35077658613`, catalog-ui job `104733783738`, which failed the newly wired durable-outcome/lineage tests before implementation.
+
+## Plan 2 production migration and readback evidence
+
+Canonical Supabase project `awpdcsayuwbsruwvaosg` is synchronized through repository migration `20260910123000`, including the final scheduler lineage migrations:
+
+- `20260910122700_admin_plan2_final_review_round13_hardening.sql`
+- `20260910122800_admin_plan2_round13_scheduler_ordering_fix.sql`
+- `20260910122900_admin_plan2_final_review_round14_hardening.sql`
+- `20260910123000_admin_plan2_round14_sequence_followup.sql`
+
+Round 14 live readback confirms:
+
+- `shop_settings_versions.settings_publication_kind` exists, is `text NOT NULL`, and is constrained to `SETTINGS_PUBLISH`, `EMERGENCY_OPERATIONAL_STATE`, `SCHEDULED_SETTINGS_PUBLISH`, and `SCHEDULED_ONLINE_ORDERS_STATE`.
+- `update_admin_shop_operational_state_v1` writes `EMERGENCY_OPERATIONAL_STATE`.
+- `private.schedule_admin_shop_config_v1` uses exact idempotency replay and does not bulk-cancel distinct pending future SHOP_CONFIG actions.
+- `apply_scheduled_shop_config_change_v1` permits the three safe intervening lineage kinds and retains `stale_settings_version` for ordinary/manual publication.
+- `claim_due_admin_config_changes_v1` claims `SHOP_CONFIG` while retaining the earlier unresolved recurring-EXIT predecessor fence.
+- trusted scheduling/apply/claim RPCs are service-role-only; browser roles cannot execute them.
+- the live SHOP_CONFIG row count was `0` at final production readback, so no legacy pending jobs required migration/backfill handling.
 
 ## Plan 2 exact-head verification before ledger update
 
-Code head `ca2fa35d473e6ba9de25762a0037d6981ee58c55` passed:
+Exact code head `81cc9b863602d04aaf6d188c1da558be747e0c58` passed all four permanent workflows:
 
-- `Admin Catalog Settings TDD` run `34673086852`: every job GREEN, including `catalog-ui`, `catalog-service`, `catalog-control-invariant`, full PostgreSQL migration-chain/application behavior, `settings-runtime`, `online-order-policy`, `catalog-scheduler`, deployment contract, and rendered catalog/settings E2E.
-- `TUX V2 CI` run `34673086798`: `quality`, `admin`, `edge-security`, `windows-package`, `menu`, `monorepo-architecture`, and `Required quality gate` all GREEN.
-- The `quality` job passed repository format, lint, unit/integration tests, Admin/WhatsApp security and architecture gates, typecheck, production builds, provisioning safety, full migration-chain smoke, Supabase function auth deployment contract, Edge Function typecheck, and root rendered browser E2E.
-- The dedicated Admin job passed security boundary, typecheck, production build, and rendered auth/shop-isolation/responsive-shell E2E.
-- The Menu job passed typecheck, production build, and rendered Menu E2E.
+- `Admin Foundation TDD` run `35081382181` — SUCCESS.
+- `Admin Catalog Settings TDD` run `35081382258` — SUCCESS, including Catalog/Settings UI/service tests, scheduler tests, the permanent `Plan 2 round 14 hardening invariant`, `Plan 2 round 14 PostgreSQL behavior`, complete repository migration chain, trusted runtime authority regressions, Menu compatibility, and rendered Catalog/Settings E2E.
+- `Admin Catalog Settings Boundary TDD` run `35081382193` — SUCCESS, including static boundary invariant and complete PostgreSQL migration-chain behavior.
+- `TUX V2 CI` run `35081382180` — SUCCESS, including format, lint, full unit/integration suite, Admin/WhatsApp security and architecture gates, typecheck, production builds, provisioning safety, migration-chain smoke, Supabase function auth contract, Edge Function typecheck, Admin/Menu/root rendered E2E, Windows package, and required architecture/quality gates.
 
-No production Supabase migration or data write was performed as part of Plan 2 implementation or verification.
+All known Codex review threads on PR #62, including the Round 14 P1 emergency-rebase finding and both P2 independent-schedule/durable-outcome findings, were answered with RED→GREEN plus canonical production evidence and resolved before this ledger update.
 
-## Plan 2 review/merge gate
+## Plan 2 final review/merge gate
 
-Plan 2 implementation is complete on draft PR #62, but the plan remains open until the human-triggered review/merge gate is satisfied. Do not start Plan 3 while PR #62 remains open. Do not merge automatically and do not apply Plan 2 repository migrations to production as part of this gate.
+This ledger commit changes the PR head, so the evidence above is the final implementation evidence immediately before ledger closure, not permission to skip exact-head verification.
+
+PR #62 must not merge until all of the following are true on the ledger-updated exact head:
+
+1. `Admin Foundation TDD`, `Admin Catalog Settings TDD`, `Admin Catalog Settings Boundary TDD`, and `TUX V2 CI` are all SUCCESS.
+2. A fresh Codex review is requested on that exact final head and produces no valid unresolved P0/P1/P2 findings. Any valid finding reopens TDD and production acceptance as appropriate.
+3. Master Gate 2 is explicitly audited: Admin publish/version authority reaches Menu and Operations at the same published version; new orders snapshot the exact configuration evidence; historical orders remain immutable after later publishes; checkout/payment/receipt/shop settings affect their real consumers; reason-code identities validate/snapshot; receipt identity/numbering applies only prospectively; and the full Catalog/Settings regression surface remains GREEN.
+
+After those gates pass, merge PR #62 using its exact expected head, verify post-merge `main` CI, then begin Plan 3 automatically in the approved execution order.
