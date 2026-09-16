@@ -141,7 +141,7 @@ The final acceptance head is the commit containing this ledger update together w
 
 1. Plan 2 extends the existing canonical catalog and settings authorities; it does not create a second runtime truth. Menu and Operations consume published/effective state only.
 2. Browser code uses the same-origin Admin BFF. Service-role access and canonical settings RPC execution remain inside trusted server boundaries.
-3. Plan 2 catalog/settings migrations are additive repository artifacts and are applied to canonical Supabase only after exact-head CI, PostgreSQL behavior, production-safety, and live-readback verification. Canonical production is synchronized through repository migration `20260910123000`.
+3. Plan 2 catalog/settings migrations are additive repository artifacts and are applied to canonical Supabase only after exact-head CI, PostgreSQL behavior, production-safety, and live-readback verification. Canonical production is synchronized through repository migration `20260910123100`.
 4. Settings row edits are optimistic-concurrency writes. `settingsVersion` fences the published settings base and row `editVersion` fences the individual canonical Order Type or Payment Method.
 5. Payment operational semantics are not editable through the normal settings surface. `logicType`, `requiresReconciliation`, and integration identity remain protected/read-only; editable fields are limited to policy that has a trusted runtime boundary; unenforced policy remains non-editable.
 6. Order Type edits are limited to name, behavior, active state, and sort order.
@@ -183,35 +183,52 @@ Round 14 established explicit settings-publication lineage. Accepted SHOP_CONFIG
 
 RED evidence for the Round 14 acceptance regressions is Admin Catalog Settings TDD run `35077658613`, catalog-ui job `104733783738`, which failed the newly wired durable-outcome/lineage tests before implementation.
 
+### Round 15 final-review closure
+
+Fresh Codex review submission `5221372288` on the ledger-predecessor head found two valid final blockers: overdue same-shop SHOP_CONFIG actions could be claimed together and execute out of chronological order after a retryable predecessor failure; and one-shot Cairo wall-clock schedules silently accepted DST-gap and repeated local timestamps.
+
+Round 15 was isolated in PR #77 on branch `fix/admin-plan2-round15-review`. RED run `35084898288`, PostgreSQL job `104757301881`, reproduced both defects on the unfixed repository chain: the same-shop pair reached `pause=CLAIMED, resume=CLAIMED`, and invalid Cairo local-time probes changed durable SHOP_CONFIG row count from `0` to `2`.
+
+Additive migration `20260910123100_admin_plan2_final_review_round15_hardening.sql` introduced strict `private.resolve_admin_cairo_schedule_v1`, wrapped both Catalog draft scheduling and SHOP_CONFIG scheduling with that resolver, and added a same-shop SHOP_CONFIG predecessor fence to `claim_due_admin_config_changes_v1`. Retryable PENDING/CLAIMED/FAILED predecessors now block later actions; APPLIED/CANCELLED/terminal FAILED predecessors release them. Nonexistent Cairo times fail strict round-trip validation and repeated local times are rejected rather than silently disambiguated.
+
+Isolation head `3cf82e962f720a880f775c64b32b83b5dca7a36b` was GREEN in Round 15 `35086445497`, Foundation `35086445452`, Catalog Settings `35086445528`, and Boundary `35086445435`. PR #77 was then promoted into Plan 2 as merge SHA `068684e25db51f2dc186eb74905292ba5c0938e7`.
+
 ## Plan 2 production migration and readback evidence
 
-Canonical Supabase project `awpdcsayuwbsruwvaosg` is synchronized through repository migration `20260910123000`, including the final scheduler lineage migrations:
+Canonical Supabase project `awpdcsayuwbsruwvaosg` is synchronized through exact repository migration `20260910123100`, including the final scheduler lineage/order/time-validation migrations:
 
 - `20260910122700_admin_plan2_final_review_round13_hardening.sql`
 - `20260910122800_admin_plan2_round13_scheduler_ordering_fix.sql`
 - `20260910122900_admin_plan2_final_review_round14_hardening.sql`
 - `20260910123000_admin_plan2_round14_sequence_followup.sql`
+- `20260910123100_admin_plan2_final_review_round15_hardening.sql`
 
-Round 14 live readback confirms:
+Round 14/15 live readback confirms:
 
 - `shop_settings_versions.settings_publication_kind` exists, is `text NOT NULL`, and is constrained to `SETTINGS_PUBLISH`, `EMERGENCY_OPERATIONAL_STATE`, `SCHEDULED_SETTINGS_PUBLISH`, and `SCHEDULED_ONLINE_ORDERS_STATE`.
 - `update_admin_shop_operational_state_v1` writes `EMERGENCY_OPERATIONAL_STATE`.
 - `private.schedule_admin_shop_config_v1` uses exact idempotency replay and does not bulk-cancel distinct pending future SHOP_CONFIG actions.
 - `apply_scheduled_shop_config_change_v1` permits the three safe intervening lineage kinds and retains `stale_settings_version` for ordinary/manual publication.
-- `claim_due_admin_config_changes_v1` claims `SHOP_CONFIG` while retaining the earlier unresolved recurring-EXIT predecessor fence.
-- trusted scheduling/apply/claim RPCs are service-role-only; browser roles cannot execute them.
+- `claim_due_admin_config_changes_v1` claims `SHOP_CONFIG` while retaining the earlier unresolved recurring-EXIT predecessor fence and now also serializing each shop's SHOP_CONFIG actions behind its earliest unresolved predecessor.
+- `private.resolve_admin_cairo_schedule_v1` is live; production timezone probes dynamically discovered `2027-04-30 00:00` as nonexistent and `2027-10-28 23:00` as ambiguous, returning `scheduled_local_time_nonexistent` and `scheduled_local_time_ambiguous` respectively, while ordinary `2027-01-15 12:00` resolved normally.
+- the public Catalog schedule wrapper and private SHOP_CONFIG schedule wrapper both call the strict resolver before durable insertion.
+- `anon` and `authenticated` cannot execute the public Catalog schedule or claim RPCs; `service_role` can. The pre-Round15 legacy Catalog scheduler is not directly executable by browser roles or `service_role`.
 - the live SHOP_CONFIG row count was `0` at final production readback, so no legacy pending jobs required migration/backfill handling.
+- the post-DDL Supabase security advisor reported no new Round15-specific exposed-function finding; its reported RLS/public-catalog/worker-function/password warnings remain pre-existing project-level advisory items rather than Round15 regressions.
+
+Both Round 15 Codex threads were answered with RED→GREEN, exact-head CI, canonical migration, ACL, scheduler-definition, and DST-probe evidence and then resolved.
 
 ## Plan 2 exact-head verification before ledger update
 
-Exact code head `81cc9b863602d04aaf6d188c1da558be747e0c58` passed all four permanent workflows:
+Exact promoted code head `068684e25db51f2dc186eb74905292ba5c0938e7` passed all five permanent workflows before this ledger mutation:
 
-- `Admin Foundation TDD` run `35081382181` — SUCCESS.
-- `Admin Catalog Settings TDD` run `35081382258` — SUCCESS, including Catalog/Settings UI/service tests, scheduler tests, the permanent `Plan 2 round 14 hardening invariant`, `Plan 2 round 14 PostgreSQL behavior`, complete repository migration chain, trusted runtime authority regressions, Menu compatibility, and rendered Catalog/Settings E2E.
-- `Admin Catalog Settings Boundary TDD` run `35081382193` — SUCCESS, including static boundary invariant and complete PostgreSQL migration-chain behavior.
-- `TUX V2 CI` run `35081382180` — SUCCESS, including format, lint, full unit/integration suite, Admin/WhatsApp security and architecture gates, typecheck, production builds, provisioning safety, migration-chain smoke, Supabase function auth contract, Edge Function typecheck, Admin/Menu/root rendered E2E, Windows package, and required architecture/quality gates.
+- `Admin Foundation TDD` run `35086604539` — SUCCESS.
+- `Admin Catalog Settings TDD` run `35086604858` — SUCCESS, including Catalog/Settings UI/service tests, scheduler tests, the full hardening/migration PostgreSQL surface, trusted runtime authority regressions, Menu compatibility, and rendered Catalog/Settings E2E.
+- `Admin Catalog Settings Boundary TDD` run `35086604449` — SUCCESS, including static boundary invariant and complete PostgreSQL migration-chain behavior.
+- `Admin Plan 2 Round 15 TDD` run `35086604610` — SUCCESS, including the dedicated static invariant and fresh PostgreSQL behavior for SHOP_CONFIG serialization and strict Cairo local-time validation.
+- `TUX V2 CI` run `35086604638` — SUCCESS, including format, lint, full unit/integration suite, Admin/WhatsApp security and architecture gates, typecheck, production builds, provisioning safety, migration-chain smoke, Supabase function auth contract, Edge Function typecheck, Admin/Menu/root rendered E2E, Windows package, and `Required quality gate`.
 
-All known Codex review threads on PR #62, including the Round 14 P1 emergency-rebase finding and both P2 independent-schedule/durable-outcome findings, were answered with RED→GREEN plus canonical production evidence and resolved before this ledger update.
+All known Codex review threads on PR #62, including the Round 14 findings and the Round 15 P1 same-shop serialization/P2 Cairo wall-clock findings, were answered with RED→GREEN plus canonical production evidence and resolved before this ledger update.
 
 ## Plan 2 final review/merge gate
 
@@ -219,7 +236,7 @@ This ledger commit changes the PR head, so the evidence above is the final imple
 
 PR #62 must not merge until all of the following are true on the ledger-updated exact head:
 
-1. `Admin Foundation TDD`, `Admin Catalog Settings TDD`, `Admin Catalog Settings Boundary TDD`, and `TUX V2 CI` are all SUCCESS.
+1. `Admin Foundation TDD`, `Admin Catalog Settings TDD`, `Admin Catalog Settings Boundary TDD`, `Admin Plan 2 Round 15 TDD`, and `TUX V2 CI` are all SUCCESS.
 2. A fresh Codex review is requested on that exact final head and produces no valid unresolved P0/P1/P2 findings. Any valid finding reopens TDD and production acceptance as appropriate.
 3. Master Gate 2 is explicitly audited: Admin publish/version authority reaches Menu and Operations at the same published version; new orders snapshot the exact configuration evidence; historical orders remain immutable after later publishes; checkout/payment/receipt/shop settings affect their real consumers; reason-code identities validate/snapshot; receipt identity/numbering applies only prospectively; and the full Catalog/Settings regression surface remains GREEN.
 
