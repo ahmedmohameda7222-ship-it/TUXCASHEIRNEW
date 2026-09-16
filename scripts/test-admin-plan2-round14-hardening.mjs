@@ -1,13 +1,20 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-const migrationPath =
-  'supabase/migrations/20260910122900_admin_plan2_final_review_round14_hardening.sql';
-if (!fs.existsSync(migrationPath)) {
-  throw new Error(`Plan 2 round 14 hardening migration is missing: ${migrationPath}`);
+const migrationPaths = [
+  'supabase/migrations/20260910122900_admin_plan2_final_review_round14_hardening.sql',
+  'supabase/migrations/20260910123000_admin_plan2_round14_sequence_followup.sql',
+];
+for (const migrationPath of migrationPaths) {
+  if (!fs.existsSync(migrationPath)) {
+    throw new Error(`Plan 2 round 14 hardening migration is missing: ${migrationPath}`);
+  }
 }
 
-const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
+const sql = migrationPaths
+  .map((migrationPath) => fs.readFileSync(migrationPath, 'utf8'))
+  .join('\n')
+  .toLowerCase();
 for (const fragment of [
   'settings_publication_kind',
   "'emergency_operational_state'",
