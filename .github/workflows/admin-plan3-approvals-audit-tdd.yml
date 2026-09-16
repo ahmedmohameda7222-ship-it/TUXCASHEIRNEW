@@ -8,6 +8,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
       - 'apps/admin/api/admin/approvals.ts'
@@ -27,6 +28,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
       - 'apps/admin/api/admin/approvals.ts'
@@ -53,6 +55,16 @@ jobs:
           node-version: 24
       - name: Plan 3 approvals and audit invariant
         run: node scripts/test-admin-approvals-audit-migration.mjs
+
+  review-static-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 3 review hardening invariant
+        run: node scripts/test-admin-approvals-audit-review-hardening-static.mjs
 
   approval-services:
     runs-on: ubuntu-latest
@@ -145,3 +157,5 @@ jobs:
         run: node scripts/test-migrations.mjs
       - name: Plan 3 approvals and audit PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-migration.mjs
+      - name: Plan 3 review hardening PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening.mjs
