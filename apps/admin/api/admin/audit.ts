@@ -1,3 +1,4 @@
+import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService';
@@ -11,6 +12,14 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 const uuidSchema = z.string().uuid();
 const textFilterSchema = z.string().trim().min(1).max(160);
 const instantSchema = z.string().datetime({ offset: true });
+const approvalStatusSchema = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'EXECUTING',
+  'EXECUTED',
+  'FAILED',
+]);
 
 function handleFailure(response: AdminResponse, error: unknown): void {
   if (error instanceof AdminAuthError) {
@@ -52,38 +61,27 @@ export default async function handler(
 
     const parseOptional = <T>(value: string | null, schema: z.ZodType<T>): T | undefined =>
       value === null ? undefined : schema.parse(value);
+    const actorEmployeeId = parseOptional(
+      requestUrl.searchParams.get('actorEmployeeId'),
+      uuidSchema,
+    );
+    const actionType = parseOptional(requestUrl.searchParams.get('actionType'), textFilterSchema);
+    const entityType = parseOptional(requestUrl.searchParams.get('entityType'), textFilterSchema);
+    const approvalStatus = parseOptional(
+      requestUrl.searchParams.get('approvalStatus'),
+      approvalStatusSchema,
+    ) as AdminApprovalStatus | undefined;
+    const from = parseOptional(requestUrl.searchParams.get('from'), instantSchema);
+    const to = parseOptional(requestUrl.searchParams.get('to'), instantSchema);
+
     const events = await listAuditReadModels(client, context.principal, {
       ...(shopId ? { shopId } : {}),
-      ...(parseOptional(requestUrl.searchParams.get('actorEmployeeId'), uuidSchema) !== undefined
-        ? {
-            actorEmployeeId: parseOptional(
-              requestUrl.searchParams.get('actorEmployeeId'),
-              uuidSchema,
-            ) as string,
-          }
-        : {}),
-      ...(parseOptional(requestUrl.searchParams.get('actionType'), textFilterSchema) !== undefined
-        ? {
-            actionType: parseOptional(
-              requestUrl.searchParams.get('actionType'),
-              textFilterSchema,
-            ) as string,
-          }
-        : {}),
-      ...(parseOptional(requestUrl.searchParams.get('entityType'), textFilterSchema) !== undefined
-        ? {
-            entityType: parseOptional(
-              requestUrl.searchParams.get('entityType'),
-              textFilterSchema,
-            ) as string,
-          }
-        : {}),
-      ...(parseOptional(requestUrl.searchParams.get('from'), instantSchema) !== undefined
-        ? { from: parseOptional(requestUrl.searchParams.get('from'), instantSchema) as string }
-        : {}),
-      ...(parseOptional(requestUrl.searchParams.get('to'), instantSchema) !== undefined
-        ? { to: parseOptional(requestUrl.searchParams.get('to'), instantSchema) as string }
-        : {}),
+      ...(actorEmployeeId ? { actorEmployeeId } : {}),
+      ...(actionType ? { actionType } : {}),
+      ...(entityType ? { entityType } : {}),
+      ...(approvalStatus ? { approvalStatus } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
     });
     sendJson(response, 200, { events });
   } catch (error) {
