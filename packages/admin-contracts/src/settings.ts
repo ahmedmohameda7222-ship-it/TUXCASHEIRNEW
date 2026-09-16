@@ -138,7 +138,8 @@ export type AdminSettingsWorkspace = {
   reasonCodes: AdminReasonCodeConfiguration[];
   weeklyHours: AdminWeeklyHoursConfiguration[];
   specialHours: AdminSpecialHoursConfiguration[];
-  shopConfigSchedules: AdminShopConfigSchedule[];
+  /** Filled by the trusted schedule projection in the Admin client workspace query. */
+  shopConfigSchedules?: AdminShopConfigSchedule[];
 };
 
 export type ResolvedSetting<T = unknown> =
