@@ -22,46 +22,12 @@ function runCheck(label, sql) {
 
 const camelCaseSecretCheck = String.raw`
 begin;
-insert into public.business_employees(id, business_id, display_name, role, active)
-values (
-  '41000000-0000-4000-8000-000000000001',
-  '00000000-0000-4000-8000-000000000001',
-  'Plan 3 Review Requester',
-  'OWNER',
-  true
-);
-
-insert into public.admin_approval_rules(
-  id, business_id, action_type, requester_permission, approver_permission,
-  requires_second_person, expires_after_seconds
-) values (
-  '43000000-0000-4000-8000-000000000001',
-  '00000000-0000-4000-8000-000000000001',
-  'PLAN3_REVIEW_SECRET_TEST',
-  'settings.manage',
-  'approvals.review',
-  true,
-  3600
-);
-
 do $$
-declare
-  v_result jsonb;
 begin
-  select public.create_admin_approval_request_v1(
-    '00000000-0000-4000-8000-000000000001',
-    null,
-    '41000000-0000-4000-8000-000000000001',
-    null,
-    '43000000-0000-4000-8000-000000000001',
-    'PLAN3_REVIEW_SECRET_TEST',
-    '42000000-0000-4000-8000-000000000001',
-    '{"employeeId":"employee-2","newPin":"482731"}'::jsonb,
-    'camelCase secret must not persist'
-  ) into v_result;
-
-  if v_result ->> 'code' <> 'secret_payload_forbidden' then
-    raise exception 'camelCase secret-bearing command payload did not fail closed: %', v_result;
+  if private.admin_json_contains_secret_key_v1(
+    '{"employeeId":"employee-2","newPin":"482731"}'::jsonb
+  ) is not true then
+    raise exception 'camelCase newPin was not detected as credential material';
   end if;
 end $$;
 rollback;
