@@ -362,12 +362,16 @@ export function createSupabaseApprovalServiceDependencies(
         p_command_payload: input.commandPayload,
         p_reason: input.reason,
       });
-      return {
-        ok: result['ok'] === true,
-        requestId: typeof result['requestId'] === 'string' ? result['requestId'] : undefined,
-        status: result['status'] === 'PENDING' ? 'PENDING' : undefined,
-        code: typeof result['code'] === 'string' ? result['code'] : undefined,
-      };
+      const response: {
+        ok: boolean;
+        requestId?: string;
+        status?: 'PENDING';
+        code?: string;
+      } = { ok: result['ok'] === true };
+      if (typeof result['requestId'] === 'string') response.requestId = result['requestId'];
+      if (result['status'] === 'PENDING') response.status = 'PENDING';
+      if (typeof result['code'] === 'string') response.code = result['code'];
+      return response;
     },
     now: () => new Date(),
   };
