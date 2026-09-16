@@ -98,8 +98,14 @@ export async function listAuditReadModels(
     );
   }
 
-  const rows = (await client.select<AuditRow[]>('admin_audit_events', query)).filter((row) =>
-    visibleToPrincipal(row, principal),
+  const matchedApprovalIds = statusMatchedApprovals
+    ? new Set(statusMatchedApprovals.map((approval) => approval.id))
+    : null;
+  const rows = (await client.select<AuditRow[]>('admin_audit_events', query)).filter(
+    (row) =>
+      visibleToPrincipal(row, principal) &&
+      (matchedApprovalIds === null ||
+        (row.approval_request_id !== null && matchedApprovalIds.has(row.approval_request_id))),
   );
   if (rows.length === 0) return [];
 
