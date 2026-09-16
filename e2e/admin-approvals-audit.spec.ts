@@ -108,7 +108,7 @@ test('requires PIN confirmation and preserves recoverable execution state after 
   await page.goto('/approvals');
   await page.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByRole('dialog')).toContainText('Enter PIN to approve');
-  await page.getByLabel('PIN').fill('482731');
+  await page.getByRole('textbox', { name: 'PIN' }).fill('482731');
   await page.getByRole('button', { name: 'Confirm approval' }).click();
   await expect(page.getByText('Execution in progress')).toBeVisible();
   await page.reload();
@@ -122,6 +122,6 @@ test('renders audit history as human-readable structured changes', async ({ page
   await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
   await expect(page.getByText('Manager Two').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Before' })).toBeVisible();
-  await expect(page.getByText('PENDING')).toBeVisible();
-  await expect(page.getByText('APPROVED')).toBeVisible();
+  await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
+  await expect(page.getByText('APPROVED', { exact: true })).toBeVisible();
 });
