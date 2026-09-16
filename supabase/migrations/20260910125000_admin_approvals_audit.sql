@@ -194,7 +194,7 @@ create table if not exists public.admin_approval_execution_jobs (
 
 create index if not exists admin_approval_execution_jobs_due_idx
   on public.admin_approval_execution_jobs(
-    case when state = 'RETRYABLE' then next_attempt_at else created_at end,
+    (case when state = 'RETRYABLE' then next_attempt_at else created_at end),
     approval_request_id
   )
   where state in ('READY', 'RETRYABLE');
