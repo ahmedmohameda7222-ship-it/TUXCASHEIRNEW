@@ -1,3 +1,4 @@
+import type { AdminShopConfigSchedule } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -59,6 +60,21 @@ type ScheduleResult =
     }
   | { ok: false; code: string; currentVersion?: number; scheduleId?: string };
 
+type ScheduleRow = {
+  id: string;
+  payload_json: unknown;
+  status: string;
+  timezone: string;
+  local_scheduled_at: string;
+  scheduled_for: string;
+  attempt_count: number;
+  terminal_failure: boolean;
+  next_attempt_at: string | null;
+  last_error: string | null;
+};
+
+const scheduleStatuses = new Set(['PENDING', 'CLAIMED', 'APPLIED', 'FAILED', 'CANCELLED']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -99,15 +115,81 @@ function parseScheduleResult(value: unknown): ScheduleResult {
   };
 }
 
+function parseScheduleRow(row: ScheduleRow): AdminShopConfigSchedule {
+  if (
+    !scheduleStatuses.has(row.status) ||
+    row.timezone !== 'Africa/Cairo' ||
+    !Number.isSafeInteger(row.attempt_count) ||
+    row.attempt_count < 0 ||
+    typeof row.terminal_failure !== 'boolean' ||
+    !isRecord(row.payload_json)
+  ) {
+    throw new Error('settings_schedule_backend_contract_invalid');
+  }
+  const operation = row.payload_json['operation'];
+  const onlineOrdersPaused = row.payload_json['onlineOrdersPaused'];
+  if (
+    operation !== 'PUBLISH_SETTINGS' &&
+    operation !== 'ONLINE_ORDERS_STATE'
+  ) {
+    throw new Error('settings_schedule_backend_contract_invalid');
+  }
+  if (
+    operation === 'PUBLISH_SETTINGS' &&
+    onlineOrdersPaused !== null &&
+    onlineOrdersPaused !== undefined
+  ) {
+    throw new Error('settings_schedule_backend_contract_invalid');
+  }
+  if (operation === 'ONLINE_ORDERS_STATE' && typeof onlineOrdersPaused !== 'boolean') {
+    throw new Error('settings_schedule_backend_contract_invalid');
+  }
+  return {
+    id: row.id,
+    operation,
+    onlineOrdersPaused: operation === 'ONLINE_ORDERS_STATE' ? onlineOrdersPaused : null,
+    status: row.status as AdminShopConfigSchedule['status'],
+    timezone: 'Africa/Cairo',
+    localScheduledAt: row.local_scheduled_at,
+    scheduledFor: row.scheduled_for,
+    attemptCount: row.attempt_count,
+    terminalFailure: row.terminal_failure,
+    nextAttemptAt: row.next_attempt_at,
+    lastError: row.last_error,
+  };
+}
+
 async function loadContext(
   request: AdminRequest,
   client: AdminSupabaseClient,
+  csrfRequired: boolean,
 ): Promise<AdminSessionContext> {
   const token = readAdminSessionToken(firstHeader(request.headers.cookie));
   if (!token) throw new AdminAuthError('session_required', 401);
   const context = await loadAdminSession(token, client);
-  requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+  if (csrfRequired) {
+    requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+  }
   return context;
+}
+
+async function loadSchedules(
+  client: AdminSupabaseClient,
+  shopId: string,
+  context: AdminSessionContext,
+): Promise<AdminShopConfigSchedule[]> {
+  requirePermission(context.principal, 'settings.manage', shopId);
+  const query = new URLSearchParams({
+    select:
+      'id,payload_json,status,timezone,local_scheduled_at,scheduled_for,attempt_count,terminal_failure,next_attempt_at,last_error',
+    business_id: `eq.${context.principal.businessId}`,
+    shop_id: `eq.${shopId}`,
+    change_kind: 'eq.SHOP_CONFIG',
+    order: 'scheduled_for.desc,id.desc',
+    limit: '50',
+  });
+  const rows = await client.select<ScheduleRow[]>('scheduled_config_changes', query);
+  return rows.map(parseScheduleRow);
 }
 
 async function executeSchedule(
@@ -138,20 +220,32 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
-  if (request.method !== 'POST') {
-    response.setHeader('allow', 'POST');
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
     return;
   }
   try {
+    const client = new AdminSupabaseClient(getAdminServerEnv());
+    if (request.method === 'GET') {
+      const requestUrl = new URL(request.url ?? '/', 'http://admin.local');
+      const shopId = uuidSchema.safeParse(requestUrl.searchParams.get('shopId'));
+      if (!shopId.success) {
+        sendJson(response, 400, { error: 'invalid_settings_schedule_request' });
+        return;
+      }
+      const context = await loadContext(request, client, false);
+      sendJson(response, 200, { schedules: await loadSchedules(client, shopId.data, context) });
+      return;
+    }
+
     if (!requireSameOrigin(request, response)) return;
     const parsed = commandSchema.safeParse(await readJsonObject(request));
     if (!parsed.success) {
       sendJson(response, 400, { error: 'invalid_settings_schedule_request' });
       return;
     }
-    const client = new AdminSupabaseClient(getAdminServerEnv());
-    const context = await loadContext(request, client);
+    const context = await loadContext(request, client, true);
     sendJson(response, 200, await executeSchedule(client, parsed.data, context));
   } catch (error) {
     if (error instanceof AdminAuthError) {
