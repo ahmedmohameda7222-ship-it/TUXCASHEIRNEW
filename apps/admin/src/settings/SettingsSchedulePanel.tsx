@@ -71,6 +71,7 @@ export function SettingsSchedulePanel({
   const [localScheduledAt, setLocalScheduledAt] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const disabled = busy || action === null || action.busy;
+  const schedules = workspace.shopConfigSchedules ?? [];
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,11 +148,11 @@ export function SettingsSchedulePanel({
         <span>Durable schedule history</span>
         <strong>Latest 50 actions</strong>
       </div>
-      {workspace.shopConfigSchedules.length === 0 ? (
+      {schedules.length === 0 ? (
         <p className="admin-field__help">No scheduled configuration history yet.</p>
       ) : (
         <div className="admin-settings-grid">
-          {workspace.shopConfigSchedules.map((schedule) => (
+          {schedules.map((schedule) => (
             <article className="admin-settings-card" key={schedule.id}>
               <div>
                 <span>{scheduleLabel(schedule)}</span>
