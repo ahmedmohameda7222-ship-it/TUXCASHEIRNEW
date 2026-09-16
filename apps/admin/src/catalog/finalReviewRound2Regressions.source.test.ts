@@ -42,7 +42,10 @@ describe('Plan 2 fresh final review regressions', () => {
     expect(authority).toContain('weeklyHours');
     expect(authority).toContain('specialHours');
     expect(intake).toContain('ONLINE_ORDERING_OUTSIDE_HOURS');
-    expect(intake).toContain("serviceKind === 'ONLINE'");
+    expect(intake).toContain('hours.serviceKind === serviceKind');
+    expect(intake).toContain("isPublishedServiceKindOpenAt(authority, 'ONLINE', now)");
+    expect(intake).toContain("request.fulfillmentPreference === 'DELIVERY' ? 'DELIVERY' : 'OPEN'");
+    expect(intake).toContain('fulfillment_outside_hours');
     expect(intake).toContain('Africa/Cairo');
     expect(publicAvailabilityMigration).toContain('catalog_public_online_ordering_open_v1');
     expect(publicAvailabilityMigration).toContain("'Africa/Cairo'");
