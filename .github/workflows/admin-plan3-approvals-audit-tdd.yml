@@ -69,6 +69,7 @@ jobs:
           npx vitest run
           apps/admin/server/approvals/approvalService.test.ts
           apps/admin/server/approvals/approvalReadService.test.ts
+          apps/admin/server/approvals/approvalPinRateLimit.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
           apps/admin/server/approvals/approvalExecutionRunner.test.ts
           apps/admin/server/audit/auditService.test.ts
