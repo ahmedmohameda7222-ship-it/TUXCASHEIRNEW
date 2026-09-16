@@ -3,8 +3,6 @@ import fs from 'node:fs';
 
 const migrationPath = 'supabase/migrations/20260910125000_admin_approvals_audit.sql';
 const databaseUrl = process.env.TEST_DATABASE_URL;
-
-// Task 1 RED is intentionally ENOENT until the Plan 3 migration exists.
 const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
 
 for (const name of [
@@ -28,6 +26,8 @@ for (const token of [
   'next_attempt_at',
   'claim_token_hash',
   'self_approval_forbidden',
+  'for update skip locked',
+  'secret_payload_forbidden',
 ]) {
   if (!sql.includes(token)) throw new Error(`durable approval/audit invariant missing ${token}`);
 }
@@ -36,10 +36,8 @@ if (!sql.includes('approver_employee_id') || !sql.includes('requester_employee_i
   throw new Error('approval schema must persist requester and approver identities separately');
 }
 
-for (const role of ['anon', 'authenticated']) {
-  if (!sql.includes(`revoke all on table public.admin_audit_events from public, anon, authenticated`)) {
-    throw new Error(`audit table must be browser-deny-by-default (${role})`);
-  }
+if (!sql.includes('revoke all on table public.admin_audit_events from public, anon, authenticated')) {
+  throw new Error('audit table must be browser-deny-by-default');
 }
 
 if (sql.includes('delete from public.admin_audit_events')) {
@@ -82,7 +80,7 @@ begin
   end loop;
 end $$;
 
--- Browser roles must not be able to execute trusted approval/audit mutation RPCs.
+-- Browser roles must not execute trusted approval/audit mutation RPCs.
 do $$
 declare
   v_role text;
@@ -111,21 +109,57 @@ begin
   end loop;
 end $$;
 
--- Append-only means even trusted direct SQL cannot silently rewrite an emitted audit fact.
+insert into public.business_employees(id, business_id, display_name, role, active)
+values
+  (
+    '31000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    'Plan 3 Requester',
+    'OWNER',
+    true
+  ),
+  (
+    '31000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    'Plan 3 Approver',
+    'OWNER',
+    true
+  );
+
+insert into public.admin_approval_rules(
+  id,
+  business_id,
+  action_type,
+  requester_permission,
+  approver_permission,
+  requires_second_person,
+  expires_after_seconds
+) values
+  (
+    '33000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    'PLAN3_SELF_APPROVAL_TEST',
+    'settings.manage',
+    'approvals.review',
+    true,
+    3600
+  ),
+  (
+    '33000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    'PLAN3_RUNTIME_TEST',
+    'settings.manage',
+    'approvals.review',
+    true,
+    3600
+  );
+
+-- Append-only means even trusted direct SQL cannot rewrite an emitted audit fact.
 do $$
 declare
   v_audit_id uuid;
   v_blocked boolean;
 begin
-  insert into public.business_employees(id, business_id, display_name, role, active)
-  values (
-    '31000000-0000-4000-8000-000000000001',
-    '00000000-0000-4000-8000-000000000001',
-    'Plan 3 Audit Actor',
-    'OWNER',
-    true
-  );
-
   insert into public.admin_audit_events(
     business_id, actor_employee_id, action_type, entity_type, entity_id, after_value
   ) values (
@@ -158,37 +192,236 @@ begin
   end if;
 end $$;
 
--- Second-person approval must be a database invariant too, including OWNER requesters.
+-- Secret-bearing generic audit metadata must fail closed.
 do $$
 declare
   v_blocked boolean := false;
 begin
   begin
-    insert into public.admin_approval_requests(
-      business_id,
-      requester_employee_id,
-      action_type,
-      command_id,
-      command_payload,
-      status,
-      approver_employee_id,
-      decided_at
+    insert into public.admin_audit_events(
+      business_id, actor_employee_id, action_type, after_value
     ) values (
       '00000000-0000-4000-8000-000000000001',
       '31000000-0000-4000-8000-000000000001',
-      'PLAN3_SELF_APPROVAL_TEST',
-      '32000000-0000-4000-8000-000000000001',
-      '{}'::jsonb,
-      'APPROVED',
-      '31000000-0000-4000-8000-000000000001',
-      now()
+      'PLAN3_SECRET_TEST',
+      '{"pin":"482731"}'::jsonb
     );
   exception when others then
     v_blocked := true;
   end;
+  if not v_blocked then
+    raise exception 'secret-bearing audit metadata was persisted';
+  end if;
+end $$;
+
+-- Second-person approval is a database invariant, including OWNER requesters.
+do $$
+declare
+  v_blocked boolean := false;
+  v_constraint text;
+begin
+  begin
+    insert into public.admin_approval_requests(
+      business_id,
+      approval_rule_id,
+      requester_employee_id,
+      action_type,
+      command_id,
+      command_payload,
+      required_approver_permission,
+      requires_second_person,
+      status,
+      approver_employee_id,
+      decided_at,
+      expires_at
+    ) values (
+      '00000000-0000-4000-8000-000000000001',
+      '33000000-0000-4000-8000-000000000001',
+      '31000000-0000-4000-8000-000000000001',
+      'PLAN3_SELF_APPROVAL_TEST',
+      '32000000-0000-4000-8000-000000000001',
+      '{}'::jsonb,
+      'approvals.review',
+      true,
+      'APPROVED',
+      '31000000-0000-4000-8000-000000000001',
+      now(),
+      now() + interval '1 hour'
+    );
+  exception when check_violation then
+    get stacked diagnostics v_constraint = CONSTRAINT_NAME;
+    v_blocked := v_constraint = 'admin_approval_requests_distinct_approver_ck';
+  end;
 
   if not v_blocked then
-    raise exception 'requester self-approval was not blocked by database invariant';
+    raise exception 'requester self-approval was not blocked by the distinct-approver invariant';
+  end if;
+end $$;
+
+-- Generic persisted command payloads reject raw PIN/verifier-style material.
+do $$
+declare
+  v_result jsonb;
+begin
+  select public.create_admin_approval_request_v1(
+    '00000000-0000-4000-8000-000000000001',
+    null,
+    '31000000-0000-4000-8000-000000000001',
+    null,
+    '33000000-0000-4000-8000-000000000002',
+    'PLAN3_RUNTIME_TEST',
+    '32000000-0000-4000-8000-000000000002',
+    '{"pin":"482731"}'::jsonb,
+    'must not persist'
+  ) into v_result;
+
+  if v_result ->> 'code' <> 'secret_payload_forbidden' then
+    raise exception 'secret-bearing command payload did not fail closed: %', v_result;
+  end if;
+end $$;
+
+-- Full durable path: self-decision denied, second person approves exactly one job,
+-- live lease cannot be stolen, expired lease is reclaimable, stale completion loses,
+-- and the winning completion is idempotent by the final hashed claim identity.
+do $$
+declare
+  v_request jsonb;
+  v_decision jsonb;
+  v_request_id uuid;
+  v_first record;
+  v_second record;
+  v_live_steal_count integer;
+  v_completion jsonb;
+  v_job_count integer;
+  v_now timestamptz := '2026-09-16T12:00:00Z'::timestamptz;
+begin
+  select public.create_admin_approval_request_v1(
+    '00000000-0000-4000-8000-000000000001',
+    null,
+    '31000000-0000-4000-8000-000000000001',
+    null,
+    '33000000-0000-4000-8000-000000000002',
+    'PLAN3_RUNTIME_TEST',
+    '32000000-0000-4000-8000-000000000003',
+    '{"safeValue":42}'::jsonb,
+    'runtime proof'
+  ) into v_request;
+
+  if coalesce((v_request ->> 'ok')::boolean, false) is not true then
+    raise exception 'approval request creation failed: %', v_request;
+  end if;
+  v_request_id := (v_request ->> 'requestId')::uuid;
+
+  select public.decide_admin_approval_request_v1(
+    v_request_id,
+    '31000000-0000-4000-8000-000000000001',
+    null,
+    'APPROVE',
+    'self attempt'
+  ) into v_decision;
+  if v_decision ->> 'code' <> 'self_approval_forbidden' then
+    raise exception 'self approval did not return stable code: %', v_decision;
+  end if;
+
+  select public.decide_admin_approval_request_v1(
+    v_request_id,
+    '31000000-0000-4000-8000-000000000002',
+    null,
+    'APPROVE',
+    'approved by second person'
+  ) into v_decision;
+  if coalesce((v_decision ->> 'ok')::boolean, false) is not true
+     or v_decision ->> 'status' <> 'APPROVED' then
+    raise exception 'second-person approval failed: %', v_decision;
+  end if;
+
+  select count(*) into v_job_count
+  from public.admin_approval_execution_jobs
+  where approval_request_id = v_request_id;
+  if v_job_count <> 1 then
+    raise exception 'approval created % execution jobs instead of exactly one', v_job_count;
+  end if;
+
+  select * into v_first
+  from public.claim_admin_approval_execution_v1('worker-a', v_now, 1, 30);
+  if v_first.approval_request_id is distinct from v_request_id
+     or v_first.attempt_count <> 1
+     or nullif(v_first.claim_token, '') is null then
+    raise exception 'first durable claim invalid';
+  end if;
+
+  select count(*) into v_live_steal_count
+  from public.claim_admin_approval_execution_v1('worker-b', v_now + interval '29 seconds', 1, 30);
+  if v_live_steal_count <> 0 then
+    raise exception 'live approval execution lease was stolen';
+  end if;
+
+  select * into v_second
+  from public.claim_admin_approval_execution_v1('worker-b', v_now + interval '31 seconds', 1, 30);
+  if v_second.approval_request_id is distinct from v_request_id
+     or v_second.attempt_count <> 2
+     or v_second.claim_token = v_first.claim_token then
+    raise exception 'expired lease was not safely reclaimed';
+  end if;
+
+  select public.complete_admin_approval_execution_v1(
+    v_request_id,
+    v_first.claim_token,
+    'EXECUTED',
+    null,
+    '{"effect":"done"}'::jsonb,
+    v_now + interval '32 seconds'
+  ) into v_completion;
+  if v_completion ->> 'code' <> 'stale_or_invalid_claim' then
+    raise exception 'stale claimant was allowed to complete: %', v_completion;
+  end if;
+
+  select public.complete_admin_approval_execution_v1(
+    v_request_id,
+    v_second.claim_token,
+    'EXECUTED',
+    null,
+    '{"effect":"done"}'::jsonb,
+    v_now + interval '33 seconds'
+  ) into v_completion;
+  if coalesce((v_completion ->> 'ok')::boolean, false) is not true
+     or v_completion ->> 'status' <> 'EXECUTED' then
+    raise exception 'winning claimant could not complete: %', v_completion;
+  end if;
+
+  select public.complete_admin_approval_execution_v1(
+    v_request_id,
+    v_second.claim_token,
+    'EXECUTED',
+    null,
+    '{"effect":"done"}'::jsonb,
+    v_now + interval '34 seconds'
+  ) into v_completion;
+  if coalesce((v_completion ->> 'idempotentReplay')::boolean, false) is not true then
+    raise exception 'completion replay did not converge idempotently: %', v_completion;
+  end if;
+
+  if not exists (
+    select 1
+    from public.admin_approval_requests r
+    join public.admin_approval_execution_jobs j on j.approval_request_id = r.id
+    where r.id = v_request_id
+      and r.status = 'EXECUTED'
+      and j.state = 'EXECUTED'
+      and j.attempt_count = 2
+      and j.claim_token_hash is null
+      and j.completed_claim_token_hash ~ '^[0-9a-f]{64}$'
+  ) then
+    raise exception 'terminal durable execution state is inconsistent';
+  end if;
+
+  if not exists (
+    select 1 from public.admin_audit_events a
+    where a.approval_request_id = v_request_id
+      and a.action_type = 'APPROVAL_COMMAND_EXECUTED'
+      and a.actor_kind = 'SYSTEM'
+  ) then
+    raise exception 'successful approval execution did not append linked audit history';
   end if;
 end $$;
 
