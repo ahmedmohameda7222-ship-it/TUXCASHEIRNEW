@@ -128,10 +128,7 @@ function parseScheduleRow(row: ScheduleRow): AdminShopConfigSchedule {
   }
   const operation = row.payload_json['operation'];
   const onlineOrdersPaused = row.payload_json['onlineOrdersPaused'];
-  if (
-    operation !== 'PUBLISH_SETTINGS' &&
-    operation !== 'ONLINE_ORDERS_STATE'
-  ) {
+  if (operation !== 'PUBLISH_SETTINGS' && operation !== 'ONLINE_ORDERS_STATE') {
     throw new Error('settings_schedule_backend_contract_invalid');
   }
   if (
@@ -144,10 +141,12 @@ function parseScheduleRow(row: ScheduleRow): AdminShopConfigSchedule {
   if (operation === 'ONLINE_ORDERS_STATE' && typeof onlineOrdersPaused !== 'boolean') {
     throw new Error('settings_schedule_backend_contract_invalid');
   }
+  const normalizedOnlineOrdersPaused: boolean | null =
+    operation === 'ONLINE_ORDERS_STATE' ? (onlineOrdersPaused as boolean) : null;
   return {
     id: row.id,
     operation,
-    onlineOrdersPaused: operation === 'ONLINE_ORDERS_STATE' ? onlineOrdersPaused : null,
+    onlineOrdersPaused: normalizedOnlineOrdersPaused,
     status: row.status as AdminShopConfigSchedule['status'],
     timezone: 'Africa/Cairo',
     localScheduledAt: row.local_scheduled_at,
