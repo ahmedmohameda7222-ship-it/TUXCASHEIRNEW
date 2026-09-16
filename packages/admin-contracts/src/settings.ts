@@ -19,6 +19,16 @@ export type AdminReasonFamily = (typeof ADMIN_REASON_FAMILIES)[number];
 export const SHOP_HOURS_SERVICE_KINDS = ['OPEN', 'DELIVERY', 'ONLINE'] as const;
 export type ShopHoursServiceKind = (typeof SHOP_HOURS_SERVICE_KINDS)[number];
 
+export const SHOP_CONFIG_SCHEDULE_STATUSES = [
+  'PENDING',
+  'CLAIMED',
+  'APPLIED',
+  'FAILED',
+  'CANCELLED',
+] as const;
+export type ShopConfigScheduleStatus = (typeof SHOP_CONFIG_SCHEDULE_STATUSES)[number];
+export type ShopConfigScheduleOperation = 'PUBLISH_SETTINGS' | 'ONLINE_ORDERS_STATE';
+
 export type SettingsChannelContext = { channel: Exclude<PaymentMethodChannel, 'BOTH'> };
 
 export type AdminPaymentMethodConfiguration = {
@@ -103,6 +113,20 @@ export type AdminSpecialHoursConfiguration = {
   note: string | null;
 };
 
+export type AdminShopConfigSchedule = {
+  id: string;
+  operation: ShopConfigScheduleOperation;
+  onlineOrdersPaused: boolean | null;
+  status: ShopConfigScheduleStatus;
+  timezone: 'Africa/Cairo';
+  localScheduledAt: string;
+  scheduledFor: string;
+  attemptCount: number;
+  terminalFailure: boolean;
+  nextAttemptAt: string | null;
+  lastError: string | null;
+};
+
 export type AdminSettingsWorkspace = {
   shop: AdminShopSettingsSummary;
   settingsVersion: number;
@@ -114,6 +138,8 @@ export type AdminSettingsWorkspace = {
   reasonCodes: AdminReasonCodeConfiguration[];
   weeklyHours: AdminWeeklyHoursConfiguration[];
   specialHours: AdminSpecialHoursConfiguration[];
+  /** Filled by the trusted schedule projection in the Admin client workspace query. */
+  shopConfigSchedules?: AdminShopConfigSchedule[];
 };
 
 export type ResolvedSetting<T = unknown> =
