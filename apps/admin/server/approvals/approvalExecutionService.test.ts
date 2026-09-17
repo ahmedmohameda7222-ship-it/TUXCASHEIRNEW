@@ -109,7 +109,10 @@ describe('approvalExecutionService', () => {
       registry: createApprovalExecutionRegistry([
         {
           actionType: claim.actionType,
-          execute: vi.fn(async () => ({ result: { entityId: 'entity-1' }, idempotentReplay: false })),
+          execute: vi.fn(async () => ({
+            result: { entityId: 'entity-1' },
+            idempotentReplay: false,
+          })),
         },
       ]),
       workerId: 'approval-runner-test',
