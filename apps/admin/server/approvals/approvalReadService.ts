@@ -6,10 +6,16 @@ import type {
 
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
+export type ApprovalReadCursor = {
+  createdAt: string;
+  id: string;
+};
+
 export type ApprovalReadFilters = {
   id?: string;
   shopId?: string;
   status?: AdminApprovalStatus;
+  cursor?: ApprovalReadCursor;
 };
 
 export type ApprovalDisplayStatus = AdminApprovalStatus | 'EXPIRED';
@@ -36,6 +42,11 @@ export type ApprovalReadModel = {
   decidedAt: string | null;
   executedAt: string | null;
   failedAt: string | null;
+};
+
+export type ApprovalReadPage = {
+  approvals: ApprovalReadModel[];
+  nextCursor: ApprovalReadCursor | null;
 };
 
 type ApprovalRequestRow = {
@@ -67,6 +78,7 @@ type ExecutionRow = {
 };
 
 const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
+const APPROVAL_PAGE_SIZE = 100;
 
 function hasBusinessWideAuthority(principal: AdminSessionPrincipal): boolean {
   return principal.role === 'OWNER' || principal.role === 'ADMIN';
@@ -153,50 +165,122 @@ function canPrincipalDecide(
   return !row.requires_second_person || row.requester_employee_id !== principal.employeeId;
 }
 
+function cursorOrFilter(cursor: ApprovalReadCursor): string {
+  return `(created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id}))`;
+}
+
 function applyPrincipalShopScope(
   query: URLSearchParams,
   principal: AdminSessionPrincipal,
   explicitShopId: string | undefined,
+  cursor: ApprovalReadCursor | undefined,
 ): void {
   if (explicitShopId) {
     query.set('shop_id', `eq.${explicitShopId}`);
+    if (cursor) query.set('or', cursorOrFilter(cursor));
     return;
   }
-  if (principal.role === 'OWNER') return;
+  if (principal.role === 'OWNER') {
+    if (cursor) query.set('or', cursorOrFilter(cursor));
+    return;
+  }
   if (principal.role === 'ADMIN') {
     if (principal.shopIds.length === 0) {
       query.set('shop_id', 'is.null');
+      if (cursor) query.set('or', cursorOrFilter(cursor));
       return;
     }
-    query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    if (cursor) {
+      const scope = `or(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`;
+      const continuation = `or${cursorOrFilter(cursor)}`;
+      query.set('and', `(${scope},${continuation})`);
+    } else {
+      query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    }
     return;
   }
   const shopIds = principal.shopIds.length > 0 ? principal.shopIds : [EMPTY_SCOPE_SENTINEL];
   query.set('shop_id', `in.(${shopIds.join(',')})`);
+  if (cursor) query.set('or', cursorOrFilter(cursor));
 }
 
-export async function listApprovalReadModels(
+function toReadModel(
+  row: ApprovalRequestRow,
+  principal: AdminSessionPrincipal,
+  employeeNames: ReadonlyMap<string, string>,
+  shopNames: ReadonlyMap<string, string>,
+  executionsByRequest: ReadonlyMap<string, ExecutionRow>,
+  nowMs: number,
+): ApprovalReadModel {
+  const execution = executionsByRequest.get(row.id);
+  const actionLabel = titleCaseAction(row.action_type);
+  const valueSummary = summarizePayload(row.command_payload);
+  const expired = isExpiredPending(row, nowMs);
+  const model: ApprovalReadModel = {
+    id: row.id,
+    requesterName: employeeNames.get(row.requester_employee_id) ?? 'Unknown requester',
+    requesterEmployeeId: row.requester_employee_id,
+    approverName: row.approver_employee_id
+      ? (employeeNames.get(row.approver_employee_id) ?? 'Unknown approver')
+      : null,
+    shopId: row.shop_id,
+    shopName: row.shop_id ? (shopNames.get(row.shop_id) ?? 'Assigned shop') : 'All shops',
+    actionLabel,
+    valueSummary,
+    reason: row.reason,
+    consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
+    status: row.status,
+    displayStatus: expired ? 'EXPIRED' : row.status,
+    canDecide: canPrincipalDecide(row, principal, expired),
+    executionLabel: expired
+      ? 'Expired — submit a new request if the action is still required.'
+      : executionLabel(row.status, execution),
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    decidedAt: row.decided_at,
+    executedAt: row.executed_at,
+    failedAt: row.failed_at,
+  };
+  if (row.status === 'FAILED') {
+    model.failureMessage = execution?.last_error_code
+      ? `The approved command stopped safely (${execution.last_error_code}).`
+      : 'The approved command could not be completed safely.';
+    model.recoveryMessage =
+      'Review the failure and submit a new request if the command policy still allows it.';
+  }
+  return model;
+}
+
+export async function listApprovalReadPage(
   client: AdminSupabaseClient,
   principal: AdminSessionPrincipal,
   filters: ApprovalReadFilters = {},
-): Promise<ApprovalReadModel[]> {
+): Promise<ApprovalReadPage> {
   const now = new Date();
   const query = new URLSearchParams({
     select:
       'id,business_id,shop_id,requester_employee_id,approver_employee_id,action_type,command_payload,reason,required_approver_permission,requires_second_person,status,expires_at,created_at,decided_at,executed_at,failed_at',
     business_id: `eq.${principal.businessId}`,
     order: 'created_at.desc,id.desc',
-    limit: filters.id ? '1' : '100',
+    limit: filters.id ? '1' : String(APPROVAL_PAGE_SIZE + 1),
   });
   if (filters.id) query.set('id', `eq.${filters.id}`);
-  applyPrincipalShopScope(query, principal, filters.shopId);
+  applyPrincipalShopScope(query, principal, filters.shopId, filters.id ? undefined : filters.cursor);
   if (filters.status) query.set('status', `eq.${filters.status}`);
   if (filters.status === 'PENDING') query.set('expires_at', `gt.${now.toISOString()}`);
 
-  const requests = (
+  const visibleRequests = (
     await client.select<ApprovalRequestRow[]>('admin_approval_requests', query)
   ).filter((row) => visibleToPrincipal(row, principal));
-  if (requests.length === 0) return [];
+  const requests = filters.id
+    ? visibleRequests.slice(0, 1)
+    : visibleRequests.slice(0, APPROVAL_PAGE_SIZE);
+  const lastRequest = requests.at(-1);
+  const nextCursor =
+    !filters.id && visibleRequests.length > APPROVAL_PAGE_SIZE && lastRequest
+      ? { createdAt: lastRequest.created_at, id: lastRequest.id }
+      : null;
+  if (requests.length === 0) return { approvals: [], nextCursor: null };
 
   const requestIds = requests.map((row) => row.id);
   const employeeIds = [
@@ -238,43 +322,18 @@ export async function listApprovalReadModels(
   const executionsByRequest = new Map(executions.map((row) => [row.approval_request_id, row]));
   const nowMs = now.getTime();
 
-  return requests.map((row) => {
-    const execution = executionsByRequest.get(row.id);
-    const actionLabel = titleCaseAction(row.action_type);
-    const valueSummary = summarizePayload(row.command_payload);
-    const expired = isExpiredPending(row, nowMs);
-    const model: ApprovalReadModel = {
-      id: row.id,
-      requesterName: employeeNames.get(row.requester_employee_id) ?? 'Unknown requester',
-      requesterEmployeeId: row.requester_employee_id,
-      approverName: row.approver_employee_id
-        ? (employeeNames.get(row.approver_employee_id) ?? 'Unknown approver')
-        : null,
-      shopId: row.shop_id,
-      shopName: row.shop_id ? (shopNames.get(row.shop_id) ?? 'Assigned shop') : 'All shops',
-      actionLabel,
-      valueSummary,
-      reason: row.reason,
-      consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
-      status: row.status,
-      displayStatus: expired ? 'EXPIRED' : row.status,
-      canDecide: canPrincipalDecide(row, principal, expired),
-      executionLabel: expired
-        ? 'Expired — submit a new request if the action is still required.'
-        : executionLabel(row.status, execution),
-      expiresAt: row.expires_at,
-      createdAt: row.created_at,
-      decidedAt: row.decided_at,
-      executedAt: row.executed_at,
-      failedAt: row.failed_at,
-    };
-    if (row.status === 'FAILED') {
-      model.failureMessage = execution?.last_error_code
-        ? `The approved command stopped safely (${execution.last_error_code}).`
-        : 'The approved command could not be completed safely.';
-      model.recoveryMessage =
-        'Review the failure and submit a new request if the command policy still allows it.';
-    }
-    return model;
-  });
+  return {
+    approvals: requests.map((row) =>
+      toReadModel(row, principal, employeeNames, shopNames, executionsByRequest, nowMs),
+    ),
+    nextCursor,
+  };
+}
+
+export async function listApprovalReadModels(
+  client: AdminSupabaseClient,
+  principal: AdminSessionPrincipal,
+  filters: ApprovalReadFilters = {},
+): Promise<ApprovalReadModel[]> {
+  return (await listApprovalReadPage(client, principal, filters)).approvals;
 }

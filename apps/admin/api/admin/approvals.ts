@@ -13,7 +13,10 @@ import {
   createSupabaseApprovalServiceDependencies,
   rejectRequest,
 } from '../../server/approvals/approvalService';
-import { listApprovalReadModels } from '../../server/approvals/approvalReadService';
+import {
+  listApprovalReadPage,
+  type ApprovalReadCursor,
+} from '../../server/approvals/approvalReadService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
 import {
@@ -31,6 +34,12 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 
 const uuidSchema = z.string().uuid();
 const statusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXECUTING', 'EXECUTED', 'FAILED']);
+const approvalCursorSchema = z
+  .object({
+    createdAt: z.string().datetime({ offset: true }),
+    id: uuidSchema,
+  })
+  .strict();
 const decisionSchema = z
   .object({
     requestId: uuidSchema,
@@ -58,6 +67,21 @@ export function buildApprovalActor(context: AdminSessionContext): AdminApprovalA
 export function parseApprovalDecisionBody(body: unknown): z.infer<typeof decisionSchema> | null {
   const parsed = decisionSchema.safeParse(body);
   return parsed.success ? parsed.data : null;
+}
+
+export function encodeApprovalCursor(cursor: ApprovalReadCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+export function decodeApprovalCursor(value: string): ApprovalReadCursor | null {
+  if (value.length === 0 || value.length > 512) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown;
+    const parsed = approvalCursorSchema.safeParse(decoded);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadContext(
@@ -130,18 +154,28 @@ export default async function handler(
       const rawShopId = requestUrl.searchParams.get('shopId');
       const rawId = requestUrl.searchParams.get('id');
       const rawStatus = requestUrl.searchParams.get('status');
+      const rawCursor = requestUrl.searchParams.get('cursor');
       const shopId = rawShopId === null ? undefined : uuidSchema.parse(rawShopId);
       const id = rawId === null ? undefined : uuidSchema.parse(rawId);
       const status =
         rawStatus === null ? undefined : (statusSchema.parse(rawStatus) as AdminApprovalStatus);
+      const cursor = rawCursor === null ? undefined : decodeApprovalCursor(rawCursor);
+      if (rawCursor !== null && cursor === null) {
+        sendJson(response, 400, { error: 'invalid_approval_cursor' });
+        return;
+      }
       const context = await loadContext(request, client, false);
       requireApprovalEndpointAccess(context, shopId);
-      const approvals = await listApprovalReadModels(client, context.principal, {
+      const page = await listApprovalReadPage(client, context.principal, {
         ...(id ? { id } : {}),
         ...(shopId ? { shopId } : {}),
         ...(status ? { status } : {}),
+        ...(cursor ? { cursor } : {}),
       });
-      sendJson(response, 200, { approvals });
+      sendJson(response, 200, {
+        approvals: page.approvals,
+        nextCursor: page.nextCursor ? encodeApprovalCursor(page.nextCursor) : null,
+      });
       return;
     }
 

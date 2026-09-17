@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -35,7 +35,10 @@ type ApprovalApiModel = {
   decidedAt: string | null;
 };
 
-type ApprovalListResponse = { approvals: ApprovalApiModel[] };
+type ApprovalListResponse = {
+  approvals: ApprovalApiModel[];
+  nextCursor?: string | null;
+};
 type StatusFilter = 'ALL' | AdminApprovalStatus;
 
 function formatInstant(value: string | null | undefined): string {
@@ -75,30 +78,38 @@ export function ApprovalsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decision, setDecision] = useState<ApprovalDecisionKind | null>(null);
 
-  const approvalsQuery = useQuery({
+  const approvalsQuery = useInfiniteQuery({
     queryKey: ['admin', 'approvals', status],
-    queryFn: async () => {
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       if (status !== 'ALL') params.set('status', status);
+      if (pageParam) params.set('cursor', pageParam);
       const suffix = params.size === 0 ? '' : `?${params.toString()}`;
       return adminFetch<ApprovalListResponse>(`/api/admin/approvals${suffix}`);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchInterval: 15_000,
   });
 
+  const approvals = useMemo(
+    () => approvalsQuery.data?.pages.flatMap((page) => page.approvals) ?? [],
+    [approvalsQuery.data],
+  );
+
   useEffect(() => {
-    const rows = approvalsQuery.data?.approvals ?? [];
-    if (rows.length === 0) {
+    if (approvals.length === 0) {
       setSelectedId(null);
       return;
     }
-    if (!selectedId || !rows.some((row) => row.id === selectedId))
-      setSelectedId(rows[0]?.id ?? null);
-  }, [approvalsQuery.data, selectedId]);
+    if (!selectedId || !approvals.some((row) => row.id === selectedId)) {
+      setSelectedId(approvals[0]?.id ?? null);
+    }
+  }, [approvals, selectedId]);
 
   const selected = useMemo(
-    () => approvalsQuery.data?.approvals.find((row) => row.id === selectedId) ?? null,
-    [approvalsQuery.data, selectedId],
+    () => approvals.find((row) => row.id === selectedId) ?? null,
+    [approvals, selectedId],
   );
 
   const decisionMutation = useMutation({
@@ -164,12 +175,12 @@ export function ApprovalsPage() {
       {approvalsQuery.isError ? (
         <p className="admin-error-text">Approvals could not be loaded.</p>
       ) : null}
-      {!approvalsQuery.isLoading && (approvalsQuery.data?.approvals.length ?? 0) === 0 ? (
+      {!approvalsQuery.isLoading && approvals.length === 0 ? (
         <p>No approval requests match this filter.</p>
       ) : null}
       <div className="admin-approvals-layout">
         <nav className="admin-approval-list" aria-label="Approval requests">
-          {(approvalsQuery.data?.approvals ?? []).map((approval) => (
+          {approvals.map((approval) => (
             <button
               className="admin-approval-list__item"
               aria-current={approval.id === selectedId ? 'true' : undefined}
@@ -183,6 +194,16 @@ export function ApprovalsPage() {
               <span>{approval.displayStatus ?? approval.status}</span>
             </button>
           ))}
+          {approvalsQuery.hasNextPage ? (
+            <button
+              className="admin-approval-list__item"
+              type="button"
+              disabled={approvalsQuery.isFetchingNextPage}
+              onClick={() => void approvalsQuery.fetchNextPage()}
+            >
+              {approvalsQuery.isFetchingNextPage ? 'Loading more approvals…' : 'Load more approvals'}
+            </button>
+          ) : null}
         </nav>
         {selected ? (
           <ApprovalDetailView
