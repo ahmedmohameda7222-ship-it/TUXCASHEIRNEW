@@ -165,10 +165,8 @@ async function loadEvents(
       p_to: filters.to ?? null,
       p_approval_status: filters.approvalStatus,
       p_event_id: filters.id ?? null,
-      p_before_created_at: filters.id
-        ? null
-        : filters.cursor?.createdAt ?? null,
-      p_before_id: filters.id ? null : filters.cursor?.id ?? null,
+      p_before_created_at: filters.id ? null : (filters.cursor?.createdAt ?? null),
+      p_before_id: filters.id ? null : (filters.cursor?.id ?? null),
       p_limit: pageLimit,
     });
     return rows.filter((row) => visibleToPrincipal(row, principal));
@@ -318,9 +316,7 @@ export async function listAuditReadPage(
   filters: AuditReadFilters = {},
 ): Promise<AuditReadPage> {
   const visibleEvents = await loadEvents(client, principal, filters);
-  const events = filters.id
-    ? visibleEvents.slice(0, 1)
-    : visibleEvents.slice(0, AUDIT_PAGE_SIZE);
+  const events = filters.id ? visibleEvents.slice(0, 1) : visibleEvents.slice(0, AUDIT_PAGE_SIZE);
   const lastEvent = events.at(-1);
   const nextCursor =
     !filters.id && visibleEvents.length > AUDIT_PAGE_SIZE && lastEvent
