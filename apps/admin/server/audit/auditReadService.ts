@@ -165,8 +165,8 @@ async function loadEvents(
       p_to: filters.to ?? null,
       p_approval_status: filters.approvalStatus,
       p_event_id: filters.id ?? null,
-      p_before_created_at: filters.id ? null : (filters.cursor?.createdAt ?? null),
-      p_before_id: filters.id ? null : (filters.cursor?.id ?? null),
+      p_before_created_at: filters.id ? null : filters.cursor?.createdAt ?? null,
+      p_before_id: filters.id ? null : filters.cursor?.id ?? null,
       p_limit: pageLimit,
     });
     return rows.filter((row) => visibleToPrincipal(row, principal));
