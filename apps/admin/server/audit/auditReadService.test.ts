@@ -93,10 +93,11 @@ describe('listAuditReadModels', () => {
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      if (name !== 'list_admin_audit_actor_options_v1') throw new Error(`unexpected rpc ${name}`);
+      if (name !== 'list_admin_audit_actor_options_v2') throw new Error(`unexpected rpc ${name}`);
       expect(payload).toEqual({
         p_business_id: manager.businessId,
         p_shop_ids: manager.shopIds,
+        p_include_business_wide: false,
       });
       return [
         {
@@ -119,13 +120,36 @@ describe('listAuditReadModels', () => {
     ]);
   });
 
+  it('scopes ADMIN actor options to assigned shops plus business-wide audit history', async () => {
+    const admin: AdminSessionPrincipal = {
+      ...principal,
+      role: 'ADMIN',
+      shopIds: ['33333333-3333-4333-8333-333333333333'],
+    };
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      expect(name).toBe('list_admin_audit_actor_options_v2');
+      expect(payload).toEqual({
+        p_business_id: admin.businessId,
+        p_shop_ids: admin.shopIds,
+        p_include_business_wide: true,
+      });
+      return [];
+    });
+
+    await auditReadService.listAuditActorOptions(
+      { rpc, select: vi.fn() } as unknown as AdminSupabaseClient,
+      admin,
+    );
+  });
+
   it('pushes approval status into the bounded database audit query instead of materializing capped IDs', async () => {
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      if (name !== 'list_admin_audit_events_v1') throw new Error(`unexpected rpc ${name}`);
+      if (name !== 'list_admin_audit_events_v2') throw new Error(`unexpected rpc ${name}`);
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: principal.businessId,
           p_approval_status: 'APPROVED',
+          p_include_business_wide: true,
           p_limit: 100,
         }),
       );
@@ -167,5 +191,53 @@ describe('listAuditReadModels', () => {
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.get('shop_id')).toBe(`in.(${manager.shopIds[0]})`);
     expect(query?.get('limit')).toBe('100');
+  });
+
+  it('pushes ADMIN assigned shops plus business-wide events before the direct-query limit', async () => {
+    const admin: AdminSessionPrincipal = {
+      ...principal,
+      role: 'ADMIN',
+      shopIds: ['33333333-3333-4333-8333-333333333333'],
+    };
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      void query;
+      if (table === 'admin_audit_events') return [];
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    await listAuditReadModels({ select } as unknown as AdminSupabaseClient, admin);
+
+    const auditCall = select.mock.calls.find(([table]) => table === 'admin_audit_events');
+    const query = auditCall?.[1];
+    expect(query?.get('shop_id')).toBeNull();
+    expect(query?.get('or')).toBe(`(shop_id.is.null,shop_id.in.(${admin.shopIds[0]}))`);
+    expect(query?.get('limit')).toBe('100');
+  });
+
+  it('passes ADMIN assigned shops plus business-wide authority into the audit status RPC', async () => {
+    const admin: AdminSessionPrincipal = {
+      ...principal,
+      role: 'ADMIN',
+      shopIds: ['33333333-3333-4333-8333-333333333333'],
+    };
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      expect(name).toBe('list_admin_audit_events_v2');
+      expect(payload).toEqual(
+        expect.objectContaining({
+          p_business_id: admin.businessId,
+          p_shop_ids: admin.shopIds,
+          p_include_business_wide: true,
+          p_approval_status: 'APPROVED',
+          p_limit: 100,
+        }),
+      );
+      return [];
+    });
+
+    await listAuditReadModels(
+      { rpc, select: vi.fn() } as unknown as AdminSupabaseClient,
+      admin,
+      { approvalStatus: 'APPROVED' },
+    );
   });
 });
