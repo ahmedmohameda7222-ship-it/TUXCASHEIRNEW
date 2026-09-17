@@ -27,6 +27,12 @@ begin
   if private.admin_text_contains_secret_v1('password is now hunter2') is not true then
     raise exception 'password narrative with an intervening connector was not detected';
   end if;
+  if private.admin_text_contains_secret_v1('PIN4827') is not true then
+    raise exception 'compact PIN disclosure was not detected';
+  end if;
+  if private.admin_text_contains_secret_v1('passcode1234') is not true then
+    raise exception 'compact passcode disclosure was not detected';
+  end if;
   if private.admin_text_contains_secret_v1('Reviewed inventory discrepancy') is not false then
     raise exception 'safe inventory reason was incorrectly classified as secret';
   end if;
