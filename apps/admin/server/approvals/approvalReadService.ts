@@ -265,7 +265,12 @@ export async function listApprovalReadPage(
     limit: filters.id ? '1' : String(APPROVAL_PAGE_SIZE + 1),
   });
   if (filters.id) query.set('id', `eq.${filters.id}`);
-  applyPrincipalShopScope(query, principal, filters.shopId, filters.id ? undefined : filters.cursor);
+  applyPrincipalShopScope(
+    query,
+    principal,
+    filters.shopId,
+    filters.id ? undefined : filters.cursor,
+  );
   if (filters.status) query.set('status', `eq.${filters.status}`);
   if (filters.status === 'PENDING') query.set('expires_at', `gt.${now.toISOString()}`);
 

@@ -201,7 +201,9 @@ export function ApprovalsPage() {
               disabled={approvalsQuery.isFetchingNextPage}
               onClick={() => void approvalsQuery.fetchNextPage()}
             >
-              {approvalsQuery.isFetchingNextPage ? 'Loading more approvals…' : 'Load more approvals'}
+              {approvalsQuery.isFetchingNextPage
+                ? 'Loading more approvals…'
+                : 'Load more approvals'}
             </button>
           ) : null}
         </nav>

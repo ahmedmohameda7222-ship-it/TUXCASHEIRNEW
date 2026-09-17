@@ -35,7 +35,9 @@ function approval(id: string, label: string, createdAt: string) {
   };
 }
 
-test('loads approvals beyond the first bounded page using the continuation cursor', async ({ page }) => {
+test('loads approvals beyond the first bounded page using the continuation cursor', async ({
+  page,
+}) => {
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
