@@ -73,6 +73,65 @@ function safeErrorCode(error: unknown): string {
   return 'approval_execution_retryable_failure';
 }
 
+function normalizeSecretKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase();
+}
+
+function isSecretResultKey(key: string): boolean {
+  const normalized = normalizeSecretKey(key);
+  const collapsed = normalized.replaceAll('_', '');
+  return (
+    /(^|_)(pin|password|passcode|verifier|salt|lookup|token)(_|$)/.test(normalized) ||
+    [
+      'pinhash',
+      'pinlookuphash',
+      'pinverifier',
+      'pinsalt',
+      'passwordhash',
+      'passwordverifier',
+      'claimtoken',
+    ].includes(collapsed)
+  );
+}
+
+function redactSecretResultFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSecretResultFields);
+  if (typeof value !== 'object' || value === null) return value;
+
+  const output: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (isSecretResultKey(key)) continue;
+    output[key] = redactSecretResultFields(child);
+  }
+  return output;
+}
+
+function safeExecutionResult(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  let encoded: string | undefined;
+  try {
+    encoded = JSON.stringify(value);
+  } catch {
+    throw new ApprovalTerminalCommandError('approval_command_result_invalid');
+  }
+  if (encoded === undefined) {
+    throw new ApprovalTerminalCommandError('approval_command_result_invalid');
+  }
+  return redactSecretResultFields(JSON.parse(encoded) as unknown);
+}
+
+function executionResultMetadata(
+  result: ApprovalCommandExecutionResult,
+): Readonly<Record<string, unknown>> {
+  const metadata: Record<string, unknown> = { idempotentReplay: result.idempotentReplay };
+  const safeResult = safeExecutionResult(result.result);
+  if (safeResult !== undefined) metadata['result'] = safeResult;
+  return metadata;
+}
+
 export function createApprovalExecutionRegistry(
   entries: readonly ApprovalExecutionRegistryEntry[],
 ): ApprovalExecutionRegistry {
@@ -138,6 +197,8 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
           continue;
         }
 
+        const resultMetadata = executionResultMetadata(result);
+
         // Completion is deliberately outside the execution catch. If the business command
         // committed but the completion write has an ambiguous network outcome, do not issue a
         // second state transition here. Leave the durable claim for lease expiry/recovery; the
@@ -147,7 +208,7 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
           claimToken: claim.claimToken,
           outcome: 'EXECUTED',
           errorCode: null,
-          resultMetadata: { idempotentReplay: result.idempotentReplay },
+          resultMetadata,
         });
         executed += 1;
       }

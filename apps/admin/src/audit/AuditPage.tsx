@@ -24,15 +24,81 @@ const APPROVAL_STATUSES: readonly AdminApprovalStatus[] = [
   'EXECUTED',
   'FAILED',
 ];
+const CAIRO_TIME_ZONE = 'Africa/Cairo';
+const cairoWallClockFormatter = new Intl.DateTimeFormat('en-CA-u-ca-gregory-nu-latn', {
+  timeZone: CAIRO_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
 
 function formatInstant(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function dateBoundary(value: string, endOfDay: boolean): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  return `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`;
+function parseBusinessDate(value: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+function cairoWallClockMillis(instantMillis: number): number {
+  const parts = Object.fromEntries(
+    cairoWallClockFormatter
+      .formatToParts(new Date(instantMillis))
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]),
+  ) as Record<string, number>;
+  return Date.UTC(
+    parts['year'] ?? 0,
+    (parts['month'] ?? 1) - 1,
+    parts['day'] ?? 1,
+    parts['hour'] ?? 0,
+    parts['minute'] ?? 0,
+    parts['second'] ?? 0,
+  );
+}
+
+function cairoStartOfDateMillis(year: number, month: number, day: number): number {
+  const targetWallClock = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  let candidate = targetWallClock;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const delta = targetWallClock - cairoWallClockMillis(candidate);
+    candidate += delta;
+    if (delta === 0) break;
+  }
+  return candidate;
+}
+
+export function cairoDateBoundary(value: string, endOfDay: boolean): string | null {
+  const parsed = parseBusinessDate(value);
+  if (!parsed) return null;
+  const start = cairoStartOfDateMillis(parsed.year, parsed.month, parsed.day);
+  if (!endOfDay) return new Date(start).toISOString();
+
+  const nextDate = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + 1));
+  const nextStart = cairoStartOfDateMillis(
+    nextDate.getUTCFullYear(),
+    nextDate.getUTCMonth() + 1,
+    nextDate.getUTCDate(),
+  );
+  return new Date(nextStart - 1).toISOString();
 }
 
 export function AuditPage() {
@@ -59,8 +125,8 @@ export function AuditPage() {
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
-      const from = dateBoundary(fromDate, false);
-      const to = dateBoundary(toDate, true);
+      const from = cairoDateBoundary(fromDate, false);
+      const to = cairoDateBoundary(toDate, true);
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (shopId) params.set('shopId', shopId);

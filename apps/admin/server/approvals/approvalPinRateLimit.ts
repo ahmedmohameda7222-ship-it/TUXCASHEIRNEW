@@ -23,7 +23,14 @@ export async function verifyApprovalPinWithRateLimit(
   input: ApprovalPinRateLimitInput,
   deps: ApprovalPinRateLimitDependencies,
 ): Promise<boolean> {
-  const rateKey = await deriveAdminRateKey(
+  const stableRateKey = await deriveAdminRateKey(
+    {
+      ip: `approval:${input.sessionId}:${input.employeeId}`,
+      userAgent: 'stable-employee-session',
+    },
+    input.rateLimitSecret,
+  );
+  const clientRateKey = await deriveAdminRateKey(
     {
       ip: `${input.fingerprint.ip}|approval:${input.sessionId}:${input.employeeId}`,
       userAgent: input.fingerprint.userAgent,
@@ -31,8 +38,13 @@ export async function verifyApprovalPinWithRateLimit(
     input.rateLimitSecret,
   );
 
-  await claimAdminPinAttempt(rateKey, deps.limiter);
+  await claimAdminPinAttempt(stableRateKey, deps.limiter);
+  await claimAdminPinAttempt(clientRateKey, deps.limiter);
+
   const valid = await deps.verifyEmployeePin(input.employeeId, input.pin);
-  if (valid) await clearAdminPinAttempts(rateKey, deps.limiter);
+  if (valid) {
+    await clearAdminPinAttempts(stableRateKey, deps.limiter);
+    await clearAdminPinAttempts(clientRateKey, deps.limiter);
+  }
   return valid;
 }

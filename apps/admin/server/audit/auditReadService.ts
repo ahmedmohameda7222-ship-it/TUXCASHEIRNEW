@@ -51,6 +51,7 @@ type AuditRow = {
   approval_request_id: string | null;
   requester_employee_id: string | null;
   approver_employee_id: string | null;
+  approval_status?: AdminApprovalStatus | null;
   created_at: string;
 };
 
@@ -93,28 +94,31 @@ function applyEventFilters(query: URLSearchParams, filters: AuditReadFilters): v
   if (filters.to) query.append('created_at', `lte.${filters.to}`);
 }
 
-export async function listAuditReadModels(
+function hasAuditRpc(client: AdminSupabaseClient): boolean {
+  return typeof (client as unknown as { rpc?: unknown }).rpc === 'function';
+}
+
+async function loadEvents(
   client: AdminSupabaseClient,
   principal: AdminSessionPrincipal,
-  filters: AuditReadFilters = {},
-): Promise<AuditReadModel[]> {
-  let approvalStatusById = new Map<string, AdminApprovalStatus>();
-  let approvalIds: string[] | null = null;
-
-  if (filters.approvalStatus) {
-    const approvalQuery = new URLSearchParams({
-      select: 'id,status',
-      business_id: `eq.${principal.businessId}`,
-      status: `eq.${filters.approvalStatus}`,
-      limit: '500',
+  filters: AuditReadFilters,
+): Promise<AuditRow[]> {
+  if (filters.approvalStatus && hasAuditRpc(client)) {
+    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v1', {
+      p_business_id: principal.businessId,
+      p_shop_ids: hasBusinessWideAuthority(principal) ? null : principal.shopIds,
+      p_shop_id: filters.shopId ?? null,
+      p_actor_employee_id: filters.actorEmployeeId ?? null,
+      p_action_type: filters.actionType ?? null,
+      p_entity_type: filters.entityType ?? null,
+      p_entity_id: filters.entityId ?? null,
+      p_from: filters.from ?? null,
+      p_to: filters.to ?? null,
+      p_approval_status: filters.approvalStatus,
+      p_event_id: filters.id ?? null,
+      p_limit: filters.id ? 1 : 100,
     });
-    applyPrincipalShopScope(approvalQuery, principal, filters.shopId);
-    const approvalRows = (
-      await client.select<ApprovalRow[]>('admin_approval_requests', approvalQuery)
-    ).filter((row) => row.status === filters.approvalStatus);
-    approvalStatusById = new Map(approvalRows.map((row) => [row.id, row.status]));
-    approvalIds = approvalRows.map((row) => row.id);
-    if (approvalIds.length === 0) return [];
+    return rows.filter((row) => visibleToPrincipal(row, principal));
   }
 
   const query = new URLSearchParams({
@@ -126,32 +130,46 @@ export async function listAuditReadModels(
   });
   applyPrincipalShopScope(query, principal, filters.shopId);
   applyEventFilters(query, filters);
-  if (approvalIds) query.set('approval_request_id', `in.(${approvalIds.join(',')})`);
-
   let events = (await client.select<AuditRow[]>('admin_audit_events', query)).filter((row) =>
     visibleToPrincipal(row, principal),
   );
-  if (approvalIds) {
-    const allowed = new Set(approvalIds);
-    events = events.filter(
-      (row) => row.approval_request_id && allowed.has(row.approval_request_id),
-    );
+  if (filters.approvalStatus) {
+    events = events.filter((row) => row.approval_status === filters.approvalStatus);
   }
+  return events;
+}
+
+export async function listAuditReadModels(
+  client: AdminSupabaseClient,
+  principal: AdminSessionPrincipal,
+  filters: AuditReadFilters = {},
+): Promise<AuditReadModel[]> {
+  const events = await loadEvents(client, principal, filters);
   if (events.length === 0) return [];
+
+  const approvalStatusById = new Map<string, AdminApprovalStatus>();
+  for (const row of events) {
+    if (row.approval_request_id && row.approval_status) {
+      approvalStatusById.set(row.approval_request_id, row.approval_status);
+    }
+  }
 
   const approvalRequestIds = [
     ...new Set(events.flatMap((row) => (row.approval_request_id ? [row.approval_request_id] : []))),
   ];
-  if (!filters.approvalStatus && approvalRequestIds.length > 0) {
+  const missingApprovalStatusIds = approvalRequestIds.filter(
+    (approvalRequestId) => !approvalStatusById.has(approvalRequestId),
+  );
+  if (missingApprovalStatusIds.length > 0) {
     const approvalRows = await client.select<ApprovalRow[]>(
       'admin_approval_requests',
       new URLSearchParams({
         select: 'id,status',
         business_id: `eq.${principal.businessId}`,
-        id: `in.(${approvalRequestIds.join(',')})`,
+        id: `in.(${missingApprovalStatusIds.join(',')})`,
       }),
     );
-    approvalStatusById = new Map(approvalRows.map((row) => [row.id, row.status]));
+    for (const row of approvalRows) approvalStatusById.set(row.id, row.status);
   }
 
   const employeeIds = [

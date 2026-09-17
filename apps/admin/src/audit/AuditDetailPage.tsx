@@ -20,21 +20,40 @@ function humanizeKey(key: string): string {
     .replace(/^./, (character) => character.toUpperCase());
 }
 
-function valueRows(value: unknown): Array<{ label: string; value: string }> {
-  if (value === null || value === undefined) return [];
+type ChangeRow = { label: string; value: string };
+
+function appendValueRows(value: unknown, label: string, rows: ChangeRow[]): void {
   if (Array.isArray(value)) {
-    return value.map((item, index) => ({ label: `Item ${index + 1}`, value: String(item) }));
+    if (value.length === 0) {
+      rows.push({ label: label || 'Value', value: '[]' });
+      return;
+    }
+    value.forEach((item, index) => {
+      appendValueRows(item, `${label ? `${label} · ` : ''}Item ${index + 1}`, rows);
+    });
+    return;
   }
-  if (typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>).map(([key, item]) => ({
-      label: humanizeKey(key),
-      value:
-        typeof item === 'object' && item !== null
-          ? 'Structured value changed'
-          : String(item ?? '—'),
-    }));
+
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      rows.push({ label: label || 'Value', value: '{}' });
+      return;
+    }
+    for (const [key, child] of entries) {
+      appendValueRows(child, `${label ? `${label} · ` : ''}${humanizeKey(key)}`, rows);
+    }
+    return;
   }
-  return [{ label: 'Value', value: String(value) }];
+
+  rows.push({ label: label || 'Value', value: String(value ?? '—') });
+}
+
+function valueRows(value: unknown): ChangeRow[] {
+  if (value === null || value === undefined) return [];
+  const rows: ChangeRow[] = [];
+  appendValueRows(value, '', rows);
+  return rows;
 }
 
 function ChangeList({ title, value }: { title: string; value: unknown }) {
@@ -44,8 +63,8 @@ function ChangeList({ title, value }: { title: string; value: unknown }) {
       <h3>{title}</h3>
       {rows.length === 0 ? <p>Not recorded.</p> : null}
       <dl>
-        {rows.map((row) => (
-          <div key={`${row.label}:${row.value}`}>
+        {rows.map((row, index) => (
+          <div key={`${index}:${row.label}`}>
             <dt>{row.label}</dt>
             <dd>{row.value}</dd>
           </div>
