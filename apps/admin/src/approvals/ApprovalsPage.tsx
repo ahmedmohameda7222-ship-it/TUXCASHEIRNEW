@@ -25,9 +25,12 @@ type ApprovalApiModel = {
   reason: string | null;
   consequence: string;
   status: AdminApprovalStatus;
+  displayStatus: AdminApprovalStatus | 'EXPIRED';
+  canDecide: boolean;
   executionLabel: string;
   failureMessage?: string;
   recoveryMessage?: string;
+  expiresAt: string;
   createdAt: string;
   decidedAt: string | null;
 };
@@ -54,7 +57,10 @@ function toViewModel(approval: ApprovalApiModel): ApprovalDetailViewModel {
     reason: approval.reason,
     consequence: approval.consequence,
     status: approval.status,
+    displayStatus: approval.displayStatus,
+    canDecide: approval.canDecide,
     executionLabel: approval.executionLabel,
+    expiresAtLabel: formatInstant(approval.expiresAt),
     createdAtLabel: formatInstant(approval.createdAt),
     decidedAtLabel: formatInstant(approval.decidedAt),
     ...(approval.failureMessage ? { failureMessage: approval.failureMessage } : {}),
@@ -105,7 +111,7 @@ export function ApprovalsPage() {
       pin: string;
       reason: string | null;
     }) => {
-      if (!selected) throw new Error('approval_selection_required');
+      if (!selected || !selected.canDecide) throw new Error('approval_selection_not_actionable');
       if (session.state.status !== 'authenticated') throw new Error('session_required');
       await adminFetch<{ ok: true; requestId: string; status: AdminApprovalStatus }>(
         '/api/admin/approvals',
@@ -172,7 +178,7 @@ export function ApprovalsPage() {
               <strong>{approval.actionLabel}</strong>
               <span>{approval.requesterName}</span>
               <span>{approval.shopName}</span>
-              <span>{approval.status}</span>
+              <span>{approval.displayStatus}</span>
             </button>
           ))}
         </nav>

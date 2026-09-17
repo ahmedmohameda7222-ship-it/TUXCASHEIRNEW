@@ -8,6 +8,8 @@ export type ApprovalReadFilters = {
   status?: AdminApprovalStatus;
 };
 
+export type ApprovalDisplayStatus = AdminApprovalStatus | 'EXPIRED';
+
 export type ApprovalReadModel = {
   id: string;
   requesterName: string;
@@ -20,9 +22,12 @@ export type ApprovalReadModel = {
   reason: string | null;
   consequence: string;
   status: AdminApprovalStatus;
+  displayStatus: ApprovalDisplayStatus;
+  canDecide: boolean;
   executionLabel: string;
   failureMessage?: string;
   recoveryMessage?: string;
+  expiresAt: string;
   createdAt: string;
   decidedAt: string | null;
   executedAt: string | null;
@@ -39,6 +44,7 @@ type ApprovalRequestRow = {
   command_payload: Readonly<Record<string, unknown>>;
   reason: string | null;
   status: AdminApprovalStatus;
+  expires_at: string;
   created_at: string;
   decided_at: string | null;
   executed_at: string | null;
@@ -113,6 +119,12 @@ function executionLabel(status: AdminApprovalStatus, execution: ExecutionRow | u
   return execution.state === 'EXECUTED' ? 'Executed successfully' : 'Execution failed';
 }
 
+function isExpiredPending(row: ApprovalRequestRow, nowMs: number): boolean {
+  if (row.status !== 'PENDING') return false;
+  const expiresAtMs = Date.parse(row.expires_at);
+  return Number.isNaN(expiresAtMs) || expiresAtMs <= nowMs;
+}
+
 function visibleToPrincipal(row: ApprovalRequestRow, principal: AdminSessionPrincipal): boolean {
   if (row.shop_id === null) return hasBusinessWideAuthority(principal);
   return principal.shopIds.includes(row.shop_id);
@@ -137,9 +149,10 @@ export async function listApprovalReadModels(
   principal: AdminSessionPrincipal,
   filters: ApprovalReadFilters = {},
 ): Promise<ApprovalReadModel[]> {
+  const now = new Date();
   const query = new URLSearchParams({
     select:
-      'id,business_id,shop_id,requester_employee_id,approver_employee_id,action_type,command_payload,reason,status,created_at,decided_at,executed_at,failed_at',
+      'id,business_id,shop_id,requester_employee_id,approver_employee_id,action_type,command_payload,reason,status,expires_at,created_at,decided_at,executed_at,failed_at',
     business_id: `eq.${principal.businessId}`,
     order: 'created_at.desc,id.desc',
     limit: filters.id ? '1' : '100',
@@ -147,6 +160,7 @@ export async function listApprovalReadModels(
   if (filters.id) query.set('id', `eq.${filters.id}`);
   applyPrincipalShopScope(query, principal, filters.shopId);
   if (filters.status) query.set('status', `eq.${filters.status}`);
+  if (filters.status === 'PENDING') query.set('expires_at', `gt.${now.toISOString()}`);
 
   const requests = (
     await client.select<ApprovalRequestRow[]>('admin_approval_requests', query)
@@ -191,11 +205,13 @@ export async function listApprovalReadModels(
   const employeeNames = new Map(employees.map((row) => [row.id, row.display_name]));
   const shopNames = new Map(shops.map((row) => [row.id, row.name]));
   const executionsByRequest = new Map(executions.map((row) => [row.approval_request_id, row]));
+  const nowMs = now.getTime();
 
   return requests.map((row) => {
     const execution = executionsByRequest.get(row.id);
     const actionLabel = titleCaseAction(row.action_type);
     const valueSummary = summarizePayload(row.command_payload);
+    const expired = isExpiredPending(row, nowMs);
     const model: ApprovalReadModel = {
       id: row.id,
       requesterName: employeeNames.get(row.requester_employee_id) ?? 'Unknown requester',
@@ -210,7 +226,12 @@ export async function listApprovalReadModels(
       reason: row.reason,
       consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
       status: row.status,
-      executionLabel: executionLabel(row.status, execution),
+      displayStatus: expired ? 'EXPIRED' : row.status,
+      canDecide: row.status === 'PENDING' && !expired,
+      executionLabel: expired
+        ? 'Expired — submit a new request if the action is still required.'
+        : executionLabel(row.status, execution),
+      expiresAt: row.expires_at,
       createdAt: row.created_at,
       decidedAt: row.decided_at,
       executedAt: row.executed_at,

@@ -14,9 +14,12 @@ export type ApprovalDetailViewModel = {
   reason: string | null;
   consequence: string;
   status: AdminApprovalStatus;
+  displayStatus?: AdminApprovalStatus | 'EXPIRED';
+  canDecide?: boolean;
   executionLabel: string;
   failureMessage?: string;
   recoveryMessage?: string;
+  expiresAtLabel?: string | null;
   createdAtLabel: string;
   decidedAtLabel?: string | null;
 };
@@ -36,7 +39,9 @@ export function ApprovalDetailView({
   onApprove(): void;
   onReject(): void;
 }) {
-  const pending = approval.status === 'PENDING';
+  const displayStatus = approval.displayStatus ?? approval.status;
+  const canDecide = approval.canDecide ?? approval.status === 'PENDING';
+
   return (
     <section className="admin-approval-detail" aria-labelledby={`approval-${approval.id}`}>
       <header className="admin-approval-detail__header">
@@ -45,9 +50,9 @@ export function ApprovalDetailView({
           <h2 id={`approval-${approval.id}`}>{approval.actionLabel}</h2>
         </div>
         <span
-          className={`admin-approval-status admin-approval-status--${approval.status.toLowerCase()}`}
+          className={`admin-approval-status admin-approval-status--${displayStatus.toLowerCase()}`}
         >
-          {approval.status}
+          {displayStatus}
         </span>
       </header>
       <dl className="admin-approval-facts">
@@ -67,6 +72,12 @@ export function ApprovalDetailView({
           <dt>Requested</dt>
           <dd>{approval.createdAtLabel}</dd>
         </div>
+        {approval.expiresAtLabel ? (
+          <div>
+            <dt>Expires</dt>
+            <dd>{approval.expiresAtLabel}</dd>
+          </div>
+        ) : null}
       </dl>
       <div className="admin-approval-detail__section">
         <strong>Reason</strong>
@@ -84,7 +95,7 @@ export function ApprovalDetailView({
         ) : null}
         {approval.recoveryMessage ? <p>{approval.recoveryMessage}</p> : null}
       </div>
-      {pending ? (
+      {canDecide ? (
         <div className="admin-approval-actions">
           <button
             className="admin-primary-button"
