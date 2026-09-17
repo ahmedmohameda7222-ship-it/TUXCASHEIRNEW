@@ -1,9 +1,10 @@
-import type {
-  AdminApprovalActor,
-  AdminApprovalRule,
-  AdminApprovalStatus,
-  AdminPermission,
-  ApprovalDecision,
+import {
+  ADMIN_APPROVAL_STATUSES,
+  type AdminApprovalActor,
+  type AdminApprovalRule,
+  type AdminApprovalStatus,
+  type AdminPermission,
+  type ApprovalDecision,
 } from '@tux/admin-contracts';
 
 import { verifyPin } from '../pin';
@@ -53,17 +54,21 @@ export type ApprovalDecisionInput = {
 export type ApprovalDecisionResult =
   { ok: true; status: 'APPROVED' | 'REJECTED' } | { ok: false; code: string };
 
+export type ApprovalRequestCreationResult = {
+  ok: boolean;
+  requestId?: string;
+  status?: AdminApprovalStatus;
+  code?: string;
+  idempotentReplay?: boolean;
+  persistedPayload?: Readonly<Record<string, unknown>>;
+};
+
 export type ApprovalServiceDependencies = {
   loadRequest(requestId: string): Promise<ApprovalRequestRecord | null>;
+  loadRule(ruleId: string): Promise<AdminApprovalRule | null>;
   verifyEmployeePin(employeeId: string, pin: string): Promise<boolean>;
   decideRequest(input: ApprovalDecisionInput): Promise<ApprovalDecisionResult>;
-  createRequest(input: CreateApprovalRequestInput): Promise<{
-    ok: boolean;
-    requestId?: string;
-    status?: 'PENDING';
-    code?: string;
-    persistedPayload?: Readonly<Record<string, unknown>>;
-  }>;
+  createRequest(input: CreateApprovalRequestInput): Promise<ApprovalRequestCreationResult>;
   now(): Date;
 };
 
@@ -83,7 +88,6 @@ export type RequestApprovalInput = {
   commandId: string;
   commandInput: unknown;
   reason?: string | null;
-  requiresRequesterRepin: boolean;
   requesterPin?: string;
 };
 
@@ -132,6 +136,22 @@ function ruleThresholdMatches(
   }
 
   return true;
+}
+
+function ruleMatchesRequest(rule: AdminApprovalRule, input: RequestApprovalInput): boolean {
+  return (
+    rule.active &&
+    rule.businessId === input.businessId &&
+    rule.actionType === input.actionType &&
+    (rule.shopId === null || rule.shopId === input.shopId)
+  );
+}
+
+function isAdminApprovalStatus(value: unknown): value is AdminApprovalStatus {
+  return (
+    typeof value === 'string' &&
+    (ADMIN_APPROVAL_STATUSES as readonly string[]).includes(value)
+  );
 }
 
 export function evaluateApprovalRequirement(
@@ -200,7 +220,13 @@ export async function requestApproval(
   if (!actorCanAccessShop(actor, input.shopId)) {
     return { ok: false, code: 'approval_shop_scope_forbidden' };
   }
-  if (input.requiresRequesterRepin) {
+
+  const rule = await deps.loadRule(input.ruleId);
+  if (!rule || !ruleMatchesRequest(rule, input)) {
+    return { ok: false, code: 'approval_rule_missing_or_mismatched' };
+  }
+
+  if (rule.requiresRequesterRepin) {
     const pin = input.requesterPin?.trim() ?? '';
     if (pin === '' || !(await deps.verifyEmployeePin(actor.employeeId, pin))) {
       return { ok: false, code: 'invalid_pin' };
@@ -222,7 +248,7 @@ export async function requestApproval(
     shopId: input.shopId,
     requesterEmployeeId: actor.employeeId,
     requesterSessionId: actor.sessionId,
-    ruleId: input.ruleId,
+    ruleId: rule.id,
     actionType: input.actionType,
     commandId: input.commandId,
     commandPayload,
@@ -291,6 +317,19 @@ type ApprovalRequestRow = {
   status: AdminApprovalStatus;
 };
 
+type ApprovalRuleRow = {
+  id: string;
+  business_id: string;
+  shop_id: string | null;
+  action_type: string;
+  requester_permission: AdminPermission;
+  approver_permission: AdminPermission;
+  requires_second_person: boolean;
+  requires_requester_repin: boolean;
+  threshold_context: unknown;
+  active: boolean;
+};
+
 function mapRequestRow(row: ApprovalRequestRow): ApprovalRequestRecord {
   return {
     id: row.id,
@@ -301,6 +340,21 @@ function mapRequestRow(row: ApprovalRequestRow): ApprovalRequestRecord {
     requiredApproverPermission: row.required_approver_permission,
     requiresSecondPerson: row.requires_second_person,
     status: row.status,
+  };
+}
+
+function mapRuleRow(row: ApprovalRuleRow): AdminApprovalRule {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    shopId: row.shop_id,
+    actionType: row.action_type,
+    requesterPermission: row.requester_permission,
+    approverPermission: row.approver_permission,
+    requiresSecondPerson: row.requires_second_person,
+    requiresRequesterRepin: row.requires_requester_repin,
+    thresholdContext: isRecord(row.threshold_context) ? row.threshold_context : {},
+    active: row.active,
   };
 }
 
@@ -319,6 +373,18 @@ export function createSupabaseApprovalServiceDependencies(
         }),
       );
       return rows[0] ? mapRequestRow(rows[0]) : null;
+    },
+    async loadRule(ruleId) {
+      const rows = await client.select<ApprovalRuleRow[]>(
+        'admin_approval_rules',
+        new URLSearchParams({
+          select:
+            'id,business_id,shop_id,action_type,requester_permission,approver_permission,requires_second_person,requires_requester_repin,threshold_context,active',
+          id: `eq.${ruleId}`,
+          limit: '1',
+        }),
+      );
+      return rows[0] ? mapRuleRow(rows[0]) : null;
     },
     async verifyEmployeePin(employeeId, pin) {
       const rows = await client.select<Array<{ pin_hash: string | null; active: boolean }>>(
@@ -364,15 +430,13 @@ export function createSupabaseApprovalServiceDependencies(
         p_command_payload: input.commandPayload,
         p_reason: input.reason,
       });
-      const response: {
-        ok: boolean;
-        requestId?: string;
-        status?: 'PENDING';
-        code?: string;
-      } = { ok: result['ok'] === true };
+      const response: ApprovalRequestCreationResult = { ok: result['ok'] === true };
       if (typeof result['requestId'] === 'string') response.requestId = result['requestId'];
-      if (result['status'] === 'PENDING') response.status = 'PENDING';
+      if (isAdminApprovalStatus(result['status'])) response.status = result['status'];
       if (typeof result['code'] === 'string') response.code = result['code'];
+      if (typeof result['idempotentReplay'] === 'boolean') {
+        response.idempotentReplay = result['idempotentReplay'];
+      }
       return response;
     },
     now: () => new Date(),
