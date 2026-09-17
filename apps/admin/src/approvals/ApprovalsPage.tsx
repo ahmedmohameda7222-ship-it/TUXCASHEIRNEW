@@ -116,6 +116,7 @@ export function ApprovalsPage() {
   const decisionMutation = useMutation({
     mutationFn: async ({
       kind,
+      requestId,
       pin,
       reason,
     }: {
