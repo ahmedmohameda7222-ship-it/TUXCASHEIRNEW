@@ -234,10 +234,8 @@ describe('listAuditReadModels', () => {
       return [];
     });
 
-    await listAuditReadModels(
-      { rpc, select: vi.fn() } as unknown as AdminSupabaseClient,
-      admin,
-      { approvalStatus: 'APPROVED' },
-    );
+    await listAuditReadModels({ rpc, select: vi.fn() } as unknown as AdminSupabaseClient, admin, {
+      approvalStatus: 'APPROVED',
+    });
   });
 });
