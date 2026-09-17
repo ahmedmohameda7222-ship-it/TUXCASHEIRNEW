@@ -1,4 +1,8 @@
-import type { AdminApprovalStatus, AdminSessionPrincipal } from '@tux/admin-contracts';
+import type {
+  AdminApprovalStatus,
+  AdminPermission,
+  AdminSessionPrincipal,
+} from '@tux/admin-contracts';
 
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
@@ -43,6 +47,8 @@ type ApprovalRequestRow = {
   action_type: string;
   command_payload: Readonly<Record<string, unknown>>;
   reason: string | null;
+  required_approver_permission: AdminPermission;
+  requires_second_person: boolean;
   status: AdminApprovalStatus;
   expires_at: string;
   created_at: string;
@@ -64,6 +70,13 @@ const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
 function hasBusinessWideAuthority(principal: AdminSessionPrincipal): boolean {
   return principal.role === 'OWNER' || principal.role === 'ADMIN';
+}
+
+function hasApproverPermission(
+  principal: AdminSessionPrincipal,
+  permission: AdminPermission,
+): boolean {
+  return principal.role === 'OWNER' || principal.permissions.includes(permission);
 }
 
 function titleCaseAction(actionType: string): string {
@@ -130,6 +143,16 @@ function visibleToPrincipal(row: ApprovalRequestRow, principal: AdminSessionPrin
   return principal.shopIds.includes(row.shop_id);
 }
 
+function canPrincipalDecide(
+  row: ApprovalRequestRow,
+  principal: AdminSessionPrincipal,
+  expired: boolean,
+): boolean {
+  if (row.status !== 'PENDING' || expired) return false;
+  if (!hasApproverPermission(principal, row.required_approver_permission)) return false;
+  return !row.requires_second_person || row.requester_employee_id !== principal.employeeId;
+}
+
 function applyPrincipalShopScope(
   query: URLSearchParams,
   principal: AdminSessionPrincipal,
@@ -160,7 +183,7 @@ export async function listApprovalReadModels(
   const now = new Date();
   const query = new URLSearchParams({
     select:
-      'id,business_id,shop_id,requester_employee_id,approver_employee_id,action_type,command_payload,reason,status,expires_at,created_at,decided_at,executed_at,failed_at',
+      'id,business_id,shop_id,requester_employee_id,approver_employee_id,action_type,command_payload,reason,required_approver_permission,requires_second_person,status,expires_at,created_at,decided_at,executed_at,failed_at',
     business_id: `eq.${principal.businessId}`,
     order: 'created_at.desc,id.desc',
     limit: filters.id ? '1' : '100',
@@ -235,7 +258,7 @@ export async function listApprovalReadModels(
       consequence: `Approving ${actionLabel} will execute the exact persisted change shown above through the durable approval executor using its existing idempotency key.`,
       status: row.status,
       displayStatus: expired ? 'EXPIRED' : row.status,
-      canDecide: row.status === 'PENDING' && !expired,
+      canDecide: canPrincipalDecide(row, principal, expired),
       executionLabel: expired
         ? 'Expired — submit a new request if the action is still required.'
         : executionLabel(row.status, execution),
