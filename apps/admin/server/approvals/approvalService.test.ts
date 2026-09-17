@@ -57,9 +57,7 @@ const approvalRule: AdminApprovalRule = {
 };
 
 function dependencies(
-  overrides: Partial<ApprovalServiceDependencies> & {
-    loadRule?: (ruleId: string) => Promise<AdminApprovalRule | null>;
-  } = {},
+  overrides: Partial<ApprovalServiceDependencies> = {},
 ): ApprovalServiceDependencies {
   return {
     loadRequest: vi.fn(async () => pendingRequest),
@@ -77,7 +75,7 @@ function dependencies(
     })),
     now: () => new Date('2026-09-16T12:00:00.000Z'),
     ...overrides,
-  } as ApprovalServiceDependencies;
+  };
 }
 
 describe('approvalService', () => {
@@ -144,7 +142,6 @@ describe('approvalService', () => {
         actionType: 'SAFE_TEST_COMMAND',
         commandId: 'command-business-wide',
         commandInput: { entityId: 'entity-1' },
-        requiresRequesterRepin: false,
       },
       approver,
       deps,
@@ -155,7 +152,7 @@ describe('approvalService', () => {
     expect(deps.createRequest).not.toHaveBeenCalled();
   });
 
-  it('requires requester re-PIN when the approval rule requires it without persisting the PIN', async () => {
+  it('requires requester re-PIN when the persisted approval rule requires it without persisting the PIN', async () => {
     const sentinelPin = '482731';
     const verifyEmployeePin = vi.fn(async () => true);
     const createRequest = vi.fn(async (input) => ({
@@ -186,7 +183,6 @@ describe('approvalService', () => {
         commandId: 'command-1',
         commandInput: { entityId: 'entity-1' },
         reason: 'Sensitive action',
-        requiresRequesterRepin: true,
         requesterPin: sentinelPin,
       },
       requester,
