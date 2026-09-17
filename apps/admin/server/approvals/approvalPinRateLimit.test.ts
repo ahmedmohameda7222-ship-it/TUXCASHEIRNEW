@@ -14,7 +14,7 @@ function limiter(allowed = true): AdminPinRateLimitRpc {
 }
 
 describe('approval PIN rate limiting', () => {
-  it('claims a bounded attempt before verifying and leaves failed attempts uncleared', async () => {
+  it('claims bounded stable and client attempts before verifying and leaves failures uncleared', async () => {
     const rpc = limiter();
     const verifyEmployeePin = vi.fn(async () => false);
 
@@ -30,12 +30,12 @@ describe('approval PIN rate limiting', () => {
     );
 
     expect(valid).toBe(false);
-    expect(rpc.claim).toHaveBeenCalledTimes(1);
+    expect(rpc.claim).toHaveBeenCalledTimes(2);
     expect(verifyEmployeePin).toHaveBeenCalledWith('employee-1', '482731');
     expect(rpc.clear).not.toHaveBeenCalled();
   });
 
-  it('clears the bounded attempt window only after successful PIN verification', async () => {
+  it('clears both bounded attempt windows only after successful PIN verification', async () => {
     const rpc = limiter();
     const verifyEmployeePin = vi.fn(async () => true);
 
@@ -51,11 +51,11 @@ describe('approval PIN rate limiting', () => {
     );
 
     expect(valid).toBe(true);
-    expect(rpc.claim).toHaveBeenCalledTimes(1);
-    expect(rpc.clear).toHaveBeenCalledTimes(1);
+    expect(rpc.claim).toHaveBeenCalledTimes(2);
+    expect(rpc.clear).toHaveBeenCalledTimes(2);
   });
 
-  it('blocks verification when the attempt window is exhausted', async () => {
+  it('blocks verification when the stable attempt window is exhausted', async () => {
     const rpc = limiter(false);
     const verifyEmployeePin = vi.fn(async () => true);
 
@@ -73,5 +73,28 @@ describe('approval PIN rate limiting', () => {
     ).rejects.toMatchObject({ code: 'too_many_pin_attempts', retryAfterSeconds: 900 });
 
     expect(verifyEmployeePin).not.toHaveBeenCalled();
+  });
+
+  it('keeps a non-rotatable employee-session bucket when User-Agent changes', async () => {
+    const rpc = limiter();
+    const verifyEmployeePin = vi.fn(async () => false);
+
+    for (const userAgent of ['attacker-agent-a', 'attacker-agent-b']) {
+      await verifyApprovalPinWithRateLimit(
+        {
+          employeeId: 'employee-1',
+          sessionId: 'session-1',
+          pin: '000000',
+          fingerprint: { ...fingerprint, userAgent },
+          rateLimitSecret: secret,
+        },
+        { verifyEmployeePin, limiter: rpc },
+      );
+    }
+
+    const rateKeys = vi.mocked(rpc.claim).mock.calls.map(([rateKey]) => rateKey);
+    expect(rateKeys).toHaveLength(4);
+    expect(new Set(rateKeys).size).toBe(3);
+    expect(rateKeys.filter((key) => key === rateKeys[0])).toHaveLength(2);
   });
 });

@@ -102,6 +102,8 @@ jobs:
           npx vitest run
           apps/admin/api/admin/approvals.test.ts
           apps/admin/src/approvals/ApprovalDetailPage.test.tsx
+          apps/admin/src/audit/AuditDetailPage.test.tsx
+          apps/admin/src/audit/AuditPage.test.tsx
       - name: Admin server and API typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
       - name: Admin app typecheck
@@ -159,3 +161,5 @@ jobs:
         run: node scripts/test-admin-approvals-audit-migration.mjs
       - name: Plan 3 review hardening PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-review-hardening.mjs
+      - name: Plan 3 review round-2 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round2.mjs

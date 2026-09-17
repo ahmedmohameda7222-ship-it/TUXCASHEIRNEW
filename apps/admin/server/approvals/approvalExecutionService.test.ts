@@ -71,6 +71,36 @@ describe('approvalExecutionService', () => {
     expect(completeClaim).toHaveBeenCalledTimes(2);
   });
 
+  it('persists the command deterministic result with replay metadata', async () => {
+    const completeClaim = vi.fn(async () => ({ ok: true as const, status: 'EXECUTED' as const }));
+    const service = createApprovalExecutionService({
+      claimApprovedCommand: vi.fn(async () => [claim]),
+      completeClaim,
+      registry: createApprovalExecutionRegistry([
+        {
+          actionType: claim.actionType,
+          execute: vi.fn(async () => ({
+            result: { entityId: 'entity-1', version: 7 },
+            idempotentReplay: false,
+          })),
+        },
+      ]),
+      workerId: 'approval-runner-test',
+    });
+
+    await service.runOnce();
+
+    expect(completeClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'EXECUTED',
+        resultMetadata: {
+          idempotentReplay: false,
+          result: { entityId: 'entity-1', version: 7 },
+        },
+      }),
+    );
+  });
+
   it('never executes an unknown persisted command type', async () => {
     const completeClaim = vi.fn();
     const service = createApprovalExecutionService({
