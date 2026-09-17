@@ -2,10 +2,7 @@ import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService';
-import {
-  listAuditActorOptions,
-  listAuditReadModels,
-} from '../../server/audit/auditReadService';
+import { listAuditActorOptions, listAuditReadModels } from '../../server/audit/auditReadService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
 import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';

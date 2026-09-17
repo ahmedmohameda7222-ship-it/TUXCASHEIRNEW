@@ -87,7 +87,9 @@ describe('listAuditReadModels', () => {
   });
 
   it('returns the actor label contract consumed by the audit UI', async () => {
-    const [event] = await listAuditReadModels(createClient(), principal, { approvalStatus: 'APPROVED' });
+    const [event] = await listAuditReadModels(createClient(), principal, {
+      approvalStatus: 'APPROVED',
+    });
     const serialized = event as unknown as Record<string, unknown>;
 
     expect(serialized['actorLabel']).toBe('Owner One');

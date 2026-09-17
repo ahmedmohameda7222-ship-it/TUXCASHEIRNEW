@@ -80,8 +80,6 @@ describe('approvalReadService', () => {
     );
     const query = executionCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
-    expect(query?.get('approval_request_id')).toBe(
-      'in.(22222222-2222-4222-8222-222222222222)',
-    );
+    expect(query?.get('approval_request_id')).toBe('in.(22222222-2222-4222-8222-222222222222)');
   });
 });
