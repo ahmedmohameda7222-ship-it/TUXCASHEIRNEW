@@ -84,6 +84,7 @@ jobs:
           apps/admin/server/approvals/approvalPinRateLimit.test.ts
           apps/admin/server/approvals/approvalExecutionService.test.ts
           apps/admin/server/approvals/approvalExecutionRunner.test.ts
+          apps/admin/server/approvals/plan3Round9Review.test.ts
           apps/admin/server/audit/auditService.test.ts
           apps/admin/server/audit/auditReadService.test.ts
 
