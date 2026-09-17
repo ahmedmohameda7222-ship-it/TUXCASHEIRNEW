@@ -14,7 +14,8 @@ type AuditApiModel = Omit<AuditDetailViewModel, 'createdAtLabel'> & {
   actorEmployeeId: string | null;
   approvalStatus: AdminApprovalStatus | null;
 };
-type AuditResponse = { events: AuditApiModel[] };
+type AuditActorOption = { employeeId: string; label: string };
+type AuditResponse = { events: AuditApiModel[]; actorOptions: AuditActorOption[] };
 
 const APPROVAL_STATUSES: readonly AdminApprovalStatus[] = [
   'PENDING',
@@ -139,6 +140,7 @@ export function AuditPage() {
     },
   });
   const events = auditQuery.data?.events ?? [];
+  const actorOptions = auditQuery.data?.actorOptions ?? [];
   const selected = useMemo(
     () => events.find((event) => event.id === selectedId) ?? events[0] ?? null,
     [events, selectedId],
@@ -148,16 +150,6 @@ export function AuditPage() {
       new Map(events.flatMap((event) => (event.shopId ? [[event.shopId, event.shopName]] : []))),
     [events],
   );
-  const actorOptions = useMemo(() => {
-    const actors = new Map<string, string>();
-    for (const event of events) {
-      if (event.actorEmployeeId) actors.set(event.actorEmployeeId, event.actorLabel);
-    }
-    if (actorEmployeeId && !actors.has(actorEmployeeId)) {
-      actors.set(actorEmployeeId, 'Selected actor');
-    }
-    return [...actors.entries()];
-  }, [events, actorEmployeeId]);
 
   return (
     <PageScaffold
@@ -207,9 +199,9 @@ export function AuditPage() {
             onChange={(event) => setActorEmployeeId(event.currentTarget.value)}
           >
             <option value="">All human actors</option>
-            {actorOptions.map(([employeeId, label]) => (
-              <option key={employeeId} value={employeeId}>
-                {label}
+            {actorOptions.map((actor) => (
+              <option key={actor.employeeId} value={actor.employeeId}>
+                {actor.label}
               </option>
             ))}
           </select>

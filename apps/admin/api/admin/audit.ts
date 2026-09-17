@@ -2,7 +2,10 @@ import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService';
-import { listAuditReadModels } from '../../server/audit/auditReadService';
+import {
+  listAuditActorOptions,
+  listAuditReadModels,
+} from '../../server/audit/auditReadService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
 import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';
@@ -74,16 +77,19 @@ export default async function handler(
     const from = parseOptional(requestUrl.searchParams.get('from'), instantSchema);
     const to = parseOptional(requestUrl.searchParams.get('to'), instantSchema);
 
-    const events = await listAuditReadModels(client, context.principal, {
-      ...(shopId ? { shopId } : {}),
-      ...(actorEmployeeId ? { actorEmployeeId } : {}),
-      ...(actionType ? { actionType } : {}),
-      ...(entityType ? { entityType } : {}),
-      ...(approvalStatus ? { approvalStatus } : {}),
-      ...(from ? { from } : {}),
-      ...(to ? { to } : {}),
-    });
-    sendJson(response, 200, { events });
+    const [events, actorOptions] = await Promise.all([
+      listAuditReadModels(client, context.principal, {
+        ...(shopId ? { shopId } : {}),
+        ...(actorEmployeeId ? { actorEmployeeId } : {}),
+        ...(actionType ? { actionType } : {}),
+        ...(entityType ? { entityType } : {}),
+        ...(approvalStatus ? { approvalStatus } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      }),
+      listAuditActorOptions(client, context.principal),
+    ]);
+    sendJson(response, 200, { events, actorOptions });
   } catch (error) {
     if (error instanceof z.ZodError) {
       sendJson(response, 400, { error: 'invalid_audit_request' });

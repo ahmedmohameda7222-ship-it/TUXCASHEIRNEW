@@ -153,6 +153,7 @@ export async function listApprovalReadModels(
   ).filter((row) => visibleToPrincipal(row, principal));
   if (requests.length === 0) return [];
 
+  const requestIds = requests.map((row) => row.id);
   const [employees, shops, executions] = await Promise.all([
     client.select<EmployeeRow[]>(
       'business_employees',
@@ -173,6 +174,7 @@ export async function listApprovalReadModels(
       new URLSearchParams({
         select: 'approval_request_id,state,attempt_count,last_error_code',
         business_id: `eq.${principal.businessId}`,
+        approval_request_id: `in.(${requestIds.join(',')})`,
       }),
     ),
   ]);

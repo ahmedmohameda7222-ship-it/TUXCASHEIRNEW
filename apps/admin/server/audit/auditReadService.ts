@@ -20,7 +20,7 @@ export type AuditReadModel = {
   shopName: string;
   actorKind: 'HUMAN' | 'SYSTEM';
   actorEmployeeId: string | null;
-  actorName: string;
+  actorLabel: string;
   actorRole: string;
   actionType: string;
   entityType: string | null;
@@ -33,6 +33,11 @@ export type AuditReadModel = {
   approverName: string | null;
   approvalStatus: AdminApprovalStatus | null;
   createdAt: string;
+};
+
+export type AuditActorOption = {
+  employeeId: string;
+  label: string;
 };
 
 type AuditRow = {
@@ -58,6 +63,7 @@ type AuditRow = {
 type EmployeeRow = { id: string; display_name: string };
 type ShopRow = { id: string; name: string };
 type ApprovalRow = { id: string; status: AdminApprovalStatus };
+type EmployeeShopAssignmentRow = { employee_id: string };
 
 const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
@@ -139,6 +145,36 @@ async function loadEvents(
   return events;
 }
 
+export async function listAuditActorOptions(
+  client: AdminSupabaseClient,
+  principal: AdminSessionPrincipal,
+): Promise<AuditActorOption[]> {
+  let employeeIds: string[] | null = null;
+  if (!hasBusinessWideAuthority(principal)) {
+    if (principal.shopIds.length === 0) return [];
+    const assignments = await client.select<EmployeeShopAssignmentRow[]>(
+      'employee_shop_assignments',
+      new URLSearchParams({
+        select: 'employee_id',
+        business_id: `eq.${principal.businessId}`,
+        shop_id: `in.(${principal.shopIds.join(',')})`,
+      }),
+    );
+    employeeIds = [...new Set(assignments.map((row) => row.employee_id))];
+    if (employeeIds.length === 0) return [];
+  }
+
+  const employeeQuery = new URLSearchParams({
+    select: 'id,display_name',
+    business_id: `eq.${principal.businessId}`,
+  });
+  if (employeeIds) employeeQuery.set('id', `in.(${employeeIds.join(',')})`);
+  const employees = await client.select<EmployeeRow[]>('business_employees', employeeQuery);
+  return employees
+    .map((row) => ({ employeeId: row.id, label: row.display_name }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
 export async function listAuditReadModels(
   client: AdminSupabaseClient,
   principal: AdminSessionPrincipal,
@@ -210,7 +246,7 @@ export async function listAuditReadModels(
     shopName: row.shop_id ? (shopNames.get(row.shop_id) ?? 'Assigned shop') : 'All shops',
     actorKind: row.actor_kind,
     actorEmployeeId: row.actor_employee_id,
-    actorName:
+    actorLabel:
       row.actor_kind === 'SYSTEM'
         ? 'System'
         : row.actor_employee_id
