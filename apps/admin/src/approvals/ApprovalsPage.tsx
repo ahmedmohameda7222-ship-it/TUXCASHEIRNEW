@@ -40,6 +40,7 @@ type ApprovalListResponse = {
   nextCursor?: string | null;
 };
 type StatusFilter = 'ALL' | AdminApprovalStatus;
+type ApprovalDecisionState = { kind: ApprovalDecisionKind; requestId: string };
 
 function formatInstant(value: string | null | undefined): string {
   if (!value) return '—';
@@ -76,7 +77,7 @@ export function ApprovalsPage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<StatusFilter>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [decision, setDecision] = useState<ApprovalDecisionKind | null>(null);
+  const [decision, setDecision] = useState<ApprovalDecisionState | null>(null);
 
   const approvalsQuery = useInfiniteQuery({
     queryKey: ['admin', 'approvals', status],
@@ -119,10 +120,12 @@ export function ApprovalsPage() {
       reason,
     }: {
       kind: ApprovalDecisionKind;
+      requestId: string;
       pin: string;
       reason: string | null;
     }) => {
-      if (!selected || selected.displayStatus === 'EXPIRED' || selected.canDecide === false) {
+      const approval = approvals.find((row) => row.id === requestId);
+      if (!approval || approval.displayStatus === 'EXPIRED' || approval.canDecide === false) {
         throw new Error('approval_selection_not_actionable');
       }
       if (session.state.status !== 'authenticated') throw new Error('session_required');
@@ -130,7 +133,7 @@ export function ApprovalsPage() {
         '/api/admin/approvals',
         {
           method: 'POST',
-          body: JSON.stringify({ requestId: selected.id, decision: kind, pin, reason }),
+          body: JSON.stringify({ requestId, decision: kind, pin, reason }),
         },
         session.state.session.csrfToken,
       );
@@ -140,6 +143,19 @@ export function ApprovalsPage() {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'approvals'] });
     },
   });
+
+  useEffect(() => {
+    if (!decision) return;
+    const approval = approvals.find((row) => row.id === decision.requestId);
+    if (
+      !approval ||
+      approval.displayStatus === 'EXPIRED' ||
+      approval.canDecide === false ||
+      selectedId !== decision.requestId
+    ) {
+      setDecision(null);
+    }
+  }, [approvals, decision, selectedId]);
 
   const decisionError =
     decisionMutation.error instanceof AdminApiError
@@ -211,18 +227,25 @@ export function ApprovalsPage() {
           <ApprovalDetailView
             approval={toViewModel(selected)}
             deciding={decisionMutation.isPending}
-            onApprove={() => setDecision('APPROVE')}
-            onReject={() => setDecision('REJECT')}
+            onApprove={() => setDecision({ kind: 'APPROVE', requestId: selected.id })}
+            onReject={() => setDecision({ kind: 'REJECT', requestId: selected.id })}
           />
         ) : null}
       </div>
       {decision ? (
         <RePinDialog
-          decision={decision}
+          decision={decision.kind}
           busy={decisionMutation.isPending}
           {...(decisionError ? { error: decisionError } : {})}
           onCancel={() => setDecision(null)}
-          onConfirm={(pin, reason) => decisionMutation.mutateAsync({ kind: decision, pin, reason })}
+          onConfirm={(pin, reason) =>
+            decisionMutation.mutateAsync({
+              kind: decision.kind,
+              requestId: decision.requestId,
+              pin,
+              reason,
+            })
+          }
         />
       ) : null}
     </PageScaffold>
