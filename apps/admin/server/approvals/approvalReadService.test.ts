@@ -12,7 +12,7 @@ const principal: AdminSessionPrincipal = {
   shopIds: ['11111111-1111-4111-8111-111111111111'],
 };
 
-function clientWithRequest() {
+function clientWithRequest(requestOverrides: Readonly<Record<string, unknown>> = {}) {
   const select = vi.fn(async (table: string, query?: URLSearchParams) => {
     void query;
     if (table === 'admin_approval_requests') {
@@ -27,10 +27,12 @@ function clientWithRequest() {
           command_payload: { employeeId: 'employee-2', role: 'ADMIN' },
           reason: 'promotion',
           status: 'PENDING',
+          expires_at: '2099-01-01T00:00:00.000Z',
           created_at: '2026-09-16T12:00:00.000Z',
           decided_at: null,
           executed_at: null,
           failed_at: null,
+          ...requestOverrides,
         },
       ];
     }
@@ -68,6 +70,44 @@ describe('approvalReadService', () => {
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.get('shop_id')).toBe(`in.(${principal.shopIds[0]})`);
     expect(query?.get('limit')).toBe('100');
+  });
+
+  it('excludes expired requests from the pending query before the bounded result limit', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-17T12:00:00.000Z'));
+    try {
+      const { client, select } = clientWithRequest();
+
+      await listApprovalReadModels(client, principal, { status: 'PENDING' });
+
+      const approvalCall = select.mock.calls.find(([table]) => table === 'admin_approval_requests');
+      const query = approvalCall?.[1];
+      expect(query?.get('status')).toBe('eq.PENDING');
+      expect(query?.get('expires_at')).toBe('gt.2026-09-17T12:00:00.000Z');
+      expect(query?.get('limit')).toBe('100');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('labels an expired pending request as expired and non-actionable in the read model', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-17T12:00:00.000Z'));
+    try {
+      const { client } = clientWithRequest({ expires_at: '2026-09-17T11:59:59.000Z' });
+
+      const [model] = await listApprovalReadModels(client, principal);
+
+      expect(model).toMatchObject({
+        status: 'PENDING',
+        displayStatus: 'EXPIRED',
+        canDecide: false,
+        expiresAt: '2026-09-17T11:59:59.000Z',
+      });
+      expect(model?.executionLabel).toContain('Expired');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('limits employee enrichment to requester and approver ids on the displayed page', async () => {

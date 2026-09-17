@@ -44,6 +44,20 @@ describe('ApprovalDetailPage', () => {
     expect(html).toContain('Reject');
   });
 
+  it('does not offer a decision for a request whose pending approval window expired', () => {
+    const html = render({
+      ...pending,
+      displayStatus: 'EXPIRED',
+      canDecide: false,
+      executionLabel: 'Expired — submit a new request if the action is still required.',
+    } as ApprovalDetailViewModel & { displayStatus: 'EXPIRED'; canDecide: false });
+
+    expect(html).toContain('EXPIRED');
+    expect(html).toContain('Expired');
+    expect(html).not.toContain('>Approve<');
+    expect(html).not.toContain('>Reject<');
+  });
+
   it('does not offer a second decision after approval has entered execution', () => {
     const html = render({
       ...pending,
