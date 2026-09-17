@@ -149,8 +149,7 @@ function ruleMatchesRequest(rule: AdminApprovalRule, input: RequestApprovalInput
 
 function isAdminApprovalStatus(value: unknown): value is AdminApprovalStatus {
   return (
-    typeof value === 'string' &&
-    (ADMIN_APPROVAL_STATUSES as readonly string[]).includes(value)
+    typeof value === 'string' && (ADMIN_APPROVAL_STATUSES as readonly string[]).includes(value)
   );
 }
 

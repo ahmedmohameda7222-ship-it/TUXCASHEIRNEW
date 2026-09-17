@@ -242,7 +242,9 @@ describe('approvalService', () => {
       status: 'EXECUTED',
       idempotentReplay: true,
     }));
-    const deps = createSupabaseApprovalServiceDependencies({ rpc } as unknown as AdminSupabaseClient);
+    const deps = createSupabaseApprovalServiceDependencies({
+      rpc,
+    } as unknown as AdminSupabaseClient);
 
     const result = await deps.createRequest({
       businessId: 'business-1',
