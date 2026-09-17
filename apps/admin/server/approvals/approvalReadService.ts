@@ -154,12 +154,21 @@ export async function listApprovalReadModels(
   if (requests.length === 0) return [];
 
   const requestIds = requests.map((row) => row.id);
+  const employeeIds = [
+    ...new Set(
+      requests.flatMap((row) => [
+        row.requester_employee_id,
+        ...(row.approver_employee_id ? [row.approver_employee_id] : []),
+      ]),
+    ),
+  ];
   const [employees, shops, executions] = await Promise.all([
     client.select<EmployeeRow[]>(
       'business_employees',
       new URLSearchParams({
         select: 'id,display_name',
         business_id: `eq.${principal.businessId}`,
+        id: `in.(${employeeIds.join(',')})`,
       }),
     ),
     client.select<ShopRow[]>(
