@@ -1,5 +1,5 @@
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -15,7 +15,11 @@ type AuditApiModel = Omit<AuditDetailViewModel, 'createdAtLabel'> & {
   approvalStatus: AdminApprovalStatus | null;
 };
 type AuditActorOption = { employeeId: string; label: string };
-type AuditResponse = { events: AuditApiModel[]; actorOptions: AuditActorOption[] };
+type AuditResponse = {
+  events: AuditApiModel[];
+  actorOptions: AuditActorOption[];
+  nextCursor?: string | null;
+};
 
 const APPROVAL_STATUSES: readonly AdminApprovalStatus[] = [
   'PENDING',
@@ -112,7 +116,7 @@ export function AuditPage() {
   const [entityType, setEntityType] = useState('');
   const [approvalStatus, setApprovalStatus] = useState<AdminApprovalStatus | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const auditQuery = useQuery({
+  const auditQuery = useInfiniteQuery({
     queryKey: [
       'admin',
       'audit',
@@ -124,7 +128,8 @@ export function AuditPage() {
       entityType,
       approvalStatus,
     ],
-    queryFn: async () => {
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       const from = cairoDateBoundary(fromDate, false);
       const to = cairoDateBoundary(toDate, true);
@@ -135,12 +140,17 @@ export function AuditPage() {
       if (actionType.trim()) params.set('actionType', actionType.trim());
       if (entityType.trim()) params.set('entityType', entityType.trim());
       if (approvalStatus) params.set('approvalStatus', approvalStatus);
+      if (pageParam) params.set('cursor', pageParam);
       const suffix = params.size === 0 ? '' : `?${params.toString()}`;
       return adminFetch<AuditResponse>(`/api/admin/audit${suffix}`);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
-  const events = auditQuery.data?.events ?? [];
-  const actorOptions = auditQuery.data?.actorOptions ?? [];
+  const events = useMemo(
+    () => auditQuery.data?.pages.flatMap((page) => page.events) ?? [],
+    [auditQuery.data],
+  );
+  const actorOptions = auditQuery.data?.pages[0]?.actorOptions ?? [];
   const selected = useMemo(
     () => events.find((event) => event.id === selectedId) ?? events[0] ?? null,
     [events, selectedId],
@@ -263,6 +273,18 @@ export function AuditPage() {
               <span>{formatInstant(event.createdAt)}</span>
             </button>
           ))}
+          {auditQuery.hasNextPage ? (
+            <button
+              className="admin-audit-list__item"
+              type="button"
+              disabled={auditQuery.isFetchingNextPage}
+              onClick={() => void auditQuery.fetchNextPage()}
+            >
+              {auditQuery.isFetchingNextPage
+                ? 'Loading more audit events…'
+                : 'Load more audit events'}
+            </button>
+          ) : null}
         </nav>
         {selected ? (
           <AuditDetailPage
