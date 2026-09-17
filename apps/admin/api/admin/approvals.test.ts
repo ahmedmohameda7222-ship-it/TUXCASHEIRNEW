@@ -7,6 +7,7 @@ import {
   parseApprovalDecisionBody,
   requireApprovalEndpointAccess,
 } from './approvals';
+import * as auditModule from './audit';
 
 function context(
   permissions: AdminSessionContext['principal']['permissions'],
@@ -81,6 +82,25 @@ describe('Admin approvals BFF boundary', () => {
     const cursor = {
       createdAt: '2026-09-18T00:00:00.000Z',
       id: '11111111-1111-4111-8111-111111111111',
+    };
+    const encoded = encode(cursor);
+    expect(typeof encoded).toBe('string');
+    expect(encoded).not.toContain(cursor.createdAt);
+    expect(decode(encoded)).toEqual(cursor);
+  });
+});
+
+describe('Admin audit BFF cursor boundary', () => {
+  it('round-trips an opaque audit continuation cursor', () => {
+    const encode = (auditModule as Record<string, unknown>)['encodeAuditCursor'];
+    const decode = (auditModule as Record<string, unknown>)['decodeAuditCursor'];
+    expect(typeof encode).toBe('function');
+    expect(typeof decode).toBe('function');
+    if (typeof encode !== 'function' || typeof decode !== 'function') return;
+
+    const cursor = {
+      createdAt: '2026-09-17T20:00:00.000Z',
+      id: '22222222-2222-4222-8222-222222222222',
     };
     const encoded = encode(cursor);
     expect(typeof encoded).toBe('string');
