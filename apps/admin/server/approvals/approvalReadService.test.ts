@@ -13,7 +13,7 @@ const principal: AdminSessionPrincipal = {
 };
 
 function clientWithRequest() {
-  const select = vi.fn(async (table: string, _query?: URLSearchParams) => {
+  const select = vi.fn(async (table: string) => {
     if (table === 'admin_approval_requests') {
       return [
         {
