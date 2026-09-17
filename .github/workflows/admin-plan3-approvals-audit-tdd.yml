@@ -165,3 +165,5 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round2.mjs
       - name: Plan 3 review round-3 PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-review-hardening-round3.mjs
+      - name: Plan 3 review round-4 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round4.mjs

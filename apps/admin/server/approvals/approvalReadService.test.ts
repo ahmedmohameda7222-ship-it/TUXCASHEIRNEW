@@ -70,6 +70,17 @@ describe('approvalReadService', () => {
     expect(query?.get('limit')).toBe('100');
   });
 
+  it('limits employee enrichment to requester and approver ids on the displayed page', async () => {
+    const { client, select } = clientWithRequest();
+
+    await listApprovalReadModels(client, principal);
+
+    const employeeCall = select.mock.calls.find(([table]) => table === 'business_employees');
+    const query = employeeCall?.[1];
+    expect(query).toBeInstanceOf(URLSearchParams);
+    expect(query?.get('id')).toBe('in.(requester-1)');
+  });
+
   it('limits execution enrichment to the displayed approval request ids', async () => {
     const { client, select } = clientWithRequest();
 
