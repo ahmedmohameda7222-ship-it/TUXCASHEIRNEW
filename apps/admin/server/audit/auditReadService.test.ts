@@ -56,22 +56,14 @@ function createClient(): AdminSupabaseClient {
       }
       if (table === 'admin_approval_requests') {
         return [
-          {
-            id: '55555555-5555-4555-8555-555555555555',
-            status: 'APPROVED',
-          },
-          {
-            id: '77777777-7777-4777-8777-777777777777',
-            status: 'REJECTED',
-          },
+          { id: '55555555-5555-4555-8555-555555555555', status: 'APPROVED' },
+          { id: '77777777-7777-4777-8777-777777777777', status: 'REJECTED' },
         ];
       }
       if (table === 'business_employees') {
         return [{ id: principal.employeeId, display_name: 'Owner One' }];
       }
-      if (table === 'shops') {
-        return [{ id: principal.shopIds[0], name: 'TUX' }];
-      }
+      if (table === 'shops') return [{ id: principal.shopIds[0], name: 'TUX' }];
       throw new Error(`unexpected table ${table}`);
     }),
   } as unknown as AdminSupabaseClient;
@@ -80,9 +72,7 @@ function createClient(): AdminSupabaseClient {
 describe('listAuditReadModels', () => {
   it('filters linked audit events by approval request status', async () => {
     const filters = { approvalStatus: 'APPROVED' } as const;
-
     const events = await listAuditReadModels(createClient(), principal, filters);
-
     expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
   });
 
@@ -91,43 +81,38 @@ describe('listAuditReadModels', () => {
       approvalStatus: 'APPROVED',
     });
     const serialized = event as unknown as Record<string, unknown>;
-
     expect(serialized['actorLabel']).toBe('Owner One');
     expect(serialized['actorName']).toBeUndefined();
   });
 
-  it('loads actor options independently of the current event page and within shop scope', async () => {
-    const loadActorOptions = (
-      auditReadService as unknown as {
-        listAuditActorOptions?: (
-          client: AdminSupabaseClient,
-          principal: AdminSessionPrincipal,
-        ) => Promise<Array<{ employeeId: string; label: string }>>;
-      }
-    ).listAuditActorOptions;
-    expect(loadActorOptions).toBeTypeOf('function');
-    if (!loadActorOptions) return;
-
+  it('loads actor options from scoped audit history so former shop actors remain filterable', async () => {
+    const loadActorOptions = auditReadService.listAuditActorOptions;
     const manager: AdminSessionPrincipal = {
       ...principal,
       role: 'MANAGER',
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
-    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
-      if (table === 'employee_shop_assignments') {
-        expect(query?.get('shop_id')).toBe(`in.(${manager.shopIds[0]})`);
-        return [{ employee_id: '99999999-9999-4999-8999-999999999999' }];
-      }
-      if (table === 'business_employees') {
-        return [{ id: '99999999-9999-4999-8999-999999999999', display_name: 'Older Actor' }];
-      }
-      throw new Error(`unexpected table ${table}`);
+    const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
+      if (name !== 'list_admin_audit_actor_options_v1') throw new Error(`unexpected rpc ${name}`);
+      expect(payload).toEqual({
+        p_business_id: manager.businessId,
+        p_shop_ids: manager.shopIds,
+      });
+      return [
+        {
+          employee_id: '99999999-9999-4999-8999-999999999999',
+          display_name: 'Former Shop Actor',
+        },
+      ];
+    });
+    const select = vi.fn(async (table: string) => {
+      throw new Error(`actor options must not depend on current assignments: ${table}`);
     });
 
-    const options = await loadActorOptions({ select } as unknown as AdminSupabaseClient, manager);
+    const options = await loadActorOptions({ rpc, select } as unknown as AdminSupabaseClient, manager);
 
     expect(options).toEqual([
-      { employeeId: '99999999-9999-4999-8999-999999999999', label: 'Older Actor' },
+      { employeeId: '99999999-9999-4999-8999-999999999999', label: 'Former Shop Actor' },
     ]);
   });
 
