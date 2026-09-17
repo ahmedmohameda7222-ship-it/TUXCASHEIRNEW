@@ -111,7 +111,13 @@ export function ApprovalsPage() {
       pin: string;
       reason: string | null;
     }) => {
-      if (!selected || !selected.canDecide) throw new Error('approval_selection_not_actionable');
+      if (
+        !selected ||
+        selected.displayStatus === 'EXPIRED' ||
+        selected.canDecide === false
+      ) {
+        throw new Error('approval_selection_not_actionable');
+      }
       if (session.state.status !== 'authenticated') throw new Error('session_required');
       await adminFetch<{ ok: true; requestId: string; status: AdminApprovalStatus }>(
         '/api/admin/approvals',
@@ -178,7 +184,7 @@ export function ApprovalsPage() {
               <strong>{approval.actionLabel}</strong>
               <span>{approval.requesterName}</span>
               <span>{approval.shopName}</span>
-              <span>{approval.displayStatus}</span>
+              <span>{approval.displayStatus ?? approval.status}</span>
             </button>
           ))}
         </nav>
