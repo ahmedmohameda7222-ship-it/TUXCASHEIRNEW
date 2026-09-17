@@ -110,35 +110,40 @@ test('loads approvals beyond the first bounded page using the continuation curso
   await expect(page.getByText('Older inventory adjustment').first()).toBeVisible();
 });
 
-test('closes the PIN dialog if the reviewed request disappears during a filter refetch', async ({
+test('closes the PIN dialog if its reviewed request disappears during the same-query interval refetch', async ({
   page,
 }) => {
+  await page.clock.install();
   await mockSession(page);
   const firstId = '66666666-6666-4666-8666-666666666666';
   const replacementId = '77777777-7777-4777-8777-777777777777';
+  let getCount = 0;
+  let postedRequestId: string | null = null;
+
   await page.route('**/api/admin/approvals*', async (route) => {
     if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() as { requestId?: string };
+      postedRequestId = body.requestId ?? null;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, requestId: replacementId, status: 'APPROVED' }),
+        body: JSON.stringify({ ok: true, requestId: body.requestId, status: 'APPROVED' }),
       });
       return;
     }
-    const url = new URL(route.request().url());
-    const pendingOnly = url.searchParams.get('status') === 'PENDING';
+
+    getCount += 1;
+    const approvals =
+      getCount === 1
+        ? [
+            approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z'),
+            approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z'),
+          ]
+        : [approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')];
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        approvals: pendingOnly
-          ? [approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z')]
-          : [
-              approval(firstId, 'Reviewed request', '2026-09-18T00:00:00.000Z'),
-              approval(replacementId, 'Replacement request', '2026-09-17T23:59:00.000Z'),
-            ],
-        nextCursor: null,
-      }),
+      body: JSON.stringify({ approvals, nextCursor: null }),
     });
   });
 
@@ -147,9 +152,12 @@ test('closes the PIN dialog if the reviewed request disappears during a filter r
   await page.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 
-  await page.getByLabel('Status').selectOption('PENDING');
+  await page.clock.fastForward(16_000);
+  await expect.poll(() => getCount).toBeGreaterThan(1);
+  await expect(page.getByText('Reviewed request')).toHaveCount(0);
   await expect(page.getByText('Replacement request').first()).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(postedRequestId).toBeNull();
 });
 
 test('loads audit events beyond the first bounded page using the continuation cursor', async ({
