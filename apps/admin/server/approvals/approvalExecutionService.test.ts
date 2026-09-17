@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  ApprovalTerminalCommandError,
   createApprovalExecutionRegistry,
   createApprovalExecutionService,
   type ApprovalExecutionClaim,
@@ -101,8 +102,60 @@ describe('approvalExecutionService', () => {
     );
   });
 
+  it('rejects an EXECUTED completion response that did not commit', async () => {
+    const service = createApprovalExecutionService({
+      claimApprovedCommand: vi.fn(async () => [claim]),
+      completeClaim: vi.fn(async () => ({ ok: false as const, code: 'approval_claim_stale' })),
+      registry: createApprovalExecutionRegistry([
+        {
+          actionType: claim.actionType,
+          execute: vi.fn(async () => ({ result: { entityId: 'entity-1' }, idempotentReplay: false })),
+        },
+      ]),
+      workerId: 'approval-runner-test',
+    });
+
+    await expect(service.runOnce()).rejects.toThrow('approval_execution_completion_not_committed');
+  });
+
+  it('rejects a FAILED completion response that did not commit', async () => {
+    const service = createApprovalExecutionService({
+      claimApprovedCommand: vi.fn(async () => [claim]),
+      completeClaim: vi.fn(async () => ({ ok: false as const, code: 'approval_claim_stale' })),
+      registry: createApprovalExecutionRegistry([
+        {
+          actionType: claim.actionType,
+          execute: vi.fn(async () => {
+            throw new ApprovalTerminalCommandError('terminal_business_error');
+          }),
+        },
+      ]),
+      workerId: 'approval-runner-test',
+    });
+
+    await expect(service.runOnce()).rejects.toThrow('approval_execution_completion_not_committed');
+  });
+
+  it('rejects a RETRYABLE completion response that did not commit', async () => {
+    const service = createApprovalExecutionService({
+      claimApprovedCommand: vi.fn(async () => [claim]),
+      completeClaim: vi.fn(async () => ({ ok: false as const, code: 'approval_claim_stale' })),
+      registry: createApprovalExecutionRegistry([
+        {
+          actionType: claim.actionType,
+          execute: vi.fn(async () => {
+            throw new Error('temporary_backend_failure');
+          }),
+        },
+      ]),
+      workerId: 'approval-runner-test',
+    });
+
+    await expect(service.runOnce()).rejects.toThrow('approval_execution_completion_not_committed');
+  });
+
   it('never executes an unknown persisted command type', async () => {
-    const completeClaim = vi.fn();
+    const completeClaim = vi.fn(async () => ({ ok: true as const, status: 'FAILED' as const }));
     const service = createApprovalExecutionService({
       claimApprovedCommand: vi.fn(async () => [{ ...claim, actionType: 'UNKNOWN_COMMAND' }]),
       completeClaim,
