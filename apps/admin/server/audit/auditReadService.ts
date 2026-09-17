@@ -61,9 +61,9 @@ type AuditRow = {
 };
 
 type EmployeeRow = { id: string; display_name: string };
+type AuditActorOptionRow = { employee_id: string; display_name: string };
 type ShopRow = { id: string; name: string };
 type ApprovalRow = { id: string; status: AdminApprovalStatus };
-type EmployeeShopAssignmentRow = { employee_id: string };
 
 const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
@@ -149,29 +149,16 @@ export async function listAuditActorOptions(
   client: AdminSupabaseClient,
   principal: AdminSessionPrincipal,
 ): Promise<AuditActorOption[]> {
-  let employeeIds: string[] | null = null;
-  if (!hasBusinessWideAuthority(principal)) {
-    if (principal.shopIds.length === 0) return [];
-    const assignments = await client.select<EmployeeShopAssignmentRow[]>(
-      'employee_shop_assignments',
-      new URLSearchParams({
-        select: 'employee_id',
-        business_id: `eq.${principal.businessId}`,
-        shop_id: `in.(${principal.shopIds.join(',')})`,
-      }),
-    );
-    employeeIds = [...new Set(assignments.map((row) => row.employee_id))];
-    if (employeeIds.length === 0) return [];
-  }
+  if (!hasAuditRpc(client)) throw new Error('admin_audit_actor_options_rpc_required');
+  if (!hasBusinessWideAuthority(principal) && principal.shopIds.length === 0) return [];
 
-  const employeeQuery = new URLSearchParams({
-    select: 'id,display_name',
-    business_id: `eq.${principal.businessId}`,
+  const rows = await client.rpc<AuditActorOptionRow[]>('list_admin_audit_actor_options_v1', {
+    p_business_id: principal.businessId,
+    p_shop_ids: hasBusinessWideAuthority(principal) ? null : principal.shopIds,
   });
-  if (employeeIds) employeeQuery.set('id', `in.(${employeeIds.join(',')})`);
-  const employees = await client.select<EmployeeRow[]>('business_employees', employeeQuery);
-  return employees
-    .map((row) => ({ employeeId: row.id, label: row.display_name }))
+
+  return rows
+    .map((row) => ({ employeeId: row.employee_id, label: row.display_name }))
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
