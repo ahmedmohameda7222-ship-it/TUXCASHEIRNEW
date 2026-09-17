@@ -109,7 +109,10 @@ describe('listAuditReadModels', () => {
       throw new Error(`actor options must not depend on current assignments: ${table}`);
     });
 
-    const options = await loadActorOptions({ rpc, select } as unknown as AdminSupabaseClient, manager);
+    const options = await loadActorOptions(
+      { rpc, select } as unknown as AdminSupabaseClient,
+      manager,
+    );
 
     expect(options).toEqual([
       { employeeId: '99999999-9999-4999-8999-999999999999', label: 'Former Shop Actor' },
