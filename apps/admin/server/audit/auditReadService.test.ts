@@ -69,22 +69,26 @@ function createClient(): AdminSupabaseClient {
   } as unknown as AdminSupabaseClient;
 }
 
+function createApprovalStatusClient(): AdminSupabaseClient {
+  const base = createClient() as unknown as {
+    select: (table: string, query?: URLSearchParams) => Promise<unknown>;
+  };
+  return {
+    select: base.select,
+    rpc: async <T>() => [approvedEvent] as unknown as T,
+  } as unknown as AdminSupabaseClient;
+}
+
 describe('listAuditReadModels', () => {
   it('filters linked audit events by approval request status', async () => {
     const filters = { approvalStatus: 'APPROVED' } as const;
-    const client = createClient() as AdminSupabaseClient & {
-      rpc?: (name: string, payload: Readonly<Record<string, unknown>>) => Promise<unknown>;
-    };
-    client.rpc = async () => [approvedEvent];
+    const client = createApprovalStatusClient();
     const events = await listAuditReadModels(client, principal, filters);
     expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
   });
 
   it('returns the actor label contract consumed by the audit UI', async () => {
-    const client = createClient() as AdminSupabaseClient & {
-      rpc?: (name: string, payload: Readonly<Record<string, unknown>>) => Promise<unknown>;
-    };
-    client.rpc = async () => [approvedEvent];
+    const client = createApprovalStatusClient();
     const [event] = await listAuditReadModels(client, principal, {
       approvalStatus: 'APPROVED',
     });
