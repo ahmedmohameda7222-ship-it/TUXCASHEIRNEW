@@ -139,7 +139,15 @@ function applyPrincipalShopScope(
     query.set('shop_id', `eq.${explicitShopId}`);
     return;
   }
-  if (hasBusinessWideAuthority(principal)) return;
+  if (principal.role === 'OWNER') return;
+  if (principal.role === 'ADMIN') {
+    if (principal.shopIds.length === 0) {
+      query.set('shop_id', 'is.null');
+      return;
+    }
+    query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    return;
+  }
   const shopIds = principal.shopIds.length > 0 ? principal.shopIds : [EMPTY_SCOPE_SENTINEL];
   query.set('shop_id', `in.(${shopIds.join(',')})`);
 }
