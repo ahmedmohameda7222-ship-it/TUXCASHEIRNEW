@@ -1,6 +1,7 @@
 import type { AdminSessionContext } from '../../server/adminAuthService';
 import { describe, expect, it } from 'vitest';
 
+import * as approvalsModule from './approvals';
 import {
   buildApprovalActor,
   parseApprovalDecisionBody,
@@ -68,5 +69,22 @@ describe('Admin approvals BFF boundary', () => {
         decision: 'APPROVE',
       }),
     ).toBeNull();
+  });
+
+  it('round-trips the opaque approval continuation cursor at the BFF boundary', () => {
+    const encode = (approvalsModule as Record<string, unknown>)['encodeApprovalCursor'];
+    const decode = (approvalsModule as Record<string, unknown>)['decodeApprovalCursor'];
+    expect(typeof encode).toBe('function');
+    expect(typeof decode).toBe('function');
+    if (typeof encode !== 'function' || typeof decode !== 'function') return;
+
+    const cursor = {
+      createdAt: '2026-09-18T00:00:00.000Z',
+      id: '11111111-1111-4111-8111-111111111111',
+    };
+    const encoded = encode(cursor);
+    expect(typeof encoded).toBe('string');
+    expect(encoded).not.toContain(cursor.createdAt);
+    expect(decode(encoded)).toEqual(cursor);
   });
 });

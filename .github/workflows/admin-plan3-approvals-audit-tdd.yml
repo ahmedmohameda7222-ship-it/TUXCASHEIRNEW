@@ -20,6 +20,7 @@ on:
       - 'apps/admin/src/app/routes.tsx'
       - 'apps/admin/vercel.json'
       - 'e2e/admin-approvals-audit.spec.ts'
+      - 'e2e/admin-approvals-pagination.spec.ts'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -40,6 +41,7 @@ on:
       - 'apps/admin/src/app/routes.tsx'
       - 'apps/admin/vercel.json'
       - 'e2e/admin-approvals-audit.spec.ts'
+      - 'e2e/admin-approvals-pagination.spec.ts'
       - 'packages/admin-contracts/src/approvals.ts'
       - 'packages/admin-contracts/src/audit.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -85,6 +87,7 @@ jobs:
           apps/admin/server/approvals/approvalExecutionService.test.ts
           apps/admin/server/approvals/approvalExecutionRunner.test.ts
           apps/admin/server/approvals/plan3Round9Review.test.ts
+          apps/admin/server/approvals/plan3Round10Review.test.ts
           apps/admin/server/audit/auditService.test.ts
           apps/admin/server/audit/auditReadService.test.ts
 
@@ -126,7 +129,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Approval and audit responsive E2E
-        run: npx playwright test e2e/admin-approvals-audit.spec.ts --config playwright.admin.config.ts
+        run: >-
+          npx playwright test
+          e2e/admin-approvals-audit.spec.ts
+          e2e/admin-approvals-pagination.spec.ts
+          --config playwright.admin.config.ts
 
   postgres-behavior:
     needs: static-invariant
@@ -174,3 +181,5 @@ jobs:
         run: node scripts/test-admin-approvals-audit-review-hardening-round6.mjs
       - name: Plan 3 review round-7 PostgreSQL behavior
         run: node scripts/test-admin-approvals-audit-review-hardening-round7.mjs
+      - name: Plan 3 review round-10 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round10.mjs
