@@ -14,7 +14,8 @@ const principal: AdminSessionPrincipal = {
 
 function createClient(): AdminSupabaseClient {
   return {
-    select: vi.fn(async (table: string) => {
+    select: vi.fn(async (table: string, query?: URLSearchParams) => {
+      void query;
       if (table === 'admin_audit_events') {
         return [
           {
@@ -89,7 +90,8 @@ describe('listAuditReadModels', () => {
       role: 'MANAGER',
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      void query;
       if (table === 'admin_audit_events') return [];
       throw new Error(`unexpected table ${table}`);
     });
