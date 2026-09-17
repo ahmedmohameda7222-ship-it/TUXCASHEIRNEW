@@ -2,7 +2,9 @@ import type { AdminSessionPrincipal } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSupabaseClient } from '../supabaseAdmin';
-import { listAuditReadModels, type AuditReadFilters } from './auditReadService';
+import * as auditReadService from './auditReadService';
+
+const { listAuditReadModels } = auditReadService;
 
 const principal: AdminSessionPrincipal = {
   employeeId: '11111111-1111-4111-8111-111111111111',
@@ -77,11 +79,54 @@ function createClient(): AdminSupabaseClient {
 
 describe('listAuditReadModels', () => {
   it('filters linked audit events by approval request status', async () => {
-    const filters = { approvalStatus: 'APPROVED' } as AuditReadFilters;
+    const filters = { approvalStatus: 'APPROVED' } as const;
 
     const events = await listAuditReadModels(createClient(), principal, filters);
 
     expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
+  });
+
+  it('returns the actor label contract consumed by the audit UI', async () => {
+    const [event] = await listAuditReadModels(createClient(), principal, { approvalStatus: 'APPROVED' });
+    const serialized = event as unknown as Record<string, unknown>;
+
+    expect(serialized['actorLabel']).toBe('Owner One');
+    expect(serialized['actorName']).toBeUndefined();
+  });
+
+  it('loads actor options independently of the current event page and within shop scope', async () => {
+    const loadActorOptions = (
+      auditReadService as unknown as {
+        listAuditActorOptions?: (
+          client: AdminSupabaseClient,
+          principal: AdminSessionPrincipal,
+        ) => Promise<Array<{ employeeId: string; label: string }>>;
+      }
+    ).listAuditActorOptions;
+    expect(loadActorOptions).toBeTypeOf('function');
+    if (!loadActorOptions) return;
+
+    const manager: AdminSessionPrincipal = {
+      ...principal,
+      role: 'MANAGER',
+      shopIds: ['33333333-3333-4333-8333-333333333333'],
+    };
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'employee_shop_assignments') {
+        expect(query?.get('shop_id')).toBe(`in.(${manager.shopIds[0]})`);
+        return [{ employee_id: '99999999-9999-4999-8999-999999999999' }];
+      }
+      if (table === 'business_employees') {
+        return [{ id: '99999999-9999-4999-8999-999999999999', display_name: 'Older Actor' }];
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const options = await loadActorOptions({ select } as unknown as AdminSupabaseClient, manager);
+
+    expect(options).toEqual([
+      { employeeId: '99999999-9999-4999-8999-999999999999', label: 'Older Actor' },
+    ]);
   });
 
   it('pushes approval status into the bounded database audit query instead of materializing capped IDs', async () => {

@@ -69,4 +69,19 @@ describe('approvalReadService', () => {
     expect(query?.get('shop_id')).toBe(`in.(${principal.shopIds[0]})`);
     expect(query?.get('limit')).toBe('100');
   });
+
+  it('limits execution enrichment to the displayed approval request ids', async () => {
+    const { client, select } = clientWithRequest();
+
+    await listApprovalReadModels(client, principal);
+
+    const executionCall = select.mock.calls.find(
+      ([table]) => table === 'admin_approval_execution_jobs',
+    );
+    const query = executionCall?.[1];
+    expect(query).toBeInstanceOf(URLSearchParams);
+    expect(query?.get('approval_request_id')).toBe(
+      'in.(22222222-2222-4222-8222-222222222222)',
+    );
+  });
 });
