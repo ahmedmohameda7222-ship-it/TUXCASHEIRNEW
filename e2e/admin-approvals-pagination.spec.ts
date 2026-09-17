@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const shopId = '11111111-1111-4111-8111-111111111111';
 
@@ -58,7 +58,7 @@ function auditEvent(id: string, label: string, createdAt: string) {
   };
 }
 
-async function mockSession(page: import('@playwright/test').Page) {
+async function mockSession(page: Page) {
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
       status: 200,
