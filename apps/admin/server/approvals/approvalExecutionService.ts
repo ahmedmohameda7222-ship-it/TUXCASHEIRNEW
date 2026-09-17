@@ -80,11 +80,20 @@ function normalizeSecretKey(key: string): string {
     .toLowerCase();
 }
 
+const API_CREDENTIAL_KEYS = new Set([
+  'api_key',
+  'client_secret',
+  'access_key',
+  'secret_key',
+  'private_key',
+]);
+
 function isSecretResultKey(key: string): boolean {
   const normalized = normalizeSecretKey(key);
   const collapsed = normalized.replaceAll('_', '');
   return (
     /(^|_)(pin|password|passcode|verifier|salt|lookup|token)(_|$)/.test(normalized) ||
+    API_CREDENTIAL_KEYS.has(normalized) ||
     [
       'pinhash',
       'pinlookuphash',

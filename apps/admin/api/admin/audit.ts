@@ -2,7 +2,11 @@ import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService';
-import { listAuditActorOptions, listAuditReadModels } from '../../server/audit/auditReadService';
+import {
+  listAuditActorOptions,
+  listAuditReadPage,
+  type AuditReadCursor,
+} from '../../server/audit/auditReadService';
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
 import { getAdminServerEnv } from '../../server/env';
 import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';
@@ -12,6 +16,12 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 const uuidSchema = z.string().uuid();
 const textFilterSchema = z.string().trim().min(1).max(160);
 const instantSchema = z.string().datetime({ offset: true });
+const auditCursorSchema = z
+  .object({
+    createdAt: instantSchema,
+    id: uuidSchema,
+  })
+  .strict();
 const approvalStatusSchema = z.enum([
   'PENDING',
   'APPROVED',
@@ -20,6 +30,21 @@ const approvalStatusSchema = z.enum([
   'EXECUTED',
   'FAILED',
 ]);
+
+export function encodeAuditCursor(cursor: AuditReadCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+export function decodeAuditCursor(value: string): AuditReadCursor | null {
+  if (value.length === 0 || value.length > 512) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown;
+    const parsed = auditCursorSchema.safeParse(decoded);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
 
 function handleFailure(response: AdminResponse, error: unknown): void {
   if (error instanceof AdminAuthError) {
@@ -56,7 +81,13 @@ export default async function handler(
     const context = await loadAdminSession(token, client);
     const requestUrl = new URL(request.url ?? '/', 'http://admin.local');
     const rawShopId = requestUrl.searchParams.get('shopId');
+    const rawCursor = requestUrl.searchParams.get('cursor');
     const shopId = rawShopId === null ? undefined : uuidSchema.parse(rawShopId);
+    const cursor = rawCursor === null ? undefined : decodeAuditCursor(rawCursor);
+    if (rawCursor !== null && cursor === null) {
+      sendJson(response, 400, { error: 'invalid_audit_cursor' });
+      return;
+    }
     requirePermission(context.principal, 'audit.view', shopId);
 
     const parseOptional = <T>(value: string | null, schema: z.ZodType<T>): T | undefined =>
@@ -74,8 +105,8 @@ export default async function handler(
     const from = parseOptional(requestUrl.searchParams.get('from'), instantSchema);
     const to = parseOptional(requestUrl.searchParams.get('to'), instantSchema);
 
-    const [events, actorOptions] = await Promise.all([
-      listAuditReadModels(client, context.principal, {
+    const [page, actorOptions] = await Promise.all([
+      listAuditReadPage(client, context.principal, {
         ...(shopId ? { shopId } : {}),
         ...(actorEmployeeId ? { actorEmployeeId } : {}),
         ...(actionType ? { actionType } : {}),
@@ -83,10 +114,15 @@ export default async function handler(
         ...(approvalStatus ? { approvalStatus } : {}),
         ...(from ? { from } : {}),
         ...(to ? { to } : {}),
+        ...(cursor ? { cursor } : {}),
       }),
       listAuditActorOptions(client, context.principal),
     ]);
-    sendJson(response, 200, { events, actorOptions });
+    sendJson(response, 200, {
+      events: page.events,
+      actorOptions,
+      nextCursor: page.nextCursor ? encodeAuditCursor(page.nextCursor) : null,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       sendJson(response, 400, { error: 'invalid_audit_request' });

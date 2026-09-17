@@ -72,12 +72,20 @@ function createClient(): AdminSupabaseClient {
 describe('listAuditReadModels', () => {
   it('filters linked audit events by approval request status', async () => {
     const filters = { approvalStatus: 'APPROVED' } as const;
-    const events = await listAuditReadModels(createClient(), principal, filters);
+    const client = createClient() as AdminSupabaseClient & {
+      rpc?: (name: string, payload: Readonly<Record<string, unknown>>) => Promise<unknown>;
+    };
+    client.rpc = async () => [approvedEvent];
+    const events = await listAuditReadModels(client, principal, filters);
     expect(events.map((event) => event.id)).toEqual(['44444444-4444-4444-8444-444444444444']);
   });
 
   it('returns the actor label contract consumed by the audit UI', async () => {
-    const [event] = await listAuditReadModels(createClient(), principal, {
+    const client = createClient() as AdminSupabaseClient & {
+      rpc?: (name: string, payload: Readonly<Record<string, unknown>>) => Promise<unknown>;
+    };
+    client.rpc = async () => [approvedEvent];
+    const [event] = await listAuditReadModels(client, principal, {
       approvalStatus: 'APPROVED',
     });
     const serialized = event as unknown as Record<string, unknown>;
@@ -144,13 +152,15 @@ describe('listAuditReadModels', () => {
 
   it('pushes approval status into the bounded database audit query instead of materializing capped IDs', async () => {
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      if (name !== 'list_admin_audit_events_v2') throw new Error(`unexpected rpc ${name}`);
+      if (name !== 'list_admin_audit_events_v3') throw new Error(`unexpected rpc ${name}`);
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: principal.businessId,
           p_approval_status: 'APPROVED',
           p_include_business_wide: true,
-          p_limit: 100,
+          p_before_created_at: null,
+          p_before_id: null,
+          p_limit: 101,
         }),
       );
       return [approvedEvent];
@@ -190,7 +200,7 @@ describe('listAuditReadModels', () => {
     const query = auditCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.get('shop_id')).toBe(`in.(${manager.shopIds[0]})`);
-    expect(query?.get('limit')).toBe('100');
+    expect(query?.get('limit')).toBe('101');
   });
 
   it('pushes ADMIN assigned shops plus business-wide events before the direct-query limit', async () => {
@@ -211,7 +221,7 @@ describe('listAuditReadModels', () => {
     const query = auditCall?.[1];
     expect(query?.get('shop_id')).toBeNull();
     expect(query?.get('or')).toBe(`(shop_id.is.null,shop_id.in.(${admin.shopIds[0]}))`);
-    expect(query?.get('limit')).toBe('100');
+    expect(query?.get('limit')).toBe('101');
   });
 
   it('passes ADMIN assigned shops plus business-wide authority into the audit status RPC', async () => {
@@ -221,14 +231,16 @@ describe('listAuditReadModels', () => {
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      expect(name).toBe('list_admin_audit_events_v2');
+      expect(name).toBe('list_admin_audit_events_v3');
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: admin.businessId,
           p_shop_ids: admin.shopIds,
           p_include_business_wide: true,
           p_approval_status: 'APPROVED',
-          p_limit: 100,
+          p_before_created_at: null,
+          p_before_id: null,
+          p_limit: 101,
         }),
       );
       return [];

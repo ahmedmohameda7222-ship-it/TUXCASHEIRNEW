@@ -2,6 +2,11 @@ import type { AdminApprovalStatus, AdminSessionPrincipal } from '@tux/admin-cont
 
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
+export type AuditReadCursor = {
+  createdAt: string;
+  id: string;
+};
+
 export type AuditReadFilters = {
   id?: string;
   shopId?: string;
@@ -12,6 +17,7 @@ export type AuditReadFilters = {
   from?: string;
   to?: string;
   approvalStatus?: AdminApprovalStatus;
+  cursor?: AuditReadCursor;
 };
 
 export type AuditReadModel = {
@@ -33,6 +39,11 @@ export type AuditReadModel = {
   approverName: string | null;
   approvalStatus: AdminApprovalStatus | null;
   createdAt: string;
+};
+
+export type AuditReadPage = {
+  events: AuditReadModel[];
+  nextCursor: AuditReadCursor | null;
 };
 
 export type AuditActorOption = {
@@ -66,6 +77,7 @@ type ShopRow = { id: string; name: string };
 type ApprovalRow = { id: string; status: AdminApprovalStatus };
 
 const EMPTY_SCOPE_SENTINEL = '00000000-0000-0000-0000-000000000000';
+const AUDIT_PAGE_SIZE = 100;
 
 function hasBusinessWideAuthority(principal: AdminSessionPrincipal): boolean {
   return principal.role === 'OWNER' || principal.role === 'ADMIN';
@@ -80,26 +92,43 @@ function visibleToPrincipal(row: AuditRow, principal: AdminSessionPrincipal): bo
   return principal.shopIds.includes(row.shop_id);
 }
 
+function cursorOrFilter(cursor: AuditReadCursor): string {
+  return `(created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id}))`;
+}
+
 function applyPrincipalShopScope(
   query: URLSearchParams,
   principal: AdminSessionPrincipal,
   explicitShopId: string | undefined,
+  cursor: AuditReadCursor | undefined,
 ): void {
   if (explicitShopId) {
     query.set('shop_id', `eq.${explicitShopId}`);
+    if (cursor) query.set('or', cursorOrFilter(cursor));
     return;
   }
-  if (principal.role === 'OWNER') return;
+  if (principal.role === 'OWNER') {
+    if (cursor) query.set('or', cursorOrFilter(cursor));
+    return;
+  }
   if (principal.role === 'ADMIN') {
     if (principal.shopIds.length === 0) {
       query.set('shop_id', 'is.null');
+      if (cursor) query.set('or', cursorOrFilter(cursor));
       return;
     }
-    query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    if (cursor) {
+      const scope = `or(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`;
+      const continuation = `or${cursorOrFilter(cursor)}`;
+      query.set('and', `(${scope},${continuation})`);
+    } else {
+      query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    }
     return;
   }
   const shopIds = principal.shopIds.length > 0 ? principal.shopIds : [EMPTY_SCOPE_SENTINEL];
   query.set('shop_id', `in.(${shopIds.join(',')})`);
+  if (cursor) query.set('or', cursorOrFilter(cursor));
 }
 
 function applyEventFilters(query: URLSearchParams, filters: AuditReadFilters): void {
@@ -121,8 +150,9 @@ async function loadEvents(
   principal: AdminSessionPrincipal,
   filters: AuditReadFilters,
 ): Promise<AuditRow[]> {
+  const pageLimit = filters.id ? 1 : AUDIT_PAGE_SIZE + 1;
   if (filters.approvalStatus && hasAuditRpc(client)) {
-    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v2', {
+    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v3', {
       p_business_id: principal.businessId,
       p_shop_ids: scopedShopIds(principal),
       p_include_business_wide: hasBusinessWideAuthority(principal),
@@ -135,7 +165,9 @@ async function loadEvents(
       p_to: filters.to ?? null,
       p_approval_status: filters.approvalStatus,
       p_event_id: filters.id ?? null,
-      p_limit: filters.id ? 1 : 100,
+      p_before_created_at: filters.id ? null : (filters.cursor?.createdAt ?? null),
+      p_before_id: filters.id ? null : (filters.cursor?.id ?? null),
+      p_limit: pageLimit,
     });
     return rows.filter((row) => visibleToPrincipal(row, principal));
   }
@@ -145,9 +177,14 @@ async function loadEvents(
       'id,business_id,shop_id,actor_kind,actor_employee_id,actor_role,requester_employee_id,approver_employee_id,action_type,entity_type,entity_id,before_value,after_value,reason,approval_request_id,created_at',
     business_id: `eq.${principal.businessId}`,
     order: 'created_at.desc,id.desc',
-    limit: filters.id ? '1' : '100',
+    limit: String(pageLimit),
   });
-  applyPrincipalShopScope(query, principal, filters.shopId);
+  applyPrincipalShopScope(
+    query,
+    principal,
+    filters.shopId,
+    filters.id ? undefined : filters.cursor,
+  );
   applyEventFilters(query, filters);
   let events = (await client.select<AuditRow[]>('admin_audit_events', query)).filter((row) =>
     visibleToPrincipal(row, principal),
@@ -176,12 +213,11 @@ export async function listAuditActorOptions(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export async function listAuditReadModels(
+async function toAuditReadModels(
   client: AdminSupabaseClient,
   principal: AdminSessionPrincipal,
-  filters: AuditReadFilters = {},
+  events: AuditRow[],
 ): Promise<AuditReadModel[]> {
-  const events = await loadEvents(client, principal, filters);
   if (events.length === 0) return [];
 
   const approvalStatusById = new Map<string, AdminApprovalStatus>();
@@ -272,4 +308,33 @@ export async function listAuditReadModels(
       : null,
     createdAt: row.created_at,
   }));
+}
+
+export async function listAuditReadPage(
+  client: AdminSupabaseClient,
+  principal: AdminSessionPrincipal,
+  filters: AuditReadFilters = {},
+): Promise<AuditReadPage> {
+  const visibleEvents = await loadEvents(client, principal, filters);
+  const events = filters.id
+    ? visibleEvents.slice(0, 1)
+    : visibleEvents.slice(0, AUDIT_PAGE_SIZE);
+  const lastEvent = events.at(-1);
+  const nextCursor =
+    !filters.id && visibleEvents.length > AUDIT_PAGE_SIZE && lastEvent
+      ? { createdAt: lastEvent.created_at, id: lastEvent.id }
+      : null;
+
+  return {
+    events: await toAuditReadModels(client, principal, events),
+    nextCursor,
+  };
+}
+
+export async function listAuditReadModels(
+  client: AdminSupabaseClient,
+  principal: AdminSessionPrincipal,
+  filters: AuditReadFilters = {},
+): Promise<AuditReadModel[]> {
+  return (await listAuditReadPage(client, principal, filters)).events;
 }

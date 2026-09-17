@@ -3,6 +3,13 @@ import type { AppendAdminAuditEventInput } from '@tux/admin-contracts';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
 
 const SECRET_KEY_PATTERN = /(^|_)(pin|password|passcode|verifier|salt|lookup)(_|$)/i;
+const API_CREDENTIAL_KEYS = new Set([
+  'api_key',
+  'client_secret',
+  'access_key',
+  'secret_key',
+  'private_key',
+]);
 const SECRET_KEY_DENYLIST = new Set([
   'pinhash',
   'pinlookuphash',
@@ -27,6 +34,7 @@ function containsCredentialMaterial(value: unknown): boolean {
     const normalizedKey = normalizeKey(key);
     if (
       SECRET_KEY_PATTERN.test(normalizedKey) ||
+      API_CREDENTIAL_KEYS.has(normalizedKey) ||
       SECRET_KEY_DENYLIST.has(normalizedKey.replaceAll('_', ''))
     ) {
       return true;
