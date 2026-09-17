@@ -71,6 +71,10 @@ function hasBusinessWideAuthority(principal: AdminSessionPrincipal): boolean {
   return principal.role === 'OWNER' || principal.role === 'ADMIN';
 }
 
+function scopedShopIds(principal: AdminSessionPrincipal): string[] | null {
+  return principal.role === 'OWNER' ? null : principal.shopIds;
+}
+
 function visibleToPrincipal(row: AuditRow, principal: AdminSessionPrincipal): boolean {
   if (row.shop_id === null) return hasBusinessWideAuthority(principal);
   return principal.shopIds.includes(row.shop_id);
@@ -85,7 +89,15 @@ function applyPrincipalShopScope(
     query.set('shop_id', `eq.${explicitShopId}`);
     return;
   }
-  if (hasBusinessWideAuthority(principal)) return;
+  if (principal.role === 'OWNER') return;
+  if (principal.role === 'ADMIN') {
+    if (principal.shopIds.length === 0) {
+      query.set('shop_id', 'is.null');
+      return;
+    }
+    query.set('or', `(shop_id.is.null,shop_id.in.(${principal.shopIds.join(',')}))`);
+    return;
+  }
   const shopIds = principal.shopIds.length > 0 ? principal.shopIds : [EMPTY_SCOPE_SENTINEL];
   query.set('shop_id', `in.(${shopIds.join(',')})`);
 }
@@ -110,9 +122,10 @@ async function loadEvents(
   filters: AuditReadFilters,
 ): Promise<AuditRow[]> {
   if (filters.approvalStatus && hasAuditRpc(client)) {
-    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v1', {
+    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v2', {
       p_business_id: principal.businessId,
-      p_shop_ids: hasBusinessWideAuthority(principal) ? null : principal.shopIds,
+      p_shop_ids: scopedShopIds(principal),
+      p_include_business_wide: hasBusinessWideAuthority(principal),
       p_shop_id: filters.shopId ?? null,
       p_actor_employee_id: filters.actorEmployeeId ?? null,
       p_action_type: filters.actionType ?? null,
@@ -152,9 +165,10 @@ export async function listAuditActorOptions(
   if (!hasAuditRpc(client)) throw new Error('admin_audit_actor_options_rpc_required');
   if (!hasBusinessWideAuthority(principal) && principal.shopIds.length === 0) return [];
 
-  const rows = await client.rpc<AuditActorOptionRow[]>('list_admin_audit_actor_options_v1', {
+  const rows = await client.rpc<AuditActorOptionRow[]>('list_admin_audit_actor_options_v2', {
     p_business_id: principal.businessId,
-    p_shop_ids: hasBusinessWideAuthority(principal) ? null : principal.shopIds,
+    p_shop_ids: scopedShopIds(principal),
+    p_include_business_wide: hasBusinessWideAuthority(principal),
   });
 
   return rows
