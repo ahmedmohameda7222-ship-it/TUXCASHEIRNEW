@@ -115,11 +115,9 @@ function safeExecutionResult(value: unknown): unknown {
   try {
     encoded = JSON.stringify(value);
   } catch {
-    throw new ApprovalTerminalCommandError('approval_command_result_invalid');
+    return undefined;
   }
-  if (encoded === undefined) {
-    throw new ApprovalTerminalCommandError('approval_command_result_invalid');
-  }
+  if (encoded === undefined) return undefined;
   return redactSecretResultFields(JSON.parse(encoded) as unknown);
 }
 
@@ -221,7 +219,9 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
         // Completion is deliberately outside the execution catch. If the business command
         // committed but the completion write has an ambiguous network outcome, do not issue a
         // second state transition here. Leave the durable claim for lease expiry/recovery; the
-        // registered command must converge by command_id on the next run.
+        // registered command must converge by command_id on the next run. Result metadata is
+        // supplemental: an unserializable result is omitted rather than abandoning a committed
+        // command claim.
         await completeCommittedClaim(deps, {
           approvalRequestId: claim.approvalRequestId,
           claimToken: claim.claimToken,
