@@ -111,11 +111,7 @@ export function ApprovalsPage() {
       pin: string;
       reason: string | null;
     }) => {
-      if (
-        !selected ||
-        selected.displayStatus === 'EXPIRED' ||
-        selected.canDecide === false
-      ) {
+      if (!selected || selected.displayStatus === 'EXPIRED' || selected.canDecide === false) {
         throw new Error('approval_selection_not_actionable');
       }
       if (session.state.status !== 'authenticated') throw new Error('session_required');
