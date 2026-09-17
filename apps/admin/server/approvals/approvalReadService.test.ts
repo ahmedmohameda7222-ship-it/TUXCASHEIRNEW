@@ -72,6 +72,24 @@ describe('approvalReadService', () => {
     expect(query?.get('limit')).toBe('100');
   });
 
+  it('pushes ADMIN assigned shops plus business-wide approvals before the result limit', async () => {
+    const admin: AdminSessionPrincipal = {
+      ...principal,
+      role: 'ADMIN',
+      shopIds: ['11111111-1111-4111-8111-111111111111'],
+    };
+    const { client, select } = clientWithRequest();
+
+    await listApprovalReadModels(client, admin);
+
+    const approvalCall = select.mock.calls.find(([table]) => table === 'admin_approval_requests');
+    const query = approvalCall?.[1];
+    expect(query).toBeInstanceOf(URLSearchParams);
+    expect(query?.get('shop_id')).toBeNull();
+    expect(query?.get('or')).toBe(`(shop_id.is.null,shop_id.in.(${admin.shopIds[0]}))`);
+    expect(query?.get('limit')).toBe('100');
+  });
+
   it('excludes expired requests from the pending query before the bounded result limit', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-17T12:00:00.000Z'));
