@@ -132,6 +132,25 @@ function executionResultMetadata(
   return metadata;
 }
 
+function assertCompletionCommitted(value: unknown): void {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    (value as Record<string, unknown>)['ok'] !== true
+  ) {
+    throw new Error('approval_execution_completion_not_committed');
+  }
+}
+
+async function completeCommittedClaim(
+  deps: ApprovalExecutionServiceDependencies,
+  input: CompleteApprovalExecutionInput,
+): Promise<void> {
+  const completion = await deps.completeClaim(input);
+  assertCompletionCommitted(completion);
+}
+
 export function createApprovalExecutionRegistry(
   entries: readonly ApprovalExecutionRegistryEntry[],
 ): ApprovalExecutionRegistry {
@@ -175,7 +194,7 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
           result = await executeClaimedCommand(claim, deps.registry);
         } catch (error) {
           if (error instanceof ApprovalTerminalCommandError) {
-            await deps.completeClaim({
+            await completeCommittedClaim(deps, {
               approvalRequestId: claim.approvalRequestId,
               claimToken: claim.claimToken,
               outcome: 'FAILED',
@@ -186,7 +205,7 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
             continue;
           }
 
-          await deps.completeClaim({
+          await completeCommittedClaim(deps, {
             approvalRequestId: claim.approvalRequestId,
             claimToken: claim.claimToken,
             outcome: 'RETRYABLE',
@@ -203,7 +222,7 @@ export function createApprovalExecutionService(deps: ApprovalExecutionServiceDep
         // committed but the completion write has an ambiguous network outcome, do not issue a
         // second state transition here. Leave the durable claim for lease expiry/recovery; the
         // registered command must converge by command_id on the next run.
-        await deps.completeClaim({
+        await completeCommittedClaim(deps, {
           approvalRequestId: claim.approvalRequestId,
           claimToken: claim.claimToken,
           outcome: 'EXECUTED',
