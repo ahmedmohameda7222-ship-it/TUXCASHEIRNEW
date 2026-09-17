@@ -45,7 +45,8 @@ describe('Plan 3 round 10 review regressions', () => {
     if (typeof listPage !== 'function') return;
 
     const rows = Array.from({ length: 101 }, (_, index) => requestRow(index));
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      void query;
       if (table === 'admin_approval_requests') return rows;
       if (table === 'business_employees') {
         return [{ id: 'requester-1', display_name: 'Requester One' }];
@@ -65,7 +66,7 @@ describe('Plan 3 round 10 review regressions', () => {
       ([table]) => table === 'admin_approval_requests',
     );
     expect(firstApprovalCall?.[1]).toBeInstanceOf(URLSearchParams);
-    expect((firstApprovalCall?.[1] as URLSearchParams | undefined)?.get('limit')).toBe('101');
+    expect(firstApprovalCall?.[1]?.get('limit')).toBe('101');
     expect(first.approvals).toHaveLength(100);
     expect(first.nextCursor).toEqual({
       createdAt: rows[99]?.created_at,
@@ -77,7 +78,7 @@ describe('Plan 3 round 10 review regressions', () => {
     const secondApprovalCall = select.mock.calls.find(
       ([table]) => table === 'admin_approval_requests',
     );
-    const nextQuery = secondApprovalCall?.[1] as URLSearchParams | undefined;
+    const nextQuery = secondApprovalCall?.[1];
     expect(nextQuery?.get('or')).toContain(`created_at.lt.${first.nextCursor?.createdAt}`);
     expect(nextQuery?.get('or')).toContain(`id.lt.${first.nextCursor?.id}`);
   });
@@ -89,7 +90,8 @@ describe('Plan 3 round 10 review regressions', () => {
 
     const admin: AdminSessionPrincipal = { ...principal, role: 'ADMIN' };
     const row = requestRow(0);
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      void query;
       if (table === 'admin_approval_requests') return [row];
       if (table === 'business_employees') {
         return [{ id: 'requester-1', display_name: 'Requester One' }];
@@ -105,7 +107,7 @@ describe('Plan 3 round 10 review regressions', () => {
     });
 
     const approvalCall = select.mock.calls.find(([table]) => table === 'admin_approval_requests');
-    const query = approvalCall?.[1] as URLSearchParams | undefined;
+    const query = approvalCall?.[1];
     const combined = query?.get('and') ?? '';
     expect(combined).toContain('shop_id.is.null');
     expect(combined).toContain(`shop_id.in.(${admin.shopIds[0]})`);

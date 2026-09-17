@@ -69,7 +69,7 @@ describe('approvalReadService', () => {
     const query = approvalCall?.[1];
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.get('shop_id')).toBe(`in.(${principal.shopIds[0]})`);
-    expect(query?.get('limit')).toBe('100');
+    expect(query?.get('limit')).toBe('101');
   });
 
   it('pushes ADMIN assigned shops plus business-wide approvals before the result limit', async () => {
@@ -87,7 +87,7 @@ describe('approvalReadService', () => {
     expect(query).toBeInstanceOf(URLSearchParams);
     expect(query?.get('shop_id')).toBeNull();
     expect(query?.get('or')).toBe(`(shop_id.is.null,shop_id.in.(${admin.shopIds[0]}))`);
-    expect(query?.get('limit')).toBe('100');
+    expect(query?.get('limit')).toBe('101');
   });
 
   it('excludes expired requests from the pending query before the bounded result limit', async () => {
@@ -102,7 +102,7 @@ describe('approvalReadService', () => {
       const query = approvalCall?.[1];
       expect(query?.get('status')).toBe('eq.PENDING');
       expect(query?.get('expires_at')).toBe('gt.2026-09-17T12:00:00.000Z');
-      expect(query?.get('limit')).toBe('100');
+      expect(query?.get('limit')).toBe('101');
     } finally {
       vi.useRealTimers();
     }
