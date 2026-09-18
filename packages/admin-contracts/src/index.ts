@@ -2,3 +2,5 @@ export * from './auth';
 export * from './commands';
 export * from './catalog';
 export * from './settings';
+export * from './approvals';
+export * from './audit';

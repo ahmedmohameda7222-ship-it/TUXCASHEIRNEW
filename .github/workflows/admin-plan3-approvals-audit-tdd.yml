@@ -1,0 +1,187 @@
+name: Admin Plan 3 Approvals Audit TDD
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/admin-03-approvals-audit
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
+      - 'apps/admin/server/approvals/**'
+      - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/admin/approvals.ts'
+      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/api/admin/audit.ts'
+      - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/src/approvals/**'
+      - 'apps/admin/src/audit/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
+      - 'e2e/admin-approvals-audit.spec.ts'
+      - 'e2e/admin-approvals-pagination.spec.ts'
+      - 'packages/admin-contracts/src/approvals.ts'
+      - 'packages/admin-contracts/src/audit.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - '.github/workflows/admin-plan3-approvals-audit-tdd.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-approvals-audit-migration.mjs'
+      - 'scripts/test-admin-approvals-audit-review-hardening*.mjs'
+      - 'apps/admin/server/approvals/**'
+      - 'apps/admin/server/audit/**'
+      - 'apps/admin/api/admin/approvals.ts'
+      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/api/admin/audit.ts'
+      - 'apps/admin/api/cron/admin-approval-executor.ts'
+      - 'apps/admin/src/approvals/**'
+      - 'apps/admin/src/audit/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
+      - 'e2e/admin-approvals-audit.spec.ts'
+      - 'e2e/admin-approvals-pagination.spec.ts'
+      - 'packages/admin-contracts/src/approvals.ts'
+      - 'packages/admin-contracts/src/audit.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - '.github/workflows/admin-plan3-approvals-audit-tdd.yml'
+
+jobs:
+  static-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 3 approvals and audit invariant
+        run: node scripts/test-admin-approvals-audit-migration.mjs
+
+  review-static-invariant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 3 review hardening invariant
+        run: node scripts/test-admin-approvals-audit-review-hardening-static.mjs
+
+  approval-services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Plan 3 approval and audit services
+        run: >-
+          npx vitest run
+          apps/admin/server/approvals/approvalService.test.ts
+          apps/admin/server/approvals/approvalReadService.test.ts
+          apps/admin/server/approvals/approvalPinRateLimit.test.ts
+          apps/admin/server/approvals/approvalExecutionService.test.ts
+          apps/admin/server/approvals/approvalExecutionRunner.test.ts
+          apps/admin/server/approvals/plan3Round9Review.test.ts
+          apps/admin/server/approvals/plan3Round10Review.test.ts
+          apps/admin/server/audit/auditService.test.ts
+          apps/admin/server/audit/auditReadService.test.ts
+
+  approval-api-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Plan 3 BFF and UI tests
+        run: >-
+          npx vitest run
+          apps/admin/api/admin/approvals.test.ts
+          apps/admin/src/approvals/ApprovalDetailPage.test.tsx
+          apps/admin/src/audit/AuditDetailPage.test.tsx
+          apps/admin/src/audit/AuditPage.test.tsx
+      - name: Admin server and API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
+      - name: Admin app typecheck
+        run: npm run typecheck -w @tux/admin
+      - name: Admin production build
+        run: npm run build -w @tux/admin
+
+  approval-e2e:
+    needs: approval-api-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Approval and audit responsive E2E
+        run: >-
+          npx playwright test
+          e2e/admin-approvals-audit.spec.ts
+          e2e/admin-approvals-pagination.spec.ts
+          --config playwright.admin.config.ts
+
+  postgres-behavior:
+    needs: static-invariant
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Apply complete repository migration chain
+        run: node scripts/test-migrations.mjs
+      - name: Plan 3 approvals and audit PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-migration.mjs
+      - name: Plan 3 review hardening PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening.mjs
+      - name: Plan 3 review round-2 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round2.mjs
+      - name: Plan 3 review round-3 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round3.mjs
+      - name: Plan 3 review round-4 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round4.mjs
+      - name: Plan 3 review round-5 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round5.mjs
+      - name: Plan 3 review round-6 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round6.mjs
+      - name: Plan 3 review round-7 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round7.mjs
+      - name: Plan 3 review round-10 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round10.mjs
+      - name: Plan 3 review round-13 PostgreSQL behavior
+        run: node scripts/test-admin-approvals-audit-review-hardening-round13.mjs
