@@ -29,7 +29,6 @@ describe('auditService credential safety', () => {
     expect(append).not.toHaveBeenCalled();
   });
 
-
   it('rejects acronym-style API credential material before calling persistence', async () => {
     const append = vi.fn(async () => 'audit-1');
 
