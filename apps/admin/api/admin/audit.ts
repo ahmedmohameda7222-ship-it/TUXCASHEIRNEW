@@ -35,6 +35,10 @@ export function encodeAuditCursor(cursor: AuditReadCursor): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
 }
 
+export function shouldLoadAuditActorOptions(cursor: AuditReadCursor | undefined): boolean {
+  return cursor === undefined;
+}
+
 export function decodeAuditCursor(value: string): AuditReadCursor | null {
   if (value.length === 0 || value.length > 512) return null;
   try {
@@ -116,7 +120,9 @@ export default async function handler(
         ...(to ? { to } : {}),
         ...(cursor ? { cursor } : {}),
       }),
-      listAuditActorOptions(client, context.principal),
+      shouldLoadAuditActorOptions(cursor)
+        ? listAuditActorOptions(client, context.principal)
+        : Promise.resolve([]),
     ]);
     sendJson(response, 200, {
       events: page.events,
