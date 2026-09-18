@@ -43,7 +43,6 @@ describe('AuditDetailPage', () => {
     expect(html).not.toContain('[object Object]');
   });
 
-
   it('renders approval attribution and request provenance for linked events', () => {
     const html = renderToStaticMarkup(
       <AuditDetailPage
