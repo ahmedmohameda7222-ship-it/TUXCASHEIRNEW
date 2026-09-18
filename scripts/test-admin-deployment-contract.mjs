@@ -3,20 +3,27 @@ import path from 'node:path';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
-const operationsVercelPath = 'vercel.json';
+const legacyOperationsVercelPath = 'vercel.json';
+const operationsVercelPath = 'apps/operations/vercel.json';
+const operationsApiDir = 'apps/operations/api';
+const rootApiDir = 'api';
 const adminDeploymentDocPath = 'apps/admin/DEPLOYMENT.md';
+const operationsDeploymentDocPath = 'apps/operations/DEPLOYMENT.md';
 const adminExecutionLedgerPath = 'docs/superpowers/execution/2026-09-10-tux-admin-execution.md';
 const cronDir = 'apps/admin/api/cron';
 
 const adminConfig = JSON.parse(fs.readFileSync(adminVercelPath, 'utf8'));
 const menuConfig = JSON.parse(fs.readFileSync(menuVercelPath, 'utf8'));
+const legacyOperationsConfig = JSON.parse(fs.readFileSync(legacyOperationsVercelPath, 'utf8'));
 const operationsConfig = JSON.parse(fs.readFileSync(operationsVercelPath, 'utf8'));
 const adminDeploymentDoc = fs.readFileSync(adminDeploymentDocPath, 'utf8');
+const operationsDeploymentDoc = fs.readFileSync(operationsDeploymentDocPath, 'utf8');
 const adminExecutionLedger = fs.readFileSync(adminExecutionLedgerPath, 'utf8');
 const adminFoundationWorkflow = fs.readFileSync(
   '.github/workflows/admin-foundation-tdd.yml',
   'utf8',
 );
+const apiTsconfig = JSON.parse(fs.readFileSync('tsconfig.api.json', 'utf8'));
 
 function assertEqual(actual, expected, message) {
   if (actual !== expected) {
@@ -32,8 +39,7 @@ function assertJsonEqual(actual, expected, message) {
   }
 }
 
-// Admin is a separate Vercel project rooted at apps/admin. Its app-local config
-// must remain authoritative and must never build the Operations workspace.
+// Admin target contract.
 assertEqual(adminConfig.framework, 'vite', 'Admin Vercel framework');
 assertEqual(adminConfig.installCommand, 'cd ../.. && npm ci', 'Admin Vercel install command');
 assertEqual(
@@ -44,26 +50,17 @@ assertEqual(
 if (adminConfig.buildCommand.toLowerCase().includes('operations')) {
   throw new Error('Admin Vercel build command must not build @tux/operations');
 }
-assertEqual(
-  adminConfig.outputDirectory,
-  'dist',
-  'Admin Vercel output must be relative to apps/admin',
-);
-
+assertEqual(adminConfig.outputDirectory, 'dist', 'Admin Vercel output directory');
 assertJsonEqual(
   adminConfig.git?.deploymentEnabled,
-  {
-    '**': false,
-    main: true,
-  },
+  { '**': false, main: true },
   'Admin Git deployment policy must deploy main only',
 );
 if (Object.prototype.hasOwnProperty.call(adminConfig.git?.deploymentEnabled ?? {}, '*')) {
   throw new Error('Admin Git deployment policy must use **, never *');
 }
 
-// File-system/API routing must happen before the SPA fallback so /api/* and
-// cron functions remain serverless routes rather than index.html.
+// File-system/API routing must happen before the SPA fallback.
 const adminRoutes = Array.isArray(adminConfig.routes) ? adminConfig.routes : [];
 if (adminRoutes.length < 2 || adminRoutes[0]?.handle !== 'filesystem') {
   throw new Error('Admin Vercel routes must preserve filesystem/API routes before SPA fallback');
@@ -73,12 +70,11 @@ assertEqual(spaFallback?.src, '/(.*)', 'Admin SPA fallback source');
 assertEqual(spaFallback?.dest, '/index.html', 'Admin SPA fallback destination');
 
 const crons = Array.isArray(adminConfig.crons) ? adminConfig.crons : [];
-const expected = new Map([
+const expectedAdminCrons = new Map([
   ['/api/cron/admin-config-scheduler', '* * * * *'],
   ['/api/cron/admin-approval-executor', '* * * * *'],
 ]);
-
-for (const [routePath, schedule] of expected) {
+for (const [routePath, schedule] of expectedAdminCrons) {
   const matches = crons.filter((entry) => entry?.path === routePath);
   if (matches.length !== 1 || matches[0]?.schedule !== schedule) {
     throw new Error(`Admin cron deployment contract missing ${routePath} @ ${schedule}`);
@@ -90,7 +86,6 @@ const routeFiles = fs
   .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
   .map((entry) => entry.name)
   .sort();
-
 for (const fileName of routeFiles) {
   const routePath = `/api/cron/${fileName.slice(0, -3)}`;
   const matches = crons.filter((entry) => entry?.path === routePath);
@@ -107,34 +102,78 @@ if (!schedulerSource.includes("process.env['CRON_SECRET']")) {
   throw new Error('Admin config scheduler route must use the CRON_SECRET deployment contract');
 }
 
-// Preserve the existing Operations project contract byte-for-byte semantically.
-// It intentionally remains the repository-root Vercel project because its API
-// functions also live at repository-root /api.
+// Preserve the live legacy Operations project contract until the manual cutover is verified.
+const expectedLegacyOperations = {
+  $schema: 'https://openapi.vercel.sh/vercel.json',
+  framework: 'vite',
+  installCommand: 'npm ci',
+  buildCommand: 'npm run build -w @tux/operations',
+  outputDirectory: 'apps/operations/dist',
+  crons: [
+    {
+      path: '/api/whatsapp-media-retention',
+      schedule: '17 3 * * *',
+    },
+  ],
+  git: {
+    deploymentEnabled: {
+      '**': false,
+      main: true,
+    },
+  },
+  ignoreCommand:
+    'if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 1; else exit 0; fi',
+};
+assertJsonEqual(
+  legacyOperationsConfig,
+  expectedLegacyOperations,
+  'Live legacy Operations Vercel deployment contract changed unexpectedly',
+);
+
+// App-local Operations contract must be functionally equivalent after Root Directory moves.
 assertJsonEqual(
   operationsConfig,
   {
-    $schema: 'https://openapi.vercel.sh/vercel.json',
-    framework: 'vite',
-    installCommand: 'npm ci',
-    buildCommand: 'npm run build -w @tux/operations',
-    outputDirectory: 'apps/operations/dist',
-    crons: [
-      {
-        path: '/api/whatsapp-media-retention',
-        schedule: '17 3 * * *',
-      },
-    ],
-    git: {
-      deploymentEnabled: {
-        '**': false,
-        main: true,
-      },
-    },
-    ignoreCommand:
-      'if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 1; else exit 0; fi',
+    ...expectedLegacyOperations,
+    installCommand: 'cd ../.. && npm ci',
+    buildCommand: 'cd ../.. && npm run build -w @tux/operations',
+    outputDirectory: 'dist',
   },
-  'Operations Vercel deployment contract changed unexpectedly',
+  'App-local Operations Vercel deployment contract is not equivalent',
 );
+if (operationsConfig.buildCommand.toLowerCase().includes('admin')) {
+  throw new Error('Operations Vercel build command must not build Admin');
+}
+
+// Every live root API function must have an app-local Vercel function entrypoint.
+const rootApiFiles = fs
+  .readdirSync(rootApiDir, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
+  .map((entry) => entry.name)
+  .sort();
+const operationsApiFiles = fs
+  .readdirSync(operationsApiDir, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
+  .map((entry) => entry.name)
+  .sort();
+assertJsonEqual(
+  operationsApiFiles,
+  rootApiFiles,
+  'Operations app-local API entrypoints must mirror every root API function',
+);
+for (const fileName of rootApiFiles) {
+  const source = fs.readFileSync(path.join(operationsApiDir, fileName), 'utf8').trim();
+  const moduleName = fileName.slice(0, -3);
+  assertEqual(
+    source,
+    `export { default } from '../../../api/${moduleName}';`,
+    `Operations API entrypoint ${fileName}`,
+  );
+}
+
+if (!apiTsconfig.include?.includes('apps/operations/api/**/*.ts')) {
+  throw new Error('Root API typecheck must include apps/operations/api/**/*.ts');
+}
 
 // Preserve the proven Menu app-local deployment boundary.
 assertEqual(menuConfig.framework, 'vite', 'Menu Vercel framework');
@@ -143,22 +182,31 @@ assertEqual(menuConfig.buildCommand, 'cd ../.. && npm run build:menu', 'Menu Ver
 assertEqual(menuConfig.outputDirectory, 'dist', 'Menu Vercel output directory');
 assertJsonEqual(
   menuConfig.git?.deploymentEnabled,
-  {
-    '**': false,
-    main: true,
-  },
+  { '**': false, main: true },
   'Menu Git deployment policy',
 );
 
+// Migration docs must not claim Admin import isolation is complete while the legacy root contract exists.
 for (const requiredText of [
-  'separate Vercel project',
-  'main',
-  'PR previews remain disabled',
-  'Include source files outside Root Directory',
+  'do not create the Admin project until',
+  'legacy root',
+  'apps/operations',
   'Plan 10',
 ]) {
   if (!adminDeploymentDoc.includes(requiredText)) {
-    throw new Error(`Admin deployment docs missing required statement: ${requiredText}`);
+    throw new Error(`Admin deployment docs missing migration statement: ${requiredText}`);
+  }
+}
+for (const requiredText of [
+  'Root Directory: `apps/operations`',
+  'Include source files outside Root Directory',
+  'cd ../.. && npm ci',
+  'cd ../.. && npm run build -w @tux/operations',
+  'Output Directory: `dist`',
+  'Only after that verification may the legacy repository-root `/vercel.json` be removed',
+]) {
+  if (!operationsDeploymentDoc.includes(requiredText)) {
+    throw new Error(`Operations deployment docs missing cutover statement: ${requiredText}`);
   }
 }
 
@@ -172,17 +220,11 @@ for (const requiredLedgerText of [
     );
   }
 }
-if (
-  adminExecutionLedger.includes(
-    'Automatic Admin production deployment remains disabled until the Plan 10 release gate',
-  )
-) {
-  throw new Error('Admin execution ledger still claims automatic Admin deployment is disabled');
-}
 
 for (const requiredWorkflowPath of [
   "      - 'vercel.json'",
   "      - 'apps/menu/vercel.json'",
+  "      - 'apps/operations/**'",
 ]) {
   if (!adminFoundationWorkflow.includes(requiredWorkflowPath)) {
     throw new Error(
@@ -191,4 +233,4 @@ for (const requiredWorkflowPath of [
   }
 }
 
-console.log('Admin/Menu/Operations Vercel deployment contracts passed.');
+console.log('Admin/Menu/Operations Vercel migration contracts passed.');
