@@ -145,28 +145,45 @@ if (operationsConfig.buildCommand.toLowerCase().includes('admin')) {
   throw new Error('Operations Vercel build command must not build Admin');
 }
 
-// Every live root API function must have an app-local Vercel function entrypoint.
-const rootApiFiles = fs
-  .readdirSync(rootApiDir, { withFileTypes: true })
-  .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-  .map((entry) => entry.name)
-  .sort();
-const operationsApiFiles = fs
-  .readdirSync(operationsApiDir, { withFileTypes: true })
-  .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-  .map((entry) => entry.name)
-  .sort();
+// Every live root API function, including nested filesystem routes, must have an
+// app-local Vercel function entrypoint.
+function collectTsFiles(directory, baseDirectory = directory) {
+  return fs
+    .readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        return collectTsFiles(absolutePath, baseDirectory);
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.ts')) {
+        return [];
+      }
+      return [path.relative(baseDirectory, absolutePath).split(path.sep).join('/')];
+    })
+    .sort();
+}
+
+const rootApiFiles = collectTsFiles(rootApiDir);
+const operationsApiFiles = collectTsFiles(operationsApiDir);
 assertJsonEqual(
   operationsApiFiles,
   rootApiFiles,
-  'Operations app-local API entrypoints must mirror every root API function',
+  'Operations app-local API entrypoints must mirror every root API function recursively',
 );
 for (const fileName of rootApiFiles) {
-  const source = fs.readFileSync(path.join(operationsApiDir, fileName), 'utf8').trim();
-  const moduleName = fileName.slice(0, -3);
+  const wrapperPath = path.join(operationsApiDir, fileName);
+  const source = fs.readFileSync(wrapperPath, 'utf8').trim();
+  const rootModulePath = path.join(rootApiDir, fileName.slice(0, -3));
+  let relativeImport = path
+    .relative(path.dirname(wrapperPath), rootModulePath)
+    .split(path.sep)
+    .join('/');
+  if (!relativeImport.startsWith('.')) {
+    relativeImport = `./${relativeImport}`;
+  }
   assertEqual(
     source,
-    `export { default } from '../../../api/${moduleName}';`,
+    `export { default } from '${relativeImport}';`,
     `Operations API entrypoint ${fileName}`,
   );
 }
