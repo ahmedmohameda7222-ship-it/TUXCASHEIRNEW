@@ -7,10 +7,13 @@ TUX Admin now has its own **separate Vercel project** from the same TUX monorepo
 Configure the Admin Vercel project with:
 
 - Root Directory: `apps/admin`
+- Include source files outside Root Directory: **Enabled**
 - Framework Preset: `Vite`
 - Install Command: `cd ../.. && npm ci`
 - Build Command: `cd ../.. && npm run build:admin`
 - Output Directory: `dist`
+
+Because the Admin install/build commands intentionally reach the monorepo root and the Admin app consumes shared workspace packages, outside-root source access must remain enabled.
 
 The project-local `apps/admin/vercel.json` is the repository deployment contract for those settings. The repository-root `/vercel.json` remains the Operations deployment contract, and `apps/menu/vercel.json` remains the Menu deployment contract.
 
