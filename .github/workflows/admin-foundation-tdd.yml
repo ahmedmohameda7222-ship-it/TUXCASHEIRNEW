@@ -6,6 +6,7 @@ on:
       - '.github/workflows/admin-foundation-tdd.yml'
       - 'apps/admin/**'
       - 'apps/operations/**'
+      - 'api/**'
       - 'docs/superpowers/execution/2026-09-10-tux-admin-execution.md'
       - 'vercel.json'
       - 'apps/menu/vercel.json'

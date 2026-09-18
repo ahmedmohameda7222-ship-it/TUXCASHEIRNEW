@@ -211,7 +211,8 @@ for (const requiredText of [
 }
 
 for (const requiredLedgerText of [
-  'Admin Git deployments from main are enabled',
+  'Admin Vercel project must not be created until the existing Operations project is cut over to Root Directory `apps/operations`',
+  'legacy root `/vercel.json` is removed after successful production verification',
   'Final production acceptance remains gated by Plan 10',
 ]) {
   if (!adminExecutionLedger.includes(requiredLedgerText)) {
@@ -221,10 +222,15 @@ for (const requiredLedgerText of [
   }
 }
 
+if (adminExecutionLedger.includes('The separate Admin Vercel project is rooted at `apps/admin`')) {
+  throw new Error('Admin execution ledger still claims the gated Admin Vercel project already exists');
+}
+
 for (const requiredWorkflowPath of [
   "      - 'vercel.json'",
   "      - 'apps/menu/vercel.json'",
   "      - 'apps/operations/**'",
+  "      - 'api/**'",
 ]) {
   if (!adminFoundationWorkflow.includes(requiredWorkflowPath)) {
     throw new Error(
