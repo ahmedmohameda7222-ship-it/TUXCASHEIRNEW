@@ -18,6 +18,11 @@ const SECRET_KEY_DENYLIST = new Set([
   'passwordhash',
   'passwordverifier',
   'claimtoken',
+  'apikey',
+  'clientsecret',
+  'accesskey',
+  'secretkey',
+  'privatekey',
 ]);
 
 function normalizeKey(key: string): string {
