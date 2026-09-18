@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/admin-foundation-tdd.yml'
       - 'apps/admin/**'
+      - 'vercel.json'
+      - 'apps/menu/vercel.json'
       - 'packages/admin-contracts/**'
       - 'packages/ui/src/tokens.css'
       - 'scripts/bootstrap-admin-owner.mjs'
