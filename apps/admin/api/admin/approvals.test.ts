@@ -107,4 +107,17 @@ describe('Admin audit BFF cursor boundary', () => {
     expect(encoded).not.toContain(cursor.createdAt);
     expect(decode(encoded)).toEqual(cursor);
   });
+  it('skips actor-option history scans for continuation requests', () => {
+    const shouldLoad = (auditModule as Record<string, unknown>)['shouldLoadAuditActorOptions'];
+    expect(typeof shouldLoad).toBe('function');
+    if (typeof shouldLoad !== 'function') return;
+
+    expect(shouldLoad(undefined)).toBe(true);
+    expect(
+      shouldLoad({
+        createdAt: '2026-09-17T20:00:00.000Z',
+        id: '22222222-2222-4222-8222-222222222222',
+      }),
+    ).toBe(false);
+  });
 });
