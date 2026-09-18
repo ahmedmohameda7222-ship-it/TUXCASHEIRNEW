@@ -1,10 +1,12 @@
 # TUX Admin Deployment Contract
 
-TUX Admin now has its own **separate Vercel project** from the same TUX monorepo. It is not deployed through the repository-root Operations project and it does not inherit the Operations build/output contract when the Vercel project Root Directory is `apps/admin`.
+TUX Admin is intended to be its own **separate Vercel project** from the same TUX monorepo, rooted at `apps/admin`.
 
-## Vercel project boundary
+## Current migration gate
 
-Configure the Admin Vercel project with:
+The repository still contains the legacy root `/vercel.json` used by the live Operations project. The real Vercel New Project import UI can preload that root Operations build/install/output contract even after `apps/admin` is selected. Therefore **do not create the Admin project until the existing Operations project has been cut over to `apps/operations` and the legacy root `/vercel.json` has been removed in the follow-up cleanup**.
+
+The repository-side Admin target contract remains:
 
 - Root Directory: `apps/admin`
 - Include source files outside Root Directory: **Enabled**
@@ -15,7 +17,7 @@ Configure the Admin Vercel project with:
 
 Because the Admin install/build commands intentionally reach the monorepo root and the Admin app consumes shared workspace packages, outside-root source access must remain enabled.
 
-The project-local `apps/admin/vercel.json` is the repository deployment contract for those settings. The repository-root `/vercel.json` remains the Operations deployment contract, and `apps/menu/vercel.json` remains the Menu deployment contract.
+After the Operations cutover and root cleanup, `apps/admin/vercel.json` is the only repository deployment contract applicable to an Admin project rooted at `apps/admin`. `apps/menu/vercel.json` remains the Menu deployment contract, and `apps/operations/vercel.json` becomes the Operations deployment contract.
 
 Admin `/api/*` functions, including `/api/cron/*`, are resolved through the filesystem before the final SPA fallback to `/index.html`. Do not replace that route ordering with a catch-all rewrite that intercepts API functions.
 

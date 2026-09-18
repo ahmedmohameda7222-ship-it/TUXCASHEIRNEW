@@ -11,6 +11,7 @@
     "api/**/*.ts",
     "server/**/*.ts",
     "apps/admin/api/**/*.ts",
-    "apps/admin/server/**/*.ts"
+    "apps/admin/server/**/*.ts",
+    "apps/operations/api/**/*.ts"
   ]
 }
