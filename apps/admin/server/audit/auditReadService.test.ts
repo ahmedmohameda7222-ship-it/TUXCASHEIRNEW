@@ -170,7 +170,7 @@ describe('listAuditReadModels', () => {
 
   it('pushes approval status into the bounded database audit query instead of materializing capped IDs', async () => {
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      if (name !== 'list_admin_audit_events_v3') throw new Error(`unexpected rpc ${name}`);
+      if (name !== 'list_admin_audit_events_v4') throw new Error(`unexpected rpc ${name}`);
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: principal.businessId,
@@ -249,7 +249,7 @@ describe('listAuditReadModels', () => {
       shopIds: ['33333333-3333-4333-8333-333333333333'],
     };
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      expect(name).toBe('list_admin_audit_events_v3');
+      expect(name).toBe('list_admin_audit_events_v4');
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: admin.businessId,
