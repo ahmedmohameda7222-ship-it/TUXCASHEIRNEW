@@ -11,6 +11,10 @@ const adminConfig = JSON.parse(fs.readFileSync(adminVercelPath, 'utf8'));
 const menuConfig = JSON.parse(fs.readFileSync(menuVercelPath, 'utf8'));
 const operationsConfig = JSON.parse(fs.readFileSync(operationsVercelPath, 'utf8'));
 const adminDeploymentDoc = fs.readFileSync(adminDeploymentDocPath, 'utf8');
+const adminFoundationWorkflow = fs.readFileSync(
+  '.github/workflows/admin-foundation-tdd.yml',
+  'utf8',
+);
 
 function assertEqual(actual, expected, message) {
   if (actual !== expected) {
@@ -152,6 +156,17 @@ for (const requiredText of [
 ]) {
   if (!adminDeploymentDoc.includes(requiredText)) {
     throw new Error(`Admin deployment docs missing required statement: ${requiredText}`);
+  }
+}
+
+for (const requiredWorkflowPath of [
+  "      - 'vercel.json'",
+  "      - 'apps/menu/vercel.json'",
+]) {
+  if (!adminFoundationWorkflow.includes(requiredWorkflowPath)) {
+    throw new Error(
+      `Admin Foundation deployment contract must trigger when ${requiredWorkflowPath.trim()} changes`,
+    );
   }
 }
 
