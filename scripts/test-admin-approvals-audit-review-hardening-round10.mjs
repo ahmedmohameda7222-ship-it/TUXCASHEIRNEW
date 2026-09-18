@@ -47,6 +47,9 @@ begin
   if private.admin_json_contains_secret_key_v1('{"apiKey":"sk_live_1234"}'::jsonb) is not true then
     raise exception 'structured apiKey disclosure was not detected';
   end if;
+  if private.admin_json_contains_secret_key_v1('{"APIKey":"sk_live_1234"}'::jsonb) is not true then
+    raise exception 'structured acronym APIKey disclosure was not detected';
+  end if;
   if private.admin_json_contains_secret_key_v1('{"clientSecret":"client-secret"}'::jsonb) is not true then
     raise exception 'structured clientSecret disclosure was not detected';
   end if;
