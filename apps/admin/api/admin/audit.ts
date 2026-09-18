@@ -35,8 +35,10 @@ export function encodeAuditCursor(cursor: AuditReadCursor): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
 }
 
-export function shouldLoadAuditActorOptions(cursor: AuditReadCursor | undefined): boolean {
-  return cursor === undefined;
+export function shouldLoadAuditActorOptions(
+  cursor: AuditReadCursor | null | undefined,
+): boolean {
+  return cursor == null;
 }
 
 export function decodeAuditCursor(value: string): AuditReadCursor | null {
