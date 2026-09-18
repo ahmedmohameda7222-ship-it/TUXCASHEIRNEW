@@ -102,6 +102,11 @@ function isSecretResultKey(key: string): boolean {
       'passwordhash',
       'passwordverifier',
       'claimtoken',
+      'apikey',
+      'clientsecret',
+      'accesskey',
+      'secretkey',
+      'privatekey',
     ].includes(collapsed)
   );
 }
