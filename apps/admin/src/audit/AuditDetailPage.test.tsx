@@ -37,4 +37,38 @@ describe('AuditDetailPage', () => {
     expect(html).not.toContain('Structured value changed');
     expect(html).not.toContain('[object Object]');
   });
+
+
+  it('renders approval attribution and request provenance for linked events', () => {
+    const html = renderToStaticMarkup(
+      <AuditDetailPage
+        event={{
+          id: 'audit-approval-1',
+          shopName: 'TUX',
+          actorLabel: 'Approver One',
+          actorRole: 'MANAGER',
+          actionType: 'APPROVAL_EXECUTED',
+          entityType: 'APPROVAL_REQUEST',
+          entityId: 'request-1',
+          beforeValue: { status: 'APPROVED' },
+          afterValue: { status: 'EXECUTED' },
+          reason: 'Approved stock adjustment',
+          approvalRequestId: 'request-1',
+          requesterName: 'Requester One',
+          approverName: 'Approver One',
+          approvalStatus: 'EXECUTED',
+          sessionId: 'session-123',
+          contextMetadata: { source: 'approval-executor', attempt: 2 },
+          createdAtLabel: '18 Sep 2026, 19:00',
+        }}
+      />,
+    );
+
+    expect(html).toContain('Requester One');
+    expect(html).toContain('Approver One');
+    expect(html).toContain('EXECUTED');
+    expect(html).toContain('session-123');
+    expect(html).toContain('approval-executor');
+    expect(html).toContain('2');
+  });
 });
