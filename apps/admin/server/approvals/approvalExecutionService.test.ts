@@ -193,4 +193,42 @@ describe('approvalExecutionService', () => {
       expect.objectContaining({ workerId: 'approval-runner-test', limit: 25 }),
     );
   });
+
+
+  it('redacts acronym-style API credentials from execution result metadata', async () => {
+    const completeClaim = vi.fn(async () => ({ ok: true as const, status: 'EXECUTED' as const }));
+    const service = createApprovalExecutionService({
+      claimApprovedCommand: vi.fn(async () => [claim]),
+      completeClaim,
+      registry: createApprovalExecutionRegistry([
+        {
+          actionType: claim.actionType,
+          execute: vi.fn(async () => ({
+            result: {
+              APIKey: 'sk_live_1234',
+              safeValue: 'kept',
+              nested: { APIKey: 'nested-secret', quantity: 2 },
+            },
+            idempotentReplay: false,
+          })),
+        },
+      ]),
+      workerId: 'approval-runner-test',
+    });
+
+    await service.runOnce();
+
+    expect(completeClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'EXECUTED',
+        resultMetadata: {
+          idempotentReplay: false,
+          result: {
+            safeValue: 'kept',
+            nested: { quantity: 2 },
+          },
+        },
+      }),
+    );
+  });
 });
