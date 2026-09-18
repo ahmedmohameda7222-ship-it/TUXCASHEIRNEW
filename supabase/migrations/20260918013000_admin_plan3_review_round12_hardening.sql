@@ -23,7 +23,7 @@ begin
       v_normalized_key := lower(
         replace(
           replace(
-            regexp_replace(v_key, '([a-z0-9])([A-Z])', '\\1_\\2', 'g'),
+            regexp_replace(v_key, '([a-z0-9])([A-Z])', '\1_\2', 'g'),
             '-',
             '_'
           ),
