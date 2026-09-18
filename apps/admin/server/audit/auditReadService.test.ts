@@ -31,6 +31,8 @@ const approvedEvent = {
   reason: 'Reviewed',
   approval_request_id: '55555555-5555-4555-8555-555555555555',
   approval_status: 'APPROVED' as const,
+  session_id: '88888888-8888-4888-8888-888888888888',
+  context_metadata: { source: 'admin-bff', deviceId: 'device-1' },
   created_at: '2026-09-16T16:40:00.000Z',
 };
 
@@ -80,6 +82,18 @@ function createApprovalStatusClient(): AdminSupabaseClient {
 }
 
 describe('listAuditReadModels', () => {
+  it('returns persisted session and context provenance', async () => {
+    const client = createApprovalStatusClient();
+    const [event] = await listAuditReadModels(client, principal, {
+      approvalStatus: 'APPROVED',
+    });
+
+    expect(event).toMatchObject({
+      sessionId: '88888888-8888-4888-8888-888888888888',
+      contextMetadata: { source: 'admin-bff', deviceId: 'device-1' },
+    });
+  });
+
   it('filters linked audit events by approval request status', async () => {
     const filters = { approvalStatus: 'APPROVED' } as const;
     const client = createApprovalStatusClient();
