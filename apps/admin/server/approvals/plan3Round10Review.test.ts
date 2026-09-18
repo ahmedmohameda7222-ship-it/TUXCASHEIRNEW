@@ -272,7 +272,7 @@ describe('Plan 3 round 10/11 review regressions', () => {
       id: '99999999-9999-4999-8999-999999999999',
     };
     const rpc = vi.fn(async (name: string, payload: Readonly<Record<string, unknown>>) => {
-      expect(name).toBe('list_admin_audit_events_v3');
+      expect(name).toBe('list_admin_audit_events_v4');
       expect(payload).toEqual(
         expect.objectContaining({
           p_business_id: admin.businessId,
