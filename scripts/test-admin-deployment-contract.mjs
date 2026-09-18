@@ -152,6 +152,7 @@ for (const requiredText of [
   'separate Vercel project',
   'main',
   'PR previews remain disabled',
+  'Include source files outside Root Directory',
   'Plan 10',
 ]) {
   if (!adminDeploymentDoc.includes(requiredText)) {
