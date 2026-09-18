@@ -25,6 +25,11 @@ describe('AuditDetailPage', () => {
           },
           reason: 'Configuration update',
           approvalRequestId: null,
+          requesterName: null,
+          approverName: null,
+          approvalStatus: null,
+          sessionId: null,
+          contextMetadata: {},
           createdAtLabel: '17 Sep 2026, 02:00',
         }}
       />,
