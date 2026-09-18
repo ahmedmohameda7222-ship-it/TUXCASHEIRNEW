@@ -1,3 +1,5 @@
+import type { AdminApprovalStatus } from '@tux/admin-contracts';
+
 export type AuditDetailViewModel = {
   id: string;
   shopName: string;
@@ -10,6 +12,11 @@ export type AuditDetailViewModel = {
   afterValue: unknown;
   reason: string | null;
   approvalRequestId: string | null;
+  requesterName: string | null;
+  approverName: string | null;
+  approvalStatus: AdminApprovalStatus | null;
+  sessionId: string | null;
+  contextMetadata: unknown;
   createdAtLabel: string;
 };
 
@@ -99,13 +106,29 @@ export function AuditDetailPage({ event }: { event: AuditDetailViewModel }) {
         </div>
         <div>
           <dt>Approval</dt>
-          <dd>{event.approvalRequestId ?? 'Not linked'}</dd>
+          <dd>
+            {event.approvalRequestId ? (
+              <>
+                <span>{event.approvalRequestId}</span>
+                <span> · Requester: {event.requesterName ?? 'Unknown'}</span>
+                <span> · Approver: {event.approverName ?? 'Not decided'}</span>
+                <span> · Status: {event.approvalStatus ?? 'Unknown'}</span>
+              </>
+            ) : (
+              'Not linked'
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Session</dt>
+          <dd>{event.sessionId ?? 'Not recorded'}</dd>
         </div>
       </dl>
       {event.reason ? <p>Reason: {event.reason}</p> : null}
       <div className="admin-audit-change-grid">
         <ChangeList title="Before" value={event.beforeValue} />
         <ChangeList title="After" value={event.afterValue} />
+        <ChangeList title="Context" value={event.contextMetadata} />
       </div>
     </article>
   );
