@@ -38,6 +38,8 @@ export type AuditReadModel = {
   requesterName: string | null;
   approverName: string | null;
   approvalStatus: AdminApprovalStatus | null;
+  sessionId: string | null;
+  contextMetadata: unknown;
   createdAt: string;
 };
 
@@ -68,6 +70,8 @@ type AuditRow = {
   requester_employee_id: string | null;
   approver_employee_id: string | null;
   approval_status?: AdminApprovalStatus | null;
+  session_id: string | null;
+  context_metadata: unknown;
   created_at: string;
 };
 
@@ -152,7 +156,7 @@ async function loadEvents(
 ): Promise<AuditRow[]> {
   const pageLimit = filters.id ? 1 : AUDIT_PAGE_SIZE + 1;
   if (filters.approvalStatus && hasAuditRpc(client)) {
-    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v3', {
+    const rows = await client.rpc<AuditRow[]>('list_admin_audit_events_v4', {
       p_business_id: principal.businessId,
       p_shop_ids: scopedShopIds(principal),
       p_include_business_wide: hasBusinessWideAuthority(principal),
@@ -174,7 +178,7 @@ async function loadEvents(
 
   const query = new URLSearchParams({
     select:
-      'id,business_id,shop_id,actor_kind,actor_employee_id,actor_role,requester_employee_id,approver_employee_id,action_type,entity_type,entity_id,before_value,after_value,reason,approval_request_id,created_at',
+      'id,business_id,shop_id,actor_kind,actor_employee_id,actor_role,requester_employee_id,approver_employee_id,action_type,entity_type,entity_id,before_value,after_value,reason,approval_request_id,session_id,context_metadata,created_at',
     business_id: `eq.${principal.businessId}`,
     order: 'created_at.desc,id.desc',
     limit: String(pageLimit),
@@ -306,6 +310,8 @@ async function toAuditReadModels(
     approvalStatus: row.approval_request_id
       ? (approvalStatusById.get(row.approval_request_id) ?? null)
       : null,
+    sessionId: row.session_id,
+    contextMetadata: row.context_metadata,
     createdAt: row.created_at,
   }));
 }
