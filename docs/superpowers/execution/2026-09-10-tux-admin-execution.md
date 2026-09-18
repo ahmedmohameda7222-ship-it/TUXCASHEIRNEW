@@ -10,7 +10,7 @@
 
 Implementation follows, in order of authority: production/business safety; `docs/superpowers/specs/2026-09-10-tux-admin-design.md`; the master plan; the active numbered plan; all mandatory hardening addenda; existing repository conventions; normal engineering judgment.
 
-Operations remains live execution authority, Menu remains customer-facing authority, and canonical Supabase remains the only business source of truth. Browser code must never receive service-role/provider secrets. Admin mutations are network-only and server-authorized. Production deployment is prohibited until Plan 10 gates are complete.
+Operations remains live execution authority, Menu remains customer-facing authority, and canonical Supabase remains the only business source of truth. Browser code must never receive service-role/provider secrets. Admin mutations are network-only and server-authorized. Admin Git deployments from main are enabled for deployment verification; PR and feature-branch previews remain disabled. Final production acceptance remains gated by Plan 10, so a pre-Plan-10 Admin deployment is not by itself an accepted production release.
 
 ## Planning preflight
 
@@ -115,7 +115,7 @@ The permanent Admin CI job now runs security checks, typecheck, production build
 
 ### Deployment-boundary self-review
 
-The initial Admin Vercel config was too thin for a workspace-based monorepo. It was hardened before Plan 1 acceptance to install and build from the repository root, preserve filesystem/API functions before the SPA fallback, and set `git.deploymentEnabled: false`. The Admin security gate now enforces those deployment invariants. Automatic Admin production deployment remains disabled until the Plan 10 release gate.
+The initial Admin Vercel config was too thin for a workspace-based monorepo. It was hardened before Plan 1 acceptance to install and build from the repository root and preserve filesystem/API functions before the SPA fallback. The separate Admin Vercel project is rooted at `apps/admin`, uses the app-local deployment contract, and now enables Git deployment from `main` only while PR and feature-branch previews remain disabled. The Admin security/deployment gates enforce those invariants. Final production acceptance remains gated by Plan 10.
 
 ### Formatting and tooling evidence
 

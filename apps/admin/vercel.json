@@ -5,7 +5,10 @@
   "buildCommand": "cd ../.. && npm run build:admin",
   "outputDirectory": "dist",
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
   },
   "crons": [
     {

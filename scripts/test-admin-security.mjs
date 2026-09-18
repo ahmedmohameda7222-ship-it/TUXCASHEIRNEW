@@ -61,9 +61,16 @@ if (vercelConfig.installCommand !== 'cd ../.. && npm ci') {
 if (vercelConfig.buildCommand !== 'cd ../.. && npm run build:admin') {
   throw new Error('Admin Vercel build must use the canonical root Admin workspace command');
 }
-if (vercelConfig.git?.deploymentEnabled !== false) {
+const adminDeploymentPolicy = vercelConfig.git?.deploymentEnabled;
+if (
+  JSON.stringify(adminDeploymentPolicy) !==
+  JSON.stringify({
+    '**': false,
+    main: true,
+  })
+) {
   throw new Error(
-    'Automatic Admin Vercel deployments must remain disabled before the Plan 10 release gate',
+    'Admin Vercel Git deployments must be enabled for main only and disabled for all other branches',
   );
 }
 if (!Array.isArray(vercelConfig.routes) || vercelConfig.routes.length < 2) {
