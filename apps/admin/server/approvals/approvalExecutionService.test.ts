@@ -194,7 +194,6 @@ describe('approvalExecutionService', () => {
     );
   });
 
-
   it('redacts acronym-style API credentials from execution result metadata', async () => {
     const completeClaim = vi.fn(async () => ({ ok: true as const, status: 'EXECUTED' as const }));
     const service = createApprovalExecutionService({
