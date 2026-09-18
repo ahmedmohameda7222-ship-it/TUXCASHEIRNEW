@@ -5,12 +5,14 @@ const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
 const operationsVercelPath = 'vercel.json';
 const adminDeploymentDocPath = 'apps/admin/DEPLOYMENT.md';
+const adminExecutionLedgerPath = 'docs/superpowers/execution/2026-09-10-tux-admin-execution.md';
 const cronDir = 'apps/admin/api/cron';
 
 const adminConfig = JSON.parse(fs.readFileSync(adminVercelPath, 'utf8'));
 const menuConfig = JSON.parse(fs.readFileSync(menuVercelPath, 'utf8'));
 const operationsConfig = JSON.parse(fs.readFileSync(operationsVercelPath, 'utf8'));
 const adminDeploymentDoc = fs.readFileSync(adminDeploymentDocPath, 'utf8');
+const adminExecutionLedger = fs.readFileSync(adminExecutionLedgerPath, 'utf8');
 const adminFoundationWorkflow = fs.readFileSync(
   '.github/workflows/admin-foundation-tdd.yml',
   'utf8',
@@ -158,6 +160,24 @@ for (const requiredText of [
   if (!adminDeploymentDoc.includes(requiredText)) {
     throw new Error(`Admin deployment docs missing required statement: ${requiredText}`);
   }
+}
+
+for (const requiredLedgerText of [
+  'Admin Git deployments from main are enabled',
+  'Final production acceptance remains gated by Plan 10',
+]) {
+  if (!adminExecutionLedger.includes(requiredLedgerText)) {
+    throw new Error(
+      `Admin execution ledger missing deployment-policy reconciliation: ${requiredLedgerText}`,
+    );
+  }
+}
+if (
+  adminExecutionLedger.includes(
+    'Automatic Admin production deployment remains disabled until the Plan 10 release gate',
+  )
+) {
+  throw new Error('Admin execution ledger still claims automatic Admin deployment is disabled');
 }
 
 for (const requiredWorkflowPath of [
