@@ -17,10 +17,7 @@ export function calculateWeightedAverageCost(
   const receiptCost = finiteNonNegative(receipt.unitCostMinor, 'receipt unit cost');
   const totalQuantity = currentQuantity + receiptQuantity;
   if (totalQuantity === 0) return 0;
-  return (
-    (currentQuantity * currentCost + receiptQuantity * receiptCost) /
-    totalQuantity
-  );
+  return (currentQuantity * currentCost + receiptQuantity * receiptCost) / totalQuantity;
 }
 
 export function calculateRecipeCost(
