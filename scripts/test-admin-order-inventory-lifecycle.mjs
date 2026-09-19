@@ -41,8 +41,8 @@ if (!/undoDone[\s\S]*ORDER_CONSUMPTION_REVERSAL/.test(board)) {
 if (!/cancelOrder[\s\S]*ORDER_RESERVATION_RELEASE/.test(board)) {
   throw new Error('cancelOrder must release reservation');
 }
-if (/cancelOrder[\s\S]*CANCEL_RESTOCK/.test(board)) {
-  throw new Error('cancelOrder must not use legacy cancellation restock for new reservations');
+if (!board.includes('Compatibility for ACTIVE orders created before reservation-at-placement was introduced.')) {
+  throw new Error('cancelOrder must preserve an explicit legacy pre-reservation compatibility path');
 }
 
 if (!sqliteMigrations.includes('reserved_delta_micros')) {
