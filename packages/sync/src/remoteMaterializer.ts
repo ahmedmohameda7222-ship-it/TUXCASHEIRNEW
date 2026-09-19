@@ -172,6 +172,7 @@ function movementMutation(movement: InventoryMovement): RemoteTableMutation {
     inventory_item_id: movement.itemId,
     movement_type: movement.movementType,
     quantity_delta_micros: movement.quantityDeltaMicros,
+    reserved_delta_micros: movement.reservedDeltaMicros ?? 0,
     worker_id: movement.workerId,
     order_id: movement.orderId,
     compensates_movement_id: movement.compensatesMovementId,
