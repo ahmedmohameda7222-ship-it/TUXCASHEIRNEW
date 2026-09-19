@@ -144,11 +144,11 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible();
   await page.getByRole('button', { name: /Beef/ }).click();
 
-  await expect(page.getByText('On Hand')).toBeVisible();
+  await expect(page.getByText('On Hand', { exact: true })).toBeVisible();
   await expect(page.getByText('3.2 kg')).toBeVisible();
-  await expect(page.getByText('Reserved')).toBeVisible();
+  await expect(page.getByText('Reserved', { exact: true })).toBeVisible();
   await expect(page.getByText('1.1 kg')).toBeVisible();
-  await expect(page.getByText('Available')).toBeVisible();
+  await expect(page.getByText('Available', { exact: true })).toBeVisible();
   await expect(page.getByText('2.1 kg')).toBeVisible();
   await expect(page.getByText('BULK STOCK RECEIVED')).toBeVisible();
 
