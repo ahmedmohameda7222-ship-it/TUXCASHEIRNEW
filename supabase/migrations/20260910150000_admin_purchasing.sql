@@ -125,6 +125,7 @@ create table public.purchase_returns (
   supplier_id uuid not null references public.suppliers(id) on delete restrict,
   supplier_reference text,
   command_id text not null check (btrim(command_id) <> ''),
+  purchase_price_variance_minor numeric(20, 6) not null default 0,
   returned_by_employee_id uuid not null references public.business_employees(id) on delete restrict,
   returned_at timestamptz not null default now(),
   unique (shop_id, command_id)
@@ -888,6 +889,9 @@ declare
   v_current_cost numeric(20, 6);
   v_current_value numeric;
   v_return_value numeric;
+  v_inventory_value_removed numeric;
+  v_line_purchase_price_variance numeric(20, 6);
+  v_total_purchase_price_variance numeric(20, 6) := 0;
   v_weighted_return_cost numeric(20, 6);
   v_new_on_hand bigint;
   v_new_value numeric;
@@ -1038,12 +1042,6 @@ begin
       ) q
     ) x;
 
-    v_current_value := v_on_hand::numeric * v_current_cost;
-    v_new_on_hand := v_on_hand - v_returned;
-    v_new_value := v_current_value - v_return_value;
-    if v_new_value < 0 then
-      return jsonb_build_object('ok', false, 'code', 'return_value_exceeds_inventory_value');
-    end if;
   end loop;
 
   v_return_id := gen_random_uuid();
@@ -1144,7 +1142,24 @@ begin
       raise exception 'TUX_PURCHASE_RETURN_ALLOCATION_INVARIANT';
     end if;
 
-    v_weighted_return_cost := v_return_value / v_returned::numeric;
+    v_current_value := v_on_hand::numeric * v_current_cost;
+    v_new_on_hand := v_on_hand - v_returned;
+    if v_return_value > v_current_value then
+      v_inventory_value_removed := v_returned::numeric * v_current_cost;
+      v_line_purchase_price_variance :=
+        (v_return_value - v_inventory_value_removed) / 1000000::numeric;
+    else
+      v_inventory_value_removed := v_return_value;
+      v_line_purchase_price_variance := 0;
+    end if;
+    v_total_purchase_price_variance :=
+      v_total_purchase_price_variance + v_line_purchase_price_variance;
+    v_weighted_return_cost := v_inventory_value_removed / v_returned::numeric;
+    v_new_value := v_current_value - v_inventory_value_removed;
+    v_new_cost := case
+      when v_new_on_hand <= 0 then 0
+      else v_new_value / v_new_on_hand::numeric
+    end;
 
     insert into public.inventory_movements(
       id, shop_id, business_day_id, inventory_item_id, movement_type,
@@ -1157,13 +1172,6 @@ begin
       'purchase-return:' || p_command_id || ':' || v_po_line.id::text,
       p_employee_id, 'ADMIN', p_command_id, v_weighted_return_cost, now()
     );
-
-    v_new_on_hand := v_on_hand - v_returned;
-    v_new_value := (v_on_hand::numeric * v_current_cost) - v_return_value;
-    v_new_cost := case
-      when v_new_on_hand <= 0 then 0
-      else v_new_value / v_new_on_hand::numeric
-    end;
 
     insert into public.inventory_cost_state(
       shop_id, inventory_item_id, weighted_unit_cost_minor, version
@@ -1183,6 +1191,10 @@ begin
     where id = v_po_line.id;
   end loop;
 
+  update public.purchase_returns
+  set purchase_price_variance_minor = v_total_purchase_price_variance
+  where id = v_return_id;
+
   v_new_version := v_order.version + 1;
   update public.purchase_orders
   set version = v_new_version, updated_at = now()
@@ -1195,7 +1207,8 @@ begin
     jsonb_build_object(
       'status', v_order.status, 'version', v_new_version,
       'returnId', v_return_id,
-      'supplierReference', nullif(btrim(coalesce(p_supplier_reference, '')), '')
+      'supplierReference', nullif(btrim(coalesce(p_supplier_reference, '')), ''),
+      'purchasePriceVarianceMinor', v_total_purchase_price_variance
     ),
     null, null, null,
     jsonb_build_object('commandId', p_command_id)
@@ -1203,7 +1216,9 @@ begin
 
   return jsonb_build_object(
     'ok', true, 'purchaseOrderId', v_order.id, 'returnId', v_return_id,
-    'status', v_order.status, 'version', v_new_version, 'idempotentReplay', false
+    'status', v_order.status, 'version', v_new_version,
+    'purchasePriceVarianceMinor', v_total_purchase_price_variance,
+    'idempotentReplay', false
   );
 end;
 $$;
