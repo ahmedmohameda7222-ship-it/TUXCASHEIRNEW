@@ -85,84 +85,90 @@ export function PurchaseOrdersPage({
       </div>
       {canManage ? (
         <form
-        className="admin-form-grid"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const orderedBaseMicros = baseMicros(quantity);
-          if (!supplierId || !itemId || orderedBaseMicros <= 0) return;
-          onCreate({
-            supplierId,
-            reference: reference.trim() || null,
-            expectedDeliveryDate: expectedDate || null,
-            lines: [
-              {
-                inventoryItemId: itemId,
-                purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
-                orderedBaseMicros,
-                expectedUnitCostMinor: minorUnits(unitCost),
-              },
-            ],
-          });
-        }}
-      >
-        <label>
-          Supplier
-          <select value={supplierId} onChange={(event) => setSupplierId(event.currentTarget.value)}>
-            {suppliers.map((supplier) => (
-              <option value={supplier.id} key={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Inventory item
-          <select value={itemId} onChange={(event) => setItemId(event.currentTarget.value)}>
-            {inventoryItems.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Reference
-          <input value={reference} onChange={(event) => setReference(event.currentTarget.value)} />
-        </label>
-        <label>
-          Expected delivery
-          <input
-            type="date"
-            value={expectedDate}
-            onChange={(event) => setExpectedDate(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Order quantity ({unitLabel})
-          <input
-            inputMode="decimal"
-            value={quantity}
-            onChange={(event) => setQuantity(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Purchase unit
-          <input
-            value={purchaseUnit}
-            onChange={(event) => setPurchaseUnit(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Expected unit cost
-          <input
-            inputMode="decimal"
-            value={unitCost}
-            onChange={(event) => setUnitCost(event.currentTarget.value)}
-          />
-        </label>
-        <button className="admin-secondary-button" type="submit" disabled={pending}>
-          Create purchase order
-        </button>
+          className="admin-form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const orderedBaseMicros = baseMicros(quantity);
+            if (!supplierId || !itemId || orderedBaseMicros <= 0) return;
+            onCreate({
+              supplierId,
+              reference: reference.trim() || null,
+              expectedDeliveryDate: expectedDate || null,
+              lines: [
+                {
+                  inventoryItemId: itemId,
+                  purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
+                  orderedBaseMicros,
+                  expectedUnitCostMinor: minorUnits(unitCost),
+                },
+              ],
+            });
+          }}
+        >
+          <label>
+            Supplier
+            <select
+              value={supplierId}
+              onChange={(event) => setSupplierId(event.currentTarget.value)}
+            >
+              {suppliers.map((supplier) => (
+                <option value={supplier.id} key={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Inventory item
+            <select value={itemId} onChange={(event) => setItemId(event.currentTarget.value)}>
+              {inventoryItems.map((item) => (
+                <option value={item.id} key={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Reference
+            <input
+              value={reference}
+              onChange={(event) => setReference(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Expected delivery
+            <input
+              type="date"
+              value={expectedDate}
+              onChange={(event) => setExpectedDate(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Order quantity ({unitLabel})
+            <input
+              inputMode="decimal"
+              value={quantity}
+              onChange={(event) => setQuantity(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Purchase unit
+            <input
+              value={purchaseUnit}
+              onChange={(event) => setPurchaseUnit(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Expected unit cost
+            <input
+              inputMode="decimal"
+              value={unitCost}
+              onChange={(event) => setUnitCost(event.currentTarget.value)}
+            />
+          </label>
+          <button className="admin-secondary-button" type="submit" disabled={pending}>
+            Create purchase order
+          </button>
         </form>
       ) : null}
     </section>

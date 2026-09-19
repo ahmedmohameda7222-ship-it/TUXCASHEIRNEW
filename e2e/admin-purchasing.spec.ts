@@ -12,12 +12,7 @@ const session = {
     employeeId: '11111111-1111-4111-8111-111111111111',
     businessId: '22222222-2222-4222-8222-222222222222',
     role: 'OWNER',
-    permissions: [
-      'purchasing.view',
-      'purchasing.manage',
-      'purchasing.receive',
-      'inventory.view',
-    ],
+    permissions: ['purchasing.view', 'purchasing.manage', 'purchasing.receive', 'inventory.view'],
     shopIds: [shopId],
   },
   csrfToken,

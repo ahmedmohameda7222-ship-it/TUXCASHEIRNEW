@@ -1,8 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  AdminPurchasingWorkspace,
-  PurchasingCommandResult,
-} from '@tux/admin-contracts';
+import type { AdminPurchasingWorkspace, PurchasingCommandResult } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';

@@ -37,49 +37,49 @@ export function SuppliersPage({
       </div>
       {canManage ? (
         <form
-        className="admin-form-grid"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const trimmed = name.trim();
-          if (!trimmed) return;
-          onCreate({
-            name: trimmed,
-            contactName: contactName.trim() || null,
-            phone: phone.trim() || null,
-            email: email.trim() || null,
-          });
-          setName('');
-          setContactName('');
-          setPhone('');
-          setEmail('');
-        }}
-      >
-        <label>
-          Supplier name
-          <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
-        </label>
-        <label>
-          Contact name
-          <input
-            value={contactName}
-            onChange={(event) => setContactName(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Phone
-          <input value={phone} onChange={(event) => setPhone(event.currentTarget.value)} />
-        </label>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.currentTarget.value)}
-          />
-        </label>
-        <button className="admin-secondary-button" type="submit" disabled={pending}>
-          Add supplier
-        </button>
+          className="admin-form-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const trimmed = name.trim();
+            if (!trimmed) return;
+            onCreate({
+              name: trimmed,
+              contactName: contactName.trim() || null,
+              phone: phone.trim() || null,
+              email: email.trim() || null,
+            });
+            setName('');
+            setContactName('');
+            setPhone('');
+            setEmail('');
+          }}
+        >
+          <label>
+            Supplier name
+            <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
+          </label>
+          <label>
+            Contact name
+            <input
+              value={contactName}
+              onChange={(event) => setContactName(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            Phone
+            <input value={phone} onChange={(event) => setPhone(event.currentTarget.value)} />
+          </label>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.currentTarget.value)}
+            />
+          </label>
+          <button className="admin-secondary-button" type="submit" disabled={pending}>
+            Add supplier
+          </button>
         </form>
       ) : null}
     </section>
