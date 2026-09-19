@@ -438,13 +438,13 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(
       scalar(
         databasePath,
-        "SELECT quantity_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1",
+        'SELECT quantity_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1',
       ),
     ).toBe(0);
     expect(
       scalar(
         databasePath,
-        "SELECT reserved_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1",
+        'SELECT reserved_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1',
       ),
     ).toBe(500_000);
     expect(result.value.nextDraft.lines).toHaveLength(0);
