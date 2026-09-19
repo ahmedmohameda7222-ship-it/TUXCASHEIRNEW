@@ -63,8 +63,8 @@ const commandSchema = z.discriminatedUnion('type', [
             .object({
               inventoryItemId: uuidSchema,
               purchaseUnitLabel: z.string().trim().min(1).max(120),
-              orderedBaseMicros: microsSchema,
-              expectedUnitCostMinor: moneySchema,
+              orderedPurchaseUnitsMicros: microsSchema,
+              expectedPurchaseUnitCostMinor: moneySchema,
             })
             .strict(),
         )
@@ -104,8 +104,8 @@ const commandSchema = z.discriminatedUnion('type', [
           z
             .object({
               lineId: uuidSchema,
-              receivedBaseMicros: microsSchema,
-              unitCostMinor: moneySchema,
+              receivedPurchaseUnitsMicros: microsSchema,
+              purchaseUnitCostMinor: moneySchema,
             })
             .strict(),
         )
@@ -125,8 +125,7 @@ const commandSchema = z.discriminatedUnion('type', [
           z
             .object({
               lineId: uuidSchema,
-              returnedBaseMicros: microsSchema,
-              unitCostMinor: moneySchema,
+              returnedPurchaseUnitsMicros: microsSchema,
             })
             .strict(),
         )
@@ -164,9 +163,14 @@ type PurchaseOrderLineRow = {
   purchase_order_id: string;
   inventory_item_id: string;
   purchase_unit_label: string;
+  base_micros_per_purchase_unit: number | string;
+  ordered_purchase_units_micros: number | string;
+  received_purchase_units_micros: number | string;
+  returned_purchase_units_micros: number | string;
   ordered_base_micros: number | string;
   received_base_micros: number | string;
   returned_base_micros: number | string;
+  expected_purchase_unit_cost_minor: number | string;
   expected_unit_cost_minor: number | string;
 };
 
@@ -247,7 +251,7 @@ function createStore(client: AdminSupabaseClient): PurchasingStore {
               'purchase_order_lines',
               new URLSearchParams({
                 select:
-                  'id,purchase_order_id,inventory_item_id,purchase_unit_label,ordered_base_micros,received_base_micros,returned_base_micros,expected_unit_cost_minor',
+                  'id,purchase_order_id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,ordered_purchase_units_micros,received_purchase_units_micros,returned_purchase_units_micros,ordered_base_micros,received_base_micros,returned_base_micros,expected_purchase_unit_cost_minor,expected_unit_cost_minor',
                 purchase_order_id: `in.(${purchaseOrderIds.join(',')})`,
                 order: 'purchase_order_id.asc,id.asc',
               }),
@@ -303,10 +307,17 @@ function createStore(client: AdminSupabaseClient): PurchasingStore {
               itemName: item?.name ?? 'Inventory item',
               unitLabel: item?.unitLabel ?? 'unit',
               purchaseUnitLabel: line.purchase_unit_label,
+              baseMicrosPerPurchaseUnit: safeInteger(line.base_micros_per_purchase_unit),
+              orderedPurchaseUnitsMicros: safeInteger(line.ordered_purchase_units_micros),
+              receivedPurchaseUnitsMicros: safeInteger(line.received_purchase_units_micros),
+              returnedPurchaseUnitsMicros: safeInteger(line.returned_purchase_units_micros),
               orderedBaseMicros,
               receivedBaseMicros,
               returnedBaseMicros: safeInteger(line.returned_base_micros),
               remainingBaseMicros: Math.max(0, orderedBaseMicros - receivedBaseMicros),
+              expectedPurchaseUnitCostMinor: finiteNumber(
+                line.expected_purchase_unit_cost_minor,
+              ),
               expectedUnitCostMinor: finiteNumber(line.expected_unit_cost_minor),
             };
           }),
