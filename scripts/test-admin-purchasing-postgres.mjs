@@ -156,7 +156,7 @@ const partialResult = psql(
        '${PO_ID}',
        'receive-partial-1',
        'INV-1001',
-       '[{"lineId":"${LINE_ID}","receivedBaseMicros":500000,"unitCostMinor":200}]'::jsonb
+       '[{"lineId":"${LINE_ID}","receivedPurchaseUnitsMicros":500,"purchaseUnitCostMinor":200000}]'::jsonb
      )::text`,
   ],
   'Partial purchase receipt',
@@ -243,6 +243,8 @@ psql(
            and inventory_item_id = '${ITEM_ID}'
            and purchase_order_id = '${PO_ID}'
            and source_kind = 'RECEIPT'
+           and base_micros_per_purchase_unit = 1000000000
+           and purchase_unit_cost_minor = 200000
            and unit_cost_minor = 200
        ) then
          raise exception 'supplier price history missing';
@@ -272,7 +274,7 @@ const replay = psql(
        '${PO_ID}',
        'receive-partial-1',
        'INV-1001',
-       '[{"lineId":"${LINE_ID}","receivedBaseMicros":500000,"unitCostMinor":200}]'::jsonb
+       '[{"lineId":"${LINE_ID}","receivedPurchaseUnitsMicros":500,"purchaseUnitCostMinor":200000}]'::jsonb
      )::text`,
   ],
   'Partial purchase receipt replay',
@@ -291,7 +293,7 @@ const completeResult = psql(
        '${PO_ID}',
        'receive-complete-2',
        'INV-1002',
-       '[{"lineId":"${LINE_ID}","receivedBaseMicros":500000,"unitCostMinor":300}]'::jsonb
+       '[{"lineId":"${LINE_ID}","receivedPurchaseUnitsMicros":500,"purchaseUnitCostMinor":300000}]'::jsonb
      )::text`,
   ],
   'Complete purchase receipt',
@@ -311,7 +313,7 @@ const returnResult = psql(
        '${PO_ID}',
        'return-1',
        'CN-1001',
-       '[{"lineId":"${LINE_ID}","returnedBaseMicros":250000,"unitCostMinor":300}]'::jsonb
+       '[{"lineId":"${LINE_ID}","returnedPurchaseUnitsMicros":250}]'::jsonb
      )::text`,
   ],
   'Purchase return',
@@ -354,6 +356,8 @@ psql(
        if not exists (
          select 1 from public.purchase_order_lines
          where id = '${LINE_ID}'
+           and received_purchase_units_micros = 1000
+           and returned_purchase_units_micros = 250
            and received_base_micros = 1000000
            and returned_base_micros = 250000
        ) then
@@ -368,6 +372,7 @@ psql(
            and r.command_id = 'return-1'
            and r.supplier_reference = 'CN-1001'
            and rl.purchase_order_line_id = '${LINE_ID}'
+           and rl.returned_purchase_units_micros = 250
            and rl.returned_base_micros = 250000
        ) then
          raise exception 'purchase return record missing';
