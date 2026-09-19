@@ -272,7 +272,7 @@ if (legacyBefore !== legacyAfter) {
 psql(
   [
     '-c',
-    `do $
+    `do $inventory_assertions$
      begin
        if not exists (
          select 1 from public.inventory_movements
@@ -310,7 +310,7 @@ psql(
           or has_table_privilege('authenticated', 'public.inventory_reservations', 'SELECT') then
          raise exception 'inventory reservation table leaked browser SELECT';
        end if;
-     end $;`,
+     end $inventory_assertions$;`,
   ],
   'Admin inventory additive compatibility assertions',
 );
@@ -354,7 +354,7 @@ psqlExpectFailure(
 psql(
   [
     '-c',
-    `do $
+    `do $reservation_fence_assertion$
      declare
        v_available bigint;
      begin
@@ -363,7 +363,7 @@ psql(
        if v_available <> 500000 then
          raise exception 'canonical reservation fence left unexpected available stock: %', v_available;
        end if;
-     end $;`,
+     end $reservation_fence_assertion$;`,
   ],
   'Canonical reservation fence balance assertion',
 );
