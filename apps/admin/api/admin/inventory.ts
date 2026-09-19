@@ -64,8 +64,17 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
-      type: z.literal('stocktake'),
+      type: z.literal('stocktake.begin'),
       shopId: uuidSchema,
+      inventoryItemIds: z.array(uuidSchema).min(1).max(500),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('stocktake.post'),
+      shopId: uuidSchema,
+      stocktakeId: uuidSchema,
       lines: z
         .array(
           z
@@ -129,6 +138,13 @@ type InventoryItemRow = {
   unit_label: string;
   tracking_mode: string;
   active: boolean;
+};
+
+type BalanceRow = {
+  inventory_item_id: string;
+  on_hand_micros: number | string;
+  reserved_micros: number | string;
+  available_micros: number | string;
 };
 
 type MovementRow = {
@@ -236,7 +252,7 @@ async function loadWorkspace(
 ): Promise<AdminInventoryWorkspace> {
   requirePermission(context.principal, 'inventory.view', shopId);
 
-  const [itemRows, movementRows, costRows, reasonRows, transferRows] = await Promise.all([
+  const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] = await Promise.all([
     client.select<InventoryItemRow[]>(
       'inventory_items',
       new URLSearchParams({
@@ -255,6 +271,10 @@ async function loadWorkspace(
         limit: '2000',
       }),
     ),
+    client.rpc<BalanceRow[]>('read_admin_inventory_balances_v1', {
+      p_employee_id: context.principal.employeeId,
+      p_shop_id: shopId,
+    }),
     client.select<CostRow[]>(
       'inventory_cost_state',
       new URLSearchParams({
@@ -317,17 +337,25 @@ async function loadWorkspace(
   const costs = new Map(
     costRows.map((row) => [row.inventory_item_id, finiteNumber(row.weighted_unit_cost_minor)]),
   );
+  const balances = new Map(
+    balanceRows.map((row) => [
+      row.inventory_item_id,
+      {
+        onHandMicros: safeInteger(row.on_hand_micros),
+        reservedMicros: safeInteger(row.reserved_micros),
+        availableMicros: safeInteger(row.available_micros),
+      },
+    ]),
+  );
 
   const items: AdminInventoryItem[] = itemRows.map((row) => {
     const movements = movementsByItem.get(row.id) ?? [];
-    const onHandMicros = movements.reduce(
-      (total, movement) => total + safeInteger(movement.quantity_delta_micros),
-      0,
-    );
-    const reservedMicros = movements.reduce(
-      (total, movement) => total + safeInteger(movement.reserved_delta_micros),
-      0,
-    );
+    const balance = balances.get(row.id) ?? {
+      onHandMicros: 0,
+      reservedMicros: 0,
+      availableMicros: 0,
+    };
+    const { onHandMicros, reservedMicros, availableMicros } = balance;
     return {
       id: row.id,
       name: row.name,
@@ -336,7 +364,7 @@ async function loadWorkspace(
       active: row.active,
       onHandMicros,
       reservedMicros,
-      availableMicros: onHandMicros - reservedMicros,
+      availableMicros,
       weightedUnitCostMinor: costs.get(row.id) ?? 0,
       history: movements.slice(0, 50).map((movement) => ({
         id: movement.id,
@@ -436,11 +464,20 @@ async function executeCommand(
         p_emergency_negative_override: command.emergencyNegativeOverride,
       });
     }
-    case 'stocktake':
+    case 'stocktake.begin':
+      requirePermission(context.principal, 'inventory.stocktake', command.shopId);
+      return client.rpc<AdminInventoryCommandResult>('begin_stocktake_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: command.shopId,
+        p_inventory_item_ids: command.inventoryItemIds,
+        p_command_id: command.commandId,
+      });
+    case 'stocktake.post':
       requirePermission(context.principal, 'inventory.stocktake', command.shopId);
       return client.rpc<AdminInventoryCommandResult>('post_stocktake_v1', {
         p_employee_id: context.principal.employeeId,
         p_shop_id: command.shopId,
+        p_stocktake_id: command.stocktakeId,
         p_lines: command.lines.map((line) => ({
           inventoryItemId: line.inventoryItemId,
           actualCountMicros: line.actualCountMicros,
