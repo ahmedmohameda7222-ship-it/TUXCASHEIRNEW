@@ -23,6 +23,7 @@ export function PurchaseOrdersPage({
   suppliers,
   inventoryItems,
   selectedId,
+  canManage,
   pending,
   onSelect,
   onCreate,
@@ -31,6 +32,7 @@ export function PurchaseOrdersPage({
   suppliers: readonly AdminSupplier[];
   inventoryItems: readonly AdminPurchasingInventoryItem[];
   selectedId: string | null;
+  canManage: boolean;
   pending: boolean;
   onSelect(id: string): void;
   onCreate(input: {
@@ -81,7 +83,8 @@ export function PurchaseOrdersPage({
           </button>
         ))}
       </div>
-      <form
+      {canManage ? (
+        <form
         className="admin-form-grid"
         onSubmit={(event) => {
           event.preventDefault();
@@ -160,7 +163,8 @@ export function PurchaseOrdersPage({
         <button className="admin-secondary-button" type="submit" disabled={pending}>
           Create purchase order
         </button>
-      </form>
+        </form>
+      ) : null}
     </section>
   );
 }
