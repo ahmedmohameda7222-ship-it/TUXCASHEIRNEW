@@ -38,7 +38,10 @@ export function TransferPage({
   }): void;
   onReceive(transferId: string): void;
 }) {
-  const destinations = useMemo(() => shopIds.filter((candidate) => candidate !== shopId), [shopId, shopIds]);
+  const destinations = useMemo(
+    () => shopIds.filter((candidate) => candidate !== shopId),
+    [shopId, shopIds],
+  );
   const incoming = useMemo(
     () =>
       transfers.filter(
