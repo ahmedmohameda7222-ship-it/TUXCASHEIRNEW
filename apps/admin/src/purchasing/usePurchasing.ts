@@ -14,12 +14,14 @@ export class PurchasingUiError extends Error {
   }
 }
 
-function key(shopId: string) {
+function queryKey(shopId: string) {
   return ['admin', 'purchasing', shopId] as const;
 }
 
-function csrf(session: ReturnType<typeof useAdminSession>): string {
-  if (session.state.status !== 'authenticated') throw new PurchasingUiError('session_required');
+function csrfToken(session: ReturnType<typeof useAdminSession>): string {
+  if (session.state.status !== 'authenticated') {
+    throw new PurchasingUiError('session_required');
+  }
   return session.state.session.csrfToken;
 }
 
@@ -32,40 +34,45 @@ export function usePurchasing(shopId: string | undefined) {
   const queryClient = useQueryClient();
 
   const workspace = useQuery({
-    queryKey: shopId ? key(shopId) : ['admin', 'purchasing', 'none'],
+    queryKey: shopId ? queryKey(shopId) : ['admin', 'purchasing', 'no-shop'],
     enabled: Boolean(shopId),
-    queryFn: () =>
-      adminFetch<AdminPurchasingWorkspace>(
-        `/api/admin/purchasing?shopId=${encodeURIComponent(shopId ?? '')}`,
-      ),
+    queryFn: async () => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return adminFetch<AdminPurchasingWorkspace>(
+        `/api/admin/purchasing?shopId=${encodeURIComponent(shopId)}`,
+      );
+    },
   });
 
-  function mutation<TInput>(toCommand: (input: TInput) => Record<string, unknown>) {
-    return useMutation({
-      mutationFn: (input: TInput) =>
-        adminFetch<PurchasingCommandResult>(
-          '/api/admin/purchasing',
-          {
-            method: 'POST',
-            body: JSON.stringify(toCommand(input)),
-          },
-          csrf(session),
-        ),
-      onSuccess: async () => {
-        if (shopId) await queryClient.invalidateQueries({ queryKey: key(shopId) });
-      },
-    });
+  async function post(command: Record<string, unknown>): Promise<PurchasingCommandResult> {
+    const result = await adminFetch<PurchasingCommandResult>(
+      '/api/admin/purchasing',
+      { method: 'POST', body: JSON.stringify(command) },
+      csrfToken(session),
+    );
+    if (!result.ok) throw new PurchasingUiError(result.code);
+    return result;
   }
 
-  return {
-    workspace,
-    createSupplier: mutation<{
+  async function invalidate(): Promise<void> {
+    if (shopId) await queryClient.invalidateQueries({ queryKey: queryKey(shopId) });
+  }
+
+  const createSupplier = useMutation({
+    mutationFn: async (input: {
       name: string;
       contactName: string | null;
       phone: string | null;
       email: string | null;
-    }>((input) => ({ type: 'supplier.create', shopId, ...input })),
-    createPurchaseOrder: mutation<{
+    }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'supplier.create', shopId, ...input });
+    },
+    onSuccess: invalidate,
+  });
+
+  const createPurchaseOrder = useMutation({
+    mutationFn: async (input: {
       supplierId: string;
       reference: string | null;
       expectedDeliveryDate: string | null;
@@ -75,18 +82,36 @@ export function usePurchasing(shopId: string | undefined) {
         orderedBaseMicros: number;
         expectedUnitCostMinor: number;
       }[];
-    }>((input) => ({ type: 'po.create', shopId, ...input, commandId: commandId() })),
-    updatePurchaseOrder: mutation<{
+    }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'po.create', shopId, ...input, commandId: commandId() });
+    },
+    onSuccess: invalidate,
+  });
+
+  const updatePurchaseOrder = useMutation({
+    mutationFn: async (input: {
       purchaseOrderId: string;
       expectedVersion: number;
       reference: string | null;
       expectedDeliveryDate: string | null;
-    }>((input) => ({ type: 'po.update', shopId, ...input })),
-    orderPurchaseOrder: mutation<{
-      purchaseOrderId: string;
-      expectedVersion: number;
-    }>((input) => ({ type: 'po.order', shopId, ...input, commandId: commandId() })),
-    receivePurchase: mutation<{
+    }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'po.update', shopId, ...input });
+    },
+    onSuccess: invalidate,
+  });
+
+  const orderPurchaseOrder = useMutation({
+    mutationFn: async (input: { purchaseOrderId: string; expectedVersion: number }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'po.order', shopId, ...input, commandId: commandId() });
+    },
+    onSuccess: invalidate,
+  });
+
+  const receivePurchase = useMutation({
+    mutationFn: async (input: {
       purchaseOrderId: string;
       supplierReference: string | null;
       lines: readonly {
@@ -94,8 +119,15 @@ export function usePurchasing(shopId: string | undefined) {
         receivedBaseMicros: number;
         unitCostMinor: number;
       }[];
-    }>((input) => ({ type: 'po.receive', shopId, ...input, commandId: commandId() })),
-    returnPurchase: mutation<{
+    }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'po.receive', shopId, ...input, commandId: commandId() });
+    },
+    onSuccess: invalidate,
+  });
+
+  const returnPurchase = useMutation({
+    mutationFn: async (input: {
       purchaseOrderId: string;
       supplierReference: string | null;
       lines: readonly {
@@ -103,6 +135,20 @@ export function usePurchasing(shopId: string | undefined) {
         returnedBaseMicros: number;
         unitCostMinor: number;
       }[];
-    }>((input) => ({ type: 'po.return', shopId, ...input, commandId: commandId() })),
+    }) => {
+      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+      return post({ type: 'po.return', shopId, ...input, commandId: commandId() });
+    },
+    onSuccess: invalidate,
+  });
+
+  return {
+    workspace,
+    createSupplier,
+    createPurchaseOrder,
+    updatePurchaseOrder,
+    orderPurchaseOrder,
+    receivePurchase,
+    returnPurchase,
   };
 }
