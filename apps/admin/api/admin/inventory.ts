@@ -17,6 +17,10 @@ import {
 import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
+  loadInventoryIntelligence,
+  updateReplenishmentPolicy,
+} from '../../server/inventory/intelligenceService.js';
+import {
   firstHeader,
   readJsonObject,
   requireSameOrigin,
@@ -93,6 +97,19 @@ const commandSchema = z.discriminatedUnion('type', [
         .min(1)
         .max(500),
       commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('replenishment.update'),
+      shopId: uuidSchema,
+      inventoryItemId: uuidSchema,
+      parLevelMicros: microsSchema.nonnegative(),
+      reorderPointMicros: microsSchema.nonnegative(),
+      preferredPurchaseUnit: z.string().trim().min(1).max(120).nullable(),
+      leadTimeDays: z.number().int().min(0).max(3650),
+      minimumOrderMicros: positiveMicrosSchema.nullable(),
+      orderMultipleMicros: positiveMicrosSchema.nullable(),
     })
     .strict(),
   z
@@ -362,11 +379,14 @@ async function loadWorkspace(
     }),
   }));
 
+  const intelligence = await loadInventoryIntelligence(client, shopId, items);
+
   return {
     shopId,
     items,
     reasonCodes: selectScopedReasons(reasonRows, shopId),
     transfers,
+    intelligence,
   };
 }
 
@@ -427,6 +447,20 @@ async function executeCommand(
         })),
         p_command_id: command.commandId,
       });
+    case 'replenishment.update':
+      requirePermission(context.principal, 'purchasing.manage', command.shopId);
+      await updateReplenishmentPolicy(client, {
+        employeeId: context.principal.employeeId,
+        shopId: command.shopId,
+        inventoryItemId: command.inventoryItemId,
+        parLevelMicros: command.parLevelMicros,
+        reorderPointMicros: command.reorderPointMicros,
+        preferredPurchaseUnit: command.preferredPurchaseUnit,
+        leadTimeDays: command.leadTimeDays,
+        minimumOrderMicros: command.minimumOrderMicros,
+        orderMultipleMicros: command.orderMultipleMicros,
+      });
+      return { ok: true };
     case 'transfer.send':
       requirePermission(context.principal, 'inventory.transfer', command.shopId);
       requirePermission(context.principal, 'inventory.transfer', command.destinationShopId);
