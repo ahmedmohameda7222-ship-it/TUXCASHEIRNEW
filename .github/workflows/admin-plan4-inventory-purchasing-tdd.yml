@@ -90,7 +90,7 @@ jobs:
         run: node scripts/test-admin-inventory-ledger-migration.mjs
 
   lifecycle-static:
-    needs: ledger-postgres
+    needs: ledger-static
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
