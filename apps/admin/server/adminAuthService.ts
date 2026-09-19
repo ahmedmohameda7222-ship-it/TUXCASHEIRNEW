@@ -117,7 +117,8 @@ async function resolvePrincipal(
       }),
     );
     for (const row of presetRows) {
-      if (isAdminPermission(row.permission_key)) granted.add(row.permission_key);
+      if (isAdminPermission(row.permission_key))
+        granted.add(row.permission_key);
     }
 
     const overrides = await client.select<
@@ -141,7 +142,9 @@ async function resolvePrincipal(
     employeeId: employee.id,
     businessId: employee.business_id,
     role,
-    permissions: ADMIN_PERMISSIONS.filter((permission) => granted.has(permission)),
+    permissions: ADMIN_PERMISSIONS.filter((permission) =>
+      granted.has(permission),
+    ),
     shopIds: [...shopIds],
   };
 }
