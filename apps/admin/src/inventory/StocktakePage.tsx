@@ -1,4 +1,4 @@
-import type { AdminInventoryItem } from '@tux/admin-contracts';
+import type { AdminInventoryItem, AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 
 function formatQuantity(micros: number, unitLabel: string): string {
@@ -16,32 +16,42 @@ function toMicros(value: string): number | null {
 
 export function StocktakePage({
   items,
+  snapshot,
   pending,
   onBack,
   onSubmit,
 }: {
   items: readonly AdminInventoryItem[];
+  snapshot: AdminStocktakeSnapshot;
   pending: boolean;
   onBack(): void;
   onSubmit(lines: readonly { inventoryItemId: string; actualCountMicros: number }[]): void;
 }) {
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const initial = useMemo(
-    () => Object.fromEntries(items.map((item) => [item.id, String(item.onHandMicros / 1_000_000)])),
-    [items],
+    () =>
+      Object.fromEntries(
+        snapshot.lines.map((line) => [
+          line.inventoryItemId,
+          String(line.snapshotOnHandMicros / 1_000_000),
+        ]),
+      ),
+    [snapshot],
   );
   const [actualByItem, setActualByItem] = useState<Record<string, string>>(initial);
 
-  const parsed = items.map((item) => ({
-    item,
-    actualMicros: toMicros(actualByItem[item.id] ?? ''),
+  const parsed = snapshot.lines.map((line) => ({
+    line,
+    item: itemById.get(line.inventoryItemId),
+    actualMicros: toMicros(actualByItem[line.inventoryItemId] ?? ''),
   }));
-  const valid = parsed.every((line) => line.actualMicros !== null);
+  const valid = parsed.every((entry) => entry.item && entry.actualMicros !== null);
 
   return (
     <section className="admin-inventory-workflow" aria-labelledby="inventory-stocktake-title">
       <div className="admin-inventory-workflow__header">
         <div>
-          <p className="admin-page__eyebrow">Immutable count posting</p>
+          <p className="admin-page__eyebrow">Frozen count boundary</p>
           <h2 id="inventory-stocktake-title">Stock count</h2>
         </div>
         <button className="admin-secondary-button" type="button" onClick={onBack}>
@@ -51,22 +61,24 @@ export function StocktakePage({
 
       <div className="admin-inventory-policy-grid">
         <div>
-          <span>Recount state</span>
-          <strong>Not required by current policy</strong>
+          <span>Count boundary</span>
+          <strong>Captured before counting</strong>
         </div>
         <div>
-          <span>Approval required</span>
-          <strong>No — direct counted variance posting</strong>
+          <span>Concurrent movements</span>
+          <strong>Preserved after the snapshot</strong>
         </div>
       </div>
 
       <div className="admin-inventory-stocktake-list">
-        {parsed.map(({ item, actualMicros }) => {
-          const variance = actualMicros === null ? null : actualMicros - item.onHandMicros;
+        {parsed.map(({ line, item, actualMicros }) => {
+          if (!item) return null;
+          const variance =
+            actualMicros === null ? null : actualMicros - line.snapshotOnHandMicros;
           const valueVariance =
-            variance === null ? null : (variance / 1_000_000) * item.weightedUnitCostMinor;
+            variance === null ? null : (variance / 1_000_000) * line.unitCostMinor;
           return (
-            <article className="admin-inventory-stocktake-row" key={item.id}>
+            <article className="admin-inventory-stocktake-row" key={line.inventoryItemId}>
               <div className="admin-inventory-stocktake-row__title">
                 <strong>{item.name}</strong>
                 <span>{item.unitLabel}</span>
@@ -74,11 +86,11 @@ export function StocktakePage({
               <dl>
                 <div>
                   <dt>Snapshot on hand</dt>
-                  <dd>{formatQuantity(item.onHandMicros, item.unitLabel)}</dd>
+                  <dd>{formatQuantity(line.snapshotOnHandMicros, item.unitLabel)}</dd>
                 </div>
                 <div>
-                  <dt>Reserved</dt>
-                  <dd>{formatQuantity(item.reservedMicros, item.unitLabel)}</dd>
+                  <dt>Snapshot reserved</dt>
+                  <dd>{formatQuantity(line.snapshotReservedMicros, item.unitLabel)}</dd>
                 </div>
               </dl>
               <label className="admin-field">
@@ -86,13 +98,14 @@ export function StocktakePage({
                 <input
                   aria-label={`Actual count for ${item.name}`}
                   inputMode="decimal"
-                  value={actualByItem[item.id] ?? ''}
-                  onChange={(event) =>
+                  value={actualByItem[line.inventoryItemId] ?? ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
                     setActualByItem((current) => ({
                       ...current,
-                      [item.id]: event.target.value,
-                    }))
-                  }
+                      [line.inventoryItemId]: value,
+                    }));
+                  }}
                 />
               </label>
               <div className="admin-inventory-variance">
@@ -121,8 +134,8 @@ export function StocktakePage({
         onClick={() => {
           if (!valid) return;
           onSubmit(
-            parsed.map(({ item, actualMicros }) => ({
-              inventoryItemId: item.id,
+            parsed.map(({ line, actualMicros }) => ({
+              inventoryItemId: line.inventoryItemId,
               actualCountMicros: actualMicros ?? 0,
             })),
           );
