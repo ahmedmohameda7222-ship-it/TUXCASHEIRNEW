@@ -28,10 +28,7 @@ export function RecordWasteSheet({
     emergencyNegativeOverride: boolean;
   }): void;
 }) {
-  const options = useMemo(
-    () => reasons.filter((reason) => reason.family === 'WASTE'),
-    [reasons],
-  );
+  const options = useMemo(() => reasons.filter((reason) => reason.family === 'WASTE'), [reasons]);
   const [quantity, setQuantity] = useState('');
   const [reasonCodeId, setReasonCodeId] = useState(options[0]?.id ?? '');
   const [note, setNote] = useState('');
@@ -90,7 +87,9 @@ export function RecordWasteSheet({
       <button
         className="admin-primary-button"
         type="button"
-        disabled={pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())}
+        disabled={
+          pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
+        }
         onClick={() => {
           if (micros === null) return;
           onSubmit({
