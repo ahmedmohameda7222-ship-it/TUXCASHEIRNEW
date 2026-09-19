@@ -29,7 +29,7 @@ on:
       - 'packages/sync/src/**'
       - 'packages/persistence/src/**'
       - 'e2e/admin-inventory.spec.ts'
-      - 'e2e/admin-purchasing.e2e.ts'
+      - 'e2e/admin-purchasing.spec.ts'
       - 'package.json'
       - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
   pull_request:
@@ -53,7 +53,7 @@ on:
       - 'packages/sync/src/**'
       - 'packages/persistence/src/**'
       - 'e2e/admin-inventory.spec.ts'
-      - 'e2e/admin-purchasing.e2e.ts'
+      - 'e2e/admin-purchasing.spec.ts'
       - 'package.json'
       - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
 
@@ -201,7 +201,7 @@ jobs:
       - name: Install Playwright Chromium for Task 5
         run: npx playwright install --with-deps chromium
       - name: Plan 4 Task 5 purchasing rendered E2E
-        run: npx playwright test e2e/admin-purchasing.e2e.ts
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-purchasing.spec.ts
 
   task5-postgres:
     needs: task5-purchasing
