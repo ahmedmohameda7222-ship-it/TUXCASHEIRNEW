@@ -22,6 +22,8 @@ for (const name of [
   'release_inventory_for_order_v1',
   'post_inventory_adjustment_v1',
   'post_inventory_waste_v1',
+  'begin_stocktake_v1',
+  'begin_stocktake_v1',
   'post_stocktake_v1',
   'send_stock_transfer_v1',
   'receive_stock_transfer_v1',
@@ -89,6 +91,24 @@ for (const fn of [
   if (!new RegExp(`grant\\s+execute\\s+on\\s+function\\s+public\\.${fn}[\\s\\S]*?to\\s+service_role`).test(lower)) {
     throw new Error(`${fn} must grant service_role execution`);
   }
+}
+
+
+const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
+if (beginStocktake < 0) {
+  throw new Error('stocktake must persist a stable DRAFT snapshot before physical counting');
+}
+const postStocktake = lower.indexOf('create or replace function public.post_stocktake_v1');
+const nextAfterPost = lower.indexOf('create or replace function public.send_stock_transfer_v1', postStocktake);
+const postStocktakeSql = lower.slice(postStocktake, nextAfterPost < 0 ? undefined : nextAfterPost);
+if (!/p_stocktake_id\s+uuid/.test(postStocktakeSql)) {
+  throw new Error('stocktake posting must target the previously captured stocktake snapshot');
+}
+if (postStocktakeSql.includes('insert into public.stocktakes')) {
+  throw new Error('post_stocktake_v1 must not create the stocktake snapshot at posting time');
+}
+if (!lower.includes("status, 'draft'") && !lower.includes("'draft'")) {
+  throw new Error('stocktake begin flow must retain a DRAFT state before posting');
 }
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
