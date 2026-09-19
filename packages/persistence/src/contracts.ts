@@ -66,7 +66,6 @@ export interface InventoryRepository {
   replaceConfigurationItems(shopId: ShopId, items: readonly InventoryItem[]): Promise<void>;
   putItem(item: InventoryItem): Promise<void>;
   getBalance(itemId: InventoryItem['id']): Promise<{
-    readonly initialized: boolean;
     readonly onHandMicros: number;
     readonly reservedMicros: number;
     readonly availableMicros: number;
