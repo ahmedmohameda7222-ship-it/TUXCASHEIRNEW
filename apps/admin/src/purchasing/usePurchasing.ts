@@ -76,8 +76,8 @@ export function usePurchasing(shopId: string | undefined) {
       lines: readonly {
         inventoryItemId: string;
         purchaseUnitLabel: string;
-        orderedBaseMicros: number;
-        expectedUnitCostMinor: number;
+        orderedPurchaseUnitsMicros: number;
+        expectedPurchaseUnitCostMinor: number;
       }[];
     }) => {
       if (!shopId) throw new PurchasingUiError('concrete_shop_required');
@@ -113,8 +113,8 @@ export function usePurchasing(shopId: string | undefined) {
       supplierReference: string | null;
       lines: readonly {
         lineId: string;
-        receivedBaseMicros: number;
-        unitCostMinor: number;
+        receivedPurchaseUnitsMicros: number;
+        purchaseUnitCostMinor: number;
       }[];
     }) => {
       if (!shopId) throw new PurchasingUiError('concrete_shop_required');
@@ -129,8 +129,7 @@ export function usePurchasing(shopId: string | undefined) {
       supplierReference: string | null;
       lines: readonly {
         lineId: string;
-        returnedBaseMicros: number;
-        unitCostMinor: number;
+        returnedPurchaseUnitsMicros: number;
       }[];
     }) => {
       if (!shopId) throw new PurchasingUiError('concrete_shop_required');
