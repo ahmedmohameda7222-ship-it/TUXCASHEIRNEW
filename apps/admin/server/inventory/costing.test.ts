@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  calculateRecipeCost,
-  calculateWeightedAverageCost,
-} from './costing';
+import { calculateRecipeCost, calculateWeightedAverageCost } from './costing';
 
 describe('Admin inventory costing', () => {
   it('calculates weighted average cost', () => {
