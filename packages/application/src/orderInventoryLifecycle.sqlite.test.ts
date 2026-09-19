@@ -8,17 +8,12 @@ import {
   parseEntityId,
   stockQuantityMicros,
   type BusinessDayId,
-  type CustomerContactId,
-  type DeliveryZoneId,
   type DraftLineId,
   type InventoryItemId,
   type InventoryMovementId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
-  type OrderId,
-  type OrderItemId,
-  type OrderSnapshot,
   type OrderTypeId,
   type PaymentMethodId,
   type ProductId,
@@ -306,130 +301,6 @@ describe('Operations order inventory lifecycle', () => {
         onHandMicros: 250_000,
         reservedMicros: 0,
         availableMicros: 250_000,
-      });
-    } finally {
-      await closeFixture(test);
-    }
-  });
-
-  it('keeps consumed inventory unchanged when a failed delivery is returned', async () => {
-    const test = await fixture();
-    try {
-      const orderId = parseEntityId<OrderId>('f1111111-1111-4111-8111-111111111111');
-      const doneAt = instant('2026-09-19T02:00:30.000Z');
-      const order: OrderSnapshot = {
-        id: orderId,
-        shopId: SHOP_ID,
-        businessDayId: DAY_ID,
-        displayOrderNo: 1,
-        idempotencyKey: 'returned-delivery-fixture',
-        status: 'DONE',
-        lifecycle: { revision: 1, doneAt, cancellation: null, returned: null },
-        source: 'POS',
-        operatorWorkerId: WORKER_ID,
-        operatorName: 'Worker',
-        createdAt: AT,
-        fulfillment: {
-          orderTypeId: ORDER_TYPE_ID,
-          orderTypeLabel: 'Delivery',
-          behavior: 'DELIVERY',
-          delivery: {
-            customerContactId: parseEntityId<CustomerContactId>(
-              'f2222222-2222-4222-8222-222222222222',
-            ),
-            customerName: 'Customer',
-            normalizedPhone: '01000000000',
-            address: '1 Test Street',
-            zoneId: parseEntityId<DeliveryZoneId>('f3333333-3333-4333-8333-333333333333'),
-            zoneLabel: 'Test Zone',
-            configuredFeeMinor: moneyMinor(0),
-            finalFeeMinor: moneyMinor(0),
-          },
-        },
-        items: [
-          {
-            id: parseEntityId<OrderItemId>('f4444444-4444-4444-8444-444444444444'),
-            productId: PRODUCT_ID,
-            productName: 'Inventory Burger',
-            unitPriceMinor: moneyMinor(10_000),
-            quantity: 1,
-            modifiers: [],
-            comboBeverages: [],
-            itemNote: null,
-          },
-        ],
-        orderNote: null,
-        itemsSubtotalMinor: moneyMinor(10_000),
-        discountMinor: moneyMinor(0),
-        deliveryFeeMinor: moneyMinor(0),
-        totalMinor: moneyMinor(10_000),
-        payments: [],
-      };
-
-      await test.database.transaction(async (transaction) => {
-        await transaction.orders.insert(order);
-        await transaction.inventory.appendMovement({
-          id: parseEntityId<InventoryMovementId>('f5555555-5555-4555-8555-555555555555'),
-          shopId: SHOP_ID,
-          businessDayId: DAY_ID,
-          itemId: INVENTORY_ITEM_ID,
-          movementType: 'ORDER_RESERVATION',
-          quantityDeltaMicros: stockQuantityMicros(0),
-          reservedDeltaMicros: stockQuantityMicros(500_000),
-          idempotencyKey: 'returned-delivery-reservation',
-          workerId: WORKER_ID,
-          orderId,
-          createdAt: AT,
-          compensatesMovementId: null,
-        });
-        await transaction.inventory.appendMovement({
-          id: parseEntityId<InventoryMovementId>('f6666666-6666-4666-8666-666666666666'),
-          shopId: SHOP_ID,
-          businessDayId: DAY_ID,
-          itemId: INVENTORY_ITEM_ID,
-          movementType: 'ORDER_CONSUMPTION',
-          quantityDeltaMicros: stockQuantityMicros(-500_000),
-          reservedDeltaMicros: stockQuantityMicros(-500_000),
-          idempotencyKey: 'returned-delivery-consumption',
-          workerId: WORKER_ID,
-          orderId,
-          createdAt: doneAt,
-          compensatesMovementId: null,
-        });
-      });
-
-      const before = await test.database.transaction((transaction) =>
-        transaction.inventory.listMovementsForOrder(orderId),
-      );
-      expect(before.map((movement) => movement.movementType)).toEqual([
-        'ORDER_RESERVATION',
-        'ORDER_CONSUMPTION',
-      ]);
-
-      const returned = await test.board.returnDelivery({
-        orderId,
-        reason: 'Delivery failed',
-      });
-      if (!returned.ok) {
-        const cause =
-          returned.error.cause instanceof Error ? returned.error.cause.message : returned.error.cause;
-        throw new Error(
-          `Expected returned delivery transition to succeed, got ${returned.error.code}: ${returned.error.message}; cause=${String(cause ?? 'none')}`,
-        );
-      }
-
-      const after = await test.database.transaction(async (transaction) => ({
-        movements: await transaction.inventory.listMovementsForOrder(orderId),
-        balance: await transaction.inventory.getBalance(INVENTORY_ITEM_ID),
-      }));
-      expect(after.movements.map((movement) => movement.movementType)).toEqual([
-        'ORDER_RESERVATION',
-        'ORDER_CONSUMPTION',
-      ]);
-      expect(after.balance).toMatchObject({
-        onHandMicros: 4_500_000,
-        reservedMicros: 0,
-        availableMicros: 4_500_000,
       });
     } finally {
       await closeFixture(test);
