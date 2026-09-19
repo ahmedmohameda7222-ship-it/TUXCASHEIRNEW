@@ -155,5 +155,5 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Full migration regression
         run: npm run test:migrations
-      - name: Full unit and integration regression (excluding intentional Task 2 RED)
-        run: npm test -- --exclude apps/admin/server/inventory/costing.test.ts
+      - name: Full unit and integration regression
+        run: npm test
