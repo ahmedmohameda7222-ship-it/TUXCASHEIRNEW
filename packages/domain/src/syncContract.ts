@@ -184,6 +184,14 @@ function nullableSafeInteger(value: unknown, label: string, minimum = 0): number
   return safeInteger(value, label, minimum);
 }
 
+function optionalNonNegativeFiniteNumber(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new TypeError(`Operations sync ${label} must be a non-negative finite number.`);
+  }
+  return value;
+}
+
 function entityId<Id extends EntityId>(value: unknown, label: string): Id {
   return parseEntityId<Id>(stringValue(value, label));
 }
@@ -260,13 +268,22 @@ function expensePaidFrom(value: unknown): ExpensePaidFrom {
 
 function movementType(value: unknown): InventoryMovementType {
   if (
+    value === 'ORDER_RESERVATION' ||
+    value === 'ORDER_RESERVATION_RELEASE' ||
     value === 'ORDER_CONSUMPTION' ||
+    value === 'ORDER_CONSUMPTION_REVERSAL' ||
     value === 'CANCEL_RESTOCK' ||
     value === 'BULK_UNIT_FINISHED' ||
     value === 'BULK_STOCK_RECEIVED' ||
     value === 'UNDO_BULK_UNIT_FINISHED' ||
     value === 'UNDO_BULK_STOCK_RECEIVED' ||
-    value === 'ADMIN_ADJUSTMENT'
+    value === 'ADMIN_ADJUSTMENT' ||
+    value === 'WASTE' ||
+    value === 'STOCKTAKE_ADJUSTMENT' ||
+    value === 'TRANSFER_OUT' ||
+    value === 'TRANSFER_IN' ||
+    value === 'PURCHASE_RECEIPT' ||
+    value === 'PURCHASE_RETURN'
   ) {
     return value;
   }
@@ -659,6 +676,10 @@ function parseCustomerContact(value: unknown): CustomerContact {
 
 function parseMovement(value: unknown): InventoryMovement {
   const source = record(value, 'inventory movement');
+  const unitCostMinor = optionalNonNegativeFiniteNumber(
+    source['unitCostMinor'],
+    'inventory movement unitCostMinor',
+  );
   const movement: InventoryMovement = {
     id: entityId<InventoryMovementId>(source['id'], 'inventory movement id'),
     shopId: entityId<ShopId>(source['shopId'], 'inventory movement shopId'),
@@ -672,8 +693,20 @@ function parseMovement(value: unknown): InventoryMovement {
       source['quantityDeltaMicros'],
       'inventory movement quantityDeltaMicros',
     ),
+    ...(source['reservedDeltaMicros'] === undefined
+      ? {}
+      : {
+          reservedDeltaMicros: stockQuantity(
+            source['reservedDeltaMicros'],
+            'inventory movement reservedDeltaMicros',
+          ),
+        }),
     idempotencyKey: fieldString(source, 'idempotencyKey'),
-    workerId: entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
+    workerId:
+      source['workerId'] === null
+        ? null
+        : entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
+    ...(unitCostMinor === undefined ? {} : { unitCostMinor }),
     orderId:
       source['orderId'] === null
         ? null
@@ -684,8 +717,10 @@ function parseMovement(value: unknown): InventoryMovement {
         ? null
         : entityId<InventoryMovementId>(source['compensatesMovementId'], 'compensated movement id'),
   };
-  if (movement.quantityDeltaMicros === 0) {
-    throw new TypeError('Operations sync inventory movement quantity cannot be zero.');
+  if (movement.quantityDeltaMicros === 0 && (movement.reservedDeltaMicros ?? 0) === 0) {
+    throw new TypeError(
+      'Operations sync inventory movement must change on-hand or reserved stock.',
+    );
   }
   return movement;
 }

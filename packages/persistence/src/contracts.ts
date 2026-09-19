@@ -65,7 +65,21 @@ export interface InventoryRepository {
   listItemsForShop(shopId: ShopId): Promise<readonly InventoryItem[]>;
   replaceConfigurationItems(shopId: ShopId, items: readonly InventoryItem[]): Promise<void>;
   putItem(item: InventoryItem): Promise<void>;
+  getBalance(itemId: InventoryItem['id']): Promise<{
+    readonly onHandMicros: number;
+    readonly reservedMicros: number;
+    readonly availableMicros: number;
+  }>;
   appendMovement(movement: InventoryMovement): Promise<void>;
+  upsertCanonicalMovement(movement: InventoryMovement): Promise<void>;
+  getWeightedUnitCost(itemId: InventoryItem['id']): Promise<number>;
+  putWeightedUnitCost(
+    shopId: ShopId,
+    itemId: InventoryItem['id'],
+    unitCostMinor: number,
+  ): Promise<void>;
+  getInventorySyncCursor(shopId: ShopId): Promise<string | null>;
+  setInventorySyncCursor(shopId: ShopId, cursor: string): Promise<void>;
   listMovementsForOrder(orderId: OrderId): Promise<readonly InventoryMovement[]>;
 }
 export interface ReconciliationRepository {

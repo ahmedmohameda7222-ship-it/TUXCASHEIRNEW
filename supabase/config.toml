@@ -33,6 +33,9 @@ verify_jwt = true
 [functions.operations-config]
 verify_jwt = true
 
+[functions.operations-inventory]
+verify_jwt = true
+
 [functions.operations-sync]
 verify_jwt = true
 

@@ -291,3 +291,106 @@ The Round 17 Codex thread `PRRT_kwDOT52lwc6i7kKz` is resolved. Because the conne
 The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
 
 Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
+
+
+## Plan 4 execution start — 2026-09-19
+
+**Plan:** `docs/superpowers/plans/2026-09-10-tux-admin-inventory-purchasing.md`  
+**Branch:** `feat/admin-04-inventory-purchasing`  
+**Base:** `469b5291c42ec6875daf59ee3f18cb5ae9478495` (includes the formatting-only baseline repair from PR #91)
+
+Pre-flight shared interfaces:
+- Tasks 1→2: Task 1 produces the canonical reservation/consumption/restore/release RPC and additive inventory ledger schema consumed by Operations lifecycle migration in Task 2.
+- Tasks 1→3: Task 3 Admin inventory actions consume Task 1 ledger/RPC semantics; UI must never edit stock projections directly.
+- Tasks 1/2→4: intelligence consumes Available = On Hand - Reserved and completed-order theoretical usage; reservations must not be subtracted twice.
+- Tasks 1/4→5: purchasing receiving/returns post immutable movements into the same canonical ledger and feed weighted-average cost/incoming quantities.
+- Mandatory hardening: OWNER-only emergency negative override is folded into Tasks 1–3; supplier-aware replenishment into Tasks 4–5; canonical Admin-origin inventory pull/convergence into Operations is required before Gate 4; central structured reason codes apply to waste/adjustment mutations.
+
+Ruling: keep the repository migration filename `20260910130000_admin_inventory_ledger.sql` specified by the approved plan for deterministic local migration-chain ordering. Production Supabase already contains later Plan 3 history, so applying this change to production is a separate guarded side effect and must not be performed implicitly while implementing the branch. If production promotion uses an out-of-order history operation, it requires explicit deployment evidence/authorization at that checkpoint.
+
+
+### Task 1: complete
+
+Evidence at branch head `13f11221e70ca20996bcbb99bc1ee0421c19ad7a`:
+- Plan 4 `ledger-static`: GREEN.
+- Plan 4 `ledger-postgres`: GREEN; the seeded legacy `inventory_movements` row survived the additive migration unchanged apart from additive defaulted columns, legacy movement labels remained valid, and the new RLS/RPC contract applied on PostgreSQL 17.
+- `npm run test:migrations`: GREEN in `task1-regression`.
+- Baseline unit/integration regression excluding the already-authored Task 2 RED test: GREEN in `task1-regression`.
+- The unfiltered pre-Task-2 run proved 319/320 test files and all 1554 executed tests passed; the only failed suite was `apps/admin/server/inventory/costing.test.ts`, intentionally RED because `costing.ts` had not yet been implemented.
+
+Task 1 Ruling: Task 2 RED tests were authored before Task 1's final regression checkpoint, so the Task 1 completion gate excludes exactly `apps/admin/server/inventory/costing.test.ts`. This does not waive or hide any existing production regression; the file remains a mandatory RED→GREEN gate for Task 2. Cost if wrong: a non-Task-2 regression could be masked only if it were placed in that exact test file before Task 2 implementation, so Task 2 must run the file unexcluded and then the full suite.
+
+
+### Plan 4 Task 2 rulings — inventory lifecycle
+
+- Ruling: local SQLite availability follows the canonical PostgreSQL `reserve_inventory_for_order_v1` authority exactly: no prior movement means on-hand/available zero, so recipe reservations are blocked until stock is explicitly established. Existing checkout fixtures must seed opening stock rather than bypassing the rule. Cost if wrong: local Operations could accept orders that the server-side inventory authority rejects.
+- Ruling: legacy ACTIVE orders created under placement-time `ORDER_CONSUMPTION` retain the explicit pre-reservation cancellation compatibility path; new reservation-backed orders release `ORDER_RESERVATION` regardless of `foodPrepared`. Cost if wrong: historical orders could either double-restore stock or lose their pre-migration cancellation semantics.
+- Ruling: repeated `DONE → undo → DONE` cycles key each `ORDER_CONSUMPTION` by the target lifecycle revision plus item id, not by order+item alone. Cost if wrong: the second legitimate DONE transition collides with the immutable ledger idempotency key.
+- Ruling: RETURNED/no-restock acceptance is anchored by the existing OrdersBoard SQLite integration test and is included in the Plan 4 targeted regression gate; the new reservation lifecycle test covers reserve/consume/undo/cancel and composes with that canonical return path rather than duplicating a weaker synthetic DONE fixture.
+
+
+### Task 2: complete
+
+Evidence at branch head `f829d6ea398b8eab5e0cf1ab9111c482e30ce65c`, Plan 4 workflow run `35418413550`:
+- `ledger-static`: GREEN.
+- `ledger-postgres`: GREEN against PostgreSQL 17.
+- `lifecycle-static`: GREEN for ACTIVE reservation, DONE consumption, undo-DONE reservation restoration, repeated DONE→undo→DONE idempotency, cancellation release, canonical RETURNED/no-restock integration, online-order delegation, sync round-trip/materialization, weighted-average/recipe costing, and IndexedDB balance projection.
+- Plan 4 typecheck: GREEN.
+- Full migration regression: GREEN.
+- Full unfiltered `npm test`: GREEN.
+- Root TUX quality on the same code state passed formatting, lint, unit/integration tests, Admin/WhatsApp security gates, typecheck, and production builds through the migration stage.
+
+Task 2 Ruling: the inventory balance contract must be implemented by every Operations persistence adapter that satisfies `InventoryRepository`; SQLite and IndexedDB both project on-hand/reserved/available from immutable movement history. Cost if wrong: browser Operations could compile around a structurally missing method or diverge from desktop stock authority.
+
+
+### Plan 4 Task 3 rulings — inventory UI command boundaries
+
+- Ruling: Task 3's `Receive` action means receiving an already-sent inter-shop transfer through `receive_stock_transfer_v1`. Supplier / purchase-order receiving remains exclusively Task 5. Cost if wrong: purchase receipts could gain a second UI/API mutation path before the purchasing transaction and cost-history authority exists.
+
+
+### Task 3: complete
+
+Evidence at exact code head `61c8152f02be2c18c53d6a5a2bf3cf045323f68b`:
+- Plan 4 workflow run `35424323905`: 5/5 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task1-regression`).
+- `task3-ui`: formatting, Inventory unit/source UI, and rendered `e2e/admin-inventory.spec.ts` GREEN.
+- Root `TUX V2 CI` run `35424323935`: all jobs GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration, security, typecheck, production builds, migration-chain smoke, Edge typecheck, and rendered browser E2E.
+- The pre-fix rendered browser regression was traced to `seedBrowserFallback()` creating recipe-tracked inventory items with no opening inventory movements. The fixture now seeds explicit `BULK_STOCK_RECEIVED` movements; production zero-stock enforcement remains unchanged and canonical with PostgreSQL reservation authority.
+
+Task 3 Ruling: Admin inventory writes remain ledger commands only. The browser does not write stock projections directly, emergency negative override remains OWNER-only, and `Receive transfer` is the inter-shop transfer receive action rather than supplier/PO receiving.
+
+
+### Task 4: complete
+
+Evidence at exact branch head `02a954768cb72e9d6e24a1939b30812ea72838f7`:
+- Plan 4 workflow run `35425790580`: all jobs GREEN, including `task4-intelligence`, lifecycle/typecheck, PostgreSQL compatibility, and full unfiltered migration + unit/integration regression.
+- Root TUX V2 CI run `35425790584`: every job GREEN, including Required quality gate.
+- Root quality job: format, lint, full tests, security gates, typecheck, production builds, migration-chain smoke, Edge Function checks, and rendered browser E2E all GREEN.
+- Admin job: security boundary, typecheck, production build, and rendered Admin E2E GREEN.
+- Task 4 behavior covers reorder suggestions with minimum/order-multiple rounding, negative available stock, replenishment metadata, actual-vs-theoretical variance, food-cost margin alerts, and inventory intelligence UI.
+
+Task 4 Ruling: `incomingMicros` intentionally remains zero until Task 5 introduces canonical open-PO line quantities. Task 5 must replace this placeholder with open purchase-order remainder without changing on-hand stock before receiving. Replenishment suggestions remain recommendations only and never auto-create or transmit supplier orders.
+
+
+### Task 5: complete
+
+Evidence at exact code head `caa37bba117f2bce567e5dd89f992613201e83db`:
+- Plan 4 workflow run `35431388442`: 8/8 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task4-intelligence`, `task5-purchasing`, `task5-postgres`, and `task1-regression`).
+- Task 5 service, open-PO incoming intelligence, migration invariant, and rendered Admin purchasing E2E are GREEN.
+- Task 5 PostgreSQL behavior is GREEN for partial receiving, immutable purchase-receipt movements, weighted-average cost update, supplier price history, audit creation, idempotent sequential replay, completion of the remaining PO quantity, and purchase return posting.
+- Root TUX V2 CI run `35431388443`: every job GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration tests, security gates, typecheck, production builds, provisioning/migration smoke, function-auth contract, Edge typecheck, and rendered browser E2E.
+- Root `admin` passed the Admin security boundary, typecheck, production build, and rendered Admin E2E including the purchasing flow.
+
+The final Task 5 rendered failure was diagnosed from the permanent Admin Playwright trace rather than by changing product behavior speculatively. The purchasing test had first been accidentally registered as an Operations `*.e2e.ts` test, which ran against the Operations Vite server. After moving it into the Admin Playwright suite, the real browser defect became visible: the page crashed after editing a keyed receive/return cost field with `Cannot read properties of null (reading 'value')`. The keyed React handlers were reading `event.currentTarget.value` from inside functional state updaters; the fix captures the input value synchronously before scheduling the updater. The corrected rendered receive/partial-receive/return flow is now GREEN in both the Plan 4 gate and the permanent Admin gate.
+
+Task 5 Ruling: supplier/PO receiving is authoritative only through the trusted Admin BFF and service-role-only transactional RPCs. Receiving posts inventory/cost/PO/price-history/audit state together; purchase returns post compensating negative inventory movements and return history; open-PO remainder contributes only to incoming intelligence and never to on-hand stock before receipt. Purchasing remains within the approved Plan 4 Task 5 scope; broader ERP-like supplier balances/payment status/attachments remain outside this task.
+
+### Plan 4 implementation completion checkpoint — 2026-09-19
+
+Tasks 1–5 are implementation-complete on PR #92. The exact pre-ledger code head is `caa37bba117f2bce567e5dd89f992613201e83db`, with dedicated Plan 4 run `35431388442` and root CI run `35431388443` fully GREEN.
+
+Production promotion remains deliberately separate:
+- Canonical Supabase project `awpdcsayuwbsruwvaosg` remains synchronized only through Plan 3 migration `20260918175515 admin_plan3_review_round13_hardening`; Plan 4 migrations `20260910130000`, `20260910140000`, and `20260910150000` have not been applied to production.
+- Admin Vercel production remains deployment `dpl_CZfC9PzpWi2PzdKadfLkGyGc5uuA` from `main` commit `b1ddf033c0401286af5f2878d9130d339f99aac8`; no Plan 4 production deployment was performed.
+- PR #92 remains draft until the explicit production-promotion/review checkpoint. This ledger mutation changes the PR head, so exact-head CI must be re-verified before any ready-for-review, merge, Supabase migration, or Admin production deployment action.

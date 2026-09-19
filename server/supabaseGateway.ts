@@ -445,16 +445,18 @@ export async function enrollDevice(
 async function callSupabaseFunction(
   config: SupabaseServerConfig,
   session: DeviceSessionSecrets,
-  functionName: 'operations-config' | 'operations-sync',
+  functionName: 'operations-config' | 'operations-sync' | 'operations-inventory',
   request: GatewayRequest,
   body: string | null,
 ): Promise<Response> {
   const incomingUrl = new URL(request.url ?? '/', 'https://tux.invalid');
   const target = new URL(`${config.projectUrl}/functions/v1/${functionName}`);
-  if (functionName === 'operations-config') target.search = incomingUrl.search;
+  if (functionName === 'operations-config' || functionName === 'operations-inventory') {
+    target.search = incomingUrl.search;
+  }
 
   return fetch(target, {
-    method: functionName === 'operations-config' ? 'GET' : 'POST',
+    method: functionName === 'operations-sync' ? 'POST' : 'GET',
     headers: {
       apikey: config.publishableKey,
       authorization: `Bearer ${session.accessToken}`,
@@ -469,9 +471,9 @@ async function callSupabaseFunction(
 export async function proxyAuthenticatedFunction(
   request: GatewayRequest,
   response: GatewayResponse,
-  functionName: 'operations-config' | 'operations-sync',
+  functionName: 'operations-config' | 'operations-sync' | 'operations-inventory',
 ): Promise<void> {
-  const expectedMethod = functionName === 'operations-config' ? 'GET' : 'POST';
+  const expectedMethod = functionName === 'operations-sync' ? 'POST' : 'GET';
   if (request.method !== expectedMethod) {
     sendJson(response, 405, { error: 'method_not_allowed' });
     return;

@@ -10,6 +10,7 @@ import {
   type BusinessDayId,
   type DeliveryZoneId,
   type InventoryItemId,
+  type InventoryMovementId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OrderId,
@@ -226,6 +227,19 @@ async function fixture(options: { failingAudit?: boolean; openWorker?: boolean }
       trackingMode: 'RECIPE_TRACKED',
       active: true,
     });
+    await transaction.inventory.appendMovement({
+      id: parseEntityId<InventoryMovementId>('12121212-1212-4212-8212-121212121212'),
+      shopId: SHOP_ID,
+      businessDayId: DAY_ID,
+      itemId: INVENTORY_ID,
+      movementType: 'BULK_STOCK_RECEIVED',
+      quantityDeltaMicros: stockQuantityMicros(100_000_000),
+      idempotencyKey: 'fixture-opening-stock',
+      workerId: WORKER_ID,
+      orderId: null,
+      createdAt: AT,
+      compensatesMovementId: null,
+    });
   });
 
   const readModel = new SqliteOperatorSessionReadModel(path);
@@ -323,7 +337,11 @@ describe('OperationsOnlineOrderAcceptanceService durable conversion', () => {
     expect(state.orders).toHaveLength(1);
     expect(state.day?.lastAllocatedDisplayOrderNo).toBe(1);
     expect(state.movements).toHaveLength(1);
-    expect(state.movements[0]?.movementType).toBe('ORDER_CONSUMPTION');
+    expect(state.movements[0]).toMatchObject({
+      movementType: 'ORDER_RESERVATION',
+      quantityDeltaMicros: 0,
+      reservedDeltaMicros: 1_000_000,
+    });
     expect(state.outbox.filter((event) => event.eventType === 'ORDER_PLACED')).toHaveLength(1);
 
     await closeFixture(test);

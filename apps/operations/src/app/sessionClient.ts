@@ -188,7 +188,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
 
       const startRemoteRuntime = (shopId: ShopId): void => {
         if (!automaticSyncStarted) {
-          startBrowserAutomaticSync({ database, now: runtime.now });
+          startBrowserAutomaticSync({ database, now: runtime.now, shopId });
           automaticSyncStarted = true;
         }
         if (!configurationTimerStarted) {

@@ -13,6 +13,7 @@ import {
   type CustomerContactId,
   type DeliveryZoneId,
   type InventoryItemId,
+  type InventoryMovementId,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
@@ -202,6 +203,19 @@ async function seed(database: SqliteOperationsDatabase): Promise<void> {
     });
     await transaction.configuration.put(configuration);
     await transaction.inventory.putItem(inventoryItem);
+    await transaction.inventory.appendMovement({
+      id: parseEntityId<InventoryMovementId>('abababab-abab-4bab-8bab-abababababab'),
+      shopId,
+      businessDayId,
+      itemId: inventoryItemId,
+      movementType: 'BULK_STOCK_RECEIVED',
+      quantityDeltaMicros: stockQuantityMicros(100_000_000),
+      idempotencyKey: 'fixture-opening-stock',
+      workerId,
+      orderId: null,
+      createdAt,
+      compensatesMovementId: null,
+    });
   });
 }
 
@@ -398,7 +412,7 @@ describe('Delivery customer learning checkout atomicity', () => {
 
     expect(scalar(test.path, 'select count(*) as value from customer_contacts')).toBe(0);
     expect(scalar(test.path, 'select count(*) as value from orders')).toBe(0);
-    expect(scalar(test.path, 'select count(*) as value from inventory_movements')).toBe(0);
+    expect(scalar(test.path, 'select count(*) as value from inventory_movements')).toBe(1);
     expect(scalar(test.path, 'select count(*) as value from audit_events')).toBe(0);
     expect(scalar(test.path, 'select count(*) as value from outbox_events')).toBe(0);
     expect(

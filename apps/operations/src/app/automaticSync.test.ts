@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({
   schedulerOptions: undefined as AutomaticOutboxSchedulerOptions | undefined,
   schedulerStarted: vi.fn(),
+  inventorySyncShop: vi.fn(async (shopId: unknown) => {
+    void shopId;
+    return 0;
+  }),
   markRemoteConfigured: vi.fn(),
   markSyncStarted: vi.fn(),
   markSyncFinished: vi.fn(),
@@ -32,6 +36,21 @@ vi.mock('@tux/sync', () => ({
       void database;
       void transport;
       void runtime;
+    }
+  },
+  HttpInventoryFeedTransport: class HttpInventoryFeedTransport {
+    constructor(options: unknown) {
+      void options;
+    }
+  },
+  InventoryConvergenceService: class InventoryConvergenceService {
+    constructor(database: unknown, transport: unknown) {
+      void database;
+      void transport;
+    }
+
+    syncShop(shopId: unknown): Promise<number> {
+      return harness.inventorySyncShop(shopId);
     }
   },
 }));
@@ -67,8 +86,13 @@ describe('startBrowserAutomaticSync', () => {
     const database = {} as OperationsDatabase;
     const now = () => '2026-08-24T06:00:00.000Z' as Instant;
 
-    startBrowserAutomaticSync({ database, now });
+    startBrowserAutomaticSync({
+      database,
+      now,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+    });
 
+    expect(harness.inventorySyncShop).toHaveBeenCalledWith('14000000-0000-4000-8000-000000000001');
     expect(harness.markRemoteConfigured).toHaveBeenCalledTimes(1);
     expect(harness.schedulerStarted).toHaveBeenCalledTimes(1);
 
