@@ -215,6 +215,23 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       async putItem(item: InventoryItem) {
         await requestResult(store('inventoryItems').put(item));
       },
+      async getBalance(itemId) {
+        const movements = (await requestResult(
+          store('inventoryMovements').getAll(),
+        )) as InventoryMovement[];
+        let onHandMicros = 0;
+        let reservedMicros = 0;
+        for (const movement of movements) {
+          if (movement.itemId !== itemId) continue;
+          onHandMicros += movement.quantityDeltaMicros;
+          reservedMicros += movement.reservedDeltaMicros ?? 0;
+        }
+        return {
+          onHandMicros,
+          reservedMicros,
+          availableMicros: onHandMicros - reservedMicros,
+        };
+      },
       async appendMovement(movement: InventoryMovement) {
         await requestResult(store('inventoryMovements').add(movement));
       },
