@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { VarianceReport } from './VarianceReport';
 
 describe('VarianceReport', () => {
   it('shows same-period actual versus theoretical usage and food-cost margin alerts', () => {
-    render(
+    const html = renderToStaticMarkup(
       <VarianceReport
         periodLabel="Last 30 days"
         variances={[
@@ -40,12 +40,12 @@ describe('VarianceReport', () => {
       />,
     );
 
-    expect(screen.getByText('Last 30 days')).toBeTruthy();
-    expect(screen.getByText('12 kg')).toBeTruthy();
-    expect(screen.getByText('10 kg')).toBeTruthy();
-    expect(screen.getByText('+2 kg')).toBeTruthy();
-    expect(screen.getByText('+20%')).toBeTruthy();
-    expect(screen.getByText(/36% food cost/i)).toBeTruthy();
-    expect(screen.getByText(/Beef/i)).toBeTruthy();
+    expect(html).toContain('Last 30 days');
+    expect(html).toContain('12 kg');
+    expect(html).toContain('10 kg');
+    expect(html).toContain('+2 kg');
+    expect(html).toContain('+20%');
+    expect(html).toContain('36% food cost');
+    expect(html).toContain('Beef');
   });
 });
