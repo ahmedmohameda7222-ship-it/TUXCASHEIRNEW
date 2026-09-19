@@ -8,6 +8,8 @@ The Operations Vercel cutover is complete and production-verified from the app-l
 
 If a Vercel New Project form was opened before this cleanup, cancel it and start a fresh import from the latest `main`. Do not deploy if the form still shows any Operations build command or `apps/operations/dist`.
 
+For initial Git-link verification after creating the Admin Vercel project, a harmless `main` change under `apps/admin` must create an Admin deployment for that commit.
+
 Configure the Admin project with:
 
 - Root Directory: `apps/admin`
