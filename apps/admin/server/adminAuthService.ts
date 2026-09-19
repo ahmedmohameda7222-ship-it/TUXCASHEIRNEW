@@ -74,7 +74,8 @@ function query(entries: Readonly<Record<string, string>>): URLSearchParams {
 }
 
 function requireRole(role: string): AdminRole {
-  if (!isAdminRole(role)) throw new AdminAuthError('authorization_state_invalid', 500);
+  if (!isAdminRole(role))
+    throw new AdminAuthError('authorization_state_invalid', 500);
   return role;
 }
 
@@ -202,7 +203,8 @@ export async function loadAdminSession(
     }),
   );
   const session = sessions[0];
-  if (!session || session.revoked_at !== null) throw new AdminAuthError('session_required', 401);
+  if (!session || session.revoked_at !== null)
+    throw new AdminAuthError('session_required', 401);
   if (new Date(session.expires_at).getTime() <= now.getTime()) {
     throw new AdminAuthError('session_expired', 401);
   }
@@ -222,7 +224,10 @@ export async function loadAdminSession(
   return { session, employee, principal };
 }
 
-export function requireSessionCsrf(context: AdminSessionContext, csrfToken: string): void {
+export function requireSessionCsrf(
+  context: AdminSessionContext,
+  csrfToken: string,
+): void {
   if (!csrfMatches(csrfToken, context.session.csrf_token_hash)) {
     throw new AdminAuthError('csrf_invalid', 403);
   }
