@@ -194,44 +194,54 @@ assertJsonEqual(
   'Menu Git deployment policy',
 );
 
-// Migration docs must not claim Admin import isolation is complete while the legacy root contract exists.
+// Final deployment docs must describe isolated app-local project contracts.
 for (const requiredText of [
-  'do not create the Admin project until',
-  'legacy root',
-  'apps/operations',
-  'Plan 10',
+  'repository root `/vercel.json` is absent',
+  'Root Directory: `apps/admin`',
+  'Include source files outside Root Directory',
+  'cd ../.. && npm ci',
+  'cd ../.. && npm run build:admin',
+  'Output Directory: `dist`',
+  'Final production acceptance is still Plan 10',
 ]) {
   if (!adminDeploymentDoc.includes(requiredText)) {
-    throw new Error(`Admin deployment docs missing migration statement: ${requiredText}`);
+    throw new Error(`Admin deployment docs missing isolated-project statement: ${requiredText}`);
   }
 }
 for (const requiredText of [
+  'Cutover status: complete',
   'Root Directory: `apps/operations`',
   'Include source files outside Root Directory',
   'cd ../.. && npm ci',
   'cd ../.. && npm run build -w @tux/operations',
   'Output Directory: `dist`',
-  'Only after that verification may the legacy repository-root `/vercel.json` be removed',
+  'dpl_9M6i179C83S6Hzry2rumFm9Tqx68',
+  'repository-root `/vercel.json` is absent',
 ]) {
   if (!operationsDeploymentDoc.includes(requiredText)) {
-    throw new Error(`Operations deployment docs missing cutover statement: ${requiredText}`);
+    throw new Error(`Operations deployment docs missing completed-cutover statement: ${requiredText}`);
   }
 }
 
 for (const requiredLedgerText of [
-  'Admin Vercel project must not be created until the existing Operations project is cut over to Root Directory `apps/operations`',
-  'legacy root `/vercel.json` is removed after successful production verification',
+  'Operations Vercel cutover was verified with production deployment `dpl_9M6i179C83S6Hzry2rumFm9Tqx68` in `READY` state',
+  'The legacy root `/vercel.json` is removed',
+  'Admin may now be created as a separate Vercel project rooted at `apps/admin`',
   'Final production acceptance remains gated by Plan 10',
 ]) {
   if (!adminExecutionLedger.includes(requiredLedgerText)) {
     throw new Error(
-      `Admin execution ledger missing deployment-policy reconciliation: ${requiredLedgerText}`,
+      `Admin execution ledger missing final deployment-policy reconciliation: ${requiredLedgerText}`,
     );
   }
 }
 
-if (adminExecutionLedger.includes('The separate Admin Vercel project is rooted at `apps/admin`')) {
-  throw new Error('Admin execution ledger still claims the gated Admin Vercel project already exists');
+if (
+  adminExecutionLedger.includes(
+    'Admin Vercel project must not be created until the existing Operations project is cut over',
+  )
+) {
+  throw new Error('Admin execution ledger still contains the obsolete Vercel migration gate');
 }
 
 for (const requiredWorkflowPath of [
@@ -247,4 +257,4 @@ for (const requiredWorkflowPath of [
   }
 }
 
-console.log('Admin/Menu/Operations Vercel migration contracts passed.');
+console.log('Admin/Menu/Operations Vercel isolation contracts passed.');
