@@ -108,6 +108,20 @@ function itemSummary(order: OrderSnapshot): string {
   return order.items.map((item) => `${item.quantity}× ${item.productName}`).join(', ');
 }
 
+function activeReservationByItem(
+  movements: readonly InventoryMovement[],
+): Map<InventoryMovement['itemId'], number> {
+  const reserved = new Map<InventoryMovement['itemId'], number>();
+  for (const movement of movements) {
+    const next = (reserved.get(movement.itemId) ?? 0) + (movement.reservedDeltaMicros ?? 0);
+    if (!Number.isSafeInteger(next)) {
+      throw new DomainInvariantError('Order inventory reservation exceeded the safe integer range.');
+    }
+    reserved.set(movement.itemId, next);
+  }
+  return reserved;
+}
+
 export class OperationsOrdersBoardService {
   readonly #database: OperationsDatabase;
   readonly #readModel: OperatorSessionReadModel;
@@ -186,6 +200,29 @@ export class OperationsOrdersBoardService {
   async markDone(orderId: OrderId): Promise<OrderTransitionResult> {
     return this.#mutate(async (transaction, context, now) => {
       const order = await this.#currentOrder(transaction, context, orderId);
+      const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+      const reservationByItem = activeReservationByItem(existingMovements);
+      const inventoryMovements: InventoryMovement[] = [];
+      for (const [itemId, reservedMicros] of reservationByItem) {
+        if (reservedMicros <= 0) continue;
+        const movement: InventoryMovement = {
+          id: this.#id<InventoryMovementId>(),
+          shopId: order.shopId,
+          businessDayId: order.businessDayId,
+          itemId,
+          movementType: 'ORDER_CONSUMPTION',
+          quantityDeltaMicros: stockQuantityMicros(-reservedMicros),
+          reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+          idempotencyKey: `order-consumption:${order.id}:${itemId}`,
+          workerId: context.operator.id,
+          orderId: order.id,
+          createdAt: now,
+          compensatesMovementId: null,
+        };
+        inventoryMovements.push(movement);
+        await transaction.inventory.appendMovement(movement);
+      }
+
       const updated = markOrderDone(order, now);
       const transition = this.#transition(
         'ORDER_MARKED_DONE',
@@ -203,7 +240,7 @@ export class OperationsOrdersBoardService {
         }),
       );
       await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_MARKED_DONE', transition, [], null),
+        this.#outbox(updated, now, 'ORDER_MARKED_DONE', transition, inventoryMovements, null),
       );
       return updated;
     });
@@ -215,6 +252,43 @@ export class OperationsOrdersBoardService {
       if (!canUndoOrderDone(order, now)) {
         throw new DomainInvariantError('The Done undo window has expired.');
       }
+
+      const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+      const reversedConsumptionIds = new Set(
+        existingMovements
+          .filter((movement) => movement.movementType === 'ORDER_CONSUMPTION_REVERSAL')
+          .map((movement) => movement.compensatesMovementId)
+          .filter((movementId): movementId is InventoryMovementId => movementId !== null),
+      );
+      const inventoryMovements: InventoryMovement[] = [];
+      for (const movement of existingMovements) {
+        if (
+          movement.movementType !== 'ORDER_CONSUMPTION' ||
+          (movement.reservedDeltaMicros ?? 0) >= 0 ||
+          reversedConsumptionIds.has(movement.id)
+        ) {
+          continue;
+        }
+        const reversedQuantity = -movement.quantityDeltaMicros;
+        const restoredReservation = -(movement.reservedDeltaMicros ?? 0);
+        const reversal: InventoryMovement = {
+          id: this.#id<InventoryMovementId>(),
+          shopId: order.shopId,
+          businessDayId: order.businessDayId,
+          itemId: movement.itemId,
+          movementType: 'ORDER_CONSUMPTION_REVERSAL',
+          quantityDeltaMicros: stockQuantityMicros(reversedQuantity),
+          reservedDeltaMicros: stockQuantityMicros(restoredReservation),
+          idempotencyKey: `order-consumption-reversal:${order.id}:${movement.id}`,
+          workerId: context.operator.id,
+          orderId: order.id,
+          createdAt: now,
+          compensatesMovementId: movement.id,
+        };
+        inventoryMovements.push(reversal);
+        await transaction.inventory.appendMovement(reversal);
+      }
+
       const updated = undoOrderDone(order);
       const transition = this.#transition(
         'ORDER_DONE_UNDONE',
@@ -232,7 +306,7 @@ export class OperationsOrdersBoardService {
         }),
       );
       await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_DONE_UNDONE', transition, [], null),
+        this.#outbox(updated, now, 'ORDER_DONE_UNDONE', transition, inventoryMovements, null),
       );
       return updated;
     });
@@ -283,11 +357,41 @@ export class OperationsOrdersBoardService {
         ...(reasonCode !== undefined ? { reasonCode } : {}),
         ...(input.note !== undefined ? { note: input.note } : {}),
       });
-      const restockMovements: InventoryMovement[] = [];
-      if (!input.foodPrepared) {
-        const movements = await transaction.inventory.listMovementsForOrder(order.id);
-        for (const movement of movements) {
-          if (movement.movementType !== 'ORDER_CONSUMPTION') continue;
+      const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+      const reservationByItem = activeReservationByItem(existingMovements);
+      const inventoryMovements: InventoryMovement[] = [];
+      const activeReservations = [...reservationByItem.entries()].filter(
+        ([, reservedMicros]) => reservedMicros > 0,
+      );
+
+      if (activeReservations.length > 0) {
+        for (const [itemId, reservedMicros] of activeReservations) {
+          const release: InventoryMovement = {
+            id: this.#id<InventoryMovementId>(),
+            shopId: order.shopId,
+            businessDayId: order.businessDayId,
+            itemId,
+            movementType: 'ORDER_RESERVATION_RELEASE',
+            quantityDeltaMicros: stockQuantityMicros(0),
+            reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+            idempotencyKey: `order-reservation-release:${order.id}:${itemId}`,
+            workerId: context.operator.id,
+            orderId: order.id,
+            createdAt: now,
+            compensatesMovementId: null,
+          };
+          inventoryMovements.push(release);
+          await transaction.inventory.appendMovement(release);
+        }
+      } else if (!input.foodPrepared) {
+        // Compatibility for ACTIVE orders created before reservation-at-placement was introduced.
+        for (const movement of existingMovements) {
+          if (
+            movement.movementType !== 'ORDER_CONSUMPTION' ||
+            (movement.reservedDeltaMicros ?? 0) !== 0
+          ) {
+            continue;
+          }
           if (movement.quantityDeltaMicros >= 0) {
             throw new DomainInvariantError('Order consumption movement must be negative.');
           }
@@ -298,13 +402,14 @@ export class OperationsOrdersBoardService {
             itemId: movement.itemId,
             movementType: 'CANCEL_RESTOCK',
             quantityDeltaMicros: stockQuantityMicros(-movement.quantityDeltaMicros),
+            reservedDeltaMicros: stockQuantityMicros(0),
             idempotencyKey: `cancel-restock:${order.id}:${movement.id}`,
             workerId: context.operator.id,
             orderId: order.id,
             createdAt: now,
             compensatesMovementId: movement.id,
           };
-          restockMovements.push(restock);
+          inventoryMovements.push(restock);
           await transaction.inventory.appendMovement(restock);
         }
       }
@@ -334,7 +439,7 @@ export class OperationsOrdersBoardService {
         }),
       );
       await transaction.outbox.append(
-        this.#outbox(updated, now, 'ORDER_CANCELLED', transition, restockMovements, null),
+        this.#outbox(updated, now, 'ORDER_CANCELLED', transition, inventoryMovements, null),
       );
       return updated;
     });
