@@ -195,6 +195,8 @@ jobs:
         run: npm ci
       - name: Plan 4 Task 5 purchasing service RED/behavior
         run: npx vitest run apps/admin/server/purchasing/purchasingService.test.ts
+      - name: Plan 4 Task 5 open-PO incoming intelligence RED/behavior
+        run: npx vitest run apps/admin/server/inventory/intelligenceService.test.ts
       - name: Plan 4 Task 5 purchasing migration invariant
         run: node scripts/test-admin-purchasing-migration.mjs
 
