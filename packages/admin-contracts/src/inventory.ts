@@ -61,11 +61,64 @@ export interface AdminInventoryTransfer {
   readonly lines: readonly AdminInventoryTransferLine[];
 }
 
+export interface AdminInventoryReorderSuggestion {
+  readonly inventoryItemId: string;
+  readonly itemName: string;
+  readonly unitLabel: string;
+  readonly availableMicros: number;
+  readonly incomingMicros: number;
+  readonly parLevelMicros: number;
+  readonly reorderPointMicros: number;
+  readonly suggestedOrderMicros: number;
+  readonly preferredSupplierId: string | null;
+  readonly preferredPurchaseUnit: string | null;
+  readonly leadTimeDays: number;
+  readonly minimumOrderMicros: number | null;
+  readonly orderMultipleMicros: number | null;
+  readonly version: number;
+}
+
+export interface AdminInventoryVariance {
+  readonly inventoryItemId: string;
+  readonly itemName: string;
+  readonly unitLabel: string;
+  readonly actualUsageMicros: number;
+  readonly theoreticalUsageMicros: number;
+  readonly varianceMicros: number;
+  readonly variancePercent: number | null;
+}
+
+export interface AdminInventoryMarginContributor {
+  readonly inventoryItemId: string;
+  readonly itemName: string;
+  readonly costMinor: number;
+}
+
+export interface AdminInventoryMarginAlert {
+  readonly productId: string;
+  readonly productName: string;
+  readonly productPriceMinor: number;
+  readonly recipeCostMinor: number;
+  readonly foodCostPercent: number;
+  readonly targetFoodCostPercent: number;
+  readonly alertThresholdPercent: number;
+  readonly alert: boolean;
+  readonly largestContributor: AdminInventoryMarginContributor | null;
+}
+
+export interface AdminInventoryIntelligence {
+  readonly periodLabel: string;
+  readonly reorderSuggestions: readonly AdminInventoryReorderSuggestion[];
+  readonly variances: readonly AdminInventoryVariance[];
+  readonly marginAlerts: readonly AdminInventoryMarginAlert[];
+}
+
 export interface AdminInventoryWorkspace {
   readonly shopId: string;
   readonly items: readonly AdminInventoryItem[];
   readonly reasonCodes: readonly AdminInventoryReasonCode[];
   readonly transfers: readonly AdminInventoryTransfer[];
+  readonly intelligence: AdminInventoryIntelligence;
 }
 
 export type AdminInventoryCommand =
@@ -107,6 +160,17 @@ export type AdminInventoryCommand =
         readonly quantityMicros: number;
       }[];
       readonly commandId: string;
+    }
+  | {
+      readonly type: 'replenishment.update';
+      readonly shopId: string;
+      readonly inventoryItemId: string;
+      readonly parLevelMicros: number;
+      readonly reorderPointMicros: number;
+      readonly preferredPurchaseUnit: string | null;
+      readonly leadTimeDays: number;
+      readonly minimumOrderMicros: number | null;
+      readonly orderMultipleMicros: number | null;
     }
   | {
       readonly type: 'transfer.receive';
