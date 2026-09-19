@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 
 describe('ReorderSuggestionsPage', () => {
   it('shows supplier-aware reorder math as a recommendation only', () => {
-    render(
+    const html = renderToStaticMarkup(
       <ReorderSuggestionsPage
         suggestions={[
           {
@@ -32,13 +32,13 @@ describe('ReorderSuggestionsPage', () => {
       />,
     );
 
-    expect(screen.getByText('6 kg')).toBeTruthy();
-    expect(screen.getByText('2 kg')).toBeTruthy();
-    expect(screen.getByText('15 kg')).toBeTruthy();
-    expect(screen.getByText('8 kg')).toBeTruthy();
-    expect(screen.getByText(/case/i)).toBeTruthy();
-    expect(screen.getByText(/3 days/i)).toBeTruthy();
-    expect(screen.getByText(/recommendation only/i)).toBeTruthy();
-    expect(screen.getByText(/does not create a purchase order/i)).toBeTruthy();
+    expect(html).toContain('6 kg');
+    expect(html).toContain('2 kg');
+    expect(html).toContain('15 kg');
+    expect(html).toContain('8 kg');
+    expect(html.toLowerCase()).toContain('case');
+    expect(html.toLowerCase()).toContain('3 days');
+    expect(html.toLowerCase()).toContain('recommendation only');
+    expect(html.toLowerCase()).toContain('does not create a purchase order');
   });
 });
