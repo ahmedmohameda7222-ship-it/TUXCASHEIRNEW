@@ -113,8 +113,7 @@ async function mockPurchasing(page: Page) {
         (command.lines as Array<{ receivedPurchaseUnitsMicros: number }>)[0]
           ?.receivedPurchaseUnitsMicros ?? 0,
       );
-      status =
-        receivedPurchaseUnitsMicros < 5_000_000 ? 'PARTIALLY_RECEIVED' : 'RECEIVED';
+      status = receivedPurchaseUnitsMicros < 5_000_000 ? 'PARTIALLY_RECEIVED' : 'RECEIVED';
       version += 1;
     }
     if (command.type === 'po.return') {
