@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { existsSync } from 'node:fs';
 
 const models = fs.readFileSync('packages/domain/src/models.ts', 'utf8');
 const orders = fs.readFileSync('packages/application/src/orders.ts', 'utf8');
@@ -64,6 +65,44 @@ if (!sqliteDatabase.includes('movement.reservedDeltaMicros ?? 0')) {
 }
 if (!remoteMaterializer.includes('reserved_delta_micros: movement.reservedDeltaMicros ?? 0')) {
   throw new Error('remote materializer must propagate reservation delta to PostgreSQL');
+}
+
+
+for (const requiredPath of [
+  'packages/sync/src/inventoryConvergence.ts',
+  'supabase/functions/operations-inventory/index.ts',
+  'apps/operations/api/operations-inventory.ts',
+]) {
+  if (!existsSync(requiredPath)) {
+    throw new Error(`Admin-origin inventory convergence missing required path: ${requiredPath}`);
+  }
+}
+
+const convergence = fs.readFileSync('packages/sync/src/inventoryConvergence.ts', 'utf8');
+const browserAutomaticSync = fs.readFileSync('apps/operations/src/app/automaticSync.ts', 'utf8');
+const desktopAutomaticSync = fs.readFileSync('apps/operations-desktop/src/main/automaticSync.ts', 'utf8');
+const indexedDb = fs.readFileSync(
+  'packages/persistence/src/browser/IndexedDbOperationsDatabase.ts',
+  'utf8',
+);
+
+if (!models.includes('workerId: WorkerId | null')) {
+  throw new Error('canonical Admin inventory movements must not be forged as worker-originated');
+}
+if (!sqliteMigrations.includes('inventory_sync_cursors')) {
+  throw new Error('SQLite must persist a durable monotonic inventory sync cursor');
+}
+if (!indexedDb.includes('inventorySyncCursor')) {
+  throw new Error('IndexedDB must persist a durable monotonic inventory sync cursor');
+}
+if (!convergence.includes('InventoryConvergenceService')) {
+  throw new Error('Operations needs an inbound inventory convergence service');
+}
+if (!browserAutomaticSync.includes('InventoryConvergenceService')) {
+  throw new Error('browser Operations automatic sync must pull canonical inventory changes');
+}
+if (!desktopAutomaticSync.includes('InventoryConvergenceService')) {
+  throw new Error('desktop Operations automatic sync must pull canonical inventory changes');
 }
 
 console.log('Admin order inventory lifecycle source invariants passed.');
