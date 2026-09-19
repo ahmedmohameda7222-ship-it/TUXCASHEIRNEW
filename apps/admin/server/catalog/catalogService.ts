@@ -28,8 +28,8 @@ import type {
   CatalogWorkspace,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization';
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import { requirePermission } from '../authorization.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export class CatalogServiceError extends Error {
   constructor(

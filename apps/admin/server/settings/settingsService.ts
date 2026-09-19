@@ -26,8 +26,8 @@ import type {
   ShopLifecycleState,
 } from '@tux/admin-contracts';
 
-import { requireBusinessWidePermission, requirePermission } from '../authorization';
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import { requireBusinessWidePermission, requirePermission } from '../authorization.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export class SettingsServiceError extends Error {
   constructor(readonly code: 'backend_contract_invalid') {
