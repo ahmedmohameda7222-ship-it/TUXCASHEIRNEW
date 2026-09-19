@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { settingsCommandSchema, settingsViewSchema } from './settings';
+import { settingsCommandSchema, settingsViewSchema } from '../../api/admin/settings';
 
 const shopId = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
 const orderTypeId = 'a373f2ac-6a95-59a2-a630-1b1b9d5a3224';

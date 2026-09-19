@@ -60,8 +60,8 @@ jobs:
           apps/admin/server/catalog/recurringAvailabilityService.test.ts
           apps/admin/server/catalog/catalogPublishHistory.test.ts
           apps/admin/server/settings/settingsService.test.ts
-          apps/admin/api/admin/catalogRecurring.test.ts
-          apps/admin/api/admin/settings.test.ts
+          apps/admin/server/api-contracts/catalogRecurring.test.ts
+          apps/admin/server/api-contracts/settings.test.ts
       - name: Admin contracts typecheck
         run: npm run typecheck -w @tux/admin-contracts
       - name: Admin API and server typecheck
@@ -113,7 +113,7 @@ jobs:
         run: >-
           npx vitest run
           apps/admin/server/settings/businessDefaultAuthority.test.ts
-          apps/admin/api/admin/reasonCodeCommand.test.ts
+          apps/admin/server/api-contracts/reasonCodeCommand.test.ts
           apps/admin/server/settings/reasonCodeManagement.test.ts
       - name: Checkout policy and immutable snapshot regressions
         run: >-
@@ -197,7 +197,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Admin deployment cron contract
+      - name: Admin deployment contract
         run: node scripts/test-admin-deployment-contract.mjs
 
   catalog-ui:

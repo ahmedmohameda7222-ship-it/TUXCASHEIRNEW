@@ -1,13 +1,13 @@
-import type { AdminSessionContext } from '../../server/adminAuthService';
+import type { AdminSessionContext } from '../adminAuthService';
 import { describe, expect, it } from 'vitest';
 
-import * as approvalsModule from './approvals';
+import * as approvalsModule from '../../api/admin/approvals';
 import {
   buildApprovalActor,
   parseApprovalDecisionBody,
   requireApprovalEndpointAccess,
-} from './approvals';
-import * as auditModule from './audit';
+} from '../../api/admin/approvals';
+import * as auditModule from '../../api/admin/audit';
 
 function context(
   permissions: AdminSessionContext['principal']['permissions'],

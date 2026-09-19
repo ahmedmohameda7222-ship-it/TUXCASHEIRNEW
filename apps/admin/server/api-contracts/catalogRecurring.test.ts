@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { catalogCommandSchema, catalogViewSchema } from './catalog';
+import { catalogCommandSchema, catalogViewSchema } from '../../api/admin/catalog';
 
 const shopId = 'c5579c9a-b2f2-5aa2-b1ed-a3a9b2492b46';
 const ruleId = '11111111-1111-4111-8111-111111111111';

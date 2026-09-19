@@ -124,6 +124,25 @@ function collectTsFiles(directory, baseDirectory = directory) {
     .sort();
 }
 
+const adminApiFiles = collectTsFiles('apps/admin/api');
+if (adminApiFiles.length > 12) {
+  throw new Error(
+    `Admin Vercel deployment exceeds the Hobby Serverless Function limit: ${adminApiFiles.length} > 12`,
+  );
+}
+const adminApiTestFiles = adminApiFiles.filter((fileName) => fileName.endsWith('.test.ts'));
+if (adminApiTestFiles.length > 0) {
+  throw new Error(
+    `Admin test files must live outside apps/admin/api so Vercel does not deploy them as Functions: ${adminApiTestFiles.join(', ')}`,
+  );
+}
+const adminCronApiFiles = adminApiFiles.filter((fileName) => fileName.startsWith('cron/'));
+if (adminCronApiFiles.length > 0) {
+  throw new Error(
+    `Admin Vercel cron endpoints must be absent while Cron Jobs are disabled: ${adminCronApiFiles.join(', ')}`,
+  );
+}
+
 const rootApiFiles = collectTsFiles(rootApiDir);
 const operationsApiFiles = collectTsFiles(operationsApiDir);
 assertJsonEqual(
