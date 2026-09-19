@@ -26,7 +26,6 @@ function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): stri
   return session.state.session.csrfToken;
 }
 
-
 export function useInventory(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
@@ -65,7 +64,9 @@ export function useInventory(shopId: string | undefined) {
     if (!shopId) throw new InventoryUiError('concrete_shop_required');
     const retainedIntent = { shopId, intent };
     const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
-    return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
+    return post(buildCommand(retainedCommandId), () =>
+      commandIds.complete(scope, retainedIntent),
+    );
   }
 
   async function invalidate(): Promise<void> {
@@ -110,12 +111,16 @@ export function useInventory(shopId: string | undefined) {
 
   const beginStocktake = useMutation({
     mutationFn: async (inventoryItemIds: readonly string[]) => {
-      const result = await postRetained('stocktake.begin', inventoryItemIds, (retainedCommandId) => ({
-        type: 'stocktake.begin',
-        shopId: shopId!,
+      const result = await postRetained(
+        'stocktake.begin',
         inventoryItemIds,
-        commandId: retainedCommandId,
-      }));
+        (retainedCommandId) => ({
+          type: 'stocktake.begin',
+          shopId: shopId!,
+          inventoryItemIds,
+          commandId: retainedCommandId,
+        }),
+      );
       if (!result.ok || !result.stocktakeId || !result.lines) {
         throw new InventoryUiError('invalid_stocktake_snapshot');
       }
