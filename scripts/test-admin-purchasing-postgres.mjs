@@ -497,7 +497,7 @@ if (varianceReturn.ok !== true) {
 psql(
   [
     '-c',
-    `do $
+    `do $purchase_variance_assertions$
      declare
        v_on_hand bigint;
        v_cost numeric(20, 6);
@@ -522,7 +522,7 @@ psql(
        if v_variance <> 500 then
          raise exception 'unexpected purchase price variance: %', v_variance;
        end if;
-     end $;`,
+     end $purchase_variance_assertions$;`,
   ],
   'Purchase return price-variance assertions',
 );
