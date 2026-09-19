@@ -181,7 +181,6 @@ jobs:
           apps/admin/src/inventory/ReorderSuggestionsPage.test.tsx
           apps/admin/src/inventory/VarianceReport.test.tsx
 
-
   task5-purchasing:
     needs: ledger-static
     runs-on: ubuntu-latest
@@ -199,7 +198,6 @@ jobs:
         run: npx vitest run apps/admin/server/inventory/intelligenceService.test.ts
       - name: Plan 4 Task 5 purchasing migration invariant
         run: node scripts/test-admin-purchasing-migration.mjs
-
 
   task5-postgres:
     needs: task5-purchasing
