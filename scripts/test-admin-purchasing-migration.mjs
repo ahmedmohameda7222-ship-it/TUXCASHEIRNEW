@@ -86,4 +86,19 @@ if (!lower.includes('preferred_supplier_id')) {
   throw new Error('purchasing must bind replenishment preferred supplier to canonical suppliers');
 }
 
+
+if (!lower.includes('inventory_unit_conversions')) {
+  throw new Error('purchasing must resolve canonical purchase-unit conversions');
+}
+const purchaseOrderLineDefinition = lower.slice(
+  lower.indexOf('create table public.purchase_order_lines'),
+  lower.indexOf('create index purchase_order_lines_item_idx'),
+);
+if (!purchaseOrderLineDefinition.includes('base_micros_per_purchase_unit')) {
+  throw new Error('PO lines must snapshot the purchase-to-base conversion used when ordered');
+}
+if (lower.includes('1000000, v_unit_cost')) {
+  throw new Error('supplier purchase-unit conversion must not be hard-coded to one base unit');
+}
+
 console.log('Admin purchasing migration static invariant passed.');
