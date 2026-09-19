@@ -115,7 +115,9 @@ function activeReservationByItem(
   for (const movement of movements) {
     const next = (reserved.get(movement.itemId) ?? 0) + (movement.reservedDeltaMicros ?? 0);
     if (!Number.isSafeInteger(next)) {
-      throw new DomainInvariantError('Order inventory reservation exceeded the safe integer range.');
+      throw new DomainInvariantError(
+        'Order inventory reservation exceeded the safe integer range.',
+      );
     }
     reserved.set(movement.itemId, next);
   }
