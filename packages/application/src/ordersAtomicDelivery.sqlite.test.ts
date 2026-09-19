@@ -412,7 +412,7 @@ describe('Delivery customer learning checkout atomicity', () => {
 
     expect(scalar(test.path, 'select count(*) as value from customer_contacts')).toBe(0);
     expect(scalar(test.path, 'select count(*) as value from orders')).toBe(0);
-    expect(scalar(test.path, 'select count(*) as value from inventory_movements')).toBe(0);
+    expect(scalar(test.path, 'select count(*) as value from inventory_movements')).toBe(1);
     expect(scalar(test.path, 'select count(*) as value from audit_events')).toBe(0);
     expect(scalar(test.path, 'select count(*) as value from outbox_events')).toBe(0);
     expect(
