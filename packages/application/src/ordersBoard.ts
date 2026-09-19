@@ -207,6 +207,7 @@ export class OperationsOrdersBoardService {
       const inventoryMovements: InventoryMovement[] = [];
       for (const [itemId, reservedMicros] of reservationByItem) {
         if (reservedMicros <= 0) continue;
+        const unitCostMinor = await transaction.inventory.getWeightedUnitCost(itemId);
         const movement: InventoryMovement = {
           id: this.#id<InventoryMovementId>(),
           shopId: order.shopId,
@@ -217,6 +218,7 @@ export class OperationsOrdersBoardService {
           reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
           idempotencyKey: `order-consumption:${order.id}:${orderLifecycle(order).revision + 1}:${itemId}`,
           workerId: context.operator.id,
+          unitCostMinor,
           orderId: order.id,
           createdAt: now,
           compensatesMovementId: null,
@@ -283,6 +285,7 @@ export class OperationsOrdersBoardService {
           reservedDeltaMicros: stockQuantityMicros(restoredReservation),
           idempotencyKey: `order-consumption-reversal:${order.id}:${movement.id}`,
           workerId: context.operator.id,
+          ...(movement.unitCostMinor === undefined ? {} : { unitCostMinor: movement.unitCostMinor }),
           orderId: order.id,
           createdAt: now,
           compensatesMovementId: movement.id,
