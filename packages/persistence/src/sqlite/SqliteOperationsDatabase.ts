@@ -366,7 +366,6 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         const row = database
           .prepare(
             `SELECT
-              COUNT(*) AS movement_count,
               COALESCE(SUM(quantity_delta_micros), 0) AS on_hand_micros,
               COALESCE(SUM(reserved_delta_micros), 0) AS reserved_micros
             FROM inventory_movements
@@ -376,7 +375,6 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
         const onHandMicros = Number(row?.['on_hand_micros'] ?? 0);
         const reservedMicros = Number(row?.['reserved_micros'] ?? 0);
         return {
-          initialized: Number(row?.['movement_count'] ?? 0) > 0,
           onHandMicros,
           reservedMicros,
           availableMicros: onHandMicros - reservedMicros,
