@@ -59,7 +59,8 @@ export function ReorderSuggestionsPage({
         preferredPurchaseUnit: row.preferredPurchaseUnit ?? '',
         leadTimeDays: String(row.leadTimeDays),
         minimumOrderMicros: row.minimumOrderMicros === null ? '' : String(row.minimumOrderMicros),
-        orderMultipleMicros: row.orderMultipleMicros === null ? '' : String(row.orderMultipleMicros),
+        orderMultipleMicros:
+          row.orderMultipleMicros === null ? '' : String(row.orderMultipleMicros),
       }
     );
   }
@@ -73,8 +74,7 @@ export function ReorderSuggestionsPage({
         <div>
           <h2>Reorder suggestions</h2>
           <p>
-            Recommendation only. This screen does not create a purchase order or contact a
-            supplier.
+            Recommendation only. This screen does not create a purchase order or contact a supplier.
           </p>
         </div>
       </div>
@@ -120,8 +120,8 @@ export function ReorderSuggestionsPage({
                 </dl>
                 {row.preferredSupplierId ? (
                   <p className="admin-inventory-note">
-                    Preferred supplier: {row.preferredSupplierId}. Supplier details are resolved
-                    by Purchasing.
+                    Preferred supplier: {row.preferredSupplierId}. Supplier details are resolved by
+                    Purchasing.
                   </p>
                 ) : null}
                 {canManage ? (
@@ -137,7 +137,9 @@ export function ReorderSuggestionsPage({
                         minimumOrderMicros:
                           draft.minimumOrderMicros === '' ? null : Number(draft.minimumOrderMicros),
                         orderMultipleMicros:
-                          draft.orderMultipleMicros === '' ? null : Number(draft.orderMultipleMicros),
+                          draft.orderMultipleMicros === ''
+                            ? null
+                            : Number(draft.orderMultipleMicros),
                       });
                     }}
                   >
