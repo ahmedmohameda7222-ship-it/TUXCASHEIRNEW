@@ -337,7 +337,9 @@ export interface InventoryMovement {
   /** Reservation projection delta; absent on legacy persisted movements and treated as zero. */
   readonly reservedDeltaMicros?: StockQuantityMicros;
   readonly idempotencyKey: string;
-  readonly workerId: WorkerId;
+  readonly workerId: WorkerId | null;
+  /** Base-unit weighted cost snapshot in minor currency units when valuation applies. */
+  readonly unitCostMinor?: number;
   readonly orderId: OrderId | null;
   readonly createdAt: Instant;
   readonly compensatesMovementId: InventoryMovementId | null;
