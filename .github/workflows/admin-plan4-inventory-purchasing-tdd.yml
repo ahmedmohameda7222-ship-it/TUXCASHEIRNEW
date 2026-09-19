@@ -156,7 +156,6 @@ jobs:
       - name: Plan 4 Task 3 inventory E2E
         run: npx playwright test --config playwright.admin.config.ts e2e/admin-inventory.spec.ts
 
-
   task4-intelligence:
     needs: ledger-static
     runs-on: ubuntu-latest
@@ -177,7 +176,6 @@ jobs:
           npx vitest run
           apps/admin/src/inventory/ReorderSuggestionsPage.test.tsx
           apps/admin/src/inventory/VarianceReport.test.tsx
-
 
   task1-regression:
     needs: ledger-postgres
