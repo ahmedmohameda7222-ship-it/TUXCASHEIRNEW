@@ -235,6 +235,37 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
       async appendMovement(movement: InventoryMovement) {
         await requestResult(store('inventoryMovements').add(movement));
       },
+      async upsertCanonicalMovement(movement: InventoryMovement) {
+        await requestResult(store('inventoryMovements').put(movement));
+      },
+      async getWeightedUnitCost(itemId) {
+        const row = await recordOrNull<{ itemId: string; weightedUnitCostMinor: number }>(
+          store('inventoryCostState').get(itemId),
+        );
+        return row?.weightedUnitCostMinor ?? 0;
+      },
+      async putWeightedUnitCost(shopId, itemId, unitCostMinor) {
+        if (!Number.isFinite(unitCostMinor) || unitCostMinor < 0) {
+          throw new Error('Inventory weighted cost must be a non-negative finite number.');
+        }
+        await requestResult(
+          store('inventoryCostState').put({
+            itemId,
+            shopId,
+            weightedUnitCostMinor: unitCostMinor,
+          }),
+        );
+      },
+      async getInventorySyncCursor(shopId) {
+        const row = await recordOrNull<{ shopId: string; cursor: string }>(
+          store('inventorySyncCursor').get(shopId),
+        );
+        return row?.cursor ?? null;
+      },
+      async setInventorySyncCursor(shopId, cursor) {
+        if (!cursor) throw new Error('Inventory sync cursor must not be empty.');
+        await requestResult(store('inventorySyncCursor').put({ shopId, cursor }));
+      },
       async listMovementsForOrder(orderId: OrderId) {
         return (await requestResult(
           store('inventoryMovements')
