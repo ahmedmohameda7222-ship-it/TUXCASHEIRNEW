@@ -155,9 +155,7 @@ export async function loadInventoryIntelligence(
   const orderStatus = new Map(orderRows.map((row) => [row.id, row.status]));
 
   const itemMap = new Map(items.map((item) => [item.id, item]));
-  const replenishmentMap = new Map(
-    replenishmentRows.map((row) => [row.inventory_item_id, row]),
-  );
+  const replenishmentMap = new Map(replenishmentRows.map((row) => [row.inventory_item_id, row]));
 
   const reorderSuggestions: AdminInventoryReorderSuggestion[] = items
     .filter((item) => item.active)
