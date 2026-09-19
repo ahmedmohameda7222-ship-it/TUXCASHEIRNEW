@@ -214,7 +214,7 @@ test('inventory adjustment and waste use structured reasons through the trusted 
   });
 });
 
-test('inventory stocktake exposes variance/recount/approval state and posts immutable count input', async ({
+test('inventory stocktake uses a frozen count boundary and posts immutable count input', async ({
   page,
 }) => {
   const fixture = await mockInventory(page);
@@ -222,8 +222,8 @@ test('inventory stocktake exposes variance/recount/approval state and posts immu
   await page.getByRole('button', { name: 'Stock count' }).click();
 
   await expect(page.getByText('Snapshot on hand')).toBeVisible();
-  await expect(page.getByText('Count boundary')).toBeVisible();
-  await expect(page.getByText('Concurrent movements')).toBeVisible();
+  await expect(page.getByText('Captured before counting')).toBeVisible();
+  await expect(page.getByText('Preserved after the snapshot')).toBeVisible();
 
   await page.getByLabel('Actual count for Beef').fill('3.0');
   await expect(page.getByText('-0.2 kg')).toBeVisible();
