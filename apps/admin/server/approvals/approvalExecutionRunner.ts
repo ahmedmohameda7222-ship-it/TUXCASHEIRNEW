@@ -1,11 +1,11 @@
-import { getAdminServerEnv } from '../env';
-import { AdminSupabaseClient } from '../supabaseAdmin';
+import { getAdminServerEnv } from '../env.js';
+import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
   createApprovalExecutionRegistry,
   createApprovalExecutionService,
   createSupabaseApprovalExecutionDependencies,
   type ApprovalExecutionRunResult,
-} from './approvalExecutionService';
+} from './approvalExecutionService.js';
 
 export type ApprovalExecutionHttpResult = {
   statusCode: number;

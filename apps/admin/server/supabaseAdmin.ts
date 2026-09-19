@@ -1,4 +1,4 @@
-import type { AdminServerEnv } from './env';
+import type { AdminServerEnv } from './env.js';
 
 export class AdminSupabaseError extends Error {
   constructor(

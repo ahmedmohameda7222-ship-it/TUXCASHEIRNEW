@@ -4,7 +4,7 @@ import {
   deriveAdminRateKey,
   type AdminClientFingerprint,
   type AdminPinRateLimitRpc,
-} from '../loginRateLimit';
+} from '../loginRateLimit.js';
 
 export type ApprovalPinRateLimitInput = {
   employeeId: string;

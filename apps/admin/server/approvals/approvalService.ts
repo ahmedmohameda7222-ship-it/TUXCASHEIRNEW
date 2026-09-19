@@ -7,8 +7,8 @@ import {
   type ApprovalDecision,
 } from '@tux/admin-contracts';
 
-import { verifyPin } from '../pin';
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import { verifyPin } from '../pin.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export type ApprovalActor = AdminApprovalActor;
 
