@@ -292,6 +292,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Print exact Task 5 purchasing format diff
+        run: |
+          cp e2e/admin-purchasing.spec.ts /tmp/admin-purchasing.before.ts
+          npx prettier --write e2e/admin-purchasing.spec.ts
+          diff -u /tmp/admin-purchasing.before.ts e2e/admin-purchasing.spec.ts || true
       - name: Plan 4 Task 5 purchasing service RED/behavior
         run: npx vitest run apps/admin/server/purchasing/purchasingService.test.ts
       - name: Plan 4 Task 5 open-PO incoming intelligence RED/behavior
