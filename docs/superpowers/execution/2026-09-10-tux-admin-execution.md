@@ -358,3 +358,15 @@ Evidence at exact code head `61c8152f02be2c18c53d6a5a2bf3cf045323f68b`:
 - The pre-fix rendered browser regression was traced to `seedBrowserFallback()` creating recipe-tracked inventory items with no opening inventory movements. The fixture now seeds explicit `BULK_STOCK_RECEIVED` movements; production zero-stock enforcement remains unchanged and canonical with PostgreSQL reservation authority.
 
 Task 3 Ruling: Admin inventory writes remain ledger commands only. The browser does not write stock projections directly, emergency negative override remains OWNER-only, and `Receive transfer` is the inter-shop transfer receive action rather than supplier/PO receiving.
+
+
+### Task 4: complete
+
+Evidence at exact branch head `02a954768cb72e9d6e24a1939b30812ea72838f7`:
+- Plan 4 workflow run `35425790580`: all jobs GREEN, including `task4-intelligence`, lifecycle/typecheck, PostgreSQL compatibility, and full unfiltered migration + unit/integration regression.
+- Root TUX V2 CI run `35425790584`: every job GREEN, including Required quality gate.
+- Root quality job: format, lint, full tests, security gates, typecheck, production builds, migration-chain smoke, Edge Function checks, and rendered browser E2E all GREEN.
+- Admin job: security boundary, typecheck, production build, and rendered Admin E2E GREEN.
+- Task 4 behavior covers reorder suggestions with minimum/order-multiple rounding, negative available stock, replenishment metadata, actual-vs-theoretical variance, food-cost margin alerts, and inventory intelligence UI.
+
+Task 4 Ruling: `incomingMicros` intentionally remains zero until Task 5 introduces canonical open-PO line quantities. Task 5 must replace this placeholder with open purchase-order remainder without changing on-hand stock before receiving. Replenishment suggestions remain recommendations only and never auto-create or transmit supplier orders.
