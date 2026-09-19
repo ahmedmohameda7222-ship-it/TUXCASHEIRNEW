@@ -192,8 +192,7 @@ export async function loadInventoryIntelligence(
       : await client.select<PurchaseOrderLineRow[]>(
           'purchase_order_lines',
           new URLSearchParams({
-            select:
-              'purchase_order_id,inventory_item_id,ordered_base_micros,received_base_micros',
+            select: 'purchase_order_id,inventory_item_id,ordered_base_micros,received_base_micros',
             purchase_order_id: `in.(${[...openPurchaseOrderIds].join(',')})`,
             order: 'purchase_order_id.asc,inventory_item_id.asc',
           }),
