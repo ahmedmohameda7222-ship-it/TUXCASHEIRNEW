@@ -59,6 +59,18 @@ type OrderStatusRow = {
   status: string;
 };
 
+type PurchaseOrderRow = {
+  id: string;
+  status: string;
+};
+
+type PurchaseOrderLineRow = {
+  purchase_order_id: string;
+  inventory_item_id: string;
+  ordered_base_micros: number | string;
+  received_base_micros: number | string;
+};
+
 function safeInteger(value: number | string, label: string): number {
   const result = typeof value === 'number' ? value : Number(value);
   if (!Number.isSafeInteger(result)) throw new Error(`inventory_intelligence_invalid:${label}`);
@@ -89,51 +101,66 @@ export async function loadInventoryIntelligence(
   now = Date.now(),
 ): Promise<AdminInventoryIntelligence> {
   const from = reportStart(now);
-  const [replenishmentRows, periodMovements, productRows, recipeRows, marginRows] =
-    await Promise.all([
-      client.select<ReplenishmentRow[]>(
-        'inventory_replenishment_settings',
-        new URLSearchParams({
-          select:
-            'inventory_item_id,par_level_base,reorder_point_base,preferred_supplier_id,preferred_purchase_unit,lead_time_days,minimum_order_quantity_base,order_multiple_base,version',
-          shop_id: `eq.${shopId}`,
-        }),
-      ),
-      client.select<PeriodMovementRow[]>(
-        'inventory_movements',
-        new URLSearchParams({
-          select: 'inventory_item_id,movement_type,quantity_delta_micros,order_id',
-          shop_id: `eq.${shopId}`,
-          created_at: `gte.${from}`,
-          order: 'created_at.asc,id.asc',
-          limit: '10000',
-        }),
-      ),
-      client.select<ProductRow[]>(
-        'products',
-        new URLSearchParams({
-          select: 'id,name,price_minor,active',
-          shop_id: `eq.${shopId}`,
-          active: 'eq.true',
-          order: 'name.asc,id.asc',
-        }),
-      ),
-      client.select<RecipeRow[]>(
-        'recipe_lines',
-        new URLSearchParams({
-          select: 'product_id,inventory_item_id,quantity_micros',
-          shop_id: `eq.${shopId}`,
-          order: 'product_id.asc,inventory_item_id.asc',
-        }),
-      ),
-      client.select<MarginSettingRow[]>(
-        'inventory_margin_settings',
-        new URLSearchParams({
-          select: 'product_id,target_food_cost_percent,alert_food_cost_percent',
-          shop_id: `eq.${shopId}`,
-        }),
-      ),
-    ]);
+  const [
+    replenishmentRows,
+    periodMovements,
+    productRows,
+    recipeRows,
+    marginRows,
+    purchaseOrderRows,
+  ] = await Promise.all([
+    client.select<ReplenishmentRow[]>(
+      'inventory_replenishment_settings',
+      new URLSearchParams({
+        select:
+          'inventory_item_id,par_level_base,reorder_point_base,preferred_supplier_id,preferred_purchase_unit,lead_time_days,minimum_order_quantity_base,order_multiple_base,version',
+        shop_id: `eq.${shopId}`,
+      }),
+    ),
+    client.select<PeriodMovementRow[]>(
+      'inventory_movements',
+      new URLSearchParams({
+        select: 'inventory_item_id,movement_type,quantity_delta_micros,order_id',
+        shop_id: `eq.${shopId}`,
+        created_at: `gte.${from}`,
+        order: 'created_at.asc,id.asc',
+        limit: '10000',
+      }),
+    ),
+    client.select<ProductRow[]>(
+      'products',
+      new URLSearchParams({
+        select: 'id,name,price_minor,active',
+        shop_id: `eq.${shopId}`,
+        active: 'eq.true',
+        order: 'name.asc,id.asc',
+      }),
+    ),
+    client.select<RecipeRow[]>(
+      'recipe_lines',
+      new URLSearchParams({
+        select: 'product_id,inventory_item_id,quantity_micros',
+        shop_id: `eq.${shopId}`,
+        order: 'product_id.asc,inventory_item_id.asc',
+      }),
+    ),
+    client.select<MarginSettingRow[]>(
+      'inventory_margin_settings',
+      new URLSearchParams({
+        select: 'product_id,target_food_cost_percent,alert_food_cost_percent',
+        shop_id: `eq.${shopId}`,
+      }),
+    ),
+    client.select<PurchaseOrderRow[]>(
+      'purchase_orders',
+      new URLSearchParams({
+        select: 'id,status',
+        shop_id: `eq.${shopId}`,
+        status: 'in.(ORDERED,PARTIALLY_RECEIVED)',
+        order: 'id.asc',
+      }),
+    ),
+  ]);
 
   const orderIds = [
     ...new Set(
@@ -154,6 +181,35 @@ export async function loadInventoryIntelligence(
         );
   const orderStatus = new Map(orderRows.map((row) => [row.id, row.status]));
 
+  const openPurchaseOrderIds = new Set(
+    purchaseOrderRows
+      .filter((row) => row.status === 'ORDERED' || row.status === 'PARTIALLY_RECEIVED')
+      .map((row) => row.id),
+  );
+  const purchaseOrderLines =
+    openPurchaseOrderIds.size === 0
+      ? []
+      : await client.select<PurchaseOrderLineRow[]>(
+          'purchase_order_lines',
+          new URLSearchParams({
+            select:
+              'purchase_order_id,inventory_item_id,ordered_base_micros,received_base_micros',
+            purchase_order_id: `in.(${[...openPurchaseOrderIds].join(',')})`,
+            order: 'purchase_order_id.asc,inventory_item_id.asc',
+          }),
+        );
+  const incomingByItem = new Map<string, number>();
+  for (const line of purchaseOrderLines) {
+    if (!openPurchaseOrderIds.has(line.purchase_order_id)) continue;
+    const ordered = safeInteger(line.ordered_base_micros, 'purchase-order-ordered');
+    const received = safeInteger(line.received_base_micros, 'purchase-order-received');
+    const remaining = Math.max(0, ordered - received);
+    incomingByItem.set(
+      line.inventory_item_id,
+      (incomingByItem.get(line.inventory_item_id) ?? 0) + remaining,
+    );
+  }
+
   const itemMap = new Map(items.map((item) => [item.id, item]));
   const replenishmentMap = new Map(replenishmentRows.map((row) => [row.inventory_item_id, row]));
 
@@ -162,7 +218,7 @@ export async function loadInventoryIntelligence(
     .map((item) => {
       const policy = replenishmentMap.get(item.id);
       const parLevelMicros = policy ? safeInteger(policy.par_level_base, 'par') : 0;
-      const incomingMicros = 0; // Task 5 will source open-PO incoming quantities.
+      const incomingMicros = incomingByItem.get(item.id) ?? 0;
       const minimumOrderMicros = policy
         ? nullablePositiveInteger(policy.minimum_order_quantity_base, 'minimum-order')
         : null;
