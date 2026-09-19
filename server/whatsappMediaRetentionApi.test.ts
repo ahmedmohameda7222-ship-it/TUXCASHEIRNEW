@@ -35,9 +35,12 @@ function retentionHttpHandler(): RetentionHttpHandler {
 }
 
 describe('WhatsApp media retention HTTP authority', () => {
-  it('has a repository endpoint and exact Vercel cron schedule', () => {
+  it('has root/app-local endpoints and the exact Operations Vercel cron schedule', () => {
     expect(existsSync(resolve('api/whatsapp-media-retention.ts'))).toBe(true);
-    const vercel = JSON.parse(readFileSync(resolve('vercel.json'), 'utf8')) as {
+    expect(existsSync(resolve('apps/operations/api/whatsapp-media-retention.ts'))).toBe(true);
+    const vercel = JSON.parse(
+      readFileSync(resolve('apps/operations/vercel.json'), 'utf8'),
+    ) as {
       readonly crons?: unknown;
     };
     expect(vercel.crons).toEqual([
