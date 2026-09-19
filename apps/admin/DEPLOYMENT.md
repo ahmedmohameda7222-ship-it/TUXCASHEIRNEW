@@ -23,7 +23,7 @@ Because the Admin install/build commands intentionally reach the monorepo root a
 
 `apps/admin/vercel.json` is the repository deployment contract for Admin. `apps/menu/vercel.json` remains the Menu contract, and `apps/operations/vercel.json` is the Operations contract.
 
-Admin `/api/*` functions, including `/api/cron/*`, are resolved through the filesystem before the final SPA fallback to `/index.html`. Do not replace that route ordering with a catch-all rewrite that intercepts API functions.
+Admin `/api/*` functions are resolved through the filesystem before the final SPA fallback to `/index.html`. The Admin deployment intentionally has no `/api/cron/*` entrypoints. Do not replace the filesystem-first route ordering with a catch-all rewrite that intercepts API functions.
 
 ## Git deployment policy
 
@@ -50,9 +50,9 @@ This project boundary only enables normal Admin deployment from `main`. **Final 
 
 ## Vercel Cron Jobs
 
-Vercel Cron Jobs are disabled for the Admin project. The Admin `vercel.json` intentionally has no `crons` property, so deploying Admin does not register scheduled jobs.
+Vercel Cron Jobs are disabled for the Admin project. The Admin `vercel.json` intentionally has no `crons` property and `apps/admin/api/cron` has no deployed entrypoints.
 
-The existing scheduler/approval HTTP handlers remain fail-closed internal endpoints, but Vercel does not invoke them on a schedule in this deployment profile. `CRON_SECRET` is therefore not required to deploy Admin while Vercel Cron Jobs remain disabled.
+`CRON_SECRET` is not required for this deployment profile. Scheduler and approval-runner service modules may remain covered by tests, but they are not exposed as Vercel Functions and are not invoked on a schedule.
 
 ## Safe smoke procedure
 
@@ -60,8 +60,8 @@ Before accepting Admin production in Plan 10:
 
 1. Apply the reviewed Admin migrations to the explicitly authorized production Supabase project using the Plan 10 migration procedure.
 2. Configure the Admin project's server-only Supabase URL/service-role key.
-3. Confirm the deployed Admin project registers no Vercel Cron Jobs.
-4. Confirm the dormant scheduler/approval HTTP endpoints fail closed when no `CRON_SECRET` is configured.
-5. If scheduled execution is reintroduced in a later reviewed plan, reintroduce its authentication and scheduling contract explicitly rather than enabling it implicitly.
+3. Confirm the deployed Admin project registers no Vercel Cron Jobs and exposes no `/api/cron/*` functions.
+4. Confirm the Admin deployment stays within the Hobby Serverless Function budget; the current contract deploys 9 TypeScript API entrypoints.
+5. If scheduled execution is reintroduced in a later reviewed plan, reintroduce its endpoint authentication and scheduling contract explicitly rather than enabling it implicitly.
 
 Do not paste production secret values into tickets, chat, CI output, or test fixtures.
