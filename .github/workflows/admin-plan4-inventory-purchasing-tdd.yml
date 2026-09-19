@@ -1,7 +1,7 @@
 name: Admin Plan 4 Inventory Purchasing TDD
 
 concurrency:
-  group: admin-plan4-${{ github.ref }}
+  group: admin-plan4-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 on:
