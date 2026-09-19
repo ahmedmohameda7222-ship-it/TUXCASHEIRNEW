@@ -124,4 +124,43 @@ describe('inventory intelligence purchasing integration', () => {
       availableMicros: 6_000,
     });
   });
+  it('aggregates every movement in the reporting window beyond the first 10,000 rows', async () => {
+    const firstPage = Array.from({ length: 10_000 }, () => ({
+      inventory_item_id: 'item-1',
+      movement_type: 'WASTE',
+      quantity_delta_micros: -1,
+      order_id: null,
+    }));
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_movements') {
+        const offset = Number(query?.get('offset') ?? '0');
+        return offset === 0
+          ? firstPage
+          : offset === 10_000
+            ? [{ inventory_item_id: 'item-1', movement_type: 'WASTE', quantity_delta_micros: -100, order_id: null }]
+            : [];
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.variances[0]).toMatchObject({
+      inventoryItemId: 'item-1',
+      actualUsageMicros: 10_100,
+    });
+    expect(select.mock.calls.filter(([table]) => table === 'inventory_movements')).toHaveLength(2);
+  });
+
 });
