@@ -676,6 +676,10 @@ function parseCustomerContact(value: unknown): CustomerContact {
 
 function parseMovement(value: unknown): InventoryMovement {
   const source = record(value, 'inventory movement');
+  const unitCostMinor = optionalNonNegativeFiniteNumber(
+    source['unitCostMinor'],
+    'inventory movement unitCostMinor',
+  );
   const movement: InventoryMovement = {
     id: entityId<InventoryMovementId>(source['id'], 'inventory movement id'),
     shopId: entityId<ShopId>(source['shopId'], 'inventory movement shopId'),
@@ -702,17 +706,7 @@ function parseMovement(value: unknown): InventoryMovement {
       source['workerId'] === null
         ? null
         : entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
-    ...(optionalNonNegativeFiniteNumber(
-      source['unitCostMinor'],
-      'inventory movement unitCostMinor',
-    ) === undefined
-      ? {}
-      : {
-          unitCostMinor: optionalNonNegativeFiniteNumber(
-            source['unitCostMinor'],
-            'inventory movement unitCostMinor',
-          ),
-        }),
+    ...(unitCostMinor === undefined ? {} : { unitCostMinor }),
     orderId:
       source['orderId'] === null
         ? null
