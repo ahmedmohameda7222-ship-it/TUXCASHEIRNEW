@@ -3,7 +3,6 @@ import path from 'node:path';
 
 const adminVercelPath = 'apps/admin/vercel.json';
 const menuVercelPath = 'apps/menu/vercel.json';
-const legacyOperationsVercelPath = 'vercel.json';
 const operationsVercelPath = 'apps/operations/vercel.json';
 const operationsApiDir = 'apps/operations/api';
 const rootApiDir = 'api';
@@ -14,7 +13,6 @@ const cronDir = 'apps/admin/api/cron';
 
 const adminConfig = JSON.parse(fs.readFileSync(adminVercelPath, 'utf8'));
 const menuConfig = JSON.parse(fs.readFileSync(menuVercelPath, 'utf8'));
-const legacyOperationsConfig = JSON.parse(fs.readFileSync(legacyOperationsVercelPath, 'utf8'));
 const operationsConfig = JSON.parse(fs.readFileSync(operationsVercelPath, 'utf8'));
 const adminDeploymentDoc = fs.readFileSync(adminDeploymentDocPath, 'utf8');
 const operationsDeploymentDoc = fs.readFileSync(operationsDeploymentDocPath, 'utf8');
@@ -102,13 +100,18 @@ if (!schedulerSource.includes("process.env['CRON_SECRET']")) {
   throw new Error('Admin config scheduler route must use the CRON_SECRET deployment contract');
 }
 
-// Preserve the live legacy Operations project contract until the manual cutover is verified.
-const expectedLegacyOperations = {
+// The repository root must not carry a Vercel project contract after Operations cutover.
+if (fs.existsSync('vercel.json')) {
+  throw new Error('Repository root vercel.json must be absent after Operations cutover');
+}
+
+// App-local Operations contract is the complete Operations deployment authority.
+const expectedOperations = {
   $schema: 'https://openapi.vercel.sh/vercel.json',
   framework: 'vite',
-  installCommand: 'npm ci',
-  buildCommand: 'npm run build -w @tux/operations',
-  outputDirectory: 'apps/operations/dist',
+  installCommand: 'cd ../.. && npm ci',
+  buildCommand: 'cd ../.. && npm run build -w @tux/operations',
+  outputDirectory: 'dist',
   crons: [
     {
       path: '/api/whatsapp-media-retention',
@@ -125,21 +128,9 @@ const expectedLegacyOperations = {
     'if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 1; else exit 0; fi',
 };
 assertJsonEqual(
-  legacyOperationsConfig,
-  expectedLegacyOperations,
-  'Live legacy Operations Vercel deployment contract changed unexpectedly',
-);
-
-// App-local Operations contract must be functionally equivalent after Root Directory moves.
-assertJsonEqual(
   operationsConfig,
-  {
-    ...expectedLegacyOperations,
-    installCommand: 'cd ../.. && npm ci',
-    buildCommand: 'cd ../.. && npm run build -w @tux/operations',
-    outputDirectory: 'dist',
-  },
-  'App-local Operations Vercel deployment contract is not equivalent',
+  expectedOperations,
+  'App-local Operations Vercel deployment contract changed unexpectedly',
 );
 if (operationsConfig.buildCommand.toLowerCase().includes('admin')) {
   throw new Error('Operations Vercel build command must not build Admin');
