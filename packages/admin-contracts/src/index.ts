@@ -5,3 +5,4 @@ export * from './settings';
 export * from './approvals';
 export * from './audit';
 export * from './inventory';
+export * from './purchasing';
