@@ -1,0 +1,166 @@
+import { useMemo, useState } from 'react';
+
+import type {
+  AdminPurchaseOrder,
+  AdminPurchasingInventoryItem,
+  AdminSupplier,
+} from '@tux/admin-contracts';
+
+function baseMicros(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.round(parsed * 1_000_000);
+}
+
+function minorUnits(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round(parsed * 100);
+}
+
+export function PurchaseOrdersPage({
+  purchaseOrders,
+  suppliers,
+  inventoryItems,
+  selectedId,
+  pending,
+  onSelect,
+  onCreate,
+}: {
+  purchaseOrders: readonly AdminPurchaseOrder[];
+  suppliers: readonly AdminSupplier[];
+  inventoryItems: readonly AdminPurchasingInventoryItem[];
+  selectedId: string | null;
+  pending: boolean;
+  onSelect(id: string): void;
+  onCreate(input: {
+    supplierId: string;
+    reference: string | null;
+    expectedDeliveryDate: string | null;
+    lines: readonly {
+      inventoryItemId: string;
+      purchaseUnitLabel: string;
+      orderedBaseMicros: number;
+      expectedUnitCostMinor: number;
+    }[];
+  }): void;
+}) {
+  const firstSupplier = suppliers[0]?.id ?? '';
+  const firstItem = inventoryItems[0]?.id ?? '';
+  const [supplierId, setSupplierId] = useState(firstSupplier);
+  const [itemId, setItemId] = useState(firstItem);
+  const [reference, setReference] = useState('');
+  const [expectedDate, setExpectedDate] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [purchaseUnit, setPurchaseUnit] = useState('unit');
+  const [unitCost, setUnitCost] = useState('');
+
+  const unitLabel = useMemo(
+    () => inventoryItems.find((item) => item.id === itemId)?.unitLabel ?? 'unit',
+    [inventoryItems, itemId],
+  );
+
+  return (
+    <section aria-labelledby="purchase-orders-heading">
+      <h2 id="purchase-orders-heading">Purchase orders</h2>
+      <div className="admin-inventory-list">
+        {purchaseOrders.map((order) => (
+          <button
+            className={
+              selectedId === order.id ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+            }
+            type="button"
+            key={order.id}
+            onClick={() => onSelect(order.id)}
+          >
+            <span>
+              <strong>{order.reference ?? order.id.slice(0, 8)}</strong>
+              <small>{order.supplierName}</small>
+            </span>
+            <span>{order.status.replaceAll('_', ' ')}</span>
+          </button>
+        ))}
+      </div>
+      <form
+        className="admin-form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const orderedBaseMicros = baseMicros(quantity);
+          if (!supplierId || !itemId || orderedBaseMicros <= 0) return;
+          onCreate({
+            supplierId,
+            reference: reference.trim() || null,
+            expectedDeliveryDate: expectedDate || null,
+            lines: [
+              {
+                inventoryItemId: itemId,
+                purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
+                orderedBaseMicros,
+                expectedUnitCostMinor: minorUnits(unitCost),
+              },
+            ],
+          });
+        }}
+      >
+        <label>
+          Supplier
+          <select value={supplierId} onChange={(event) => setSupplierId(event.currentTarget.value)}>
+            {suppliers.map((supplier) => (
+              <option value={supplier.id} key={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Inventory item
+          <select value={itemId} onChange={(event) => setItemId(event.currentTarget.value)}>
+            {inventoryItems.map((item) => (
+              <option value={item.id} key={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Reference
+          <input value={reference} onChange={(event) => setReference(event.currentTarget.value)} />
+        </label>
+        <label>
+          Expected delivery
+          <input
+            type="date"
+            value={expectedDate}
+            onChange={(event) => setExpectedDate(event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Order quantity ({unitLabel})
+          <input
+            inputMode="decimal"
+            value={quantity}
+            onChange={(event) => setQuantity(event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Purchase unit
+          <input
+            value={purchaseUnit}
+            onChange={(event) => setPurchaseUnit(event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Expected unit cost
+          <input
+            inputMode="decimal"
+            value={unitCost}
+            onChange={(event) => setUnitCost(event.currentTarget.value)}
+          />
+        </label>
+        <button className="admin-secondary-button" type="submit" disabled={pending}>
+          Create purchase order
+        </button>
+      </form>
+    </section>
+  );
+}
