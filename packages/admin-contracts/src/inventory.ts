@@ -121,6 +121,19 @@ export interface AdminInventoryWorkspace {
   readonly intelligence: AdminInventoryIntelligence;
 }
 
+
+export interface AdminStocktakeSnapshotLine {
+  readonly inventoryItemId: string;
+  readonly snapshotOnHandMicros: number;
+  readonly snapshotReservedMicros: number;
+  readonly unitCostMinor: number;
+}
+
+export interface AdminStocktakeSnapshot {
+  readonly stocktakeId: string;
+  readonly lines: readonly AdminStocktakeSnapshotLine[];
+}
+
 export type AdminInventoryCommand =
   | {
       readonly type: 'adjust';
@@ -143,8 +156,15 @@ export type AdminInventoryCommand =
       readonly commandId: string;
     }
   | {
-      readonly type: 'stocktake';
+      readonly type: 'stocktake.begin';
       readonly shopId: string;
+      readonly inventoryItemIds: readonly string[];
+      readonly commandId: string;
+    }
+  | {
+      readonly type: 'stocktake.post';
+      readonly shopId: string;
+      readonly stocktakeId: string;
       readonly lines: readonly {
         readonly inventoryItemId: string;
         readonly actualCountMicros: number;
