@@ -106,6 +106,17 @@ jobs:
         run: npx vitest run apps/admin/server/inventory/costing.test.ts
       - name: Plan 4 order inventory lifecycle invariant
         run: node scripts/test-admin-order-inventory-lifecycle.mjs
+      - name: Plan 4 lifecycle and sync regressions
+        run: >-
+          npx vitest run
+          packages/application/src/orders.test.ts
+          packages/application/src/ordersOnlineSource.sqlite.test.ts
+          packages/application/src/onlineOrderAcceptance.test.ts
+          packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+          packages/domain/src/syncContract.test.ts
+          packages/sync/src/remoteMaterializer.test.ts
+      - name: Plan 4 typecheck
+        run: npm run typecheck
 
 
   task1-regression:
