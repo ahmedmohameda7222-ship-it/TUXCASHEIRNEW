@@ -1,0 +1,90 @@
+name: Plan 4 Exact Prettier
+
+concurrency:
+  group: plan4-prettier-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - feat/admin-04-inventory-purchasing
+    paths:
+      - '.github/workflows/prettier-plan4-exact.yml'
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Render exact Prettier output
+        run: |
+          npx prettier --write "packages/admin-contracts/src/inventory.ts" "packages/admin-contracts/src/index.ts" "apps/admin/server/inventory/costing.test.ts" "apps/admin/server/inventory/costing.ts" "apps/admin/server/inventory/inventoryService.ts" "packages/domain/src/models.ts" "packages/domain/src/syncContract.ts" "packages/persistence/src/contracts.ts" "packages/persistence/src/sqlite/migrations.ts" "packages/persistence/src/sqlite/SqliteOperationsDatabase.ts" "packages/application/src/orders.ts" "packages/application/src/ordersBoard.ts" "packages/application/src/orderInventoryLifecycle.sqlite.test.ts" "packages/sync/src/remoteMaterializer.ts" "scripts/test-admin-order-inventory-lifecycle.mjs" ".github/workflows/admin-plan4-inventory-purchasing-tdd.yml"
+          echo "FILE_0_BEGIN"
+          base64 -w0 "packages/admin-contracts/src/inventory.ts"
+          echo
+          echo "FILE_0_END"
+          echo "FILE_1_BEGIN"
+          base64 -w0 "packages/admin-contracts/src/index.ts"
+          echo
+          echo "FILE_1_END"
+          echo "FILE_2_BEGIN"
+          base64 -w0 "apps/admin/server/inventory/costing.test.ts"
+          echo
+          echo "FILE_2_END"
+          echo "FILE_3_BEGIN"
+          base64 -w0 "apps/admin/server/inventory/costing.ts"
+          echo
+          echo "FILE_3_END"
+          echo "FILE_4_BEGIN"
+          base64 -w0 "apps/admin/server/inventory/inventoryService.ts"
+          echo
+          echo "FILE_4_END"
+          echo "FILE_5_BEGIN"
+          base64 -w0 "packages/domain/src/models.ts"
+          echo
+          echo "FILE_5_END"
+          echo "FILE_6_BEGIN"
+          base64 -w0 "packages/domain/src/syncContract.ts"
+          echo
+          echo "FILE_6_END"
+          echo "FILE_7_BEGIN"
+          base64 -w0 "packages/persistence/src/contracts.ts"
+          echo
+          echo "FILE_7_END"
+          echo "FILE_8_BEGIN"
+          base64 -w0 "packages/persistence/src/sqlite/migrations.ts"
+          echo
+          echo "FILE_8_END"
+          echo "FILE_9_BEGIN"
+          base64 -w0 "packages/persistence/src/sqlite/SqliteOperationsDatabase.ts"
+          echo
+          echo "FILE_9_END"
+          echo "FILE_10_BEGIN"
+          base64 -w0 "packages/application/src/orders.ts"
+          echo
+          echo "FILE_10_END"
+          echo "FILE_11_BEGIN"
+          base64 -w0 "packages/application/src/ordersBoard.ts"
+          echo
+          echo "FILE_11_END"
+          echo "FILE_12_BEGIN"
+          base64 -w0 "packages/application/src/orderInventoryLifecycle.sqlite.test.ts"
+          echo
+          echo "FILE_12_END"
+          echo "FILE_13_BEGIN"
+          base64 -w0 "packages/sync/src/remoteMaterializer.ts"
+          echo
+          echo "FILE_13_END"
+          echo "FILE_14_BEGIN"
+          base64 -w0 "scripts/test-admin-order-inventory-lifecycle.mjs"
+          echo
+          echo "FILE_14_END"
+          echo "FILE_15_BEGIN"
+          base64 -w0 ".github/workflows/admin-plan4-inventory-purchasing-tdd.yml"
+          echo
+          echo "FILE_15_END"
