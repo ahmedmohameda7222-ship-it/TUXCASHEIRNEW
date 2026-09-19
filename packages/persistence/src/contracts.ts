@@ -71,6 +71,15 @@ export interface InventoryRepository {
     readonly availableMicros: number;
   }>;
   appendMovement(movement: InventoryMovement): Promise<void>;
+  upsertCanonicalMovement(movement: InventoryMovement): Promise<void>;
+  getWeightedUnitCost(itemId: InventoryItem['id']): Promise<number>;
+  putWeightedUnitCost(
+    shopId: ShopId,
+    itemId: InventoryItem['id'],
+    unitCostMinor: number,
+  ): Promise<void>;
+  getInventorySyncCursor(shopId: ShopId): Promise<string | null>;
+  setInventorySyncCursor(shopId: ShopId, cursor: string): Promise<void>;
   listMovementsForOrder(orderId: OrderId): Promise<readonly InventoryMovement[]>;
 }
 export interface ReconciliationRepository {
