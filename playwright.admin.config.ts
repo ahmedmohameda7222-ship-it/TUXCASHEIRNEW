@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   testMatch:
-    /admin-(?:auth|shell|catalog|catalog-publish|catalog-recurring-availability|settings|approvals-audit|approvals-pagination)\.spec\.ts/,
+    /admin-(?:auth|shell|catalog|catalog-publish|catalog-recurring-availability|settings|approvals-audit|approvals-pagination|inventory)\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
