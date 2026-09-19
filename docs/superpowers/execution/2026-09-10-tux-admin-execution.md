@@ -291,3 +291,19 @@ The Round 17 Codex thread `PRRT_kwDOT52lwc6i7kKz` is resolved. Because the conne
 The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
 
 Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
+
+
+## Plan 4 execution start — 2026-09-19
+
+**Plan:** `docs/superpowers/plans/2026-09-10-tux-admin-inventory-purchasing.md`  
+**Branch:** `feat/admin-04-inventory-purchasing`  
+**Base:** `469b5291c42ec6875daf59ee3f18cb5ae9478495` (includes the formatting-only baseline repair from PR #91)
+
+Pre-flight shared interfaces:
+- Tasks 1→2: Task 1 produces the canonical reservation/consumption/restore/release RPC and additive inventory ledger schema consumed by Operations lifecycle migration in Task 2.
+- Tasks 1→3: Task 3 Admin inventory actions consume Task 1 ledger/RPC semantics; UI must never edit stock projections directly.
+- Tasks 1/2→4: intelligence consumes Available = On Hand - Reserved and completed-order theoretical usage; reservations must not be subtracted twice.
+- Tasks 1/4→5: purchasing receiving/returns post immutable movements into the same canonical ledger and feed weighted-average cost/incoming quantities.
+- Mandatory hardening: OWNER-only emergency negative override is folded into Tasks 1–3; supplier-aware replenishment into Tasks 4–5; canonical Admin-origin inventory pull/convergence into Operations is required before Gate 4; central structured reason codes apply to waste/adjustment mutations.
+
+Ruling: keep the repository migration filename `20260910130000_admin_inventory_ledger.sql` specified by the approved plan for deterministic local migration-chain ordering. Production Supabase already contains later Plan 3 history, so applying this change to production is a separate guarded side effect and must not be performed implicitly while implementing the branch. If production promotion uses an out-of-order history operation, it requires explicit deployment evidence/authorization at that checkpoint.
