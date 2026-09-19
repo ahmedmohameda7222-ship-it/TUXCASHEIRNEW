@@ -16,6 +16,16 @@ type ReplenishmentDraft = {
   orderMultipleMicros: string;
 };
 
+type NumericReplenishmentDraftKey = Exclude<keyof ReplenishmentDraft, 'preferredPurchaseUnit'>;
+
+const NUMERIC_REPLENISHMENT_FIELDS = [
+  ['Par micros', 'parLevelMicros'],
+  ['Reorder point micros', 'reorderPointMicros'],
+  ['Lead time days', 'leadTimeDays'],
+  ['Minimum order micros', 'minimumOrderMicros'],
+  ['Order multiple micros', 'orderMultipleMicros'],
+] as const satisfies readonly (readonly [string, NumericReplenishmentDraftKey])[];
+
 export function ReorderSuggestionsPage({
   suggestions,
   canManage,
@@ -131,13 +141,7 @@ export function ReorderSuggestionsPage({
                       });
                     }}
                   >
-                    {[
-                      ['Par micros', 'parLevelMicros'],
-                      ['Reorder point micros', 'reorderPointMicros'],
-                      ['Lead time days', 'leadTimeDays'],
-                      ['Minimum order micros', 'minimumOrderMicros'],
-                      ['Order multiple micros', 'orderMultipleMicros'],
-                    ].map(([label, key]) => (
+                    {NUMERIC_REPLENISHMENT_FIELDS.map(([label, key]) => (
                       <label key={key}>
                         <span>{label}</span>
                         <input
