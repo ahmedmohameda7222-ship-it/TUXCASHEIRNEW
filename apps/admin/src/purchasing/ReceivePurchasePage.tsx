@@ -28,19 +28,23 @@ export function ReceivePurchasePage({
   onCancel(): void;
   onReceive(input: {
     supplierReference: string | null;
-    lines: readonly { lineId: string; receivedBaseMicros: number; unitCostMinor: number }[];
+    lines: readonly {
+      lineId: string;
+      receivedPurchaseUnitsMicros: number;
+      purchaseUnitCostMinor: number;
+    }[];
   }): void;
   onReturn(input: {
     supplierReference: string | null;
-    lines: readonly { lineId: string; returnedBaseMicros: number; unitCostMinor: number }[];
+    lines: readonly { lineId: string; returnedPurchaseUnitsMicros: number }[];
   }): void;
 }) {
   const eligible = useMemo(
     () =>
       order.lines.filter((line) =>
         mode === 'receive'
-          ? line.remainingBaseMicros > 0
-          : line.receivedBaseMicros - line.returnedBaseMicros > 0,
+          ? line.orderedPurchaseUnitsMicros - line.receivedPurchaseUnitsMicros > 0
+          : line.receivedPurchaseUnitsMicros - line.returnedPurchaseUnitsMicros > 0,
       ),
     [mode, order.lines],
   );
@@ -57,20 +61,19 @@ export function ReceivePurchasePage({
           const lines = eligible
             .map((line) => ({
               lineId: line.id,
-              receivedBaseMicros: micros(quantities[line.id] ?? ''),
-              unitCostMinor: minor(costs[line.id] ?? ''),
+              receivedPurchaseUnitsMicros: micros(quantities[line.id] ?? ''),
+              purchaseUnitCostMinor: minor(costs[line.id] ?? ''),
             }))
-            .filter((line) => line.receivedBaseMicros > 0);
+            .filter((line) => line.receivedPurchaseUnitsMicros > 0);
           if (lines.length > 0) onReceive({ supplierReference: reference.trim() || null, lines });
           return;
         }
         const lines = eligible
           .map((line) => ({
             lineId: line.id,
-            returnedBaseMicros: micros(quantities[line.id] ?? ''),
-            unitCostMinor: minor(costs[line.id] ?? ''),
+            returnedPurchaseUnitsMicros: micros(quantities[line.id] ?? ''),
           }))
-          .filter((line) => line.returnedBaseMicros > 0);
+          .filter((line) => line.returnedPurchaseUnitsMicros > 0);
         if (lines.length > 0) onReturn({ supplierReference: reference.trim() || null, lines });
       }}
     >
@@ -82,8 +85,11 @@ export function ReceivePurchasePage({
       {eligible.map((line) => (
         <div className="admin-form-grid" key={line.id}>
           <label>
-            {mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`}
+            {mode === 'receive'
+              ? `Receive ${line.itemName} (${line.purchaseUnitLabel})`
+              : `Return ${line.itemName} (${line.purchaseUnitLabel})`}
             <input
+              aria-label={mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`}
               inputMode="decimal"
               value={quantities[line.id] ?? ''}
               onChange={(event) => {
@@ -92,19 +98,20 @@ export function ReceivePurchasePage({
               }}
             />
           </label>
-          <label>
-            {mode === 'receive'
-              ? `Unit cost for ${line.itemName}`
-              : `Return unit cost for ${line.itemName}`}
-            <input
-              inputMode="decimal"
-              value={costs[line.id] ?? ''}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setCosts((current) => ({ ...current, [line.id]: value }));
-              }}
-            />
-          </label>
+          {mode === 'receive' ? (
+            <label>
+              {`Purchase-unit cost for ${line.itemName}`}
+              <input
+                aria-label={`Unit cost for ${line.itemName}`}
+                inputMode="decimal"
+                value={costs[line.id] ?? ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setCosts((current) => ({ ...current, [line.id]: value }));
+                }}
+              />
+            </label>
+          ) : null}
         </div>
       ))}
       <div className="admin-inventory-page-actions">
