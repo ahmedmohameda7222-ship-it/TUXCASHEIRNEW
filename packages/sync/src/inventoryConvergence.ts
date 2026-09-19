@@ -126,7 +126,7 @@ function parseMovement(value: unknown): InventoryMovement {
 function parseItem(value: unknown): InventoryItem {
   const source = object(value, 'Inventory feed item');
   const trackingMode = source['trackingMode'];
-  if (trackingMode !== 'RECIPE_TRACKED' && trackingMode !== 'DIRECT_STOCK') {
+  if (trackingMode !== 'RECIPE_TRACKED' && trackingMode !== 'BULK_MANUAL') {
     throw new TypeError('Inventory feed tracking mode is unsupported.');
   }
   if (typeof source['active'] !== 'boolean') throw new TypeError('Inventory item active is invalid.');
