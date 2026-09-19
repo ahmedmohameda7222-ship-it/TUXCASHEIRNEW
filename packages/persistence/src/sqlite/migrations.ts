@@ -406,6 +406,51 @@ CREATE TABLE whatsapp_drafts (
 );
 `,
   },
+
+  {
+    version: 11,
+    name: 'inventory_reservation_projection',
+    sql: `
+CREATE TABLE inventory_movements_v11 (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL REFERENCES shops(id),
+  business_day_id TEXT REFERENCES business_days(id),
+  item_id TEXT NOT NULL REFERENCES inventory_items(id),
+  movement_type TEXT NOT NULL,
+  quantity_delta_micros INTEGER NOT NULL,
+  reserved_delta_micros INTEGER NOT NULL DEFAULT 0,
+  idempotency_key TEXT NOT NULL,
+  worker_id TEXT NOT NULL REFERENCES workers(id),
+  order_id TEXT REFERENCES orders(id),
+  created_at TEXT NOT NULL,
+  compensates_movement_id TEXT REFERENCES inventory_movements_v11(id),
+  payload_json TEXT NOT NULL,
+  UNIQUE (shop_id, idempotency_key),
+  CHECK (quantity_delta_micros <> 0 OR reserved_delta_micros <> 0)
+);
+
+INSERT INTO inventory_movements_v11(
+  id, shop_id, business_day_id, item_id, movement_type,
+  quantity_delta_micros, reserved_delta_micros, idempotency_key,
+  worker_id, order_id, created_at, compensates_movement_id, payload_json
+)
+SELECT
+  id, shop_id, business_day_id, item_id, movement_type,
+  quantity_delta_micros, 0, idempotency_key,
+  worker_id, order_id, created_at, compensates_movement_id, payload_json
+FROM inventory_movements;
+
+DROP TABLE inventory_movements;
+ALTER TABLE inventory_movements_v11 RENAME TO inventory_movements;
+
+CREATE INDEX idx_inventory_movements_item
+  ON inventory_movements(item_id, created_at);
+CREATE INDEX idx_inventory_movements_business_day
+  ON inventory_movements(business_day_id, created_at);
+CREATE INDEX idx_inventory_movements_order
+  ON inventory_movements(order_id, created_at, id);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {
