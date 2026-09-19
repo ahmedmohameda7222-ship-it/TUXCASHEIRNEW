@@ -10,6 +10,10 @@ const sqliteDatabase = fs.readFileSync(
   'utf8',
 );
 const remoteMaterializer = fs.readFileSync('packages/sync/src/remoteMaterializer.ts', 'utf8');
+const inventoryMigration = fs.readFileSync(
+  'supabase/migrations/20260910130000_admin_inventory_ledger.sql',
+  'utf8',
+);
 
 for (const movementType of [
   'ORDER_RESERVATION',
@@ -88,6 +92,12 @@ const indexedDb = fs.readFileSync(
 
 if (!models.includes('workerId: WorkerId | null')) {
   throw new Error('canonical Admin inventory movements must not be forged as worker-originated');
+}
+if (!inventoryMigration.includes('inventory_movement_feed')) {
+  throw new Error('canonical inventory convergence needs an ingestion-ordered server feed');
+}
+if (!inventoryMigration.includes('capture_inventory_movement_feed_v1')) {
+  throw new Error('canonical inventory feed must capture every newly materialized movement');
 }
 if (!sqliteMigrations.includes('inventory_sync_cursors')) {
   throw new Error('SQLite must persist a durable monotonic inventory sync cursor');
