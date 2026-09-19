@@ -2,6 +2,7 @@ import {
   instant,
   parseEntityId,
   stockQuantityMicros,
+  type EntityId,
   type InventoryItem,
   type InventoryMovement,
   type InventoryMovementId,
@@ -78,7 +79,7 @@ function nonNegativeFinite(value: unknown, label: string): number {
   return value;
 }
 
-function nullableEntityId<Id extends string>(value: unknown, label: string): Id | null {
+function nullableEntityId<Id extends EntityId>(value: unknown, label: string): Id | null {
   if (value === null) return null;
   return parseEntityId<Id>(stringValue(value, label));
 }
@@ -173,10 +174,12 @@ export class HttpInventoryFeedTransport implements InventoryFeedTransport {
     target.searchParams.set('shopId', shopId);
     if (cursor !== null) target.searchParams.set('cursor', cursor);
     const dynamicHeaders = (await this.#headerProvider?.()) ?? {};
+    const sameOrigin =
+      typeof globalThis.location !== 'undefined' && target.origin === globalThis.location.origin;
     const response = await this.#fetcher(target, {
       method: 'GET',
       headers: { accept: 'application/json', ...this.#headers, ...dynamicHeaders },
-      credentials: target.origin === globalThis.location?.origin ? 'same-origin' : undefined,
+      ...(sameOrigin ? { credentials: 'same-origin' as const } : {}),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
