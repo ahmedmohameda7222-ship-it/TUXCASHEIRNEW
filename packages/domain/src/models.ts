@@ -310,13 +310,22 @@ export interface InventoryItem {
 }
 
 export type InventoryMovementType =
+  | 'ORDER_RESERVATION'
+  | 'ORDER_RESERVATION_RELEASE'
   | 'ORDER_CONSUMPTION'
+  | 'ORDER_CONSUMPTION_REVERSAL'
   | 'CANCEL_RESTOCK'
   | 'BULK_UNIT_FINISHED'
   | 'BULK_STOCK_RECEIVED'
   | 'UNDO_BULK_UNIT_FINISHED'
   | 'UNDO_BULK_STOCK_RECEIVED'
-  | 'ADMIN_ADJUSTMENT';
+  | 'ADMIN_ADJUSTMENT'
+  | 'WASTE'
+  | 'STOCKTAKE_ADJUSTMENT'
+  | 'TRANSFER_OUT'
+  | 'TRANSFER_IN'
+  | 'PURCHASE_RECEIPT'
+  | 'PURCHASE_RETURN';
 
 export interface InventoryMovement {
   readonly id: InventoryMovementId;
@@ -325,6 +334,8 @@ export interface InventoryMovement {
   readonly itemId: InventoryItemId;
   readonly movementType: InventoryMovementType;
   readonly quantityDeltaMicros: StockQuantityMicros;
+  /** Reservation projection delta; absent on legacy persisted movements and treated as zero. */
+  readonly reservedDeltaMicros?: StockQuantityMicros;
   readonly idempotencyKey: string;
   readonly workerId: WorkerId;
   readonly orderId: OrderId | null;
