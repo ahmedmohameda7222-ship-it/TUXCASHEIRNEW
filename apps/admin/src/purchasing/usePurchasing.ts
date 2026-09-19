@@ -62,9 +62,7 @@ export function usePurchasing(shopId: string | undefined) {
     if (!shopId) throw new PurchasingUiError('concrete_shop_required');
     const retainedIntent = { shopId, intent };
     const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
-    return post(buildCommand(retainedCommandId), () =>
-      commandIds.complete(scope, retainedIntent),
-    );
+    return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
   }
 
   async function invalidate(): Promise<void> {
