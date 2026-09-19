@@ -123,11 +123,18 @@ psql(
        '${EMPLOYEE_ID}', timestamptz '2026-09-19 00:05:00+00',
        'create-po-test', 'order-po-test'
      );
+     insert into public.inventory_unit_conversions(
+       shop_id, inventory_item_id, purchase_unit_label, base_micros_per_purchase_unit, active
+     ) values (
+       '${SHOP_ID}', '${ITEM_ID}', 'kg', 1000000000, true
+     );
      insert into public.purchase_order_lines(
        id, purchase_order_id, inventory_item_id, purchase_unit_label,
-       ordered_base_micros, expected_unit_cost_minor
+       base_micros_per_purchase_unit, ordered_purchase_units_micros,
+       ordered_base_micros, expected_purchase_unit_cost_minor, expected_unit_cost_minor
      ) values (
-       '${LINE_ID}', '${PO_ID}', '${ITEM_ID}', 'kg', 1000000, 180
+       '${LINE_ID}', '${PO_ID}', '${ITEM_ID}', 'kg',
+       1000000000, 1000, 1000000, 180000, 180
      );`,
   ],
   'Purchasing fixture seed',
