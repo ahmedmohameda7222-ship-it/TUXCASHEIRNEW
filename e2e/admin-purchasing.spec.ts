@@ -24,8 +24,9 @@ async function mockPurchasing(page: Page) {
   const commands: Command[] = [];
   let status: 'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'DRAFT';
   let version = 1;
-  let receivedBaseMicros = 0;
-  let returnedBaseMicros = 0;
+  const baseMicrosPerPurchaseUnit = 2_000_000;
+  let receivedPurchaseUnitsMicros = 0;
+  let returnedPurchaseUnitsMicros = 0;
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -75,10 +76,19 @@ async function mockPurchasing(page: Page) {
                   itemName: 'Beef',
                   unitLabel: 'kg',
                   purchaseUnitLabel: 'case',
+                  baseMicrosPerPurchaseUnit,
+                  orderedPurchaseUnitsMicros: 5_000_000,
+                  receivedPurchaseUnitsMicros,
+                  returnedPurchaseUnitsMicros,
                   orderedBaseMicros: 10_000_000,
-                  receivedBaseMicros,
-                  returnedBaseMicros,
-                  remainingBaseMicros: 10_000_000 - receivedBaseMicros,
+                  receivedBaseMicros:
+                    (receivedPurchaseUnitsMicros * baseMicrosPerPurchaseUnit) / 1_000_000,
+                  returnedBaseMicros:
+                    (returnedPurchaseUnitsMicros * baseMicrosPerPurchaseUnit) / 1_000_000,
+                  remainingBaseMicros:
+                    10_000_000 -
+                    (receivedPurchaseUnitsMicros * baseMicrosPerPurchaseUnit) / 1_000_000,
+                  expectedPurchaseUnitCostMinor: 24000,
                   expectedUnitCostMinor: 12000,
                 },
               ],
@@ -99,15 +109,18 @@ async function mockPurchasing(page: Page) {
       version += 1;
     }
     if (command.type === 'po.receive') {
-      receivedBaseMicros += Number(
-        (command.lines as Array<{ receivedBaseMicros: number }>)[0]?.receivedBaseMicros ?? 0,
+      receivedPurchaseUnitsMicros += Number(
+        (command.lines as Array<{ receivedPurchaseUnitsMicros: number }>)[0]
+          ?.receivedPurchaseUnitsMicros ?? 0,
       );
-      status = receivedBaseMicros < 10_000_000 ? 'PARTIALLY_RECEIVED' : 'RECEIVED';
+      status =
+        receivedPurchaseUnitsMicros < 5_000_000 ? 'PARTIALLY_RECEIVED' : 'RECEIVED';
       version += 1;
     }
     if (command.type === 'po.return') {
-      returnedBaseMicros += Number(
-        (command.lines as Array<{ returnedBaseMicros: number }>)[0]?.returnedBaseMicros ?? 0,
+      returnedPurchaseUnitsMicros += Number(
+        (command.lines as Array<{ returnedPurchaseUnitsMicros: number }>)[0]
+          ?.returnedPurchaseUnitsMicros ?? 0,
       );
       version += 1;
     }
@@ -153,8 +166,8 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await expect(page.getByText('ORDERED').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Receive purchase' }).click();
-  await page.getByLabel('Receive Beef').fill('4');
-  await page.getByLabel('Unit cost for Beef').fill('125');
+  await page.getByLabel('Receive Beef').fill('2');
+  await page.getByLabel('Unit cost for Beef').fill('250');
   await page.getByLabel('Supplier reference').fill('INV-100');
   await page.getByRole('button', { name: 'Post receipt' }).click();
 
@@ -162,8 +175,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await expect(page.getByText(/6 kg remaining/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Return purchase' }).click();
-  await page.getByLabel('Return Beef').fill('1');
-  await page.getByLabel('Return unit cost for Beef').fill('125');
+  await page.getByLabel('Return Beef').fill('0.5');
   await page.getByLabel('Return reference').fill('CN-100');
   await page.getByRole('button', { name: 'Post return' }).click();
 
@@ -172,12 +184,18 @@ test('purchasing posts partial receiving and purchase returns without pretending
       expect.objectContaining({
         type: 'po.receive',
         purchaseOrderId: poId,
-        lines: [{ lineId, receivedBaseMicros: 4_000_000, unitCostMinor: 12500 }],
+        lines: [
+          {
+            lineId,
+            receivedPurchaseUnitsMicros: 2_000_000,
+            purchaseUnitCostMinor: 25000,
+          },
+        ],
       }),
       expect.objectContaining({
         type: 'po.return',
         purchaseOrderId: poId,
-        lines: [{ lineId, returnedBaseMicros: 1_000_000, unitCostMinor: 12500 }],
+        lines: [{ lineId, returnedPurchaseUnitsMicros: 500_000 }],
       }),
     ]),
   );
