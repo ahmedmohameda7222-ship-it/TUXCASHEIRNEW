@@ -82,15 +82,12 @@ describe('approval execution production runner', () => {
     expect(execute).toHaveBeenCalledWith();
   });
 
-  it('deploys the approval executor every minute through the Admin Vercel contract', async () => {
+  it('does not register the approval executor as a Vercel Cron Job', async () => {
     const raw = await readFile(new URL('../../vercel.json', import.meta.url), 'utf8');
     const config = JSON.parse(raw) as {
       crons?: Array<{ path: string; schedule: string }>;
     };
 
-    expect(config.crons).toContainEqual({
-      path: '/api/cron/admin-approval-executor',
-      schedule: '* * * * *',
-    });
+    expect(config).not.toHaveProperty('crons');
   });
 });
