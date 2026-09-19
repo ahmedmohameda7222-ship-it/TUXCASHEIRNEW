@@ -95,6 +95,22 @@ export function useInventory(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
+  const updateReplenishment = useMutation({
+    mutationFn: async (input: {
+      inventoryItemId: string;
+      parLevelMicros: number;
+      reorderPointMicros: number;
+      preferredPurchaseUnit: string | null;
+      leadTimeDays: number;
+      minimumOrderMicros: number | null;
+      orderMultipleMicros: number | null;
+    }) => {
+      if (!shopId) throw new InventoryUiError('concrete_shop_required');
+      return post({ type: 'replenishment.update', shopId, ...input });
+    },
+    onSuccess: invalidate,
+  });
+
   const sendTransfer = useMutation({
     mutationFn: async (input: {
       destinationShopId: string;
@@ -119,6 +135,7 @@ export function useInventory(shopId: string | undefined) {
     adjustStock,
     recordWaste,
     postStocktake,
+    updateReplenishment,
     sendTransfer,
     receiveTransfer,
   };
