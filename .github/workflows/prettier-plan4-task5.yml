@@ -1,0 +1,36 @@
+name: Plan 4 Task 5 Exact Prettier
+
+on:
+  push:
+    branches:
+      - feat/admin-04-inventory-purchasing
+    paths:
+      - '.github/workflows/prettier-plan4-task5.yml'
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Render exact Task 5 formatting
+        run: |
+          npx prettier --write "apps/admin/server/inventory/intelligenceService.ts"
+          npx prettier --write "apps/admin/server/purchasing/purchasingService.test.ts"
+          npx prettier --write ".github/workflows/admin-plan4-inventory-purchasing-tdd.yml"
+          echo "FILE_0_BEGIN"
+          base64 -w0 "apps/admin/server/inventory/intelligenceService.ts"
+          echo
+          echo "FILE_0_END"
+          echo "FILE_1_BEGIN"
+          base64 -w0 "apps/admin/server/purchasing/purchasingService.test.ts"
+          echo
+          echo "FILE_1_END"
+          echo "FILE_2_BEGIN"
+          base64 -w0 ".github/workflows/admin-plan4-inventory-purchasing-tdd.yml"
+          echo
+          echo "FILE_2_END"
