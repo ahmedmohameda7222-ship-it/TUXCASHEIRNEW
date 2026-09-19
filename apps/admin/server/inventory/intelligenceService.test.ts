@@ -168,8 +168,6 @@ describe('inventory intelligence purchasing integration', () => {
       inventoryItemId: 'item-1',
       actualUsageMicros: 10_100,
     });
-    expect(
-      select.mock.calls.filter(([table]) => table === 'inventory_movements'),
-    ).toHaveLength(2);
+    expect(select.mock.calls.filter(([table]) => table === 'inventory_movements')).toHaveLength(2);
   });
 });
