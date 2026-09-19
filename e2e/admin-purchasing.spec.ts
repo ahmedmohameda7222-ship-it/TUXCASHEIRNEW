@@ -134,8 +134,8 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
   await page.goto('/purchasing');
 
   await expect(page.getByRole('heading', { name: 'Purchasing' })).toBeVisible();
-  await expect(page.getByText('Prime Foods')).toBeVisible();
-  await expect(page.getByText('PO-100')).toBeVisible();
+  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+  await expect(page.getByText('PO-100').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Mark ordered' }).click();
 
@@ -155,7 +155,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await page.goto('/purchasing');
 
   await page.getByRole('button', { name: 'Mark ordered' }).click();
-  await expect(page.getByText('ORDERED')).toBeVisible();
+  await expect(page.getByText('ORDERED').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Receive purchase' }).click();
   await page.getByLabel('Receive Beef').fill('4');
@@ -163,7 +163,7 @@ test('purchasing posts partial receiving and purchase returns without pretending
   await page.getByLabel('Supplier reference').fill('INV-100');
   await page.getByRole('button', { name: 'Post receipt' }).click();
 
-  await expect(page.getByText('PARTIALLY RECEIVED')).toBeVisible();
+  await expect(page.getByText('PARTIALLY RECEIVED').first()).toBeVisible();
   await expect(page.getByText(/6 kg remaining/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Return purchase' }).click();
