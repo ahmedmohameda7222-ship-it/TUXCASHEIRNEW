@@ -120,7 +120,27 @@ async function mockInventory(page: Page) {
     if (command.type === 'waste') {
       onHandMicros -= Number(command.quantityMicros);
     }
-    if (command.type === 'stocktake') {
+    if (command.type === 'stocktake.begin') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          idempotentReplay: false,
+          stocktakeId: '99999999-9999-4999-8999-999999999999',
+          lines: [
+            {
+              inventoryItemId: itemId,
+              snapshotOnHandMicros: onHandMicros,
+              snapshotReservedMicros: reservedMicros,
+              unitCostMinor: 12000,
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (command.type === 'stocktake.post') {
       const lines = command.lines as Array<{ actualCountMicros: number }>;
       onHandMicros = lines[0]?.actualCountMicros ?? onHandMicros;
     }
@@ -202,17 +222,23 @@ test('inventory stocktake exposes variance/recount/approval state and posts immu
   await page.getByRole('button', { name: 'Stock count' }).click();
 
   await expect(page.getByText('Snapshot on hand')).toBeVisible();
-  await expect(page.getByText('Recount state')).toBeVisible();
-  await expect(page.getByText('Approval required')).toBeVisible();
+  await expect(page.getByText('Count boundary')).toBeVisible();
+  await expect(page.getByText('Concurrent movements')).toBeVisible();
 
   await page.getByLabel('Actual count for Beef').fill('3.0');
   await expect(page.getByText('-0.2 kg')).toBeVisible();
   await page.getByRole('button', { name: 'Post stock count' }).click();
 
-  await expect.poll(() => fixture.commands.length).toBe(1);
+  await expect.poll(() => fixture.commands.length).toBe(2);
   expect(fixture.commands[0]).toMatchObject({
-    type: 'stocktake',
+    type: 'stocktake.begin',
     shopId,
+    inventoryItemIds: [itemId],
+  });
+  expect(fixture.commands[1]).toMatchObject({
+    type: 'stocktake.post',
+    shopId,
+    stocktakeId: '99999999-9999-4999-8999-999999999999',
     lines: [{ inventoryItemId: itemId, actualCountMicros: 3_000_000 }],
   });
 });
