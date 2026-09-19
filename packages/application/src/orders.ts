@@ -667,7 +667,7 @@ export class OperationsOrdersService {
             for (const [itemId, requiredMicros] of inventoryUsage) {
               if (requiredMicros === 0) continue;
               const balance = await transaction.inventory.getBalance(itemId);
-              if (balance.availableMicros < requiredMicros) {
+              if (balance.initialized && balance.availableMicros < requiredMicros) {
                 throw new DomainInvariantError(
                   `Insufficient available stock for inventory item ${itemId}.`,
                 );
