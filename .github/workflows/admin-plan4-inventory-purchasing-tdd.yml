@@ -225,6 +225,7 @@ jobs:
           packages/application/src/ordersOnlineSource.sqlite.test.ts
           packages/application/src/onlineOrderAcceptance.test.ts
           packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+          packages/persistence/src/sqlite/SqliteOperationsDatabase.inventoryConvergence.test.ts
           apps/operations-desktop/src/main/ordersBoard.integration.test.ts
           packages/domain/src/syncContract.test.ts
           packages/sync/src/remoteMaterializer.test.ts
