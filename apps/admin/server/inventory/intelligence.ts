@@ -13,6 +13,13 @@ function finiteNonNegative(value: number, label: string): number {
   return value;
 }
 
+function finite(value: number, label: string): number {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`${label} must be finite.`);
+  }
+  return value;
+}
+
 function optionalPositive(value: number | null | undefined, label: string): number | null {
   if (value === null || value === undefined) return null;
   if (!Number.isFinite(value) || value <= 0) {
@@ -22,7 +29,7 @@ function optionalPositive(value: number | null | undefined, label: string): numb
 }
 
 export function suggestOrderQuantity(input: ReorderSuggestionInput): number {
-  const available = finiteNonNegative(input.available, 'available');
+  const available = finite(input.available, 'available');
   const par = finiteNonNegative(input.par, 'par');
   const incoming = finiteNonNegative(input.incoming, 'incoming');
   const minimumOrder = optionalPositive(input.minimumOrder, 'minimum order');
