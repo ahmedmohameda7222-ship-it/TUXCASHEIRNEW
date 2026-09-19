@@ -490,7 +490,7 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
-      sendJson(response, 200, await loadWorkspace(client, context, shopId));
+      sendJson(response, 200, { ...(await loadWorkspace(client, context, shopId)) });
       return;
     }
 
