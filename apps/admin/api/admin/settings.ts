@@ -5,9 +5,9 @@ import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
-} from '../../server/adminAuthService';
-import { AdminAuthorizationError } from '../../server/authorization';
-import { getAdminServerEnv } from '../../server/env';
+} from '../../server/adminAuthService.js';
+import { AdminAuthorizationError } from '../../server/authorization.js';
+import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
   readJsonObject,
@@ -15,20 +15,20 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http';
-import { readAdminSessionToken } from '../../server/session';
-import { updateShopOperationalState } from '../../server/settings/settingsOperationalState';
+} from '../../server/http.js';
+import { readAdminSessionToken } from '../../server/session.js';
+import { updateShopOperationalState } from '../../server/settings/settingsOperationalState.js';
 import {
   createSettingsService,
   createSupabaseSettingsStore,
   SettingsServiceError,
-} from '../../server/settings/settingsService';
+} from '../../server/settings/settingsService.js';
 import {
   updateShopIdentity,
   upsertShopSpecialHours,
   upsertShopWeeklyHours,
-} from '../../server/settings/settingsShopManagement';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
+} from '../../server/settings/settingsShopManagement.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
 const uuidSchema = z.string().uuid();

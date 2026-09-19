@@ -7,23 +7,23 @@ import {
   type AdminSessionPrincipal,
 } from '@tux/admin-contracts';
 
-import type { AdminServerEnv } from './env';
+import type { AdminServerEnv } from './env.js';
 import {
   claimAdminPinAttempt,
   clearAdminPinAttempts,
   createAdminPinRateLimitRpc,
   deriveAdminRateKey,
   type AdminClientFingerprint,
-} from './loginRateLimit';
-import { pinLookupHash, verifyPin } from './pin';
+} from './loginRateLimit.js';
+import { pinLookupHash, verifyPin } from './pin.js';
 import {
   createSessionMaterial,
   csrfMatches,
   deriveAdminCsrfToken,
   sha256Hex,
   type AdminSessionMaterial,
-} from './session';
-import type { AdminSupabaseClient } from './supabaseAdmin';
+} from './session.js';
+import type { AdminSupabaseClient } from './supabaseAdmin.js';
 
 export type AdminEmployeeRow = {
   id: string;

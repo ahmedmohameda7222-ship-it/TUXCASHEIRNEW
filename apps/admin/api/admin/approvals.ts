@@ -6,19 +6,19 @@ import {
   loadAdminSession,
   requireSessionCsrf,
   type AdminSessionContext,
-} from '../../server/adminAuthService';
-import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit';
+} from '../../server/adminAuthService.js';
+import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit.js';
 import {
   approveRequest,
   createSupabaseApprovalServiceDependencies,
   rejectRequest,
-} from '../../server/approvals/approvalService';
+} from '../../server/approvals/approvalService.js';
 import {
   listApprovalReadPage,
   type ApprovalReadCursor,
-} from '../../server/approvals/approvalReadService';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
-import { getAdminServerEnv } from '../../server/env';
+} from '../../server/approvals/approvalReadService.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import { getAdminServerEnv } from '../../server/env.js';
 import {
   clientFingerprint,
   firstHeader,
@@ -27,10 +27,10 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http';
-import { AdminRateLimitError, createAdminPinRateLimitRpc } from '../../server/loginRateLimit';
-import { readAdminSessionToken } from '../../server/session';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
+} from '../../server/http.js';
+import { AdminRateLimitError, createAdminPinRateLimitRpc } from '../../server/loginRateLimit.js';
+import { readAdminSessionToken } from '../../server/session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
 const statusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXECUTING', 'EXECUTED', 'FAILED']);

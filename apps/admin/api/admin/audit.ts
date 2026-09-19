@@ -1,17 +1,17 @@
 import type { AdminApprovalStatus } from '@tux/admin-contracts';
 import { z } from 'zod';
 
-import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService';
+import { AdminAuthError, loadAdminSession } from '../../server/adminAuthService.js';
 import {
   listAuditActorOptions,
   listAuditReadPage,
   type AuditReadCursor,
-} from '../../server/audit/auditReadService';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
-import { getAdminServerEnv } from '../../server/env';
-import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http';
-import { readAdminSessionToken } from '../../server/session';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
+} from '../../server/audit/auditReadService.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import { getAdminServerEnv } from '../../server/env.js';
+import { firstHeader, sendJson, type AdminRequest, type AdminResponse } from '../../server/http.js';
+import { readAdminSessionToken } from '../../server/session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
 const textFilterSchema = z.string().trim().min(1).max(160);

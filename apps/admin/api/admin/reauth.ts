@@ -2,7 +2,7 @@ import {
   handleAdminReauth,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/adminAuthGateway';
+} from '../../server/adminAuthGateway.js';
 
 export default async function handler(
   request: AdminRequest,

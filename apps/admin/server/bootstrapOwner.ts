@@ -1,4 +1,4 @@
-import { hashPin, pinLookupHash } from './pin';
+import { hashPin, pinLookupHash } from './pin.js';
 
 export class OwnerBootstrapError extends Error {
   constructor(readonly code: 'owner_already_exists' | 'pin_already_in_use' | 'bootstrap_failed') {
