@@ -34,10 +34,15 @@ export type AdminPurchaseOrderLine = {
   readonly itemName: string;
   readonly unitLabel: string;
   readonly purchaseUnitLabel: string;
+  readonly baseMicrosPerPurchaseUnit: number;
+  readonly orderedPurchaseUnitsMicros: number;
+  readonly receivedPurchaseUnitsMicros: number;
+  readonly returnedPurchaseUnitsMicros: number;
   readonly orderedBaseMicros: number;
   readonly receivedBaseMicros: number;
   readonly returnedBaseMicros: number;
   readonly remainingBaseMicros: number;
+  readonly expectedPurchaseUnitCostMinor: number;
   readonly expectedUnitCostMinor: number;
 };
 
@@ -85,8 +90,8 @@ export type CreatePurchaseOrderInput = {
   readonly lines: readonly {
     readonly inventoryItemId: string;
     readonly purchaseUnitLabel: string;
-    readonly orderedBaseMicros: number;
-    readonly expectedUnitCostMinor: number;
+    readonly orderedPurchaseUnitsMicros: number;
+    readonly expectedPurchaseUnitCostMinor: number;
   }[];
   readonly commandId: string;
 };
@@ -106,8 +111,8 @@ export type ReceivePurchaseInput = {
   readonly supplierReference: string | null;
   readonly lines: readonly {
     readonly lineId: string;
-    readonly receivedBaseMicros: number;
-    readonly unitCostMinor: number;
+    readonly receivedPurchaseUnitsMicros: number;
+    readonly purchaseUnitCostMinor: number;
   }[];
 };
 
@@ -118,8 +123,7 @@ export type ReturnPurchaseInput = {
   readonly supplierReference: string | null;
   readonly lines: readonly {
     readonly lineId: string;
-    readonly returnedBaseMicros: number;
-    readonly unitCostMinor: number;
+    readonly returnedPurchaseUnitsMicros: number;
   }[];
 };
 
