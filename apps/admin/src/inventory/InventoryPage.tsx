@@ -5,12 +5,14 @@ import { useShopScope } from '../shops/ShopScopeProvider';
 import { AdjustStockSheet } from './AdjustStockSheet';
 import { InventoryItemPage } from './InventoryItemPage';
 import { RecordWasteSheet } from './RecordWasteSheet';
+import { ReorderSuggestionsPage } from './ReorderSuggestionsPage';
 import { StocktakePage } from './StocktakePage';
 import { TransferPage } from './TransferPage';
 import { useInventory } from './useInventory';
+import { VarianceReport } from './VarianceReport';
 import './inventory.css';
 
-type WorkspaceMode = 'detail' | 'stocktake' | 'transfer';
+type WorkspaceMode = 'detail' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
@@ -48,6 +50,7 @@ export function InventoryPage() {
   const canAdjust = principal.permissions.includes('inventory.adjust');
   const canStocktake = principal.permissions.includes('inventory.stocktake');
   const canTransfer = principal.permissions.includes('inventory.transfer');
+  const canManageReplenishment = principal.permissions.includes('purchasing.manage');
   const canOverrideNegative =
     principal.role === 'OWNER' && principal.permissions.includes('inventory.override_negative');
 
@@ -86,6 +89,26 @@ export function InventoryPage() {
               Stock count
             </button>
           ) : null}
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              setMode('reorder');
+              setItemAction(null);
+            }}
+          >
+            Reorder
+          </button>
+          <button
+            className="admin-secondary-button"
+            type="button"
+            onClick={() => {
+              setMode('variance');
+              setItemAction(null);
+            }}
+          >
+            Variance & margins
+          </button>
           {canTransfer ? (
             <button
               className="admin-primary-button"
@@ -101,7 +124,24 @@ export function InventoryPage() {
         </div>
       }
     >
-      {mode === 'stocktake' ? (
+      {mode === 'reorder' ? (
+        <ReorderSuggestionsPage
+          suggestions={workspace.intelligence.reorderSuggestions}
+          canManage={canManageReplenishment}
+          saving={inventory.updateReplenishment.isPending}
+          onBack={() => setMode('detail')}
+          onSave={(inventoryItemId, input) =>
+            inventory.updateReplenishment.mutate({ inventoryItemId, ...input })
+          }
+        />
+      ) : mode === 'variance' ? (
+        <VarianceReport
+          periodLabel={workspace.intelligence.periodLabel}
+          variances={workspace.intelligence.variances}
+          marginAlerts={workspace.intelligence.marginAlerts}
+          onBack={() => setMode('detail')}
+        />
+      ) : mode === 'stocktake' ? (
         <StocktakePage
           items={items}
           pending={inventory.postStocktake.isPending}
