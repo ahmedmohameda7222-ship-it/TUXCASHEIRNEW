@@ -124,6 +124,7 @@ describe('inventory intelligence purchasing integration', () => {
       availableMicros: 6_000,
     });
   });
+
   it('aggregates every movement in the reporting window beyond the first 10,000 rows', async () => {
     const firstPage = Array.from({ length: 10_000 }, () => ({
       inventory_item_id: 'item-1',
@@ -137,7 +138,14 @@ describe('inventory intelligence purchasing integration', () => {
         return offset === 0
           ? firstPage
           : offset === 10_000
-            ? [{ inventory_item_id: 'item-1', movement_type: 'WASTE', quantity_delta_micros: -100, order_id: null }]
+            ? [
+                {
+                  inventory_item_id: 'item-1',
+                  movement_type: 'WASTE',
+                  quantity_delta_micros: -100,
+                  order_id: null,
+                },
+              ]
             : [];
       }
       if (table === 'inventory_replenishment_settings') return [];
@@ -160,7 +168,8 @@ describe('inventory intelligence purchasing integration', () => {
       inventoryItemId: 'item-1',
       actualUsageMicros: 10_100,
     });
-    expect(select.mock.calls.filter(([table]) => table === 'inventory_movements')).toHaveLength(2);
+    expect(
+      select.mock.calls.filter(([table]) => table === 'inventory_movements'),
+    ).toHaveLength(2);
   });
-
 });
