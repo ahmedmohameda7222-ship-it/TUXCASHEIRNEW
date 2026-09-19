@@ -10,6 +10,7 @@ on:
     branches:
       - feat/admin-04-inventory-purchasing
       - feat/admin-04-inventory-intelligence
+      - feat/admin-04-purchasing
     paths:
       - 'supabase/migrations/**'
       - 'scripts/test-admin-inventory-ledger-migration.mjs'
@@ -174,6 +175,21 @@ jobs:
           apps/admin/src/inventory/VarianceReport.test.tsx
       - name: Plan 4 Task 4 typecheck
         run: npm run typecheck
+
+
+  task5-purchasing:
+    needs: ledger-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 4 Task 5 purchasing rules
+        run: npx vitest run apps/admin/server/purchasing/purchasingService.test.ts
 
 
   task1-regression:
