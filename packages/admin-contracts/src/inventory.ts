@@ -129,3 +129,49 @@ export type AdminInventoryCommandResult =
       readonly inventoryItemId?: string;
       readonly availableMicros?: number;
     };
+
+
+export interface AdminReorderSuggestion {
+  readonly inventoryItemId: string;
+  readonly itemName: string;
+  readonly unitLabel: string;
+  readonly availableMicros: number;
+  readonly parLevelMicros: number;
+  readonly reorderPointMicros: number;
+  readonly incomingMicros: number;
+  readonly suggestedOrderMicros: number;
+  readonly preferredSupplierName: string | null;
+  readonly preferredPurchaseUnitLabel: string | null;
+  readonly leadTimeDays: number;
+  readonly minimumOrderMicros: number | null;
+  readonly orderMultipleMicros: number | null;
+}
+
+export interface AdminInventoryUsageVariance {
+  readonly inventoryItemId: string;
+  readonly itemName: string;
+  readonly unitLabel: string;
+  readonly actualUsageMicros: number;
+  readonly theoreticalUsageMicros: number;
+  readonly varianceMicros: number;
+  readonly variancePercent: number | null;
+}
+
+export interface AdminRecipeMarginContributor {
+  readonly inventoryItemId: string;
+  readonly name: string;
+  readonly costMinor: number;
+  readonly sharePercent: number;
+}
+
+export interface AdminRecipeMarginAlert {
+  readonly productId: string;
+  readonly productName: string;
+  readonly sellingPriceMinor: number;
+  readonly recipeCostMinor: number;
+  readonly currentCostPercent: number;
+  readonly targetCostPercent: number;
+  readonly overTargetPercentagePoints: number;
+  readonly alert: boolean;
+  readonly contributors: readonly AdminRecipeMarginContributor[];
+}
