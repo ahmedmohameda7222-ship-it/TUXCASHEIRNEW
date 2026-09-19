@@ -902,7 +902,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $waste$
 declare
   v_business_id uuid;
   v_role text;
@@ -1053,7 +1053,7 @@ begin
     'availableMicros', v_new_available
   );
 end;
-$;
+$waste$;
 
 create or replace function public.post_stocktake_v1(
   p_employee_id uuid,
