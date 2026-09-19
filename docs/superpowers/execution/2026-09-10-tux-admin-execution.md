@@ -370,3 +370,27 @@ Evidence at exact branch head `02a954768cb72e9d6e24a1939b30812ea72838f7`:
 - Task 4 behavior covers reorder suggestions with minimum/order-multiple rounding, negative available stock, replenishment metadata, actual-vs-theoretical variance, food-cost margin alerts, and inventory intelligence UI.
 
 Task 4 Ruling: `incomingMicros` intentionally remains zero until Task 5 introduces canonical open-PO line quantities. Task 5 must replace this placeholder with open purchase-order remainder without changing on-hand stock before receiving. Replenishment suggestions remain recommendations only and never auto-create or transmit supplier orders.
+
+
+### Task 5: complete
+
+Evidence at exact code head `caa37bba117f2bce567e5dd89f992613201e83db`:
+- Plan 4 workflow run `35431388442`: 8/8 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task4-intelligence`, `task5-purchasing`, `task5-postgres`, and `task1-regression`).
+- Task 5 service, open-PO incoming intelligence, migration invariant, and rendered Admin purchasing E2E are GREEN.
+- Task 5 PostgreSQL behavior is GREEN for partial receiving, immutable purchase-receipt movements, weighted-average cost update, supplier price history, audit creation, idempotent sequential replay, completion of the remaining PO quantity, and purchase return posting.
+- Root TUX V2 CI run `35431388443`: every job GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration tests, security gates, typecheck, production builds, provisioning/migration smoke, function-auth contract, Edge typecheck, and rendered browser E2E.
+- Root `admin` passed the Admin security boundary, typecheck, production build, and rendered Admin E2E including the purchasing flow.
+
+The final Task 5 rendered failure was diagnosed from the permanent Admin Playwright trace rather than by changing product behavior speculatively. The purchasing test had first been accidentally registered as an Operations `*.e2e.ts` test, which ran against the Operations Vite server. After moving it into the Admin Playwright suite, the real browser defect became visible: the page crashed after editing a keyed receive/return cost field with `Cannot read properties of null (reading 'value')`. The keyed React handlers were reading `event.currentTarget.value` from inside functional state updaters; the fix captures the input value synchronously before scheduling the updater. The corrected rendered receive/partial-receive/return flow is now GREEN in both the Plan 4 gate and the permanent Admin gate.
+
+Task 5 Ruling: supplier/PO receiving is authoritative only through the trusted Admin BFF and service-role-only transactional RPCs. Receiving posts inventory/cost/PO/price-history/audit state together; purchase returns post compensating negative inventory movements and return history; open-PO remainder contributes only to incoming intelligence and never to on-hand stock before receipt. Purchasing remains within the approved Plan 4 Task 5 scope; broader ERP-like supplier balances/payment status/attachments remain outside this task.
+
+### Plan 4 implementation completion checkpoint — 2026-09-19
+
+Tasks 1–5 are implementation-complete on PR #92. The exact pre-ledger code head is `caa37bba117f2bce567e5dd89f992613201e83db`, with dedicated Plan 4 run `35431388442` and root CI run `35431388443` fully GREEN.
+
+Production promotion remains deliberately separate:
+- Canonical Supabase project `awpdcsayuwbsruwvaosg` remains synchronized only through Plan 3 migration `20260918175515 admin_plan3_review_round13_hardening`; Plan 4 migrations `20260910130000`, `20260910140000`, and `20260910150000` have not been applied to production.
+- Admin Vercel production remains deployment `dpl_CZfC9PzpWi2PzdKadfLkGyGc5uuA` from `main` commit `b1ddf033c0401286af5f2878d9130d339f99aac8`; no Plan 4 production deployment was performed.
+- PR #92 remains draft until the explicit production-promotion/review checkpoint. This ledger mutation changes the PR head, so exact-head CI must be re-verified before any ready-for-review, merge, Supabase migration, or Admin production deployment action.
