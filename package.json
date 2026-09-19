@@ -37,7 +37,8 @@
     "typecheck:menu": "npm run typecheck -w @tux/menu",
     "test:e2e:menu": "playwright test --config playwright.menu.config.ts",
     "test:monorepo-architecture": "node --test scripts/monorepo-architecture-guard.test.mjs && node scripts/test-monorepo-architecture.mjs",
-    "test:admin-inventory-ledger": "node scripts/test-admin-inventory-ledger-migration.mjs"
+    "test:admin-inventory-ledger": "node scripts/test-admin-inventory-ledger-migration.mjs",
+    "test:admin-order-inventory-lifecycle": "node scripts/test-admin-order-inventory-lifecycle.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
