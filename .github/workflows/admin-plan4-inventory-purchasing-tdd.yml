@@ -58,6 +58,36 @@ on:
       - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
 
 jobs:
+  final-review-stocktake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 4 final review stable stocktake boundary
+        run: node scripts/test-admin-inventory-ledger-migration.mjs
+
+  final-review-purchase-units:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 4 final review purchase-unit conversion
+        run: node scripts/test-admin-purchasing-migration.mjs
+
+  final-review-convergence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 4 final review Admin to Operations inventory convergence
+        run: node scripts/test-admin-order-inventory-lifecycle.mjs
+
   ledger-static:
     runs-on: ubuntu-latest
     steps:
