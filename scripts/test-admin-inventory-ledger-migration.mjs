@@ -167,8 +167,11 @@ psql(
        values ('${shopId}', 'Inventory Migration Shop', true);
      insert into public.workers(id, shop_id, display_name, pin_hash, active)
        values ('${workerId}', '${shopId}', 'Legacy Worker', 'fixture-pin-hash', true);
-     insert into public.business_days(id, shop_id, business_date, sequence, opened_at, opened_by_worker_id, status)
-       values ('${dayId}', '${shopId}', date '2026-09-19', 1, timestamptz '2026-09-19 00:00:00+00', '${workerId}', 'OPEN');
+     insert into public.business_days(id, shop_id, status, started_at, started_by_worker_id)
+       values (
+         '${dayId}', '${shopId}', 'OPEN',
+         timestamptz '2026-09-19 00:00:00+00', '${workerId}'
+       );
      insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
        values ('${itemId}', '${shopId}', 'Legacy Flour', 'kg', 'RECIPE_TRACKED', true);
      insert into public.inventory_movements(
