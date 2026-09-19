@@ -4,3 +4,4 @@ export * from './catalog';
 export * from './settings';
 export * from './approvals';
 export * from './audit';
+export * from './inventory';
