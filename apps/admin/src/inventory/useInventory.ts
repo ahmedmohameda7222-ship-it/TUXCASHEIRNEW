@@ -85,12 +85,35 @@ export function useInventory(shopId: string | undefined) {
     onSuccess: invalidate,
   });
 
-  const postStocktake = useMutation({
-    mutationFn: async (
-      lines: readonly { inventoryItemId: string; actualCountMicros: number }[],
-    ) => {
+  const beginStocktake = useMutation({
+    mutationFn: async (inventoryItemIds: readonly string[]) => {
       if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({ type: 'stocktake', shopId, commandId: commandId(), lines });
+      const result = await post({
+        type: 'stocktake.begin',
+        shopId,
+        inventoryItemIds,
+        commandId: commandId(),
+      });
+      if (!result.ok || !result.stocktakeId || !result.lines) {
+        throw new InventoryUiError('invalid_stocktake_snapshot');
+      }
+      return { stocktakeId: result.stocktakeId, lines: result.lines };
+    },
+  });
+
+  const postStocktake = useMutation({
+    mutationFn: async (input: {
+      stocktakeId: string;
+      lines: readonly { inventoryItemId: string; actualCountMicros: number }[];
+    }) => {
+      if (!shopId) throw new InventoryUiError('concrete_shop_required');
+      return post({
+        type: 'stocktake.post',
+        shopId,
+        stocktakeId: input.stocktakeId,
+        commandId: commandId(),
+        lines: input.lines,
+      });
     },
     onSuccess: invalidate,
   });
@@ -134,6 +157,7 @@ export function useInventory(shopId: string | undefined) {
     workspaceQuery,
     adjustStock,
     recordWaste,
+    beginStocktake,
     postStocktake,
     updateReplenishment,
     sendTransfer,
