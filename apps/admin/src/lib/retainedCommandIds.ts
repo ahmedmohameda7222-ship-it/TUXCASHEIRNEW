@@ -1,8 +1,3 @@
-type RetainedCommand = {
-  readonly fingerprint: string;
-  readonly commandId: string;
-};
-
 function stableFingerprint(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((entry) => stableFingerprint(entry)).join(',')}]`;
@@ -18,23 +13,26 @@ function stableFingerprint(value: unknown): string {
   return encoded === undefined ? String(value) : encoded;
 }
 
+function retainedKey(scope: string, intent: unknown): string {
+  return `${scope}\u0000${stableFingerprint(intent)}`;
+}
+
 export function createRetainedCommandIds(
   createId: () => string = () => crypto.randomUUID(),
 ) {
-  const retained = new Map<string, RetainedCommand>();
+  const retained = new Map<string, string>();
 
   return {
     forIntent(scope: string, intent: unknown): string {
-      const fingerprint = stableFingerprint(intent);
-      const existing = retained.get(scope);
-      if (existing?.fingerprint === fingerprint) return existing.commandId;
+      const key = retainedKey(scope, intent);
+      const existing = retained.get(key);
+      if (existing !== undefined) return existing;
       const commandId = createId();
-      retained.set(scope, { fingerprint, commandId });
+      retained.set(key, commandId);
       return commandId;
     },
     complete(scope: string, intent: unknown): void {
-      const fingerprint = stableFingerprint(intent);
-      if (retained.get(scope)?.fingerprint === fingerprint) retained.delete(scope);
+      retained.delete(retainedKey(scope, intent));
     },
   };
 }
