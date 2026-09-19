@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type {
   AdminInventoryCommand,
   AdminInventoryCommandResult,
@@ -7,6 +8,7 @@ import type {
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 
 export class InventoryUiError extends Error {
   constructor(readonly code: string) {
@@ -24,13 +26,11 @@ function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): stri
   return session.state.session.csrfToken;
 }
 
-function commandId(): string {
-  return crypto.randomUUID();
-}
 
 export function useInventory(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
+  const commandIds = useMemo(() => createRetainedCommandIds(), []);
 
   const workspaceQuery = useQuery({
     queryKey: shopId ? inventoryQueryKey(shopId) : ['admin', 'inventory', 'no-shop'],
@@ -43,14 +43,29 @@ export function useInventory(shopId: string | undefined) {
     },
   });
 
-  async function post(command: AdminInventoryCommand): Promise<AdminInventoryCommandResult> {
+  async function post(
+    command: AdminInventoryCommand,
+    onAuthoritativeResponse?: () => void,
+  ): Promise<AdminInventoryCommandResult> {
     const result = await adminFetch<AdminInventoryCommandResult>(
       '/api/admin/inventory',
       { method: 'POST', body: JSON.stringify(command) },
       csrfTokenForMutation(session),
     );
+    onAuthoritativeResponse?.();
     if (!result.ok) throw new InventoryUiError(result.code);
     return result;
+  }
+
+  async function postRetained(
+    scope: string,
+    intent: unknown,
+    buildCommand: (retainedCommandId: string) => AdminInventoryCommand,
+  ): Promise<AdminInventoryCommandResult> {
+    if (!shopId) throw new InventoryUiError('concrete_shop_required');
+    const retainedIntent = { shopId, intent };
+    const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
+    return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
   }
 
   async function invalidate(): Promise<void> {
@@ -65,8 +80,12 @@ export function useInventory(shopId: string | undefined) {
       note: string | null;
       emergencyNegativeOverride: boolean;
     }) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({ type: 'adjust', shopId, commandId: commandId(), ...input });
+      return postRetained('adjust', input, (retainedCommandId) => ({
+        type: 'adjust',
+        shopId: shopId!,
+        commandId: retainedCommandId,
+        ...input,
+      }));
     },
     onSuccess: invalidate,
   });
@@ -79,21 +98,24 @@ export function useInventory(shopId: string | undefined) {
       note: string | null;
       emergencyNegativeOverride: boolean;
     }) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({ type: 'waste', shopId, commandId: commandId(), ...input });
+      return postRetained('waste', input, (retainedCommandId) => ({
+        type: 'waste',
+        shopId: shopId!,
+        commandId: retainedCommandId,
+        ...input,
+      }));
     },
     onSuccess: invalidate,
   });
 
   const beginStocktake = useMutation({
     mutationFn: async (inventoryItemIds: readonly string[]) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      const result = await post({
+      const result = await postRetained('stocktake.begin', inventoryItemIds, (retainedCommandId) => ({
         type: 'stocktake.begin',
-        shopId,
+        shopId: shopId!,
         inventoryItemIds,
-        commandId: commandId(),
-      });
+        commandId: retainedCommandId,
+      }));
       if (!result.ok || !result.stocktakeId || !result.lines) {
         throw new InventoryUiError('invalid_stocktake_snapshot');
       }
@@ -106,14 +128,13 @@ export function useInventory(shopId: string | undefined) {
       stocktakeId: string;
       lines: readonly { inventoryItemId: string; actualCountMicros: number }[];
     }) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({
+      return postRetained('stocktake.post', input, (retainedCommandId) => ({
         type: 'stocktake.post',
-        shopId,
+        shopId: shopId!,
         stocktakeId: input.stocktakeId,
-        commandId: commandId(),
+        commandId: retainedCommandId,
         lines: input.lines,
-      });
+      }));
     },
     onSuccess: invalidate,
   });
@@ -139,16 +160,24 @@ export function useInventory(shopId: string | undefined) {
       destinationShopId: string;
       lines: readonly { inventoryItemId: string; quantityMicros: number }[];
     }) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({ type: 'transfer.send', shopId, commandId: commandId(), ...input });
+      return postRetained('transfer.send', input, (retainedCommandId) => ({
+        type: 'transfer.send',
+        shopId: shopId!,
+        commandId: retainedCommandId,
+        ...input,
+      }));
     },
     onSuccess: invalidate,
   });
 
   const receiveTransfer = useMutation({
     mutationFn: async (transferId: string) => {
-      if (!shopId) throw new InventoryUiError('concrete_shop_required');
-      return post({ type: 'transfer.receive', shopId, transferId, commandId: commandId() });
+      return postRetained('transfer.receive', transferId, (retainedCommandId) => ({
+        type: 'transfer.receive',
+        shopId: shopId!,
+        transferId,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });
