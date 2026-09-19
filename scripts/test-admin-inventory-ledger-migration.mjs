@@ -181,25 +181,30 @@ psql(
      ) values (
        '${movementId}', '${shopId}', '${dayId}', '${itemId}', 'ADMIN_ADJUSTMENT',
        2500000, '${workerId}', null, null, 'legacy-admin-adjustment', timestamptz '2026-09-19 01:00:00+00'
-     );
-     create temporary table legacy_inventory_snapshot as
-       select * from public.inventory_movements where id = '${movementId}';`,
+     );`,
   ],
   'Legacy inventory fixture',
 );
 
+const legacyBefore = psql(
+  [
+    '-At',
+    '-c',
+    `select to_jsonb(x)::text
+     from public.inventory_movements x
+     where x.id = '${movementId}'`,
+  ],
+  'Legacy inventory snapshot before Plan 4 migration',
+).trim();
+
 psql(['-f', migrationPath], migrationName);
 
-psql(
+const legacyAfter = psql(
   [
+    '-At',
     '-c',
-    `do $$
-     declare
-       v_before jsonb;
-       v_after jsonb;
-     begin
-       select to_jsonb(x) into v_before from legacy_inventory_snapshot x;
-       select to_jsonb(x) - array[
+    `select (
+       to_jsonb(x) - array[
          'reserved_delta_micros',
          'admin_employee_id',
          'source_kind',
@@ -212,15 +217,25 @@ psql(
          'reason_config_version',
          'note',
          'emergency_negative_override'
-       ]::text[] into v_after
-       from public.inventory_movements x
-       where x.id = '${movementId}';
+       ]::text[]
+     )::text
+     from public.inventory_movements x
+     where x.id = '${movementId}'`,
+  ],
+  'Legacy inventory snapshot after Plan 4 migration',
+).trim();
 
-       if v_before is distinct from v_after then
-         raise exception 'legacy inventory movement changed across additive migration: before %, after %',
-           v_before, v_after;
-       end if;
+if (legacyBefore !== legacyAfter) {
+  throw new Error(
+    `legacy inventory movement changed across additive migration:\nbefore: ${legacyBefore}\nafter: ${legacyAfter}`,
+  );
+}
 
+psql(
+  [
+    '-c',
+    `do $
+     begin
        if not exists (
          select 1 from public.inventory_movements
          where id = '${movementId}'
