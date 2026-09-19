@@ -1,4 +1,4 @@
-import { verifyPin } from './pin';
+import { verifyPin } from './pin.js';
 
 export type ReauthenticatableSession = {
   sessionId: string;

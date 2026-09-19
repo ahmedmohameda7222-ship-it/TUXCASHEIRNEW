@@ -5,20 +5,20 @@ import {
   AdminAuthError,
   loadAdminSession,
   requireSessionCsrf,
-} from '../../server/adminAuthService';
-import { AdminAuthorizationError } from '../../server/authorization';
-import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume';
+} from '../../server/adminAuthService.js';
+import { AdminAuthorizationError } from '../../server/authorization.js';
+import { resumeCatalogDraft } from '../../server/catalog/catalogDraftResume.js';
 import {
   CatalogServiceError,
   createCatalogService,
   createSupabaseCatalogStore,
-} from '../../server/catalog/catalogService';
+} from '../../server/catalog/catalogService.js';
 import {
   createRecurringAvailabilityService,
   createSupabaseRecurringAvailabilityStore,
   RecurringAvailabilityServiceError,
-} from '../../server/catalog/recurringAvailabilityService';
-import { getAdminServerEnv } from '../../server/env';
+} from '../../server/catalog/recurringAvailabilityService.js';
+import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
   readJsonObject,
@@ -26,9 +26,9 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http';
-import { readAdminSessionToken } from '../../server/session';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
+} from '../../server/http.js';
+import { readAdminSessionToken } from '../../server/session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
 const cairoLocalTimestampSchema = z

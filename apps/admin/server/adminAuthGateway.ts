@@ -4,8 +4,8 @@ import {
   loginAdmin,
   requireSessionCsrf,
   restoreSessionCsrf,
-} from './adminAuthService';
-import { getAdminServerEnv } from './env';
+} from './adminAuthService.js';
+import { getAdminServerEnv } from './env.js';
 import {
   clientFingerprint,
   firstHeader,
@@ -15,24 +15,24 @@ import {
   shouldUseSecureCookie,
   type AdminRequest,
   type AdminResponse,
-} from './http';
+} from './http.js';
 import {
   AdminRateLimitError,
   claimAdminPinAttempt,
   clearAdminPinAttempts,
   createAdminPinRateLimitRpc,
   deriveAdminRateKey,
-} from './loginRateLimit';
-import { AdminReauthError, reauthenticateAdminSession } from './reauth';
+} from './loginRateLimit.js';
+import { AdminReauthError, reauthenticateAdminSession } from './reauth.js';
 import {
   ADMIN_SESSION_TTL_SECONDS,
   adminSessionCookie,
   clearAdminSessionCookie,
   readAdminSessionToken,
-} from './session';
-import { AdminSupabaseClient, AdminSupabaseError } from './supabaseAdmin';
+} from './session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from './supabaseAdmin.js';
 
-export type { AdminRequest, AdminResponse } from './http';
+export type { AdminRequest, AdminResponse } from './http.js';
 
 const PIN_PATTERN = /^\d{4,12}$/;
 

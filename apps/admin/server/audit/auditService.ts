@@ -1,6 +1,6 @@
 import type { AppendAdminAuditEventInput } from '@tux/admin-contracts';
 
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 const SECRET_KEY_PATTERN = /(^|_)(pin|password|passcode|verifier|salt|lookup)(_|$)/i;
 const API_CREDENTIAL_KEYS = new Set([

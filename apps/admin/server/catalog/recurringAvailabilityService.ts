@@ -7,8 +7,8 @@ import type {
   CatalogSaveRecurringAvailabilityRuleResult,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization';
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import { requirePermission } from '../authorization.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export class RecurringAvailabilityServiceError extends Error {
   constructor(readonly code: 'backend_contract_invalid') {

@@ -4,9 +4,9 @@ import type {
   ShopOperationalStateUpdateInput,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization';
-import type { AdminSupabaseClient } from '../supabaseAdmin';
-import { SettingsServiceError } from './settingsService';
+import { requirePermission } from '../authorization.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
+import { SettingsServiceError } from './settingsService.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

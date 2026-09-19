@@ -6,9 +6,9 @@ import {
   loadAdminSession,
   requireSessionCsrf,
   type AdminSessionContext,
-} from '../../server/adminAuthService';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization';
-import { getAdminServerEnv } from '../../server/env';
+} from '../../server/adminAuthService.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import { getAdminServerEnv } from '../../server/env.js';
 import {
   firstHeader,
   readJsonObject,
@@ -16,9 +16,9 @@ import {
   sendJson,
   type AdminRequest,
   type AdminResponse,
-} from '../../server/http';
-import { readAdminSessionToken } from '../../server/session';
-import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin';
+} from '../../server/http.js';
+import { readAdminSessionToken } from '../../server/session.js';
+import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
 const localScheduledAtSchema = z

@@ -1,6 +1,6 @@
 import type { AdminApprovalExecutionClaim } from '@tux/admin-contracts';
 
-import type { AdminSupabaseClient } from '../supabaseAdmin';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export type ApprovalExecutionClaim = AdminApprovalExecutionClaim;
 

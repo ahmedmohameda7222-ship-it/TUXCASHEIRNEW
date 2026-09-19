@@ -70,6 +70,28 @@ if (Object.prototype.hasOwnProperty.call(adminConfig, 'crons')) {
   throw new Error('Admin Vercel deployment contract must not register Cron Jobs');
 }
 
+// Vercel executes Admin API functions as Node ESM. Relative production imports
+// must include a runtime extension so transpiled .js files resolve under Node.
+for (const directory of ['apps/admin/api', 'apps/admin/server']) {
+  for (const fileName of collectTsFiles(directory)) {
+    if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
+    const absolutePath = path.join(directory, fileName);
+    const source = fs.readFileSync(absolutePath, 'utf8');
+    const relativeSpecifiers = [
+      ...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)['"]([^'"]+)['"]/g),
+    ]
+      .map((match) => match[1])
+      .filter((specifier) => specifier?.startsWith('.'));
+    for (const specifier of relativeSpecifiers) {
+      if (!/\.(?:js|mjs|cjs|json)$/.test(specifier)) {
+        throw new Error(
+          `Admin Node ESM production import must include a runtime extension: ${absolutePath} -> ${specifier}`,
+        );
+      }
+    }
+  }
+}
+
 // The repository root must not carry a Vercel project contract after Operations cutover.
 if (fs.existsSync('vercel.json')) {
   throw new Error('Repository root vercel.json must be absent after Operations cutover');
