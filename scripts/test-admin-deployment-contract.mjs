@@ -92,6 +92,21 @@ for (const directory of ['apps/admin/api', 'apps/admin/server']) {
   }
 }
 
+// Admin Serverless Functions must not runtime-import the source-only
+// @tux/admin-contracts workspace package. Type-only imports are erased safely.
+for (const directory of ['apps/admin/api', 'apps/admin/server']) {
+  for (const fileName of collectTsFiles(directory)) {
+    if (fileName.endsWith('.test.ts') || fileName.includes('.source.test.')) continue;
+    const absolutePath = path.join(directory, fileName);
+    const source = fs.readFileSync(absolutePath, 'utf8');
+    if (/import\s+(?!type\b)[^;]*?from\s+['"]@tux\/admin-contracts['"]/gs.test(source)) {
+      throw new Error(
+        `Admin Vercel runtime code must use @tux/admin-contracts only through type-only imports: ${absolutePath}`,
+      );
+    }
+  }
+}
+
 // The repository root must not carry a Vercel project contract after Operations cutover.
 if (fs.existsSync('vercel.json')) {
   throw new Error('Repository root vercel.json must be absent after Operations cutover');

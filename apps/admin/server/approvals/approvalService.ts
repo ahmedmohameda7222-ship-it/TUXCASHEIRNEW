@@ -1,11 +1,12 @@
-import {
-  ADMIN_APPROVAL_STATUSES,
-  type AdminApprovalActor,
-  type AdminApprovalRule,
-  type AdminApprovalStatus,
-  type AdminPermission,
-  type ApprovalDecision,
+import type {
+  AdminApprovalActor,
+  AdminApprovalRule,
+  AdminApprovalStatus,
+  AdminPermission,
+  ApprovalDecision,
 } from '@tux/admin-contracts';
+
+import { ADMIN_APPROVAL_STATUSES } from '../adminContractRuntime.js';
 
 import { verifyPin } from '../pin.js';
 import type { AdminSupabaseClient } from '../supabaseAdmin.js';
