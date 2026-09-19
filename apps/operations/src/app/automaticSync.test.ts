@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({
   schedulerOptions: undefined as AutomaticOutboxSchedulerOptions | undefined,
   schedulerStarted: vi.fn(),
-  inventorySyncShop: vi.fn(async (_shopId: unknown) => 0),
+  inventorySyncShop: vi.fn(async (shopId: unknown) => {
+    void shopId;
+    return 0;
+  }),
   markRemoteConfigured: vi.fn(),
   markSyncStarted: vi.fn(),
   markSyncFinished: vi.fn(),
