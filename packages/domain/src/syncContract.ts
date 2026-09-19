@@ -184,6 +184,14 @@ function nullableSafeInteger(value: unknown, label: string, minimum = 0): number
   return safeInteger(value, label, minimum);
 }
 
+function optionalNonNegativeFiniteNumber(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new TypeError(`Operations sync ${label} must be a non-negative finite number.`);
+  }
+  return value;
+}
+
 function entityId<Id extends EntityId>(value: unknown, label: string): Id {
   return parseEntityId<Id>(stringValue(value, label));
 }
@@ -690,7 +698,21 @@ function parseMovement(value: unknown): InventoryMovement {
           ),
         }),
     idempotencyKey: fieldString(source, 'idempotencyKey'),
-    workerId: entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
+    workerId:
+      source['workerId'] === null
+        ? null
+        : entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
+    ...(optionalNonNegativeFiniteNumber(
+      source['unitCostMinor'],
+      'inventory movement unitCostMinor',
+    ) === undefined
+      ? {}
+      : {
+          unitCostMinor: optionalNonNegativeFiniteNumber(
+            source['unitCostMinor'],
+            'inventory movement unitCostMinor',
+          ),
+        }),
     orderId:
       source['orderId'] === null
         ? null
