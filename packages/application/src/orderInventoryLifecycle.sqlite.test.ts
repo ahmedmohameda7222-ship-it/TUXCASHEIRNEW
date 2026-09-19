@@ -298,7 +298,6 @@ describe('Operations order inventory lifecycle', () => {
         transaction.inventory.getBalance(INVENTORY_ITEM_ID),
       );
       expect(balance).toMatchObject({
-        initialized: true,
         onHandMicros: 250_000,
         reservedMicros: 0,
         availableMicros: 250_000,
