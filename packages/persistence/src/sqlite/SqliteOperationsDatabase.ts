@@ -386,8 +386,8 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             `INSERT INTO inventory_movements(
               id, shop_id, business_day_id, item_id, movement_type,
               quantity_delta_micros, reserved_delta_micros, idempotency_key,
-              worker_id, order_id, created_at, compensates_movement_id, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              worker_id, unit_cost_minor, order_id, created_at, compensates_movement_id, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             movement.id,
@@ -404,6 +404,81 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             movement.compensatesMovementId,
             serialize(movement),
           );
+      },
+      async upsertCanonicalMovement(movement: InventoryMovement) {
+        database
+          .prepare(
+            `INSERT INTO inventory_movements(
+              id, shop_id, business_day_id, item_id, movement_type,
+              quantity_delta_micros, reserved_delta_micros, idempotency_key,
+              worker_id, unit_cost_minor, order_id, created_at, compensates_movement_id, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              movement_type = excluded.movement_type,
+              quantity_delta_micros = excluded.quantity_delta_micros,
+              reserved_delta_micros = excluded.reserved_delta_micros,
+              worker_id = excluded.worker_id,
+              unit_cost_minor = excluded.unit_cost_minor,
+              order_id = excluded.order_id,
+              created_at = excluded.created_at,
+              compensates_movement_id = excluded.compensates_movement_id,
+              payload_json = excluded.payload_json`,
+          )
+          .run(
+            movement.id,
+            movement.shopId,
+            movement.businessDayId,
+            movement.itemId,
+            movement.movementType,
+            movement.quantityDeltaMicros,
+            movement.reservedDeltaMicros ?? 0,
+            movement.idempotencyKey,
+            movement.workerId,
+            movement.unitCostMinor ?? null,
+            movement.orderId,
+            movement.createdAt,
+            movement.compensatesMovementId,
+            serialize(movement),
+          );
+      },
+      async getWeightedUnitCost(itemId) {
+        const row = database
+          .prepare('SELECT weighted_unit_cost_minor FROM inventory_cost_state WHERE item_id = ?')
+          .get(itemId) as { weighted_unit_cost_minor?: unknown } | undefined;
+        return Number(row?.weighted_unit_cost_minor ?? 0);
+      },
+      async putWeightedUnitCost(shopId, itemId, unitCostMinor) {
+        if (!Number.isFinite(unitCostMinor) || unitCostMinor < 0) {
+          throw new Error('Inventory weighted cost must be a non-negative finite number.');
+        }
+        database
+          .prepare(
+            `INSERT INTO inventory_cost_state(item_id, shop_id, weighted_unit_cost_minor, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(item_id) DO UPDATE SET
+               shop_id = excluded.shop_id,
+               weighted_unit_cost_minor = excluded.weighted_unit_cost_minor,
+               updated_at = excluded.updated_at`,
+          )
+          .run(itemId, shopId, unitCostMinor, new Date().toISOString());
+      },
+      async getInventorySyncCursor(shopId) {
+        const row = database
+          .prepare('SELECT cursor FROM inventory_sync_cursors WHERE shop_id = ?')
+          .get(shopId) as { cursor?: unknown } | undefined;
+        return typeof row?.cursor === 'string' ? row.cursor : null;
+      },
+      async setInventorySyncCursor(shopId, cursor) {
+        if (!cursor) throw new Error('Inventory sync cursor must not be empty.');
+        database
+          .prepare(
+            `INSERT INTO inventory_sync_cursors(shop_id, cursor, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(shop_id) DO UPDATE SET
+               cursor = excluded.cursor,
+               updated_at = excluded.updated_at`,
+          )
+          .run(shopId, cursor, new Date().toISOString());
       },
       async listMovementsForOrder(orderId: OrderId) {
         return database
