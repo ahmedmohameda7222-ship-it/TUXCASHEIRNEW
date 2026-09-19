@@ -327,3 +327,17 @@ Task 1 Ruling: Task 2 RED tests were authored before Task 1's final regression c
 - Ruling: legacy ACTIVE orders created under placement-time `ORDER_CONSUMPTION` retain the explicit pre-reservation cancellation compatibility path; new reservation-backed orders release `ORDER_RESERVATION` regardless of `foodPrepared`. Cost if wrong: historical orders could either double-restore stock or lose their pre-migration cancellation semantics.
 - Ruling: repeated `DONE → undo → DONE` cycles key each `ORDER_CONSUMPTION` by the target lifecycle revision plus item id, not by order+item alone. Cost if wrong: the second legitimate DONE transition collides with the immutable ledger idempotency key.
 - Ruling: RETURNED/no-restock acceptance is anchored by the existing OrdersBoard SQLite integration test and is included in the Plan 4 targeted regression gate; the new reservation lifecycle test covers reserve/consume/undo/cancel and composes with that canonical return path rather than duplicating a weaker synthetic DONE fixture.
+
+
+### Task 2: complete
+
+Evidence at branch head `f829d6ea398b8eab5e0cf1ab9111c482e30ce65c`, Plan 4 workflow run `35418413550`:
+- `ledger-static`: GREEN.
+- `ledger-postgres`: GREEN against PostgreSQL 17.
+- `lifecycle-static`: GREEN for ACTIVE reservation, DONE consumption, undo-DONE reservation restoration, repeated DONE→undo→DONE idempotency, cancellation release, canonical RETURNED/no-restock integration, online-order delegation, sync round-trip/materialization, weighted-average/recipe costing, and IndexedDB balance projection.
+- Plan 4 typecheck: GREEN.
+- Full migration regression: GREEN.
+- Full unfiltered `npm test`: GREEN.
+- Root TUX quality on the same code state passed formatting, lint, unit/integration tests, Admin/WhatsApp security gates, typecheck, and production builds through the migration stage.
+
+Task 2 Ruling: the inventory balance contract must be implemented by every Operations persistence adapter that satisfies `InventoryRepository`; SQLite and IndexedDB both project on-hand/reserved/available from immutable movement history. Cost if wrong: browser Operations could compile around a structurally missing method or diverge from desktop stock authority.
