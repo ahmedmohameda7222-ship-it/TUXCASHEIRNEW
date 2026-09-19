@@ -1,0 +1,90 @@
+name: Admin Plan 4 Inventory Purchasing TDD
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/admin-04-inventory-purchasing
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-inventory-ledger-migration.mjs'
+      - 'scripts/test-admin-order-inventory-lifecycle.mjs'
+      - 'apps/admin/server/inventory/**'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/api/admin/inventory.ts'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/src/inventory/**'
+      - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/inventory.ts'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'packages/application/src/orders.ts'
+      - 'packages/application/src/ordersBoard.ts'
+      - 'packages/sync/src/**'
+      - 'packages/persistence/src/**'
+      - 'e2e/admin-inventory.spec.ts'
+      - 'e2e/admin-purchasing.spec.ts'
+      - 'package.json'
+      - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-inventory-ledger-migration.mjs'
+      - 'scripts/test-admin-order-inventory-lifecycle.mjs'
+      - 'apps/admin/server/inventory/**'
+      - 'apps/admin/server/purchasing/**'
+      - 'apps/admin/api/admin/inventory.ts'
+      - 'apps/admin/api/admin/purchasing.ts'
+      - 'apps/admin/src/inventory/**'
+      - 'apps/admin/src/purchasing/**'
+      - 'packages/admin-contracts/src/inventory.ts'
+      - 'packages/admin-contracts/src/purchasing.ts'
+      - 'packages/application/src/orders.ts'
+      - 'packages/application/src/ordersBoard.ts'
+      - 'packages/sync/src/**'
+      - 'packages/persistence/src/**'
+      - 'e2e/admin-inventory.spec.ts'
+      - 'e2e/admin-purchasing.spec.ts'
+      - 'package.json'
+      - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
+
+jobs:
+  ledger-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 4 inventory ledger invariant
+        run: node scripts/test-admin-inventory-ledger-migration.mjs
+
+  ledger-postgres:
+    needs: ledger-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 4 inventory ledger PostgreSQL compatibility
+        run: node scripts/test-admin-inventory-ledger-migration.mjs
