@@ -341,3 +341,8 @@ Evidence at branch head `f829d6ea398b8eab5e0cf1ab9111c482e30ce65c`, Plan 4 workf
 - Root TUX quality on the same code state passed formatting, lint, unit/integration tests, Admin/WhatsApp security gates, typecheck, and production builds through the migration stage.
 
 Task 2 Ruling: the inventory balance contract must be implemented by every Operations persistence adapter that satisfies `InventoryRepository`; SQLite and IndexedDB both project on-hand/reserved/available from immutable movement history. Cost if wrong: browser Operations could compile around a structurally missing method or diverge from desktop stock authority.
+
+
+### Plan 4 Task 3 rulings — inventory UI command boundaries
+
+- Ruling: Task 3's `Receive` action means receiving an already-sent inter-shop transfer through `receive_stock_transfer_v1`. Supplier / purchase-order receiving remains exclusively Task 5. Cost if wrong: purchase receipts could gain a second UI/API mutation path before the purchasing transaction and cost-history authority exists.
