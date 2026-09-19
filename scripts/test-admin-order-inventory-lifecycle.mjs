@@ -41,8 +41,14 @@ if (!/undoDone[\s\S]*ORDER_CONSUMPTION_REVERSAL/.test(board)) {
 if (!/cancelOrder[\s\S]*ORDER_RESERVATION_RELEASE/.test(board)) {
   throw new Error('cancelOrder must release reservation');
 }
-if (!board.includes('Compatibility for ACTIVE orders created before reservation-at-placement was introduced.')) {
-  throw new Error('cancelOrder must preserve an explicit legacy pre-reservation compatibility path');
+if (
+  !board.includes(
+    'Compatibility for ACTIVE orders created before reservation-at-placement was introduced.',
+  )
+) {
+  throw new Error(
+    'cancelOrder must preserve an explicit legacy pre-reservation compatibility path',
+  );
 }
 
 if (!sqliteMigrations.includes('reserved_delta_micros')) {
@@ -52,7 +58,9 @@ if (!sqliteMigrations.includes('quantity_delta_micros <> 0 OR reserved_delta_mic
   throw new Error('SQLite inventory effect constraint must allow reservation-only movements');
 }
 if (!sqliteDatabase.includes('movement.reservedDeltaMicros ?? 0')) {
-  throw new Error('SQLite movement writes must persist reservedDeltaMicros with legacy zero fallback');
+  throw new Error(
+    'SQLite movement writes must persist reservedDeltaMicros with legacy zero fallback',
+  );
 }
 if (!remoteMaterializer.includes('reserved_delta_micros: movement.reservedDeltaMicros ?? 0')) {
   throw new Error('remote materializer must propagate reservation delta to PostgreSQL');
