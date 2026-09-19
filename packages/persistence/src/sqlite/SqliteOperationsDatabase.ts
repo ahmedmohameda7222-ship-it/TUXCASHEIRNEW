@@ -362,13 +362,32 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             serialize(item),
           );
       },
+      async getBalance(itemId) {
+        const row = database
+          .prepare(
+            `SELECT
+              COALESCE(SUM(quantity_delta_micros), 0) AS on_hand_micros,
+              COALESCE(SUM(reserved_delta_micros), 0) AS reserved_micros
+            FROM inventory_movements
+            WHERE item_id = ?`,
+          )
+          .get(itemId) as Record<string, unknown> | undefined;
+        const onHandMicros = Number(row?.['on_hand_micros'] ?? 0);
+        const reservedMicros = Number(row?.['reserved_micros'] ?? 0);
+        return {
+          onHandMicros,
+          reservedMicros,
+          availableMicros: onHandMicros - reservedMicros,
+        };
+      },
       async appendMovement(movement: InventoryMovement) {
         database
           .prepare(
             `INSERT INTO inventory_movements(
-              id, shop_id, business_day_id, item_id, movement_type, quantity_delta_micros, idempotency_key,
+              id, shop_id, business_day_id, item_id, movement_type,
+              quantity_delta_micros, reserved_delta_micros, idempotency_key,
               worker_id, order_id, created_at, compensates_movement_id, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             movement.id,
@@ -377,6 +396,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             movement.itemId,
             movement.movementType,
             movement.quantityDeltaMicros,
+            movement.reservedDeltaMicros ?? 0,
             movement.idempotencyKey,
             movement.workerId,
             movement.orderId,
