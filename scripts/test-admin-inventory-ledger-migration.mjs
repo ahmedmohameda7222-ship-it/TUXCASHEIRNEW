@@ -234,7 +234,7 @@ if (legacyBefore !== legacyAfter) {
 psql(
   [
     '-c',
-    `do $
+    `do $$
      begin
        if not exists (
          select 1 from public.inventory_movements
