@@ -76,10 +76,13 @@ export function InventoryItemPage({
                   {movement.reasonLabel ? <span>{movement.reasonLabel}</span> : null}
                 </div>
                 <div>
-                  <span>{formatInventoryQuantity(movement.quantityDeltaMicros, item.unitLabel)}</span>
+                  <span>
+                    {formatInventoryQuantity(movement.quantityDeltaMicros, item.unitLabel)}
+                  </span>
                   {movement.reservedDeltaMicros !== 0 ? (
                     <small>
-                      Reserved {formatInventoryQuantity(movement.reservedDeltaMicros, item.unitLabel)}
+                      Reserved{' '}
+                      {formatInventoryQuantity(movement.reservedDeltaMicros, item.unitLabel)}
                     </small>
                   ) : null}
                 </div>
