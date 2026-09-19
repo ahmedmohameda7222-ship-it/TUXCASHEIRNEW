@@ -1,7 +1,4 @@
-import type {
-  AdminInventoryMarginAlert,
-  AdminInventoryVariance,
-} from '@tux/admin-contracts';
+import type { AdminInventoryMarginAlert, AdminInventoryVariance } from '@tux/admin-contracts';
 
 function quantity(micros: number, unitLabel: string, signed = false): string {
   const value = micros / 1_000_000;
