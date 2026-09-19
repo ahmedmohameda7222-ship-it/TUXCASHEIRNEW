@@ -106,6 +106,8 @@ jobs:
         run: npm ci
       - name: Plan 4 Operations inventory lifecycle behavior
         run: npx vitest run packages/application/src/orderInventoryLifecycle.sqlite.test.ts
+      - name: Plan 4 IndexedDB inventory balance behavior
+        run: npx vitest run packages/persistence/src/browser/IndexedDbOperationsDatabase.inventory.test.ts
       - name: Plan 4 costing tests
         run: npx vitest run apps/admin/server/inventory/costing.test.ts
       - name: Plan 4 order inventory lifecycle invariant
