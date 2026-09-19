@@ -142,7 +142,7 @@ function draft(intentKey: string): OrderDraft {
   };
 }
 
-async function fixture() {
+async function fixture(initialStockMicros = 5_000_000) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-inventory-lifecycle-'));
   temporaryDirectories.push(directory);
   const databasePath = join(directory, 'operations.sqlite3');
@@ -191,7 +191,7 @@ async function fixture() {
       businessDayId: DAY_ID,
       itemId: INVENTORY_ITEM_ID,
       movementType: 'BULK_STOCK_RECEIVED',
-      quantityDeltaMicros: stockQuantityMicros(5_000_000),
+      quantityDeltaMicros: stockQuantityMicros(initialStockMicros),
       idempotencyKey: 'seed-stock',
       workerId: WORKER_ID,
       orderId: null,
@@ -284,6 +284,28 @@ describe('Operations order inventory lifecycle', () => {
         quantityDeltaMicros: 500_000,
         reservedDeltaMicros: 500_000,
       });
+    } finally {
+      await closeFixture(test);
+    }
+  });
+
+  it('blocks placement when initialized available stock is below the recipe requirement', async () => {
+    const test = await fixture(250_000);
+    try {
+      const placed = await test.orders.placeOrder(
+        draft('abababab-abab-4bab-8bab-abababababab'),
+      );
+      expect(placed.ok).toBe(false);
+      if (placed.ok) return;
+      expect(placed.error.code).toBe('CONFLICT_ERROR');
+      expect(placed.error.message).toMatch(/insufficient available stock/i);
+
+      const orderMovements = await test.database.transaction((transaction) =>
+        transaction.inventory.listMovementsForOrder(
+          parseEntityId('abababab-abab-4bab-8bab-abababababab') as never,
+        ),
+      );
+      expect(orderMovements).toHaveLength(0);
     } finally {
       await closeFixture(test);
     }
