@@ -9,4 +9,15 @@ describe('Admin inventory route', () => {
     expect(source).toContain("import { InventoryPage } from '../inventory/InventoryPage';");
     expect(source).toContain("if (route.path === '/inventory') return <InventoryPage />;");
   });
+  it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
+    const inventorySource = await readFile(resolve('apps/admin/src/inventory/useInventory.ts'), 'utf8');
+    const purchasingSource = await readFile(resolve('apps/admin/src/purchasing/usePurchasing.ts'), 'utf8');
+
+    for (const source of [inventorySource, purchasingSource]) {
+      expect(source).toContain('createRetainedCommandIds');
+      expect(source).toContain('.complete(');
+      expect(source).not.toMatch(/commandId:\s*commandId\(\)/);
+    }
+  });
+
 });
