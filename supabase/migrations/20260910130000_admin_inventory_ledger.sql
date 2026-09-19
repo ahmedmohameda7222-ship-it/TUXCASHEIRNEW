@@ -84,6 +84,41 @@ create index if not exists inventory_movements_order_item_idx
   on public.inventory_movements(order_id, inventory_item_id, created_at)
   where order_id is not null;
 
+create table public.inventory_movement_feed (
+  sequence bigint generated always as identity primary key,
+  movement_id uuid not null unique references public.inventory_movements(id) on delete restrict,
+  shop_id uuid not null references public.shops(id) on delete restrict,
+  captured_at timestamptz not null default now()
+);
+create index inventory_movement_feed_shop_sequence_idx
+  on public.inventory_movement_feed(shop_id, sequence);
+
+insert into public.inventory_movement_feed(movement_id, shop_id)
+select m.id, m.shop_id
+from public.inventory_movements m
+order by m.created_at, m.id;
+
+create or replace function private.capture_inventory_movement_feed_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $
+begin
+  insert into public.inventory_movement_feed(movement_id, shop_id)
+  values (new.id, new.shop_id)
+  on conflict (movement_id) do nothing;
+  return new;
+end;
+$;
+
+revoke all on function private.capture_inventory_movement_feed_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_capture_feed
+after insert on public.inventory_movements
+for each row execute function private.capture_inventory_movement_feed_v1();
+
 create table public.inventory_unit_conversions (
   id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.shops(id) on delete restrict,
@@ -198,6 +233,7 @@ create table public.stock_transfer_lines (
   unique (transfer_id, inventory_item_id)
 );
 
+alter table public.inventory_movement_feed enable row level security;
 alter table public.inventory_unit_conversions enable row level security;
 alter table public.inventory_reservations enable row level security;
 alter table public.inventory_cost_state enable row level security;
@@ -206,6 +242,7 @@ alter table public.stocktake_lines enable row level security;
 alter table public.stock_transfers enable row level security;
 alter table public.stock_transfer_lines enable row level security;
 
+revoke all on public.inventory_movement_feed from public, anon, authenticated;
 revoke all on public.inventory_unit_conversions from public, anon, authenticated;
 revoke all on public.inventory_reservations from public, anon, authenticated;
 revoke all on public.inventory_cost_state from public, anon, authenticated;
@@ -214,6 +251,8 @@ revoke all on public.stocktake_lines from public, anon, authenticated;
 revoke all on public.stock_transfers from public, anon, authenticated;
 revoke all on public.stock_transfer_lines from public, anon, authenticated;
 
+grant select on public.inventory_movement_feed to service_role;
+grant usage, select on sequence public.inventory_movement_feed_sequence_seq to service_role;
 grant select, insert, update, delete on public.inventory_unit_conversions to service_role;
 grant select, insert, update, delete on public.inventory_reservations to service_role;
 grant select, insert, update, delete on public.inventory_cost_state to service_role;
