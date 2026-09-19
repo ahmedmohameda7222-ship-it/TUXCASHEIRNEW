@@ -21,7 +21,9 @@ import {
 import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
+  HttpInventoryFeedTransport,
   HttpOutboxTransport,
+  InventoryConvergenceService,
   OutboxSyncService,
   SupabaseDeviceSessionManager,
   type OutboxSyncSummary,
@@ -313,6 +315,12 @@ export function createDesktopSupabaseDeviceSessionManager(): SupabaseDeviceSessi
   return createSessionManager();
 }
 
+export interface DesktopAutomaticSyncHandle {
+  stop(): void;
+}
+
+const INVENTORY_SYNC_INTERVAL_MS = 15_000;
+
 export function startDesktopAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
@@ -320,7 +328,7 @@ export function startDesktopAutomaticSync(input: {
   readonly onConfigured?: () => void;
   readonly onStart?: () => void;
   readonly onResult?: (result: OutboxSyncSummary | Error) => void;
-}): AutomaticOutboxScheduler | null {
+}): DesktopAutomaticSyncHandle | null {
   const explicitEndpoint = process.env['TUX_SYNC_ENDPOINT']?.trim();
   const supabaseUrl = process.env['TUX_SUPABASE_URL']?.trim();
   const endpoint =
@@ -350,7 +358,45 @@ export function startDesktopAutomaticSync(input: {
     ...(input.onStart === undefined ? {} : { onStart: input.onStart }),
     ...(input.onResult === undefined ? {} : { onResult: input.onResult }),
   });
+
+  let inventoryTimer: ReturnType<typeof setInterval> | null = null;
+  let inventoryRunning = false;
+  if (supabaseUrl && supabaseUrl.length > 0) {
+    const inventoryEndpoint =
+      `${supabaseUrl.replace(/\/$/, '')}/functions/v1/operations-inventory`;
+    const convergence = new InventoryConvergenceService(
+      input.database,
+      new HttpInventoryFeedTransport({
+        endpoint: inventoryEndpoint,
+        headerProvider,
+      }),
+    );
+    const synchronizeInventory = async (): Promise<void> => {
+      if (inventoryRunning) return;
+      inventoryRunning = true;
+      try {
+        const session = await ensureDesktopSupabaseDeviceSession(sessionManager);
+        await convergence.syncShop(session.shopId);
+      } catch (cause) {
+        console.warn(
+          'TUX canonical inventory feed is unavailable; using the last known-good local projection.',
+          cause,
+        );
+      } finally {
+        inventoryRunning = false;
+      }
+    };
+    void synchronizeInventory();
+    inventoryTimer = setInterval(() => void synchronizeInventory(), INVENTORY_SYNC_INTERVAL_MS);
+  }
+
   input.onConfigured?.();
   scheduler.start();
-  return scheduler;
+  return {
+    stop(): void {
+      scheduler.stop();
+      if (inventoryTimer !== null) clearInterval(inventoryTimer);
+      inventoryTimer = null;
+    },
+  };
 }
