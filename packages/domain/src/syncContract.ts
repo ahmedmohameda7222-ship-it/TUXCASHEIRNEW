@@ -702,7 +702,9 @@ function parseMovement(value: unknown): InventoryMovement {
         : entityId<InventoryMovementId>(source['compensatesMovementId'], 'compensated movement id'),
   };
   if (movement.quantityDeltaMicros === 0 && (movement.reservedDeltaMicros ?? 0) === 0) {
-    throw new TypeError('Operations sync inventory movement must change on-hand or reserved stock.');
+    throw new TypeError(
+      'Operations sync inventory movement must change on-hand or reserved stock.',
+    );
   }
   return movement;
 }
