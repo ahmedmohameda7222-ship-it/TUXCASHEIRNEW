@@ -1,5 +1,9 @@
 name: Admin Plan 4 Inventory Purchasing TDD
 
+concurrency:
+  group: admin-plan4-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
