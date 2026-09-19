@@ -289,6 +289,46 @@ $$;
 revoke all on function private.inventory_balance_v1(uuid, uuid)
   from public, anon, authenticated;
 
+create or replace function private.enforce_inventory_order_reservation_capacity_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $reservation_capacity$
+declare
+  v_available bigint;
+begin
+  if new.movement_type is distinct from 'ORDER_RESERVATION'
+     or coalesce(new.reserved_delta_micros, 0) <= 0 then
+    return new;
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-inventory:' || new.shop_id::text || ':' || new.inventory_item_id::text,
+      0
+    )
+  );
+
+  select b.available_micros
+    into v_available
+  from private.inventory_balance_v1(new.shop_id, new.inventory_item_id) b;
+
+  if v_available < new.reserved_delta_micros then
+    raise exception 'TUX_INVENTORY_INSUFFICIENT_STOCK';
+  end if;
+
+  return new;
+end;
+$reservation_capacity$;
+
+revoke all on function private.enforce_inventory_order_reservation_capacity_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_reservation_capacity
+before insert on public.inventory_movements
+for each row execute function private.enforce_inventory_order_reservation_capacity_v1();
+
 create or replace function private.assert_inventory_item_shop_v1(
   p_shop_id uuid,
   p_inventory_item_id uuid
