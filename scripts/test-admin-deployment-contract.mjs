@@ -9,7 +9,6 @@ const rootApiDir = 'api';
 const adminDeploymentDocPath = 'apps/admin/DEPLOYMENT.md';
 const operationsDeploymentDocPath = 'apps/operations/DEPLOYMENT.md';
 const adminExecutionLedgerPath = 'docs/superpowers/execution/2026-09-10-tux-admin-execution.md';
-const cronDir = 'apps/admin/api/cron';
 
 const adminConfig = JSON.parse(fs.readFileSync(adminVercelPath, 'utf8'));
 const menuConfig = JSON.parse(fs.readFileSync(menuVercelPath, 'utf8'));
@@ -67,37 +66,8 @@ const spaFallback = adminRoutes.at(-1);
 assertEqual(spaFallback?.src, '/(.*)', 'Admin SPA fallback source');
 assertEqual(spaFallback?.dest, '/index.html', 'Admin SPA fallback destination');
 
-const crons = Array.isArray(adminConfig.crons) ? adminConfig.crons : [];
-const expectedAdminCrons = new Map([
-  ['/api/cron/admin-config-scheduler', '* * * * *'],
-  ['/api/cron/admin-approval-executor', '* * * * *'],
-]);
-for (const [routePath, schedule] of expectedAdminCrons) {
-  const matches = crons.filter((entry) => entry?.path === routePath);
-  if (matches.length !== 1 || matches[0]?.schedule !== schedule) {
-    throw new Error(`Admin cron deployment contract missing ${routePath} @ ${schedule}`);
-  }
-}
-
-const routeFiles = fs
-  .readdirSync(cronDir, { withFileTypes: true })
-  .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-  .map((entry) => entry.name)
-  .sort();
-for (const fileName of routeFiles) {
-  const routePath = `/api/cron/${fileName.slice(0, -3)}`;
-  const matches = crons.filter((entry) => entry?.path === routePath);
-  if (matches.length !== 1) {
-    throw new Error(`Admin cron route ${routePath} must have exactly one Vercel schedule`);
-  }
-}
-
-const schedulerSource = fs.readFileSync(path.join(cronDir, 'admin-config-scheduler.ts'), 'utf8');
-if (!schedulerSource.includes('handleCatalogSchedulerRequest')) {
-  throw new Error('Admin config scheduler route must use the shared scheduler auth handler');
-}
-if (!schedulerSource.includes("process.env['CRON_SECRET']")) {
-  throw new Error('Admin config scheduler route must use the CRON_SECRET deployment contract');
+if (Object.prototype.hasOwnProperty.call(adminConfig, 'crons')) {
+  throw new Error('Admin Vercel deployment contract must not register Cron Jobs');
 }
 
 // The repository root must not carry a Vercel project contract after Operations cutover.
