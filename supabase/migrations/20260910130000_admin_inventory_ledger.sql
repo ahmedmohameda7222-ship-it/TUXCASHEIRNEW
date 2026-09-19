@@ -103,14 +103,14 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $inventory_feed$
 begin
   insert into public.inventory_movement_feed(movement_id, shop_id)
   values (new.id, new.shop_id)
   on conflict (movement_id) do nothing;
   return new;
 end;
-$;
+$inventory_feed$;
 
 revoke all on function private.capture_inventory_movement_feed_v1()
   from public, anon, authenticated;
@@ -366,7 +366,7 @@ returns table(
 language plpgsql
 security definer
 set search_path = pg_catalog, public, private
-as $
+as $inventory_balances$
 begin
   perform 1
   from private.admin_inventory_authority_v1(
@@ -384,7 +384,7 @@ begin
   where i.shop_id = p_shop_id
   order by i.id;
 end;
-$;
+$inventory_balances$;
 
 revoke all on function public.read_admin_inventory_balances_v1(uuid, uuid)
   from public, anon, authenticated;
