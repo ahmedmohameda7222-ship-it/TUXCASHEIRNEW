@@ -16,13 +16,6 @@ create table public.inventory_replenishment_settings (
   order_multiple_base bigint check (
     order_multiple_base is null or order_multiple_base > 0
   ),
-  target_food_cost_percent numeric(7, 3) not null default 30
-    check (target_food_cost_percent >= 0 and target_food_cost_percent <= 100),
-  alert_food_cost_percent numeric(7, 3) not null default 35
-    check (
-      alert_food_cost_percent >= target_food_cost_percent
-      and alert_food_cost_percent <= 100
-    ),
   updated_by_employee_id uuid references public.business_employees(id) on delete restrict,
   version bigint not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
@@ -41,7 +34,27 @@ create index inventory_replenishment_settings_shop_reorder_idx
     inventory_item_id
   );
 
+create table public.inventory_margin_settings (
+  shop_id uuid not null references public.shops(id) on delete restrict,
+  product_id uuid not null references public.products(id) on delete restrict,
+  target_food_cost_percent numeric(7, 3) not null default 30
+    check (target_food_cost_percent >= 0 and target_food_cost_percent <= 100),
+  alert_food_cost_percent numeric(7, 3) not null default 35
+    check (
+      alert_food_cost_percent >= target_food_cost_percent
+      and alert_food_cost_percent <= 100
+    ),
+  updated_by_employee_id uuid references public.business_employees(id) on delete restrict,
+  version bigint not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (shop_id, product_id)
+);
+
 alter table public.inventory_replenishment_settings enable row level security;
+alter table public.inventory_margin_settings enable row level security;
 
 revoke all on public.inventory_replenishment_settings from public, anon, authenticated;
+revoke all on public.inventory_margin_settings from public, anon, authenticated;
 grant select, insert, update, delete on public.inventory_replenishment_settings to service_role;
+grant select, insert, update, delete on public.inventory_margin_settings to service_role;
