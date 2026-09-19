@@ -14,6 +14,7 @@ import {
 } from './intelligence.js';
 
 const REPORT_WINDOW_DAYS = 30;
+const MOVEMENT_PAGE_SIZE = 10_000;
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 type ReplenishmentRow = {
@@ -94,6 +95,29 @@ function reportStart(now: number): string {
   return new Date(now - REPORT_WINDOW_DAYS * DAY_MS).toISOString();
 }
 
+async function loadPeriodMovements(
+  client: AdminSupabaseClient,
+  shopId: string,
+  from: string,
+): Promise<PeriodMovementRow[]> {
+  const movements: PeriodMovementRow[] = [];
+  for (let offset = 0; ; offset += MOVEMENT_PAGE_SIZE) {
+    const page = await client.select<PeriodMovementRow[]>(
+      'inventory_movements',
+      new URLSearchParams({
+        select: 'inventory_item_id,movement_type,quantity_delta_micros,order_id',
+        shop_id: `eq.${shopId}`,
+        created_at: `gte.${from}`,
+        order: 'created_at.asc,id.asc',
+        limit: String(MOVEMENT_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    movements.push(...page);
+    if (page.length < MOVEMENT_PAGE_SIZE) return movements;
+  }
+}
+
 export async function loadInventoryIntelligence(
   client: AdminSupabaseClient,
   shopId: string,
@@ -117,16 +141,7 @@ export async function loadInventoryIntelligence(
         shop_id: `eq.${shopId}`,
       }),
     ),
-    client.select<PeriodMovementRow[]>(
-      'inventory_movements',
-      new URLSearchParams({
-        select: 'inventory_item_id,movement_type,quantity_delta_micros,order_id',
-        shop_id: `eq.${shopId}`,
-        created_at: `gte.${from}`,
-        order: 'created_at.asc,id.asc',
-        limit: '10000',
-      }),
-    ),
+    loadPeriodMovements(client, shopId, from),
     client.select<ProductRow[]>(
       'products',
       new URLSearchParams({
