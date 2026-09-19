@@ -1,12 +1,14 @@
 # TUX Admin Deployment Contract
 
-TUX Admin is intended to be its own **separate Vercel project** from the same TUX monorepo, rooted at `apps/admin`.
+TUX Admin is a **separate Vercel project** from the same TUX monorepo, rooted at `apps/admin`.
 
-## Current migration gate
+## Import state
 
-The repository still contains the legacy root `/vercel.json` used by the live Operations project. The real Vercel New Project import UI can preload that root Operations build/install/output contract even after `apps/admin` is selected. Therefore **do not create the Admin project until the existing Operations project has been cut over to `apps/operations` and the legacy root `/vercel.json` has been removed in the follow-up cleanup**.
+The Operations Vercel cutover is complete and production-verified from the app-local Operations boundary. The repository root `/vercel.json` is absent, so a fresh Admin import rooted at `apps/admin` must resolve the Admin app-local contract instead of the former Operations contract.
 
-The repository-side Admin target contract remains:
+If a Vercel New Project form was opened before this cleanup, cancel it and start a fresh import from the latest `main`. Do not deploy if the form still shows any Operations build command or `apps/operations/dist`.
+
+Configure the Admin project with:
 
 - Root Directory: `apps/admin`
 - Include source files outside Root Directory: **Enabled**
@@ -17,7 +19,7 @@ The repository-side Admin target contract remains:
 
 Because the Admin install/build commands intentionally reach the monorepo root and the Admin app consumes shared workspace packages, outside-root source access must remain enabled.
 
-After the Operations cutover and root cleanup, `apps/admin/vercel.json` is the only repository deployment contract applicable to an Admin project rooted at `apps/admin`. `apps/menu/vercel.json` remains the Menu deployment contract, and `apps/operations/vercel.json` becomes the Operations deployment contract.
+`apps/admin/vercel.json` is the repository deployment contract for Admin. `apps/menu/vercel.json` remains the Menu contract, and `apps/operations/vercel.json` is the Operations contract.
 
 Admin `/api/*` functions, including `/api/cron/*`, are resolved through the filesystem before the final SPA fallback to `/index.html`. Do not replace that route ordering with a catch-all rewrite that intercepts API functions.
 
