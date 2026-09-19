@@ -206,7 +206,10 @@ function selectScopedReasons(
       family: row.family as AdminInventoryReasonCode['family'],
       label: row.label,
     }))
-    .sort((left, right) => left.family.localeCompare(right.family) || left.label.localeCompare(right.label));
+    .sort(
+      (left, right) =>
+        left.family.localeCompare(right.family) || left.label.localeCompare(right.label),
+    );
 }
 
 async function loadWorkspace(
@@ -294,7 +297,9 @@ async function loadWorkspace(
     list.push(movement);
     movementsByItem.set(movement.inventory_item_id, list);
   }
-  const costs = new Map(costRows.map((row) => [row.inventory_item_id, finiteNumber(row.weighted_unit_cost_minor)]));
+  const costs = new Map(
+    costRows.map((row) => [row.inventory_item_id, finiteNumber(row.weighted_unit_cost_minor)]),
+  );
 
   const items: AdminInventoryItem[] = itemRows.map((row) => {
     const movements = movementsByItem.get(row.id) ?? [];
