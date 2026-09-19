@@ -48,21 +48,20 @@ Use `**`, not `*`, so slash-named feature branches are also disabled.
 
 This project boundary only enables normal Admin deployment from `main`. **Final production acceptance is still Plan 10** and remains responsible for the reviewed reliability, migration, secret, environment, and smoke-test acceptance gates.
 
-## Server-only scheduler secret
+## Vercel Cron Jobs
 
-`CRON_SECRET` is required by every Admin scheduled route. It is a server-only deployment secret and must never be exposed through Vite/browser environment variables, client bundles, logs, screenshots, or documentation values.
+Vercel Cron Jobs are disabled for the Admin project. The Admin `vercel.json` intentionally has no `crons` property, so deploying Admin does not register scheduled jobs.
 
-The production scheduler invokes `/api/cron/admin-config-scheduler` every minute. The approval execution runner invokes `/api/cron/admin-approval-executor` every minute. The cron expressions are only wake-up cadences; due work is selected from canonical state in PostgreSQL.
+The existing scheduler/approval HTTP handlers remain fail-closed internal endpoints, but Vercel does not invoke them on a schedule in this deployment profile. `CRON_SECRET` is therefore not required to deploy Admin while Vercel Cron Jobs remain disabled.
 
 ## Safe smoke procedure
 
 Before accepting Admin production in Plan 10:
 
 1. Apply the reviewed Admin migrations to the explicitly authorized production Supabase project using the Plan 10 migration procedure.
-2. Configure the Admin project's server-only Supabase URL/service-role key and `CRON_SECRET`.
-3. Send an unauthenticated `GET /api/cron/admin-config-scheduler`; with `CRON_SECRET` configured it must return `401 unauthorized` and execute no work. If the secret is absent, the route must fail closed with `503 cron_secret_not_configured`.
-4. Send an authenticated GET with `Authorization: Bearer <CRON_SECRET>`. A healthy no-work invocation may return `200` with zero claimed/applied/failed counts.
-5. Confirm that scheduled routes accept no caller-supplied business command payload that bypasses the trusted server/RPC boundaries.
-6. Confirm a claimed job cannot be claimed by a second worker during its lease, and that an expired claim can be safely reclaimed after the configured lease interval.
+2. Configure the Admin project's server-only Supabase URL/service-role key.
+3. Confirm the deployed Admin project registers no Vercel Cron Jobs.
+4. Confirm the dormant scheduler/approval HTTP endpoints fail closed when no `CRON_SECRET` is configured.
+5. If scheduled execution is reintroduced in a later reviewed plan, reintroduce its authentication and scheduling contract explicitly rather than enabling it implicitly.
 
 Do not paste production secret values into tickets, chat, CI output, or test fixtures.
