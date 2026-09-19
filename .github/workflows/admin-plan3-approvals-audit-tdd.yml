@@ -12,9 +12,8 @@ on:
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
       - 'apps/admin/api/admin/approvals.ts'
-      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/server/api-contracts/approvals.test.ts'
       - 'apps/admin/api/admin/audit.ts'
-      - 'apps/admin/api/cron/admin-approval-executor.ts'
       - 'apps/admin/src/approvals/**'
       - 'apps/admin/src/audit/**'
       - 'apps/admin/src/app/routes.tsx'
@@ -33,9 +32,8 @@ on:
       - 'apps/admin/server/approvals/**'
       - 'apps/admin/server/audit/**'
       - 'apps/admin/api/admin/approvals.ts'
-      - 'apps/admin/api/admin/approvals.test.ts'
+      - 'apps/admin/server/api-contracts/approvals.test.ts'
       - 'apps/admin/api/admin/audit.ts'
-      - 'apps/admin/api/cron/admin-approval-executor.ts'
       - 'apps/admin/src/approvals/**'
       - 'apps/admin/src/audit/**'
       - 'apps/admin/src/app/routes.tsx'
@@ -104,7 +102,7 @@ jobs:
       - name: Plan 3 BFF and UI tests
         run: >-
           npx vitest run
-          apps/admin/api/admin/approvals.test.ts
+          apps/admin/server/api-contracts/approvals.test.ts
           apps/admin/src/approvals/ApprovalDetailPage.test.tsx
           apps/admin/src/audit/AuditDetailPage.test.tsx
           apps/admin/src/audit/AuditPage.test.tsx
