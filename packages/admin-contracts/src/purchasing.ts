@@ -56,9 +56,16 @@ export type AdminPurchaseOrder = {
   readonly lines: readonly AdminPurchaseOrderLine[];
 };
 
+export type AdminPurchasingInventoryItem = {
+  readonly id: string;
+  readonly name: string;
+  readonly unitLabel: string;
+};
+
 export type AdminPurchasingWorkspace = {
   readonly shopId: string;
   readonly suppliers: readonly AdminSupplier[];
+  readonly inventoryItems: readonly AdminPurchasingInventoryItem[];
   readonly purchaseOrders: readonly AdminPurchaseOrder[];
 };
 
