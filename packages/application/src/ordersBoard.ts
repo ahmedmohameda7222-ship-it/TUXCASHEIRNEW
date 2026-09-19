@@ -215,7 +215,7 @@ export class OperationsOrdersBoardService {
           movementType: 'ORDER_CONSUMPTION',
           quantityDeltaMicros: stockQuantityMicros(-reservedMicros),
           reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
-          idempotencyKey: `order-consumption:${order.id}:${itemId}`,
+          idempotencyKey: `order-consumption:${order.id}:${orderLifecycle(order).revision + 1}:${itemId}`,
           workerId: context.operator.id,
           orderId: order.id,
           createdAt: now,
