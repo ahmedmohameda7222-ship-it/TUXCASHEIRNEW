@@ -300,12 +300,15 @@ describe('Operations order inventory lifecycle', () => {
       expect(placed.error.code).toBe('CONFLICT_ERROR');
       expect(placed.error.message).toMatch(/insufficient available stock/i);
 
-      const orderMovements = await test.database.transaction((transaction) =>
-        transaction.inventory.listMovementsForOrder(
-          parseEntityId('abababab-abab-4bab-8bab-abababababab') as never,
-        ),
+      const balance = await test.database.transaction((transaction) =>
+        transaction.inventory.getBalance(INVENTORY_ITEM_ID),
       );
-      expect(orderMovements).toHaveLength(0);
+      expect(balance).toMatchObject({
+        initialized: true,
+        onHandMicros: 250_000,
+        reservedMicros: 0,
+        availableMicros: 250_000,
+      });
     } finally {
       await closeFixture(test);
     }
