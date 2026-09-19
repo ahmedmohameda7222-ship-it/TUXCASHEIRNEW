@@ -8,6 +8,7 @@ const sql = fs.readFileSync(migrationPath, 'utf8').toLowerCase();
 
 for (const name of [
   'inventory_replenishment_settings',
+  'inventory_margin_settings',
   'par_level_base',
   'reorder_point_base',
   'preferred_supplier_id',
@@ -26,6 +27,9 @@ if (!sql.includes('enable row level security')) {
 }
 if (!sql.includes('revoke all on public.inventory_replenishment_settings from public, anon, authenticated')) {
   throw new Error('browser roles must not access replenishment settings directly');
+}
+if (!sql.includes('revoke all on public.inventory_margin_settings from public, anon, authenticated')) {
+  throw new Error('browser roles must not access margin settings directly');
 }
 if (!sql.includes('grant select, insert, update, delete on public.inventory_replenishment_settings to service_role')) {
   throw new Error('service_role must own the replenishment settings boundary');
