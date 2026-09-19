@@ -121,7 +121,6 @@ export interface AdminInventoryWorkspace {
   readonly intelligence: AdminInventoryIntelligence;
 }
 
-
 export interface AdminStocktakeSnapshotLine {
   readonly inventoryItemId: string;
   readonly snapshotOnHandMicros: number;
@@ -205,6 +204,7 @@ export type AdminInventoryCommandResult =
       readonly idempotentReplay?: boolean;
       readonly movementId?: string;
       readonly stocktakeId?: string;
+      readonly lines?: readonly AdminStocktakeSnapshotLine[];
       readonly transferId?: string;
     }
   | {
