@@ -451,6 +451,66 @@ CREATE INDEX idx_inventory_movements_order
   ON inventory_movements(order_id, created_at, id);
 `,
   },
+  {
+    version: 12,
+    name: 'inventory_remote_convergence',
+    sql: `
+CREATE TABLE inventory_movements_v12 (
+  id TEXT PRIMARY KEY,
+  shop_id TEXT NOT NULL REFERENCES shops(id),
+  business_day_id TEXT REFERENCES business_days(id),
+  item_id TEXT NOT NULL REFERENCES inventory_items(id),
+  movement_type TEXT NOT NULL,
+  quantity_delta_micros INTEGER NOT NULL,
+  reserved_delta_micros INTEGER NOT NULL DEFAULT 0,
+  idempotency_key TEXT NOT NULL,
+  worker_id TEXT REFERENCES workers(id),
+  unit_cost_minor REAL,
+  order_id TEXT REFERENCES orders(id),
+  created_at TEXT NOT NULL,
+  compensates_movement_id TEXT REFERENCES inventory_movements_v12(id),
+  payload_json TEXT NOT NULL,
+  UNIQUE (shop_id, idempotency_key),
+  CHECK (quantity_delta_micros <> 0 OR reserved_delta_micros <> 0),
+  CHECK (unit_cost_minor IS NULL OR unit_cost_minor >= 0)
+);
+
+INSERT INTO inventory_movements_v12(
+  id, shop_id, business_day_id, item_id, movement_type,
+  quantity_delta_micros, reserved_delta_micros, idempotency_key,
+  worker_id, unit_cost_minor, order_id, created_at, compensates_movement_id, payload_json
+)
+SELECT
+  id, shop_id, business_day_id, item_id, movement_type,
+  quantity_delta_micros, reserved_delta_micros, idempotency_key,
+  worker_id, NULL, order_id, created_at, compensates_movement_id, payload_json
+FROM inventory_movements;
+
+DROP TABLE inventory_movements;
+ALTER TABLE inventory_movements_v12 RENAME TO inventory_movements;
+
+CREATE INDEX idx_inventory_movements_item
+  ON inventory_movements(item_id, created_at);
+CREATE INDEX idx_inventory_movements_business_day
+  ON inventory_movements(business_day_id, created_at);
+CREATE INDEX idx_inventory_movements_order
+  ON inventory_movements(order_id, created_at, id);
+
+CREATE TABLE inventory_cost_state (
+  item_id TEXT PRIMARY KEY REFERENCES inventory_items(id),
+  shop_id TEXT NOT NULL REFERENCES shops(id),
+  weighted_unit_cost_minor REAL NOT NULL CHECK (weighted_unit_cost_minor >= 0),
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_inventory_cost_state_shop ON inventory_cost_state(shop_id, item_id);
+
+CREATE TABLE inventory_sync_cursors (
+  shop_id TEXT PRIMARY KEY REFERENCES shops(id),
+  cursor TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {
