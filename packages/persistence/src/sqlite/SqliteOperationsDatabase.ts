@@ -399,6 +399,7 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
             movement.reservedDeltaMicros ?? 0,
             movement.idempotencyKey,
             movement.workerId,
+            movement.unitCostMinor ?? null,
             movement.orderId,
             movement.createdAt,
             movement.compensatesMovementId,
