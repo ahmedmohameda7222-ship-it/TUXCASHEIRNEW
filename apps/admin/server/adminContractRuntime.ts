@@ -60,10 +60,15 @@ const ADMIN_PERMISSION_MEMBERSHIP = {
   'approvals.review': true,
 } as const satisfies Record<AdminPermission, true>;
 
-export const ADMIN_PERMISSIONS = Object.keys(ADMIN_PERMISSION_MEMBERSHIP) as AdminPermission[];
+export const ADMIN_PERMISSIONS = Object.keys(
+  ADMIN_PERMISSION_MEMBERSHIP,
+) as AdminPermission[];
 
 export function isAdminPermission(value: string): value is AdminPermission {
-  return Object.prototype.hasOwnProperty.call(ADMIN_PERMISSION_MEMBERSHIP, value);
+  return Object.prototype.hasOwnProperty.call(
+    ADMIN_PERMISSION_MEMBERSHIP,
+    value,
+  );
 }
 
 const ADMIN_APPROVAL_STATUS_MEMBERSHIP = {
