@@ -136,8 +136,11 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Plan 4 Task 3 inventory item UI
-        run: npx vitest run apps/admin/src/inventory/InventoryItemPage.test.tsx
+      - name: Plan 4 Task 3 inventory unit/source UI
+        run: >-
+          npx vitest run
+          apps/admin/src/inventory/InventoryItemPage.test.tsx
+          apps/admin/src/inventory/InventoryRoute.source.test.ts
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Plan 4 Task 3 inventory E2E
