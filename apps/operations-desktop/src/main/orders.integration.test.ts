@@ -367,7 +367,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(result.error.code).toBe('VALIDATION_ERROR');
     expect(result.error.validationIssues?.some((issue) => issue.path === 'payment')).toBe(true);
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(0);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(0);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
     expect(
       scalar(
         databasePath,
@@ -416,7 +416,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(payment?.changeMinor).toBe(moneyMinor(4_000));
 
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
@@ -438,9 +438,15 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(
       scalar(
         databasePath,
-        'SELECT quantity_delta_micros AS value FROM inventory_movements LIMIT 1',
+        "SELECT quantity_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1",
       ),
-    ).toBe(-500_000);
+    ).toBe(0);
+    expect(
+      scalar(
+        databasePath,
+        "SELECT reserved_delta_micros AS value FROM inventory_movements WHERE order_id IS NOT NULL LIMIT 1",
+      ),
+    ).toBe(500_000);
     expect(result.value.nextDraft.lines).toHaveLength(0);
     expect(result.value.nextDraft.payment).toEqual({ mode: 'NONE' });
     expect(result.value.nextDraft.orderTypeId).toBe(TAKE_AWAY_ID);
@@ -470,7 +476,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(replay.value.nextDraft.lines).toHaveLength(1);
     expect(replay.value.postCommitWarnings).toContain('DRAFT_SCOPE_ADVANCED');
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
@@ -508,7 +514,7 @@ describe('OperationsOrdersService with SQLite', () => {
     if (result.ok) throw new Error('Expected durable checkout to fail.');
     expect(result.error.code).toBe('LOCAL_PERSISTENCE_ERROR');
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(0);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(0);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
     expect(
       scalar(
         databasePath,
@@ -600,7 +606,7 @@ describe('OperationsOrdersService with SQLite', () => {
     await printer.started;
 
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
@@ -662,7 +668,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(result.value.postCommitWarnings).toContain('DRAFT_SCOPE_ADVANCED');
     expect(result.value.nextDraft.checkoutIntentKey).toBe(recovered.value.draft.checkoutIntentKey);
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
@@ -720,7 +726,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(placed.value.postCommitWarnings).toContain('PRINT_FAILED');
     expect(printer.orders).toHaveLength(1);
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
@@ -742,7 +748,7 @@ describe('OperationsOrdersService with SQLite', () => {
     expect(printer.orders.every((order) => order.id === placed.value.order.id)).toBe(true);
 
     expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM orders')).toBe(1);
-    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(1);
+    expect(scalar(databasePath, 'SELECT COUNT(*) AS value FROM inventory_movements')).toBe(2);
     expect(
       scalar(
         databasePath,
