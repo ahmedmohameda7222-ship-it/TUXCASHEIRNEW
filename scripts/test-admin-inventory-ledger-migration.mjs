@@ -197,6 +197,7 @@ psql(
      begin
        select to_jsonb(x) into v_before from legacy_inventory_snapshot x;
        select to_jsonb(x) - array[
+         'reserved_delta_micros',
          'admin_employee_id',
          'source_kind',
          'command_id',
@@ -222,7 +223,9 @@ psql(
          where id = '${movementId}'
            and movement_type = 'ADMIN_ADJUSTMENT'
            and quantity_delta_micros = 2500000
+           and reserved_delta_micros = 0
            and worker_id = '${workerId}'
+           and source_kind = 'OPERATIONS'
            and idempotency_key = 'legacy-admin-adjustment'
        ) then
          raise exception 'legacy inventory movement identity/history did not survive';
@@ -235,6 +238,16 @@ psql(
            and pg_get_constraintdef(oid) ilike '%PURCHASE_RETURN%'
        ) then
          raise exception 'movement type constraint is not a legacy-preserving superset';
+       end if;
+
+       if not exists (
+         select 1
+         from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'inventory_movements'
+           and column_name = 'reserved_delta_micros'
+       ) then
+         raise exception 'reservation delta column is missing from canonical inventory ledger';
        end if;
 
        if has_table_privilege('anon', 'public.inventory_reservations', 'SELECT')
