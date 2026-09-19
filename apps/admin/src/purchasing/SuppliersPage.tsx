@@ -4,10 +4,12 @@ import type { AdminSupplier } from '@tux/admin-contracts';
 
 export function SuppliersPage({
   suppliers,
+  canManage,
   pending,
   onCreate,
 }: {
   suppliers: readonly AdminSupplier[];
+  canManage: boolean;
   pending: boolean;
   onCreate(input: {
     name: string;
@@ -33,7 +35,8 @@ export function SuppliersPage({
           </article>
         ))}
       </div>
-      <form
+      {canManage ? (
+        <form
         className="admin-form-grid"
         onSubmit={(event) => {
           event.preventDefault();
@@ -77,7 +80,8 @@ export function SuppliersPage({
         <button className="admin-secondary-button" type="submit" disabled={pending}>
           Add supplier
         </button>
-      </form>
+        </form>
+      ) : null}
     </section>
   );
 }
