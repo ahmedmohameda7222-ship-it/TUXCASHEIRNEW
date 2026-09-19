@@ -1,10 +1,8 @@
-# TUX Operations Vercel Cutover Contract
+# TUX Operations Vercel Deployment Contract
 
-Operations currently remains live through the repository-root Vercel project and the root `/vercel.json`. That legacy contract must stay in place until the existing production project has been switched to the app-local root and a successful production deployment has been verified.
+## Cutover status: complete
 
-## App-local target contract
-
-After the repository-side preparation is merged, the existing Operations project can be moved to:
+The existing Operations Vercel project `tuxcasheirnew` is now on the app-local monorepo boundary:
 
 - Root Directory: `apps/operations`
 - Include source files outside Root Directory: **Enabled**
@@ -13,28 +11,28 @@ After the repository-side preparation is merged, the existing Operations project
 - Build Command: `cd ../.. && npm run build -w @tux/operations`
 - Output Directory: `dist`
 
-The app-local `apps/operations/vercel.json` preserves the existing main-only Git policy, the existing `/api/whatsapp-media-retention` cron schedule, and the existing ignore command.
+The cutover was production-verified with deployment `dpl_9M6i179C83S6Hzry2rumFm9Tqx68` from `main` commit `4afea2c27d9cc561a55089ffef5a3fc402cd849e`. It reached `READY` and retained the existing production alias `tuxcasheirnew-three.vercel.app` without an alias error.
+
+The repository-root `/vercel.json` is absent in the final repository state. `apps/operations/vercel.json` is the only Operations Vercel project contract.
 
 ## Runtime/API preservation
 
-Every existing repository-root `api/*.ts` Operations function has an app-local entrypoint under `apps/operations/api/*.ts`. Each entrypoint delegates to the existing root handler instead of duplicating business logic. This preserves the deployed route names and behavior while allowing Vercel to discover the functions from the new project Root Directory.
+Every repository-root Operations API function has a matching app-local entrypoint under `apps/operations/api/**`. Each entrypoint delegates to the existing root handler instead of duplicating business logic, preserving deployed route names and behavior.
 
-Because those entrypoints import the existing root handlers and the Operations workspace consumes shared monorepo packages, **Include source files outside Root Directory must be enabled** before the cutover deployment.
+Those wrappers import handlers and shared packages outside `apps/operations`, so **Include source files outside Root Directory must remain enabled**.
 
-## Cutover verification trigger
+The app-local contract preserves:
 
-When Vercel skips an empty commit as an unaffected monorepo change, a documentation-only change inside `apps/operations` may be used to force one production build after the Root Directory setting changes. This does not change Operations runtime behavior.
+- the existing `/api/whatsapp-media-retention` cron schedule;
+- the existing main-only Git deployment policy;
+- the existing ignore command;
+- the Operations workspace build command;
+- the existing production domain/alias.
 
-## Zero-downtime sequence
+Do not manually invoke `/api/whatsapp-media-retention` as a smoke test because it is an operational retention job.
 
-1. Merge the repository preparation that adds this app-local contract and the app-local API entrypoints.
-2. Confirm CI and Codex review are green.
-3. In the existing Operations Vercel project, change Root Directory from the repository root to `apps/operations`.
-4. Enable **Include source files outside Root Directory**.
-5. Confirm the project settings resolve to the app-local values above.
-6. Deploy the current `main` commit and wait for that deployment to reach Ready.
-7. Verify the existing Operations production domain, all existing `/api/*` routes used by Operations, and `/api/whatsapp-media-retention`.
-8. Only after that verification may the legacy repository-root `/vercel.json` be removed in a separate repository change.
-9. Do not create the Admin Vercel project until that root cleanup is merged, because the Vercel New Project import UI can otherwise preload the repository-root Operations commands.
+## Future changes
 
-Changing the project Root Directory does not require changing the production domain. The previous Ready production deployment remains the rollback target until the new app-local deployment is verified.
+Any Operations deployment change must be made in `apps/operations/vercel.json` and covered by `npm run test:admin-deployment`. Any new root `api/**/*.ts` handler must have the recursively mirrored `apps/operations/api/**/*.ts` entrypoint enforced by that regression gate.
+
+The previous `READY` production deployments remain available as rollback artifacts; changing repository deployment contracts does not require changing the production domain.
