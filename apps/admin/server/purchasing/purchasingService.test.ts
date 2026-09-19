@@ -179,7 +179,9 @@ describe('Admin purchasing service', () => {
     const purchasingStore = store();
     const service = createPurchasingService(purchasingStore);
 
-    await expect(service.loadWorkspace('shop-a', buyer)).resolves.toMatchObject({ shopId: 'shop-a' });
+    await expect(service.loadWorkspace('shop-a', buyer)).resolves.toMatchObject({
+      shopId: 'shop-a',
+    });
     expect(purchasingStore.loadWorkspace).toHaveBeenCalledWith('shop-a', 'business-1');
 
     await expect(service.loadWorkspace('shop-b', buyer)).rejects.toThrow(/shop_forbidden/);
