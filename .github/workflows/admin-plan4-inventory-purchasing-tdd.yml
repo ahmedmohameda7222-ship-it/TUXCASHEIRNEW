@@ -168,10 +168,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Plan 4 Task 4 migration invariant
-        run: node scripts/test-admin-inventory-intelligence-migration.mjs
       - name: Plan 4 Task 4 inventory intelligence RED/behavior
         run: npx vitest run apps/admin/server/inventory/intelligence.test.ts
+      - name: Plan 4 Task 4 migration invariant
+        run: node scripts/test-admin-inventory-intelligence-migration.mjs
 
 
   task1-regression:
