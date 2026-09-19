@@ -42,8 +42,8 @@ export function PurchaseOrdersPage({
     lines: readonly {
       inventoryItemId: string;
       purchaseUnitLabel: string;
-      orderedBaseMicros: number;
-      expectedUnitCostMinor: number;
+      orderedPurchaseUnitsMicros: number;
+      expectedPurchaseUnitCostMinor: number;
     }[];
   }): void;
 }) {
@@ -54,7 +54,7 @@ export function PurchaseOrdersPage({
   const [reference, setReference] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [purchaseUnit, setPurchaseUnit] = useState('unit');
+  const [purchaseUnit, setPurchaseUnit] = useState('');
   const [unitCost, setUnitCost] = useState('');
 
   const unitLabel = useMemo(
@@ -88,8 +88,8 @@ export function PurchaseOrdersPage({
           className="admin-form-grid"
           onSubmit={(event) => {
             event.preventDefault();
-            const orderedBaseMicros = baseMicros(quantity);
-            if (!supplierId || !itemId || orderedBaseMicros <= 0) return;
+            const orderedPurchaseUnitsMicros = baseMicros(quantity);
+            if (!supplierId || !itemId || orderedPurchaseUnitsMicros <= 0) return;
             onCreate({
               supplierId,
               reference: reference.trim() || null,
@@ -98,8 +98,8 @@ export function PurchaseOrdersPage({
                 {
                   inventoryItemId: itemId,
                   purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
-                  orderedBaseMicros,
-                  expectedUnitCostMinor: minorUnits(unitCost),
+                  orderedPurchaseUnitsMicros,
+                  expectedPurchaseUnitCostMinor: minorUnits(unitCost),
                 },
               ],
             });
@@ -144,7 +144,7 @@ export function PurchaseOrdersPage({
             />
           </label>
           <label>
-            Order quantity ({unitLabel})
+            Order quantity (purchase units)
             <input
               inputMode="decimal"
               value={quantity}
@@ -155,11 +155,12 @@ export function PurchaseOrdersPage({
             Purchase unit
             <input
               value={purchaseUnit}
+              placeholder={unitLabel}
               onChange={(event) => setPurchaseUnit(event.currentTarget.value)}
             />
           </label>
           <label>
-            Expected unit cost
+            Expected purchase-unit cost
             <input
               inputMode="decimal"
               value={unitCost}
