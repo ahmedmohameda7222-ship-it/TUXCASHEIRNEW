@@ -1,3 +1,4 @@
+import type { AdminStocktakeSnapshot } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -22,6 +23,7 @@ export function InventoryPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
+  const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
   const items = workspace?.items ?? [];
@@ -81,9 +83,18 @@ export function InventoryPage() {
             <button
               className="admin-secondary-button"
               type="button"
+              disabled={inventory.beginStocktake.isPending || items.length === 0}
               onClick={() => {
-                setMode('stocktake');
-                setItemAction(null);
+                inventory.beginStocktake.mutate(
+                  items.map((item) => item.id),
+                  {
+                    onSuccess: (snapshot) => {
+                      setStocktakeSnapshot(snapshot);
+                      setMode('stocktake');
+                      setItemAction(null);
+                    },
+                  },
+                );
               }}
             >
               Stock count
@@ -141,13 +152,25 @@ export function InventoryPage() {
           marginAlerts={workspace.intelligence.marginAlerts}
           onBack={() => setMode('detail')}
         />
-      ) : mode === 'stocktake' ? (
+      ) : mode === 'stocktake' && stocktakeSnapshot ? (
         <StocktakePage
           items={items}
+          snapshot={stocktakeSnapshot}
           pending={inventory.postStocktake.isPending}
-          onBack={() => setMode('detail')}
+          onBack={() => {
+            setStocktakeSnapshot(null);
+            setMode('detail');
+          }}
           onSubmit={(lines) =>
-            inventory.postStocktake.mutate(lines, { onSuccess: () => setMode('detail') })
+            inventory.postStocktake.mutate(
+              { stocktakeId: stocktakeSnapshot.stocktakeId, lines },
+              {
+                onSuccess: () => {
+                  setStocktakeSnapshot(null);
+                  setMode('detail');
+                },
+              },
+            )
           }
         />
       ) : mode === 'transfer' ? (
