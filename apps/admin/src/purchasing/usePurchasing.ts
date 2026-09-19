@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { AdminPurchasingWorkspace, PurchasingCommandResult } from '@tux/admin-contracts';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
+import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 
 export class PurchasingUiError extends Error {
   constructor(readonly code: string) {
@@ -22,13 +24,11 @@ function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   return session.state.session.csrfToken;
 }
 
-function commandId(): string {
-  return crypto.randomUUID();
-}
 
 export function usePurchasing(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
+  const commandIds = useMemo(() => createRetainedCommandIds(), []);
 
   const workspace = useQuery({
     queryKey: shopId ? queryKey(shopId) : ['admin', 'purchasing', 'no-shop'],
@@ -41,14 +41,29 @@ export function usePurchasing(shopId: string | undefined) {
     },
   });
 
-  async function post(command: Record<string, unknown>): Promise<PurchasingCommandResult> {
+  async function post(
+    command: Record<string, unknown>,
+    onAuthoritativeResponse?: () => void,
+  ): Promise<PurchasingCommandResult> {
     const result = await adminFetch<PurchasingCommandResult>(
       '/api/admin/purchasing',
       { method: 'POST', body: JSON.stringify(command) },
       csrfToken(session),
     );
+    onAuthoritativeResponse?.();
     if (!result.ok) throw new PurchasingUiError(result.code);
     return result;
+  }
+
+  async function postRetained(
+    scope: string,
+    intent: unknown,
+    buildCommand: (retainedCommandId: string) => Record<string, unknown>,
+  ): Promise<PurchasingCommandResult> {
+    if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+    const retainedIntent = { shopId, intent };
+    const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
+    return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
   }
 
   async function invalidate(): Promise<void> {
@@ -80,8 +95,12 @@ export function usePurchasing(shopId: string | undefined) {
         expectedPurchaseUnitCostMinor: number;
       }[];
     }) => {
-      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
-      return post({ type: 'po.create', shopId, ...input, commandId: commandId() });
+      return postRetained('po.create', input, (retainedCommandId) => ({
+        type: 'po.create',
+        shopId: shopId!,
+        ...input,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });
@@ -101,8 +120,12 @@ export function usePurchasing(shopId: string | undefined) {
 
   const orderPurchaseOrder = useMutation({
     mutationFn: async (input: { purchaseOrderId: string; expectedVersion: number }) => {
-      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
-      return post({ type: 'po.order', shopId, ...input, commandId: commandId() });
+      return postRetained('po.order', input, (retainedCommandId) => ({
+        type: 'po.order',
+        shopId: shopId!,
+        ...input,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });
@@ -117,8 +140,12 @@ export function usePurchasing(shopId: string | undefined) {
         purchaseUnitCostMinor: number;
       }[];
     }) => {
-      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
-      return post({ type: 'po.receive', shopId, ...input, commandId: commandId() });
+      return postRetained('po.receive', input, (retainedCommandId) => ({
+        type: 'po.receive',
+        shopId: shopId!,
+        ...input,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });
@@ -132,8 +159,12 @@ export function usePurchasing(shopId: string | undefined) {
         returnedPurchaseUnitsMicros: number;
       }[];
     }) => {
-      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
-      return post({ type: 'po.return', shopId, ...input, commandId: commandId() });
+      return postRetained('po.return', input, (retainedCommandId) => ({
+        type: 'po.return',
+        shopId: shopId!,
+        ...input,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });
