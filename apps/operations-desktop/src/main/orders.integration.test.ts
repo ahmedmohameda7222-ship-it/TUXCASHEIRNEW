@@ -18,6 +18,7 @@ import {
   type DeliveryZoneId,
   type DraftLineId,
   type InventoryItemId,
+  type InventoryMovementId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
@@ -195,6 +196,19 @@ async function fixture(
       unitLabel: 'g',
       trackingMode: 'RECIPE_TRACKED',
       active: true,
+    });
+    await transaction.inventory.appendMovement({
+      id: parseEntityId<InventoryMovementId>('71000000-0000-4000-8000-000000000001'),
+      shopId: SHOP_ID,
+      businessDayId: BUSINESS_DAY_ID,
+      itemId: INVENTORY_ITEM_ID,
+      movementType: 'BULK_STOCK_RECEIVED',
+      quantityDeltaMicros: stockQuantityMicros(100_000_000),
+      idempotencyKey: 'fixture-opening-stock',
+      workerId: WORKER_ID,
+      orderId: null,
+      createdAt: STARTED_AT,
+      compensatesMovementId: null,
     });
   });
 
