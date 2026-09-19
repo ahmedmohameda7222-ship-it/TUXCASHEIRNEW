@@ -90,7 +90,9 @@ export function AdjustStockSheet({
       <button
         className="admin-primary-button"
         type="button"
-        disabled={pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())}
+        disabled={
+          pending || micros === null || reasonCodeId.length === 0 || (override && !note.trim())
+        }
         onClick={() => {
           if (micros === null) return;
           onSubmit({
