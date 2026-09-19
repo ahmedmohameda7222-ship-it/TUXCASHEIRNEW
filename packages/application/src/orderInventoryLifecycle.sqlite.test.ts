@@ -222,19 +222,6 @@ async function fixture() {
   return { database, readModel, draftStore, orders, board };
 }
 
-async function movements(
-  test: Awaited<ReturnType<typeof fixture>>,
-  orderId: Parameters<
-    Awaited<ReturnType<typeof fixture>>['database']['transaction']
-  >[0] extends never
-    ? never
-    : string,
-) {
-  return test.database.transaction((transaction) =>
-    transaction.inventory.listMovementsForOrder(orderId as never),
-  );
-}
-
 async function closeFixture(test: Awaited<ReturnType<typeof fixture>>) {
   await test.readModel.close();
   await test.draftStore.close();
