@@ -134,6 +134,22 @@ function psql(args, label) {
   return result.stdout;
 }
 
+function psqlExpectFailure(args, label, expectedMessage) {
+  const result = spawnSync('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  if (result.status === 0) {
+    throw new Error(`${label} unexpectedly succeeded.`);
+  }
+  if (!output.includes(expectedMessage)) {
+    process.stderr.write(output);
+    throw new Error(`${label} failed without ${expectedMessage}.`);
+  }
+  return output;
+}
+
 psql(
   [
     '-c',
@@ -256,7 +272,7 @@ if (legacyBefore !== legacyAfter) {
 psql(
   [
     '-c',
-    `do $$
+    `do $
      begin
        if not exists (
          select 1 from public.inventory_movements
@@ -294,9 +310,62 @@ psql(
           or has_table_privilege('authenticated', 'public.inventory_reservations', 'SELECT') then
          raise exception 'inventory reservation table leaked browser SELECT';
        end if;
-     end $$;`,
+     end $;`,
   ],
   'Admin inventory additive compatibility assertions',
+);
+
+const firstReservationMovementId = '64000000-0000-4000-8000-000000000001';
+const secondReservationMovementId = '64000000-0000-4000-8000-000000000002';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '${firstReservationMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_RESERVATION', 0, 2000000, '${workerId}',
+       'device-a:last-unit-reservation', timestamptz '2026-09-19 02:00:00+00'
+     );`,
+  ],
+  'First canonical device reservation',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '${secondReservationMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_RESERVATION', 0, 1000000, '${workerId}',
+       'device-b:competing-last-unit-reservation', timestamptz '2026-09-19 02:00:01+00'
+     );`,
+  ],
+  'Competing canonical device reservation',
+  'TUX_INVENTORY_INSUFFICIENT_STOCK',
+);
+
+psql(
+  [
+    '-c',
+    `do $
+     declare
+       v_available bigint;
+     begin
+       select b.available_micros into v_available
+       from private.inventory_balance_v1('${shopId}', '${itemId}') b;
+       if v_available <> 500000 then
+         raise exception 'canonical reservation fence left unexpected available stock: %', v_available;
+       end if;
+     end $;`,
+  ],
+  'Canonical reservation fence balance assertion',
 );
 
 console.log('Admin inventory ledger static and PostgreSQL compatibility invariants passed.');
