@@ -86,9 +86,10 @@ export function ReceivePurchasePage({
             <input
               inputMode="decimal"
               value={quantities[line.id] ?? ''}
-              onChange={(event) =>
-                setQuantities((current) => ({ ...current, [line.id]: event.currentTarget.value }))
-              }
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setQuantities((current) => ({ ...current, [line.id]: value }));
+              }}
             />
           </label>
           <label>
@@ -98,9 +99,10 @@ export function ReceivePurchasePage({
             <input
               inputMode="decimal"
               value={costs[line.id] ?? ''}
-              onChange={(event) =>
-                setCosts((current) => ({ ...current, [line.id]: event.currentTarget.value }))
-              }
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setCosts((current) => ({ ...current, [line.id]: value }));
+              }}
             />
           </label>
         </div>
