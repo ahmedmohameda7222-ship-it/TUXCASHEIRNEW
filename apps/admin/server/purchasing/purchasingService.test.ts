@@ -75,8 +75,8 @@ describe('Admin purchasing service', () => {
           lines: [
             {
               lineId: 'line-1',
-              receivedBaseMicros: 9_500,
-              unitCostMinor: 125,
+              receivedPurchaseUnitsMicros: 9_500,
+              purchaseUnitCostMinor: 125,
             },
           ],
         },
@@ -97,8 +97,8 @@ describe('Admin purchasing service', () => {
       lines: [
         {
           lineId: 'line-1',
-          receivedBaseMicros: 9_500,
-          unitCostMinor: 125,
+          receivedPurchaseUnitsMicros: 9_500,
+          purchaseUnitCostMinor: 125,
         },
       ],
     });
@@ -119,7 +119,9 @@ describe('Admin purchasing service', () => {
           purchaseOrderId: 'po-1',
           commandId: 'receive-1',
           supplierReference: null,
-          lines: [{ lineId: 'line-1', receivedBaseMicros: 1_000, unitCostMinor: 100 }],
+          lines: [
+            { lineId: 'line-1', receivedPurchaseUnitsMicros: 1_000, purchaseUnitCostMinor: 100 },
+          ],
         },
         managerWithoutReceive,
       ),
@@ -132,7 +134,9 @@ describe('Admin purchasing service', () => {
           purchaseOrderId: 'po-1',
           commandId: 'receive-2',
           supplierReference: null,
-          lines: [{ lineId: 'line-1', receivedBaseMicros: 1_000, unitCostMinor: 100 }],
+          lines: [
+            { lineId: 'line-1', receivedPurchaseUnitsMicros: 1_000, purchaseUnitCostMinor: 100 },
+          ],
         },
         buyer,
       ),
@@ -159,7 +163,7 @@ describe('Admin purchasing service', () => {
           purchaseOrderId: 'po-1',
           commandId: 'return-1',
           supplierReference: 'CN-1',
-          lines: [{ lineId: 'line-1', returnedBaseMicros: 500, unitCostMinor: 125 }],
+          lines: [{ lineId: 'line-1', returnedPurchaseUnitsMicros: 500 }],
         },
         buyer,
       ),
@@ -171,7 +175,7 @@ describe('Admin purchasing service', () => {
       purchaseOrderId: 'po-1',
       commandId: 'return-1',
       supplierReference: 'CN-1',
-      lines: [{ lineId: 'line-1', returnedBaseMicros: 500, unitCostMinor: 125 }],
+      lines: [{ lineId: 'line-1', returnedPurchaseUnitsMicros: 500 }],
     });
   });
 
