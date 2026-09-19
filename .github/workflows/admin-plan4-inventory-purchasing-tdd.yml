@@ -138,6 +138,10 @@ jobs:
         run: npm ci
       - name: Plan 4 Task 3 inventory item UI
         run: npx vitest run apps/admin/src/inventory/InventoryItemPage.test.tsx
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 4 Task 3 inventory E2E
+        run: npx playwright test e2e/admin-inventory.spec.ts
 
   task1-regression:
     needs: ledger-postgres
