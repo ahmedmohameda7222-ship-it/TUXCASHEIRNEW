@@ -307,3 +307,15 @@ Pre-flight shared interfaces:
 - Mandatory hardening: OWNER-only emergency negative override is folded into Tasks 1–3; supplier-aware replenishment into Tasks 4–5; canonical Admin-origin inventory pull/convergence into Operations is required before Gate 4; central structured reason codes apply to waste/adjustment mutations.
 
 Ruling: keep the repository migration filename `20260910130000_admin_inventory_ledger.sql` specified by the approved plan for deterministic local migration-chain ordering. Production Supabase already contains later Plan 3 history, so applying this change to production is a separate guarded side effect and must not be performed implicitly while implementing the branch. If production promotion uses an out-of-order history operation, it requires explicit deployment evidence/authorization at that checkpoint.
+
+
+### Task 1: complete
+
+Evidence at branch head `13f11221e70ca20996bcbb99bc1ee0421c19ad7a`:
+- Plan 4 `ledger-static`: GREEN.
+- Plan 4 `ledger-postgres`: GREEN; the seeded legacy `inventory_movements` row survived the additive migration unchanged apart from additive defaulted columns, legacy movement labels remained valid, and the new RLS/RPC contract applied on PostgreSQL 17.
+- `npm run test:migrations`: GREEN in `task1-regression`.
+- Baseline unit/integration regression excluding the already-authored Task 2 RED test: GREEN in `task1-regression`.
+- The unfiltered pre-Task-2 run proved 319/320 test files and all 1554 executed tests passed; the only failed suite was `apps/admin/server/inventory/costing.test.ts`, intentionally RED because `costing.ts` had not yet been implemented.
+
+Task 1 Ruling: Task 2 RED tests were authored before Task 1's final regression checkpoint, so the Task 1 completion gate excludes exactly `apps/admin/server/inventory/costing.test.ts`. This does not waive or hide any existing production regression; the file remains a mandatory RED→GREEN gate for Task 2. Cost if wrong: a non-Task-2 regression could be masked only if it were placed in that exact test file before Task 2 implementation, so Task 2 must run the file unexcluded and then the full suite.
