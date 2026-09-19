@@ -198,6 +198,10 @@ jobs:
         run: npx vitest run apps/admin/server/inventory/intelligenceService.test.ts
       - name: Plan 4 Task 5 purchasing migration invariant
         run: node scripts/test-admin-purchasing-migration.mjs
+      - name: Install Playwright Chromium for Task 5
+        run: npx playwright install --with-deps chromium
+      - name: Plan 4 Task 5 purchasing rendered E2E
+        run: npx playwright test e2e/admin-purchasing.spec.ts
 
   task5-postgres:
     needs: task5-purchasing
