@@ -268,8 +268,6 @@ psql(
          raise exception 'reservation delta column is missing from canonical inventory ledger';
        end if;
 
-       drop table public.plan4_legacy_inventory_snapshot;
-
        if has_table_privilege('anon', 'public.inventory_reservations', 'SELECT')
           or has_table_privilege('authenticated', 'public.inventory_reservations', 'SELECT') then
          raise exception 'inventory reservation table leaked browser SELECT';
