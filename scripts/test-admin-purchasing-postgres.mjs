@@ -334,6 +334,7 @@ psql(
        v_on_hand bigint;
        v_reserved bigint;
        v_available bigint;
+       v_cost numeric(20, 6);
      begin
        select b.on_hand_micros, b.reserved_micros, b.available_micros
          into v_on_hand, v_reserved, v_available
@@ -341,6 +342,13 @@ psql(
        if v_on_hand <> 1750000 or v_reserved <> 0 or v_available <> 1750000 then
          raise exception 'purchase return inventory mismatch: %, %, %',
            v_on_hand, v_reserved, v_available;
+       end if;
+
+       select weighted_unit_cost_minor into v_cost
+       from public.inventory_cost_state
+       where shop_id = '${SHOP_ID}' and inventory_item_id = '${ITEM_ID}';
+       if v_cost <> 157.142857 then
+         raise exception 'purchase return weighted cost mismatch: %', v_cost;
        end if;
 
        if not exists (
