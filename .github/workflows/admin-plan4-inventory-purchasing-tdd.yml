@@ -172,6 +172,11 @@ jobs:
         run: npx vitest run apps/admin/server/inventory/intelligence.test.ts
       - name: Plan 4 Task 4 migration invariant
         run: node scripts/test-admin-inventory-intelligence-migration.mjs
+      - name: Plan 4 Task 4 intelligence UI RED/behavior
+        run: >-
+          npx vitest run
+          apps/admin/src/inventory/ReorderSuggestionsPage.test.tsx
+          apps/admin/src/inventory/VarianceReport.test.tsx
 
 
   task1-regression:
