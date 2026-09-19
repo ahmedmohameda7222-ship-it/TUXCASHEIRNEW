@@ -13,6 +13,7 @@ import {
   type CustomerContactId,
   type DeliveryZoneId,
   type InventoryItemId,
+  type InventoryMovementId,
   type OpenBusinessDay,
   type OperationsConfigurationSnapshot,
   type OrderDraft,
@@ -202,6 +203,19 @@ async function seed(database: SqliteOperationsDatabase): Promise<void> {
     });
     await transaction.configuration.put(configuration);
     await transaction.inventory.putItem(inventoryItem);
+    await transaction.inventory.appendMovement({
+      id: parseEntityId<InventoryMovementId>('abababab-abab-4bab-8bab-abababababab'),
+      shopId,
+      businessDayId,
+      itemId: inventoryItemId,
+      movementType: 'BULK_STOCK_RECEIVED',
+      quantityDeltaMicros: stockQuantityMicros(100_000_000),
+      idempotencyKey: 'fixture-opening-stock',
+      workerId,
+      orderId: null,
+      createdAt,
+      compensatesMovementId: null,
+    });
   });
 }
 
