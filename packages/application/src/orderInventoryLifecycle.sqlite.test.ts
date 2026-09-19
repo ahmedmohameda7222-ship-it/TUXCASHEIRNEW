@@ -410,7 +410,13 @@ describe('Operations order inventory lifecycle', () => {
         orderId,
         reason: 'Delivery failed',
       });
-      expect(returned.ok).toBe(true);
+      if (!returned.ok) {
+        const cause =
+          returned.error.cause instanceof Error ? returned.error.cause.message : returned.error.cause;
+        throw new Error(
+          `Expected returned delivery transition to succeed, got ${returned.error.code}: ${returned.error.message}; cause=${String(cause ?? 'none')}`,
+        );
+      }
 
       const after = await test.database.transaction(async (transaction) => ({
         movements: await transaction.inventory.listMovementsForOrder(orderId),
