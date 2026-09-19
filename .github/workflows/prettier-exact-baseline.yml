@@ -1,0 +1,32 @@
+name: Prettier Exact Baseline
+
+on:
+  push:
+    branches:
+      - chore/admin-format-baseline
+    paths:
+      - 'apps/admin/server/adminAuthService.ts'
+      - 'apps/admin/server/adminContractRuntime.ts'
+      - '.github/workflows/prettier-exact-baseline.yml'
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Render exact Prettier output
+        run: |
+          npx prettier --write apps/admin/server/adminAuthService.ts apps/admin/server/adminContractRuntime.ts
+          echo "AUTH_BEGIN"
+          base64 -w0 apps/admin/server/adminAuthService.ts
+          echo
+          echo "AUTH_END"
+          echo "CONTRACT_BEGIN"
+          base64 -w0 apps/admin/server/adminContractRuntime.ts
+          echo
+          echo "CONTRACT_END"
