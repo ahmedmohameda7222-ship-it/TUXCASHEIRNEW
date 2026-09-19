@@ -280,6 +280,23 @@ describe('Operations order inventory lifecycle', () => {
         quantityDeltaMicros: 500_000,
         reservedDeltaMicros: 500_000,
       });
+
+      const doneAgain = await test.board.markDone(placed.value.order.id);
+      expect(doneAgain.ok).toBe(true);
+      orderMovements = await test.database.transaction((transaction) =>
+        transaction.inventory.listMovementsForOrder(placed.value.order.id),
+      );
+      expect(orderMovements.map((movement) => movement.movementType)).toEqual([
+        'ORDER_RESERVATION',
+        'ORDER_CONSUMPTION',
+        'ORDER_CONSUMPTION_REVERSAL',
+        'ORDER_CONSUMPTION',
+      ]);
+      expect(orderMovements[3]).toMatchObject({
+        quantityDeltaMicros: -500_000,
+        reservedDeltaMicros: -500_000,
+      });
+      expect(orderMovements[3]?.idempotencyKey).not.toBe(orderMovements[1]?.idempotencyKey);
     } finally {
       await closeFixture(test);
     }
