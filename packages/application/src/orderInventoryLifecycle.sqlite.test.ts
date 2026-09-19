@@ -37,9 +37,7 @@ const WORKER_ID = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222'
 const DAY_ID = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const CATEGORY_ID = parseEntityId<MenuCategoryId>('44444444-4444-4444-8444-444444444444');
 const PRODUCT_ID = parseEntityId<ProductId>('55555555-5555-4555-8555-555555555555');
-const INVENTORY_ITEM_ID = parseEntityId<InventoryItemId>(
-  '66666666-6666-4666-8666-666666666666',
-);
+const INVENTORY_ITEM_ID = parseEntityId<InventoryItemId>('66666666-6666-4666-8666-666666666666');
 const ORDER_TYPE_ID = parseEntityId<OrderTypeId>('77777777-7777-4777-8777-777777777777');
 const PAYMENT_ID = parseEntityId<PaymentMethodId>('88888888-8888-4888-8888-888888888888');
 const AT = instant('2026-09-19T02:00:00.000Z');
@@ -240,9 +238,7 @@ describe('Operations order inventory lifecycle', () => {
   it('reserves on ACTIVE, consumes on DONE, and restores reservation on undo DONE', async () => {
     const test = await fixture();
     try {
-      const placed = await test.orders.placeOrder(
-        draft('dddddddd-dddd-4ddd-8ddd-dddddddddddd'),
-      );
+      const placed = await test.orders.placeOrder(draft('dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
       expect(placed.ok).toBe(true);
       if (!placed.ok) return;
 
@@ -292,9 +288,7 @@ describe('Operations order inventory lifecycle', () => {
   it('blocks placement when initialized available stock is below the recipe requirement', async () => {
     const test = await fixture(250_000);
     try {
-      const placed = await test.orders.placeOrder(
-        draft('abababab-abab-4bab-8bab-abababababab'),
-      );
+      const placed = await test.orders.placeOrder(draft('abababab-abab-4bab-8bab-abababababab'));
       expect(placed.ok).toBe(false);
       if (placed.ok) return;
       expect(placed.error.code).toBe('CONFLICT_ERROR');
@@ -317,9 +311,7 @@ describe('Operations order inventory lifecycle', () => {
   it('releases an ACTIVE reservation on cancellation even when foodPrepared is true', async () => {
     const test = await fixture();
     try {
-      const placed = await test.orders.placeOrder(
-        draft('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'),
-      );
+      const placed = await test.orders.placeOrder(draft('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
       expect(placed.ok).toBe(true);
       if (!placed.ok) return;
 
