@@ -122,7 +122,6 @@ jobs:
       - name: Plan 4 typecheck
         run: npm run typecheck
 
-
   task1-regression:
     needs: ledger-postgres
     runs-on: ubuntu-latest
