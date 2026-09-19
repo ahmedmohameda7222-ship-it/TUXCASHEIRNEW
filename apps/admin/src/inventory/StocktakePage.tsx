@@ -73,8 +73,7 @@ export function StocktakePage({
       <div className="admin-inventory-stocktake-list">
         {parsed.map(({ line, item, actualMicros }) => {
           if (!item) return null;
-          const variance =
-            actualMicros === null ? null : actualMicros - line.snapshotOnHandMicros;
+          const variance = actualMicros === null ? null : actualMicros - line.snapshotOnHandMicros;
           const valueVariance =
             variance === null ? null : (variance / 1_000_000) * line.unitCostMinor;
           return (

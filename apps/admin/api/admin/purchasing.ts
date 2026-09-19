@@ -315,9 +315,7 @@ function createStore(client: AdminSupabaseClient): PurchasingStore {
               receivedBaseMicros,
               returnedBaseMicros: safeInteger(line.returned_base_micros),
               remainingBaseMicros: Math.max(0, orderedBaseMicros - receivedBaseMicros),
-              expectedPurchaseUnitCostMinor: finiteNumber(
-                line.expected_purchase_unit_cost_minor,
-              ),
+              expectedPurchaseUnitCostMinor: finiteNumber(line.expected_purchase_unit_cost_minor),
               expectedUnitCostMinor: finiteNumber(line.expected_unit_cost_minor),
             };
           }),

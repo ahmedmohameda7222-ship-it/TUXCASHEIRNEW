@@ -285,7 +285,9 @@ export class OperationsOrdersBoardService {
           reservedDeltaMicros: stockQuantityMicros(restoredReservation),
           idempotencyKey: `order-consumption-reversal:${order.id}:${movement.id}`,
           workerId: context.operator.id,
-          ...(movement.unitCostMinor === undefined ? {} : { unitCostMinor: movement.unitCostMinor }),
+          ...(movement.unitCostMinor === undefined
+            ? {}
+            : { unitCostMinor: movement.unitCostMinor }),
           orderId: order.id,
           createdAt: now,
           compensatesMovementId: movement.id,

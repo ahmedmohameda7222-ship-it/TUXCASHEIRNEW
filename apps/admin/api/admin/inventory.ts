@@ -252,56 +252,57 @@ async function loadWorkspace(
 ): Promise<AdminInventoryWorkspace> {
   requirePermission(context.principal, 'inventory.view', shopId);
 
-  const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] = await Promise.all([
-    client.select<InventoryItemRow[]>(
-      'inventory_items',
-      new URLSearchParams({
-        select: 'id,shop_id,name,unit_label,tracking_mode,active',
-        shop_id: `eq.${shopId}`,
-        order: 'name.asc,id.asc',
+  const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] =
+    await Promise.all([
+      client.select<InventoryItemRow[]>(
+        'inventory_items',
+        new URLSearchParams({
+          select: 'id,shop_id,name,unit_label,tracking_mode,active',
+          shop_id: `eq.${shopId}`,
+          order: 'name.asc,id.asc',
+        }),
+      ),
+      client.select<MovementRow[]>(
+        'inventory_movements',
+        new URLSearchParams({
+          select:
+            'id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,reason_label_snapshot,created_at',
+          shop_id: `eq.${shopId}`,
+          order: 'created_at.desc,id.desc',
+          limit: '2000',
+        }),
+      ),
+      client.rpc<BalanceRow[]>('read_admin_inventory_balances_v1', {
+        p_employee_id: context.principal.employeeId,
+        p_shop_id: shopId,
       }),
-    ),
-    client.select<MovementRow[]>(
-      'inventory_movements',
-      new URLSearchParams({
-        select:
-          'id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,reason_label_snapshot,created_at',
-        shop_id: `eq.${shopId}`,
-        order: 'created_at.desc,id.desc',
-        limit: '2000',
-      }),
-    ),
-    client.rpc<BalanceRow[]>('read_admin_inventory_balances_v1', {
-      p_employee_id: context.principal.employeeId,
-      p_shop_id: shopId,
-    }),
-    client.select<CostRow[]>(
-      'inventory_cost_state',
-      new URLSearchParams({
-        select: 'inventory_item_id,weighted_unit_cost_minor',
-        shop_id: `eq.${shopId}`,
-      }),
-    ),
-    client.select<ReasonRow[]>(
-      'admin_reason_codes',
-      new URLSearchParams({
-        select: 'id,shop_id,reason_key,family,label,version',
-        business_id: `eq.${context.principal.businessId}`,
-        active: 'eq.true',
-        or: `(shop_id.is.null,shop_id.eq.${shopId})`,
-        order: 'family.asc,reason_key.asc,version.desc',
-      }),
-    ),
-    client.select<TransferRow[]>(
-      'stock_transfers',
-      new URLSearchParams({
-        select: 'id,source_shop_id,destination_shop_id,status,sent_at,received_at',
-        or: `(source_shop_id.eq.${shopId},destination_shop_id.eq.${shopId})`,
-        order: 'sent_at.desc,id.desc',
-        limit: '100',
-      }),
-    ),
-  ]);
+      client.select<CostRow[]>(
+        'inventory_cost_state',
+        new URLSearchParams({
+          select: 'inventory_item_id,weighted_unit_cost_minor',
+          shop_id: `eq.${shopId}`,
+        }),
+      ),
+      client.select<ReasonRow[]>(
+        'admin_reason_codes',
+        new URLSearchParams({
+          select: 'id,shop_id,reason_key,family,label,version',
+          business_id: `eq.${context.principal.businessId}`,
+          active: 'eq.true',
+          or: `(shop_id.is.null,shop_id.eq.${shopId})`,
+          order: 'family.asc,reason_key.asc,version.desc',
+        }),
+      ),
+      client.select<TransferRow[]>(
+        'stock_transfers',
+        new URLSearchParams({
+          select: 'id,source_shop_id,destination_shop_id,status,sent_at,received_at',
+          or: `(source_shop_id.eq.${shopId},destination_shop_id.eq.${shopId})`,
+          order: 'sent_at.desc,id.desc',
+          limit: '100',
+        }),
+      ),
+    ]);
 
   const transferIds = transferRows.map((row) => row.id);
   const transferLineRows =

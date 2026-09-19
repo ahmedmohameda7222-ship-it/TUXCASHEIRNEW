@@ -89,9 +89,7 @@ describe('startBrowserAutomaticSync', () => {
       shopId: '14000000-0000-4000-8000-000000000001' as never,
     });
 
-    expect(harness.inventorySyncShop).toHaveBeenCalledWith(
-      '14000000-0000-4000-8000-000000000001',
-    );
+    expect(harness.inventorySyncShop).toHaveBeenCalledWith('14000000-0000-4000-8000-000000000001');
     expect(harness.markRemoteConfigured).toHaveBeenCalledTimes(1);
     expect(harness.schedulerStarted).toHaveBeenCalledTimes(1);
 

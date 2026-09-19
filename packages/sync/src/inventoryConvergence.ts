@@ -130,7 +130,8 @@ function parseItem(value: unknown): InventoryItem {
   if (trackingMode !== 'RECIPE_TRACKED' && trackingMode !== 'BULK_MANUAL') {
     throw new TypeError('Inventory feed tracking mode is unsupported.');
   }
-  if (typeof source['active'] !== 'boolean') throw new TypeError('Inventory item active is invalid.');
+  if (typeof source['active'] !== 'boolean')
+    throw new TypeError('Inventory item active is invalid.');
   return {
     id: parseEntityId<InventoryItem['id']>(stringValue(source['id'], 'Inventory item id')),
     shopId: parseEntityId<ShopId>(stringValue(source['shopId'], 'Inventory item shop')),
@@ -153,8 +154,7 @@ export class HttpInventoryFeedTransport implements InventoryFeedTransport {
   readonly #endpoint: string;
   readonly #headers: Readonly<Record<string, string>>;
   readonly #headerProvider:
-    | (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>)
-    | null;
+    (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>) | null;
   readonly #fetcher: typeof fetch;
 
   constructor(options: HttpInventoryFeedTransportOptions) {

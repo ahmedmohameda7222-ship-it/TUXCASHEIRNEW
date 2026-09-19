@@ -362,8 +362,7 @@ export function startDesktopAutomaticSync(input: {
   let inventoryTimer: ReturnType<typeof setInterval> | null = null;
   let inventoryRunning = false;
   if (supabaseUrl && supabaseUrl.length > 0) {
-    const inventoryEndpoint =
-      `${supabaseUrl.replace(/\/$/, '')}/functions/v1/operations-inventory`;
+    const inventoryEndpoint = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/operations-inventory`;
     const convergence = new InventoryConvergenceService(
       input.database,
       new HttpInventoryFeedTransport({

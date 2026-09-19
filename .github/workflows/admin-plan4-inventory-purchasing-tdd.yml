@@ -11,6 +11,14 @@ on:
       - feat/admin-04-inventory-purchasing
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/functions/operations-inventory/**'
+      - 'api/operations-inventory.ts'
+      - 'apps/operations/api/operations-inventory.ts'
+      - 'apps/operations/src/app/automaticSync.ts'
+      - 'apps/operations/src/app/automaticSync.test.ts'
+      - 'apps/operations/src/app/sessionClient.ts'
+      - 'apps/operations-desktop/src/main/automaticSync.ts'
+      - 'apps/operations-desktop/src/main/index.ts'
       - 'scripts/test-admin-inventory-ledger-migration.mjs'
       - 'scripts/test-admin-order-inventory-lifecycle.mjs'
       - 'scripts/test-admin-inventory-balance-authority.mjs'
@@ -36,7 +44,17 @@ on:
       - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
   pull_request:
     paths:
+      - 'scripts/test-admin-inventory-cost-snapshot.mjs'
+      - 'scripts/test-admin-inventory-balance-authority.mjs'
       - 'supabase/migrations/**'
+      - 'supabase/functions/operations-inventory/**'
+      - 'api/operations-inventory.ts'
+      - 'apps/operations/api/operations-inventory.ts'
+      - 'apps/operations/src/app/automaticSync.ts'
+      - 'apps/operations/src/app/automaticSync.test.ts'
+      - 'apps/operations/src/app/sessionClient.ts'
+      - 'apps/operations-desktop/src/main/automaticSync.ts'
+      - 'apps/operations-desktop/src/main/index.ts'
       - 'scripts/test-admin-inventory-ledger-migration.mjs'
       - 'scripts/test-admin-order-inventory-lifecycle.mjs'
       - 'scripts/test-admin-inventory-intelligence-migration.mjs'
@@ -60,37 +78,6 @@ on:
       - '.github/workflows/admin-plan4-inventory-purchasing-tdd.yml'
 
 jobs:
-  format-diagnostic:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Print exact Plan 4 Prettier diff
-        run: |
-          npx prettier --write \
-            apps/admin/api/admin/inventory.ts \
-            apps/admin/api/admin/purchasing.ts \
-            apps/admin/src/inventory/StocktakePage.tsx \
-            apps/admin/src/purchasing/ReceivePurchasePage.tsx \
-            apps/operations-desktop/src/main/automaticSync.ts \
-            apps/operations/src/app/automaticSync.test.ts \
-            packages/application/src/ordersBoard.ts \
-            packages/sync/src/inventoryConvergence.ts
-          git diff --no-color -- \
-            apps/admin/api/admin/inventory.ts \
-            apps/admin/api/admin/purchasing.ts \
-            apps/admin/src/inventory/StocktakePage.tsx \
-            apps/admin/src/purchasing/ReceivePurchasePage.tsx \
-            apps/operations-desktop/src/main/automaticSync.ts \
-            apps/operations/src/app/automaticSync.test.ts \
-            packages/application/src/ordersBoard.ts \
-            packages/sync/src/inventoryConvergence.ts
-
   final-review-balances:
     runs-on: ubuntu-latest
     steps:

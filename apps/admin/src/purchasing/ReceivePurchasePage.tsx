@@ -89,7 +89,9 @@ export function ReceivePurchasePage({
               ? `Receive ${line.itemName} (${line.purchaseUnitLabel})`
               : `Return ${line.itemName} (${line.purchaseUnitLabel})`}
             <input
-              aria-label={mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`}
+              aria-label={
+                mode === 'receive' ? `Receive ${line.itemName}` : `Return ${line.itemName}`
+              }
               inputMode="decimal"
               value={quantities[line.id] ?? ''}
               onChange={(event) => {
