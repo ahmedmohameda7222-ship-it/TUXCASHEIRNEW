@@ -681,13 +681,14 @@ function parseMovement(value: unknown): InventoryMovement {
       source['quantityDeltaMicros'],
       'inventory movement quantityDeltaMicros',
     ),
-    reservedDeltaMicros:
-      source['reservedDeltaMicros'] === undefined
-        ? stockQuantityMicros(0)
-        : stockQuantity(
+    ...(source['reservedDeltaMicros'] === undefined
+      ? {}
+      : {
+          reservedDeltaMicros: stockQuantity(
             source['reservedDeltaMicros'],
             'inventory movement reservedDeltaMicros',
           ),
+        }),
     idempotencyKey: fieldString(source, 'idempotencyKey'),
     workerId: entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
     orderId:
