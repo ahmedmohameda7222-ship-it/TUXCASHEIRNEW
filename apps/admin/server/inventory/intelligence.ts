@@ -112,7 +112,10 @@ export function calculateFoodCostMarginAlert(input: {
     ...ingredient,
     costMinor: finiteNonNegative(ingredient.costMinor, 'ingredient cost'),
   }));
-  const recipeCostMinor = ingredients.reduce((total, ingredient) => total + ingredient.costMinor, 0);
+  const recipeCostMinor = ingredients.reduce(
+    (total, ingredient) => total + ingredient.costMinor,
+    0,
+  );
   const foodCostPercent = (recipeCostMinor / productPriceMinor) * 100;
   const largestContributor =
     ingredients.length === 0
