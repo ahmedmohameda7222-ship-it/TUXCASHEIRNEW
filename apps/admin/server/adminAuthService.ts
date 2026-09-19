@@ -1,11 +1,14 @@
+import type {
+  AdminPermission,
+  AdminRole,
+  AdminSessionPrincipal,
+} from '@tux/admin-contracts';
+
 import {
   ADMIN_PERMISSIONS,
   isAdminPermission,
   isAdminRole,
-  type AdminPermission,
-  type AdminRole,
-  type AdminSessionPrincipal,
-} from '@tux/admin-contracts';
+} from './adminContractRuntime.js';
 
 import type { AdminServerEnv } from './env.js';
 import {
