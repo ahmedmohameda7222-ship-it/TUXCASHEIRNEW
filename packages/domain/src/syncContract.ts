@@ -260,13 +260,22 @@ function expensePaidFrom(value: unknown): ExpensePaidFrom {
 
 function movementType(value: unknown): InventoryMovementType {
   if (
+    value === 'ORDER_RESERVATION' ||
+    value === 'ORDER_RESERVATION_RELEASE' ||
     value === 'ORDER_CONSUMPTION' ||
+    value === 'ORDER_CONSUMPTION_REVERSAL' ||
     value === 'CANCEL_RESTOCK' ||
     value === 'BULK_UNIT_FINISHED' ||
     value === 'BULK_STOCK_RECEIVED' ||
     value === 'UNDO_BULK_UNIT_FINISHED' ||
     value === 'UNDO_BULK_STOCK_RECEIVED' ||
-    value === 'ADMIN_ADJUSTMENT'
+    value === 'ADMIN_ADJUSTMENT' ||
+    value === 'WASTE' ||
+    value === 'STOCKTAKE_ADJUSTMENT' ||
+    value === 'TRANSFER_OUT' ||
+    value === 'TRANSFER_IN' ||
+    value === 'PURCHASE_RECEIPT' ||
+    value === 'PURCHASE_RETURN'
   ) {
     return value;
   }
@@ -672,6 +681,13 @@ function parseMovement(value: unknown): InventoryMovement {
       source['quantityDeltaMicros'],
       'inventory movement quantityDeltaMicros',
     ),
+    reservedDeltaMicros:
+      source['reservedDeltaMicros'] === undefined
+        ? stockQuantityMicros(0)
+        : stockQuantity(
+            source['reservedDeltaMicros'],
+            'inventory movement reservedDeltaMicros',
+          ),
     idempotencyKey: fieldString(source, 'idempotencyKey'),
     workerId: entityId<WorkerId>(source['workerId'], 'inventory movement workerId'),
     orderId:
@@ -684,8 +700,8 @@ function parseMovement(value: unknown): InventoryMovement {
         ? null
         : entityId<InventoryMovementId>(source['compensatesMovementId'], 'compensated movement id'),
   };
-  if (movement.quantityDeltaMicros === 0) {
-    throw new TypeError('Operations sync inventory movement quantity cannot be zero.');
+  if (movement.quantityDeltaMicros === 0 && (movement.reservedDeltaMicros ?? 0) === 0) {
+    throw new TypeError('Operations sync inventory movement must change on-hand or reserved stock.');
   }
   return movement;
 }
