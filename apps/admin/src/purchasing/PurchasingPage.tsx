@@ -69,6 +69,7 @@ export function PurchasingPage() {
         <div className="admin-inventory-list">
           <SuppliersPage
             suppliers={workspace.suppliers}
+            canManage={canManage}
             pending={purchasing.createSupplier.isPending}
             onCreate={(input) => purchasing.createSupplier.mutate(input)}
           />
@@ -77,6 +78,7 @@ export function PurchasingPage() {
             suppliers={workspace.suppliers}
             inventoryItems={workspace.inventoryItems}
             selectedId={selectedId}
+            canManage={canManage}
             pending={purchasing.createPurchaseOrder.isPending}
             onSelect={(id) => {
               setSelectedId(id);
