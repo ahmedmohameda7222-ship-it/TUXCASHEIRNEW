@@ -17,9 +17,7 @@ function retainedKey(scope: string, intent: unknown): string {
   return `${scope}\u0000${stableFingerprint(intent)}`;
 }
 
-export function createRetainedCommandIds(
-  createId: () => string = () => crypto.randomUUID(),
-) {
+export function createRetainedCommandIds(createId: () => string = () => crypto.randomUUID()) {
   const retained = new Map<string, string>();
 
   return {
