@@ -29,7 +29,7 @@ type InventoryCommand = Record<string, unknown>;
 async function mockInventory(page: Page) {
   const commands: InventoryCommand[] = [];
   let onHandMicros = 3_200_000;
-  let reservedMicros = 1_100_000;
+  const reservedMicros = 1_100_000;
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
