@@ -21,6 +21,10 @@ Every existing repository-root `api/*.ts` Operations function has an app-local e
 
 Because those entrypoints import the existing root handlers and the Operations workspace consumes shared monorepo packages, **Include source files outside Root Directory must be enabled** before the cutover deployment.
 
+## Cutover verification trigger
+
+When Vercel skips an empty commit as an unaffected monorepo change, a documentation-only change inside `apps/operations` may be used to force one production build after the Root Directory setting changes. This does not change Operations runtime behavior.
+
 ## Zero-downtime sequence
 
 1. Merge the repository preparation that adds this app-local contract and the app-local API entrypoints.
