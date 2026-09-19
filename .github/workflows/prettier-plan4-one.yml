@@ -1,0 +1,26 @@
+name: Plan 4 Exact Prettier One
+
+on:
+  push:
+    branches:
+      - feat/admin-04-inventory-purchasing
+    paths:
+      - '.github/workflows/prettier-plan4-one.yml'
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Render exact file
+        run: |
+          npx prettier --write apps/operations-desktop/src/main/orders.integration.test.ts
+          echo "FILE_BEGIN"
+          base64 -w0 apps/operations-desktop/src/main/orders.integration.test.ts
+          echo
+          echo "FILE_END"
