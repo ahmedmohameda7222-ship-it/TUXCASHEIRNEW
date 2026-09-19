@@ -53,6 +53,16 @@ describe('inventory intelligence', () => {
     ).toBe(4_000);
   });
 
+  it('treats negative available stock as additional reorder shortage', () => {
+    expect(
+      suggestOrderQuantity({
+        available: -1_000,
+        par: 5_000,
+        incoming: 0,
+      }),
+    ).toBe(6_000);
+  });
+
   it('returns zero when available plus incoming already meets the par target', () => {
     expect(
       suggestOrderQuantity({
