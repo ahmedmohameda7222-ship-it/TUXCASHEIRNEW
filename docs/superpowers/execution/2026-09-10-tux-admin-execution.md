@@ -346,3 +346,15 @@ Task 2 Ruling: the inventory balance contract must be implemented by every Opera
 ### Plan 4 Task 3 rulings — inventory UI command boundaries
 
 - Ruling: Task 3's `Receive` action means receiving an already-sent inter-shop transfer through `receive_stock_transfer_v1`. Supplier / purchase-order receiving remains exclusively Task 5. Cost if wrong: purchase receipts could gain a second UI/API mutation path before the purchasing transaction and cost-history authority exists.
+
+
+### Task 3: complete
+
+Evidence at exact code head `61c8152f02be2c18c53d6a5a2bf3cf045323f68b`:
+- Plan 4 workflow run `35424323905`: 5/5 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task1-regression`).
+- `task3-ui`: formatting, Inventory unit/source UI, and rendered `e2e/admin-inventory.spec.ts` GREEN.
+- Root `TUX V2 CI` run `35424323935`: all jobs GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration, security, typecheck, production builds, migration-chain smoke, Edge typecheck, and rendered browser E2E.
+- The pre-fix rendered browser regression was traced to `seedBrowserFallback()` creating recipe-tracked inventory items with no opening inventory movements. The fixture now seeds explicit `BULK_STOCK_RECEIVED` movements; production zero-stock enforcement remains unchanged and canonical with PostgreSQL reservation authority.
+
+Task 3 Ruling: Admin inventory writes remain ledger commands only. The browser does not write stock projections directly, emergency negative override remains OWNER-only, and `Receive transfer` is the inter-shop transfer receive action rather than supplier/PO receiving.
