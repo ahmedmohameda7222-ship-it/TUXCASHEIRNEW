@@ -391,6 +391,25 @@ psqlExpectFailure(
   'TUX_INVENTORY_INSUFFICIENT_STOCK',
 );
 
+const forgedReleaseMovementId = '64000000-0000-4000-8000-000000000003';
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '${forgedReleaseMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_RESERVATION_RELEASE', 0, -3000000, '${workerId}',
+       'forged:reservation-release', timestamptz '2026-09-19 02:00:01+00'
+     );`,
+  ],
+  'Canonical reservation underflow fence',
+  'TUX_INVENTORY_RESERVATION_UNDERFLOW',
+);
+
 psql(
   [
     '-c',
