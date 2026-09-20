@@ -457,3 +457,21 @@ Exact pre-ledger fixed head `548b8cdac30d76abbbd2c41476b0c64c3ab6586a` passed:
 The earlier principal-scoped durable-command-ID hardening remains intact on this head. Production promotion remains a separate explicit checkpoint: this work does not authorize ready-for-review, merge, Supabase migration application, or Vercel production deployment.
 
 This ledger mutation changes the PR head again. The ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure.
+
+
+## Plan 4 final review follow-up — fulfilled rejection, prepared cancellation, and full-depletion return variance — 2026-09-20
+
+The Codex review of exact head `efd5dd0d771c1b4e1d8bc6b5eb8e0df9e6be25d2` identified three additional actionable lifecycle/accounting issues. Each was reproduced RED before implementation and closed GREEN:
+
+- A canonical reservation rejection that arrives after the local order is already `DONE` no longer falls through the ACTIVE-only compensator silently. The fulfilled order and local consumption remain intact, an `ORDER_SYNC_CONFLICT` audit event records `inventory_reservation_rejected_after_fulfillment` with `manualReconciliationRequired: true`, the rejected outbox stream and dependent lifecycle events are quarantined, and sync health exposes a visible manual-reconciliation detail. RED head `ae9d477edbc40210a860781585b47a2e1ea26c05` failed the fulfilled-rejection outbox and sync-health regressions.
+- Cancelling an ACTIVE order with `foodPrepared: true` now converts every active reservation into costed `ORDER_CONSUMPTION` rather than `ORDER_RESERVATION_RELEASE`. Quantity and reserved deltas both consume the reserved quantity, the current weighted unit cost is snapshotted, and cancellation remains `stockRestored: false`. The prior lifecycle test that encoded the superseded release behavior was updated to assert the corrected consumption/balance invariant. RED head `ae9d477e…` failed the prepared-cancellation integration regression.
+- A purchase return that exhausts remaining on-hand inventory now removes the entire current inventory value and books the signed difference between receipt return value and current inventory value as purchase-price variance before zeroing weighted cost. This covers both higher-cost and lower-cost full-depletion returns. RED head `ae9d477e…` failed the cheaper full-return PostgreSQL regression with variance `0` instead of `-500`.
+
+Exact pre-ledger fixed head `846d20fd513558ce7387a6028582f81c6d643206` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35529090983` — 14/14 jobs SUCCESS, including lifecycle, full regression, final-review return cost, and Task 5 PostgreSQL behavior.
+- `TUX V2 CI` run `35529090965` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- All other permanent Admin workflows attached to this exact head were SUCCESS.
+- The three review threads were answered with RED→GREEN evidence and resolved.
+
+Production promotion remains a distinct explicit checkpoint. This ledger mutation changes the PR head again, so the ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure. No merge, Supabase production migration, or Vercel production deployment is authorized by this update.
