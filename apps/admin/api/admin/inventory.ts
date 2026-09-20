@@ -140,7 +140,7 @@ export type InventoryItemRow = {
   active: boolean;
 };
 
-type BalanceRow = {
+export type BalanceRow = {
   inventory_item_id: string;
   on_hand_micros: number | string;
   reserved_micros: number | string;
@@ -157,7 +157,7 @@ type MovementRow = {
   created_at: string;
 };
 
-type CostRow = {
+export type CostRow = {
   inventory_item_id: string;
   weighted_unit_cost_minor: number | string;
 };
@@ -193,6 +193,58 @@ const TRANSFER_LINE_PAGE_SIZE = 1_000;
 const TRANSFER_ITEM_BATCH_SIZE = 100;
 
 const INVENTORY_ITEM_PAGE_SIZE = 10_000;
+
+const INVENTORY_BALANCE_PAGE_SIZE = 10_000;
+const INVENTORY_COST_PAGE_SIZE = 10_000;
+
+export async function loadInventoryBalanceRows(
+  client: AdminSupabaseClient,
+  employeeId: string,
+  shopId: string,
+): Promise<BalanceRow[]> {
+  const rows: BalanceRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.rpc<BalanceRow[]>(
+      'read_admin_inventory_balances_v1',
+      {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+      },
+      new URLSearchParams({
+        order: 'inventory_item_id.asc',
+        limit: String(INVENTORY_BALANCE_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+export async function loadInventoryCostRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<CostRow[]> {
+  const rows: CostRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<CostRow[]>(
+      'inventory_cost_state',
+      new URLSearchParams({
+        select: 'inventory_item_id,weighted_unit_cost_minor',
+        shop_id: `eq.${shopId}`,
+        order: 'inventory_item_id.asc',
+        limit: String(INVENTORY_COST_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
 
 export async function loadInventoryItemRows(
   client: AdminSupabaseClient,
@@ -392,17 +444,8 @@ async function loadWorkspace(
           limit: '2000',
         }),
       ),
-      client.rpc<BalanceRow[]>('read_admin_inventory_balances_v1', {
-        p_employee_id: context.principal.employeeId,
-        p_shop_id: shopId,
-      }),
-      client.select<CostRow[]>(
-        'inventory_cost_state',
-        new URLSearchParams({
-          select: 'inventory_item_id,weighted_unit_cost_minor',
-          shop_id: `eq.${shopId}`,
-        }),
-      ),
+      loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
+      loadInventoryCostRows(client, shopId),
       client.select<ReasonRow[]>(
         'admin_reason_codes',
         new URLSearchParams({

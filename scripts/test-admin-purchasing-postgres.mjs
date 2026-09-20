@@ -551,7 +551,7 @@ psql(
        unit_cost_minor, created_at
      ) values (
        '${COST_MOVEMENT_ID}', '${SHOP_ID}', null, '${ITEM_ID}', 'ORDER_CONSUMPTION',
-       -1000, -1000, '${COST_WORKER_ID}', null,
+       -1000, 0, '${COST_WORKER_ID}', null,
        null, 'canonical-cost-snapshot', 'OPERATIONS', 'canonical-cost-snapshot',
        111, timestamptz '2026-09-19 03:00:00+00'
      );`,
