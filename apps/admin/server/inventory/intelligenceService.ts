@@ -15,6 +15,7 @@ import {
 
 const REPORT_WINDOW_DAYS = 30;
 const MOVEMENT_PAGE_SIZE = 10_000;
+const ORDER_STATUS_BATCH_SIZE = 100;
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 type ReplenishmentRow = {
@@ -101,7 +102,8 @@ async function loadPeriodMovements(
   from: string,
 ): Promise<PeriodMovementRow[]> {
   const movements: PeriodMovementRow[] = [];
-  for (let offset = 0; ; offset += MOVEMENT_PAGE_SIZE) {
+  let offset = 0;
+  for (;;) {
     const page = await client.select<PeriodMovementRow[]>(
       'inventory_movements',
       new URLSearchParams({
@@ -113,9 +115,37 @@ async function loadPeriodMovements(
         offset: String(offset),
       }),
     );
+    if (page.length === 0) return movements;
     movements.push(...page);
-    if (page.length < MOVEMENT_PAGE_SIZE) return movements;
+    offset += page.length;
   }
+}
+
+async function loadOrderStatuses(
+  client: AdminSupabaseClient,
+  orderIds: readonly string[],
+): Promise<OrderStatusRow[]> {
+  const rows: OrderStatusRow[] = [];
+  for (let start = 0; start < orderIds.length; start += ORDER_STATUS_BATCH_SIZE) {
+    const batch = orderIds.slice(start, start + ORDER_STATUS_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<OrderStatusRow[]>(
+        'orders',
+        new URLSearchParams({
+          select: 'id,status',
+          id: `in.(${batch.join(',')})`,
+          order: 'id.asc',
+          limit: String(batch.length),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+  return rows;
 }
 
 export async function loadInventoryIntelligence(
@@ -184,16 +214,7 @@ export async function loadInventoryIntelligence(
         .filter((orderId): orderId is string => orderId !== null),
     ),
   ];
-  const orderRows =
-    orderIds.length === 0
-      ? []
-      : await client.select<OrderStatusRow[]>(
-          'orders',
-          new URLSearchParams({
-            select: 'id,status',
-            id: `in.(${orderIds.join(',')})`,
-          }),
-        );
+  const orderRows = orderIds.length === 0 ? [] : await loadOrderStatuses(client, orderIds);
   const orderStatus = new Map(orderRows.map((row) => [row.id, row.status]));
 
   const openPurchaseOrderIds = new Set(
@@ -401,6 +422,8 @@ export async function updateReplenishmentPolicy(
       limit: '1',
     }),
   );
+  const observedVersion =
+    existing.length === 0 ? null : safeInteger(existing[0]!.version, 'version');
   const payload = {
     par_level_base: input.parLevelMicros,
     reorder_point_base: input.reorderPointMicros,
@@ -409,7 +432,7 @@ export async function updateReplenishmentPolicy(
     minimum_order_quantity_base: input.minimumOrderMicros,
     order_multiple_base: input.orderMultipleMicros,
     updated_by_employee_id: input.employeeId,
-    version: existing.length === 0 ? 1 : safeInteger(existing[0]!.version, 'version') + 1,
+    version: observedVersion === null ? 1 : observedVersion + 1,
     updated_at: new Date().toISOString(),
   };
 
@@ -423,12 +446,16 @@ export async function updateReplenishmentPolicy(
     return;
   }
 
-  await client.update(
+  const updated = await client.update<{ version: number | string }[]>(
     'inventory_replenishment_settings',
     new URLSearchParams({
       shop_id: `eq.${input.shopId}`,
       inventory_item_id: `eq.${input.inventoryItemId}`,
+      version: `eq.${observedVersion}`,
     }),
     payload,
   );
+  if (updated.length !== 1) {
+    throw new Error('inventory_replenishment_conflict');
+  }
 }
