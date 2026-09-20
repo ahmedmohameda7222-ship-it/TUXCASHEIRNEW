@@ -15,6 +15,7 @@ import {
 
 const REPORT_WINDOW_DAYS = 30;
 const MOVEMENT_PAGE_SIZE = 10_000;
+const RECIPE_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_BATCH_SIZE = 100;
 const ORDER_STATUS_BATCH_SIZE = 100;
@@ -119,6 +120,29 @@ async function loadPeriodMovements(
     );
     if (page.length === 0) return movements;
     movements.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadRecipeLines(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<RecipeRow[]> {
+  const rows: RecipeRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<RecipeRow[]>(
+      'recipe_lines',
+      new URLSearchParams({
+        select: 'product_id,inventory_item_id,quantity_micros',
+        shop_id: `eq.${shopId}`,
+        order: 'product_id.asc,inventory_item_id.asc',
+        limit: String(RECIPE_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
     offset += page.length;
   }
 }
@@ -234,14 +258,7 @@ export async function loadInventoryIntelligence(
         order: 'name.asc,id.asc',
       }),
     ),
-    client.select<RecipeRow[]>(
-      'recipe_lines',
-      new URLSearchParams({
-        select: 'product_id,inventory_item_id,quantity_micros',
-        shop_id: `eq.${shopId}`,
-        order: 'product_id.asc,inventory_item_id.asc',
-      }),
-    ),
+    loadRecipeLines(client, shopId),
     client.select<MarginSettingRow[]>(
       'inventory_margin_settings',
       new URLSearchParams({
