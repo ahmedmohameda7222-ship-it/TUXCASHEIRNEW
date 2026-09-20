@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   instant,
   parseEntityId,
+  stockQuantityMicros,
   type InventoryItemId,
   type InventoryMovement,
   type InventoryMovementId,
@@ -214,8 +215,8 @@ describe('OutboxSyncService', () => {
       businessDayId: null,
       itemId,
       movementType: 'ORDER_RESERVATION',
-      quantityDeltaMicros: 0 as InventoryMovement['quantityDeltaMicros'],
-      reservedDeltaMicros: 2_000_000 as InventoryMovement['reservedDeltaMicros'],
+      quantityDeltaMicros: stockQuantityMicros(0),
+      reservedDeltaMicros: stockQuantityMicros(2_000_000),
       idempotencyKey: 'reservation-local',
       workerId: null,
       orderId,
