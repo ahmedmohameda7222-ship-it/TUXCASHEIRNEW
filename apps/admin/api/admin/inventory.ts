@@ -236,8 +236,7 @@ export async function loadTransferRows(
   const byId = new Map<string, TransferRow>();
   for (const row of [...recentRows, ...incomingSentRows]) byId.set(row.id, row);
   return [...byId.values()].sort(
-    (left, right) =>
-      right.sent_at.localeCompare(left.sent_at) || right.id.localeCompare(left.id),
+    (left, right) => right.sent_at.localeCompare(left.sent_at) || right.id.localeCompare(left.id),
   );
 }
 
