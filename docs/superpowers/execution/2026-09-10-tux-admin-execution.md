@@ -514,3 +514,29 @@ Exact pre-ledger fixed head `e1b7a74994153f3a5c35a5eeee82bac4db550c74` passed:
 
 Production promotion remains a separate explicit checkpoint. This ledger update does not authorize ready-for-review, merge, Supabase production migration, or Vercel production deployment. Because this documentation commit changes the PR head, the ledger-inclusive exact head must pass the permanent workflow set again before the four Codex threads are resolved and another exact-head final Codex review is requested.
 
+## Plan 4 final review follow-up — immutable movement identity, terminal rejection reconciliation, and exhaustive workspace paging — 2026-09-21
+
+The Codex review of exact head `35bcf1b23e7c21f21b60fa9147107c19f5171346` identified seven additional actionable integrity and scale findings. All seven were reproduced before closure and fixed without changing the production-promotion boundary:
+
+- Canonical inventory movements are now strictly append-only. `private.enforce_inventory_movement_immutability_v1` rejects every UPDATE of `public.inventory_movements` with `TUX_INVENTORY_MOVEMENT_IMMUTABLE`, so a synced UPSERT cannot reuse a known movement UUID to rewrite an Admin receipt, reservation, or prior movement while bypassing INSERT-time capacity/underflow checks.
+- Rejected offline placements now surface manual reconciliation for every locally fulfilled terminal state, not only `DONE`. `DONE`, `RETURNED`, and prepared `CANCELLED` orders emit `ORDER_SYNC_CONFLICT` with `inventory_reservation_rejected_after_fulfillment` and `manualReconciliationRequired: true` instead of silently retaining local fulfillment/consumption after canonical rejection.
+- Stocktake entry points now use active inventory items only. Direct counts and every <=500-item batch are built from the active subset; if a shop has no active inventory items, the stock-count action is disabled.
+- `post_stocktake_v1` now validates submitted stocktake item IDs as an exact set: duplicate IDs are rejected and two-way `EXCEPT` comparisons prove that no snapshot line is omitted or replaced before any count is posted.
+- Inventory intelligence now pages `inventory_replenishment_settings` and active `products` by actual returned row count under PostgREST caps, preserving reorder policies and margin alerts for catalogs above the server row cap.
+- The purchasing workspace now pages every active purchasable inventory item so PO creation does not silently omit items beyond the PostgREST cap.
+
+The formatted RED head `b1cbfa4792a9c0d36049753eb7048c0c1e5f805a` (Plan-4 run `35543109211`) failed `final-review-stocktake` job `106164466288` and `ledger-static` job `106164466318` before the exact-set/immutability hardening. Intermediate GREEN commits `99f0da5a1f001d3b84b63c0a26c30707e6ca29af`, `590c8341c112a9b72a3feef17e428fabdf07d313`, and `a6dbc3eb54659c902bacf82fecab9552dee792b6` closed movement immutability, stocktake exact-set/active filtering, terminal placement reconciliation, replenishment/product paging, and purchasable-item paging. Their staged workflow failures were used to keep each remaining regression visible until its corresponding production fix landed.
+
+A focused large-catalog self-audit then found two adjacent readers in the same bounded-PostgREST risk class and closed them with independent RED→GREEN evidence:
+
+- Supplier paging: test-only head `716cfc77334b111c4e0dd074511d0d87f211124b`, Plan-4 run `35545193511`, `task5-purchasing` job `106169789022` failed because a 1,250-supplier workspace returned only 1,000 suppliers. `92e687271914455c7c47f277bdb139817d6393fe` added exhaustive supplier paging by actual returned row count.
+- Margin-policy paging: on supplier-fixed head `92e687271914455c7c47f277bdb139817d6393fe`, Plan-4 run `35545277507`, `task5-purchasing` job `106170003074` failed because product `product-1249` fell back to default target/alert thresholds `30/35` instead of configured `20/25`. `3da5b319cd625f7decb5e78b6fb77d66647be37a` added exhaustive `inventory_margin_settings` paging; `49a330ddd8b0776a1437c90d3d7458521af8ec6d` contains the final formatting-normalized regression.
+
+Exact pre-ledger fixed head `49a330ddd8b0776a1437c90d3d7458521af8ec6d` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35545425487` — 14/14 jobs SUCCESS, including lifecycle/sync reconciliation, stocktake UI/PostgreSQL integrity, inventory intelligence, purchasing workspace, both PostgreSQL behavior paths, rendered Task 3/5 E2E, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35545425514` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. The quality lane passed format, lint, unit/integration tests, typecheck, production builds, migration-chain smoke, Edge Function checks, and rendered browser E2E.
+- Foundation `35545425523`, Catalog `35545425512`, Catalog Boundary `35545425504`, Plan 2 rounds 15/16/17 `35545425505` / `35545425500` / `35545425503`, and Plan 3 `35545425502` were SUCCESS.
+
+Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this hardening round. Because this ledger commit changes the PR head, the resulting ledger-inclusive exact head must pass the permanent workflow set before the seven Codex threads are resolved and another final exact-head Codex review is requested.
+
