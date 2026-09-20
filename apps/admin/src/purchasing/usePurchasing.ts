@@ -31,10 +31,7 @@ export function usePurchasing(shopId: string | undefined) {
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
       : 'unauthenticated';
-  const commandIds = useMemo(
-    () => createRetainedCommandIds(commandNamespace),
-    [commandNamespace],
-  );
+  const commandIds = useMemo(() => createRetainedCommandIds(commandNamespace), [commandNamespace]);
 
   const workspace = useQuery({
     queryKey: shopId ? queryKey(shopId) : ['admin', 'purchasing', 'no-shop'],
