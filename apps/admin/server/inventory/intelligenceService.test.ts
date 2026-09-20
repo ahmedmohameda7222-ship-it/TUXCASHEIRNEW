@@ -21,19 +21,21 @@ describe('inventory intelligence purchasing integration', () => {
   it('counts only the unreceived remainder of open purchase orders as incoming stock', async () => {
     const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'inventory_replenishment_settings') {
-        return [
-          {
-            inventory_item_id: 'item-1',
-            par_level_base: 15_000,
-            reorder_point_base: 7_000,
-            preferred_supplier_id: 'supplier-1',
-            preferred_purchase_unit: 'case',
-            lead_time_days: 3,
-            minimum_order_quantity_base: null,
-            order_multiple_base: null,
-            version: 4,
-          },
-        ];
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [
+              {
+                inventory_item_id: 'item-1',
+                par_level_base: 15_000,
+                reorder_point_base: 7_000,
+                preferred_supplier_id: 'supplier-1',
+                preferred_purchase_unit: 'case',
+                lead_time_days: 3,
+                minimum_order_quantity_base: null,
+                order_multiple_base: null,
+                version: 4,
+              },
+            ]
+          : [];
       }
       if (table === 'purchase_orders') {
         return Number(query?.get('offset') ?? '0') === 0
@@ -325,7 +327,9 @@ describe('inventory intelligence purchasing integration', () => {
         return recipeLines.slice(offset, offset + Math.min(requested, 1_000));
       }
       if (table === 'products') {
-        return [{ id: 'product-1', name: 'Burger', price_minor: 1_000_000, active: true }];
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [{ id: 'product-1', name: 'Burger', price_minor: 1_000_000, active: true }]
+          : [];
       }
       if (table === 'inventory_replenishment_settings') return [];
       if (table === 'purchase_orders') return [];

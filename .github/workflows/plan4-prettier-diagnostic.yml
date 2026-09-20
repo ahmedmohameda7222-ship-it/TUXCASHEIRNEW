@@ -1,0 +1,23 @@
+name: Plan 4 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - feat/admin-04-inventory-purchasing
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Print exact Intelligence Prettier diff
+        run: |
+          npx prettier --write apps/admin/server/inventory/intelligenceService.ts apps/admin/server/inventory/intelligenceService.test.ts
+          git diff --no-ext-diff --no-color -- apps/admin/server/inventory/intelligenceService.ts apps/admin/server/inventory/intelligenceService.test.ts
+          git diff --quiet -- apps/admin/server/inventory/intelligenceService.ts apps/admin/server/inventory/intelligenceService.test.ts
