@@ -209,10 +209,71 @@ async function loadContext(
   return context;
 }
 
-function createStore(client: AdminSupabaseClient): PurchasingStore {
+const PURCHASE_ORDER_HISTORY_LIMIT = 500;
+const PURCHASE_ORDER_PAGE_SIZE = 500;
+const PURCHASE_ORDER_LINE_BATCH_SIZE = 100;
+const PURCHASE_ORDER_LINE_PAGE_SIZE = 10_000;
+
+async function loadActionablePurchaseOrders(
+  client: AdminSupabaseClient,
+  businessId: string,
+  shopId: string,
+): Promise<PurchaseOrderRow[]> {
+  const rows: PurchaseOrderRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<PurchaseOrderRow[]>(
+      'purchase_orders',
+      new URLSearchParams({
+        select:
+          'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
+        business_id: `eq.${businessId}`,
+        shop_id: `eq.${shopId}`,
+        status: 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)',
+        order: 'created_at.desc,id.desc',
+        limit: String(PURCHASE_ORDER_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadPurchaseOrderLines(
+  client: AdminSupabaseClient,
+  purchaseOrderIds: readonly string[],
+): Promise<PurchaseOrderLineRow[]> {
+  const rows: PurchaseOrderLineRow[] = [];
+  for (let start = 0; start < purchaseOrderIds.length; start += PURCHASE_ORDER_LINE_BATCH_SIZE) {
+    const batch = purchaseOrderIds.slice(start, start + PURCHASE_ORDER_LINE_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<PurchaseOrderLineRow[]>(
+        'purchase_order_lines',
+        new URLSearchParams({
+          select:
+            'id,purchase_order_id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,ordered_purchase_units_micros,received_purchase_units_micros,returned_purchase_units_micros,ordered_base_micros,received_base_micros,returned_base_micros,expected_purchase_unit_cost_minor,expected_unit_cost_minor',
+          purchase_order_id: `in.(${batch.join(',')})`,
+          order: 'purchase_order_id.asc,id.asc',
+          limit: String(PURCHASE_ORDER_LINE_PAGE_SIZE),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+  return rows;
+}
+
+export function createPurchasingStore(client: AdminSupabaseClient): PurchasingStore {
   return {
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
-      const [supplierRows, purchaseOrderRows, inventoryRows] = await Promise.all([
+      const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows] =
+        await Promise.all([
         client.select<SupplierRow[]>(
           'suppliers',
           new URLSearchParams({
@@ -229,9 +290,10 @@ function createStore(client: AdminSupabaseClient): PurchasingStore {
             business_id: `eq.${businessId}`,
             shop_id: `eq.${shopId}`,
             order: 'created_at.desc,id.desc',
-            limit: '500',
+            limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
           }),
         ),
+        loadActionablePurchaseOrders(client, businessId, shopId),
         client.select<InventoryItemRow[]>(
           'inventory_items',
           new URLSearchParams({
@@ -243,19 +305,17 @@ function createStore(client: AdminSupabaseClient): PurchasingStore {
         ),
       ]);
 
+      const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
+      for (const row of [...recentPurchaseOrderRows, ...actionablePurchaseOrderRows]) {
+        purchaseOrdersById.set(row.id, row);
+      }
+      const purchaseOrderRows = [...purchaseOrdersById.values()].sort(
+        (left, right) =>
+          right.created_at.localeCompare(left.created_at) || right.id.localeCompare(left.id),
+      );
       const purchaseOrderIds = purchaseOrderRows.map((row) => row.id);
       const lineRows =
-        purchaseOrderIds.length === 0
-          ? []
-          : await client.select<PurchaseOrderLineRow[]>(
-              'purchase_order_lines',
-              new URLSearchParams({
-                select:
-                  'id,purchase_order_id,inventory_item_id,purchase_unit_label,base_micros_per_purchase_unit,ordered_purchase_units_micros,received_purchase_units_micros,returned_purchase_units_micros,ordered_base_micros,received_base_micros,returned_base_micros,expected_purchase_unit_cost_minor,expected_unit_cost_minor',
-                purchase_order_id: `in.(${purchaseOrderIds.join(',')})`,
-                order: 'purchase_order_id.asc,id.asc',
-              }),
-            );
+        purchaseOrderIds.length === 0 ? [] : await loadPurchaseOrderLines(client, purchaseOrderIds);
 
       const suppliers: AdminSupplier[] = supplierRows.map((row) => ({
         id: row.id,
@@ -446,7 +506,7 @@ export default async function handler(
 
   try {
     const client = new AdminSupabaseClient(getAdminServerEnv());
-    const service = createPurchasingService(createStore(client));
+    const service = createPurchasingService(createPurchasingStore(client));
 
     if (request.method === 'GET') {
       const shopId = uuidSchema.parse(
