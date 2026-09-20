@@ -29,7 +29,14 @@ function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): stri
 export function useInventory(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
-  const commandIds = useMemo(() => createRetainedCommandIds(), []);
+  const commandNamespace =
+    session.state.status === 'authenticated'
+      ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
+      : 'unauthenticated';
+  const commandIds = useMemo(
+    () => createRetainedCommandIds(commandNamespace),
+    [commandNamespace],
+  );
 
   const workspaceQuery = useQuery({
     queryKey: shopId ? inventoryQueryKey(shopId) : ['admin', 'inventory', 'no-shop'],
@@ -62,6 +69,7 @@ export function useInventory(shopId: string | undefined) {
     buildCommand: (retainedCommandId: string) => AdminInventoryCommand,
   ): Promise<AdminInventoryCommandResult> {
     if (!shopId) throw new InventoryUiError('concrete_shop_required');
+    csrfTokenForMutation(session);
     const retainedIntent = { shopId, intent };
     const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
     return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
