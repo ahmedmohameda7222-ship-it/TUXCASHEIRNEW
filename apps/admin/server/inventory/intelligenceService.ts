@@ -124,10 +124,7 @@ async function loadPeriodMovements(
   }
 }
 
-async function loadRecipeLines(
-  client: AdminSupabaseClient,
-  shopId: string,
-): Promise<RecipeRow[]> {
+async function loadRecipeLines(client: AdminSupabaseClient, shopId: string): Promise<RecipeRow[]> {
   const rows: RecipeRow[] = [];
   let offset = 0;
   for (;;) {
