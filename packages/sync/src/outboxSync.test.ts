@@ -2,12 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   instant,
   parseEntityId,
+  type InventoryItemId,
+  type InventoryMovement,
+  type InventoryMovementId,
+  type OrderId,
+  type OrderSnapshot,
   type OutboxEvent,
   type OutboxEventId,
   type ShopId,
 } from '@tux/domain';
 import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
-import { nextOutboxRetryAt, outboxRetryDelayMs, OutboxSyncService } from './outboxSync';
+import {
+  nextOutboxRetryAt,
+  outboxRetryDelayMs,
+  OutboxDeliveryError,
+  OutboxSyncService,
+} from './outboxSync';
 
 const SHOP_ID = parseEntityId<ShopId>('11000000-0000-4000-8000-000000000001');
 
@@ -34,12 +44,30 @@ function outbox(id: string, createdAt: string): OutboxEvent {
 
 class MemoryDatabase implements OperationsDatabase {
   readonly events = new Map<OutboxEventId, OutboxEvent>();
+  readonly orders = new Map<OrderId, OrderSnapshot>();
+  readonly movements: InventoryMovement[] = [];
   async initialize(): Promise<void> {}
   async close(): Promise<void> {}
   async transaction<Result>(
     work: (transaction: OperationsTransaction) => Promise<Result>,
   ): Promise<Result> {
     const transaction = {
+      orders: {
+        getById: async (id: OrderId) => this.orders.get(id) ?? null,
+        updateOperationalState: async (order: OrderSnapshot) => {
+          this.orders.set(order.id, order);
+        },
+      },
+      inventory: {
+        listMovementsForOrder: async (orderId: OrderId) =>
+          this.movements.filter((movement) => movement.orderId === orderId),
+        appendMovement: async (movement: InventoryMovement) => {
+          this.movements.push(movement);
+        },
+      },
+      audit: {
+        append: async () => undefined,
+      },
       outbox: {
         append: async (event: OutboxEvent) => {
           this.events.set(event.id, event);
@@ -154,6 +182,79 @@ describe('OutboxSyncService', () => {
     expect(outboxRetryDelayMs(20)).toBe(300_000);
     expect(nextOutboxRetryAt(instant('2026-08-18T10:00:00.000Z'), 2)).toBe(
       '2026-08-18T10:00:04.000Z',
+    );
+  });
+
+  it('cancels an active local order and releases its reservation after canonical rejection', async () => {
+    const database = new MemoryDatabase();
+    const placement = outbox(
+      '21000000-0000-4000-8000-000000000005',
+      '2026-08-18T10:00:00.000Z',
+    );
+    const orderId = parseEntityId<OrderId>(placement.aggregateId);
+    const itemId = parseEntityId<InventoryItemId>('51000000-0000-4000-8000-000000000001');
+    const reservationId = parseEntityId<InventoryMovementId>(
+      '61000000-0000-4000-8000-000000000001',
+    );
+    database.events.set(placement.id, placement);
+    database.orders.set(orderId, {
+      id: orderId,
+      shopId: SHOP_ID,
+      businessDayId: parseEntityId('31000000-0000-4000-8000-000000000001'),
+      displayOrderNo: 7,
+      idempotencyKey: 'checkout-7',
+      status: 'ACTIVE',
+      lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
+      operatorWorkerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+      operatorName: 'Worker',
+    } as unknown as OrderSnapshot);
+    database.movements.push({
+      id: reservationId,
+      shopId: SHOP_ID,
+      businessDayId: null,
+      itemId,
+      movementType: 'ORDER_RESERVATION',
+      quantityDeltaMicros: 0 as InventoryMovement['quantityDeltaMicros'],
+      reservedDeltaMicros: 2_000_000 as InventoryMovement['reservedDeltaMicros'],
+      idempotencyKey: 'reservation-local',
+      workerId: null,
+      orderId,
+      createdAt: instant('2026-08-18T10:00:00.000Z'),
+      compensatesMovementId: null,
+    });
+
+    const service = new OutboxSyncService(
+      database,
+      {
+        deliver: async () => {
+          throw new OutboxDeliveryError(
+            'Canonical inventory reservation rejected.',
+            'PERMANENT',
+            422,
+          );
+        },
+      },
+      { now: () => instant('2026-08-18T11:00:00.000Z') },
+    );
+
+    const result = await service.syncOnce();
+
+    expect(result).toMatchObject({ quarantined: 1, failed: 0 });
+    expect(database.orders.get(orderId)).toMatchObject({
+      status: 'CANCELLED',
+      lifecycle: {
+        cancellation: {
+          stockRestored: true,
+        },
+      },
+    });
+    expect(database.movements).toContainEqual(
+      expect.objectContaining({
+        orderId,
+        itemId,
+        movementType: 'ORDER_RESERVATION_RELEASE',
+        reservedDeltaMicros: -2_000_000,
+      }),
     );
   });
 });
