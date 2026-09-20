@@ -310,6 +310,46 @@ describe('inventory intelligence purchasing integration', () => {
     expect(lineQueries.length).toBeGreaterThan(12);
   });
 
+  it('pages every recipe line before computing food-cost margin alerts', async () => {
+    const recipeLines = Array.from({ length: 1_250 }, () => ({
+      product_id: 'product-1',
+      inventory_item_id: 'item-1',
+      quantity_micros: 1_000_000,
+    }));
+    const recipeQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'recipe_lines') {
+        recipeQueries.push(query!);
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return recipeLines.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'products') {
+        return [{ id: 'product-1', name: 'Burger', price_minor: 1_000_000, active: true }];
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'inventory_movements') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.marginAlerts[0]?.recipeCostMinor).toBe(125_000);
+    expect(recipeQueries.map((query) => query.get('offset'))).toEqual([
+      '0',
+      '1000',
+      '1250',
+    ]);
+  });
+
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
     const update = vi.fn(async (table: string, query: URLSearchParams) => {
       void table;
