@@ -577,4 +577,124 @@ if (canonicalConsumptionCost !== 777) {
   );
 }
 
+
+const CHEAP_VARIANCE_ITEM_ID = '35000000-0000-4000-8000-000000000003';
+const CHEAP_VARIANCE_PO_ID = '55000000-0000-4000-8000-000000000003';
+const CHEAP_VARIANCE_LINE_ID = '65000000-0000-4000-8000-000000000003';
+const CHEAP_VARIANCE_RECEIPT_ID = '85000000-0000-4000-8000-000000000003';
+const CHEAP_VARIANCE_RECEIPT_LINE_ID = '95000000-0000-4000-8000-000000000003';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(
+       id, shop_id, name, unit_label, tracking_mode, active
+     ) values (
+       '${CHEAP_VARIANCE_ITEM_ID}', '${SHOP_ID}', 'Cheap Variance Item', 'ea', 'RECIPE_TRACKED', true
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, admin_employee_id,
+       source_kind, command_id, unit_cost_minor, created_at
+     ) values (
+       '75000000-0000-4000-8000-000000000003',
+       '${SHOP_ID}', null, '${CHEAP_VARIANCE_ITEM_ID}', 'ADMIN_ADJUSTMENT',
+       10000000, 0, null, null, null, 'cheap-variance-opening-stock',
+       '${EMPLOYEE_ID}', 'ADMIN', 'cheap-variance-opening-stock', 150,
+       timestamptz '2026-09-19 04:00:00+00'
+     );
+     insert into public.inventory_cost_state(
+       shop_id, inventory_item_id, weighted_unit_cost_minor, version
+     ) values ('${SHOP_ID}', '${CHEAP_VARIANCE_ITEM_ID}', 150, 1);
+     insert into public.purchase_orders(
+       id, business_id, shop_id, supplier_id, status, reference, version,
+       created_by_employee_id, ordered_at, create_command_id, order_command_id
+     ) values (
+       '${CHEAP_VARIANCE_PO_ID}', '${BUSINESS_ID}', '${SHOP_ID}', '${SUPPLIER_ID}', 'RECEIVED',
+       'PO-CHEAP-VARIANCE', 4, '${EMPLOYEE_ID}', timestamptz '2026-09-19 03:00:00+00',
+       'create-po-cheap-variance', 'order-po-cheap-variance'
+     );
+     insert into public.purchase_order_lines(
+       id, purchase_order_id, inventory_item_id, purchase_unit_label,
+       base_micros_per_purchase_unit, ordered_purchase_units_micros,
+       received_purchase_units_micros, ordered_base_micros, received_base_micros,
+       expected_purchase_unit_cost_minor, expected_unit_cost_minor
+     ) values (
+       '${CHEAP_VARIANCE_LINE_ID}', '${CHEAP_VARIANCE_PO_ID}', '${CHEAP_VARIANCE_ITEM_ID}', 'ea',
+       1000000, 10000000, 10000000, 10000000, 10000000, 100, 100
+     );
+     insert into public.purchase_receipts(
+       id, purchase_order_id, shop_id, supplier_id, supplier_reference,
+       command_id, received_by_employee_id, received_at
+     ) values (
+       '${CHEAP_VARIANCE_RECEIPT_ID}', '${CHEAP_VARIANCE_PO_ID}', '${SHOP_ID}', '${SUPPLIER_ID}',
+       'INV-CHEAP-VARIANCE', 'receive-cheap-variance', '${EMPLOYEE_ID}',
+       timestamptz '2026-09-19 03:30:00+00'
+     );
+     insert into public.purchase_receipt_lines(
+       id, purchase_receipt_id, purchase_order_line_id, inventory_item_id,
+       received_purchase_units_micros, received_base_micros,
+       purchase_unit_cost_minor, unit_cost_minor
+     ) values (
+       '${CHEAP_VARIANCE_RECEIPT_LINE_ID}', '${CHEAP_VARIANCE_RECEIPT_ID}', '${CHEAP_VARIANCE_LINE_ID}',
+       '${CHEAP_VARIANCE_ITEM_ID}', 10000000, 10000000, 100, 100
+     );`,
+  ],
+  'Cheaper purchase return variance fixture',
+);
+
+const cheapVarianceReturnResult = psql(
+  [
+    '-At',
+    '-c',
+    `select public.return_purchase_order_v1(
+       '${EMPLOYEE_ID}',
+       '${SHOP_ID}',
+       '${CHEAP_VARIANCE_PO_ID}',
+       'return-cheap-variance',
+       'CN-CHEAP-VARIANCE',
+       '[{"lineId":"${CHEAP_VARIANCE_LINE_ID}","returnedPurchaseUnitsMicros":10000000}]'::jsonb
+     )::text`,
+  ],
+  'Cheaper purchase return that exhausts inventory',
+).trim();
+const cheapVarianceReturn = JSON.parse(cheapVarianceReturnResult);
+if (cheapVarianceReturn.ok !== true) {
+  throw new Error(`cheaper purchase return was rejected: ${cheapVarianceReturnResult}`);
+}
+
+psql(
+  [
+    '-c',
+    `do $cheap_purchase_variance_assertions$
+     declare
+       v_on_hand bigint;
+       v_cost numeric(20, 6);
+       v_variance numeric(20, 6);
+     begin
+       select b.on_hand_micros into v_on_hand
+       from private.inventory_balance_v1('${SHOP_ID}', '${CHEAP_VARIANCE_ITEM_ID}') b;
+       if v_on_hand <> 0 then
+         raise exception 'cheap variance return did not remove all stock: %', v_on_hand;
+       end if;
+
+       select weighted_unit_cost_minor into v_cost
+       from public.inventory_cost_state
+       where shop_id = '${SHOP_ID}' and inventory_item_id = '${CHEAP_VARIANCE_ITEM_ID}';
+       if v_cost <> 0 then
+         raise exception 'cheap variance return did not zero exhausted inventory cost: %', v_cost;
+       end if;
+
+       select purchase_price_variance_minor into v_variance
+       from public.purchase_returns
+       where shop_id = '${SHOP_ID}' and command_id = 'return-cheap-variance';
+       if v_variance <> -500 then
+         raise exception 'unexpected cheaper-return purchase price variance: %', v_variance;
+       end if;
+     end $cheap_purchase_variance_assertions$;`,
+  ],
+  'Cheaper purchase return variance assertions',
+);
+
 console.log('Admin purchasing PostgreSQL partial-receipt/return behavior passed.');
