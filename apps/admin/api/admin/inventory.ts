@@ -186,6 +186,109 @@ type TransferLineRow = {
   quantity_micros: number | string;
 };
 
+const TRANSFER_HISTORY_LIMIT = 100;
+const TRANSFER_PAGE_SIZE = 500;
+const TRANSFER_LINE_BATCH_SIZE = 100;
+const TRANSFER_LINE_PAGE_SIZE = 1_000;
+const TRANSFER_ITEM_BATCH_SIZE = 100;
+
+async function loadIncomingSentTransfers(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<TransferRow[]> {
+  const rows: TransferRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<TransferRow[]>(
+      'stock_transfers',
+      new URLSearchParams({
+        select: 'id,source_shop_id,destination_shop_id,status,sent_at,received_at',
+        destination_shop_id: `eq.${shopId}`,
+        status: 'eq.SENT',
+        order: 'sent_at.desc,id.desc',
+        limit: String(TRANSFER_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+export async function loadTransferRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<TransferRow[]> {
+  const [recentRows, incomingSentRows] = await Promise.all([
+    client.select<TransferRow[]>(
+      'stock_transfers',
+      new URLSearchParams({
+        select: 'id,source_shop_id,destination_shop_id,status,sent_at,received_at',
+        or: `(source_shop_id.eq.${shopId},destination_shop_id.eq.${shopId})`,
+        order: 'sent_at.desc,id.desc',
+        limit: String(TRANSFER_HISTORY_LIMIT),
+      }),
+    ),
+    loadIncomingSentTransfers(client, shopId),
+  ]);
+
+  const byId = new Map<string, TransferRow>();
+  for (const row of [...recentRows, ...incomingSentRows]) byId.set(row.id, row);
+  return [...byId.values()].sort(
+    (left, right) =>
+      right.sent_at.localeCompare(left.sent_at) || right.id.localeCompare(left.id),
+  );
+}
+
+async function loadTransferLines(
+  client: AdminSupabaseClient,
+  transferIds: readonly string[],
+): Promise<TransferLineRow[]> {
+  const rows: TransferLineRow[] = [];
+  for (let start = 0; start < transferIds.length; start += TRANSFER_LINE_BATCH_SIZE) {
+    const batch = transferIds.slice(start, start + TRANSFER_LINE_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<TransferLineRow[]>(
+        'stock_transfer_lines',
+        new URLSearchParams({
+          select: 'transfer_id,inventory_item_id,quantity_micros',
+          transfer_id: `in.(${batch.join(',')})`,
+          order: 'transfer_id.asc,inventory_item_id.asc',
+          limit: String(TRANSFER_LINE_PAGE_SIZE),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+  return rows;
+}
+
+async function loadTransferItems(
+  client: AdminSupabaseClient,
+  inventoryItemIds: readonly string[],
+): Promise<InventoryItemRow[]> {
+  const rows: InventoryItemRow[] = [];
+  for (let start = 0; start < inventoryItemIds.length; start += TRANSFER_ITEM_BATCH_SIZE) {
+    const batch = inventoryItemIds.slice(start, start + TRANSFER_ITEM_BATCH_SIZE);
+    rows.push(
+      ...(await client.select<InventoryItemRow[]>(
+        'inventory_items',
+        new URLSearchParams({
+          select: 'id,shop_id,name,unit_label,tracking_mode,active',
+          id: `in.(${batch.join(',')})`,
+          order: 'id.asc',
+        }),
+      )),
+    );
+  }
+  return rows;
+}
+
 function safeInteger(value: number | string): number {
   const result = typeof value === 'number' ? value : Number(value);
   if (!Number.isSafeInteger(result)) throw new Error('inventory_backend_contract_invalid');
@@ -293,41 +396,16 @@ async function loadWorkspace(
           order: 'family.asc,reason_key.asc,version.desc',
         }),
       ),
-      client.select<TransferRow[]>(
-        'stock_transfers',
-        new URLSearchParams({
-          select: 'id,source_shop_id,destination_shop_id,status,sent_at,received_at',
-          or: `(source_shop_id.eq.${shopId},destination_shop_id.eq.${shopId})`,
-          order: 'sent_at.desc,id.desc',
-          limit: '100',
-        }),
-      ),
+      loadTransferRows(client, shopId),
     ]);
 
   const transferIds = transferRows.map((row) => row.id);
   const transferLineRows =
-    transferIds.length === 0
-      ? []
-      : await client.select<TransferLineRow[]>(
-          'stock_transfer_lines',
-          new URLSearchParams({
-            select: 'transfer_id,inventory_item_id,quantity_micros',
-            transfer_id: `in.(${transferIds.join(',')})`,
-            order: 'transfer_id.asc,inventory_item_id.asc',
-          }),
-        );
+    transferIds.length === 0 ? [] : await loadTransferLines(client, transferIds);
 
   const transferItemIds = [...new Set(transferLineRows.map((line) => line.inventory_item_id))];
   const transferItemRows =
-    transferItemIds.length === 0
-      ? []
-      : await client.select<InventoryItemRow[]>(
-          'inventory_items',
-          new URLSearchParams({
-            select: 'id,shop_id,name,unit_label,tracking_mode,active',
-            id: `in.(${transferItemIds.join(',')})`,
-          }),
-        );
+    transferItemIds.length === 0 ? [] : await loadTransferItems(client, transferItemIds);
 
   const movementsByItem = new Map<string, MovementRow[]>();
   for (const movement of movementRows) {
