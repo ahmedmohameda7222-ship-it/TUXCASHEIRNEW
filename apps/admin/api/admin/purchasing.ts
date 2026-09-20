@@ -213,6 +213,7 @@ const PURCHASE_ORDER_HISTORY_LIMIT = 500;
 const PURCHASE_ORDER_PAGE_SIZE = 500;
 const PURCHASE_ORDER_LINE_BATCH_SIZE = 100;
 const PURCHASE_ORDER_LINE_PAGE_SIZE = 10_000;
+const PURCHASABLE_ITEM_PAGE_SIZE = 10_000;
 
 async function loadActionablePurchaseOrders(
   client: AdminSupabaseClient,
@@ -232,6 +233,30 @@ async function loadActionablePurchaseOrders(
         status: 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)',
         order: 'created_at.desc,id.desc',
         limit: String(PURCHASE_ORDER_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadPurchasableInventoryItems(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<InventoryItemRow[]> {
+  const rows: InventoryItemRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<InventoryItemRow[]>(
+      'inventory_items',
+      new URLSearchParams({
+        select: 'id,name,unit_label,active',
+        shop_id: `eq.${shopId}`,
+        active: 'eq.true',
+        order: 'name.asc,id.asc',
+        limit: String(PURCHASABLE_ITEM_PAGE_SIZE),
         offset: String(offset),
       }),
     );
@@ -294,15 +319,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
             }),
           ),
           loadActionablePurchaseOrders(client, businessId, shopId),
-          client.select<InventoryItemRow[]>(
-            'inventory_items',
-            new URLSearchParams({
-              select: 'id,name,unit_label,active',
-              shop_id: `eq.${shopId}`,
-              active: 'eq.true',
-              order: 'name.asc,id.asc',
-            }),
-          ),
+          loadPurchasableInventoryItems(client, shopId),
         ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
