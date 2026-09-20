@@ -1,5 +1,16 @@
-import type { Instant, OutboxEvent } from '@tux/domain';
-import type { OperationsDatabase } from '@tux/persistence';
+import {
+  cancelActiveOrder,
+  parseEntityId,
+  stockQuantityMicros,
+  type AuditEventId,
+  type EntityId,
+  type Instant,
+  type InventoryMovement,
+  type InventoryMovementId,
+  type OrderId,
+  type OutboxEvent,
+} from '@tux/domain';
+import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 
 export type OutboxFailureKind = 'TRANSIENT' | 'PERMANENT';
 
@@ -65,6 +76,86 @@ function failureKind(error: unknown): OutboxFailureKind {
   return error instanceof OutboxDeliveryError ? error.kind : 'TRANSIENT';
 }
 
+function newEntityId<Id extends EntityId>(): Id {
+  return parseEntityId<Id>(globalThis.crypto.randomUUID());
+}
+
+function isCanonicalReservationRejection(error: unknown): boolean {
+  return error instanceof OutboxDeliveryError && error.kind === 'PERMANENT' && error.status === 422;
+}
+
+async function reconcileRejectedOrderPlacement(
+  transaction: OperationsTransaction,
+  event: OutboxEvent,
+  failedAt: Instant,
+): Promise<void> {
+  if (event.aggregateType !== 'ORDER' || event.eventType !== 'ORDER_PLACED') return;
+
+  let orderId: OrderId;
+  try {
+    orderId = parseEntityId<OrderId>(event.aggregateId);
+  } catch {
+    return;
+  }
+
+  const order = await transaction.orders.getById(orderId);
+  if (order === null || order.status !== 'ACTIVE') return;
+
+  const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+  const reservationByItem = new Map<InventoryMovement['itemId'], number>();
+  for (const movement of existingMovements) {
+    const reservedDelta = movement.reservedDeltaMicros ?? 0;
+    if (reservedDelta === 0) continue;
+    reservationByItem.set(
+      movement.itemId,
+      (reservationByItem.get(movement.itemId) ?? 0) + reservedDelta,
+    );
+  }
+
+  for (const [itemId, reservedMicros] of reservationByItem) {
+    if (reservedMicros <= 0) continue;
+    await transaction.inventory.appendMovement({
+      id: newEntityId<InventoryMovementId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      itemId,
+      movementType: 'ORDER_RESERVATION_RELEASE',
+      quantityDeltaMicros: stockQuantityMicros(0),
+      reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+      idempotencyKey: `sync-rejected-reservation-release:${event.id}:${itemId}`,
+      workerId: order.operatorWorkerId,
+      orderId: order.id,
+      createdAt: failedAt,
+      compensatesMovementId: null,
+    });
+  }
+
+  const cancelled = cancelActiveOrder(order, {
+    at: failedAt,
+    workerId: order.operatorWorkerId,
+    workerName: order.operatorName,
+    foodPrepared: false,
+    reason: 'Inventory reservation rejected by canonical stock authority.',
+  });
+  await transaction.orders.updateOperationalState(cancelled);
+  await transaction.audit.append({
+    id: newEntityId<AuditEventId>(),
+    shopId: order.shopId,
+    businessDayId: order.businessDayId,
+    aggregateType: 'ORDER',
+    aggregateId: order.id,
+    eventType: 'ORDER_CANCELLED',
+    workerId: order.operatorWorkerId,
+    createdAt: failedAt,
+    details: {
+      reason: 'Inventory reservation rejected by canonical stock authority.',
+      stockRestored: true,
+      syncConflict: 'inventory_reservation_rejected',
+      rejectedOutboxEventId: event.id,
+    },
+  });
+}
+
 export class OutboxSyncService {
   readonly #database: OperationsDatabase;
   readonly #transport: OutboxTransport;
@@ -126,6 +217,9 @@ export class OutboxSyncService {
         if (failureKind(error) === 'PERMANENT') {
           dependencyBlocked += await this.#database.transaction(async (transaction) => {
             await transaction.outbox.quarantine(event.id, failedAt, lastError);
+            if (isCanonicalReservationRejection(error)) {
+              await reconcileRejectedOrderPlacement(transaction, event, failedAt);
+            }
             return transaction.outbox.quarantineDependents(event, failedAt, lastError);
           });
           if (event.aggregateRevision !== null) {
