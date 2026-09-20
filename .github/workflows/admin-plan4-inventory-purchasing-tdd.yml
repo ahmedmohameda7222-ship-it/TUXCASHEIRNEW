@@ -231,6 +231,7 @@ jobs:
           apps/operations-desktop/src/main/ordersBoard.integration.test.ts
           packages/domain/src/syncContract.test.ts
           packages/sync/src/remoteMaterializer.test.ts
+          packages/sync/src/outboxSync.test.ts
       - name: Plan 4 typecheck
         run: npm run typecheck
 
@@ -296,7 +297,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Plan 4 Task 5 purchasing service RED/behavior
-        run: npx vitest run apps/admin/server/purchasing/purchasingService.test.ts
+        run: >-
+          npx vitest run
+          apps/admin/server/purchasing/purchasingService.test.ts
+          apps/admin/server/purchasing/purchasingApiStore.test.ts
       - name: Plan 4 Task 5 open-PO incoming intelligence RED/behavior
         run: npx vitest run apps/admin/server/inventory/intelligenceService.test.ts
       - name: Plan 4 Task 5 purchasing migration invariant

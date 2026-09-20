@@ -16,6 +16,8 @@ import {
 const REPORT_WINDOW_DAYS = 30;
 const MOVEMENT_PAGE_SIZE = 10_000;
 const RECIPE_PAGE_SIZE = 10_000;
+const REPLENISHMENT_PAGE_SIZE = 10_000;
+const PRODUCT_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_BATCH_SIZE = 100;
 const ORDER_STATUS_BATCH_SIZE = 100;
@@ -120,6 +122,54 @@ async function loadPeriodMovements(
     );
     if (page.length === 0) return movements;
     movements.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadReplenishmentRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<ReplenishmentRow[]> {
+  const rows: ReplenishmentRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<ReplenishmentRow[]>(
+      'inventory_replenishment_settings',
+      new URLSearchParams({
+        select:
+          'inventory_item_id,par_level_base,reorder_point_base,preferred_supplier_id,preferred_purchase_unit,lead_time_days,minimum_order_quantity_base,order_multiple_base,version',
+        shop_id: `eq.${shopId}`,
+        order: 'inventory_item_id.asc',
+        limit: String(REPLENISHMENT_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadProductRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<ProductRow[]> {
+  const rows: ProductRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<ProductRow[]>(
+      'products',
+      new URLSearchParams({
+        select: 'id,name,price_minor,active',
+        shop_id: `eq.${shopId}`,
+        active: 'eq.true',
+        order: 'name.asc,id.asc',
+        limit: String(PRODUCT_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
     offset += page.length;
   }
 }
@@ -237,24 +287,9 @@ export async function loadInventoryIntelligence(
     marginRows,
     purchaseOrderRows,
   ] = await Promise.all([
-    client.select<ReplenishmentRow[]>(
-      'inventory_replenishment_settings',
-      new URLSearchParams({
-        select:
-          'inventory_item_id,par_level_base,reorder_point_base,preferred_supplier_id,preferred_purchase_unit,lead_time_days,minimum_order_quantity_base,order_multiple_base,version',
-        shop_id: `eq.${shopId}`,
-      }),
-    ),
+    loadReplenishmentRows(client, shopId),
     loadPeriodMovements(client, shopId, from),
-    client.select<ProductRow[]>(
-      'products',
-      new URLSearchParams({
-        select: 'id,name,price_minor,active',
-        shop_id: `eq.${shopId}`,
-        active: 'eq.true',
-        order: 'name.asc,id.asc',
-      }),
-    ),
+    loadProductRows(client, shopId),
     loadRecipeLines(client, shopId),
     client.select<MarginSettingRow[]>(
       'inventory_margin_settings',

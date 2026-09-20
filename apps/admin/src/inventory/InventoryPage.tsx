@@ -30,6 +30,7 @@ export function InventoryPage() {
 
   const workspace = inventory.workspaceQuery.data;
   const items = workspace?.items ?? [];
+  const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   useEffect(() => {
     if (selectedItemId && items.some((item) => item.id === selectedItemId)) return;
@@ -44,11 +45,11 @@ export function InventoryPage() {
 
   const stocktakeBatches = useMemo(() => {
     const batches = [];
-    for (let start = 0; start < items.length; start += STOCKTAKE_BATCH_SIZE) {
-      batches.push(items.slice(start, start + STOCKTAKE_BATCH_SIZE));
+    for (let start = 0; start < stocktakeItems.length; start += STOCKTAKE_BATCH_SIZE) {
+      batches.push(stocktakeItems.slice(start, start + STOCKTAKE_BATCH_SIZE));
     }
     return batches;
-  }, [items]);
+  }, [stocktakeItems]);
 
   const beginStocktakeBatch = (batch: typeof items) => {
     inventory.beginStocktake.mutate(
@@ -107,14 +108,14 @@ export function InventoryPage() {
             <button
               className="admin-secondary-button"
               type="button"
-              disabled={inventory.beginStocktake.isPending || items.length === 0}
+              disabled={inventory.beginStocktake.isPending || stocktakeItems.length === 0}
               onClick={() => {
-                if (items.length > STOCKTAKE_BATCH_SIZE) {
+                if (stocktakeItems.length > STOCKTAKE_BATCH_SIZE) {
                   setMode('stocktake-select');
                   setItemAction(null);
                   return;
                 }
-                beginStocktakeBatch(items);
+                beginStocktakeBatch(stocktakeItems);
               }}
             >
               Stock count
