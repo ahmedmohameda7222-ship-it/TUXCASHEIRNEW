@@ -77,9 +77,11 @@ describe('Admin inventory route', () => {
     );
 
     expect(rows).toHaveLength(1_250);
-    expect(
-      select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset')),
-    ).toEqual(['0', '1000', '1250']);
+    expect(select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset'))).toEqual([
+      '0',
+      '1000',
+      '1250',
+    ]);
   });
 
   it('pages canonical balance RPC rows under the PostgREST function cap', async () => {
@@ -109,9 +111,7 @@ describe('Admin inventory route', () => {
 
     expect(rows).toHaveLength(1_250);
     expect(
-      rpc.mock.calls.map(([, , query]) =>
-        (query as URLSearchParams | undefined)?.get('offset'),
-      ),
+      rpc.mock.calls.map(([, , query]) => (query as URLSearchParams | undefined)?.get('offset')),
     ).toEqual(['0', '1000', '1250']);
   });
 
@@ -127,19 +127,21 @@ describe('Admin inventory route', () => {
       return costs.slice(offset, offset + Math.min(requested, 1_000));
     });
 
-    const rows = await loadInventoryCostRows({ select } as unknown as AdminSupabaseClient, 'shop-a');
+    const rows = await loadInventoryCostRows(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+    );
 
     expect(rows).toHaveLength(1_250);
-    expect(
-      select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset')),
-    ).toEqual(['0', '1000', '1250']);
+    expect(select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset'))).toEqual([
+      '0',
+      '1000',
+      '1250',
+    ]);
   });
 
   it('offers bounded stocktake batches when the catalog exceeds 500 items', async () => {
-    const source = await readFile(
-      resolve('apps/admin/src/inventory/InventoryPage.tsx'),
-      'utf8',
-    );
+    const source = await readFile(resolve('apps/admin/src/inventory/InventoryPage.tsx'), 'utf8');
     expect(source).toContain('STOCKTAKE_BATCH_SIZE = 500');
     expect(source).toContain("'stocktake-select'");
     expect(source).toContain('stocktakeBatches');

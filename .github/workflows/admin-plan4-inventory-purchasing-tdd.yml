@@ -245,11 +245,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Print exact Inventory Prettier diff
-        run: |
-          npx prettier --write apps/admin/src/inventory/InventoryPage.tsx apps/admin/src/inventory/InventoryRoute.source.test.ts
-          git diff --no-ext-diff --no-color -- apps/admin/src/inventory/InventoryPage.tsx apps/admin/src/inventory/InventoryRoute.source.test.ts
-          git diff --quiet -- apps/admin/src/inventory/InventoryPage.tsx apps/admin/src/inventory/InventoryRoute.source.test.ts
       - name: Verify Task 3 formatting
         run: >-
           npx prettier --check

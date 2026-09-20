@@ -16,12 +16,7 @@ import './inventory.css';
 const STOCKTAKE_BATCH_SIZE = 500;
 
 type WorkspaceMode =
-  | 'detail'
-  | 'stocktake-select'
-  | 'stocktake'
-  | 'transfer'
-  | 'reorder'
-  | 'variance';
+  'detail' | 'stocktake-select' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
