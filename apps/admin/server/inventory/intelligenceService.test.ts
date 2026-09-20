@@ -45,26 +45,28 @@ describe('inventory intelligence purchasing integration', () => {
           : [];
       }
       if (table === 'purchase_order_lines') {
-        return [
-          {
-            purchase_order_id: 'po-open',
-            inventory_item_id: 'item-1',
-            ordered_base_micros: 5_000,
-            received_base_micros: 2_000,
-          },
-          {
-            purchase_order_id: 'po-draft',
-            inventory_item_id: 'item-1',
-            ordered_base_micros: 9_000,
-            received_base_micros: 0,
-          },
-          {
-            purchase_order_id: 'po-closed',
-            inventory_item_id: 'item-1',
-            ordered_base_micros: 8_000,
-            received_base_micros: 8_000,
-          },
-        ];
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [
+              {
+                purchase_order_id: 'po-open',
+                inventory_item_id: 'item-1',
+                ordered_base_micros: 5_000,
+                received_base_micros: 2_000,
+              },
+              {
+                purchase_order_id: 'po-draft',
+                inventory_item_id: 'item-1',
+                ordered_base_micros: 9_000,
+                received_base_micros: 0,
+              },
+              {
+                purchase_order_id: 'po-closed',
+                inventory_item_id: 'item-1',
+                ordered_base_micros: 8_000,
+                received_base_micros: 8_000,
+              },
+            ]
+          : [];
       }
       if (table === 'inventory_movements') return [];
       if (table === 'products') return [];
@@ -98,14 +100,16 @@ describe('inventory intelligence purchasing integration', () => {
           : [];
       }
       if (table === 'purchase_order_lines') {
-        return [
-          {
-            purchase_order_id: 'po-open',
-            inventory_item_id: 'item-1',
-            ordered_base_micros: 20_000,
-            received_base_micros: 0,
-          },
-        ];
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [
+              {
+                purchase_order_id: 'po-open',
+                inventory_item_id: 'item-1',
+                ordered_base_micros: 20_000,
+                received_base_micros: 0,
+              },
+            ]
+          : [];
       }
       if (table === 'inventory_movements') return [];
       if (table === 'products') return [];
