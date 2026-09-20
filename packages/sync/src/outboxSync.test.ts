@@ -3,6 +3,7 @@ import {
   instant,
   parseEntityId,
   stockQuantityMicros,
+  type AuditEvent,
   type InventoryItemId,
   type InventoryMovement,
   type InventoryMovementId,
@@ -47,6 +48,7 @@ class MemoryDatabase implements OperationsDatabase {
   readonly events = new Map<OutboxEventId, OutboxEvent>();
   readonly orders = new Map<OrderId, OrderSnapshot>();
   readonly movements: InventoryMovement[] = [];
+  readonly auditEvents: AuditEvent[] = [];
   async initialize(): Promise<void> {}
   async close(): Promise<void> {}
   async transaction<Result>(
@@ -67,7 +69,9 @@ class MemoryDatabase implements OperationsDatabase {
         },
       },
       audit: {
-        append: async () => undefined,
+        append: async (event: AuditEvent) => {
+          this.auditEvents.push(event);
+        },
       },
       outbox: {
         append: async (event: OutboxEvent) => {
@@ -183,6 +187,92 @@ describe('OutboxSyncService', () => {
     expect(outboxRetryDelayMs(20)).toBe(300_000);
     expect(nextOutboxRetryAt(instant('2026-08-18T10:00:00.000Z'), 2)).toBe(
       '2026-08-18T10:00:04.000Z',
+    );
+  });
+
+  it('surfaces a fulfilled local order when canonical placement is rejected', async () => {
+    const database = new MemoryDatabase();
+    const placement = outbox('21000000-0000-4000-8000-000000000006', '2026-08-18T10:00:00.000Z');
+    const orderId = parseEntityId<OrderId>(placement.aggregateId);
+    const itemId = parseEntityId<InventoryItemId>('51000000-0000-4000-8000-000000000002');
+    database.events.set(placement.id, placement);
+    database.orders.set(orderId, {
+      id: orderId,
+      shopId: SHOP_ID,
+      businessDayId: parseEntityId('31000000-0000-4000-8000-000000000001'),
+      displayOrderNo: 8,
+      idempotencyKey: 'checkout-8',
+      status: 'DONE',
+      lifecycle: {
+        revision: 1,
+        doneAt: instant('2026-08-18T10:05:00.000Z'),
+        cancellation: null,
+        returned: null,
+      },
+      operatorWorkerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+      operatorName: 'Worker',
+    } as unknown as OrderSnapshot);
+    database.movements.push(
+      {
+        id: parseEntityId<InventoryMovementId>('61000000-0000-4000-8000-000000000002'),
+        shopId: SHOP_ID,
+        businessDayId: null,
+        itemId,
+        movementType: 'ORDER_RESERVATION',
+        quantityDeltaMicros: stockQuantityMicros(0),
+        reservedDeltaMicros: stockQuantityMicros(2_000_000),
+        idempotencyKey: 'reservation-done-local',
+        workerId: null,
+        orderId,
+        createdAt: instant('2026-08-18T10:00:00.000Z'),
+        compensatesMovementId: null,
+      },
+      {
+        id: parseEntityId<InventoryMovementId>('61000000-0000-4000-8000-000000000003'),
+        shopId: SHOP_ID,
+        businessDayId: null,
+        itemId,
+        movementType: 'ORDER_CONSUMPTION',
+        quantityDeltaMicros: stockQuantityMicros(-2_000_000),
+        reservedDeltaMicros: stockQuantityMicros(-2_000_000),
+        idempotencyKey: 'consumption-done-local',
+        workerId: null,
+        orderId,
+        createdAt: instant('2026-08-18T10:05:00.000Z'),
+        compensatesMovementId: null,
+      },
+    );
+
+    const service = new OutboxSyncService(
+      database,
+      {
+        deliver: async () => {
+          throw new OutboxDeliveryError(
+            'Canonical inventory reservation rejected.',
+            'PERMANENT',
+            422,
+          );
+        },
+      },
+      { now: () => instant('2026-08-18T11:00:00.000Z') },
+    );
+
+    const result = await service.syncOnce();
+
+    expect(database.orders.get(orderId)?.status).toBe('DONE');
+    expect(database.movements).toHaveLength(2);
+    expect(result.lastError).toMatch(/already DONE locally.*manual reconciliation/i);
+    expect(database.auditEvents).toContainEqual(
+      expect.objectContaining({
+        aggregateType: 'ORDER',
+        aggregateId: orderId,
+        eventType: 'ORDER_SYNC_CONFLICT',
+        details: expect.objectContaining({
+          syncConflict: 'inventory_reservation_rejected_after_fulfillment',
+          localStatus: 'DONE',
+          manualReconciliationRequired: true,
+        }),
+      }),
     );
   });
 
