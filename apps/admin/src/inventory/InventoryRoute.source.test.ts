@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSupabaseClient } from '../../server/supabaseAdmin';
-import { loadTransferRows } from '../../api/admin/inventory';
+import { loadInventoryItemRows, loadTransferRows } from '../../api/admin/inventory';
 
 describe('Admin inventory route', () => {
   it('mounts the real InventoryPage instead of the generic placeholder', async () => {
@@ -48,6 +48,44 @@ describe('Admin inventory route', () => {
       .map(([, query]) => query)
       .filter((query) => query.get('status') === 'eq.SENT');
     expect(actionableQueries.map((query) => query.get('offset'))).toEqual(['0', '500', '625']);
+  });
+
+  it('pages the complete inventory item catalog under PostgREST caps', async () => {
+    const inventoryItems = Array.from({ length: 1_250 }, (_, index) => ({
+      id: `item-${index}`,
+      shop_id: 'shop-a',
+      name: `Item ${String(index).padStart(4, '0')}`,
+      unit_label: 'unit',
+      tracking_mode: 'RECIPE_TRACKED',
+      active: true,
+    }));
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table !== 'inventory_items') throw new Error('unexpected table: ' + table);
+      const offset = Number(query.get('offset') ?? '0');
+      const requested = Number(query.get('limit') ?? '10000');
+      return inventoryItems.slice(offset, offset + Math.min(requested, 1_000));
+    });
+
+    const rows = await loadInventoryItemRows(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+    );
+
+    expect(rows).toHaveLength(1_250);
+    expect(
+      select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset')),
+    ).toEqual(['0', '1000', '1250']);
+  });
+
+  it('offers bounded stocktake batches when the catalog exceeds 500 items', async () => {
+    const source = await readFile(
+      resolve('apps/admin/src/inventory/InventoryPage.tsx'),
+      'utf8',
+    );
+    expect(source).toContain('STOCKTAKE_BATCH_SIZE = 500');
+    expect(source).toContain("'stocktake-select'");
+    expect(source).toContain('stocktakeBatches');
+    expect(source).toContain("mode === 'stocktake-select'");
   });
 
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {

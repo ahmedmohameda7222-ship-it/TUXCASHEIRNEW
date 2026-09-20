@@ -116,6 +116,17 @@ const movement: InventoryMovement = {
   compensatesMovementId: null,
 };
 
+const bulkMovement: InventoryMovement = {
+  ...movement,
+  id: id<InventoryMovementId>('dededede-dede-4ede-8ede-dededededede'),
+  movementType: 'BULK_STOCK_RECEIVED',
+  quantityDeltaMicros: stockQuantityMicros(2_000_000),
+  reservedDeltaMicros: stockQuantityMicros(0),
+  idempotencyKey: 'bulk-stock:dededede-dede-4ede-8ede-dededededede',
+  orderId: null,
+  compensatesMovementId: null,
+};
+
 const manualExpense: ManualExpenseRecord = {
   id: id<ExpenseId>('ffffffff-ffff-4fff-8fff-ffffffffffff'),
   shopId,
@@ -283,7 +294,7 @@ describe('OperationsSyncPayloadV1', () => {
           },
         },
       },
-      { eventType: 'INVENTORY_MOVEMENT_RECORDED', version: 1, movement },
+      { eventType: 'INVENTORY_MOVEMENT_RECORDED', version: 1, movement: bulkMovement },
       { eventType: 'BUSINESS_DAY_STARTED', version: 1, businessDay },
       { eventType: 'WORKER_SIGNED_IN', version: 1, session, previousSession: null },
       {
@@ -312,6 +323,25 @@ describe('OperationsSyncPayloadV1', () => {
     for (const payload of payloads) {
       expect(roundTrip(payload)).toEqual(payload);
     }
+  });
+
+  it('rejects reservation lifecycle deltas from generic inventory movement events', () => {
+    const forgedRelease: InventoryMovement = {
+      ...movement,
+      id: id<InventoryMovementId>('abababab-abab-4bab-8bab-abababababac'),
+      movementType: 'ORDER_RESERVATION_RELEASE',
+      quantityDeltaMicros: stockQuantityMicros(0),
+      reservedDeltaMicros: stockQuantityMicros(-5_000_000),
+      idempotencyKey: 'forged-reservation-release',
+    };
+
+    expect(() =>
+      roundTrip({
+        eventType: 'INVENTORY_MOVEMENT_RECORDED',
+        version: 1,
+        movement: forgedRelease,
+      }),
+    ).toThrow(/inventory movement.*lifecycle|generic inventory movement/i);
   });
 
   it('rejects unsupported versions and incomplete placement facts at runtime', () => {

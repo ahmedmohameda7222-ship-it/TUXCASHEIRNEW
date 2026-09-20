@@ -90,6 +90,13 @@ if (!lower.includes('preferred_supplier_id')) {
 if (!lower.includes('inventory_unit_conversions')) {
   throw new Error('purchasing must resolve canonical purchase-unit conversions');
 }
+if (
+  !/create\s+unique\s+index[\s\S]*?inventory_unit_conversions[\s\S]*?lower\s*\(\s*btrim\s*\(\s*purchase_unit_label\s*\)\s*\)/.test(
+    lower,
+  )
+) {
+  throw new Error('purchase-unit labels must be unique case-insensitively per inventory item');
+}
 const purchaseOrderLineDefinition = lower.slice(
   lower.indexOf('create table public.purchase_order_lines'),
   lower.indexOf('create index purchase_order_lines_item_idx'),
