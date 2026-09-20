@@ -438,3 +438,22 @@ Exact pre-ledger fixed code head `4ad0b285a6e00da22e45591208b1a845fdd718bb` pass
 - All other permanent Admin workflows attached to this exact head were SUCCESS.
 
 This ledger mutation changes the PR head again. Final Plan 4 review closure therefore still requires the ledger-inclusive exact head to pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding. Production Supabase/Vercel remain unchanged and are not authorized by this ledger update.
+
+
+## Plan 4 final review follow-up — transfer identity and PO paging — 2026-09-20
+
+The fresh Codex review of ledger-inclusive head `441d3b2cc5ec36530ab5c8f57728a390903f4057` identified three additional actionable issues, all handled with RED→GREEN evidence:
+
+- Transfer destination identity is now immutable after send. `stock_transfer_lines` persists `destination_inventory_item_id` when `send_stock_transfer_v1` validates the destination item; `receive_stock_transfer_v1` uses that stored UUID directly instead of re-resolving mutable item name/unit after source stock has already left. RED head `cec86e117b493eec5c43efc138a8f52671b06600` failed the new transfer invariant before this column/behavior existed.
+- Incoming purchase-order intelligence now pages open POs by actual returned row count and batches their line reads to at most 100 PO IDs per request, with each batch paged until exhaustion. RED root run `35521640087` failed `pages open purchase orders and batches their lines under PostgREST caps` with `purchase order line request too large`.
+- The purchasing workspace now keeps the newest 500 historical POs plus every actionable `DRAFT`, `ORDERED`, or `PARTIALLY_RECEIVED` PO from an independently paged query, deduplicates by PO ID, and batches/pages line reads. RED root run `35521640087` failed `keeps actionable purchase orders accessible beyond the 500-row history window` before actionable-order workspace support existed.
+
+Exact pre-ledger fixed head `548b8cdac30d76abbbd2c41476b0c64c3ab6586a` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35522323937` — 14/14 jobs SUCCESS, including ledger static/PostgreSQL, Task 4 intelligence, Task 5 purchasing, both PostgreSQL behavior jobs, lifecycle, rendered UI gates, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35522323924` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- All three review threads were answered with exact-head evidence and resolved.
+
+The earlier principal-scoped durable-command-ID hardening remains intact on this head. Production promotion remains a separate explicit checkpoint: this work does not authorize ready-for-review, merge, Supabase migration application, or Vercel production deployment.
+
+This ledger mutation changes the PR head again. The ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure.
