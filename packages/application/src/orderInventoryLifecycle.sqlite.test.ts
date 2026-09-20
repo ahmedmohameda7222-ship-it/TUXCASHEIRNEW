@@ -324,7 +324,7 @@ describe('Operations order inventory lifecycle', () => {
     }
   });
 
-  it('releases an ACTIVE reservation on cancellation even when foodPrepared is true', async () => {
+  it('consumes an ACTIVE reservation on cancellation when foodPrepared is true', async () => {
     const test = await fixture();
     try {
       const placed = await test.orders.placeOrder(draft('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
@@ -343,11 +343,19 @@ describe('Operations order inventory lifecycle', () => {
       );
       expect(orderMovements.map((movement) => movement.movementType)).toEqual([
         'ORDER_RESERVATION',
-        'ORDER_RESERVATION_RELEASE',
+        'ORDER_CONSUMPTION',
       ]);
       expect(orderMovements[1]).toMatchObject({
-        quantityDeltaMicros: 0,
+        quantityDeltaMicros: -500_000,
         reservedDeltaMicros: -500_000,
+      });
+      const balance = await test.database.transaction((transaction) =>
+        transaction.inventory.getBalance(INVENTORY_ITEM_ID),
+      );
+      expect(balance).toMatchObject({
+        onHandMicros: 4_500_000,
+        reservedMicros: 0,
+        availableMicros: 4_500_000,
       });
     } finally {
       await closeFixture(test);
