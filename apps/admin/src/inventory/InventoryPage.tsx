@@ -161,7 +161,10 @@ export function InventoryPage() {
       }
     >
       {mode === 'stocktake-select' ? (
-        <section className="admin-inventory-workflow" aria-labelledby="inventory-stocktake-batch-title">
+        <section
+          className="admin-inventory-workflow"
+          aria-labelledby="inventory-stocktake-batch-title"
+        >
           <div className="admin-inventory-workflow__header">
             <div>
               <p className="admin-page__eyebrow">Bounded count session</p>
@@ -176,8 +179,8 @@ export function InventoryPage() {
             </button>
           </div>
           <p>
-            Count up to {STOCKTAKE_BATCH_SIZE} items per frozen snapshot. Complete one batch,
-            then start the next batch from Inventory.
+            Count up to {STOCKTAKE_BATCH_SIZE} items per frozen snapshot. Complete one batch, then
+            start the next batch from Inventory.
           </p>
           <div className="admin-inventory-list" aria-label="Stock count batches">
             {stocktakeBatches.map((batch, index) => {
