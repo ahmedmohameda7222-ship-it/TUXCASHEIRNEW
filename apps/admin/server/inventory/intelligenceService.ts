@@ -18,6 +18,7 @@ const MOVEMENT_PAGE_SIZE = 10_000;
 const RECIPE_PAGE_SIZE = 10_000;
 const REPLENISHMENT_PAGE_SIZE = 10_000;
 const PRODUCT_PAGE_SIZE = 10_000;
+const MARGIN_SETTING_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_PAGE_SIZE = 10_000;
 const PURCHASE_ORDER_BATCH_SIZE = 100;
 const ORDER_STATUS_BATCH_SIZE = 100;
@@ -171,6 +172,29 @@ async function loadProductRows(client: AdminSupabaseClient, shopId: string): Pro
   }
 }
 
+async function loadMarginRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<MarginSettingRow[]> {
+  const rows: MarginSettingRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<MarginSettingRow[]>(
+      'inventory_margin_settings',
+      new URLSearchParams({
+        select: 'product_id,target_food_cost_percent,alert_food_cost_percent',
+        shop_id: `eq.${shopId}`,
+        order: 'product_id.asc',
+        limit: String(MARGIN_SETTING_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
 async function loadRecipeLines(client: AdminSupabaseClient, shopId: string): Promise<RecipeRow[]> {
   const rows: RecipeRow[] = [];
   let offset = 0;
@@ -288,13 +312,7 @@ export async function loadInventoryIntelligence(
     loadPeriodMovements(client, shopId, from),
     loadProductRows(client, shopId),
     loadRecipeLines(client, shopId),
-    client.select<MarginSettingRow[]>(
-      'inventory_margin_settings',
-      new URLSearchParams({
-        select: 'product_id,target_food_cost_percent,alert_food_cost_percent',
-        shop_id: `eq.${shopId}`,
-      }),
-    ),
+    loadMarginRows(client, shopId),
     loadOpenPurchaseOrders(client, shopId),
   ]);
 
