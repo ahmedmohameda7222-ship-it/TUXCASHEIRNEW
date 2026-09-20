@@ -116,6 +116,24 @@ if (!receiveTransfer.includes('v_source_line.destination_inventory_item_id')) {
   throw new Error('receive_stock_transfer_v1 must use the immutable destination item snapshot');
 }
 
+const reservationCapacityStart = lower.indexOf(
+  'create or replace function private.enforce_inventory_order_reservation_capacity_v1',
+);
+const reservationCapacityEnd = lower.indexOf(
+  'revoke all on function private.enforce_inventory_order_reservation_capacity_v1',
+  reservationCapacityStart,
+);
+const reservationCapacitySql = lower.slice(reservationCapacityStart, reservationCapacityEnd);
+if (
+  !reservationCapacitySql.includes("'order_consumption'") ||
+  !reservationCapacitySql.includes('new.quantity_delta_micros < 0') ||
+  !reservationCapacitySql.includes('coalesce(new.reserved_delta_micros, 0) = 0')
+) {
+  throw new Error(
+    'canonical capacity fence must serialize legacy zero-reservation ORDER_CONSUMPTION',
+  );
+}
+
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
 if (beginStocktake < 0) {
   throw new Error('stocktake must persist a stable DRAFT snapshot before physical counting');
@@ -388,6 +406,48 @@ psql(
      end $reservation_fence_assertion$;`,
   ],
   'Canonical reservation fence balance assertion',
+);
+
+const legacyConsumptionMovementId = '74000000-0000-4000-8000-000000000001';
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '${legacyConsumptionMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_CONSUMPTION', -1000000, 0, '${workerId}',
+       'legacy-device:competing-placement', timestamptz '2026-09-19 02:00:02+00'
+     );`,
+  ],
+  'Legacy zero-reservation placement capacity fence',
+  'TUX_INVENTORY_INSUFFICIENT_STOCK',
+);
+
+psql(
+  [
+    '-c',
+    `do $legacy_consumption_fence_assertion$
+     declare
+       v_available bigint;
+     begin
+       if exists (
+         select 1 from public.inventory_movements
+         where id = '${legacyConsumptionMovementId}'
+       ) then
+         raise exception 'rejected legacy consumption was persisted';
+       end if;
+       select b.available_micros into v_available
+       from private.inventory_balance_v1('${shopId}', '${itemId}') b;
+       if v_available <> 500000 then
+         raise exception 'legacy consumption fence changed canonical availability: %', v_available;
+       end if;
+     end $legacy_consumption_fence_assertion$;`,
+  ],
+  'Legacy placement rejection balance assertion',
 );
 
 console.log('Admin inventory ledger static and PostgreSQL compatibility invariants passed.');
