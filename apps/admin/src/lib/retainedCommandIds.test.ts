@@ -52,19 +52,19 @@ describe('retained Admin command IDs', () => {
     const ids = ['command-1', 'command-2', 'command-3'];
     const createId = () => ids.shift() ?? 'unexpected-command';
 
-    const firstLifetime = createRetainedCommandIds(createId);
+    const firstLifetime = createRetainedCommandIds('employee-a', createId);
     expect(firstLifetime.forIntent('inventory.adjust', { shopId: 'shop-1', quantity: 3 })).toBe(
       'command-1',
     );
 
-    const reloadedLifetime = createRetainedCommandIds(createId);
+    const reloadedLifetime = createRetainedCommandIds('employee-a', createId);
     expect(reloadedLifetime.forIntent('inventory.adjust', { quantity: 3, shopId: 'shop-1' })).toBe(
       'command-1',
     );
 
     reloadedLifetime.complete('inventory.adjust', { shopId: 'shop-1', quantity: 3 });
 
-    const nextIntentLifetime = createRetainedCommandIds(createId);
+    const nextIntentLifetime = createRetainedCommandIds('employee-a', createId);
     expect(
       nextIntentLifetime.forIntent('inventory.adjust', { shopId: 'shop-1', quantity: 3 }),
     ).toBe('command-2');
