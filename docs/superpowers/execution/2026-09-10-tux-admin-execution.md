@@ -394,3 +394,30 @@ Production promotion remains deliberately separate:
 - Canonical Supabase project `awpdcsayuwbsruwvaosg` remains synchronized only through Plan 3 migration `20260918175515 admin_plan3_review_round13_hardening`; Plan 4 migrations `20260910130000`, `20260910140000`, and `20260910150000` have not been applied to production.
 - Admin Vercel production remains deployment `dpl_CZfC9PzpWi2PzdKadfLkGyGc5uuA` from `main` commit `b1ddf033c0401286af5f2878d9130d339f99aac8`; no Plan 4 production deployment was performed.
 - PR #92 remains draft until the explicit production-promotion/review checkpoint. This ledger mutation changes the PR head, so exact-head CI must be re-verified before any ready-for-review, merge, Supabase migration, or Admin production deployment action.
+
+
+## Plan 4 final review hardening closeout — 2026-09-20
+
+After Tasks 1–5 reached implementation completion, fresh PR #92 Codex review rounds identified material whole-branch concurrency, convergence, idempotency, reporting, and valuation gaps. Each accepted finding was handled with RED→GREEN evidence before implementation and then re-run through the permanent Plan 4 and root gates.
+
+The final review-hardening pass closed these six findings:
+
+- Canonical multi-device reservation rejection is now surfaced and reconciled locally instead of retrying forever. The canonical ledger rejects the losing reservation under the per-item advisory lock; `operations-sync` maps `TUX_INVENTORY_INSUFFICIENT_STOCK` to permanent HTTP 422; `OutboxSyncService` transactionally quarantines the rejected `ORDER_PLACED` stream, appends local `ORDER_RESERVATION_RELEASE` movements, cancels the still-ACTIVE local order with an explicit sync-conflict audit record, and quarantines dependent lifecycle events.
+- Admin mutation command IDs now survive reload/revisit recovery. Stable normalized intent keys are persisted in browser local storage and recovered by a new hook/page lifetime; an authoritative response clears the durable entry. Storage failure degrades to the existing in-memory retention rather than weakening the server idempotency contract.
+- Inventory-intelligence movement paging no longer assumes the requested 10,000-row limit equals the effective PostgREST row cap. The reader advances by the actual returned row count and continues until an empty page; the regression uses 1,250 rows behind an effective 1,000-row cap.
+- Order-status reads for actual-vs-theoretical reporting are bounded to 100 IDs per request and paginated within each batch, avoiding unbounded `in.(...)` URLs and capped-response truncation.
+- Canonical `ORDER_CONSUMPTION` cost is bound at PostgreSQL ingestion under the per-item inventory lock. A stale device-supplied cost can no longer become immutable historical COGS; replay preserves the already-stored canonical snapshot. The PostgreSQL regression sends stale cost 111 against canonical cost 777 and verifies 777 is stored.
+- Replenishment-policy updates use an observed-version compare-and-swap predicate. A concurrent writer that advances the row version causes the guarded PATCH to affect zero rows and returns `inventory_replenishment_conflict` instead of silently overwriting another Admin session.
+
+Additional review hardening completed before this final pass includes canonical Admin→Operations inventory convergence, authoritative server-side balances, stable stocktake boundaries, purchase-unit conversion snapshots, weighted purchase-return revaluation with explicit purchase-price variance, SQLite convergence without unsynchronized order/day/worker FK dependencies, and service-role/JWT deployment registration for the Operations inventory feed.
+
+Exact pre-ledger review-hardened code head `3f235e62e4768f361859d2f8bc88089327a372cc` passed the permanent gates:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35517992164` — 14/14 jobs SUCCESS, including all seven dedicated final-review gates, Task 3/4/5 UI/service gates, both PostgreSQL behavior jobs, lifecycle/typecheck, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35517992152` — SUCCESS, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. Root quality passed format, lint, full unit/integration tests, Admin/WhatsApp security and architecture, typecheck, production builds, provisioning safety, migration-chain smoke, Supabase function-auth contract, Edge Function typecheck, and rendered browser E2E.
+- All other permanent Admin workflows attached to the exact code head were SUCCESS.
+- The six latest Codex review threads were answered with exact-head RED→GREEN evidence and resolved after the green gate result.
+
+Production promotion remains a distinct guarded checkpoint. This review hardening does not authorize a Supabase migration, Vercel production deployment, ready-for-review transition, or merge.
+
+This ledger commit changes the PR head. Therefore PR #92 must not move to production promotion until the ledger-inclusive exact head passes the permanent workflow set again and a fresh Codex review of that exact final head produces no valid unresolved P0/P1/P2 finding. Any valid new finding reopens TDD.
