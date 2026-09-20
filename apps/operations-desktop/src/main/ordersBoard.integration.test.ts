@@ -366,6 +366,56 @@ describe('Operations Orders Board SQLite integration', () => {
     ).toEqual(['ORDER_CANCELLED']);
   });
 
+  it('converts an active reservation into costed consumption when prepared food is cancelled', async () => {
+    const fx = await fixture();
+    const original = order({ id: 'c5000000-0000-4000-8000-000000000002', no: 8 });
+    await fx.database.transaction(async (transaction) => {
+      await transaction.orders.insert(original);
+      await transaction.inventory.putWeightedUnitCost(SHOP_ID, INVENTORY_ID, 321);
+      await transaction.inventory.appendMovement({
+        id: parseEntityId<InventoryMovementId>('75000000-0000-4000-8000-000000000008'),
+        shopId: SHOP_ID,
+        businessDayId: DAY_ID,
+        itemId: INVENTORY_ID,
+        movementType: 'ORDER_RESERVATION',
+        quantityDeltaMicros: stockQuantityMicros(0),
+        reservedDeltaMicros: stockQuantityMicros(500_000),
+        idempotencyKey: `order-reservation:${original.id}:${INVENTORY_ID}`,
+        workerId: WORKER_ID,
+        orderId: original.id,
+        createdAt: original.createdAt,
+        compensatesMovementId: null,
+      });
+    });
+
+    const result = await fx.service.cancelOrder({
+      orderId: original.id,
+      foodPrepared: true,
+      reason: 'Prepared before cancellation',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(orderLifecycle(result.value).cancellation).toMatchObject({
+      foodPrepared: true,
+      stockRestored: false,
+    });
+    const movements = await fx.database.transaction((transaction) =>
+      transaction.inventory.listMovementsForOrder(original.id),
+    );
+    expect(movements.some((movement) => movement.movementType === 'ORDER_RESERVATION_RELEASE')).toBe(
+      false,
+    );
+    expect(movements).toContainEqual(
+      expect.objectContaining({
+        movementType: 'ORDER_CONSUMPTION',
+        quantityDeltaMicros: -500_000,
+        reservedDeltaMicros: -500_000,
+        unitCostMinor: 321,
+      }),
+    );
+  });
+
   it('cancels prepared order without restoring inventory', async () => {
     const fx = await fixture();
     const original = order({ id: 'c5000000-0000-4000-8000-000000000001', no: 5 });
