@@ -442,9 +442,7 @@ describe('inventory intelligence purchasing integration', () => {
     );
 
     expect(result.marginAlerts).toHaveLength(1_250);
-    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(
-      true,
-    );
+    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(true);
     expect(productQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 

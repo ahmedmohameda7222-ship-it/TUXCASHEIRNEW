@@ -150,10 +150,7 @@ async function loadReplenishmentRows(
   }
 }
 
-async function loadProductRows(
-  client: AdminSupabaseClient,
-  shopId: string,
-): Promise<ProductRow[]> {
+async function loadProductRows(client: AdminSupabaseClient, shopId: string): Promise<ProductRow[]> {
   const rows: ProductRow[] = [];
   let offset = 0;
   for (;;) {
