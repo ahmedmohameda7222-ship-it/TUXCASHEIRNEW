@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminInventoryItem } from '@tux/admin-contracts';
 import type { AdminSupabaseClient } from '../supabaseAdmin';
-import { loadInventoryIntelligence } from './intelligenceService';
+import { loadInventoryIntelligence, updateReplenishmentPolicy } from './intelligenceService';
 
 const item: AdminInventoryItem = {
   id: 'item-1',
@@ -170,4 +170,105 @@ describe('inventory intelligence purchasing integration', () => {
     });
     expect(select.mock.calls.filter(([table]) => table === 'inventory_movements')).toHaveLength(2);
   });
+  it('continues paging when PostgREST returns fewer rows than the requested limit', async () => {
+    const allMovements = Array.from({ length: 1_250 }, (_, index) => ({
+      inventory_item_id: 'item-1',
+      movement_type: 'WASTE',
+      quantity_delta_micros: -1,
+      order_id: null,
+      index,
+    }));
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_movements') {
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        const effectiveCap = Math.min(requested, 1_000);
+        return allMovements.slice(offset, offset + effectiveCap);
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.variances[0]).toMatchObject({
+      inventoryItemId: 'item-1',
+      actualUsageMicros: 1_250,
+    });
+  });
+
+  it('batches order-status lookups instead of creating one unbounded in-list request', async () => {
+    const movements = Array.from({ length: 250 }, (_, index) => ({
+      inventory_item_id: 'item-1',
+      movement_type: 'ORDER_CONSUMPTION',
+      quantity_delta_micros: -1,
+      order_id: `order-${index.toString().padStart(3, '0')}`,
+    }));
+    const orderQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_movements') {
+        return Number(query?.get('offset') ?? '0') === 0 ? movements : [];
+      }
+      if (table === 'orders') {
+        const ids = (query?.get('id') ?? '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+        if (ids.length > 100) throw new Error('order status request too large');
+        orderQueries.push(query!);
+        return ids.filter(Boolean).map((id) => ({ id, status: 'DONE' }));
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    await expect(
+      loadInventoryIntelligence(
+        { select } as unknown as AdminSupabaseClient,
+        'shop-a',
+        [item],
+        Date.parse('2026-09-19T06:00:00.000Z'),
+      ),
+    ).resolves.toBeDefined();
+
+    expect(orderQueries.length).toBeGreaterThan(1);
+  });
+
+  it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
+    const update = vi.fn(async (_table: string, _query: URLSearchParams) => []);
+    const client = {
+      select: vi.fn(async () => [{ version: 4 }]),
+      update,
+      insert: vi.fn(),
+    } as unknown as AdminSupabaseClient;
+
+    await expect(
+      updateReplenishmentPolicy(client, {
+        employeeId: 'employee-1',
+        shopId: 'shop-a',
+        inventoryItemId: 'item-1',
+        parLevelMicros: 10_000,
+        reorderPointMicros: 5_000,
+        preferredPurchaseUnit: 'case',
+        leadTimeDays: 2,
+        minimumOrderMicros: null,
+        orderMultipleMicros: null,
+      }),
+    ).rejects.toThrow(/inventory_replenishment_conflict/);
+
+    const query = update.mock.calls[0]?.[1];
+    expect(query?.get('version')).toBe('eq.4');
+  });
+
 });
