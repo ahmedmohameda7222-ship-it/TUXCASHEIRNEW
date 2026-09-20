@@ -102,8 +102,7 @@ async function reconcileRejectedOrderPlacement(
   if (order === null) return null;
 
   if (order.status === 'DONE') {
-    const detail =
-      `Order ${order.displayOrderNo} is already DONE locally after canonical inventory rejection; manual reconciliation required.`;
+    const detail = `Order ${order.displayOrderNo} is already DONE locally after canonical inventory rejection; manual reconciliation required.`;
     await transaction.audit.append({
       id: newEntityId<AuditEventId>(),
       shopId: order.shopId,
