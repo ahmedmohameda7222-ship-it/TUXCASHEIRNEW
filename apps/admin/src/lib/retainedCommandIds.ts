@@ -13,8 +13,8 @@ function stableFingerprint(value: unknown): string {
   return encoded === undefined ? String(value) : encoded;
 }
 
-function retainedKey(scope: string, intent: unknown): string {
-  return `${scope}\u0000${stableFingerprint(intent)}`;
+function retainedKey(namespace: string, scope: string, intent: unknown): string {
+  return `${namespace}\u0000${scope}\u0000${stableFingerprint(intent)}`;
 }
 
 function storageKey(key: string): string {
@@ -57,13 +57,17 @@ function clearCommandId(storage: Storage | null, key: string): void {
   }
 }
 
-export function createRetainedCommandIds(createId: () => string = () => crypto.randomUUID()) {
+export function createRetainedCommandIds(
+  namespace: string,
+  createId: () => string = () => crypto.randomUUID(),
+) {
+  if (namespace.trim().length === 0) throw new Error('retained_command_namespace_required');
   const retained = new Map<string, string>();
   const storage = durableStorage();
 
   return {
     forIntent(scope: string, intent: unknown): string {
-      const key = retainedKey(scope, intent);
+      const key = retainedKey(namespace, scope, intent);
       const existing = retained.get(key) ?? storedCommandId(storage, key);
       if (existing !== null && existing !== undefined) {
         retained.set(key, existing);
@@ -75,7 +79,7 @@ export function createRetainedCommandIds(createId: () => string = () => crypto.r
       return commandId;
     },
     complete(scope: string, intent: unknown): void {
-      const key = retainedKey(scope, intent);
+      const key = retainedKey(namespace, scope, intent);
       retained.delete(key);
       clearCommandId(storage, key);
     },
