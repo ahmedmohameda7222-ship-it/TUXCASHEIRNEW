@@ -357,6 +357,24 @@ create trigger inventory_movements_reservation_capacity
 before insert on public.inventory_movements
 for each row execute function private.enforce_inventory_order_reservation_capacity_v1();
 
+create or replace function private.enforce_inventory_movement_immutability_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $movement_immutability$
+begin
+  raise exception 'TUX_INVENTORY_MOVEMENT_IMMUTABLE';
+end;
+$movement_immutability$;
+
+revoke all on function private.enforce_inventory_movement_immutability_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_immutable
+before update on public.inventory_movements
+for each row execute function private.enforce_inventory_movement_immutability_v1();
+
 create or replace function private.bind_order_consumption_cost_v1()
 returns trigger
 language plpgsql
@@ -1457,6 +1475,41 @@ begin
   ) then
     return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
   end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) submitted(value)
+    group by submitted.value ->> 'inventoryItemId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+  end if;
+
+  begin
+    if exists (
+      (
+        select l.inventory_item_id
+        from public.stocktake_lines l
+        where l.stocktake_id = v_stocktake.id
+        except
+        select (submitted.value ->> 'inventoryItemId')::uuid
+        from jsonb_array_elements(p_lines) submitted(value)
+      )
+    ) or exists (
+      (
+        select (submitted.value ->> 'inventoryItemId')::uuid
+        from jsonb_array_elements(p_lines) submitted(value)
+        except
+        select l.inventory_item_id
+        from public.stocktake_lines l
+        where l.stocktake_id = v_stocktake.id
+      )
+    ) then
+      return jsonb_build_object('ok', false, 'code', 'stocktake_line_set_mismatch');
+    end if;
+  exception when others then
+    return jsonb_build_object('ok', false, 'code', 'invalid_stocktake_line');
+  end;
 
   for v_line in
     select value from jsonb_array_elements(p_lines)
