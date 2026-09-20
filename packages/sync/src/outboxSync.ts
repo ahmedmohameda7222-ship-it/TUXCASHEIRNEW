@@ -88,18 +88,42 @@ async function reconcileRejectedOrderPlacement(
   transaction: OperationsTransaction,
   event: OutboxEvent,
   failedAt: Instant,
-): Promise<void> {
-  if (event.aggregateType !== 'ORDER' || event.eventType !== 'ORDER_PLACED') return;
+): Promise<string | null> {
+  if (event.aggregateType !== 'ORDER' || event.eventType !== 'ORDER_PLACED') return null;
 
   let orderId: OrderId;
   try {
     orderId = parseEntityId<OrderId>(event.aggregateId);
   } catch {
-    return;
+    return null;
   }
 
   const order = await transaction.orders.getById(orderId);
-  if (order === null || order.status !== 'ACTIVE') return;
+  if (order === null) return null;
+
+  if (order.status === 'DONE') {
+    const detail =
+      `Order ${order.displayOrderNo} is already DONE locally after canonical inventory rejection; manual reconciliation required.`;
+    await transaction.audit.append({
+      id: newEntityId<AuditEventId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      aggregateType: 'ORDER',
+      aggregateId: order.id,
+      eventType: 'ORDER_SYNC_CONFLICT',
+      workerId: order.operatorWorkerId,
+      createdAt: failedAt,
+      details: {
+        syncConflict: 'inventory_reservation_rejected_after_fulfillment',
+        localStatus: order.status,
+        manualReconciliationRequired: true,
+        rejectedOutboxEventId: event.id,
+      },
+    });
+    return detail;
+  }
+
+  if (order.status !== 'ACTIVE') return null;
 
   const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
   const reservationByItem = new Map<InventoryMovement['itemId'], number>();
@@ -154,6 +178,7 @@ async function reconcileRejectedOrderPlacement(
       rejectedOutboxEventId: event.id,
     },
   });
+  return null;
 }
 
 export class OutboxSyncService {
@@ -215,18 +240,20 @@ export class OutboxSyncService {
         const lastError = normalizedError(error);
         const failedAt = this.#runtime.now();
         if (failureKind(error) === 'PERMANENT') {
+          let permanentError = lastError;
           dependencyBlocked += await this.#database.transaction(async (transaction) => {
-            await transaction.outbox.quarantine(event.id, failedAt, lastError);
             if (isCanonicalReservationRejection(error)) {
-              await reconcileRejectedOrderPlacement(transaction, event, failedAt);
+              permanentError =
+                (await reconcileRejectedOrderPlacement(transaction, event, failedAt)) ?? lastError;
             }
-            return transaction.outbox.quarantineDependents(event, failedAt, lastError);
+            await transaction.outbox.quarantine(event.id, failedAt, permanentError);
+            return transaction.outbox.quarantineDependents(event, failedAt, permanentError);
           });
           if (event.aggregateRevision !== null) {
             blockedAggregateRevisions.set(aggregateKey, event.aggregateRevision);
           }
           quarantined += 1;
-          lastPermanentError = lastError;
+          lastPermanentError = permanentError;
           continue;
         }
 
