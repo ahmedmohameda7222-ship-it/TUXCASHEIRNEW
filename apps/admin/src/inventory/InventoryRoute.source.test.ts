@@ -109,7 +109,9 @@ describe('Admin inventory route', () => {
 
     expect(rows).toHaveLength(1_250);
     expect(
-      rpc.mock.calls.map(([, , query]) => (query as URLSearchParams | undefined)?.get('offset')),
+      rpc.mock.calls.map(([, , query]) =>
+        (query as URLSearchParams | undefined)?.get('offset'),
+      ),
     ).toEqual(['0', '1000', '1250']);
   });
 
@@ -125,10 +127,7 @@ describe('Admin inventory route', () => {
       return costs.slice(offset, offset + Math.min(requested, 1_000));
     });
 
-    const rows = await loadInventoryCostRows(
-      { select } as unknown as AdminSupabaseClient,
-      'shop-a',
-    );
+    const rows = await loadInventoryCostRows({ select } as unknown as AdminSupabaseClient, 'shop-a');
 
     expect(rows).toHaveLength(1_250);
     expect(
