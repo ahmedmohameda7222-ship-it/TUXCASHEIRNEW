@@ -14,6 +14,7 @@ const inventoryMigration = fs.readFileSync(
   'supabase/migrations/20260910130000_admin_inventory_ledger.sql',
   'utf8',
 );
+const operationsSync = fs.readFileSync('supabase/functions/operations-sync/index.ts', 'utf8');
 
 for (const movementType of [
   'ORDER_RESERVATION',
@@ -113,6 +114,14 @@ if (!browserAutomaticSync.includes('InventoryConvergenceService')) {
 }
 if (!desktopAutomaticSync.includes('InventoryConvergenceService')) {
   throw new Error('desktop Operations automatic sync must pull canonical inventory changes');
+}
+if (
+  !operationsSync.includes('TUX_INVENTORY_INSUFFICIENT_STOCK') ||
+  !operationsSync.includes("jsonResponse(422, { error: 'inventory_reservation_rejected' })")
+) {
+  throw new Error(
+    'operations-sync must classify canonical reservation rejection as a permanent conflict',
+  );
 }
 
 console.log('Admin order inventory lifecycle source invariants passed.');
