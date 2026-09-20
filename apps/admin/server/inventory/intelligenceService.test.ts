@@ -251,6 +251,55 @@ describe('inventory intelligence purchasing integration', () => {
     expect(orderQueries.length).toBeGreaterThan(1);
   });
 
+  it('pages open purchase orders and batches their lines under PostgREST caps', async () => {
+    const purchaseOrders = Array.from({ length: 1_250 }, (_, index) => ({
+      id: `po-${index.toString().padStart(4, '0')}`,
+      status: 'ORDERED',
+    }));
+    const lineQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'purchase_orders') {
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return purchaseOrders.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'purchase_order_lines') {
+        const ids = (query?.get('purchase_order_id') ?? '')
+          .replace(/^in\.\(/, '')
+          .replace(/\)$/, '')
+          .split(',')
+          .filter(Boolean);
+        if (ids.length > 100) throw new Error('purchase order line request too large');
+        lineQueries.push(query!);
+        const offset = Number(query?.get('offset') ?? '0');
+        const rows = ids.map((id) => ({
+          purchase_order_id: id,
+          inventory_item_id: 'item-1',
+          ordered_base_micros: 1,
+          received_base_micros: 0,
+        }));
+        return rows.slice(offset, offset + 100);
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'inventory_movements') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.reorderSuggestions[0]?.incomingMicros).toBe(1_250);
+    expect(lineQueries.length).toBeGreaterThan(12);
+  });
+
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
     const update = vi.fn(async (table: string, query: URLSearchParams) => {
       void table;
