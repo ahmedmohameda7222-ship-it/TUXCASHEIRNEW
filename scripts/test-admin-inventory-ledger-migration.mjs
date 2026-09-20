@@ -94,6 +94,28 @@ for (const fn of [
 }
 
 
+const transferLineDefinition = lower.slice(
+  lower.indexOf('create table public.stock_transfer_lines'),
+  lower.indexOf('alter table public.inventory_movement_feed'),
+);
+if (!transferLineDefinition.includes('destination_inventory_item_id')) {
+  throw new Error('transfer lines must snapshot the destination inventory item at send time');
+}
+const sendTransfer = lower.slice(
+  lower.indexOf('create or replace function public.send_stock_transfer_v1'),
+  lower.indexOf('create or replace function public.receive_stock_transfer_v1'),
+);
+if (!sendTransfer.includes('destination_inventory_item_id')) {
+  throw new Error('send_stock_transfer_v1 must persist the resolved destination inventory item');
+}
+const receiveTransfer = lower.slice(
+  lower.indexOf('create or replace function public.receive_stock_transfer_v1'),
+  lower.indexOf('revoke all on function public.reserve_inventory_for_order_v1'),
+);
+if (!receiveTransfer.includes('v_source_line.destination_inventory_item_id')) {
+  throw new Error('receive_stock_transfer_v1 must use the immutable destination item snapshot');
+}
+
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
 if (beginStocktake < 0) {
   throw new Error('stocktake must persist a stable DRAFT snapshot before physical counting');
