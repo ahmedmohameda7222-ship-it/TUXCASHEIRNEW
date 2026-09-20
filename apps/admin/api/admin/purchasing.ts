@@ -274,36 +274,36 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
       const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows] =
         await Promise.all([
-        client.select<SupplierRow[]>(
-          'suppliers',
-          new URLSearchParams({
-            select: 'id,business_id,name,contact_name,phone,email,active',
-            business_id: `eq.${businessId}`,
-            order: 'name.asc,id.asc',
-          }),
-        ),
-        client.select<PurchaseOrderRow[]>(
-          'purchase_orders',
-          new URLSearchParams({
-            select:
-              'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
-            business_id: `eq.${businessId}`,
-            shop_id: `eq.${shopId}`,
-            order: 'created_at.desc,id.desc',
-            limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
-          }),
-        ),
-        loadActionablePurchaseOrders(client, businessId, shopId),
-        client.select<InventoryItemRow[]>(
-          'inventory_items',
-          new URLSearchParams({
-            select: 'id,name,unit_label,active',
-            shop_id: `eq.${shopId}`,
-            active: 'eq.true',
-            order: 'name.asc,id.asc',
-          }),
-        ),
-      ]);
+          client.select<SupplierRow[]>(
+            'suppliers',
+            new URLSearchParams({
+              select: 'id,business_id,name,contact_name,phone,email,active',
+              business_id: `eq.${businessId}`,
+              order: 'name.asc,id.asc',
+            }),
+          ),
+          client.select<PurchaseOrderRow[]>(
+            'purchase_orders',
+            new URLSearchParams({
+              select:
+                'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
+              business_id: `eq.${businessId}`,
+              shop_id: `eq.${shopId}`,
+              order: 'created_at.desc,id.desc',
+              limit: String(PURCHASE_ORDER_HISTORY_LIMIT),
+            }),
+          ),
+          loadActionablePurchaseOrders(client, businessId, shopId),
+          client.select<InventoryItemRow[]>(
+            'inventory_items',
+            new URLSearchParams({
+              select: 'id,name,unit_label,active',
+              shop_id: `eq.${shopId}`,
+              active: 'eq.true',
+              order: 'name.asc,id.asc',
+            }),
+          ),
+        ]);
 
       const purchaseOrdersById = new Map<string, PurchaseOrderRow>();
       for (const row of [...recentPurchaseOrderRows, ...actionablePurchaseOrderRows]) {
