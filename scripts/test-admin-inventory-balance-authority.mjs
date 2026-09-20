@@ -9,7 +9,10 @@ const migration = fs.readFileSync(
 if (!migration.includes('create or replace function public.read_admin_inventory_balances_v1')) {
   throw new Error('canonical full-ledger balance RPC is missing');
 }
-if (!api.includes("client.rpc<BalanceRow[]>('read_admin_inventory_balances_v1'")) {
+if (
+  !api.includes('export async function loadInventoryBalanceRows') ||
+  !api.includes("'read_admin_inventory_balances_v1'")
+) {
   throw new Error('Admin inventory workspace must read current balances from the canonical RPC');
 }
 if (!api.includes('const balances = new Map(') || !api.includes('const balance = balances.get(row.id)')) {
