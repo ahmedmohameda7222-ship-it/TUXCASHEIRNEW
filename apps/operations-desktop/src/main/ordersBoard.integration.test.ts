@@ -375,9 +375,7 @@ describe('Operations Orders Board SQLite integration', () => {
         await transaction.orders.insert(original);
         await transaction.inventory.putWeightedUnitCost(SHOP_ID, INVENTORY_ID, 321);
         await transaction.inventory.appendMovement({
-          id: parseEntityId<InventoryMovementId>(
-            '75000000-0000-4000-8000-000000000008',
-          ),
+          id: parseEntityId<InventoryMovementId>('75000000-0000-4000-8000-000000000008'),
           shopId: SHOP_ID,
           businessDayId: DAY_ID,
           itemId: INVENTORY_ID,
