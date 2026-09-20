@@ -214,6 +214,7 @@ const PURCHASE_ORDER_PAGE_SIZE = 500;
 const PURCHASE_ORDER_LINE_BATCH_SIZE = 100;
 const PURCHASE_ORDER_LINE_PAGE_SIZE = 10_000;
 const PURCHASABLE_ITEM_PAGE_SIZE = 10_000;
+const SUPPLIER_PAGE_SIZE = 10_000;
 
 async function loadActionablePurchaseOrders(
   client: AdminSupabaseClient,
@@ -233,6 +234,29 @@ async function loadActionablePurchaseOrders(
         status: 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)',
         order: 'created_at.desc,id.desc',
         limit: String(PURCHASE_ORDER_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadSupplierRows(
+  client: AdminSupabaseClient,
+  businessId: string,
+): Promise<SupplierRow[]> {
+  const rows: SupplierRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<SupplierRow[]>(
+      'suppliers',
+      new URLSearchParams({
+        select: 'id,business_id,name,contact_name,phone,email,active',
+        business_id: `eq.${businessId}`,
+        order: 'name.asc,id.asc',
+        limit: String(SUPPLIER_PAGE_SIZE),
         offset: String(offset),
       }),
     );
@@ -299,14 +323,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
     async loadWorkspace(shopId, businessId): Promise<AdminPurchasingWorkspace> {
       const [supplierRows, recentPurchaseOrderRows, actionablePurchaseOrderRows, inventoryRows] =
         await Promise.all([
-          client.select<SupplierRow[]>(
-            'suppliers',
-            new URLSearchParams({
-              select: 'id,business_id,name,contact_name,phone,email,active',
-              business_id: `eq.${businessId}`,
-              order: 'name.asc,id.asc',
-            }),
-          ),
+          loadSupplierRows(client, businessId),
           client.select<PurchaseOrderRow[]>(
             'purchase_orders',
             new URLSearchParams({
