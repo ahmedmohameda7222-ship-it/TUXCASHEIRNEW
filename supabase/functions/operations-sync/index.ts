@@ -97,6 +97,9 @@ Deno.serve(async (request) => {
     if (message.includes('TUX_DEPENDENCY_MISSING')) {
       return jsonResponse(425, { error: 'sync_dependency_not_ready' });
     }
+    if (message.includes('TUX_INVENTORY_INSUFFICIENT_STOCK')) {
+      return jsonResponse(422, { error: 'inventory_reservation_rejected' });
+    }
     if (message.includes('TUX_SYNC_') || message.includes('TUX_CONFIGURATION_')) {
       return jsonResponse(400, { error: 'invalid_materialization_plan' });
     }
