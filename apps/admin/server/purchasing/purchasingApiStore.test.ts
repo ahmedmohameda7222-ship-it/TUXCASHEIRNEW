@@ -31,17 +31,19 @@ describe('Admin purchasing workspace pagination', () => {
     };
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') {
-        return [
-          {
-            id: 'supplier-1',
-            business_id: 'business-1',
-            name: 'Supplier',
-            contact_name: null,
-            phone: null,
-            email: null,
-            active: true,
-          },
-        ];
+        return Number(query.get('offset') ?? '0') === 0
+          ? [
+              {
+                id: 'supplier-1',
+                business_id: 'business-1',
+                name: 'Supplier',
+                contact_name: null,
+                phone: null,
+                email: null,
+                active: true,
+              },
+            ]
+          : [];
       }
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
@@ -59,6 +61,43 @@ describe('Admin purchasing workspace pagination', () => {
     } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
 
     expect(workspace.purchaseOrders.some((order) => order.id === 'old-actionable')).toBe(true);
+  });
+
+  it('pages every supplier under PostgREST caps', async () => {
+    const suppliers = Array.from({ length: 1_250 }, (_, index) => ({
+      id: `supplier-${index}`,
+      business_id: 'business-1',
+      name: `Supplier ${String(index).padStart(4, '0')}`,
+      contact_name: null,
+      phone: null,
+      email: null,
+      active: true,
+    }));
+    const supplierQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'suppliers') {
+        supplierQueries.push(query);
+        const offset = Number(query.get('offset') ?? '0');
+        const requested = Number(query.get('limit') ?? '10000');
+        return suppliers.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'purchase_orders') return [];
+      if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_items') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
+
+    expect(workspace.suppliers).toHaveLength(1_250);
+    expect(workspace.suppliers.at(-1)?.id).toBe('supplier-1249');
+    expect(supplierQueries.map((query) => query.get('offset'))).toEqual([
+      '0',
+      '1000',
+      '1250',
+    ]);
   });
 
   it('pages every active purchasable inventory item under PostgREST caps', async () => {

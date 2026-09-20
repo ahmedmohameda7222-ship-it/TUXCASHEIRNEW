@@ -413,7 +413,13 @@ describe('inventory intelligence purchasing integration', () => {
       inventory_item_id: 'item-1',
       quantity_micros: 1_000_000,
     }));
+    const marginSettings = products.map((product) => ({
+      product_id: product.id,
+      target_food_cost_percent: 20,
+      alert_food_cost_percent: 25,
+    }));
     const productQueries: URLSearchParams[] = [];
+    const marginQueries: URLSearchParams[] = [];
     const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'products') {
         productQueries.push(query!);
@@ -426,10 +432,15 @@ describe('inventory intelligence purchasing integration', () => {
         const requested = Number(query?.get('limit') ?? '10000');
         return recipes.slice(offset, offset + Math.min(requested, 1_000));
       }
+      if (table === 'inventory_margin_settings') {
+        marginQueries.push(query!);
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return marginSettings.slice(offset, offset + Math.min(requested, 1_000));
+      }
       if (table === 'inventory_replenishment_settings') return [];
       if (table === 'inventory_movements') return [];
       if (table === 'purchase_orders') return [];
-      if (table === 'inventory_margin_settings') return [];
       if (table === 'orders') return [];
       throw new Error('unexpected table: ' + table);
     });
@@ -442,8 +453,12 @@ describe('inventory intelligence purchasing integration', () => {
     );
 
     expect(result.marginAlerts).toHaveLength(1_250);
-    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(true);
+    expect(result.marginAlerts.find((row) => row.productId === 'product-1249')).toMatchObject({
+      targetFoodCostPercent: 20,
+      alertThresholdPercent: 25,
+    });
     expect(productQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
+    expect(marginQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
