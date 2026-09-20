@@ -82,7 +82,10 @@ class MemoryDatabase implements OperationsDatabase {
             )
             .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
             .slice(0, limit),
-        markDelivered: async (id: OutboxEventId, deliveredAt: ReturnType<typeof instant>) => {
+        markDelivered: async (
+          id: OutboxEventId,
+          deliveredAt: ReturnType<typeof instant>,
+        ) => {
           const current = this.events.get(id);
           if (current === undefined) throw new Error('Missing event');
           this.events.set(id, { ...current, deliveredAt, nextAttemptAt: null, lastError: null });
@@ -116,8 +119,14 @@ class MemoryDatabase implements OperationsDatabase {
 describe('OutboxSyncService', () => {
   it('delivers oldest eligible events and marks delivered only after transport success', async () => {
     const database = new MemoryDatabase();
-    const first = outbox('21000000-0000-4000-8000-000000000001', '2026-08-18T10:00:00.000Z');
-    const second = outbox('21000000-0000-4000-8000-000000000002', '2026-08-18T10:01:00.000Z');
+    const first = outbox(
+      '21000000-0000-4000-8000-000000000001',
+      '2026-08-18T10:00:00.000Z',
+    );
+    const second = outbox(
+      '21000000-0000-4000-8000-000000000002',
+      '2026-08-18T10:01:00.000Z',
+    );
     database.events.set(second.id, second);
     database.events.set(first.id, first);
     const delivered: string[] = [];
@@ -145,8 +154,14 @@ describe('OutboxSyncService', () => {
 
   it('records retry metadata and stops the batch at the first failure', async () => {
     const database = new MemoryDatabase();
-    const first = outbox('21000000-0000-4000-8000-000000000003', '2026-08-18T10:00:00.000Z');
-    const second = outbox('21000000-0000-4000-8000-000000000004', '2026-08-18T10:01:00.000Z');
+    const first = outbox(
+      '21000000-0000-4000-8000-000000000003',
+      '2026-08-18T10:00:00.000Z',
+    );
+    const second = outbox(
+      '21000000-0000-4000-8000-000000000004',
+      '2026-08-18T10:01:00.000Z',
+    );
     database.events.set(first.id, first);
     database.events.set(second.id, second);
     const attempted: string[] = [];
@@ -193,7 +208,9 @@ describe('OutboxSyncService', () => {
       '2026-08-18T10:00:00.000Z',
     );
     const orderId = parseEntityId<OrderId>(placement.aggregateId);
-    const itemId = parseEntityId<InventoryItemId>('51000000-0000-4000-8000-000000000001');
+    const itemId = parseEntityId<InventoryItemId>(
+      '51000000-0000-4000-8000-000000000001',
+    );
     const reservationId = parseEntityId<InventoryMovementId>(
       '61000000-0000-4000-8000-000000000001',
     );
