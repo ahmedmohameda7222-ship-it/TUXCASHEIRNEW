@@ -329,6 +329,52 @@ create trigger inventory_movements_reservation_capacity
 before insert on public.inventory_movements
 for each row execute function private.enforce_inventory_order_reservation_capacity_v1();
 
+create or replace function private.bind_order_consumption_cost_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $order_consumption_cost$
+declare
+  v_unit_cost numeric(20, 6);
+begin
+  if new.movement_type is distinct from 'ORDER_CONSUMPTION' then
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE'
+     and old.movement_type = 'ORDER_CONSUMPTION'
+     and old.inventory_item_id = new.inventory_item_id then
+    new.unit_cost_minor := old.unit_cost_minor;
+    return new;
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-inventory:' || new.shop_id::text || ':' || new.inventory_item_id::text,
+      0
+    )
+  );
+
+  select c.weighted_unit_cost_minor
+    into v_unit_cost
+  from public.inventory_cost_state c
+  where c.shop_id = new.shop_id
+    and c.inventory_item_id = new.inventory_item_id;
+
+  new.unit_cost_minor := coalesce(v_unit_cost, 0);
+  return new;
+end;
+$order_consumption_cost$;
+
+revoke all on function private.bind_order_consumption_cost_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_bind_order_consumption_cost
+before insert or update of movement_type, inventory_item_id, unit_cost_minor
+on public.inventory_movements
+for each row execute function private.bind_order_consumption_cost_v1();
+
 create or replace function private.assert_inventory_item_shop_v1(
   p_shop_id uuid,
   p_inventory_item_id uuid
