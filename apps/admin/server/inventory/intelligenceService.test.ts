@@ -387,7 +387,9 @@ describe('inventory intelligence purchasing integration', () => {
       Date.parse('2026-09-19T06:00:00.000Z'),
     );
 
-    expect(result.reorderSuggestions.find((row) => row.inventoryItemId === 'item-1249')).toMatchObject({
+    expect(
+      result.reorderSuggestions.find((row) => row.inventoryItemId === 'item-1249'),
+    ).toMatchObject({
       parLevelMicros: 15_000,
       preferredSupplierId: 'supplier-1249',
       version: 1_250,
@@ -436,7 +438,9 @@ describe('inventory intelligence purchasing integration', () => {
     );
 
     expect(result.marginAlerts).toHaveLength(1_250);
-    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(true);
+    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(
+      true,
+    );
     expect(productQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 

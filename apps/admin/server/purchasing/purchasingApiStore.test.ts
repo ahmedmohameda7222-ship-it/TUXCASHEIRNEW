@@ -61,7 +61,6 @@ describe('Admin purchasing workspace pagination', () => {
     expect(workspace.purchaseOrders.some((order) => order.id === 'old-actionable')).toBe(true);
   });
 
-
   it('pages every active purchasable inventory item under PostgREST caps', async () => {
     const inventoryItems = Array.from({ length: 1_250 }, (_, index) => ({
       id: `item-${index}`,
