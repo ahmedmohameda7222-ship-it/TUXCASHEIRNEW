@@ -227,6 +227,7 @@ create table public.stock_transfer_lines (
   id uuid primary key default gen_random_uuid(),
   transfer_id uuid not null references public.stock_transfers(id) on delete restrict,
   inventory_item_id uuid not null references public.inventory_items(id) on delete restrict,
+  destination_inventory_item_id uuid not null references public.inventory_items(id) on delete restrict,
   quantity_micros bigint not null check (quantity_micros > 0),
   source_unit_cost_minor numeric(20, 6) not null default 0 check (source_unit_cost_minor >= 0),
   created_at timestamptz not null default now(),
@@ -1546,7 +1547,9 @@ declare
   v_role text;
   v_transfer_id uuid;
   v_line jsonb;
+  v_resolved_lines jsonb := '[]'::jsonb;
   v_item_id uuid;
+  v_destination_item_id uuid;
   v_quantity bigint;
   v_available bigint;
   v_unit_cost numeric(20, 6);
@@ -1595,21 +1598,28 @@ begin
       return jsonb_build_object('ok', false, 'code', 'invalid_transfer_line');
     end if;
     perform private.assert_inventory_item_shop_v1(p_source_shop_id, v_item_id);
-    if not exists (
-      select 1
-      from public.inventory_items destination_item
-      join public.inventory_items source_item
-        on source_item.id = v_item_id
-      where destination_item.shop_id = p_destination_shop_id
-        and destination_item.active
-        and destination_item.name = source_item.name
-        and destination_item.unit_label = source_item.unit_label
-    ) then
+    select destination_item.id
+      into v_destination_item_id
+    from public.inventory_items destination_item
+    join public.inventory_items source_item
+      on source_item.id = v_item_id
+    where destination_item.shop_id = p_destination_shop_id
+      and destination_item.active
+      and destination_item.name = source_item.name
+      and destination_item.unit_label = source_item.unit_label
+    order by destination_item.id
+    limit 1;
+
+    if v_destination_item_id is null then
       return jsonb_build_object(
         'ok', false, 'code', 'destination_inventory_item_not_found',
         'inventoryItemId', v_item_id
       );
     end if;
+
+    v_resolved_lines := v_resolved_lines || jsonb_build_array(
+      v_line || jsonb_build_object('destinationInventoryItemId', v_destination_item_id)
+    );
 
     perform pg_advisory_xact_lock(
       hashtextextended(
@@ -1637,10 +1647,11 @@ begin
   );
 
   for v_line in
-    select value from jsonb_array_elements(p_lines)
+    select value from jsonb_array_elements(v_resolved_lines)
     order by value ->> 'inventoryItemId'
   loop
     v_item_id := (v_line ->> 'inventoryItemId')::uuid;
+    v_destination_item_id := (v_line ->> 'destinationInventoryItemId')::uuid;
     v_quantity := (v_line ->> 'quantityMicros')::bigint;
     select coalesce(c.weighted_unit_cost_minor, 0)
       into v_unit_cost
@@ -1649,9 +1660,11 @@ begin
     v_unit_cost := coalesce(v_unit_cost, 0);
 
     insert into public.stock_transfer_lines(
-      transfer_id, inventory_item_id, quantity_micros, source_unit_cost_minor
+      transfer_id, inventory_item_id, destination_inventory_item_id,
+      quantity_micros, source_unit_cost_minor
     ) values (
-      v_transfer_id, v_item_id, v_quantity, v_unit_cost
+      v_transfer_id, v_item_id, v_destination_item_id,
+      v_quantity, v_unit_cost
     );
 
     insert into public.inventory_movements(
@@ -1722,21 +1735,7 @@ begin
     where l.transfer_id = p_transfer_id
     order by l.inventory_item_id
   loop
-    select destination_item.id
-      into v_destination_item_id
-    from public.inventory_items destination_item
-    join public.inventory_items source_item
-      on source_item.id = v_source_line.inventory_item_id
-    where destination_item.shop_id = v_transfer.destination_shop_id
-      and destination_item.active
-      and destination_item.name = source_item.name
-      and destination_item.unit_label = source_item.unit_label
-    order by destination_item.id
-    limit 1;
-
-    if v_destination_item_id is null then
-      raise exception 'TUX_TRANSFER_DESTINATION_ITEM_NOT_FOUND';
-    end if;
+    v_destination_item_id := v_source_line.destination_inventory_item_id;
 
     perform pg_advisory_xact_lock(
       hashtextextended(
