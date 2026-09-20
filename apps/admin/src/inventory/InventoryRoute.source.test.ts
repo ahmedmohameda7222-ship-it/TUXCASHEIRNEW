@@ -4,7 +4,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSupabaseClient } from '../../server/supabaseAdmin';
-import { loadInventoryItemRows, loadTransferRows } from '../../api/admin/inventory';
+import {
+  loadInventoryBalanceRows,
+  loadInventoryCostRows,
+  loadInventoryItemRows,
+  loadTransferRows,
+} from '../../api/admin/inventory';
 
 describe('Admin inventory route', () => {
   it('mounts the real InventoryPage instead of the generic placeholder', async () => {
@@ -67,6 +72,60 @@ describe('Admin inventory route', () => {
     });
 
     const rows = await loadInventoryItemRows(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+    );
+
+    expect(rows).toHaveLength(1_250);
+    expect(
+      select.mock.calls.map(([, query]) => (query as URLSearchParams).get('offset')),
+    ).toEqual(['0', '1000', '1250']);
+  });
+
+  it('pages canonical balance RPC rows under the PostgREST function cap', async () => {
+    const balances = Array.from({ length: 1_250 }, (_, index) => ({
+      inventory_item_id: `item-${index}`,
+      on_hand_micros: index,
+      reserved_micros: 0,
+      available_micros: index,
+    }));
+    const rpc = vi.fn(
+      async (name: string, payload: Record<string, unknown>, query?: URLSearchParams) => {
+        if (name !== 'read_admin_inventory_balances_v1') {
+          throw new Error('unexpected rpc: ' + name);
+        }
+        expect(payload).toEqual({ p_employee_id: 'employee-a', p_shop_id: 'shop-a' });
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return balances.slice(offset, offset + Math.min(requested, 1_000));
+      },
+    );
+
+    const rows = await loadInventoryBalanceRows(
+      { rpc } as unknown as AdminSupabaseClient,
+      'employee-a',
+      'shop-a',
+    );
+
+    expect(rows).toHaveLength(1_250);
+    expect(
+      rpc.mock.calls.map(([, , query]) => (query as URLSearchParams | undefined)?.get('offset')),
+    ).toEqual(['0', '1000', '1250']);
+  });
+
+  it('pages the complete inventory cost state under PostgREST caps', async () => {
+    const costs = Array.from({ length: 1_250 }, (_, index) => ({
+      inventory_item_id: `item-${index}`,
+      weighted_unit_cost_minor: index,
+    }));
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table !== 'inventory_cost_state') throw new Error('unexpected table: ' + table);
+      const offset = Number(query.get('offset') ?? '0');
+      const requested = Number(query.get('limit') ?? '10000');
+      return costs.slice(offset, offset + Math.min(requested, 1_000));
+    });
+
+    const rows = await loadInventoryCostRows(
       { select } as unknown as AdminSupabaseClient,
       'shop-a',
     );
