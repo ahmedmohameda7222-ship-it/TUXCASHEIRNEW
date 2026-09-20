@@ -1144,7 +1144,11 @@ begin
 
     v_current_value := v_on_hand::numeric * v_current_cost;
     v_new_on_hand := v_on_hand - v_returned;
-    if v_return_value > v_current_value then
+    if v_new_on_hand <= 0 then
+      v_inventory_value_removed := v_current_value;
+      v_line_purchase_price_variance :=
+        (v_return_value - v_inventory_value_removed) / 1000000::numeric;
+    elsif v_return_value > v_current_value then
       v_inventory_value_removed := v_returned::numeric * v_current_cost;
       v_line_purchase_price_variance :=
         (v_return_value - v_inventory_value_removed) / 1000000::numeric;
