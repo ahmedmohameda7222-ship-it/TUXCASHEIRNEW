@@ -19,7 +19,7 @@ const item: AdminInventoryItem = {
 
 describe('inventory intelligence purchasing integration', () => {
   it('counts only the unreceived remainder of open purchase orders as incoming stock', async () => {
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'inventory_replenishment_settings') {
         return [
           {
@@ -36,11 +36,13 @@ describe('inventory intelligence purchasing integration', () => {
         ];
       }
       if (table === 'purchase_orders') {
-        return [
-          { id: 'po-open', status: 'PARTIALLY_RECEIVED' },
-          { id: 'po-draft', status: 'DRAFT' },
-          { id: 'po-closed', status: 'RECEIVED' },
-        ];
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [
+              { id: 'po-open', status: 'PARTIALLY_RECEIVED' },
+              { id: 'po-draft', status: 'DRAFT' },
+              { id: 'po-closed', status: 'RECEIVED' },
+            ]
+          : [];
       }
       if (table === 'purchase_order_lines') {
         return [
@@ -88,9 +90,13 @@ describe('inventory intelligence purchasing integration', () => {
   });
 
   it('never changes on-hand or available stock when a PO is merely ordered', async () => {
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'inventory_replenishment_settings') return [];
-      if (table === 'purchase_orders') return [{ id: 'po-open', status: 'ORDERED' }];
+      if (table === 'purchase_orders') {
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [{ id: 'po-open', status: 'ORDERED' }]
+          : [];
+      }
       if (table === 'purchase_order_lines') {
         return [
           {
