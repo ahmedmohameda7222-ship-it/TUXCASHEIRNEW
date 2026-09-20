@@ -9,6 +9,7 @@ export interface SyncHealthSnapshot {
     'Local only' | 'Sync pending' | 'Syncing' | 'Synced' | 'Sync retrying' | 'Sync issue';
   readonly remoteConfigured: boolean;
   readonly attentionRequired: boolean;
+  readonly detail?: string;
 }
 
 export function buildSyncHealth(input: {
@@ -48,6 +49,7 @@ export function buildSyncHealth(input: {
       label: 'Sync issue',
       remoteConfigured: true,
       attentionRequired: true,
+      ...(result.lastError === null ? {} : { detail: result.lastError }),
     };
   }
   if (result?.failed) {
