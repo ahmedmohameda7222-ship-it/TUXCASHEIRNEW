@@ -27,7 +27,14 @@ function csrfToken(session: ReturnType<typeof useAdminSession>): string {
 export function usePurchasing(shopId: string | undefined) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
-  const commandIds = useMemo(() => createRetainedCommandIds(), []);
+  const commandNamespace =
+    session.state.status === 'authenticated'
+      ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
+      : 'unauthenticated';
+  const commandIds = useMemo(
+    () => createRetainedCommandIds(commandNamespace),
+    [commandNamespace],
+  );
 
   const workspace = useQuery({
     queryKey: shopId ? queryKey(shopId) : ['admin', 'purchasing', 'no-shop'],
@@ -60,6 +67,7 @@ export function usePurchasing(shopId: string | undefined) {
     buildCommand: (retainedCommandId: string) => Record<string, unknown>,
   ): Promise<PurchasingCommandResult> {
     if (!shopId) throw new PurchasingUiError('concrete_shop_required');
+    csrfToken(session);
     const retainedIntent = { shopId, intent };
     const retainedCommandId = commandIds.forIntent(scope, retainedIntent);
     return post(buildCommand(retainedCommandId), () => commandIds.complete(scope, retainedIntent));
