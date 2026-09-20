@@ -1,5 +1,12 @@
 -- TUX Admin Plan 4 Task 5: suppliers, purchase orders, receiving, and purchase returns.
 
+create unique index if not exists inventory_unit_conversions_item_purchase_label_ci_uq
+  on public.inventory_unit_conversions(
+    inventory_item_id,
+    lower(btrim(purchase_unit_label))
+  )
+  where active;
+
 create table public.suppliers (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete restrict,
@@ -368,15 +375,15 @@ begin
       return jsonb_build_object('ok', false, 'code', 'inventory_item_not_found');
     end if;
 
-    select u.base_micros_per_purchase_unit into v_conversion
-    from public.inventory_unit_conversions u
-    where u.shop_id = p_shop_id
-      and u.inventory_item_id = v_item_id
-      and lower(u.purchase_unit_label) = lower(v_purchase_unit)
-      and u.active
-    limit 1;
-    if v_conversion is null and lower(v_purchase_unit) = lower(v_base_unit) then
+    if lower(v_purchase_unit) = lower(btrim(v_base_unit)) then
       v_conversion := 1000000;
+    else
+      select u.base_micros_per_purchase_unit into v_conversion
+      from public.inventory_unit_conversions u
+      where u.shop_id = p_shop_id
+        and u.inventory_item_id = v_item_id
+        and lower(btrim(u.purchase_unit_label)) = lower(v_purchase_unit)
+        and u.active;
     end if;
     if v_conversion is null then
       return jsonb_build_object(
@@ -411,15 +418,15 @@ begin
 
     select i.unit_label into v_base_unit
     from public.inventory_items i where i.id = v_item_id and i.shop_id = p_shop_id;
-    select u.base_micros_per_purchase_unit into v_conversion
-    from public.inventory_unit_conversions u
-    where u.shop_id = p_shop_id
-      and u.inventory_item_id = v_item_id
-      and lower(u.purchase_unit_label) = lower(v_purchase_unit)
-      and u.active
-    limit 1;
-    if v_conversion is null and lower(v_purchase_unit) = lower(v_base_unit) then
+    if lower(v_purchase_unit) = lower(btrim(v_base_unit)) then
       v_conversion := 1000000;
+    else
+      select u.base_micros_per_purchase_unit into v_conversion
+      from public.inventory_unit_conversions u
+      where u.shop_id = p_shop_id
+        and u.inventory_item_id = v_item_id
+        and lower(btrim(u.purchase_unit_label)) = lower(v_purchase_unit)
+        and u.active;
     end if;
 
     v_ordered_base :=

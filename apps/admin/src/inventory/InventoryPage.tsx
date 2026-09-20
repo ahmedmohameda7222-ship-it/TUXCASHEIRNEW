@@ -13,7 +13,15 @@ import { useInventory } from './useInventory';
 import { VarianceReport } from './VarianceReport';
 import './inventory.css';
 
-type WorkspaceMode = 'detail' | 'stocktake' | 'transfer' | 'reorder' | 'variance';
+const STOCKTAKE_BATCH_SIZE = 500;
+
+type WorkspaceMode =
+  | 'detail'
+  | 'stocktake-select'
+  | 'stocktake'
+  | 'transfer'
+  | 'reorder'
+  | 'variance';
 type ItemAction = 'adjust' | 'waste' | null;
 
 export function InventoryPage() {
@@ -38,6 +46,27 @@ export function InventoryPage() {
     () => items.find((item) => item.id === selectedItemId) ?? null,
     [items, selectedItemId],
   );
+
+  const stocktakeBatches = useMemo(() => {
+    const batches = [];
+    for (let start = 0; start < items.length; start += STOCKTAKE_BATCH_SIZE) {
+      batches.push(items.slice(start, start + STOCKTAKE_BATCH_SIZE));
+    }
+    return batches;
+  }, [items]);
+
+  const beginStocktakeBatch = (batch: typeof items) => {
+    inventory.beginStocktake.mutate(
+      batch.map((item) => item.id),
+      {
+        onSuccess: (snapshot) => {
+          setStocktakeSnapshot(snapshot);
+          setMode('stocktake');
+          setItemAction(null);
+        },
+      },
+    );
+  };
 
   if (!shopId) {
     return (
@@ -85,16 +114,12 @@ export function InventoryPage() {
               type="button"
               disabled={inventory.beginStocktake.isPending || items.length === 0}
               onClick={() => {
-                inventory.beginStocktake.mutate(
-                  items.map((item) => item.id),
-                  {
-                    onSuccess: (snapshot) => {
-                      setStocktakeSnapshot(snapshot);
-                      setMode('stocktake');
-                      setItemAction(null);
-                    },
-                  },
-                );
+                if (items.length > STOCKTAKE_BATCH_SIZE) {
+                  setMode('stocktake-select');
+                  setItemAction(null);
+                  return;
+                }
+                beginStocktakeBatch(items);
               }}
             >
               Stock count
@@ -135,7 +160,50 @@ export function InventoryPage() {
         </div>
       }
     >
-      {mode === 'reorder' ? (
+      {mode === 'stocktake-select' ? (
+        <section className="admin-inventory-workflow" aria-labelledby="inventory-stocktake-batch-title">
+          <div className="admin-inventory-workflow__header">
+            <div>
+              <p className="admin-page__eyebrow">Bounded count session</p>
+              <h2 id="inventory-stocktake-batch-title">Choose a stock count batch</h2>
+            </div>
+            <button
+              className="admin-secondary-button"
+              type="button"
+              onClick={() => setMode('detail')}
+            >
+              Back to inventory
+            </button>
+          </div>
+          <p>
+            Count up to {STOCKTAKE_BATCH_SIZE} items per frozen snapshot. Complete one batch,
+            then start the next batch from Inventory.
+          </p>
+          <div className="admin-inventory-list" aria-label="Stock count batches">
+            {stocktakeBatches.map((batch, index) => {
+              const first = batch[0];
+              const last = batch[batch.length - 1];
+              return (
+                <button
+                  className="admin-inventory-row"
+                  type="button"
+                  key={first?.id ?? index}
+                  disabled={inventory.beginStocktake.isPending}
+                  onClick={() => beginStocktakeBatch(batch)}
+                >
+                  <span>
+                    <strong>Batch {index + 1}</strong>
+                    <small>
+                      {first && last ? `${first.name} – ${last.name}` : 'Inventory items'}
+                    </small>
+                  </span>
+                  <span>{batch.length} items</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : mode === 'reorder' ? (
         <ReorderSuggestionsPage
           suggestions={workspace.intelligence.reorderSuggestions}
           canManage={canManageReplenishment}

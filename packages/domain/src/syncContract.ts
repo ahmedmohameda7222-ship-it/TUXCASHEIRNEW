@@ -990,6 +990,105 @@ function validateMovementContext(
     assertSameIdentity(movement.orderId, orderId, 'inventory movement order');
 }
 
+function reservationDelta(movement: InventoryMovement): number {
+  return movement.reservedDeltaMicros ?? 0;
+}
+
+function validatePlacementMovement(movement: InventoryMovement): void {
+  const reserved = reservationDelta(movement);
+  const validReservation =
+    movement.movementType === 'ORDER_RESERVATION' &&
+    movement.quantityDeltaMicros === 0 &&
+    reserved > 0 &&
+    movement.compensatesMovementId === null;
+  const validLegacyConsumption =
+    movement.movementType === 'ORDER_CONSUMPTION' &&
+    movement.quantityDeltaMicros < 0 &&
+    reserved === 0 &&
+    movement.compensatesMovementId === null;
+  if (!validReservation && !validLegacyConsumption) {
+    throw new TypeError(
+      'Operations sync ORDER_PLACED inventory movement violates placement lifecycle semantics.',
+    );
+  }
+}
+
+function validateTransitionMovement(
+  eventType: OrderTransitionSyncEventType,
+  transition: OrderTransitionSyncSnapshotV1,
+  movement: InventoryMovement,
+): void {
+  const reserved = reservationDelta(movement);
+  const matchedConsumption =
+    movement.movementType === 'ORDER_CONSUMPTION' &&
+    movement.quantityDeltaMicros < 0 &&
+    reserved < 0 &&
+    movement.quantityDeltaMicros === reserved &&
+    movement.compensatesMovementId === null;
+  const matchedReversal =
+    movement.movementType === 'ORDER_CONSUMPTION_REVERSAL' &&
+    movement.quantityDeltaMicros > 0 &&
+    reserved > 0 &&
+    movement.quantityDeltaMicros === reserved &&
+    movement.compensatesMovementId !== null;
+  const reservationRelease =
+    movement.movementType === 'ORDER_RESERVATION_RELEASE' &&
+    movement.quantityDeltaMicros === 0 &&
+    reserved < 0 &&
+    movement.compensatesMovementId === null;
+  const legacyRestock =
+    movement.movementType === 'CANCEL_RESTOCK' &&
+    movement.quantityDeltaMicros > 0 &&
+    reserved === 0 &&
+    movement.compensatesMovementId !== null;
+
+  const valid =
+    (eventType === 'ORDER_MARKED_DONE' && matchedConsumption) ||
+    (eventType === 'ORDER_DONE_UNDONE' && matchedReversal) ||
+    (eventType === 'ORDER_CANCELLED' &&
+      transition.foodPrepared === true &&
+      transition.stockRestored === false &&
+      matchedConsumption) ||
+    (eventType === 'ORDER_CANCELLED' &&
+      transition.foodPrepared === false &&
+      transition.stockRestored === true &&
+      (reservationRelease || legacyRestock));
+
+  if (!valid) {
+    throw new TypeError(
+      'Operations sync inventory movement does not match the order lifecycle transition.',
+    );
+  }
+}
+
+function validateGenericInventoryMovement(movement: InventoryMovement): void {
+  const reserved = reservationDelta(movement);
+  const noOrderLifecycleState = reserved === 0 && movement.orderId === null;
+  const valid =
+    noOrderLifecycleState &&
+    ((movement.movementType === 'BULK_UNIT_FINISHED' &&
+      movement.quantityDeltaMicros < 0 &&
+      movement.compensatesMovementId === null) ||
+      (movement.movementType === 'BULK_STOCK_RECEIVED' &&
+        movement.quantityDeltaMicros > 0 &&
+        movement.compensatesMovementId === null) ||
+      (movement.movementType === 'UNDO_BULK_UNIT_FINISHED' &&
+        movement.quantityDeltaMicros > 0 &&
+        movement.compensatesMovementId !== null) ||
+      (movement.movementType === 'UNDO_BULK_STOCK_RECEIVED' &&
+        movement.quantityDeltaMicros < 0 &&
+        movement.compensatesMovementId !== null) ||
+      (movement.movementType === 'ADMIN_ADJUSTMENT' &&
+        movement.quantityDeltaMicros !== 0 &&
+        movement.compensatesMovementId === null));
+
+  if (!valid) {
+    throw new TypeError(
+      'Operations sync generic inventory movement cannot carry order lifecycle reservation state.',
+    );
+  }
+}
+
 export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayloadV1 {
   const source = record(value, 'payload');
   const eventType = supportedEventType(source['eventType']);
@@ -1024,9 +1123,10 @@ export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayl
       source['inventoryMovements'],
       'ORDER_PLACED inventory movements',
     ).map(parseMovement);
-    inventoryMovements.forEach((movement) =>
-      validateMovementContext(movement, order.shopId, order.businessDayId, order.id),
-    );
+    inventoryMovements.forEach((movement) => {
+      validateMovementContext(movement, order.shopId, order.businessDayId, order.id);
+      validatePlacementMovement(movement);
+    });
     return {
       eventType,
       version: 1,
@@ -1054,9 +1154,13 @@ export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayl
       source['inventoryMovements'],
       'order transition inventory movements',
     ).map(parseMovement);
-    inventoryMovements.forEach((movement) =>
-      validateMovementContext(movement, order.shopId, order.businessDayId, order.id),
-    );
+    inventoryMovements.forEach((movement) => {
+      validateMovementContext(movement, order.shopId, order.businessDayId, order.id);
+      validateTransitionMovement(eventType, transition, movement);
+    });
+    if (eventType === 'DELIVERY_RETURNED' && inventoryMovements.length > 0) {
+      throw new TypeError('Operations sync DELIVERY_RETURNED cannot mutate inventory.');
+    }
     const deliveryFailedExpense =
       source['deliveryFailedExpense'] === null
         ? null
@@ -1107,7 +1211,9 @@ export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayl
   }
 
   if (eventType === 'INVENTORY_MOVEMENT_RECORDED') {
-    return { eventType, version: 1, movement: parseMovement(source['movement']) };
+    const movement = parseMovement(source['movement']);
+    validateGenericInventoryMovement(movement);
+    return { eventType, version: 1, movement };
   }
 
   if (eventType === 'BUSINESS_DAY_STARTED' || eventType === 'BUSINESS_DAY_CLOSED') {

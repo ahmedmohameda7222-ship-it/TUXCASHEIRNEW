@@ -298,6 +298,7 @@ set search_path = pg_catalog, public, private
 as $reservation_capacity$
 declare
   v_available bigint;
+  v_reserved bigint;
   v_required_capacity numeric(20, 0);
 begin
   if new.movement_type = 'ORDER_RESERVATION'
@@ -307,6 +308,8 @@ begin
      and coalesce(new.reserved_delta_micros, 0) = 0
      and new.quantity_delta_micros < 0 then
     v_required_capacity := -(new.quantity_delta_micros::numeric);
+  elsif coalesce(new.reserved_delta_micros, 0) < 0 then
+    v_required_capacity := null;
   else
     return new;
   end if;
@@ -318,11 +321,16 @@ begin
     )
   );
 
-  select b.available_micros
-    into v_available
+  select b.available_micros, b.reserved_micros
+    into v_available, v_reserved
   from private.inventory_balance_v1(new.shop_id, new.inventory_item_id) b;
 
-  if v_available < v_required_capacity then
+  if coalesce(new.reserved_delta_micros, 0) < 0
+     and v_reserved < -(new.reserved_delta_micros::numeric) then
+    raise exception 'TUX_INVENTORY_RESERVATION_UNDERFLOW';
+  end if;
+
+  if v_required_capacity is not null and v_available < v_required_capacity then
     raise exception 'TUX_INVENTORY_INSUFFICIENT_STOCK';
   end if;
 

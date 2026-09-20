@@ -131,7 +131,7 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-type InventoryItemRow = {
+export type InventoryItemRow = {
   id: string;
   shop_id: string;
   name: string;
@@ -191,6 +191,31 @@ const TRANSFER_PAGE_SIZE = 500;
 const TRANSFER_LINE_BATCH_SIZE = 100;
 const TRANSFER_LINE_PAGE_SIZE = 1_000;
 const TRANSFER_ITEM_BATCH_SIZE = 100;
+
+const INVENTORY_ITEM_PAGE_SIZE = 10_000;
+
+export async function loadInventoryItemRows(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<InventoryItemRow[]> {
+  const rows: InventoryItemRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<InventoryItemRow[]>(
+      'inventory_items',
+      new URLSearchParams({
+        select: 'id,shop_id,name,unit_label,tracking_mode,active',
+        shop_id: `eq.${shopId}`,
+        order: 'name.asc,id.asc',
+        limit: String(INVENTORY_ITEM_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
 
 async function loadIncomingSentTransfers(
   client: AdminSupabaseClient,
@@ -356,14 +381,7 @@ async function loadWorkspace(
 
   const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] =
     await Promise.all([
-      client.select<InventoryItemRow[]>(
-        'inventory_items',
-        new URLSearchParams({
-          select: 'id,shop_id,name,unit_label,tracking_mode,active',
-          shop_id: `eq.${shopId}`,
-          order: 'name.asc,id.asc',
-        }),
-      ),
+      loadInventoryItemRows(client, shopId),
       client.select<MovementRow[]>(
         'inventory_movements',
         new URLSearchParams({
