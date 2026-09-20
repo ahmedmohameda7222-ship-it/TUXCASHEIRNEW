@@ -421,3 +421,20 @@ Exact pre-ledger review-hardened code head `3f235e62e4768f361859d2f8bc88089327a3
 Production promotion remains a distinct guarded checkpoint. This review hardening does not authorize a Supabase migration, Vercel production deployment, ready-for-review transition, or merge.
 
 This ledger commit changes the PR head. Therefore PR #92 must not move to production promotion until the ledger-inclusive exact head passes the permanent workflow set again and a fresh Codex review of that exact final head produces no valid unresolved P0/P1/P2 finding. Any valid new finding reopens TDD.
+
+
+## Plan 4 final review follow-up — principal-scoped durable command IDs — 2026-09-20
+
+During the final exact-head review window after the prior ledger closeout, an additional targeted integrity audit found that durable Admin mutation command IDs were persisted by shop + normalized intent but not by authenticated principal. If Admin A experienced an ambiguous committed response, logged out, and Admin B later performed the same intent from the same browser, B could reuse A's retained command ID. Because canonical inventory and purchasing replay checks are scoped primarily by shop + command ID, B could receive A's idempotent replay instead of executing B's distinct authorized intent, with incorrect actor/audit semantics.
+
+TDD evidence:
+- RED head `0767ed1599d62db204aeab0d441ca11fcb3db569` added a regression requiring identical pending intent to receive distinct durable IDs for distinct employees while preserving same-employee reload recovery. The unimplemented namespace API caused the Admin typecheck to fail before the fix, proving the test was RED.
+- The fix makes `createRetainedCommandIds` require a non-empty namespace and includes it in both in-memory and durable retained keys. Inventory and Purchasing hooks bind that namespace to the authenticated `businessId:employeeId`, recreate the helper when the principal changes, and reject unauthenticated mutation attempts before creating a pending ID.
+- Same-principal reload/revisit continues to reuse an ambiguous pending command; a different authenticated principal cannot inherit it.
+
+Exact pre-ledger fixed code head `4ad0b285a6e00da22e45591208b1a845fdd718bb` passed:
+- `Admin Plan 4 Inventory Purchasing TDD` run `35519618544` — 14/14 jobs SUCCESS, including full unit/migration regression.
+- `TUX V2 CI` run `35519618573` — SUCCESS, including format, lint, full unit/integration tests, Admin/WhatsApp security, typecheck, production builds, migration-chain smoke, Edge Function checks, rendered browser E2E, all application jobs, and `Required quality gate`.
+- All other permanent Admin workflows attached to this exact head were SUCCESS.
+
+This ledger mutation changes the PR head again. Final Plan 4 review closure therefore still requires the ledger-inclusive exact head to pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding. Production Supabase/Vercel remain unchanged and are not authorized by this ledger update.
