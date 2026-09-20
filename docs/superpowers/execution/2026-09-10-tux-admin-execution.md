@@ -475,3 +475,22 @@ Exact pre-ledger fixed head `846d20fd513558ce7387a6028582f81c6d643206` passed:
 - The three review threads were answered with RED→GREEN evidence and resolved.
 
 Production promotion remains a distinct explicit checkpoint. This ledger mutation changes the PR head again, so the ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure. No merge, Supabase production migration, or Vercel production deployment is authorized by this update.
+
+## Plan 4 final review follow-up — legacy placement capacity, pending transfer reachability, and recipe paging — 2026-09-20
+
+The final Codex review of exact head `904ce81416505fd1af4a8a34f3325a68a8272071` identified three additional actionable issues. Each was captured by a regression before closure and is now fixed:
+
+- Legacy queued `ORDER_PLACED` inventory consumption can no longer bypass canonical stock capacity. The ledger trigger now treats zero-reservation `ORDER_CONSUMPTION` with a negative quantity delta as legacy placement demand, acquires the same per-shop/per-item advisory lock used by reservations, recomputes canonical available stock, and rejects insufficient capacity with `TUX_INVENTORY_INSUFFICIENT_STOCK`. RED head `bf2d4483ccaba7a5f0fd3d918a98bd730cabeaa0` failed Plan-4 `ledger-static` job `106138077818` in run `35533393946` with the expected `canonical capacity fence must serialize legacy zero-reservation ORDER_CONSUMPTION` assertion.
+- Incoming `SENT` transfers remain reachable even after they fall outside the newest-100 transfer history window. The Admin inventory workspace now loads the bounded recent history plus an independently paged destination-scoped `SENT` set, deduplicates by transfer ID, pages/batches transfer-line reads, and batches transfer inventory-item reads. The regression also covers multiple actionable pages rather than only the first page.
+- Recipe intelligence now pages the complete shop `recipe_lines` set by actual returned row count until exhaustion. The regression places 1,250 recipe rows behind an effective 1,000-row PostgREST cap and verifies the full recipe cost and page offsets, preventing truncated recipe costs from suppressing food-cost margin alerts.
+
+Exact pre-ledger fixed head `b1599025b1cf543f6ce10b4f0498660a7a4021a0` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35533800694` — 14/14 jobs SUCCESS, including `ledger-static`, `ledger-postgres`, Task 3 transfer UI/source regression, Task 4 intelligence, Task 5 purchasing, lifecycle/typecheck, both PostgreSQL behavior jobs, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35533800647` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Foundation, Catalog, Catalog Boundary, Plan 2 rounds 15/16/17, and Plan 3 permanent workflows attached to this exact head were SUCCESS.
+
+Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this review-hardening step.
+
+This ledger plus strengthened transfer regression changes the PR head. The resulting exact head must pass the permanent workflow set again before the three Codex threads are resolved and a fresh final Codex review is requested.
+
