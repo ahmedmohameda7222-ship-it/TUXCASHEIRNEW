@@ -276,6 +276,89 @@ describe('OutboxSyncService', () => {
     );
   });
 
+  it.each([
+    { status: 'RETURNED' as const, foodPrepared: null },
+    { status: 'CANCELLED' as const, foodPrepared: true },
+  ])(
+    'surfaces a $status fulfilled local order when canonical placement is rejected',
+    async ({ status, foodPrepared }) => {
+      const database = new MemoryDatabase();
+      const placement = outbox(
+        status === 'RETURNED'
+          ? '21000000-0000-4000-8000-000000000016'
+          : '21000000-0000-4000-8000-000000000017',
+        '2026-08-18T10:00:00.000Z',
+      );
+      const orderId = parseEntityId<OrderId>(placement.aggregateId);
+      database.events.set(placement.id, placement);
+      database.orders.set(orderId, {
+        id: orderId,
+        shopId: SHOP_ID,
+        businessDayId: parseEntityId('31000000-0000-4000-8000-000000000001'),
+        displayOrderNo: status === 'RETURNED' ? 16 : 17,
+        idempotencyKey: `checkout-${status.toLowerCase()}`,
+        status,
+        lifecycle: {
+          revision: 2,
+          doneAt: instant('2026-08-18T10:05:00.000Z'),
+          cancellation:
+            status === 'CANCELLED'
+              ? {
+                  at: instant('2026-08-18T10:06:00.000Z'),
+                  workerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+                  workerName: 'Worker',
+                  foodPrepared,
+                  reason: 'Cancelled after preparation',
+                  stockRestored: false,
+                }
+              : null,
+          returned:
+            status === 'RETURNED'
+              ? {
+                  at: instant('2026-08-18T10:06:00.000Z'),
+                  workerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+                  workerName: 'Worker',
+                  reason: 'Delivery returned',
+                }
+              : null,
+        },
+        operatorWorkerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+        operatorName: 'Worker',
+      } as unknown as OrderSnapshot);
+
+      const service = new OutboxSyncService(
+        database,
+        {
+          deliver: async () => {
+            throw new OutboxDeliveryError(
+              'Canonical inventory reservation rejected.',
+              'PERMANENT',
+              422,
+            );
+          },
+        },
+        { now: () => instant('2026-08-18T11:00:00.000Z') },
+      );
+
+      const result = await service.syncOnce();
+
+      expect(result.lastError).toMatch(/manual reconciliation required/i);
+      expect(database.orders.get(orderId)?.status).toBe(status);
+      expect(database.auditEvents).toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'ORDER',
+          aggregateId: orderId,
+          eventType: 'ORDER_SYNC_CONFLICT',
+          details: expect.objectContaining({
+            syncConflict: 'inventory_reservation_rejected_after_fulfillment',
+            localStatus: status,
+            manualReconciliationRequired: true,
+          }),
+        }),
+      );
+    },
+  );
+
   it('cancels an active local order and releases its reservation after canonical rejection', async () => {
     const database = new MemoryDatabase();
     const placement = outbox('21000000-0000-4000-8000-000000000005', '2026-08-18T10:00:00.000Z');

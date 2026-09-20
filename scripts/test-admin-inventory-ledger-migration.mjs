@@ -134,6 +134,13 @@ if (
   );
 }
 
+if (
+  !lower.includes('enforce_inventory_movement_immutability_v1') ||
+  !/before\s+update\s+on\s+public\.inventory_movements/.test(lower)
+) {
+  throw new Error('canonical inventory movement rows must reject post-insert rewrites');
+}
+
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
 if (beginStocktake < 0) {
   throw new Error('stocktake must persist a stable DRAFT snapshot before physical counting');
@@ -146,6 +153,12 @@ if (!/p_stocktake_id\s+uuid/.test(postStocktakeSql)) {
 }
 if (postStocktakeSql.includes('insert into public.stocktakes')) {
   throw new Error('post_stocktake_v1 must not create the stocktake snapshot at posting time');
+}
+if (
+  !postStocktakeSql.includes('having count(*) > 1') ||
+  !postStocktakeSql.includes('except')
+) {
+  throw new Error('stocktake posting must validate submitted inventory IDs as an exact set');
 }
 if (!lower.includes("status, 'draft'") && !lower.includes("'draft'")) {
   throw new Error('stocktake begin flow must retain a DRAFT state before posting');
@@ -308,6 +321,17 @@ if (legacyBefore !== legacyAfter) {
     `legacy inventory movement changed across additive migration:\nbefore: ${legacyBefore}\nafter: ${legacyAfter}`,
   );
 }
+
+psqlExpectFailure(
+  [
+    '-c',
+    `update public.inventory_movements
+     set quantity_delta_micros = quantity_delta_micros + 1
+     where id = '${movementId}';`,
+  ],
+  'Canonical inventory movement rewrite fence',
+  'TUX_INVENTORY_MOVEMENT_IMMUTABLE',
+);
 
 psql(
   [

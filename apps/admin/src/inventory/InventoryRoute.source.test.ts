@@ -148,6 +148,12 @@ describe('Admin inventory route', () => {
     expect(source).toContain("mode === 'stocktake-select'");
   });
 
+  it('excludes inactive inventory items from stocktake requests and batches', async () => {
+    const source = await readFile(resolve('apps/admin/src/inventory/InventoryPage.tsx'), 'utf8');
+    expect(source).toContain('items.filter((item) => item.active)');
+    expect(source).toContain('beginStocktakeBatch(stocktakeItems)');
+  });
+
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
     const inventorySource = await readFile(
       resolve('apps/admin/src/inventory/useInventory.ts'),

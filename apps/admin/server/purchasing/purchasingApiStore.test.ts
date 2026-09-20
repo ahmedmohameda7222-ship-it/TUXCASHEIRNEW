@@ -60,4 +60,35 @@ describe('Admin purchasing workspace pagination', () => {
 
     expect(workspace.purchaseOrders.some((order) => order.id === 'old-actionable')).toBe(true);
   });
+
+
+  it('pages every active purchasable inventory item under PostgREST caps', async () => {
+    const inventoryItems = Array.from({ length: 1_250 }, (_, index) => ({
+      id: `item-${index}`,
+      name: `Item ${String(index).padStart(4, '0')}`,
+      unit_label: 'unit',
+      active: true,
+    }));
+    const itemQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'suppliers') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'purchase_order_lines') return [];
+      if (table === 'inventory_items') {
+        itemQueries.push(query);
+        const offset = Number(query.get('offset') ?? '0');
+        const requested = Number(query.get('limit') ?? '10000');
+        return inventoryItems.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
+
+    expect(workspace.inventoryItems).toHaveLength(1_250);
+    expect(workspace.inventoryItems.at(-1)?.id).toBe('item-1249');
+    expect(itemQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
+  });
 });

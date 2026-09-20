@@ -346,6 +346,100 @@ describe('inventory intelligence purchasing integration', () => {
     expect(recipeQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
+  it('pages replenishment settings before building large-catalog reorder suggestions', async () => {
+    const items = Array.from({ length: 1_250 }, (_, index) => ({
+      ...item,
+      id: `item-${index}`,
+      name: `Item ${index}`,
+    }));
+    const settings = items.map((entry, index) => ({
+      inventory_item_id: entry.id,
+      par_level_base: 15_000,
+      reorder_point_base: 7_000,
+      preferred_supplier_id: `supplier-${index}`,
+      preferred_purchase_unit: 'case',
+      lead_time_days: 3,
+      minimum_order_quantity_base: null,
+      order_multiple_base: null,
+      version: index + 1,
+    }));
+    const queries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_replenishment_settings') {
+        queries.push(query!);
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return settings.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'inventory_movements') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      items,
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.reorderSuggestions.find((row) => row.inventoryItemId === 'item-1249')).toMatchObject({
+      parLevelMicros: 15_000,
+      preferredSupplierId: 'supplier-1249',
+      version: 1_250,
+    });
+    expect(queries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
+  });
+
+  it('pages active products before computing large-catalog margin alerts', async () => {
+    const products = Array.from({ length: 1_250 }, (_, index) => ({
+      id: `product-${index}`,
+      name: `Product ${index}`,
+      price_minor: 1_000,
+      active: true,
+    }));
+    const recipes = products.map((product) => ({
+      product_id: product.id,
+      inventory_item_id: 'item-1',
+      quantity_micros: 1_000_000,
+    }));
+    const productQueries: URLSearchParams[] = [];
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'products') {
+        productQueries.push(query!);
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return products.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'recipe_lines') {
+        const offset = Number(query?.get('offset') ?? '0');
+        const requested = Number(query?.get('limit') ?? '10000');
+        return recipes.slice(offset, offset + Math.min(requested, 1_000));
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'inventory_movements') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.marginAlerts).toHaveLength(1_250);
+    expect(result.marginAlerts.some((row) => row.productId === 'product-1249')).toBe(true);
+    expect(productQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
+  });
+
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
     const update = vi.fn(async (table: string, query: URLSearchParams) => {
       void table;
