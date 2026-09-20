@@ -93,11 +93,7 @@ describe('Admin purchasing workspace pagination', () => {
 
     expect(workspace.suppliers).toHaveLength(1_250);
     expect(workspace.suppliers.at(-1)?.id).toBe('supplier-1249');
-    expect(supplierQueries.map((query) => query.get('offset'))).toEqual([
-      '0',
-      '1000',
-      '1250',
-    ]);
+    expect(supplierQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
   it('pages every active purchasable inventory item under PostgREST caps', async () => {
