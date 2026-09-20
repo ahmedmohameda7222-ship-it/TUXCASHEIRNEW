@@ -252,7 +252,11 @@ describe('inventory intelligence purchasing integration', () => {
   });
 
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
-    const update = vi.fn(async (_table: string, _query: URLSearchParams) => []);
+    const update = vi.fn(async (table: string, query: URLSearchParams) => {
+      void table;
+      void query;
+      return [];
+    });
     const client = {
       select: vi.fn(async () => [{ version: 4 }]),
       update,
