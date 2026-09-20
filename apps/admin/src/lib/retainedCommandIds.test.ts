@@ -31,6 +31,22 @@ afterEach(() => {
 });
 
 describe('retained Admin command IDs', () => {
+  it('isolates durable pending intents between authenticated employees', () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    const ids = ['command-a', 'command-b', 'command-c'];
+    const createId = () => ids.shift() ?? 'unexpected-command';
+    const intent = { shopId: 'shop-1', quantity: 3 };
+
+    const employeeA = createRetainedCommandIds('employee-a', createId);
+    expect(employeeA.forIntent('inventory.adjust', intent)).toBe('command-a');
+
+    const employeeB = createRetainedCommandIds('employee-b', createId);
+    expect(employeeB.forIntent('inventory.adjust', intent)).toBe('command-b');
+
+    const employeeAReload = createRetainedCommandIds('employee-a', createId);
+    expect(employeeAReload.forIntent('inventory.adjust', intent)).toBe('command-a');
+  });
+
   it('survives a hook/page lifetime until an authoritative response clears the intent', () => {
     vi.stubGlobal('localStorage', memoryStorage());
     const ids = ['command-1', 'command-2', 'command-3'];
