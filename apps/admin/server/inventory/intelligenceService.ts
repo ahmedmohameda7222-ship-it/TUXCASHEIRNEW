@@ -15,6 +15,8 @@ import {
 
 const REPORT_WINDOW_DAYS = 30;
 const MOVEMENT_PAGE_SIZE = 10_000;
+const PURCHASE_ORDER_PAGE_SIZE = 10_000;
+const PURCHASE_ORDER_BATCH_SIZE = 100;
 const ORDER_STATUS_BATCH_SIZE = 100;
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
@@ -121,6 +123,57 @@ async function loadPeriodMovements(
   }
 }
 
+async function loadOpenPurchaseOrders(
+  client: AdminSupabaseClient,
+  shopId: string,
+): Promise<PurchaseOrderRow[]> {
+  const rows: PurchaseOrderRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.select<PurchaseOrderRow[]>(
+      'purchase_orders',
+      new URLSearchParams({
+        select: 'id,status',
+        shop_id: `eq.${shopId}`,
+        status: 'in.(ORDERED,PARTIALLY_RECEIVED)',
+        order: 'id.asc',
+        limit: String(PURCHASE_ORDER_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+async function loadOpenPurchaseOrderLines(
+  client: AdminSupabaseClient,
+  purchaseOrderIds: readonly string[],
+): Promise<PurchaseOrderLineRow[]> {
+  const rows: PurchaseOrderLineRow[] = [];
+  for (let start = 0; start < purchaseOrderIds.length; start += PURCHASE_ORDER_BATCH_SIZE) {
+    const batch = purchaseOrderIds.slice(start, start + PURCHASE_ORDER_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<PurchaseOrderLineRow[]>(
+        'purchase_order_lines',
+        new URLSearchParams({
+          select: 'purchase_order_id,inventory_item_id,ordered_base_micros,received_base_micros',
+          purchase_order_id: `in.(${batch.join(',')})`,
+          order: 'purchase_order_id.asc,inventory_item_id.asc',
+          limit: String(PURCHASE_ORDER_PAGE_SIZE),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+  return rows;
+}
+
 async function loadOrderStatuses(
   client: AdminSupabaseClient,
   orderIds: readonly string[],
@@ -196,15 +249,7 @@ export async function loadInventoryIntelligence(
         shop_id: `eq.${shopId}`,
       }),
     ),
-    client.select<PurchaseOrderRow[]>(
-      'purchase_orders',
-      new URLSearchParams({
-        select: 'id,status',
-        shop_id: `eq.${shopId}`,
-        status: 'in.(ORDERED,PARTIALLY_RECEIVED)',
-        order: 'id.asc',
-      }),
-    ),
+    loadOpenPurchaseOrders(client, shopId),
   ]);
 
   const orderIds = [
@@ -225,14 +270,7 @@ export async function loadInventoryIntelligence(
   const purchaseOrderLines =
     openPurchaseOrderIds.size === 0
       ? []
-      : await client.select<PurchaseOrderLineRow[]>(
-          'purchase_order_lines',
-          new URLSearchParams({
-            select: 'purchase_order_id,inventory_item_id,ordered_base_micros,received_base_micros',
-            purchase_order_id: `in.(${[...openPurchaseOrderIds].join(',')})`,
-            order: 'purchase_order_id.asc,inventory_item_id.asc',
-          }),
-        );
+      : await loadOpenPurchaseOrderLines(client, [...openPurchaseOrderIds]);
   const incomingByItem = new Map<string, number>();
   for (const line of purchaseOrderLines) {
     if (!openPurchaseOrderIds.has(line.purchase_order_id)) continue;
