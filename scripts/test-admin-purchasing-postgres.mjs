@@ -527,4 +527,54 @@ psql(
   'Purchase return price-variance assertions',
 );
 
+
+const COST_WORKER_ID = '26000000-0000-4000-8000-000000000001';
+const COST_MOVEMENT_ID = '76000000-0000-4000-8000-000000000001';
+
+psql(
+  [
+    '-c',
+    `insert into public.workers(id, shop_id, display_name, pin_hash, active)
+     values ('${COST_WORKER_ID}', '${SHOP_ID}', 'Cost Worker', 'test-hash', true)
+     on conflict (id) do nothing;
+     insert into public.inventory_cost_state(
+       shop_id, inventory_item_id, weighted_unit_cost_minor, version
+     ) values ('${SHOP_ID}', '${ITEM_ID}', 777, 1)
+     on conflict (shop_id, inventory_item_id) do update
+     set weighted_unit_cost_minor = excluded.weighted_unit_cost_minor,
+         version = public.inventory_cost_state.version + 1,
+         updated_at = now();
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, source_kind, command_id,
+       unit_cost_minor, created_at
+     ) values (
+       '${COST_MOVEMENT_ID}', '${SHOP_ID}', null, '${ITEM_ID}', 'ORDER_CONSUMPTION',
+       -1000, -1000, '${COST_WORKER_ID}', null,
+       null, 'canonical-cost-snapshot', 'OPERATIONS', 'canonical-cost-snapshot',
+       111, timestamptz '2026-09-19 03:00:00+00'
+     );`,
+  ],
+  'Canonical consumption cost fixture',
+);
+
+const canonicalConsumptionCost = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select unit_cost_minor::text
+       from public.inventory_movements
+       where id = '${COST_MOVEMENT_ID}'`,
+    ],
+    'Canonical consumption cost snapshot assertion',
+  ).trim(),
+);
+if (canonicalConsumptionCost !== 777) {
+  throw new Error(
+    `canonical ORDER_CONSUMPTION must snapshot locked cost 777, got ${canonicalConsumptionCost}`,
+  );
+}
+
 console.log('Admin purchasing PostgreSQL partial-receipt/return behavior passed.');
