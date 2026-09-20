@@ -168,7 +168,10 @@ describe('inventory intelligence purchasing integration', () => {
       inventoryItemId: 'item-1',
       actualUsageMicros: 10_100,
     });
-    expect(select.mock.calls.filter(([table]) => table === 'inventory_movements')).toHaveLength(2);
+    const movementOffsets = select.mock.calls
+      .filter(([table]) => table === 'inventory_movements')
+      .map(([, query]) => query?.get('offset'));
+    expect(movementOffsets).toEqual(['0', '10000', '10001']);
   });
   it('continues paging when PostgREST returns fewer rows than the requested limit', async () => {
     const allMovements = Array.from({ length: 1_250 }, (_, index) => ({
@@ -220,7 +223,10 @@ describe('inventory intelligence purchasing integration', () => {
         return Number(query?.get('offset') ?? '0') === 0 ? movements : [];
       }
       if (table === 'orders') {
-        const ids = (query?.get('id') ?? '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+        const ids = (query?.get('id') ?? '')
+          .replace(/^in\.\(/, '')
+          .replace(/\)$/, '')
+          .split(',');
         if (ids.length > 100) throw new Error('order status request too large');
         orderQueries.push(query!);
         return ids.filter(Boolean).map((id) => ({ id, status: 'DONE' }));
@@ -270,5 +276,4 @@ describe('inventory intelligence purchasing integration', () => {
     const query = update.mock.calls[0]?.[1];
     expect(query?.get('version')).toBe('eq.4');
   });
-
 });
