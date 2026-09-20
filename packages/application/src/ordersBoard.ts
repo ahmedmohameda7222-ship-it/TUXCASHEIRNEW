@@ -373,22 +373,38 @@ export class OperationsOrdersBoardService {
 
       if (activeReservations.length > 0) {
         for (const [itemId, reservedMicros] of activeReservations) {
-          const release: InventoryMovement = {
-            id: this.#id<InventoryMovementId>(),
-            shopId: order.shopId,
-            businessDayId: order.businessDayId,
-            itemId,
-            movementType: 'ORDER_RESERVATION_RELEASE',
-            quantityDeltaMicros: stockQuantityMicros(0),
-            reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
-            idempotencyKey: `order-reservation-release:${order.id}:${itemId}`,
-            workerId: context.operator.id,
-            orderId: order.id,
-            createdAt: now,
-            compensatesMovementId: null,
-          };
-          inventoryMovements.push(release);
-          await transaction.inventory.appendMovement(release);
+          const movement: InventoryMovement = input.foodPrepared
+            ? {
+                id: this.#id<InventoryMovementId>(),
+                shopId: order.shopId,
+                businessDayId: order.businessDayId,
+                itemId,
+                movementType: 'ORDER_CONSUMPTION',
+                quantityDeltaMicros: stockQuantityMicros(-reservedMicros),
+                reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+                idempotencyKey: `cancel-prepared-consumption:${order.id}:${itemId}`,
+                workerId: context.operator.id,
+                unitCostMinor: await transaction.inventory.getWeightedUnitCost(itemId),
+                orderId: order.id,
+                createdAt: now,
+                compensatesMovementId: null,
+              }
+            : {
+                id: this.#id<InventoryMovementId>(),
+                shopId: order.shopId,
+                businessDayId: order.businessDayId,
+                itemId,
+                movementType: 'ORDER_RESERVATION_RELEASE',
+                quantityDeltaMicros: stockQuantityMicros(0),
+                reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+                idempotencyKey: `order-reservation-release:${order.id}:${itemId}`,
+                workerId: context.operator.id,
+                orderId: order.id,
+                createdAt: now,
+                compensatesMovementId: null,
+              };
+          inventoryMovements.push(movement);
+          await transaction.inventory.appendMovement(movement);
         }
       } else if (!input.foodPrepared) {
         // Compatibility for ACTIVE orders created before reservation-at-placement was introduced.
