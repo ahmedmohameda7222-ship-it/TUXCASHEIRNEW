@@ -33,10 +33,7 @@ export function useInventory(shopId: string | undefined) {
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
       : 'unauthenticated';
-  const commandIds = useMemo(
-    () => createRetainedCommandIds(commandNamespace),
-    [commandNamespace],
-  );
+  const commandIds = useMemo(() => createRetainedCommandIds(commandNamespace), [commandNamespace]);
 
   const workspaceQuery = useQuery({
     queryKey: shopId ? inventoryQueryKey(shopId) : ['admin', 'inventory', 'no-shop'],
