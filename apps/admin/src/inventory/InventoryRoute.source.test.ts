@@ -38,10 +38,7 @@ describe('Admin inventory route', () => {
       return recent;
     });
 
-    const rows = await loadTransferRows(
-      { select } as unknown as AdminSupabaseClient,
-      'shop-a',
-    );
+    const rows = await loadTransferRows({ select } as unknown as AdminSupabaseClient, 'shop-a');
 
     expect(rows).toHaveLength(101);
     expect(rows.some((row) => row.id === 'old-incoming-sent')).toBe(true);
