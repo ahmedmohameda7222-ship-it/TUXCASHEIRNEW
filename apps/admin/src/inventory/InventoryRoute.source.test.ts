@@ -47,11 +47,7 @@ describe('Admin inventory route', () => {
     const actionableQueries = select.mock.calls
       .map(([, query]) => query)
       .filter((query) => query.get('status') === 'eq.SENT');
-    expect(actionableQueries.map((query) => query.get('offset'))).toEqual([
-      '0',
-      '500',
-      '625',
-    ]);
+    expect(actionableQueries.map((query) => query.get('offset'))).toEqual(['0', '500', '625']);
   });
 
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
