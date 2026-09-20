@@ -129,7 +129,7 @@ async function loadOrderStatuses(
   for (let start = 0; start < orderIds.length; start += ORDER_STATUS_BATCH_SIZE) {
     const batch = orderIds.slice(start, start + ORDER_STATUS_BATCH_SIZE);
     let offset = 0;
-    for (;;) {
+    while (offset < batch.length) {
       const page = await client.select<OrderStatusRow[]>(
         'orders',
         new URLSearchParams({
