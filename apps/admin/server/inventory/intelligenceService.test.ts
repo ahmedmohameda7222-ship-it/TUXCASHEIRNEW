@@ -343,11 +343,7 @@ describe('inventory intelligence purchasing integration', () => {
     );
 
     expect(result.marginAlerts[0]?.recipeCostMinor).toBe(125_000);
-    expect(recipeQueries.map((query) => query.get('offset'))).toEqual([
-      '0',
-      '1000',
-      '1250',
-    ]);
+    expect(recipeQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
   it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
