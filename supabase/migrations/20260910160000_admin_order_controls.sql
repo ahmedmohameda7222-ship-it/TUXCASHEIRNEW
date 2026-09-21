@@ -285,7 +285,7 @@ immutable
 set search_path = pg_catalog, public
 as $fingerprint$
   select encode(
-    digest(
+    extensions.digest(
       p_command_type || ':' || p_order_id::text || ':' ||
         coalesce(p_payload, '{}'::jsonb)::text,
       'sha256'
