@@ -359,6 +359,111 @@ describe('OutboxSyncService', () => {
     },
   );
 
+  it('restores uncompensated legacy consumption after canonical placement rejection', async () => {
+    const database = new MemoryDatabase();
+    const placement = outbox('21000000-0000-4000-8000-000000000018', '2026-08-18T10:00:00.000Z');
+    const orderId = parseEntityId<OrderId>(placement.aggregateId);
+    const itemId = parseEntityId<InventoryItemId>('51000000-0000-4000-8000-000000000018');
+    const consumptionId = parseEntityId<InventoryMovementId>(
+      '61000000-0000-4000-8000-000000000018',
+    );
+    const alreadyCompensatedId = parseEntityId<InventoryMovementId>(
+      '61000000-0000-4000-8000-000000000019',
+    );
+    database.events.set(placement.id, placement);
+    database.orders.set(orderId, {
+      id: orderId,
+      shopId: SHOP_ID,
+      businessDayId: parseEntityId('31000000-0000-4000-8000-000000000001'),
+      displayOrderNo: 18,
+      idempotencyKey: 'checkout-18',
+      status: 'ACTIVE',
+      lifecycle: { revision: 0, doneAt: null, cancellation: null, returned: null },
+      operatorWorkerId: parseEntityId('41000000-0000-4000-8000-000000000001'),
+      operatorName: 'Worker',
+    } as unknown as OrderSnapshot);
+    database.movements.push(
+      {
+        id: consumptionId,
+        shopId: SHOP_ID,
+        businessDayId: null,
+        itemId,
+        movementType: 'ORDER_CONSUMPTION',
+        quantityDeltaMicros: stockQuantityMicros(-2_000_000),
+        reservedDeltaMicros: stockQuantityMicros(0),
+        idempotencyKey: 'legacy-consumption-local',
+        workerId: null,
+        orderId,
+        createdAt: instant('2026-08-18T10:00:00.000Z'),
+        compensatesMovementId: null,
+      },
+      {
+        id: alreadyCompensatedId,
+        shopId: SHOP_ID,
+        businessDayId: null,
+        itemId,
+        movementType: 'ORDER_CONSUMPTION',
+        quantityDeltaMicros: stockQuantityMicros(-1_000_000),
+        reservedDeltaMicros: stockQuantityMicros(0),
+        idempotencyKey: 'legacy-consumption-already-restored',
+        workerId: null,
+        orderId,
+        createdAt: instant('2026-08-18T10:00:01.000Z'),
+        compensatesMovementId: null,
+      },
+      {
+        id: parseEntityId<InventoryMovementId>('61000000-0000-4000-8000-000000000020'),
+        shopId: SHOP_ID,
+        businessDayId: null,
+        itemId,
+        movementType: 'CANCEL_RESTOCK',
+        quantityDeltaMicros: stockQuantityMicros(1_000_000),
+        reservedDeltaMicros: stockQuantityMicros(0),
+        idempotencyKey: 'legacy-consumption-existing-restock',
+        workerId: null,
+        orderId,
+        createdAt: instant('2026-08-18T10:00:02.000Z'),
+        compensatesMovementId: alreadyCompensatedId,
+      },
+    );
+
+    const service = new OutboxSyncService(
+      database,
+      {
+        deliver: async () => {
+          throw new OutboxDeliveryError(
+            'Canonical inventory reservation rejected.',
+            'PERMANENT',
+            422,
+          );
+        },
+      },
+      { now: () => instant('2026-08-18T11:00:00.000Z') },
+    );
+
+    const result = await service.syncOnce();
+
+    expect(result).toMatchObject({ quarantined: 1, failed: 0 });
+    expect(database.orders.get(orderId)?.status).toBe('CANCELLED');
+    const restocks = database.movements.filter(
+      (movement) => movement.movementType === 'CANCEL_RESTOCK',
+    );
+    expect(restocks).toHaveLength(2);
+    expect(restocks).toContainEqual(
+      expect.objectContaining({
+        orderId,
+        itemId,
+        movementType: 'CANCEL_RESTOCK',
+        quantityDeltaMicros: 2_000_000,
+        reservedDeltaMicros: 0,
+        compensatesMovementId: consumptionId,
+      }),
+    );
+    expect(
+      restocks.filter((movement) => movement.compensatesMovementId === alreadyCompensatedId),
+    ).toHaveLength(1);
+  });
+
   it('cancels an active local order and releases its reservation after canonical rejection', async () => {
     const database = new MemoryDatabase();
     const placement = outbox('21000000-0000-4000-8000-000000000005', '2026-08-18T10:00:00.000Z');
