@@ -150,6 +150,7 @@ export function useInventory(shopId: string | undefined) {
   const updateReplenishment = useMutation({
     mutationFn: async (input: {
       inventoryItemId: string;
+      expectedVersion: number;
       parLevelMicros: number;
       reorderPointMicros: number;
       preferredPurchaseUnit: string | null;
