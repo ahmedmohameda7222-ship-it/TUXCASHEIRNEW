@@ -363,6 +363,24 @@ create trigger inventory_movements_reservation_capacity
 before insert on public.inventory_movements
 for each row execute function private.enforce_inventory_order_reservation_capacity_v1();
 
+create table private.inventory_bulk_undo_claims (
+  original_movement_id uuid primary key,
+  undo_movement_id uuid not null unique
+);
+
+revoke all on private.inventory_bulk_undo_claims
+  from public, anon, authenticated;
+
+insert into private.inventory_bulk_undo_claims(original_movement_id, undo_movement_id)
+select distinct on (original.id)
+  original.id,
+  compensation.id
+from public.inventory_movements compensation
+join public.inventory_movements original
+  on original.id = compensation.compensates_movement_id
+where original.movement_type in ('BULK_UNIT_FINISHED', 'BULK_STOCK_RECEIVED')
+order by original.id, compensation.created_at, compensation.id;
+
 create or replace function private.enforce_inventory_bulk_undo_integrity_v1()
 returns trigger
 language plpgsql
@@ -372,52 +390,67 @@ as $bulk_undo_integrity$
 declare
   v_original public.inventory_movements%rowtype;
 begin
-  if new.movement_type not in ('UNDO_BULK_UNIT_FINISHED', 'UNDO_BULK_STOCK_RECEIVED') then
+  if new.compensates_movement_id is null then
+    if new.movement_type in ('UNDO_BULK_UNIT_FINISHED', 'UNDO_BULK_STOCK_RECEIVED') then
+      raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+    end if;
     return new;
-  end if;
-
-  if new.compensates_movement_id is null
-     or coalesce(new.reserved_delta_micros, 0) <> 0
-     or new.order_id is not null then
-    raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
   end if;
 
   select m.*
     into v_original
   from public.inventory_movements m
   where m.id = new.compensates_movement_id
-    and m.shop_id = new.shop_id
   for update;
 
-  if not found
+  if not found then
+    if new.movement_type in ('UNDO_BULK_UNIT_FINISHED', 'UNDO_BULK_STOCK_RECEIVED') then
+      raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+    end if;
+    return new;
+  end if;
+
+  if v_original.movement_type not in ('BULK_UNIT_FINISHED', 'BULK_STOCK_RECEIVED') then
+    if new.movement_type in ('UNDO_BULK_UNIT_FINISHED', 'UNDO_BULK_STOCK_RECEIVED') then
+      raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+    end if;
+    return new;
+  end if;
+
+  if v_original.shop_id is distinct from new.shop_id
      or v_original.inventory_item_id is distinct from new.inventory_item_id
      or coalesce(v_original.reserved_delta_micros, 0) <> 0
+     or coalesce(new.reserved_delta_micros, 0) <> 0
      or v_original.order_id is not null
+     or new.order_id is not null
      or v_original.compensates_movement_id is not null
      or new.quantity_delta_micros::numeric <> -(v_original.quantity_delta_micros::numeric)
      or (
-       new.movement_type = 'UNDO_BULK_UNIT_FINISHED'
+       v_original.movement_type = 'BULK_UNIT_FINISHED'
        and (
-         v_original.movement_type is distinct from 'BULK_UNIT_FINISHED'
+         new.movement_type is distinct from 'UNDO_BULK_UNIT_FINISHED'
          or v_original.quantity_delta_micros >= 0
          or new.quantity_delta_micros <= 0
        )
      )
      or (
-       new.movement_type = 'UNDO_BULK_STOCK_RECEIVED'
+       v_original.movement_type = 'BULK_STOCK_RECEIVED'
        and (
-         v_original.movement_type is distinct from 'BULK_STOCK_RECEIVED'
+         new.movement_type is distinct from 'UNDO_BULK_STOCK_RECEIVED'
          or v_original.quantity_delta_micros <= 0
          or new.quantity_delta_micros >= 0
        )
-     )
-     or exists (
-       select 1
-       from public.inventory_movements compensation
-       where compensation.compensates_movement_id = v_original.id
      ) then
     raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
   end if;
+
+  begin
+    insert into private.inventory_bulk_undo_claims(original_movement_id, undo_movement_id)
+    values (v_original.id, new.id);
+  exception
+    when unique_violation then
+      raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+  end;
 
   return new;
 end;
