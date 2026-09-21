@@ -75,6 +75,7 @@ const ITEM_ID = '35000000-0000-4000-8000-000000000001';
 const SUPPLIER_ID = '45000000-0000-4000-8000-000000000001';
 const PO_ID = '55000000-0000-4000-8000-000000000001';
 const LINE_ID = '65000000-0000-4000-8000-000000000001';
+const SECOND_PO_ID = '55000000-0000-4000-8000-000000000099';
 
 psql(
   [
@@ -135,6 +136,16 @@ psql(
      ) values (
        '${LINE_ID}', '${PO_ID}', '${ITEM_ID}', 'kg',
        1000000000, 1000, 1000000, 180000, 180
+     );
+     insert into public.purchase_orders(
+       id, business_id, shop_id, supplier_id, status,
+       reference, expected_delivery_date, version,
+       created_by_employee_id, ordered_at, create_command_id, order_command_id
+     ) values (
+       '${SECOND_PO_ID}', '${BUSINESS_ID}', '${SHOP_ID}', '${SUPPLIER_ID}', 'ORDERED',
+       'PO-TEST-SECOND', date '2026-09-23', 7,
+       '${EMPLOYEE_ID}', timestamptz '2026-09-19 00:06:00+00',
+       'create-po-second', 'order-po-second'
      );`,
   ],
   'Purchasing fixture seed',
@@ -290,6 +301,29 @@ if (JSON.parse(replay).idempotentReplay !== true) {
   throw new Error(`purchase receipt replay was not idempotent: ${replay}`);
 }
 
+const reusedReceive = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.receive_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${SECOND_PO_ID}',
+         'receive-partial-1',
+         'INV-REUSED',
+         '[{"lineId":"${LINE_ID}","receivedPurchaseUnitsMicros":500,"purchaseUnitCostMinor":200000}]'::jsonb
+       )::text`,
+    ],
+    'Purchase receipt command reuse',
+  ).trim(),
+);
+if (reusedReceive.ok !== false || reusedReceive.code !== 'idempotency_conflict') {
+  throw new Error(
+    `purchase receipt command was not bound to its original PO: ${JSON.stringify(reusedReceive)}`,
+  );
+}
+
 const completeResult = psql(
   [
     '-At',
@@ -333,6 +367,50 @@ if (
   returned.idempotentReplay !== false
 ) {
   throw new Error(`unexpected purchase return result: ${returnResult}`);
+}
+
+const returnReplay = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.return_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${PO_ID}',
+         'return-1',
+         'CN-1001',
+         '[{"lineId":"${LINE_ID}","returnedPurchaseUnitsMicros":250}]'::jsonb
+       )::text`,
+    ],
+    'Purchase return replay',
+  ).trim(),
+);
+if (returnReplay.idempotentReplay !== true) {
+  throw new Error(`purchase return replay was not idempotent: ${JSON.stringify(returnReplay)}`);
+}
+
+const reusedReturn = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.return_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${SECOND_PO_ID}',
+         'return-1',
+         'CN-REUSED',
+         '[{"lineId":"${LINE_ID}","returnedPurchaseUnitsMicros":250}]'::jsonb
+       )::text`,
+    ],
+    'Purchase return command reuse',
+  ).trim(),
+);
+if (reusedReturn.ok !== false || reusedReturn.code !== 'idempotency_conflict') {
+  throw new Error(
+    `purchase return command was not bound to its original PO: ${JSON.stringify(reusedReturn)}`,
+  );
 }
 
 psql(

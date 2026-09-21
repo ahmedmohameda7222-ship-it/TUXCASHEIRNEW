@@ -116,6 +116,35 @@ if (!receiveTransfer.includes('v_source_line.destination_inventory_item_id')) {
   throw new Error('receive_stock_transfer_v1 must use the immutable destination item snapshot');
 }
 
+const sendReplayIndex = sendTransfer.indexOf("'idempotentreplay'");
+const sendFirstAuthority = sendTransfer.indexOf('admin_inventory_authority_v1');
+const sendSecondAuthority = sendTransfer.indexOf(
+  'admin_inventory_authority_v1',
+  sendFirstAuthority + 1,
+);
+if (
+  sendReplayIndex < 0 ||
+  sendFirstAuthority < 0 ||
+  sendSecondAuthority < 0 ||
+  sendFirstAuthority > sendReplayIndex ||
+  sendSecondAuthority > sendReplayIndex
+) {
+  throw new Error('transfer send replay must authorize both shops before returning success');
+}
+if (!sendTransfer.includes('idempotency_conflict')) {
+  throw new Error('transfer send replay must reject command reuse for a different destination');
+}
+
+const receiveReplayIndex = receiveTransfer.indexOf("'idempotentreplay'");
+const receiveAuthorityIndex = receiveTransfer.indexOf('admin_inventory_authority_v1');
+if (
+  receiveReplayIndex < 0 ||
+  receiveAuthorityIndex < 0 ||
+  receiveAuthorityIndex > receiveReplayIndex
+) {
+  throw new Error('transfer receive replay must authorize its destination before returning success');
+}
+
 const reservationCapacityStart = lower.indexOf(
   'create or replace function private.enforce_inventory_order_reservation_capacity_v1',
 );
