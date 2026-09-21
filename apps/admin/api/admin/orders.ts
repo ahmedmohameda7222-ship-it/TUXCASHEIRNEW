@@ -232,7 +232,7 @@ async function assertBusinessShop(
       limit: '1',
     }),
   );
-  if (rows.length !== 1) throw new AdminAuthorizationError('shop_scope_forbidden');
+  if (rows.length !== 1) throw new AdminAuthorizationError('shop_forbidden');
 }
 
 export function createOrderStore(client: AdminSupabaseClient): OrderStore {
