@@ -1594,13 +1594,6 @@ begin
     raise exception 'TUX_SYNC_PLAN_INVALID';
   end if;
 
-  if v_event_type = 'ORDER_PLACED' then
-    perform private.assert_operations_placement_inventory_requirements_v1(
-      v_shop_id,
-      p_envelope
-    );
-  end if;
-
   for v_mutation in select value from jsonb_array_elements(p_plan -> 'mutations') loop
     if v_mutation -> 'row' ? 'shop_id'
        and v_mutation #>> '{row,shop_id}' <> v_shop_id::text then
@@ -1608,6 +1601,13 @@ begin
     end if;
     perform private.apply_tux_remote_mutation(v_mutation);
   end loop;
+
+  if v_event_type = 'ORDER_PLACED' then
+    perform private.assert_operations_placement_inventory_requirements_v1(
+      v_shop_id,
+      p_envelope
+    );
+  end if;
 
   if v_event_type in ('ORDER_MARKED_DONE', 'ORDER_CANCELLED', 'DELIVERY_RETURNED') then
     begin
