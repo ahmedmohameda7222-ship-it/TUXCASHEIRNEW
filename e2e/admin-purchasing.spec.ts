@@ -27,6 +27,7 @@ async function mockPurchasing(
     startWithoutSuppliers?: boolean;
     failCommandType?: string;
     failureCode?: string;
+    failureCodesByCommand?: Readonly<Record<string, string>>;
   } = {},
 ) {
   const commands: Command[] = [];
@@ -115,11 +116,17 @@ async function mockPurchasing(
     const command = request.postDataJSON() as Command;
     commands.push(command);
 
-    if (command.type === options.failCommandType) {
+    const commandType = String(command.type);
+    const commandFailure =
+      options.failureCodesByCommand?.[commandType] ??
+      (commandType === options.failCommandType
+        ? (options.failureCode ?? 'purchasing_conflict')
+        : null);
+    if (commandFailure) {
       await route.fulfill({
         status: 409,
         contentType: 'application/json',
-        body: JSON.stringify({ error: options.failureCode ?? 'purchasing_conflict' }),
+        body: JSON.stringify({ error: commandFailure }),
       });
       return;
     }
@@ -197,6 +204,23 @@ test('purchasing surfaces ordinary mutation conflicts to the operator', async ({
 
   await page.getByRole('button', { name: 'Mark ordered' }).click();
 
+  await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
+});
+
+test('purchasing replaces an older mutation error with the most recent failure', async ({ page }) => {
+  await mockPurchasing(page, {
+    failureCodesByCommand: {
+      'supplier.create': 'supplier_name_conflict',
+      'po.order': 'stale_purchase_order_version',
+    },
+  });
+  await page.goto('/purchasing');
+
+  await page.getByLabel('Supplier name').fill('Duplicate supplier');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
+
+  await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
 
