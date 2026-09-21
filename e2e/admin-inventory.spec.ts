@@ -240,7 +240,9 @@ test('inventory surfaces ordinary mutation conflicts to the operator', async ({ 
   await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
 });
 
-test('inventory replaces an older mutation error with the most recent failure', async ({ page }) => {
+test('inventory replaces an older mutation error with the most recent failure', async ({
+  page,
+}) => {
   await mockInventory(page, {
     failureCodesByCommand: {
       adjust: 'insufficient_stock',
