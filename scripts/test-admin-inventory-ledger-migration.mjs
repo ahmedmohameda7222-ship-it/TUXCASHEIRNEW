@@ -570,6 +570,9 @@ psql(
 
 
 const configProductId = '85000000-0000-4000-8000-000000000001';
+const snapshotFutureProductId = '85000000-0000-4000-8000-000000000006';
+const snapshotModifierId = '85000000-0000-4000-8000-000000000007';
+const snapshotBeverageProductId = '85000000-0000-4000-8000-000000000008';
 const placementOrderId = '85000000-0000-4000-8000-000000000002';
 const terminalOrderId = '85000000-0000-4000-8000-000000000003';
 const terminalReservationMovementId = '85000000-0000-4000-8000-000000000004';
@@ -587,7 +590,18 @@ psql(
          "snapshot": {
            "shopId": "${shopId}",
            "version": 9001,
-           "modifiers": [],
+           "products": [
+             { "id": "${configProductId}" },
+             { "id": "${snapshotBeverageProductId}" }
+           ],
+           "modifiers": [
+             {
+               "id": "${snapshotModifierId}",
+               "standaloneProductId": null
+             }
+           ],
+           "productModifierLinks": [],
+           "comboBeverageOptions": [],
            "recipeLines": [
              {
                "shopId": "${shopId}",
@@ -712,6 +726,114 @@ psqlExpectFailure(
      );`,
   ],
   'Duplicate canonical placement reservation item',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "${placementOrderId}",
+             "items": [
+               {
+                 "productId": "${snapshotFutureProductId}",
+                 "quantity": 1,
+                 "modifiers": [],
+                 "comboBeverages": []
+               }
+             ]
+           },
+           "inventoryMovements": []
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Placement product absent from referenced configuration snapshot',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "${placementOrderId}",
+             "items": [
+               {
+                 "productId": "${configProductId}",
+                 "quantity": 2,
+                 "modifiers": [
+                   { "modifierId": "${snapshotModifierId}", "quantity": 1 }
+                 ],
+                 "comboBeverages": []
+               }
+             ]
+           },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 1000000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Placement modifier absent from referenced product relation',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "${placementOrderId}",
+             "items": [
+               {
+                 "productId": "${configProductId}",
+                 "quantity": 2,
+                 "modifiers": [],
+                 "comboBeverages": [
+                   { "productId": "${snapshotBeverageProductId}" }
+                 ]
+               }
+             ]
+           },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 1000000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Placement beverage absent from referenced combo relation',
   'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
 );
 
