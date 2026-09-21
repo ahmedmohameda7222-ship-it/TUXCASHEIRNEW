@@ -137,6 +137,10 @@ if (
   );
 }
 
+if (!operationsSync.includes('TUX_INVENTORY_BULK_UNDO_MISMATCH')) {
+  throw new Error('operations-sync must classify forged bulk undo rejection as protocol failure');
+}
+
 if (
   !operationsInventory.includes('loadAllInventoryItems') ||
   !operationsInventory.includes('loadAllInventoryCosts') ||
