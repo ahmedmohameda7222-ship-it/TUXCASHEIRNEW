@@ -61,7 +61,11 @@ export function InventoryPage() {
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   useEffect(() => {
-    if (selectedItemId && items.some((item) => item.id === selectedItemId)) return;
+    const selected = selectedItemId ? items.find((item) => item.id === selectedItemId) : null;
+    if (selected) {
+      if (!selected.active) setItemAction(null);
+      return;
+    }
     setSelectedItemId(null);
     setItemAction(null);
   }, [items, selectedItemId]);
@@ -333,7 +337,7 @@ export function InventoryPage() {
                 <InventoryItemPage
                   item={selectedItem}
                   actions={
-                    canAdjust ? (
+                    canAdjust && selectedItem.active ? (
                       <>
                         <button
                           className="admin-secondary-button"
@@ -353,7 +357,7 @@ export function InventoryPage() {
                     ) : undefined
                   }
                 />
-                {itemAction === 'adjust' ? (
+                {itemAction === 'adjust' && selectedItem.active ? (
                   <AdjustStockSheet
                     item={selectedItem}
                     reasons={workspace.reasonCodes}
@@ -368,7 +372,7 @@ export function InventoryPage() {
                     }
                   />
                 ) : null}
-                {itemAction === 'waste' ? (
+                {itemAction === 'waste' && selectedItem.active ? (
                   <RecordWasteSheet
                     item={selectedItem}
                     reasons={workspace.reasonCodes}
