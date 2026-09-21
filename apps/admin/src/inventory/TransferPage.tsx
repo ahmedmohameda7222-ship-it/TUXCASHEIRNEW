@@ -49,10 +49,14 @@ export function TransferPage({
       ),
     [shopId, transfers],
   );
+  const transferableItems = useMemo(() => items.filter((item) => item.active), [items]);
   const [destinationShopId, setDestinationShopId] = useState(destinations[0] ?? '');
-  const [itemId, setItemId] = useState(items[0]?.id ?? '');
+  const [itemId, setItemId] = useState(transferableItems[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
   const quantityMicros = positiveMicros(quantity);
+  const selectedItemId = transferableItems.some((item) => item.id === itemId)
+    ? itemId
+    : (transferableItems[0]?.id ?? '');
 
   return (
     <section className="admin-inventory-workflow" aria-labelledby="inventory-transfer-title">
@@ -116,8 +120,8 @@ export function TransferPage({
             </label>
             <label className="admin-select-field">
               <span>Inventory item</span>
-              <select value={itemId} onChange={(event) => setItemId(event.target.value)}>
-                {items.map((item) => (
+              <select value={selectedItemId} onChange={(event) => setItemId(event.target.value)}>
+                {transferableItems.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
@@ -138,14 +142,14 @@ export function TransferPage({
               disabled={
                 sending ||
                 destinationShopId.length === 0 ||
-                itemId.length === 0 ||
+                selectedItemId.length === 0 ||
                 quantityMicros === null
               }
               onClick={() => {
                 if (quantityMicros === null) return;
                 onSend({
                   destinationShopId,
-                  lines: [{ inventoryItemId: itemId, quantityMicros }],
+                  lines: [{ inventoryItemId: selectedItemId, quantityMicros }],
                 });
               }}
             >
