@@ -464,8 +464,8 @@ psql(
     '-c',
     `insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
        values
-         ('${bulkItemId}', '${shopId}', 'Bulk Beef', 'kg', 'BULK_TRACKED', true),
-         ('${bulkOtherItemId}', '${shopId}', 'Bulk Chicken', 'kg', 'BULK_TRACKED', true);
+         ('${bulkItemId}', '${shopId}', 'Bulk Beef', 'kg', 'RECIPE_TRACKED', true),
+         ('${bulkOtherItemId}', '${shopId}', 'Bulk Chicken', 'kg', 'RECIPE_TRACKED', true);
      insert into public.inventory_movements(
        id, shop_id, business_day_id, inventory_item_id, movement_type,
        quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
