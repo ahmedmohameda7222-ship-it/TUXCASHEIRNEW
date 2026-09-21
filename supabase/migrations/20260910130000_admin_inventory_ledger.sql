@@ -505,6 +505,14 @@ begin
     ) or exists (
       select 1
       from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
+      join lateral jsonb_array_elements(v_bundle #> '{snapshot,products}') product
+        on product.value ->> 'id' = item.value ->> 'productId'
+      where product.value ->> 'isCombo' = 'true'
+        and jsonb_array_length(coalesce(item.value -> 'comboBeverages', '[]'::jsonb))
+          <> (item.value ->> 'quantity')::integer
+    ) or exists (
+      select 1
+      from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
       cross join lateral jsonb_array_elements(
         coalesce(item.value -> 'modifiers', '[]'::jsonb)
       ) modifier
