@@ -113,6 +113,7 @@ const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('replenishment.update'),
       shopId: uuidSchema,
       inventoryItemId: uuidSchema,
+      expectedVersion: microsSchema.nonnegative(),
       parLevelMicros: microsSchema.nonnegative(),
       reorderPointMicros: microsSchema.nonnegative(),
       preferredPurchaseUnit: z.string().trim().min(1).max(120).nullable(),
@@ -648,6 +649,7 @@ async function executeCommand(
         employeeId: context.principal.employeeId,
         shopId: command.shopId,
         inventoryItemId: command.inventoryItemId,
+        expectedVersion: command.expectedVersion,
         parLevelMicros: command.parLevelMicros,
         reorderPointMicros: command.reorderPointMicros,
         preferredPurchaseUnit: command.preferredPurchaseUnit,
@@ -690,6 +692,14 @@ function handleFailure(response: AdminResponse, error: unknown): void {
   }
   if (error instanceof z.ZodError) {
     sendJson(response, 400, { error: 'invalid_inventory_request' });
+    return;
+  }
+  if (error instanceof Error && error.message === 'inventory_replenishment_conflict') {
+    sendJson(response, 409, { error: 'inventory_replenishment_conflict' });
+    return;
+  }
+  if (error instanceof Error && error.message === 'inventory_replenishment_item_not_found') {
+    sendJson(response, 404, { error: 'inventory_replenishment_item_not_found' });
     return;
   }
   if (error instanceof AdminSupabaseError) {
