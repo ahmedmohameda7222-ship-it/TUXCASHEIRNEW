@@ -15,6 +15,17 @@ import './inventory.css';
 
 const STOCKTAKE_BATCH_SIZE = 500;
 
+function latestMutationError(
+  mutations: readonly { error: unknown; submittedAt: number }[],
+): unknown {
+  let latest: { error: unknown; submittedAt: number } | null = null;
+  for (const mutation of mutations) {
+    if (mutation.error === null || mutation.error === undefined) continue;
+    if (latest === null || mutation.submittedAt >= latest.submittedAt) latest = mutation;
+  }
+  return latest?.error ?? null;
+}
+
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
   const raw = error instanceof Error ? error.message : String(error);
@@ -36,16 +47,15 @@ export function InventoryPage() {
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
-  const mutationError =
-    [
-      inventory.adjustStock.error,
-      inventory.recordWaste.error,
-      inventory.beginStocktake.error,
-      inventory.postStocktake.error,
-      inventory.updateReplenishment.error,
-      inventory.sendTransfer.error,
-      inventory.receiveTransfer.error,
-    ].find((error) => error !== null && error !== undefined) ?? null;
+  const mutationError = latestMutationError([
+    inventory.adjustStock,
+    inventory.recordWaste,
+    inventory.beginStocktake,
+    inventory.postStocktake,
+    inventory.updateReplenishment,
+    inventory.sendTransfer,
+    inventory.receiveTransfer,
+  ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
