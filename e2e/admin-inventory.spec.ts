@@ -18,6 +18,7 @@ const ownerSession = {
       'inventory.stocktake',
       'inventory.transfer',
       'inventory.override_negative',
+      'purchasing.manage',
     ],
     shopIds: [shopId, otherShopId],
   },
@@ -28,7 +29,11 @@ type InventoryCommand = Record<string, unknown>;
 
 async function mockInventory(
   page: Page,
-  options: { failCommandType?: string; failureCode?: string } = {},
+  options: {
+    failCommandType?: string;
+    failureCode?: string;
+    failureCodesByCommand?: Readonly<Record<string, string>>;
+  } = {},
 ) {
   const commands: InventoryCommand[] = [];
   let onHandMicros = 3_200_000;
@@ -107,6 +112,29 @@ async function mockInventory(
               ],
             },
           ],
+          intelligence: {
+            periodLabel: 'Last 30 days',
+            reorderSuggestions: [
+              {
+                inventoryItemId: itemId,
+                itemName: 'Beef',
+                unitLabel: 'kg',
+                availableMicros: onHandMicros - reservedMicros,
+                incomingMicros: 0,
+                parLevelMicros: 3_000_000,
+                reorderPointMicros: 2_500_000,
+                suggestedOrderMicros: 900_000,
+                preferredSupplierId: null,
+                preferredPurchaseUnit: 'case',
+                leadTimeDays: 2,
+                minimumOrderMicros: null,
+                orderMultipleMicros: null,
+                version: 4,
+              },
+            ],
+            variances: [],
+            marginAlerts: [],
+          },
         }),
       });
       return;
@@ -117,11 +145,17 @@ async function mockInventory(
     const command = request.postDataJSON() as InventoryCommand;
     commands.push(command);
 
-    if (command.type === options.failCommandType) {
+    const commandType = String(command.type);
+    const commandFailure =
+      options.failureCodesByCommand?.[commandType] ??
+      (commandType === options.failCommandType
+        ? (options.failureCode ?? 'inventory_conflict')
+        : null);
+    if (commandFailure) {
       await route.fulfill({
         status: 409,
         contentType: 'application/json',
-        body: JSON.stringify({ error: options.failureCode ?? 'inventory_conflict' }),
+        body: JSON.stringify({ error: commandFailure }),
       });
       return;
     }
@@ -204,6 +238,48 @@ test('inventory surfaces ordinary mutation conflicts to the operator', async ({ 
   await page.getByRole('button', { name: 'Post adjustment' }).click();
 
   await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+});
+
+test('inventory replaces an older mutation error with the most recent failure', async ({ page }) => {
+  await mockInventory(page, {
+    failureCodesByCommand: {
+      adjust: 'insufficient_stock',
+      waste: 'waste_conflict',
+    },
+  });
+  await page.goto('/inventory');
+  await page.getByRole('button', { name: /Beef/ }).click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  await page.getByLabel('Quantity change').fill('-5');
+  await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  await page.getByLabel('Waste quantity').fill('0.25');
+  await page.getByLabel('Waste reason').selectOption(wasteReasonId);
+  await page.getByRole('button', { name: 'Post waste' }).click();
+  await expect(page.getByRole('alert')).toContainText(/waste conflict/i);
+});
+
+test('replenishment save submits the workspace version the admin actually edited', async ({ page }) => {
+  const fixture = await mockInventory(page);
+  await page.goto('/inventory');
+
+  await page.getByRole('button', { name: 'Reorder' }).click();
+  await page.getByLabel('Par micros').fill('3500000');
+  await page.getByRole('button', { name: 'Save policy' }).click();
+
+  await expect.poll(() => fixture.commands.length).toBe(1);
+  expect(fixture.commands[0]).toMatchObject({
+    type: 'replenishment.update',
+    shopId,
+    inventoryItemId: itemId,
+    expectedVersion: 4,
+    parLevelMicros: 3_500_000,
+  });
 });
 
 test('inventory adjustment and waste use structured reasons through the trusted BFF', async ({
