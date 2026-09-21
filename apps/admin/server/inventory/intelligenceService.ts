@@ -555,7 +555,7 @@ export async function updateReplenishmentPolicy(
       });
     } catch (error) {
       if (error instanceof AdminSupabaseError && error.status === 409) {
-        throw new Error('inventory_replenishment_conflict');
+        throw new Error('inventory_replenishment_conflict', { cause: error });
       }
       throw error;
     }
