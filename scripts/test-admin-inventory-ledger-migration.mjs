@@ -171,10 +171,14 @@ if (
 }
 if (
   !lower.includes('enforce_inventory_bulk_undo_integrity_v1') ||
+  !lower.includes('inventory_bulk_undo_claims') ||
   !lower.includes('tux_inventory_bulk_undo_mismatch') ||
+  !lower.includes('when unique_violation') ||
   !/before\s+insert\s+on\s+public\.inventory_movements/.test(lower)
 ) {
-  throw new Error('canonical bulk undo movements must be bound to one exact original movement');
+  throw new Error(
+    'canonical bulk undo movements must claim one exact original movement atomically',
+  );
 }
 if (
   !lower.includes('assert_operations_placement_inventory_requirements_v1') ||
