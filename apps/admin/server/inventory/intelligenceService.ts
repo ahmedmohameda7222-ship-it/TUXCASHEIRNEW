@@ -6,7 +6,7 @@ import type {
   AdminInventoryVariance,
 } from '@tux/admin-contracts';
 
-import type { AdminSupabaseClient } from '../supabaseAdmin.js';
+import { AdminSupabaseError, type AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
   calculateActualVsTheoretical,
   calculateFoodCostMarginAlert,
@@ -355,6 +355,9 @@ export async function loadInventoryIntelligence(
     .map((item) => {
       const policy = replenishmentMap.get(item.id);
       const parLevelMicros = policy ? safeInteger(policy.par_level_base, 'par') : 0;
+      const reorderPointMicros = policy
+        ? safeInteger(policy.reorder_point_base, 'reorder-point')
+        : 0;
       const incomingMicros = incomingByItem.get(item.id) ?? 0;
       const minimumOrderMicros = policy
         ? nullablePositiveInteger(policy.minimum_order_quantity_base, 'minimum-order')
@@ -369,10 +372,11 @@ export async function loadInventoryIntelligence(
         availableMicros: item.availableMicros,
         incomingMicros,
         parLevelMicros,
-        reorderPointMicros: policy ? safeInteger(policy.reorder_point_base, 'reorder-point') : 0,
+        reorderPointMicros,
         suggestedOrderMicros: suggestOrderQuantity({
           available: item.availableMicros,
           par: parLevelMicros,
+          reorderPoint: reorderPointMicros,
           incoming: incomingMicros,
           minimumOrder: minimumOrderMicros,
           orderMultiple: orderMultipleMicros,
@@ -507,6 +511,7 @@ export async function updateReplenishmentPolicy(
     employeeId: string;
     shopId: string;
     inventoryItemId: string;
+    expectedVersion: number;
     parLevelMicros: number;
     reorderPointMicros: number;
     preferredPurchaseUnit: string | null;
@@ -515,17 +520,19 @@ export async function updateReplenishmentPolicy(
     orderMultipleMicros: number | null;
   },
 ): Promise<void> {
-  const existing = await client.select<{ version: number | string }[]>(
-    'inventory_replenishment_settings',
+  const inventoryItems = await client.select<{ id: string }[]>(
+    'inventory_items',
     new URLSearchParams({
-      select: 'version',
+      select: 'id',
+      id: `eq.${input.inventoryItemId}`,
       shop_id: `eq.${input.shopId}`,
-      inventory_item_id: `eq.${input.inventoryItemId}`,
       limit: '1',
     }),
   );
-  const observedVersion =
-    existing.length === 0 ? null : safeInteger(existing[0]!.version, 'version');
+  if (inventoryItems.length !== 1) {
+    throw new Error('inventory_replenishment_item_not_found');
+  }
+
   const payload = {
     par_level_base: input.parLevelMicros,
     reorder_point_base: input.reorderPointMicros,
@@ -534,17 +541,24 @@ export async function updateReplenishmentPolicy(
     minimum_order_quantity_base: input.minimumOrderMicros,
     order_multiple_base: input.orderMultipleMicros,
     updated_by_employee_id: input.employeeId,
-    version: observedVersion === null ? 1 : observedVersion + 1,
+    version: input.expectedVersion + 1,
     updated_at: new Date().toISOString(),
   };
 
-  if (existing.length === 0) {
-    await client.insert('inventory_replenishment_settings', {
-      shop_id: input.shopId,
-      inventory_item_id: input.inventoryItemId,
-      preferred_supplier_id: null,
-      ...payload,
-    });
+  if (input.expectedVersion === 0) {
+    try {
+      await client.insert('inventory_replenishment_settings', {
+        shop_id: input.shopId,
+        inventory_item_id: input.inventoryItemId,
+        preferred_supplier_id: null,
+        ...payload,
+      });
+    } catch (error) {
+      if (error instanceof AdminSupabaseError && error.status === 409) {
+        throw new Error('inventory_replenishment_conflict');
+      }
+      throw error;
+    }
     return;
   }
 
@@ -553,7 +567,7 @@ export async function updateReplenishmentPolicy(
     new URLSearchParams({
       shop_id: `eq.${input.shopId}`,
       inventory_item_id: `eq.${input.inventoryItemId}`,
-      version: `eq.${observedVersion}`,
+      version: `eq.${input.expectedVersion}`,
     }),
     payload,
   );
