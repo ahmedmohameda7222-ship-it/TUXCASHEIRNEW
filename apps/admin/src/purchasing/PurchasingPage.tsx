@@ -10,6 +10,17 @@ import { usePurchasing } from './usePurchasing';
 
 type ActionMode = 'receive' | 'return' | null;
 
+function latestMutationError(
+  mutations: readonly { error: unknown; submittedAt: number }[],
+): unknown {
+  let latest: { error: unknown; submittedAt: number } | null = null;
+  for (const mutation of mutations) {
+    if (mutation.error === null || mutation.error === undefined) continue;
+    if (latest === null || mutation.submittedAt >= latest.submittedAt) latest = mutation;
+  }
+  return latest?.error ?? null;
+}
+
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
   const raw = error instanceof Error ? error.message : String(error);
@@ -22,15 +33,14 @@ export function PurchasingPage() {
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const purchasing = usePurchasing(shopId);
   const workspace = purchasing.workspace.data;
-  const mutationError =
-    [
-      purchasing.createSupplier.error,
-      purchasing.createPurchaseOrder.error,
-      purchasing.updatePurchaseOrder.error,
-      purchasing.orderPurchaseOrder.error,
-      purchasing.receivePurchase.error,
-      purchasing.returnPurchase.error,
-    ].find((error) => error !== null && error !== undefined) ?? null;
+  const mutationError = latestMutationError([
+    purchasing.createSupplier,
+    purchasing.createPurchaseOrder,
+    purchasing.updatePurchaseOrder,
+    purchasing.orderPurchaseOrder,
+    purchasing.receivePurchase,
+    purchasing.returnPurchase,
+  ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<ActionMode>(null);
