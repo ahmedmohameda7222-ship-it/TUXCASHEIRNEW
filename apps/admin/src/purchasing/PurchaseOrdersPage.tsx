@@ -60,9 +60,7 @@ export function PurchaseOrdersPage({
   const selectedSupplierId = suppliers.some((supplier) => supplier.id === supplierId)
     ? supplierId
     : firstSupplier;
-  const selectedItemId = inventoryItems.some((item) => item.id === itemId)
-    ? itemId
-    : firstItem;
+  const selectedItemId = inventoryItems.some((item) => item.id === itemId) ? itemId : firstItem;
   const unitLabel = useMemo(
     () => inventoryItems.find((item) => item.id === selectedItemId)?.unitLabel ?? 'unit',
     [inventoryItems, selectedItemId],
