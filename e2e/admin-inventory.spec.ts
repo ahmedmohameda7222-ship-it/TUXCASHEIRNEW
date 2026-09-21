@@ -225,7 +225,9 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('button', { name: 'Transfer stock' })).toBeVisible();
 });
 
-test('inventory keeps inactive item history read-only without adjustment actions', async ({ page }) => {
+test('inventory keeps inactive item history read-only without adjustment actions', async ({
+  page,
+}) => {
   await mockInventory(page, { itemActive: false });
   await page.goto('/inventory');
 
