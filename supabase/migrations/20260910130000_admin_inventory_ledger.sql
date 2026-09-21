@@ -186,16 +186,22 @@ create table public.stocktake_lines (
   inventory_item_id uuid not null references public.inventory_items(id) on delete restrict,
   snapshot_on_hand_micros bigint not null,
   snapshot_reserved_micros bigint not null check (snapshot_reserved_micros >= 0),
+  posting_expected_on_hand_micros bigint,
   actual_count_micros bigint check (actual_count_micros is null or actual_count_micros >= 0),
   variance_micros bigint,
   unit_cost_minor numeric(20, 6) not null default 0 check (unit_cost_minor >= 0),
   created_at timestamptz not null default now(),
   unique (stocktake_id, inventory_item_id),
   check (
-    (actual_count_micros is null and variance_micros is null)
+    (
+      actual_count_micros is null
+      and posting_expected_on_hand_micros is null
+      and variance_micros is null
+    )
     or (
       actual_count_micros is not null
-      and variance_micros = actual_count_micros - snapshot_on_hand_micros
+      and posting_expected_on_hand_micros is not null
+      and variance_micros = actual_count_micros - posting_expected_on_hand_micros
     )
   )
 );
@@ -446,6 +452,159 @@ $$;
 revoke all on function private.assert_inventory_item_shop_v1(uuid, uuid)
   from public, anon, authenticated;
 
+create or replace function private.assert_operations_placement_inventory_requirements_v1(
+  p_shop_id uuid,
+  p_envelope jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $placement_requirements$
+declare
+  v_configuration_version integer;
+  v_bundle jsonb;
+  v_mismatch boolean;
+begin
+  begin
+    v_configuration_version := (p_envelope #>> '{payload,configurationVersion}')::integer;
+  exception when others then
+    raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+  end;
+
+  if v_configuration_version is null
+     or jsonb_typeof(p_envelope #> '{payload,order,items}') is distinct from 'array'
+     or jsonb_typeof(p_envelope #> '{payload,inventoryMovements}') is distinct from 'array' then
+    raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+  end if;
+
+  select s.bundle_json
+    into v_bundle
+  from public.operations_configuration_snapshots s
+  where s.shop_id = p_shop_id
+    and s.version = v_configuration_version;
+
+  if not found
+     or jsonb_typeof(v_bundle #> '{snapshot,recipeLines}') is distinct from 'array'
+     or jsonb_typeof(v_bundle #> '{snapshot,modifiers}') is distinct from 'array' then
+    raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+  end if;
+
+  with order_items as (
+    select item.value as item
+    from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
+  ),
+  product_uses as (
+    select
+      (item ->> 'productId')::uuid as product_id,
+      (item ->> 'quantity')::numeric as multiplier
+    from order_items
+
+    union all
+
+    select
+      (beverage.value ->> 'productId')::uuid,
+      1::numeric
+    from order_items
+    cross join lateral jsonb_array_elements(
+      coalesce(item -> 'comboBeverages', '[]'::jsonb)
+    ) beverage
+
+    union all
+
+    select
+      (modifier_definition.value ->> 'standaloneProductId')::uuid,
+      ((modifier.value ->> 'quantity')::numeric * (item ->> 'quantity')::numeric)
+    from order_items
+    cross join lateral jsonb_array_elements(
+      coalesce(item -> 'modifiers', '[]'::jsonb)
+    ) modifier
+    join lateral jsonb_array_elements(v_bundle #> '{snapshot,modifiers}') modifier_definition
+      on modifier_definition.value ->> 'id' = modifier.value ->> 'modifierId'
+    where modifier_definition.value ->> 'standaloneProductId' is not null
+  ),
+  expected as (
+    select
+      (recipe.value ->> 'inventoryItemId')::uuid as inventory_item_id,
+      sum((recipe.value ->> 'quantityMicros')::numeric * product_uses.multiplier) as quantity_micros
+    from product_uses
+    join lateral jsonb_array_elements(v_bundle #> '{snapshot,recipeLines}') recipe
+      on recipe.value ->> 'productId' = product_uses.product_id::text
+    group by (recipe.value ->> 'inventoryItemId')::uuid
+  ),
+  submitted as (
+    select
+      (movement.value ->> 'itemId')::uuid as inventory_item_id,
+      sum(
+        case movement.value ->> 'movementType'
+          when 'ORDER_RESERVATION'
+            then (movement.value ->> 'reservedDeltaMicros')::numeric
+          when 'ORDER_CONSUMPTION'
+            then -((movement.value ->> 'quantityDeltaMicros')::numeric)
+          else null
+        end
+      ) as quantity_micros,
+      bool_and(
+        (
+          movement.value ->> 'movementType' = 'ORDER_RESERVATION'
+          and (movement.value ->> 'quantityDeltaMicros')::numeric = 0
+          and (movement.value ->> 'reservedDeltaMicros')::numeric > 0
+        )
+        or (
+          movement.value ->> 'movementType' = 'ORDER_CONSUMPTION'
+          and (movement.value ->> 'quantityDeltaMicros')::numeric < 0
+          and coalesce((movement.value ->> 'reservedDeltaMicros')::numeric, 0) = 0
+        )
+      ) as lifecycle_shape_valid
+    from jsonb_array_elements(p_envelope #> '{payload,inventoryMovements}') movement
+    group by (movement.value ->> 'itemId')::uuid
+  )
+  select exists (
+    select 1
+    from expected e
+    full join submitted s using (inventory_item_id)
+    where e.inventory_item_id is null
+       or s.inventory_item_id is null
+       or s.lifecycle_shape_valid is distinct from true
+       or e.quantity_micros is distinct from s.quantity_micros
+  )
+  into v_mismatch;
+
+  if coalesce(v_mismatch, false) then
+    raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+  end if;
+end;
+$placement_requirements$;
+
+revoke all on function private.assert_operations_placement_inventory_requirements_v1(uuid, jsonb)
+  from public, anon, authenticated;
+
+create or replace function private.assert_order_inventory_reservations_settled_v1(
+  p_shop_id uuid,
+  p_order_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $reservation_settlement$
+begin
+  if exists (
+    select 1
+    from public.inventory_movements m
+    where m.shop_id = p_shop_id
+      and m.order_id = p_order_id
+    group by m.inventory_item_id
+    having coalesce(sum(m.reserved_delta_micros), 0) <> 0
+  ) then
+    raise exception 'TUX_INVENTORY_RESERVATION_NOT_SETTLED';
+  end if;
+end;
+$reservation_settlement$;
+
+revoke all on function private.assert_order_inventory_reservations_settled_v1(uuid, uuid)
+  from public, anon, authenticated;
+
 create or replace function private.admin_inventory_authority_v1(
   p_employee_id uuid,
   p_shop_id uuid,
@@ -521,6 +680,69 @@ $inventory_balances$;
 revoke all on function public.read_admin_inventory_balances_v1(uuid, uuid)
   from public, anon, authenticated;
 grant execute on function public.read_admin_inventory_balances_v1(uuid, uuid)
+  to service_role;
+
+create or replace function public.read_admin_inventory_movement_history_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_per_item_limit integer default 50
+)
+returns table(
+  id uuid,
+  inventory_item_id uuid,
+  movement_type text,
+  quantity_delta_micros bigint,
+  reserved_delta_micros bigint,
+  reason_label_snapshot text,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $movement_history$
+begin
+  perform 1
+  from private.admin_inventory_authority_v1(
+    p_employee_id, p_shop_id, 'inventory.view'
+  );
+
+  if p_per_item_limit is null or p_per_item_limit < 1 or p_per_item_limit > 200 then
+    raise exception 'TUX_ADMIN_INVENTORY_HISTORY_LIMIT_INVALID';
+  end if;
+
+  return query
+  select
+    ranked.id,
+    ranked.inventory_item_id,
+    ranked.movement_type,
+    ranked.quantity_delta_micros,
+    ranked.reserved_delta_micros,
+    ranked.reason_label_snapshot,
+    ranked.created_at
+  from (
+    select
+      m.id,
+      m.inventory_item_id,
+      m.movement_type,
+      m.quantity_delta_micros,
+      m.reserved_delta_micros,
+      m.reason_label_snapshot,
+      m.created_at,
+      row_number() over (
+        partition by m.inventory_item_id
+        order by m.created_at desc, m.id desc
+      ) as item_rank
+    from public.inventory_movements m
+    where m.shop_id = p_shop_id
+  ) ranked
+  where ranked.item_rank <= p_per_item_limit
+  order by ranked.inventory_item_id, ranked.created_at desc, ranked.id desc;
+end;
+$movement_history$;
+
+revoke all on function public.read_admin_inventory_movement_history_v1(uuid, uuid, integer)
+  from public, anon, authenticated;
+grant execute on function public.read_admin_inventory_movement_history_v1(uuid, uuid, integer)
   to service_role;
 
 create or replace function private.inventory_reason_snapshot_v1(
@@ -1275,6 +1497,161 @@ begin
 end;
 $waste$;
 
+create or replace function public.ingest_tux_operations_materialization_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_envelope jsonb,
+  p_payload_sha256 text,
+  p_plan jsonb
+)
+returns text
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $operations_materialization$
+declare
+  v_event_id uuid;
+  v_shop_id uuid;
+  v_idempotency_key text;
+  v_event_type text;
+  v_payload_version integer;
+  v_order_id uuid;
+  v_existing public.operations_sync_event_receipts%rowtype;
+  v_mutation jsonb;
+begin
+  if jsonb_typeof(p_envelope) <> 'object' or jsonb_typeof(p_plan) <> 'object' then
+    raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+  end if;
+
+  v_event_id := (p_envelope ->> 'eventId')::uuid;
+  v_shop_id := (p_envelope ->> 'shopId')::uuid;
+  v_idempotency_key := p_envelope ->> 'idempotencyKey';
+  v_event_type := p_envelope ->> 'eventType';
+  v_payload_version := (p_envelope ->> 'payloadVersion')::integer;
+
+  if v_payload_version <> 1
+     or v_idempotency_key is null
+     or btrim(v_idempotency_key) = ''
+     or length(coalesce(p_payload_sha256, '')) <> 64 then
+    raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+  end if;
+
+  if p_plan ->> 'eventId' <> v_event_id::text
+     or p_plan ->> 'shopId' <> v_shop_id::text
+     or p_plan ->> 'idempotencyKey' <> v_idempotency_key
+     or p_plan ->> 'eventType' <> v_event_type then
+    raise exception 'TUX_SYNC_PLAN_IDENTITY_MISMATCH';
+  end if;
+
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = v_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended('receipt:' || v_shop_id::text || ':' || v_event_id::text, 0)
+  );
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'aggregate:' || v_shop_id::text || ':' || coalesce(p_envelope ->> 'aggregateType', '') || ':' ||
+      coalesce(p_envelope ->> 'aggregateId', ''),
+      0
+    )
+  );
+
+  select * into v_existing
+  from public.operations_sync_event_receipts
+  where event_id = v_event_id
+     or (shop_id = v_shop_id and idempotency_key = v_idempotency_key)
+  order by case when event_id = v_event_id then 0 else 1 end
+  limit 1;
+
+  if found then
+    if v_existing.event_id = v_event_id
+       and v_existing.shop_id = v_shop_id
+       and v_existing.idempotency_key = v_idempotency_key
+       and v_existing.event_type = v_event_type
+       and v_existing.payload_version = v_payload_version
+       and v_existing.payload_sha256 = p_payload_sha256 then
+      return 'REPLAY';
+    end if;
+    raise exception 'TUX_PROTOCOL_CONFLICT';
+  end if;
+
+  if jsonb_typeof(p_plan -> 'mutations') <> 'array' then
+    raise exception 'TUX_SYNC_PLAN_INVALID';
+  end if;
+
+  if v_event_type = 'ORDER_PLACED' then
+    perform private.assert_operations_placement_inventory_requirements_v1(
+      v_shop_id,
+      p_envelope
+    );
+  end if;
+
+  for v_mutation in select value from jsonb_array_elements(p_plan -> 'mutations') loop
+    if v_mutation -> 'row' ? 'shop_id'
+       and v_mutation #>> '{row,shop_id}' <> v_shop_id::text then
+      raise exception 'TUX_SYNC_MUTATION_SHOP_MISMATCH';
+    end if;
+    perform private.apply_tux_remote_mutation(v_mutation);
+  end loop;
+
+  if v_event_type in ('ORDER_MARKED_DONE', 'ORDER_CANCELLED', 'DELIVERY_RETURNED') then
+    begin
+      v_order_id := (p_envelope #>> '{payload,order,id}')::uuid;
+    exception when others then
+      raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+    end;
+    perform private.assert_order_inventory_reservations_settled_v1(
+      v_shop_id,
+      v_order_id
+    );
+  end if;
+
+  insert into public.operations_sync_event_receipts(
+    event_id,
+    shop_id,
+    idempotency_key,
+    event_type,
+    payload_version,
+    payload_sha256,
+    envelope_json
+  ) values (
+    v_event_id,
+    v_shop_id,
+    v_idempotency_key,
+    v_event_type,
+    v_payload_version,
+    p_payload_sha256,
+    p_envelope
+  );
+
+  update public.devices
+     set last_seen_at = now()
+   where id = p_device_id and shop_id = v_shop_id and auth_user_id = p_auth_user_id;
+
+  return 'APPLIED';
+end;
+$operations_materialization$;
+
+revoke all on function public.ingest_tux_operations_materialization_v1(uuid, uuid, jsonb, text, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.ingest_tux_operations_materialization_v1(uuid, uuid, jsonb, text, jsonb)
+  to service_role;
+
 create or replace function public.begin_stocktake_v1(
   p_employee_id uuid,
   p_shop_id uuid,
@@ -1440,6 +1817,7 @@ declare
   v_current_reserved bigint;
   v_delta bigint;
   v_unit_cost numeric(20, 6);
+  v_posting_expected_by_item jsonb := '{}'::jsonb;
 begin
   if p_employee_id is null or p_shop_id is null or p_stocktake_id is null
      or p_lines is null or jsonb_typeof(p_lines) <> 'array'
@@ -1546,7 +1924,10 @@ begin
       into v_current_on_hand, v_current_reserved
     from private.inventory_balance_v1(p_shop_id, v_item_id) b;
 
-    v_delta := v_actual - v_snapshot_on_hand;
+    v_posting_expected_by_item :=
+      v_posting_expected_by_item
+      || jsonb_build_object(v_item_id::text, v_current_on_hand);
+    v_delta := v_actual - v_current_on_hand;
 
     if v_current_on_hand + v_delta - v_current_reserved < 0 then
       return jsonb_build_object(
@@ -1574,10 +1955,12 @@ begin
       and l.inventory_item_id = v_item_id
     for update;
 
-    v_delta := v_actual - v_snapshot_on_hand;
+    v_current_on_hand := (v_posting_expected_by_item ->> v_item_id::text)::bigint;
+    v_delta := v_actual - v_current_on_hand;
 
     update public.stocktake_lines
-    set actual_count_micros = v_actual,
+    set posting_expected_on_hand_micros = v_current_on_hand,
+        actual_count_micros = v_actual,
         variance_micros = v_delta
     where stocktake_id = v_stocktake.id
       and inventory_item_id = v_item_id;

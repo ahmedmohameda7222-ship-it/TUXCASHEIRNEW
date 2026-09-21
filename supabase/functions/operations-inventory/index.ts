@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PAGE_SIZE = 250;
+const PROJECTION_PAGE_SIZE = 10_000;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -91,6 +92,42 @@ Deno.serve(async (request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  async function loadAllInventoryItems() {
+    const rows: Record<string, unknown>[] = [];
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await serviceClient
+        .from('inventory_items')
+        .select('id,shop_id,name,unit_label,tracking_mode,active')
+        .eq('shop_id', shopId)
+        .order('id', { ascending: true })
+        .range(offset, offset + PROJECTION_PAGE_SIZE - 1);
+      if (error) return { data: null, error };
+      const page = (data ?? []) as Record<string, unknown>[];
+      if (page.length === 0) return { data: rows, error: null };
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+
+  async function loadAllInventoryCosts() {
+    const rows: Record<string, unknown>[] = [];
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await serviceClient
+        .from('inventory_cost_state')
+        .select('inventory_item_id,weighted_unit_cost_minor')
+        .eq('shop_id', shopId)
+        .order('inventory_item_id', { ascending: true })
+        .range(offset, offset + PROJECTION_PAGE_SIZE - 1);
+      if (error) return { data: null, error };
+      const page = (data ?? []) as Record<string, unknown>[];
+      if (page.length === 0) return { data: rows, error: null };
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+
   const [feedResult, itemsResult, costsResult] = await Promise.all([
     serviceClient
       .from('inventory_movement_feed')
@@ -99,16 +136,8 @@ Deno.serve(async (request) => {
       .gt('sequence', cursor)
       .order('sequence', { ascending: true })
       .limit(PAGE_SIZE + 1),
-    serviceClient
-      .from('inventory_items')
-      .select('id,shop_id,name,unit_label,tracking_mode,active')
-      .eq('shop_id', shopId)
-      .order('id', { ascending: true }),
-    serviceClient
-      .from('inventory_cost_state')
-      .select('inventory_item_id,weighted_unit_cost_minor')
-      .eq('shop_id', shopId)
-      .order('inventory_item_id', { ascending: true }),
+    loadAllInventoryItems(),
+    loadAllInventoryCosts(),
   ]);
 
   if (feedResult.error || itemsResult.error || costsResult.error) {

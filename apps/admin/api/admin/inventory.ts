@@ -196,6 +196,8 @@ const INVENTORY_ITEM_PAGE_SIZE = 10_000;
 
 const INVENTORY_BALANCE_PAGE_SIZE = 10_000;
 const INVENTORY_COST_PAGE_SIZE = 10_000;
+const INVENTORY_HISTORY_PAGE_SIZE = 10_000;
+const INVENTORY_HISTORY_PER_ITEM_LIMIT = 50;
 
 export async function loadInventoryBalanceRows(
   client: AdminSupabaseClient,
@@ -214,6 +216,32 @@ export async function loadInventoryBalanceRows(
       new URLSearchParams({
         order: 'inventory_item_id.asc',
         limit: String(INVENTORY_BALANCE_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    offset += page.length;
+  }
+}
+
+export async function loadInventoryMovementHistoryRows(
+  client: AdminSupabaseClient,
+  employeeId: string,
+  shopId: string,
+): Promise<MovementRow[]> {
+  const rows: MovementRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await client.rpc<MovementRow[]>(
+      'read_admin_inventory_movement_history_v1',
+      {
+        p_employee_id: employeeId,
+        p_shop_id: shopId,
+        p_per_item_limit: INVENTORY_HISTORY_PER_ITEM_LIMIT,
+      },
+      new URLSearchParams({
+        limit: String(INVENTORY_HISTORY_PAGE_SIZE),
         offset: String(offset),
       }),
     );
@@ -434,15 +462,10 @@ async function loadWorkspace(
   const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] =
     await Promise.all([
       loadInventoryItemRows(client, shopId),
-      client.select<MovementRow[]>(
-        'inventory_movements',
-        new URLSearchParams({
-          select:
-            'id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,reason_label_snapshot,created_at',
-          shop_id: `eq.${shopId}`,
-          order: 'created_at.desc,id.desc',
-          limit: '2000',
-        }),
+      loadInventoryMovementHistoryRows(
+        client,
+        context.principal.employeeId,
+        shopId,
       ),
       loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
       loadInventoryCostRows(client, shopId),
