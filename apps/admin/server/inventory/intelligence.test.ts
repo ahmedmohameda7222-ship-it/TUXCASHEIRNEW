@@ -17,6 +17,26 @@ describe('inventory intelligence', () => {
     ).toBe(7_000);
   });
 
+  it('does not recommend a par refill until inventory position reaches the reorder point', () => {
+    expect(
+      suggestOrderQuantity({
+        available: 9_000,
+        par: 15_000,
+        reorderPoint: 7_000,
+        incoming: 0,
+      }),
+    ).toBe(0);
+
+    expect(
+      suggestOrderQuantity({
+        available: 7_000,
+        par: 15_000,
+        reorderPoint: 7_000,
+        incoming: 0,
+      }),
+    ).toBe(8_000);
+  });
+
   it('does not subtract reservations twice because available is already on-hand minus reserved', () => {
     expect(
       suggestOrderQuantity({
