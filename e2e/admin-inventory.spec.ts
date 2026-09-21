@@ -266,7 +266,9 @@ test('inventory replaces an older mutation error with the most recent failure', 
   await expect(page.getByRole('alert')).toContainText(/waste conflict/i);
 });
 
-test('replenishment save submits the workspace version the admin actually edited', async ({ page }) => {
+test('replenishment save submits the workspace version the admin actually edited', async ({
+  page,
+}) => {
   const fixture = await mockInventory(page);
   await page.goto('/inventory');
 
