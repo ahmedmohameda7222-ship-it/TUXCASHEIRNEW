@@ -170,6 +170,13 @@ if (
   throw new Error('canonical inventory movement rows must reject post-insert rewrites');
 }
 if (
+  !lower.includes('enforce_inventory_bulk_undo_integrity_v1') ||
+  !lower.includes('tux_inventory_bulk_undo_mismatch') ||
+  !/before\s+insert\s+on\s+public\.inventory_movements/.test(lower)
+) {
+  throw new Error('canonical bulk undo movements must be bound to one exact original movement');
+}
+if (
   !lower.includes('assert_operations_placement_inventory_requirements_v1') ||
   !lower.includes('tux_inventory_placement_requirements_mismatch') ||
   !lower.includes('assert_order_inventory_reservations_settled_v1') ||
@@ -433,6 +440,185 @@ psql(
      end $inventory_assertions$;`,
   ],
   'Admin inventory additive compatibility assertions',
+);
+
+const bulkItemId = '44000000-0000-4000-8000-000000000002';
+const bulkOtherItemId = '44000000-0000-4000-8000-000000000003';
+const bulkReceivedMovementId = '54000000-0000-4000-8000-000000000002';
+const wrongQuantityUndoId = '54000000-0000-4000-8000-000000000003';
+const wrongItemUndoId = '54000000-0000-4000-8000-000000000004';
+const wrongTypeUndoId = '54000000-0000-4000-8000-000000000005';
+const validReceivedUndoId = '54000000-0000-4000-8000-000000000006';
+const duplicateReceivedUndoId = '54000000-0000-4000-8000-000000000007';
+const bulkSeedMovementId = '54000000-0000-4000-8000-000000000008';
+const bulkFinishedMovementId = '54000000-0000-4000-8000-000000000009';
+const wrongFinishedUndoId = '54000000-0000-4000-8000-00000000000a';
+const validFinishedUndoId = '54000000-0000-4000-8000-00000000000b';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
+       values
+         ('${bulkItemId}', '${shopId}', 'Bulk Beef', 'kg', 'BULK_TRACKED', true),
+         ('${bulkOtherItemId}', '${shopId}', 'Bulk Chicken', 'kg', 'BULK_TRACKED', true);
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${bulkReceivedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'BULK_STOCK_RECEIVED', 5000000, 0, '${workerId}', null, null,
+       'bulk-received:canonical-original', timestamptz '2026-09-19 01:10:00+00'
+     );`,
+  ],
+  'Canonical bulk undo fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongQuantityUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -4000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:wrong-quantity',
+       timestamptz '2026-09-19 01:11:00+00'
+     );`,
+  ],
+  'Bulk undo wrong inverse quantity fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongItemUndoId}', '${shopId}', '${dayId}', '${bulkOtherItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:wrong-item',
+       timestamptz '2026-09-19 01:12:00+00'
+     );`,
+  ],
+  'Bulk undo wrong inventory item fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongTypeUndoId}', '${shopId}', '${dayId}', '${itemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -2500000, 0, '${workerId}', null,
+       '${movementId}', 'bulk-undo:wrong-original-type',
+       timestamptz '2026-09-19 01:13:00+00'
+     );`,
+  ],
+  'Bulk undo wrong original type fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${validReceivedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:valid-received',
+       timestamptz '2026-09-19 01:14:00+00'
+     );`,
+  ],
+  'Valid exact bulk stock receipt undo',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${duplicateReceivedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:duplicate-received',
+       timestamptz '2026-09-19 01:15:00+00'
+     );`,
+  ],
+  'Duplicate bulk stock receipt undo fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values
+       (
+         '${bulkSeedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+         'BULK_STOCK_RECEIVED', 6000000, 0, '${workerId}', null, null,
+         'bulk-finished:seed-stock', timestamptz '2026-09-19 01:16:00+00'
+       ),
+       (
+         '${bulkFinishedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+         'BULK_UNIT_FINISHED', -2000000, 0, '${workerId}', null, null,
+         'bulk-finished:canonical-original', timestamptz '2026-09-19 01:17:00+00'
+       );`,
+  ],
+  'Canonical bulk unit finished fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongFinishedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_UNIT_FINISHED', 3000000, 0, '${workerId}', null,
+       '${bulkFinishedMovementId}', 'bulk-undo:wrong-finished-quantity',
+       timestamptz '2026-09-19 01:18:00+00'
+     );`,
+  ],
+  'Bulk unit finished undo wrong inverse quantity fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${validFinishedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_UNIT_FINISHED', 2000000, 0, '${workerId}', null,
+       '${bulkFinishedMovementId}', 'bulk-undo:valid-finished',
+       timestamptz '2026-09-19 01:19:00+00'
+     );`,
+  ],
+  'Valid exact bulk unit finished undo',
 );
 
 const firstReservationMovementId = '64000000-0000-4000-8000-000000000001';
