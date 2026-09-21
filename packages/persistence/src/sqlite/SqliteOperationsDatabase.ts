@@ -280,6 +280,24 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
           .prepare('UPDATE orders SET status = ?, payload_json = ? WHERE id = ?')
           .run(updated.status, serialize(updated), updated.id);
       },
+      async getLifecycleSyncCursor(shopId) {
+        const row = database
+          .prepare('SELECT cursor FROM order_lifecycle_sync_cursors WHERE shop_id = ?')
+          .get(shopId) as { cursor?: unknown } | undefined;
+        return typeof row?.cursor === 'string' ? row.cursor : null;
+      },
+      async setLifecycleSyncCursor(shopId, cursor) {
+        if (!cursor) throw new Error('Order lifecycle sync cursor must not be empty.');
+        database
+          .prepare(
+            `INSERT INTO order_lifecycle_sync_cursors(shop_id, cursor, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(shop_id) DO UPDATE SET
+               cursor = excluded.cursor,
+               updated_at = excluded.updated_at`,
+          )
+          .run(shopId, cursor, new Date().toISOString());
+      },
     },
     expenses: {
       async put(expense: Expense) {
