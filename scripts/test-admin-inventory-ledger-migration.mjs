@@ -672,6 +672,49 @@ psql(
   'Complete canonical placement reservation set',
 );
 
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "${placementOrderId}",
+             "items": [
+               {
+                 "productId": "${configProductId}",
+                 "quantity": 2,
+                 "modifiers": [],
+                 "comboBeverages": []
+               }
+             ]
+           },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 500000
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 500000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Duplicate canonical placement reservation item',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
 psql(
   [
     '-c',
