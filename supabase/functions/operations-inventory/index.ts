@@ -76,21 +76,38 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser(token);
   if (userError || !userData.user) return jsonResponse(401, { error: 'invalid_access_token' });
 
-  const { data: device, error: deviceError } = await userClient
-    .from('devices')
-    .select('id,shop_id')
-    .eq('id', deviceId)
-    .eq('shop_id', shopId)
-    .maybeSingle();
-  if (deviceError) {
-    console.error('inventory feed device lookup failed', deviceError);
-    return jsonResponse(500, { error: 'device_authorization_lookup_failed' });
-  }
-  if (!device) return jsonResponse(403, { error: 'device_not_authorized' });
-
   const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const [membershipResult, deviceResult] = await Promise.all([
+    serviceClient
+      .from('shop_memberships')
+      .select('shop_id')
+      .eq('shop_id', shopId)
+      .eq('auth_user_id', userData.user.id)
+      .eq('role', 'OPERATIONS_DEVICE')
+      .eq('active', true)
+      .maybeSingle(),
+    serviceClient
+      .from('devices')
+      .select('id,shop_id')
+      .eq('id', deviceId)
+      .eq('shop_id', shopId)
+      .eq('auth_user_id', userData.user.id)
+      .eq('active', true)
+      .maybeSingle(),
+  ]);
+  if (membershipResult.error || deviceResult.error) {
+    console.error(
+      'inventory feed device authorization lookup failed',
+      membershipResult.error ?? deviceResult.error,
+    );
+    return jsonResponse(500, { error: 'device_authorization_lookup_failed' });
+  }
+  if (!membershipResult.data || !deviceResult.data) {
+    return jsonResponse(403, { error: 'device_not_authorized' });
+  }
 
   async function loadAllInventoryItems() {
     const rows: Record<string, unknown>[] = [];
