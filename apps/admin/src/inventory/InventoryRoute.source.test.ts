@@ -212,6 +212,15 @@ describe('Admin inventory route', () => {
     ).toEqual(['0', '1000', '1250']);
   });
 
+  it('excludes inactive inventory items from the transfer send selector', async () => {
+    const source = await readFile(resolve('apps/admin/src/inventory/TransferPage.tsx'), 'utf8');
+    expect(source).toContain('const transferableItems = useMemo(');
+    expect(source).toContain('items.filter((item) => item.active)');
+    expect(source).toContain('transferableItems[0]?.id');
+    expect(source).toContain('{transferableItems.map((item) => (');
+    expect(source).not.toContain('{items.map((item) => (');
+  });
+
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
     const inventorySource = await readFile(
       resolve('apps/admin/src/inventory/useInventory.ts'),
