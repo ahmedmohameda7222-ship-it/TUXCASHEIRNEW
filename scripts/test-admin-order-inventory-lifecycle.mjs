@@ -146,4 +146,20 @@ if (
   throw new Error('Operations inventory projection must page complete item and cost datasets');
 }
 
+const inventoryAuthorizationBoundary = operationsInventory.slice(
+  0,
+  operationsInventory.indexOf('async function loadAllInventoryItems'),
+);
+if (
+  !inventoryAuthorizationBoundary.includes(".from('shop_memberships')") ||
+  !inventoryAuthorizationBoundary.includes(".eq('auth_user_id', userData.user.id)") ||
+  !inventoryAuthorizationBoundary.includes(".eq('role', 'OPERATIONS_DEVICE')") ||
+  !inventoryAuthorizationBoundary.includes(".eq('id', deviceId)") ||
+  (inventoryAuthorizationBoundary.match(/\.eq\('active', true\)/g)?.length ?? 0) < 2
+) {
+  throw new Error(
+    'Operations inventory privileged reads must require the active OPERATIONS_DEVICE membership and active device together',
+  );
+}
+
 console.log('Admin order inventory lifecycle source invariants passed.');
