@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 6;
+export const INDEXED_DB_VERSION = 7;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -16,6 +16,7 @@ export const INDEXED_DB_STORES = [
   'inventoryMovements',
   'inventoryCostState',
   'inventorySyncCursor',
+  'orderLifecycleSyncCursor',
   'reconciliations',
   'auditEvents',
   'outboxEvents',
@@ -273,6 +274,13 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
       const costs = database.createObjectStore('inventoryCostState', { keyPath: 'itemId' });
       costs.createIndex('shopId', 'shopId');
       database.createObjectStore('inventorySyncCursor', { keyPath: 'shopId' });
+    },
+  },
+  {
+    version: 7,
+    name: 'order_lifecycle_convergence_state',
+    apply(database) {
+      database.createObjectStore('orderLifecycleSyncCursor', { keyPath: 'shopId' });
     },
   },
 ];
