@@ -33,6 +33,7 @@ async function mockInventory(
     failCommandType?: string;
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
+    itemActive?: boolean;
   } = {},
 ) {
   const commands: InventoryCommand[] = [];
@@ -63,7 +64,7 @@ async function mockInventory(
               name: 'Beef',
               unitLabel: 'kg',
               trackingMode: 'RECIPE_TRACKED',
-              active: true,
+              active: options.itemActive ?? true,
               onHandMicros,
               reservedMicros,
               availableMicros: onHandMicros - reservedMicros,
@@ -222,6 +223,16 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('button', { name: 'Record waste' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stock count' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Transfer stock' })).toBeVisible();
+});
+
+test('inventory keeps inactive item history read-only without adjustment actions', async ({ page }) => {
+  await mockInventory(page, { itemActive: false });
+  await page.goto('/inventory');
+
+  await page.getByRole('button', { name: /Beef/ }).click();
+  await expect(page.getByText('BULK STOCK RECEIVED')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Adjust stock' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Record waste' })).toHaveCount(0);
 });
 
 test('inventory surfaces ordinary mutation conflicts to the operator', async ({ page }) => {
