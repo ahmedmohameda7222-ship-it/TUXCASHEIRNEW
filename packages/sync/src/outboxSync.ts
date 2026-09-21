@@ -130,6 +130,11 @@ async function reconcileRejectedOrderPlacement(
   if (order.status !== 'ACTIVE') return null;
 
   const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+  const compensatedMovementIds = new Set(
+    existingMovements
+      .map((movement) => movement.compensatesMovementId)
+      .filter((movementId): movementId is InventoryMovementId => movementId !== null),
+  );
   const reservationByItem = new Map<InventoryMovement['itemId'], number>();
   for (const movement of existingMovements) {
     const reservedDelta = movement.reservedDeltaMicros ?? 0;
@@ -155,6 +160,31 @@ async function reconcileRejectedOrderPlacement(
       orderId: order.id,
       createdAt: failedAt,
       compensatesMovementId: null,
+    });
+  }
+
+  for (const movement of existingMovements) {
+    if (
+      movement.movementType !== 'ORDER_CONSUMPTION' ||
+      (movement.reservedDeltaMicros ?? 0) !== 0 ||
+      movement.quantityDeltaMicros >= 0 ||
+      compensatedMovementIds.has(movement.id)
+    ) {
+      continue;
+    }
+    await transaction.inventory.appendMovement({
+      id: newEntityId<InventoryMovementId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      itemId: movement.itemId,
+      movementType: 'CANCEL_RESTOCK',
+      quantityDeltaMicros: stockQuantityMicros(-movement.quantityDeltaMicros),
+      reservedDeltaMicros: stockQuantityMicros(0),
+      idempotencyKey: `sync-rejected-legacy-restock:${event.id}:${movement.id}`,
+      workerId: order.operatorWorkerId,
+      orderId: order.id,
+      createdAt: failedAt,
+      compensatesMovementId: movement.id,
     });
   }
 
