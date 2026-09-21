@@ -445,13 +445,21 @@ export async function enrollDevice(
 async function callSupabaseFunction(
   config: SupabaseServerConfig,
   session: DeviceSessionSecrets,
-  functionName: 'operations-config' | 'operations-sync' | 'operations-inventory',
+  functionName:
+    | 'operations-config'
+    | 'operations-sync'
+    | 'operations-inventory'
+    | 'operations-order-lifecycle',
   request: GatewayRequest,
   body: string | null,
 ): Promise<Response> {
   const incomingUrl = new URL(request.url ?? '/', 'https://tux.invalid');
   const target = new URL(`${config.projectUrl}/functions/v1/${functionName}`);
-  if (functionName === 'operations-config' || functionName === 'operations-inventory') {
+  if (
+    functionName === 'operations-config' ||
+    functionName === 'operations-inventory' ||
+    functionName === 'operations-order-lifecycle'
+  ) {
     target.search = incomingUrl.search;
   }
 
@@ -471,7 +479,11 @@ async function callSupabaseFunction(
 export async function proxyAuthenticatedFunction(
   request: GatewayRequest,
   response: GatewayResponse,
-  functionName: 'operations-config' | 'operations-sync' | 'operations-inventory',
+  functionName:
+    | 'operations-config'
+    | 'operations-sync'
+    | 'operations-inventory'
+    | 'operations-order-lifecycle',
 ): Promise<void> {
   const expectedMethod = functionName === 'operations-sync' ? 'POST' : 'GET';
   if (request.method !== expectedMethod) {
