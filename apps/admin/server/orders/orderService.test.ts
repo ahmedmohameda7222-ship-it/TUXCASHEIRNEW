@@ -131,7 +131,7 @@ describe('Admin order service', () => {
 
   it('blocks cancellation when the principal lacks orders.cancel', async () => {
     const service = createOrderService(fixtureStore());
-    await expect(
+    expect(() =>
       service.cancelActiveOrder(
         {
           shopId,
@@ -143,7 +143,7 @@ describe('Admin order service', () => {
         },
         principal(['orders.view']),
       ),
-    ).rejects.toThrow(/permission|forbidden/i);
+    ).toThrow(/permission|forbidden/i);
   });
 
   it('keeps refunds as separate immutable events and requires a refund-family reason', async () => {
