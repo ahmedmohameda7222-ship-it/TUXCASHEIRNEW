@@ -956,6 +956,19 @@ returns table(
   from_status text,
   to_status text,
   event_type text,
+  worker_id uuid,
+  worker_name_snapshot text,
+  admin_employee_id uuid,
+  food_prepared boolean,
+  restore_stock boolean,
+  reason text,
+  reason_code_id uuid,
+  reason_code_key text,
+  reason_label_snapshot text,
+  reason_family_snapshot text,
+  reason_config_version bigint,
+  reason_scope text,
+  note text,
   created_at timestamptz
 )
 language plpgsql
@@ -995,10 +1008,28 @@ begin
     e.from_status,
     e.to_status,
     e.event_type,
+    e.worker_id,
+    e.worker_name_snapshot,
+    e.admin_employee_id,
+    e.food_prepared,
+    e.restore_stock,
+    e.reason,
+    e.reason_code_id,
+    e.reason_code_key,
+    e.reason_label_snapshot,
+    e.reason_family_snapshot,
+    e.reason_config_version,
+    case
+      when e.reason_code_id is null then null
+      when reason_code.shop_id is null then 'BUSINESS'
+      else 'SHOP'
+    end as reason_scope,
+    e.note,
     e.created_at
   from public.order_lifecycle_feed f
   join public.order_status_events e on e.id = f.status_event_id
   join public.orders o on o.id = f.order_id and o.shop_id = f.shop_id
+  left join public.admin_reason_codes reason_code on reason_code.id = e.reason_code_id
   where f.shop_id = p_shop_id
     and f.sequence > p_after_sequence
   order by f.sequence
