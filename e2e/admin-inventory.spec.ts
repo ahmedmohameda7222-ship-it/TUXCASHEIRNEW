@@ -26,7 +26,10 @@ const ownerSession = {
 
 type InventoryCommand = Record<string, unknown>;
 
-async function mockInventory(page: Page) {
+async function mockInventory(
+  page: Page,
+  options: { failCommandType?: string; failureCode?: string } = {},
+) {
   const commands: InventoryCommand[] = [];
   let onHandMicros = 3_200_000;
   const reservedMicros = 1_100_000;
@@ -114,6 +117,15 @@ async function mockInventory(page: Page) {
     const command = request.postDataJSON() as InventoryCommand;
     commands.push(command);
 
+    if (command.type === options.failCommandType) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: options.failureCode ?? 'inventory_conflict' }),
+      });
+      return;
+    }
+
     if (command.type === 'adjust') {
       onHandMicros += Number(command.quantityDeltaMicros);
     }
@@ -176,6 +188,22 @@ test('inventory renders on-hand, reserved, available, history, and action entry 
   await expect(page.getByRole('button', { name: 'Record waste' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stock count' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Transfer stock' })).toBeVisible();
+});
+
+test('inventory surfaces ordinary mutation conflicts to the operator', async ({ page }) => {
+  await mockInventory(page, {
+    failCommandType: 'adjust',
+    failureCode: 'insufficient_stock',
+  });
+  await page.goto('/inventory');
+  await page.getByRole('button', { name: /Beef/ }).click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  await page.getByLabel('Quantity change').fill('-5');
+  await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+
+  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
 });
 
 test('inventory adjustment and waste use structured reasons through the trusted BFF', async ({
