@@ -111,10 +111,11 @@ jobs:
         run: >-
           npx vitest run
           packages/application/src/orders.test.ts
-          packages/application/src/ordersBoard.test.ts
+          packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
           packages/sync/src/remoteMaterializer.test.ts
           packages/sync/src/remoteReceipt.test.ts
           packages/sync/src/httpTransport.test.ts
+          packages/sync/src/orderLifecycleConvergence.test.ts
       - name: Plan 5 typecheck
         run: npm run typecheck
 
