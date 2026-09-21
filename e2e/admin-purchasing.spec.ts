@@ -22,7 +22,11 @@ type Command = Record<string, unknown>;
 
 async function mockPurchasing(
   page: Page,
-  options: { startWithoutSuppliers?: boolean } = {},
+  options: {
+    startWithoutSuppliers?: boolean;
+    failCommandType?: string;
+    failureCode?: string;
+  } = {},
 ) {
   const commands: Command[] = [];
   let suppliers = options.startWithoutSuppliers
@@ -110,6 +114,15 @@ async function mockPurchasing(
     const command = request.postDataJSON() as Command;
     commands.push(command);
 
+    if (command.type === options.failCommandType) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: options.failureCode ?? 'purchasing_conflict' }),
+      });
+      return;
+    }
+
     if (command.type === 'supplier.create') {
       suppliers = [
         {
@@ -172,6 +185,18 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
     purchaseOrderId: poId,
     expectedVersion: 1,
   });
+});
+
+test('purchasing surfaces ordinary mutation conflicts to the operator', async ({ page }) => {
+  await mockPurchasing(page, {
+    failCommandType: 'po.order',
+    failureCode: 'stale_purchase_order_version',
+  });
+  await page.goto('/purchasing');
+
+  await page.getByRole('button', { name: 'Mark ordered' }).click();
+
+  await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
 
 test('purchase order defaults adopt the first supplier created after an initially empty workspace', async ({
