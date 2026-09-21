@@ -578,21 +578,21 @@ const terminalSettlementMovementId = '85000000-0000-4000-8000-000000000005';
 psql(
   [
     '-c',
-    \`insert into public.operations_configuration_snapshots(
+    `insert into public.operations_configuration_snapshots(
        shop_id, version, bundle_json, published_at
      ) values (
-       '\${shopId}', 9001,
+       '${shopId}', 9001,
        $bundle$
        {
          "snapshot": {
-           "shopId": "\${shopId}",
+           "shopId": "${shopId}",
            "version": 9001,
            "modifiers": [],
            "recipeLines": [
              {
-               "shopId": "\${shopId}",
-               "productId": "\${configProductId}",
-               "inventoryItemId": "\${itemId}",
+               "shopId": "${shopId}",
+               "productId": "${configProductId}",
+               "inventoryItemId": "${itemId}",
                "quantityMicros": 500000
              }
            ]
@@ -601,7 +601,7 @@ psql(
        }
        $bundle$::jsonb,
        timestamptz '2026-09-19 02:10:00+00'
-     );\`,
+     );`,
   ],
   'Canonical placement configuration fixture',
 );
@@ -609,17 +609,17 @@ psql(
 psqlExpectFailure(
   [
     '-c',
-    \`select private.assert_operations_placement_inventory_requirements_v1(
-       '\${shopId}',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
        $envelope$
        {
          "payload": {
            "configurationVersion": 9001,
            "order": {
-             "id": "\${placementOrderId}",
+             "id": "${placementOrderId}",
              "items": [
                {
-                 "productId": "\${configProductId}",
+                 "productId": "${configProductId}",
                  "quantity": 2,
                  "modifiers": [],
                  "comboBeverages": []
@@ -630,7 +630,7 @@ psqlExpectFailure(
          }
        }
        $envelope$::jsonb
-     );\`,
+     );`,
   ],
   'Incomplete canonical placement reservation set',
   'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
@@ -639,17 +639,17 @@ psqlExpectFailure(
 psql(
   [
     '-c',
-    \`select private.assert_operations_placement_inventory_requirements_v1(
-       '\${shopId}',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
        $envelope$
        {
          "payload": {
            "configurationVersion": 9001,
            "order": {
-             "id": "\${placementOrderId}",
+             "id": "${placementOrderId}",
              "items": [
                {
-                 "productId": "\${configProductId}",
+                 "productId": "${configProductId}",
                  "quantity": 2,
                  "modifiers": [],
                  "comboBeverages": []
@@ -658,7 +658,7 @@ psql(
            },
            "inventoryMovements": [
              {
-               "itemId": "\${itemId}",
+               "itemId": "${itemId}",
                "movementType": "ORDER_RESERVATION",
                "quantityDeltaMicros": 0,
                "reservedDeltaMicros": 1000000
@@ -667,7 +667,7 @@ psql(
          }
        }
        $envelope$::jsonb
-     );\`,
+     );`,
   ],
   'Complete canonical placement reservation set',
 );
@@ -675,17 +675,17 @@ psql(
 psql(
   [
     '-c',
-    \`set session_replication_role = replica;
+    `set session_replication_role = replica;
      insert into public.inventory_movements(
        id, shop_id, business_day_id, inventory_item_id, movement_type,
        quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
        idempotency_key, created_at
      ) values (
-       '\${terminalReservationMovementId}', '\${shopId}', '\${dayId}', '\${itemId}',
-       'ORDER_RESERVATION', 0, 100000, '\${workerId}', '\${terminalOrderId}',
+       '${terminalReservationMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_RESERVATION', 0, 100000, '${workerId}', '${terminalOrderId}',
        'terminal-reservation-fixture', timestamptz '2026-09-19 02:11:00+00'
      );
-     set session_replication_role = origin;\`,
+     set session_replication_role = origin;`,
   ],
   'Terminal reservation fixture',
 );
@@ -693,9 +693,9 @@ psql(
 psqlExpectFailure(
   [
     '-c',
-    \`select private.assert_order_inventory_reservations_settled_v1(
-       '\${shopId}', '\${terminalOrderId}'
-     );\`,
+    `select private.assert_order_inventory_reservations_settled_v1(
+       '${shopId}', '${terminalOrderId}'
+     );`,
   ],
   'Incomplete terminal reservation settlement',
   'TUX_INVENTORY_RESERVATION_NOT_SETTLED',
@@ -704,20 +704,20 @@ psqlExpectFailure(
 psql(
   [
     '-c',
-    \`set session_replication_role = replica;
+    `set session_replication_role = replica;
      insert into public.inventory_movements(
        id, shop_id, business_day_id, inventory_item_id, movement_type,
        quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
        idempotency_key, created_at
      ) values (
-       '\${terminalSettlementMovementId}', '\${shopId}', '\${dayId}', '\${itemId}',
-       'ORDER_CONSUMPTION', -100000, -100000, '\${workerId}', '\${terminalOrderId}',
+       '${terminalSettlementMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'ORDER_CONSUMPTION', -100000, -100000, '${workerId}', '${terminalOrderId}',
        'terminal-settlement-fixture', timestamptz '2026-09-19 02:12:00+00'
      );
      set session_replication_role = origin;
      select private.assert_order_inventory_reservations_settled_v1(
-       '\${shopId}', '\${terminalOrderId}'
-     );\`,
+       '${shopId}', '${terminalOrderId}'
+     );`,
   ],
   'Complete terminal reservation settlement',
 );
@@ -729,22 +729,22 @@ const stocktakeEmployeeId = '86000000-0000-4000-8000-000000000003';
 psql(
   [
     '-c',
-    \`insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
-       values ('\${stocktakeItemId}', '\${shopId}', 'Stocktake Boundary Item', 'unit', 'RECIPE_TRACKED', true);
+    `insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
+       values ('${stocktakeItemId}', '${shopId}', 'Stocktake Boundary Item', 'unit', 'RECIPE_TRACKED', true);
      insert into public.inventory_movements(
        id, shop_id, business_day_id, inventory_item_id, movement_type,
        quantity_delta_micros, reserved_delta_micros, worker_id,
        idempotency_key, created_at
      ) values (
-       '86000000-0000-4000-8000-000000000004', '\${shopId}', '\${dayId}', '\${stocktakeItemId}',
-       'BULK_STOCK_RECEIVED', 10000000, 0, '\${workerId}',
+       '86000000-0000-4000-8000-000000000004', '${shopId}', '${dayId}', '${stocktakeItemId}',
+       'BULK_STOCK_RECEIVED', 10000000, 0, '${workerId}',
        'stocktake-boundary-seed', timestamptz '2026-09-19 03:00:00+00'
      );
      set session_replication_role = replica;
      insert into public.stocktakes(
        id, shop_id, created_by_employee_id, status, command_id, started_at, created_at
      ) values (
-       '\${stocktakeId}', '\${shopId}', '\${stocktakeEmployeeId}', 'DRAFT',
+       '${stocktakeId}', '${shopId}', '${stocktakeEmployeeId}', 'DRAFT',
        'stocktake-boundary-begin', timestamptz '2026-09-19 03:00:01+00',
        timestamptz '2026-09-19 03:00:01+00'
      );
@@ -753,7 +753,7 @@ psql(
        snapshot_reserved_micros, actual_count_micros, variance_micros,
        unit_cost_minor, created_at
      ) values (
-       '\${stocktakeId}', '\${stocktakeItemId}', 10000000, 0, null, null, 0,
+       '${stocktakeId}', '${stocktakeItemId}', 10000000, 0, null, null, 0,
        timestamptz '2026-09-19 03:00:01+00'
      );
      set session_replication_role = origin;
@@ -762,8 +762,8 @@ psql(
        quantity_delta_micros, reserved_delta_micros, worker_id,
        idempotency_key, created_at
      ) values (
-       '86000000-0000-4000-8000-000000000005', '\${shopId}', '\${dayId}', '\${stocktakeItemId}',
-       'ADMIN_ADJUSTMENT', -2000000, 0, '\${workerId}',
+       '86000000-0000-4000-8000-000000000005', '${shopId}', '${dayId}', '${stocktakeItemId}',
+       'ADMIN_ADJUSTMENT', -2000000, 0, '${workerId}',
        'stocktake-boundary-intervening-sale', timestamptz '2026-09-19 03:00:02+00'
      );
      create or replace function private.admin_inventory_authority_v1(
@@ -775,11 +775,11 @@ psql(
      as $auth$ select null::uuid, 'OWNER'::text $auth$;
      set session_replication_role = replica;
      select public.post_stocktake_v1(
-       '\${stocktakeEmployeeId}', '\${shopId}', '\${stocktakeId}',
-       '[{"inventoryItemId":"\${stocktakeItemId}","actualCountMicros":8000000}]'::jsonb,
+       '${stocktakeEmployeeId}', '${shopId}', '${stocktakeId}',
+       '[{"inventoryItemId":"${stocktakeItemId}","actualCountMicros":8000000}]'::jsonb,
        'stocktake-boundary-post'
      );
-     set session_replication_role = origin;\`,
+     set session_replication_role = origin;`,
   ],
   'Stocktake posting boundary behavior',
 );
@@ -787,27 +787,27 @@ psql(
 psql(
   [
     '-c',
-    \`do $stocktake_boundary_assertion$
+    `do $stocktake_boundary_assertion$
      declare
        v_on_hand bigint;
        v_variance bigint;
        v_posting_expected bigint;
      begin
        select b.on_hand_micros into v_on_hand
-       from private.inventory_balance_v1('\${shopId}', '\${stocktakeItemId}') b;
+       from private.inventory_balance_v1('${shopId}', '${stocktakeItemId}') b;
        if v_on_hand <> 8000000 then
          raise exception 'stocktake double-applied intervening movement: %', v_on_hand;
        end if;
        select l.variance_micros, l.posting_expected_on_hand_micros
          into v_variance, v_posting_expected
        from public.stocktake_lines l
-       where l.stocktake_id = '\${stocktakeId}'
-         and l.inventory_item_id = '\${stocktakeItemId}';
+       where l.stocktake_id = '${stocktakeId}'
+         and l.inventory_item_id = '${stocktakeItemId}';
        if v_variance <> 0 or v_posting_expected <> 8000000 then
          raise exception 'stocktake posting boundary snapshot is incorrect: %, %',
            v_variance, v_posting_expected;
        end if;
-     end $stocktake_boundary_assertion$;\`,
+     end $stocktake_boundary_assertion$;`,
   ],
   'Stocktake posting boundary assertion',
 );
