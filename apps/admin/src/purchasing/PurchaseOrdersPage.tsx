@@ -57,9 +57,15 @@ export function PurchaseOrdersPage({
   const [purchaseUnit, setPurchaseUnit] = useState('');
   const [unitCost, setUnitCost] = useState('');
 
+  const selectedSupplierId = suppliers.some((supplier) => supplier.id === supplierId)
+    ? supplierId
+    : firstSupplier;
+  const selectedItemId = inventoryItems.some((item) => item.id === itemId)
+    ? itemId
+    : firstItem;
   const unitLabel = useMemo(
-    () => inventoryItems.find((item) => item.id === itemId)?.unitLabel ?? 'unit',
-    [inventoryItems, itemId],
+    () => inventoryItems.find((item) => item.id === selectedItemId)?.unitLabel ?? 'unit',
+    [inventoryItems, selectedItemId],
   );
 
   return (
@@ -89,14 +95,14 @@ export function PurchaseOrdersPage({
           onSubmit={(event) => {
             event.preventDefault();
             const orderedPurchaseUnitsMicros = baseMicros(quantity);
-            if (!supplierId || !itemId || orderedPurchaseUnitsMicros <= 0) return;
+            if (!selectedSupplierId || !selectedItemId || orderedPurchaseUnitsMicros <= 0) return;
             onCreate({
-              supplierId,
+              supplierId: selectedSupplierId,
               reference: reference.trim() || null,
               expectedDeliveryDate: expectedDate || null,
               lines: [
                 {
-                  inventoryItemId: itemId,
+                  inventoryItemId: selectedItemId,
                   purchaseUnitLabel: purchaseUnit.trim() || unitLabel,
                   orderedPurchaseUnitsMicros,
                   expectedPurchaseUnitCostMinor: minorUnits(unitCost),
@@ -108,7 +114,7 @@ export function PurchaseOrdersPage({
           <label>
             Supplier
             <select
-              value={supplierId}
+              value={selectedSupplierId}
               onChange={(event) => setSupplierId(event.currentTarget.value)}
             >
               {suppliers.map((supplier) => (
@@ -120,7 +126,10 @@ export function PurchaseOrdersPage({
           </label>
           <label>
             Inventory item
-            <select value={itemId} onChange={(event) => setItemId(event.currentTarget.value)}>
+            <select
+              value={selectedItemId}
+              onChange={(event) => setItemId(event.currentTarget.value)}
+            >
               {inventoryItems.map((item) => (
                 <option value={item.id} key={item.id}>
                   {item.name}
