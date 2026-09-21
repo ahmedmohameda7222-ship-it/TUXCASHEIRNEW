@@ -462,11 +462,7 @@ async function loadWorkspace(
   const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] =
     await Promise.all([
       loadInventoryItemRows(client, shopId),
-      loadInventoryMovementHistoryRows(
-        client,
-        context.principal.employeeId,
-        shopId,
-      ),
+      loadInventoryMovementHistoryRows(client, context.principal.employeeId, shopId),
       loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
       loadInventoryCostRows(client, shopId),
       client.select<ReasonRow[]>(

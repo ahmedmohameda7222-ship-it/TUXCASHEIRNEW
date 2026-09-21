@@ -18,8 +18,12 @@ if (
 if (!api.includes('const balances = new Map(') || !api.includes('const balance = balances.get(row.id)')) {
   throw new Error('Admin inventory item balances must come from the canonical balance projection');
 }
-if (!api.includes("limit: '2000'")) {
-  throw new Error('Admin inventory history should remain separately bounded from current balances');
+if (
+  !api.includes('export async function loadInventoryMovementHistoryRows') ||
+  !api.includes("'read_admin_inventory_movement_history_v1'") ||
+  !migration.includes('create or replace function public.read_admin_inventory_movement_history_v1')
+) {
+  throw new Error('Admin inventory history must remain independently bounded per inventory item');
 }
 
 console.log('Admin inventory full-ledger balance authority invariant passed.');
