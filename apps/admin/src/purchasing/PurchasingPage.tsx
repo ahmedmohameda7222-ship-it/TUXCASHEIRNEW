@@ -10,11 +10,28 @@ import { usePurchasing } from './usePurchasing';
 
 type ActionMode = 'receive' | 'return' | null;
 
+function mutationErrorMessage(error: unknown): string | null {
+  if (error === null || error === undefined) return null;
+  const raw = error instanceof Error ? error.message : String(error);
+  const normalized = raw.trim().replaceAll('_', ' ').replaceAll('-', ' ');
+  return normalized || 'Purchasing action failed';
+}
+
 export function PurchasingPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const purchasing = usePurchasing(shopId);
   const workspace = purchasing.workspace.data;
+  const mutationError =
+    [
+      purchasing.createSupplier.error,
+      purchasing.createPurchaseOrder.error,
+      purchasing.updatePurchaseOrder.error,
+      purchasing.orderPurchaseOrder.error,
+      purchasing.receivePurchase.error,
+      purchasing.returnPurchase.error,
+    ].find((error) => error !== null && error !== undefined) ?? null;
+  const mutationErrorText = mutationErrorMessage(mutationError);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<ActionMode>(null);
 
@@ -65,6 +82,11 @@ export function PurchasingPage() {
       title="Purchasing"
       description="Draft, order, receive and return supplier purchases through trusted server-side inventory transactions."
     >
+      {mutationErrorText ? (
+        <p className="admin-inventory-note" role="alert">
+          {mutationErrorText}
+        </p>
+      ) : null}
       <div className="admin-inventory-layout">
         <div className="admin-inventory-list">
           <SuppliersPage
