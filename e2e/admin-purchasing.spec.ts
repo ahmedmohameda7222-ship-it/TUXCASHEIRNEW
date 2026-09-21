@@ -20,8 +20,24 @@ const session = {
 
 type Command = Record<string, unknown>;
 
-async function mockPurchasing(page: Page) {
+async function mockPurchasing(
+  page: Page,
+  options: { startWithoutSuppliers?: boolean } = {},
+) {
   const commands: Command[] = [];
+  let suppliers = options.startWithoutSuppliers
+    ? []
+    : [
+        {
+          id: supplierId,
+          businessId: session.principal.businessId,
+          name: 'Prime Foods',
+          contactName: 'Sara',
+          phone: '01000000000',
+          email: 'orders@prime.test',
+          active: true,
+        },
+      ];
   let status: 'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'DRAFT';
   let version = 1;
   const baseMicrosPerPurchaseUnit = 2_000_000;
@@ -44,17 +60,7 @@ async function mockPurchasing(page: Page) {
         contentType: 'application/json',
         body: JSON.stringify({
           shopId,
-          suppliers: [
-            {
-              id: supplierId,
-              businessId: session.principal.businessId,
-              name: 'Prime Foods',
-              contactName: 'Sara',
-              phone: '01000000000',
-              email: 'orders@prime.test',
-              active: true,
-            },
-          ],
+          suppliers,
           inventoryItems: [{ id: itemId, name: 'Beef', unitLabel: 'kg' }],
           purchaseOrders: [
             {
@@ -104,6 +110,19 @@ async function mockPurchasing(page: Page) {
     const command = request.postDataJSON() as Command;
     commands.push(command);
 
+    if (command.type === 'supplier.create') {
+      suppliers = [
+        {
+          id: supplierId,
+          businessId: session.principal.businessId,
+          name: String(command.name),
+          contactName: null,
+          phone: null,
+          email: null,
+          active: true,
+        },
+      ];
+    }
     if (command.type === 'po.order') {
       status = 'ORDERED';
       version += 1;
@@ -152,6 +171,38 @@ test('purchasing renders suppliers and can order a draft PO through the trusted 
     shopId,
     purchaseOrderId: poId,
     expectedVersion: 1,
+  });
+});
+
+test('purchase order defaults adopt the first supplier created after an initially empty workspace', async ({
+  page,
+}) => {
+  const fixture = await mockPurchasing(page, { startWithoutSuppliers: true });
+  await page.goto('/purchasing');
+
+  await page.getByLabel('Supplier name').fill('Prime Foods');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(page.getByText('Prime Foods').first()).toBeVisible();
+
+  await page.getByLabel('Order quantity (purchase units)').fill('1');
+  await page.getByRole('button', { name: 'Create purchase order' }).click();
+
+  await expect.poll(() => fixture.commands.length).toBe(2);
+  expect(fixture.commands[0]).toMatchObject({
+    type: 'supplier.create',
+    shopId,
+    name: 'Prime Foods',
+  });
+  expect(fixture.commands[1]).toMatchObject({
+    type: 'po.create',
+    shopId,
+    supplierId,
+    lines: [
+      expect.objectContaining({
+        inventoryItemId: itemId,
+        orderedPurchaseUnitsMicros: 1_000_000,
+      }),
+    ],
   });
 });
 
