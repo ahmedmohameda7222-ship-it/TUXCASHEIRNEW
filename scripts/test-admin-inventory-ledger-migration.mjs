@@ -169,6 +169,25 @@ if (
 ) {
   throw new Error('canonical inventory movement rows must reject post-insert rewrites');
 }
+if (
+  !lower.includes('assert_operations_placement_inventory_requirements_v1') ||
+  !lower.includes('tux_inventory_placement_requirements_mismatch') ||
+  !lower.includes('assert_order_inventory_reservations_settled_v1') ||
+  !lower.includes('tux_inventory_reservation_not_settled') ||
+  !lower.includes('operations_sync_event_receipts')
+) {
+  throw new Error(
+    'canonical sync receipt must validate complete placement requirements and terminal settlement',
+  );
+}
+
+if (
+  !lower.includes('read_admin_inventory_movement_history_v1') ||
+  !/row_number\s*\(\s*\)\s*over\s*\(\s*partition\s+by\s+m\.inventory_item_id/i.test(sql) ||
+  !/item_rank\s*<=\s*p_per_item_limit/i.test(sql)
+) {
+  throw new Error('Admin inventory history must be bounded independently per inventory item');
+}
 
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
 if (beginStocktake < 0) {
@@ -188,6 +207,14 @@ if (
   !postStocktakeSql.includes('except')
 ) {
   throw new Error('stocktake posting must validate submitted inventory IDs as an exact set');
+}
+if (
+  !lower.includes('posting_expected_on_hand_micros') ||
+  !postStocktakeSql.includes('v_delta := v_actual - v_current_on_hand')
+) {
+  throw new Error(
+    'stocktake posting must reconcile the physical count against canonical on-hand at posting',
+  );
 }
 if (!lower.includes("status, 'draft'") && !lower.includes("'draft'")) {
   throw new Error('stocktake begin flow must retain a DRAFT state before posting');
@@ -539,6 +566,250 @@ psql(
      end $legacy_consumption_fence_assertion$;`,
   ],
   'Legacy placement rejection balance assertion',
+);
+
+
+const configProductId = '85000000-0000-4000-8000-000000000001';
+const placementOrderId = '85000000-0000-4000-8000-000000000002';
+const terminalOrderId = '85000000-0000-4000-8000-000000000003';
+const terminalReservationMovementId = '85000000-0000-4000-8000-000000000004';
+const terminalSettlementMovementId = '85000000-0000-4000-8000-000000000005';
+
+psql(
+  [
+    '-c',
+    \`insert into public.operations_configuration_snapshots(
+       shop_id, version, bundle_json, published_at
+     ) values (
+       '\${shopId}', 9001,
+       $bundle$
+       {
+         "snapshot": {
+           "shopId": "\${shopId}",
+           "version": 9001,
+           "modifiers": [],
+           "recipeLines": [
+             {
+               "shopId": "\${shopId}",
+               "productId": "\${configProductId}",
+               "inventoryItemId": "\${itemId}",
+               "quantityMicros": 500000
+             }
+           ]
+         },
+         "inventoryItems": []
+       }
+       $bundle$::jsonb,
+       timestamptz '2026-09-19 02:10:00+00'
+     );\`,
+  ],
+  'Canonical placement configuration fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    \`select private.assert_operations_placement_inventory_requirements_v1(
+       '\${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "\${placementOrderId}",
+             "items": [
+               {
+                 "productId": "\${configProductId}",
+                 "quantity": 2,
+                 "modifiers": [],
+                 "comboBeverages": []
+               }
+             ]
+           },
+           "inventoryMovements": []
+         }
+       }
+       $envelope$::jsonb
+     );\`,
+  ],
+  'Incomplete canonical placement reservation set',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    \`select private.assert_operations_placement_inventory_requirements_v1(
+       '\${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9001,
+           "order": {
+             "id": "\${placementOrderId}",
+             "items": [
+               {
+                 "productId": "\${configProductId}",
+                 "quantity": 2,
+                 "modifiers": [],
+                 "comboBeverages": []
+               }
+             ]
+           },
+           "inventoryMovements": [
+             {
+               "itemId": "\${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 1000000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );\`,
+  ],
+  'Complete canonical placement reservation set',
+);
+
+psql(
+  [
+    '-c',
+    \`set session_replication_role = replica;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       idempotency_key, created_at
+     ) values (
+       '\${terminalReservationMovementId}', '\${shopId}', '\${dayId}', '\${itemId}',
+       'ORDER_RESERVATION', 0, 100000, '\${workerId}', '\${terminalOrderId}',
+       'terminal-reservation-fixture', timestamptz '2026-09-19 02:11:00+00'
+     );
+     set session_replication_role = origin;\`,
+  ],
+  'Terminal reservation fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    \`select private.assert_order_inventory_reservations_settled_v1(
+       '\${shopId}', '\${terminalOrderId}'
+     );\`,
+  ],
+  'Incomplete terminal reservation settlement',
+  'TUX_INVENTORY_RESERVATION_NOT_SETTLED',
+);
+
+psql(
+  [
+    '-c',
+    \`set session_replication_role = replica;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       idempotency_key, created_at
+     ) values (
+       '\${terminalSettlementMovementId}', '\${shopId}', '\${dayId}', '\${itemId}',
+       'ORDER_CONSUMPTION', -100000, -100000, '\${workerId}', '\${terminalOrderId}',
+       'terminal-settlement-fixture', timestamptz '2026-09-19 02:12:00+00'
+     );
+     set session_replication_role = origin;
+     select private.assert_order_inventory_reservations_settled_v1(
+       '\${shopId}', '\${terminalOrderId}'
+     );\`,
+  ],
+  'Complete terminal reservation settlement',
+);
+
+const stocktakeItemId = '86000000-0000-4000-8000-000000000001';
+const stocktakeId = '86000000-0000-4000-8000-000000000002';
+const stocktakeEmployeeId = '86000000-0000-4000-8000-000000000003';
+
+psql(
+  [
+    '-c',
+    \`insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
+       values ('\${stocktakeItemId}', '\${shopId}', 'Stocktake Boundary Item', 'unit', 'RECIPE_TRACKED', true);
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '86000000-0000-4000-8000-000000000004', '\${shopId}', '\${dayId}', '\${stocktakeItemId}',
+       'BULK_STOCK_RECEIVED', 10000000, 0, '\${workerId}',
+       'stocktake-boundary-seed', timestamptz '2026-09-19 03:00:00+00'
+     );
+     set session_replication_role = replica;
+     insert into public.stocktakes(
+       id, shop_id, created_by_employee_id, status, command_id, started_at, created_at
+     ) values (
+       '\${stocktakeId}', '\${shopId}', '\${stocktakeEmployeeId}', 'DRAFT',
+       'stocktake-boundary-begin', timestamptz '2026-09-19 03:00:01+00',
+       timestamptz '2026-09-19 03:00:01+00'
+     );
+     insert into public.stocktake_lines(
+       stocktake_id, inventory_item_id, snapshot_on_hand_micros,
+       snapshot_reserved_micros, actual_count_micros, variance_micros,
+       unit_cost_minor, created_at
+     ) values (
+       '\${stocktakeId}', '\${stocktakeItemId}', 10000000, 0, null, null, 0,
+       timestamptz '2026-09-19 03:00:01+00'
+     );
+     set session_replication_role = origin;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id,
+       idempotency_key, created_at
+     ) values (
+       '86000000-0000-4000-8000-000000000005', '\${shopId}', '\${dayId}', '\${stocktakeItemId}',
+       'ADMIN_ADJUSTMENT', -2000000, 0, '\${workerId}',
+       'stocktake-boundary-intervening-sale', timestamptz '2026-09-19 03:00:02+00'
+     );
+     create or replace function private.admin_inventory_authority_v1(
+       p_employee_id uuid, p_shop_id uuid, p_permission text
+     )
+     returns table(business_id uuid, employee_role text)
+     language sql security definer
+     set search_path = pg_catalog, public
+     as $auth$ select null::uuid, 'OWNER'::text $auth$;
+     set session_replication_role = replica;
+     select public.post_stocktake_v1(
+       '\${stocktakeEmployeeId}', '\${shopId}', '\${stocktakeId}',
+       '[{"inventoryItemId":"\${stocktakeItemId}","actualCountMicros":8000000}]'::jsonb,
+       'stocktake-boundary-post'
+     );
+     set session_replication_role = origin;\`,
+  ],
+  'Stocktake posting boundary behavior',
+);
+
+psql(
+  [
+    '-c',
+    \`do $stocktake_boundary_assertion$
+     declare
+       v_on_hand bigint;
+       v_variance bigint;
+       v_posting_expected bigint;
+     begin
+       select b.on_hand_micros into v_on_hand
+       from private.inventory_balance_v1('\${shopId}', '\${stocktakeItemId}') b;
+       if v_on_hand <> 8000000 then
+         raise exception 'stocktake double-applied intervening movement: %', v_on_hand;
+       end if;
+       select l.variance_micros, l.posting_expected_on_hand_micros
+         into v_variance, v_posting_expected
+       from public.stocktake_lines l
+       where l.stocktake_id = '\${stocktakeId}'
+         and l.inventory_item_id = '\${stocktakeItemId}';
+       if v_variance <> 0 or v_posting_expected <> 8000000 then
+         raise exception 'stocktake posting boundary snapshot is incorrect: %, %',
+           v_variance, v_posting_expected;
+       end if;
+     end $stocktake_boundary_assertion$;\`,
+  ],
+  'Stocktake posting boundary assertion',
 );
 
 console.log('Admin inventory ledger static and PostgreSQL compatibility invariants passed.');

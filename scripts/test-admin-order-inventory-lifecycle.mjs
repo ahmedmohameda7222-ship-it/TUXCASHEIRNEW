@@ -15,6 +15,10 @@ const inventoryMigration = fs.readFileSync(
   'utf8',
 );
 const operationsSync = fs.readFileSync('supabase/functions/operations-sync/index.ts', 'utf8');
+const operationsInventory = fs.readFileSync(
+  'supabase/functions/operations-inventory/index.ts',
+  'utf8',
+);
 
 for (const movementType of [
   'ORDER_RESERVATION',
@@ -122,6 +126,15 @@ if (
   throw new Error(
     'operations-sync must classify canonical reservation rejection as a permanent conflict',
   );
+}
+
+if (
+  !operationsInventory.includes('loadAllInventoryItems') ||
+  !operationsInventory.includes('loadAllInventoryCosts') ||
+  !operationsInventory.includes('offset += page.length') ||
+  !operationsInventory.includes('.range(')
+) {
+  throw new Error('Operations inventory projection must page complete item and cost datasets');
 }
 
 console.log('Admin order inventory lifecycle source invariants passed.');
