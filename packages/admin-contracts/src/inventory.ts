@@ -184,6 +184,7 @@ export type AdminInventoryCommand =
       readonly type: 'replenishment.update';
       readonly shopId: string;
       readonly inventoryItemId: string;
+      readonly expectedVersion: number;
       readonly parLevelMicros: number;
       readonly reorderPointMicros: number;
       readonly preferredPurchaseUnit: string | null;
