@@ -1606,6 +1606,11 @@ begin
       v_shop_id,
       v_mutation
     );
+    perform private.assert_tux_online_order_materialization_origin(
+      p_device_id,
+      v_shop_id,
+      v_mutation
+    );
     perform private.apply_tux_remote_mutation(v_mutation);
   end loop;
 
