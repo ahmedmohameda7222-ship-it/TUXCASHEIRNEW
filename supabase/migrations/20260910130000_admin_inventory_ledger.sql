@@ -629,6 +629,87 @@ $placement_requirements$;
 revoke all on function private.assert_operations_placement_inventory_requirements_v1(uuid, jsonb)
   from public, anon, authenticated;
 
+create or replace function private.assert_order_inventory_undo_reversal_set_v1(
+  p_shop_id uuid,
+  p_order_id uuid,
+  p_envelope jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $undo_reversal_set$
+declare
+  v_mismatch boolean;
+begin
+  if p_shop_id is null
+     or p_order_id is null
+     or jsonb_typeof(p_envelope #> '{payload,inventoryMovements}') is distinct from 'array' then
+    raise exception 'TUX_INVENTORY_UNDO_REVERSAL_MISMATCH';
+  end if;
+
+  begin
+    with canonical as (
+      select
+        m.id as consumption_id,
+        m.inventory_item_id,
+        -m.quantity_delta_micros as quantity_micros,
+        -m.reserved_delta_micros as reserved_micros
+      from public.inventory_movements m
+      where m.shop_id = p_shop_id
+        and m.order_id = p_order_id
+        and m.movement_type = 'ORDER_CONSUMPTION'
+        and m.quantity_delta_micros < 0
+        and m.reserved_delta_micros < 0
+        and not exists (
+          select 1
+          from public.inventory_movements reversal
+          where reversal.shop_id = p_shop_id
+            and reversal.order_id = p_order_id
+            and reversal.movement_type = 'ORDER_CONSUMPTION_REVERSAL'
+            and reversal.compensates_movement_id = m.id
+        )
+    ),
+    submitted as (
+      select
+        (movement.value ->> 'compensatesMovementId')::uuid as consumption_id,
+        (movement.value ->> 'itemId')::uuid as inventory_item_id,
+        movement.value ->> 'movementType' as movement_type,
+        (movement.value ->> 'quantityDeltaMicros')::bigint as quantity_micros,
+        coalesce((movement.value ->> 'reservedDeltaMicros')::bigint, 0) as reserved_micros
+      from jsonb_array_elements(p_envelope #> '{payload,inventoryMovements}') movement
+    )
+    select
+      exists (
+        select 1
+        from canonical c
+        full join submitted s using (consumption_id)
+        where c.consumption_id is null
+           or s.consumption_id is null
+           or s.movement_type is distinct from 'ORDER_CONSUMPTION_REVERSAL'
+           or s.inventory_item_id is distinct from c.inventory_item_id
+           or s.quantity_micros is distinct from c.quantity_micros
+           or s.reserved_micros is distinct from c.reserved_micros
+      )
+      or (
+        select count(*) <> count(distinct s.consumption_id)
+        from submitted s
+      )
+    into v_mismatch;
+
+    if coalesce(v_mismatch, false) then
+      raise exception 'TUX_INVENTORY_UNDO_REVERSAL_MISMATCH';
+    end if;
+  exception
+    when invalid_text_representation or numeric_value_out_of_range then
+      raise exception 'TUX_INVENTORY_UNDO_REVERSAL_MISMATCH';
+  end;
+end;
+$undo_reversal_set$;
+
+revoke all on function private.assert_order_inventory_undo_reversal_set_v1(uuid, uuid, jsonb)
+  from public, anon, authenticated;
+
 create or replace function private.assert_order_inventory_reservations_settled_v1(
   p_shop_id uuid,
   p_order_id uuid
@@ -1642,6 +1723,19 @@ begin
 
   if jsonb_typeof(p_plan -> 'mutations') <> 'array' then
     raise exception 'TUX_SYNC_PLAN_INVALID';
+  end if;
+
+  if v_event_type = 'ORDER_DONE_UNDONE' then
+    begin
+      v_order_id := (p_envelope #>> '{payload,order,id}')::uuid;
+    exception when others then
+      raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+    end;
+    perform private.assert_order_inventory_undo_reversal_set_v1(
+      v_shop_id,
+      v_order_id,
+      p_envelope
+    );
   end if;
 
   for v_mutation in select value from jsonb_array_elements(p_plan -> 'mutations') loop
