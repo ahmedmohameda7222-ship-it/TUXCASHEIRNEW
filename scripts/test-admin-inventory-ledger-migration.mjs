@@ -887,6 +887,128 @@ psql(
   'Complete terminal reservation settlement',
 );
 
+const undoOrderId = '85000000-0000-4000-8000-000000000009';
+const undoConsumptionOneId = '85000000-0000-4000-8000-00000000000a';
+const undoConsumptionTwoId = '85000000-0000-4000-8000-00000000000b';
+
+psql(
+  [
+    '-c',
+    `set session_replication_role = replica;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values
+       (
+         '${undoConsumptionOneId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -100000, -100000, '${workerId}', '${undoOrderId}',
+         null, 'undo-consumption-one', timestamptz '2026-09-19 02:20:00+00'
+       ),
+       (
+         '${undoConsumptionTwoId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -200000, -200000, '${workerId}', '${undoOrderId}',
+         null, 'undo-consumption-two', timestamptz '2026-09-19 02:20:01+00'
+       );
+     reset session_replication_role;`,
+  ],
+  'Canonical undo consumption fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_undo_reversal_set_v1(
+       '${shopId}',
+       '${undoOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION_REVERSAL",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 200000,
+               "compensatesMovementId": "${undoConsumptionOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION_REVERSAL",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 200000,
+               "compensatesMovementId": "${undoConsumptionTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Oversized canonical undo reversal',
+  'TUX_INVENTORY_UNDO_REVERSAL_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_undo_reversal_set_v1(
+       '${shopId}',
+       '${undoOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION_REVERSAL",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 100000,
+               "compensatesMovementId": "${undoConsumptionOneId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Partial canonical undo reversal set',
+  'TUX_INVENTORY_UNDO_REVERSAL_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_inventory_undo_reversal_set_v1(
+       '${shopId}',
+       '${undoOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION_REVERSAL",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 100000,
+               "compensatesMovementId": "${undoConsumptionOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION_REVERSAL",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 200000,
+               "compensatesMovementId": "${undoConsumptionTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Exact canonical undo reversal set',
+);
+
 const stocktakeItemId = '86000000-0000-4000-8000-000000000001';
 const stocktakeId = '86000000-0000-4000-8000-000000000002';
 const stocktakeEmployeeId = '86000000-0000-4000-8000-000000000003';
