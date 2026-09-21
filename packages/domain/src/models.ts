@@ -174,8 +174,10 @@ export type OrderReasonCodeSnapshot = ReasonCodeSnapshot;
 
 export interface OrderCancellationSnapshot {
   readonly at: Instant;
-  readonly workerId: WorkerId;
+  readonly workerId: WorkerId | null;
   readonly workerName: string;
+  /** Present when the canonical transition was authored by TUX Admin rather than Operations. */
+  readonly adminEmployeeId?: string;
   readonly foodPrepared: boolean;
   readonly stockRestored: boolean;
   readonly reason: string;
@@ -187,8 +189,10 @@ export interface OrderCancellationSnapshot {
 
 export interface OrderReturnSnapshot {
   readonly at: Instant;
-  readonly workerId: WorkerId;
+  readonly workerId: WorkerId | null;
   readonly workerName: string;
+  /** Present when the canonical transition was authored by TUX Admin rather than Operations. */
+  readonly adminEmployeeId?: string;
   readonly reason: string;
   /** Present for configured future mutations; absent on legacy returns. */
   readonly reasonCode?: OrderReasonCodeSnapshot;
