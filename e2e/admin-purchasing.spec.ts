@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { AdminSupplier } from '@tux/admin-contracts';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const supplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -29,7 +30,7 @@ async function mockPurchasing(
   } = {},
 ) {
   const commands: Command[] = [];
-  let suppliers = options.startWithoutSuppliers
+  let suppliers: AdminSupplier[] = options.startWithoutSuppliers
     ? []
     : [
         {
