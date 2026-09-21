@@ -573,6 +573,8 @@ const configProductId = '85000000-0000-4000-8000-000000000001';
 const snapshotFutureProductId = '85000000-0000-4000-8000-000000000006';
 const snapshotModifierId = '85000000-0000-4000-8000-000000000007';
 const snapshotBeverageProductId = '85000000-0000-4000-8000-000000000008';
+const comboProductId = '85000000-0000-4000-8000-00000000000c';
+const comboCardinalityBeverageId = '85000000-0000-4000-8000-00000000000d';
 const placementOrderId = '85000000-0000-4000-8000-000000000002';
 const terminalOrderId = '85000000-0000-4000-8000-000000000003';
 const terminalReservationMovementId = '85000000-0000-4000-8000-000000000004';
@@ -834,6 +836,95 @@ psqlExpectFailure(
      );`,
   ],
   'Placement beverage absent from referenced combo relation',
+  'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.operations_configuration_snapshots(
+       shop_id, version, bundle_json, published_at
+     ) values (
+       '${shopId}', 9002,
+       $bundle$
+       {
+         "snapshot": {
+           "shopId": "${shopId}",
+           "version": 9002,
+           "products": [
+             { "id": "${comboProductId}", "isCombo": true },
+             { "id": "${comboCardinalityBeverageId}", "isCombo": false }
+           ],
+           "modifiers": [],
+           "productModifierLinks": [],
+           "comboBeverageOptions": [
+             {
+               "shopId": "${shopId}",
+               "comboProductId": "${comboProductId}",
+               "beverageProductId": "${comboCardinalityBeverageId}",
+               "sortOrder": 0
+             }
+           ],
+           "recipeLines": [
+             {
+               "shopId": "${shopId}",
+               "productId": "${comboProductId}",
+               "inventoryItemId": "${itemId}",
+               "quantityMicros": 500000
+             },
+             {
+               "shopId": "${shopId}",
+               "productId": "${comboCardinalityBeverageId}",
+               "inventoryItemId": "${itemId}",
+               "quantityMicros": 100000
+             }
+           ]
+         },
+         "inventoryItems": []
+       }
+       $bundle$::jsonb,
+       timestamptz '2026-09-19 02:10:30+00'
+     );`,
+  ],
+  'Combo placement cardinality configuration fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_operations_placement_inventory_requirements_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "configurationVersion": 9002,
+           "order": {
+             "id": "${placementOrderId}",
+             "items": [
+               {
+                 "productId": "${comboProductId}",
+                 "quantity": 2,
+                 "modifiers": [],
+                 "comboBeverages": [
+                   { "productId": "${comboCardinalityBeverageId}" }
+                 ]
+               }
+             ]
+           },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": 1100000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Combo placement requires one beverage per combo unit',
   'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH',
 );
 
