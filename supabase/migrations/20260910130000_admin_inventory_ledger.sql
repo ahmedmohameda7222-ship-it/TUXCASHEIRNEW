@@ -1626,6 +1626,7 @@ declare
   v_destination_business uuid;
   v_role text;
   v_transfer_id uuid;
+  v_existing_transfer public.stock_transfers%rowtype;
   v_line jsonb;
   v_resolved_lines jsonb := '[]'::jsonb;
   v_item_id uuid;
@@ -1642,15 +1643,6 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_transfer_command');
   end if;
 
-  select t.id into v_transfer_id
-  from public.stock_transfers t
-  where t.source_shop_id = p_source_shop_id and t.send_command_id = p_command_id;
-  if v_transfer_id is not null then
-    return jsonb_build_object(
-      'ok', true, 'idempotentReplay', true, 'transferId', v_transfer_id
-    );
-  end if;
-
   select a.business_id, a.employee_role into v_source_business, v_role
   from private.admin_inventory_authority_v1(
     p_employee_id, p_source_shop_id, 'inventory.transfer'
@@ -1662,6 +1654,18 @@ begin
 
   if v_source_business is distinct from v_destination_business then
     return jsonb_build_object('ok', false, 'code', 'cross_business_transfer_forbidden');
+  end if;
+
+  select t.* into v_existing_transfer
+  from public.stock_transfers t
+  where t.source_shop_id = p_source_shop_id and t.send_command_id = p_command_id;
+  if found then
+    if v_existing_transfer.destination_shop_id is distinct from p_destination_shop_id then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+    return jsonb_build_object(
+      'ok', true, 'idempotentReplay', true, 'transferId', v_existing_transfer.id
+    );
   end if;
 
   for v_line in
@@ -1797,17 +1801,18 @@ begin
   if not found then
     return jsonb_build_object('ok', false, 'code', 'transfer_not_found');
   end if;
+
+  perform 1
+  from private.admin_inventory_authority_v1(
+    p_employee_id, v_transfer.destination_shop_id, 'inventory.transfer'
+  );
+
   if v_transfer.status = 'RECEIVED' and v_transfer.receive_command_id = p_command_id then
     return jsonb_build_object('ok', true, 'idempotentReplay', true);
   end if;
   if v_transfer.status <> 'SENT' then
     return jsonb_build_object('ok', false, 'code', 'transfer_not_receivable');
   end if;
-
-  perform 1
-  from private.admin_inventory_authority_v1(
-    p_employee_id, v_transfer.destination_shop_id, 'inventory.transfer'
-  );
 
   for v_source_line in
     select l.*

@@ -620,6 +620,7 @@ declare
   v_business_id uuid;
   v_order public.purchase_orders%rowtype;
   v_existing_receipt uuid;
+  v_existing_receipt_purchase_order_id uuid;
   v_receipt_id uuid;
   v_line jsonb;
   v_line_id uuid;
@@ -646,19 +647,6 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_receive_command');
   end if;
 
-  select r.id into v_existing_receipt
-  from public.purchase_receipts r
-  where r.shop_id = p_shop_id and r.command_id = p_command_id;
-  if v_existing_receipt is not null then
-    select po.* into v_order
-    from public.purchase_orders po where po.id = p_purchase_order_id;
-    return jsonb_build_object(
-      'ok', true, 'purchaseOrderId', p_purchase_order_id,
-      'receiptId', v_existing_receipt, 'status', v_order.status,
-      'version', v_order.version, 'idempotentReplay', true
-    );
-  end if;
-
   select po.* into v_order
   from public.purchase_orders po
   where po.id = p_purchase_order_id and po.shop_id = p_shop_id
@@ -666,6 +654,21 @@ begin
 
   if not found or v_order.business_id is distinct from v_business_id then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_found');
+  end if;
+
+  select r.id, r.purchase_order_id
+    into v_existing_receipt, v_existing_receipt_purchase_order_id
+  from public.purchase_receipts r
+  where r.shop_id = p_shop_id and r.command_id = p_command_id;
+  if v_existing_receipt is not null then
+    if v_existing_receipt_purchase_order_id is distinct from v_order.id then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+    return jsonb_build_object(
+      'ok', true, 'purchaseOrderId', v_order.id,
+      'receiptId', v_existing_receipt, 'status', v_order.status,
+      'version', v_order.version, 'idempotentReplay', true
+    );
   end if;
   if v_order.status not in ('ORDERED', 'PARTIALLY_RECEIVED') then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_receivable');
@@ -884,6 +887,7 @@ declare
   v_business_id uuid;
   v_order public.purchase_orders%rowtype;
   v_existing_return uuid;
+  v_existing_return_purchase_order_id uuid;
   v_return_id uuid;
   v_line jsonb;
   v_line_id uuid;
@@ -920,18 +924,6 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_return_command');
   end if;
 
-  select r.id into v_existing_return
-  from public.purchase_returns r
-  where r.shop_id = p_shop_id and r.command_id = p_command_id;
-  if v_existing_return is not null then
-    select po.* into v_order from public.purchase_orders po where po.id = p_purchase_order_id;
-    return jsonb_build_object(
-      'ok', true, 'purchaseOrderId', p_purchase_order_id,
-      'returnId', v_existing_return, 'status', v_order.status,
-      'version', v_order.version, 'idempotentReplay', true
-    );
-  end if;
-
   select po.* into v_order
   from public.purchase_orders po
   where po.id = p_purchase_order_id and po.shop_id = p_shop_id
@@ -939,6 +931,21 @@ begin
 
   if not found or v_order.business_id is distinct from v_business_id then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_found');
+  end if;
+
+  select r.id, r.purchase_order_id
+    into v_existing_return, v_existing_return_purchase_order_id
+  from public.purchase_returns r
+  where r.shop_id = p_shop_id and r.command_id = p_command_id;
+  if v_existing_return is not null then
+    if v_existing_return_purchase_order_id is distinct from v_order.id then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+    return jsonb_build_object(
+      'ok', true, 'purchaseOrderId', v_order.id,
+      'returnId', v_existing_return, 'status', v_order.status,
+      'version', v_order.version, 'idempotentReplay', true
+    );
   end if;
   if v_order.status not in ('PARTIALLY_RECEIVED', 'RECEIVED') then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_returnable');
