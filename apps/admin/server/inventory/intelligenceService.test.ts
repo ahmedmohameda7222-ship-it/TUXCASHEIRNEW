@@ -26,7 +26,7 @@ describe('inventory intelligence purchasing integration', () => {
               {
                 inventory_item_id: 'item-1',
                 par_level_base: 15_000,
-                reorder_point_base: 7_000,
+                reorder_point_base: 10_000,
                 preferred_supplier_id: 'supplier-1',
                 preferred_purchase_unit: 'case',
                 lead_time_days: 3,
