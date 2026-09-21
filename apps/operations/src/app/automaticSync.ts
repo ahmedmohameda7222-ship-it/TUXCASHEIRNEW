@@ -3,8 +3,10 @@ import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
   HttpInventoryFeedTransport,
+  HttpOrderLifecycleFeedTransport,
   HttpOutboxTransport,
   InventoryConvergenceService,
+  OrderLifecycleConvergenceService,
   OutboxSyncService,
 } from '@tux/sync';
 import { browserSyncStatusStore } from './syncStatus';
@@ -26,6 +28,7 @@ export function startBrowserAutomaticSync(input: {
   });
 
   let inventoryRunning = false;
+  let lifecycleRunning = false;
   const synchronizeInventory = async (): Promise<void> => {
     if (input.shopId === undefined || inventoryRunning) return;
     inventoryRunning = true;
@@ -46,11 +49,35 @@ export function startBrowserAutomaticSync(input: {
     }
   };
 
+  const synchronizeLifecycle = async (): Promise<void> => {
+    if (input.shopId === undefined || lifecycleRunning) return;
+    lifecycleRunning = true;
+    try {
+      const lifecycleEndpoint = new URL(
+        '/api/operations-order-lifecycle',
+        window.location.origin,
+      ).toString();
+      const convergence = new OrderLifecycleConvergenceService(
+        input.database,
+        new HttpOrderLifecycleFeedTransport({ endpoint: lifecycleEndpoint }),
+      );
+      await convergence.syncShop(input.shopId);
+    } catch {
+      // Operations remains usable from its last known-good local lifecycle projection.
+    } finally {
+      lifecycleRunning = false;
+    }
+  };
+
   browserSyncStatusStore.markRemoteConfigured();
   if (input.shopId !== undefined) {
     void synchronizeInventory();
+    void synchronizeLifecycle();
     if (typeof window.setInterval === 'function') {
-      window.setInterval(() => void synchronizeInventory(), INVENTORY_SYNC_INTERVAL_MS);
+      window.setInterval(() => {
+        void synchronizeInventory();
+        void synchronizeLifecycle();
+      }, INVENTORY_SYNC_INTERVAL_MS);
     }
   }
 
@@ -59,6 +86,7 @@ export function startBrowserAutomaticSync(input: {
     window.addEventListener('online', () => {
       browserSyncStatusStore.setOnline(true);
       void synchronizeInventory();
+      void synchronizeLifecycle();
     });
     window.addEventListener('offline', () => browserSyncStatusStore.setOnline(false));
   }
