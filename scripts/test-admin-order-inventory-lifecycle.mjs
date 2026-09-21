@@ -129,6 +129,15 @@ if (
 }
 
 if (
+  !operationsSync.includes('TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH') ||
+  !operationsSync.includes('TUX_INVENTORY_RESERVATION_NOT_SETTLED')
+) {
+  throw new Error(
+    'operations-sync must classify lifecycle completeness rejection as a permanent protocol failure',
+  );
+}
+
+if (
   !operationsInventory.includes('loadAllInventoryItems') ||
   !operationsInventory.includes('loadAllInventoryCosts') ||
   !operationsInventory.includes('offset += page.length') ||
