@@ -555,7 +555,8 @@ begin
           and (movement.value ->> 'quantityDeltaMicros')::numeric < 0
           and coalesce((movement.value ->> 'reservedDeltaMicros')::numeric, 0) = 0
         )
-      ) as lifecycle_shape_valid
+      ) as lifecycle_shape_valid,
+      count(*) as movement_count
     from jsonb_array_elements(p_envelope #> '{payload,inventoryMovements}') movement
     group by (movement.value ->> 'itemId')::uuid
   )
@@ -566,6 +567,7 @@ begin
     where e.inventory_item_id is null
        or s.inventory_item_id is null
        or s.lifecycle_shape_valid is distinct from true
+       or s.movement_count <> 1
        or e.quantity_micros is distinct from s.quantity_micros
   )
   into v_mismatch;
@@ -1599,6 +1601,11 @@ begin
        and v_mutation #>> '{row,shop_id}' <> v_shop_id::text then
       raise exception 'TUX_SYNC_MUTATION_SHOP_MISMATCH';
     end if;
+    perform private.assert_tux_online_order_materialization_origin(
+      p_device_id,
+      v_shop_id,
+      v_mutation
+    );
     perform private.apply_tux_remote_mutation(v_mutation);
   end loop;
 
