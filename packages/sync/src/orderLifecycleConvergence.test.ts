@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   instant,
+  moneyMinor,
   parseEntityId,
   type OrderId,
   type OrderSnapshot,
@@ -46,7 +47,7 @@ function order(): OrderSnapshot {
         id: parseEntityId('ffffffff-ffff-4fff-8fff-ffffffffffff'),
         productId: parseEntityId('11111111-1111-4111-8111-111111111111'),
         productName: 'Burger',
-        unitPriceMinor: 10000,
+        unitPriceMinor: moneyMinor(10000),
         quantity: 1,
         modifiers: [],
         comboBeverages: [],
@@ -54,10 +55,10 @@ function order(): OrderSnapshot {
       },
     ],
     orderNote: null,
-    itemsSubtotalMinor: 10000,
-    discountMinor: 0,
-    deliveryFeeMinor: 0,
-    totalMinor: 10000,
+    itemsSubtotalMinor: moneyMinor(10000),
+    discountMinor: moneyMinor(0),
+    deliveryFeeMinor: moneyMinor(0),
+    totalMinor: moneyMinor(10000),
     payments: [
       {
         id: parseEntityId('22222222-2222-4222-8222-222222222222'),
@@ -65,11 +66,10 @@ function order(): OrderSnapshot {
           id: parseEntityId('33333333-3333-4333-8333-333333333333'),
           label: 'Cash',
           logicType: 'CASH',
-          requiresReconciliation: true,
         },
-        allocatedMinor: 10000,
-        receivedMinor: 10000,
-        changeMinor: 0,
+        allocatedMinor: moneyMinor(10000),
+        receivedMinor: moneyMinor(10000),
+        changeMinor: moneyMinor(0),
       },
     ],
   };
