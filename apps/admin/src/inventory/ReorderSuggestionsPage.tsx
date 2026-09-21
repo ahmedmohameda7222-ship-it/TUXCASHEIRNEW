@@ -40,6 +40,7 @@ export function ReorderSuggestionsPage({
   onSave: (
     inventoryItemId: string,
     input: {
+      expectedVersion: number;
       parLevelMicros: number;
       reorderPointMicros: number;
       preferredPurchaseUnit: string | null;
@@ -130,6 +131,7 @@ export function ReorderSuggestionsPage({
                     onSubmit={(event) => {
                       event.preventDefault();
                       onSave(row.inventoryItemId, {
+                        expectedVersion: row.version,
                         parLevelMicros: Number(draft.parLevelMicros),
                         reorderPointMicros: Number(draft.reorderPointMicros),
                         preferredPurchaseUnit: draft.preferredPurchaseUnit.trim() || null,
