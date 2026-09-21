@@ -207,7 +207,9 @@ test('purchasing surfaces ordinary mutation conflicts to the operator', async ({
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
 
-test('purchasing replaces an older mutation error with the most recent failure', async ({ page }) => {
+test('purchasing replaces an older mutation error with the most recent failure', async ({
+  page,
+}) => {
   await mockPurchasing(page, {
     failureCodesByCommand: {
       'supplier.create': 'supplier_name_conflict',
