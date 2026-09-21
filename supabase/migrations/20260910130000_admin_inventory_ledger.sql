@@ -485,10 +485,58 @@ begin
     and s.version = v_configuration_version;
 
   if not found
-     or jsonb_typeof(v_bundle #> '{snapshot,recipeLines}') is distinct from 'array'
-     or jsonb_typeof(v_bundle #> '{snapshot,modifiers}') is distinct from 'array' then
+     or jsonb_typeof(v_bundle #> '{snapshot,products}') is distinct from 'array'
+     or jsonb_typeof(v_bundle #> '{snapshot,modifiers}') is distinct from 'array'
+     or jsonb_typeof(v_bundle #> '{snapshot,productModifierLinks}') is distinct from 'array'
+     or jsonb_typeof(v_bundle #> '{snapshot,comboBeverageOptions}') is distinct from 'array'
+     or jsonb_typeof(v_bundle #> '{snapshot,recipeLines}') is distinct from 'array' then
     raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
   end if;
+
+  begin
+    if exists (
+      select 1
+      from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
+      where not exists (
+        select 1
+        from jsonb_array_elements(v_bundle #> '{snapshot,products}') product
+        where product.value ->> 'id' = item.value ->> 'productId'
+      )
+    ) or exists (
+      select 1
+      from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
+      cross join lateral jsonb_array_elements(
+        coalesce(item.value -> 'modifiers', '[]'::jsonb)
+      ) modifier
+      where not exists (
+        select 1
+        from jsonb_array_elements(v_bundle #> '{snapshot,modifiers}') modifier_definition
+        join lateral jsonb_array_elements(v_bundle #> '{snapshot,productModifierLinks}') link
+          on link.value ->> 'modifierId' = modifier_definition.value ->> 'id'
+        where modifier_definition.value ->> 'id' = modifier.value ->> 'modifierId'
+          and link.value ->> 'productId' = item.value ->> 'productId'
+      )
+    ) or exists (
+      select 1
+      from jsonb_array_elements(p_envelope #> '{payload,order,items}') item
+      cross join lateral jsonb_array_elements(
+        coalesce(item.value -> 'comboBeverages', '[]'::jsonb)
+      ) beverage
+      where not exists (
+        select 1
+        from jsonb_array_elements(v_bundle #> '{snapshot,comboBeverageOptions}') option_definition
+        join lateral jsonb_array_elements(v_bundle #> '{snapshot,products}') beverage_product
+          on beverage_product.value ->> 'id' = option_definition.value ->> 'beverageProductId'
+        where option_definition.value ->> 'comboProductId' = item.value ->> 'productId'
+          and option_definition.value ->> 'beverageProductId' = beverage.value ->> 'productId'
+      )
+    ) then
+      raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+    end if;
+  exception
+    when invalid_text_representation or numeric_value_out_of_range then
+      raise exception 'TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH';
+  end;
 
   with order_items as (
     select item.value as item
