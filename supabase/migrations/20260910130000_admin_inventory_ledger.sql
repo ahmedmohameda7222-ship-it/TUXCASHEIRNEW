@@ -363,6 +363,73 @@ create trigger inventory_movements_reservation_capacity
 before insert on public.inventory_movements
 for each row execute function private.enforce_inventory_order_reservation_capacity_v1();
 
+create or replace function private.enforce_inventory_bulk_undo_integrity_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $bulk_undo_integrity$
+declare
+  v_original public.inventory_movements%rowtype;
+begin
+  if new.movement_type not in ('UNDO_BULK_UNIT_FINISHED', 'UNDO_BULK_STOCK_RECEIVED') then
+    return new;
+  end if;
+
+  if new.compensates_movement_id is null
+     or coalesce(new.reserved_delta_micros, 0) <> 0
+     or new.order_id is not null then
+    raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+  end if;
+
+  select m.*
+    into v_original
+  from public.inventory_movements m
+  where m.id = new.compensates_movement_id
+    and m.shop_id = new.shop_id
+  for update;
+
+  if not found
+     or v_original.inventory_item_id is distinct from new.inventory_item_id
+     or coalesce(v_original.reserved_delta_micros, 0) <> 0
+     or v_original.order_id is not null
+     or v_original.compensates_movement_id is not null
+     or new.quantity_delta_micros::numeric <> -(v_original.quantity_delta_micros::numeric)
+     or (
+       new.movement_type = 'UNDO_BULK_UNIT_FINISHED'
+       and (
+         v_original.movement_type is distinct from 'BULK_UNIT_FINISHED'
+         or v_original.quantity_delta_micros >= 0
+         or new.quantity_delta_micros <= 0
+       )
+     )
+     or (
+       new.movement_type = 'UNDO_BULK_STOCK_RECEIVED'
+       and (
+         v_original.movement_type is distinct from 'BULK_STOCK_RECEIVED'
+         or v_original.quantity_delta_micros <= 0
+         or new.quantity_delta_micros >= 0
+       )
+     )
+     or exists (
+       select 1
+       from public.inventory_movements compensation
+       where compensation.compensates_movement_id = v_original.id
+     ) then
+    raise exception 'TUX_INVENTORY_BULK_UNDO_MISMATCH';
+  end if;
+
+  return new;
+end;
+$bulk_undo_integrity$;
+
+revoke all on function private.enforce_inventory_bulk_undo_integrity_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_bulk_undo_integrity
+before insert on public.inventory_movements
+for each row execute function private.enforce_inventory_bulk_undo_integrity_v1();
+
 create or replace function private.enforce_inventory_movement_immutability_v1()
 returns trigger
 language plpgsql
