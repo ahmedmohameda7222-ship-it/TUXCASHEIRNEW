@@ -130,7 +130,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Plan 5 Task 2 order detail RED/behavior
-        run: npx vitest run apps/admin/src/orders/OrderDetailPage.test.tsx
+        run: npx vitest run apps/admin/src/orders/OrderDetailPage.test.tsx apps/admin/src/orders/OrdersTask2.test.tsx
 
   regression:
     needs: task1-order-controls
