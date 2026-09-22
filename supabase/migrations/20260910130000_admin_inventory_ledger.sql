@@ -1010,6 +1010,62 @@ $reservation_settlement$;
 revoke all on function private.assert_order_inventory_reservations_settled_v1(uuid, uuid)
   from public, anon, authenticated;
 
+create or replace function private.assert_order_transition_precondition_v1(
+  p_shop_id uuid,
+  p_envelope jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $order_transition_precondition$
+declare
+  v_order_id uuid;
+  v_from_status text;
+  v_revision bigint;
+  v_current_status text;
+  v_current_revision bigint;
+begin
+  if p_shop_id is null
+     or jsonb_typeof(p_envelope #> '{payload,order}') is distinct from 'object'
+     or jsonb_typeof(p_envelope #> '{payload,transition}') is distinct from 'object' then
+    raise exception 'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH';
+  end if;
+
+  begin
+    v_order_id := (p_envelope #>> '{payload,order,id}')::uuid;
+    v_from_status := p_envelope #>> '{payload,transition,fromStatus}';
+    v_revision := (p_envelope #>> '{payload,transition,revision}')::bigint;
+  exception
+    when invalid_text_representation or numeric_value_out_of_range then
+      raise exception 'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH';
+  end;
+
+  if v_order_id is null
+     or v_from_status not in ('ACTIVE', 'DONE', 'CANCELLED', 'RETURNED')
+     or v_revision is null
+     or v_revision < 1 then
+    raise exception 'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH';
+  end if;
+
+  select o.status, coalesce(o.operational_revision, 0)
+    into v_current_status, v_current_revision
+  from public.orders o
+  where o.id = v_order_id
+    and o.shop_id = p_shop_id
+  for update;
+
+  if not found
+     or v_current_status is distinct from v_from_status
+     or v_revision <> v_current_revision + 1 then
+    raise exception 'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH';
+  end if;
+end;
+$order_transition_precondition$;
+
+revoke all on function private.assert_order_transition_precondition_v1(uuid, jsonb)
+  from public, anon, authenticated;
+
 create or replace function private.admin_inventory_authority_v1(
   p_employee_id uuid,
   p_shop_id uuid,
@@ -1997,6 +2053,18 @@ begin
 
   if jsonb_typeof(p_plan -> 'mutations') <> 'array' then
     raise exception 'TUX_SYNC_PLAN_INVALID';
+  end if;
+
+  if v_event_type in (
+    'ORDER_MARKED_DONE',
+    'ORDER_DONE_UNDONE',
+    'ORDER_CANCELLED',
+    'DELIVERY_RETURNED'
+  ) then
+    perform private.assert_order_transition_precondition_v1(
+      v_shop_id,
+      p_envelope
+    );
   end if;
 
   if v_event_type = 'ORDER_DONE_UNDONE' then
