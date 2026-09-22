@@ -76,6 +76,8 @@ const SUPPLIER_ID = '45000000-0000-4000-8000-000000000001';
 const PO_ID = '55000000-0000-4000-8000-000000000001';
 const LINE_ID = '65000000-0000-4000-8000-000000000001';
 const SECOND_PO_ID = '55000000-0000-4000-8000-000000000099';
+const ORDER_COMMAND_PO_A_ID = '55000000-0000-4000-8000-0000000000a1';
+const ORDER_COMMAND_PO_B_ID = '55000000-0000-4000-8000-0000000000b1';
 
 psql(
   [
@@ -151,6 +153,67 @@ psql(
   ],
   'Purchasing fixture seed',
 );
+
+psql(
+  [
+    '-c',
+    `insert into public.purchase_orders(
+       id, business_id, shop_id, supplier_id, status, version,
+       created_by_employee_id, create_command_id
+     ) values
+       (
+         '${ORDER_COMMAND_PO_A_ID}', '${BUSINESS_ID}', '${SHOP_ID}', '${SUPPLIER_ID}',
+         'DRAFT', 1, '${EMPLOYEE_ID}', 'create-order-command-a'
+       ),
+       (
+         '${ORDER_COMMAND_PO_B_ID}', '${BUSINESS_ID}', '${SHOP_ID}', '${SUPPLIER_ID}',
+         'DRAFT', 1, '${EMPLOYEE_ID}', 'create-order-command-b'
+       );`,
+  ],
+  'Purchase order command-reuse fixture',
+);
+
+const firstOrderCommand = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.order_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${ORDER_COMMAND_PO_A_ID}',
+         1,
+         'order-command-reuse'
+       )::text`,
+    ],
+    'Purchase order command first use',
+  ).trim(),
+);
+if (firstOrderCommand.ok !== true || firstOrderCommand.idempotentReplay !== false) {
+  throw new Error(`unexpected first order-command result: ${JSON.stringify(firstOrderCommand)}`);
+}
+
+const reusedOrderCommand = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.order_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${ORDER_COMMAND_PO_B_ID}',
+         1,
+         'order-command-reuse'
+       )::text`,
+    ],
+    'Purchase order command cross-PO reuse',
+  ).trim(),
+);
+if (reusedOrderCommand.ok !== false || reusedOrderCommand.code !== 'idempotency_conflict') {
+  throw new Error(
+    `order command id was reusable across purchase orders: ${JSON.stringify(reusedOrderCommand)}`,
+  );
+}
 
 const supplierCreateResult = psql(
   [
