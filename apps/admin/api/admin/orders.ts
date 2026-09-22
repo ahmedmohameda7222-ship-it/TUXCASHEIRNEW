@@ -24,6 +24,7 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from '../../server/http.js';
+import { handleCustomersRequest } from '../../server/customers/customerApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -655,6 +656,14 @@ export default async function handler(
   request: AdminRequest,
   response: AdminResponse,
 ): Promise<void> {
+  const routedUrl = new URL(request.url ?? '/', 'http://admin.local');
+  if (routedUrl.searchParams.get('__adminResource') === 'customers') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await handleCustomersRequest(request, response);
+    return;
+  }
+
   if (request.method !== 'GET' && request.method !== 'POST') {
     response.setHeader('allow', 'GET, POST');
     sendJson(response, 405, { error: 'method_not_allowed' });
