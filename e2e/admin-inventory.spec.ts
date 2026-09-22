@@ -279,6 +279,29 @@ test('inventory replaces an older mutation error with the most recent failure', 
   await expect(page.getByRole('alert')).toContainText(/waste conflict/i);
 });
 
+test('inventory clears an older mutation error after a later action succeeds', async ({ page }) => {
+  await mockInventory(page, {
+    failCommandType: 'adjust',
+    failureCode: 'insufficient_stock',
+  });
+  await page.goto('/inventory');
+  await page.getByRole('button', { name: /Beef/ }).click();
+
+  await page.getByRole('button', { name: 'Adjust stock' }).click();
+  await page.getByLabel('Quantity change').fill('-5');
+  await page.getByLabel('Adjustment reason').selectOption(adjustmentReasonId);
+  await page.getByRole('button', { name: 'Post adjustment' }).click();
+  await expect(page.getByRole('alert')).toContainText(/insufficient stock/i);
+
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Record waste' }).click();
+  await page.getByLabel('Waste quantity').fill('0.25');
+  await page.getByLabel('Waste reason').selectOption(wasteReasonId);
+  await page.getByRole('button', { name: 'Post waste' }).click();
+
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('replenishment save submits the workspace version the admin actually edited', async ({
   page,
 }) => {
