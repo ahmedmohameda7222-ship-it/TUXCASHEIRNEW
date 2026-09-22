@@ -20,7 +20,7 @@ function latestMutationError(
 ): unknown {
   let latest: { error: unknown; submittedAt: number } | null = null;
   for (const mutation of mutations) {
-    if (mutation.error === null || mutation.error === undefined) continue;
+    if (mutation.submittedAt <= 0) continue;
     if (latest === null || mutation.submittedAt >= latest.submittedAt) latest = mutation;
   }
   return latest?.error ?? null;
