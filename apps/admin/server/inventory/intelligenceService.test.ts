@@ -137,6 +137,49 @@ describe('inventory intelligence purchasing integration', () => {
     });
   });
 
+  it('includes bulk consumption and its undo in actual usage', async () => {
+    const select = vi.fn(async (table: string) => {
+      if (table === 'inventory_movements') {
+        return [
+          {
+            inventory_item_id: 'item-1',
+            movement_type: 'BULK_UNIT_FINISHED',
+            quantity_delta_micros: -5_000,
+            order_id: null,
+          },
+          {
+            inventory_item_id: 'item-1',
+            movement_type: 'UNDO_BULK_UNIT_FINISHED',
+            quantity_delta_micros: 2_000,
+            order_id: null,
+          },
+        ];
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [{ ...item, trackingMode: 'BULK_MANUAL' }],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.variances).toContainEqual(
+      expect.objectContaining({
+        inventoryItemId: 'item-1',
+        actualUsageMicros: 3_000,
+        theoreticalUsageMicros: 0,
+      }),
+    );
+  });
+
   it('aggregates every movement in the reporting window beyond the first 10,000 rows', async () => {
     const firstPage = Array.from({ length: 10_000 }, () => ({
       inventory_item_id: 'item-1',
