@@ -1168,6 +1168,7 @@ grant execute on function public.read_admin_inventory_balances_v1(uuid, uuid)
 create or replace function public.read_admin_inventory_movement_history_v1(
   p_employee_id uuid,
   p_shop_id uuid,
+  p_inventory_item_id uuid,
   p_per_item_limit integer default 50
 )
 returns table(
@@ -1189,43 +1190,33 @@ begin
     p_employee_id, p_shop_id, 'inventory.view'
   );
 
-  if p_per_item_limit is null or p_per_item_limit < 1 or p_per_item_limit > 200 then
+  if p_inventory_item_id is null
+     or p_per_item_limit is null
+     or p_per_item_limit < 1
+     or p_per_item_limit > 200 then
     raise exception 'TUX_ADMIN_INVENTORY_HISTORY_LIMIT_INVALID';
   end if;
 
   return query
   select
-    ranked.id,
-    ranked.inventory_item_id,
-    ranked.movement_type,
-    ranked.quantity_delta_micros,
-    ranked.reserved_delta_micros,
-    ranked.reason_label_snapshot,
-    ranked.created_at
-  from (
-    select
-      m.id,
-      m.inventory_item_id,
-      m.movement_type,
-      m.quantity_delta_micros,
-      m.reserved_delta_micros,
-      m.reason_label_snapshot,
-      m.created_at,
-      row_number() over (
-        partition by m.inventory_item_id
-        order by m.created_at desc, m.id desc
-      ) as item_rank
-    from public.inventory_movements m
-    where m.shop_id = p_shop_id
-  ) ranked
-  where ranked.item_rank <= p_per_item_limit
-  order by ranked.inventory_item_id, ranked.created_at desc, ranked.id desc;
+    m.id,
+    m.inventory_item_id,
+    m.movement_type,
+    m.quantity_delta_micros,
+    m.reserved_delta_micros,
+    m.reason_label_snapshot,
+    m.created_at
+  from public.inventory_movements m
+  where m.shop_id = p_shop_id
+    and m.inventory_item_id = p_inventory_item_id
+  order by m.created_at desc, m.id desc
+  limit p_per_item_limit;
 end;
 $movement_history$;
 
-revoke all on function public.read_admin_inventory_movement_history_v1(uuid, uuid, integer)
+revoke all on function public.read_admin_inventory_movement_history_v1(uuid, uuid, uuid, integer)
   from public, anon, authenticated;
-grant execute on function public.read_admin_inventory_movement_history_v1(uuid, uuid, integer)
+grant execute on function public.read_admin_inventory_movement_history_v1(uuid, uuid, uuid, integer)
   to service_role;
 
 create or replace function private.inventory_reason_snapshot_v1(
