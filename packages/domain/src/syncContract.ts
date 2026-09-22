@@ -26,7 +26,11 @@ import {
 } from './ids';
 import type { JsonValue } from './json';
 import { moneyMinor, type MoneyMinor } from './money';
-import { stockQuantityMicros, type StockQuantityMicros } from './quantity';
+import {
+  STOCK_QUANTITY_SCALE,
+  stockQuantityMicros,
+  type StockQuantityMicros,
+} from './quantity';
 import { instant, type Instant } from './time';
 import type {
   Expense,
@@ -948,6 +952,98 @@ function parseTransition(
   };
 }
 
+function validateTransitionSemantics(
+  eventType: OrderTransitionSyncEventType,
+  order: OrderSnapshot,
+  transition: OrderTransitionSyncSnapshotV1,
+): void {
+  const lifecycle = order.lifecycle;
+  if (lifecycle === undefined) {
+    throw new TypeError('Operations sync order transition requires lifecycle data.');
+  }
+
+  if (eventType === 'ORDER_MARKED_DONE') {
+    if (
+      transition.fromStatus !== 'ACTIVE' ||
+      transition.toStatus !== 'DONE' ||
+      lifecycle.doneAt !== transition.at ||
+      lifecycle.cancellation !== null ||
+      lifecycle.returned !== null ||
+      transition.reason !== null ||
+      transition.foodPrepared !== null ||
+      transition.stockRestored !== null
+    ) {
+      throw new TypeError(
+        'Operations sync ORDER_MARKED_DONE transition must be ACTIVE -> DONE with matching lifecycle data.',
+      );
+    }
+    return;
+  }
+
+  if (eventType === 'ORDER_DONE_UNDONE') {
+    if (
+      transition.fromStatus !== 'DONE' ||
+      transition.toStatus !== 'ACTIVE' ||
+      lifecycle.doneAt !== null ||
+      lifecycle.cancellation !== null ||
+      lifecycle.returned !== null ||
+      transition.reason !== null ||
+      transition.foodPrepared !== null ||
+      transition.stockRestored !== null
+    ) {
+      throw new TypeError(
+        'Operations sync ORDER_DONE_UNDONE transition must be DONE -> ACTIVE with cleared Done lifecycle data.',
+      );
+    }
+    return;
+  }
+
+  if (eventType === 'ORDER_CANCELLED') {
+    const cancellation = lifecycle.cancellation;
+    const cancellationFlagsAreCanonical =
+      (transition.foodPrepared === true && transition.stockRestored === false) ||
+      (transition.foodPrepared === false && transition.stockRestored === true);
+    if (
+      transition.fromStatus !== 'ACTIVE' ||
+      transition.toStatus !== 'CANCELLED' ||
+      lifecycle.doneAt !== null ||
+      lifecycle.returned !== null ||
+      cancellation === null ||
+      cancellation.at !== transition.at ||
+      cancellation.workerId !== transition.workerId ||
+      cancellation.workerName !== transition.workerName ||
+      cancellation.reason !== transition.reason ||
+      cancellation.foodPrepared !== transition.foodPrepared ||
+      cancellation.stockRestored !== transition.stockRestored ||
+      !cancellationFlagsAreCanonical
+    ) {
+      throw new TypeError(
+        'Operations sync ORDER_CANCELLED transition must be ACTIVE -> CANCELLED with matching cancellation lifecycle data.',
+      );
+    }
+    return;
+  }
+
+  const returned = lifecycle.returned;
+  if (
+    transition.fromStatus !== 'DONE' ||
+    transition.toStatus !== 'RETURNED' ||
+    lifecycle.doneAt === null ||
+    lifecycle.cancellation !== null ||
+    returned === null ||
+    returned.at !== transition.at ||
+    returned.workerId !== transition.workerId ||
+    returned.workerName !== transition.workerName ||
+    returned.reason !== transition.reason ||
+    transition.foodPrepared !== null ||
+    transition.stockRestored !== null
+  ) {
+    throw new TypeError(
+      'Operations sync DELIVERY_RETURNED transition must be DONE -> RETURNED with matching return lifecycle data.',
+    );
+  }
+}
+
 const SUPPORTED_EVENT_TYPES = new Set<OperationsSyncPayloadV1['eventType']>([
   'ORDER_PLACED',
   'ORDER_MARKED_DONE',
@@ -1063,28 +1159,32 @@ function validateTransitionMovement(
 
 function validateGenericInventoryMovement(movement: InventoryMovement): void {
   const reserved = reservationDelta(movement);
-  const noOrderLifecycleState = reserved === 0 && movement.orderId === null;
+  const wholeUnitQuantity = movement.quantityDeltaMicros % STOCK_QUANTITY_SCALE === 0;
+  const operationsBulkContext =
+    reserved === 0 &&
+    movement.orderId === null &&
+    movement.businessDayId !== null &&
+    movement.workerId !== null;
   const valid =
-    noOrderLifecycleState &&
+    operationsBulkContext &&
     ((movement.movementType === 'BULK_UNIT_FINISHED' &&
-      movement.quantityDeltaMicros < 0 &&
+      movement.quantityDeltaMicros === -STOCK_QUANTITY_SCALE &&
       movement.compensatesMovementId === null) ||
       (movement.movementType === 'BULK_STOCK_RECEIVED' &&
         movement.quantityDeltaMicros > 0 &&
+        wholeUnitQuantity &&
         movement.compensatesMovementId === null) ||
       (movement.movementType === 'UNDO_BULK_UNIT_FINISHED' &&
-        movement.quantityDeltaMicros > 0 &&
+        movement.quantityDeltaMicros === STOCK_QUANTITY_SCALE &&
         movement.compensatesMovementId !== null) ||
       (movement.movementType === 'UNDO_BULK_STOCK_RECEIVED' &&
         movement.quantityDeltaMicros < 0 &&
-        movement.compensatesMovementId !== null) ||
-      (movement.movementType === 'ADMIN_ADJUSTMENT' &&
-        movement.quantityDeltaMicros !== 0 &&
-        movement.compensatesMovementId === null));
+        wholeUnitQuantity &&
+        movement.compensatesMovementId !== null));
 
   if (!valid) {
     throw new TypeError(
-      'Operations sync generic inventory movement cannot carry order lifecycle reservation state.',
+      'Operations sync generic inventory movement violates Operations Bulk Stock semantics.',
     );
   }
 }
@@ -1150,6 +1250,7 @@ export function parseOperationsSyncPayloadV1(value: unknown): OperationsSyncPayl
         'Operations sync order lifecycle must match its transition revision/status.',
       );
     }
+    validateTransitionSemantics(eventType, order, transition);
     const inventoryMovements = arrayValue(
       source['inventoryMovements'],
       'order transition inventory movements',
