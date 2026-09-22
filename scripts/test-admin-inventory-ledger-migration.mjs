@@ -1290,6 +1290,145 @@ psql(
   'Exact canonical undo reversal set',
 );
 
+const cancelRestockOrderId = '85000000-0000-4000-8000-000000000019';
+const cancelLegacyOneId = '85000000-0000-4000-8000-00000000001a';
+const cancelLegacyTwoId = '85000000-0000-4000-8000-00000000001b';
+
+psql(
+  [
+    '-c',
+    `set session_replication_role = replica;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values
+       (
+         '${cancelLegacyOneId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -100000, 0, '${workerId}', '${cancelRestockOrderId}',
+         null, 'cancel-legacy-one', timestamptz '2026-09-19 02:30:00+00'
+       ),
+       (
+         '${cancelLegacyTwoId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -200000, 0, '${workerId}', '${cancelRestockOrderId}',
+         null, 'cancel-legacy-two', timestamptz '2026-09-19 02:30:01+00'
+       );
+     reset session_replication_role;`,
+  ],
+  'Canonical cancellation legacy-consumption fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 999999,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Oversized canonical cancellation restock',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Partial canonical cancellation restock set',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Exact canonical cancellation restock set',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '85000000-0000-4000-8000-00000000001c', '${shopId}', '${dayId}', '${itemId}',
+       'CANCEL_RESTOCK', 999999, 0, '${workerId}', '${cancelRestockOrderId}',
+       '${cancelLegacyOneId}', 'cancel-restock-forged', timestamptz '2026-09-19 02:30:02+00'
+     );`,
+  ],
+  'Forged cancellation restock row',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
+);
+
 const stocktakeItemId = '86000000-0000-4000-8000-000000000001';
 const stocktakeId = '86000000-0000-4000-8000-000000000002';
 const stocktakeEmployeeId = '86000000-0000-4000-8000-000000000003';
