@@ -151,6 +151,73 @@ psql(
   'Purchasing fixture seed',
 );
 
+const supplierCreateResult = psql(
+  [
+    '-At',
+    '-c',
+    `select public.create_supplier_v1(
+       '${EMPLOYEE_ID}',
+       '${BUSINESS_ID}',
+       '${SHOP_ID}',
+       'Retry Supplier',
+       null,
+       null,
+       null,
+       'supplier-create-retry-1'
+     )::text`,
+  ],
+  'Supplier create idempotency first call',
+).trim();
+const supplierCreate = JSON.parse(supplierCreateResult);
+if (
+  supplierCreate.ok !== true ||
+  typeof supplierCreate.supplierId !== 'string' ||
+  supplierCreate.idempotentReplay !== false
+) {
+  throw new Error(`unexpected supplier create result: ${supplierCreateResult}`);
+}
+
+const supplierReplayResult = psql(
+  [
+    '-At',
+    '-c',
+    `select public.create_supplier_v1(
+       '${EMPLOYEE_ID}',
+       '${BUSINESS_ID}',
+       '${SHOP_ID}',
+       'Retry Supplier',
+       null,
+       null,
+       null,
+       'supplier-create-retry-1'
+     )::text`,
+  ],
+  'Supplier create idempotency replay',
+).trim();
+const supplierReplay = JSON.parse(supplierReplayResult);
+if (
+  supplierReplay.ok !== true ||
+  supplierReplay.supplierId !== supplierCreate.supplierId ||
+  supplierReplay.idempotentReplay !== true
+) {
+  throw new Error(`unexpected supplier replay result: ${supplierReplayResult}`);
+}
+
+const supplierReplayCount = psql(
+  [
+    '-At',
+    '-c',
+    `select count(*)
+     from public.suppliers
+     where business_id = '${BUSINESS_ID}'
+       and name = 'Retry Supplier'`,
+  ],
+  'Supplier create idempotency row count',
+).trim();
+if (supplierReplayCount !== '1') {
+  throw new Error(`supplier replay inserted duplicate rows: ${supplierReplayCount}`);
+}
+
 const before = psql(
   [
     '-At',
