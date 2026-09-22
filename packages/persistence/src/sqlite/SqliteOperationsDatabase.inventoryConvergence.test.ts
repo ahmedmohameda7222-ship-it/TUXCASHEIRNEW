@@ -82,7 +82,9 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
     }
   });
 
-  it('replaces the full local projection when the canonical server row has the same movement id', async () => {
+  it(
+    'replaces the full local projection when the canonical server row has the same movement id',
+    async () => {
     const database = new SqliteOperationsDatabase(':memory:');
     await database.initialize();
     try {
@@ -153,5 +155,6 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
     } finally {
       database.close();
     }
-  });
+    },
+  );
 });
