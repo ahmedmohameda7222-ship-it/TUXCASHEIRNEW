@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 describe('create_purchase_order_v1 source contract', () => {
   it('rejects duplicate inventory items before inserting the purchase-order header', () => {
     const sql = readFileSync(
-      new URL('../../../../supabase/migrations/20260910150000_admin_purchasing.sql', import.meta.url),
+      new URL(\n        '../../../../supabase/migrations/20260910150000_admin_purchasing.sql',\n        import.meta.url,\n      ),
       'utf8',
     );
     const start = sql.indexOf('create or replace function public.create_purchase_order_v1');
