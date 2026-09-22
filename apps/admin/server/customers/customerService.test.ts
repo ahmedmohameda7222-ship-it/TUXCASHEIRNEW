@@ -10,6 +10,7 @@ import {
 const businessId = '10000000-0000-4000-8000-000000000001';
 const employeeId = '20000000-0000-4000-8000-000000000001';
 const survivorCustomerId = '30000000-0000-4000-8000-000000000001';
+const shopId = '40000000-0000-4000-8000-000000000001';
 const mergedCustomerId = '30000000-0000-4000-8000-000000000002';
 
 function principal(
@@ -25,7 +26,7 @@ function principal(
     businessId,
     role,
     permissions,
-    shopIds: ['40000000-0000-4000-8000-000000000001'],
+    shopIds: [shopId],
   };
 }
 
@@ -57,7 +58,7 @@ describe('canonical customer service', () => {
     const service = createCustomerService(store);
 
     await expect(
-      service.findByPhone({ phone: '01012345678' }, principal(['customers.view'])),
+      service.findByPhone({ shopId, phone: '01012345678' }, principal(['customers.view'])),
     ).resolves.toMatchObject({
       id: survivorCustomerId,
       normalizedPhone: '+201012345678',
@@ -65,15 +66,17 @@ describe('canonical customer service', () => {
     });
 
     await expect(
-      service.findByPhone({ phone: '01112345678' }, principal(['customers.view'])),
+      service.findByPhone({ shopId, phone: '01112345678' }, principal(['customers.view'])),
     ).resolves.toBeNull();
 
     expect(store.findByNormalizedPhone).toHaveBeenNthCalledWith(1, {
       businessId,
+      shopId,
       normalizedPhone: '+201012345678',
     });
     expect(store.findByNormalizedPhone).toHaveBeenNthCalledWith(2, {
       businessId,
+      shopId,
       normalizedPhone: '+201112345678',
     });
   });
