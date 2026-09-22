@@ -738,6 +738,15 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_receive_command');
   end if;
 
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) line(value)
+    group by line.value ->> 'lineId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_purchase_order_line');
+  end if;
+
   select po.* into v_order
   from public.purchase_orders po
   where po.id = p_purchase_order_id and po.shop_id = p_shop_id
@@ -1013,6 +1022,15 @@ begin
      or jsonb_typeof(p_lines) <> 'array'
      or jsonb_array_length(p_lines) = 0 then
     return jsonb_build_object('ok', false, 'code', 'invalid_return_command');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) line(value)
+    group by line.value ->> 'lineId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_purchase_order_line');
   end if;
 
   select po.* into v_order
