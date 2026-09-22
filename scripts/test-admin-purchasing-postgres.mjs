@@ -219,6 +219,30 @@ if (supplierReplayCount !== '1') {
   throw new Error(`supplier replay inserted duplicate rows: ${supplierReplayCount}`);
 }
 
+const duplicateSupplierResult = psql(
+  [
+    '-At',
+    '-c',
+    `select public.create_supplier_v1(
+       '${EMPLOYEE_ID}',
+       '${BUSINESS_ID}',
+       '${SHOP_ID}',
+       'Test Supplier',
+       null,
+       null,
+       null,
+       'supplier-create-name-conflict'
+     )::text`,
+  ],
+  'Supplier create duplicate-name conflict',
+).trim();
+const duplicateSupplier = JSON.parse(duplicateSupplierResult);
+if (duplicateSupplier.ok !== false || duplicateSupplier.code !== 'supplier_name_conflict') {
+  throw new Error(
+    `duplicate supplier name was not returned as a structured conflict: ${duplicateSupplierResult}`,
+  );
+}
+
 const before = psql(
   [
     '-At',
