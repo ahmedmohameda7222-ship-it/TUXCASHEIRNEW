@@ -241,6 +241,21 @@ test('purchasing replaces an older mutation error with the most recent failure',
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
 
+test('purchasing clears an older mutation error after a later action succeeds', async ({ page }) => {
+  await mockPurchasing(page, {
+    failCommandType: 'supplier.create',
+    failureCode: 'supplier_name_conflict',
+  });
+  await page.goto('/purchasing');
+
+  await page.getByLabel('Supplier name').fill('Duplicate supplier');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(page.getByRole('alert')).toContainText(/supplier name conflict/i);
+
+  await page.getByRole('button', { name: 'Mark ordered' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('supplier creation retains its command id across a lost response retry', async ({ page }) => {
   const fixture = await mockPurchasing(page, {
     startWithoutSuppliers: true,
