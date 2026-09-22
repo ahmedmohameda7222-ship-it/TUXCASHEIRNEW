@@ -47,7 +47,10 @@ export function PurchaseOrdersPage({
     }[];
   }): void;
 }) {
-  const activeSuppliers = useMemo(() => suppliers.filter((supplier) => supplier.active), [suppliers]);
+  const activeSuppliers = useMemo(
+    () => suppliers.filter((supplier) => supplier.active),
+    [suppliers],
+  );
   const firstSupplier = activeSuppliers[0]?.id ?? '';
   const firstItem = inventoryItems[0]?.id ?? '';
   const [supplierId, setSupplierId] = useState(firstSupplier);
