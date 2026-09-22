@@ -40,8 +40,8 @@ type ItemAction = 'adjust' | 'waste' | null;
 export function InventoryPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const inventory = useInventory(shopId);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
@@ -70,10 +70,15 @@ export function InventoryPage() {
     setItemAction(null);
   }, [items, selectedItemId]);
 
-  const selectedItem = useMemo(
-    () => items.find((item) => item.id === selectedItemId) ?? null,
-    [items, selectedItemId],
-  );
+  const selectedItem = useMemo(() => {
+    const item = items.find((candidate) => candidate.id === selectedItemId) ?? null;
+    if (item === null) return null;
+    const history =
+      inventory.itemHistoryQuery.data?.inventoryItemId === item.id
+        ? inventory.itemHistoryQuery.data.history
+        : [];
+    return { ...item, history };
+  }, [inventory.itemHistoryQuery.data, items, selectedItemId]);
 
   const stocktakeBatches = useMemo(() => {
     const batches = [];
