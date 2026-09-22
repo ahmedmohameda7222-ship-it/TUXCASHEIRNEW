@@ -399,6 +399,53 @@ if (duplicateSupplier.ok !== false || duplicateSupplier.code !== 'supplier_name_
   );
 }
 
+const duplicatePurchaseOrderResult = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.create_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${BUSINESS_ID}',
+         '${SHOP_ID}',
+         '${SUPPLIER_ID}',
+         'PO-DUPLICATE-ITEMS',
+         date '2026-09-24',
+         '[
+           {"inventoryItemId":"${ITEM_ID}","purchaseUnitLabel":"kg","orderedPurchaseUnitsMicros":1000,"expectedPurchaseUnitCostMinor":180000},
+           {"inventoryItemId":"${ITEM_ID}","purchaseUnitLabel":"kg","orderedPurchaseUnitsMicros":2000,"expectedPurchaseUnitCostMinor":180000}
+         ]'::jsonb,
+         'po-create-duplicate-items'
+       )::text`,
+    ],
+    'Duplicate purchase-order inventory item rejection',
+  ).trim(),
+);
+if (
+  duplicatePurchaseOrderResult.ok !== false ||
+  duplicatePurchaseOrderResult.code !== 'duplicate_inventory_item'
+) {
+  throw new Error(
+    `duplicate purchase-order item was not rejected deterministically: ${JSON.stringify(
+      duplicatePurchaseOrderResult,
+    )}`,
+  );
+}
+const duplicatePurchaseOrderRows = psql(
+  [
+    '-At',
+    '-c',
+    `select count(*)
+     from public.purchase_orders
+     where shop_id = '${SHOP_ID}'
+       and create_command_id = 'po-create-duplicate-items'`,
+  ],
+  'Duplicate purchase-order no-mutation assertion',
+).trim();
+if (duplicatePurchaseOrderRows !== '0') {
+  throw new Error(`duplicate purchase-order request persisted a header: ${duplicatePurchaseOrderRows}`);
+}
+
 psql(
   [
     '-c',
