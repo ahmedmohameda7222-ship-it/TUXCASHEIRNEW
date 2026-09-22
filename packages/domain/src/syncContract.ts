@@ -26,11 +26,7 @@ import {
 } from './ids';
 import type { JsonValue } from './json';
 import { moneyMinor, type MoneyMinor } from './money';
-import {
-  STOCK_QUANTITY_SCALE,
-  stockQuantityMicros,
-  type StockQuantityMicros,
-} from './quantity';
+import { STOCK_QUANTITY_SCALE, stockQuantityMicros, type StockQuantityMicros } from './quantity';
 import { instant, type Instant } from './time';
 import type {
   Expense,
