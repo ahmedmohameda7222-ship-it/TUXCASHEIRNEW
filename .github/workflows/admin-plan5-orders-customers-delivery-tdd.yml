@@ -155,8 +155,31 @@ jobs:
       - name: Plan 5 canonical customer identity RED/behavior
         run: npx vitest run apps/admin/server/customers/phone.test.ts apps/admin/server/customers/customerService.test.ts
 
+  task4-loyalty-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 loyalty promotions migration invariant
+        run: node scripts/test-admin-loyalty-promotions-migration.mjs
+
+  task4-loyalty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 loyalty and promotion rule RED/behavior
+        run: npx vitest run apps/admin/server/customers/loyaltyService.test.ts
+
   regression:
-    needs: [task1-order-controls, task3-customers-static, task3-customers]
+    needs: [task1-order-controls, task3-customers-static, task3-customers, task4-loyalty-static, task4-loyalty]
     runs-on: ubuntu-latest
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
