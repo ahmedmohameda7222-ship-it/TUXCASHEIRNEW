@@ -4,6 +4,7 @@ import type {
   AdminOrderFinancialMutationResult,
   AdminOrderSearchResult,
   AdminOrderStatus,
+  AdminReasonCodeConfiguration,
 } from '@tux/admin-contracts';
 import { z } from 'zod';
 
@@ -166,6 +167,16 @@ type AuditRow = {
   created_at: string;
 };
 
+type ReasonCodeRow = {
+  id: string;
+  shop_id: string | null;
+  reason_key: string;
+  family: AdminReasonCodeConfiguration['family'];
+  label: string;
+  active: boolean;
+  version: number | string;
+};
+
 function safeInteger(value: number | string | null): number {
   if (value === null) return 0;
   const result = typeof value === 'number' ? value : Number(value);
@@ -237,6 +248,30 @@ async function assertBusinessShop(
 
 export function createOrderStore(client: AdminSupabaseClient): OrderStore {
   return {
+    async listActionReasons(input): Promise<readonly AdminReasonCodeConfiguration[]> {
+      await assertBusinessShop(client, input.businessId, input.shopId);
+      const rows = await client.select<ReasonCodeRow[]>(
+        'admin_reason_codes',
+        new URLSearchParams({
+          select: 'id,shop_id,reason_key,family,label,active,version',
+          business_id: `eq.${input.businessId}`,
+          or: `(shop_id.is.null,shop_id.eq.${input.shopId})`,
+          active: 'eq.true',
+          family: 'in.(CANCELLATION,REFUND_RETURN)',
+          order: 'family.asc,reason_key.asc,shop_id.desc.nullslast',
+        }),
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        scope: row.shop_id === null ? 'BUSINESS' : 'SHOP',
+        key: row.reason_key,
+        family: row.family,
+        label: row.label,
+        active: row.active,
+        version: safeInteger(row.version),
+      }));
+    },
+
     async searchOrders(input): Promise<AdminOrderSearchResult> {
       await assertBusinessShop(client, input.businessId, input.shopId);
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
@@ -634,6 +669,12 @@ export default async function handler(
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const context = await loadContext(request, client, false);
+      if (url.searchParams.get('view') === 'action-reasons') {
+        sendJson(response, 200, {
+          reasons: await service.listActionReasons({ shopId }, context.principal),
+        });
+        return;
+      }
       const orderId = url.searchParams.get('orderId');
       if (orderId) {
         const detail = await service.getOrderDetail(
