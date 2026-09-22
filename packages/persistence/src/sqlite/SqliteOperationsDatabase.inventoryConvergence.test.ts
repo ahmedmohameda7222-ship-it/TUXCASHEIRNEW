@@ -82,76 +82,77 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
     }
   });
 
-  it('replaces the full local projection when the canonical server row has the same movement id', async () => {
-    const database = new SqliteOperationsDatabase(':memory:');
-    await database.initialize();
-    try {
-      const movementId = parseEntityId<InventoryMovementId>(
-        '88888888-8888-4888-8888-888888888888',
-      );
-      await database.transaction(async (transaction) => {
-        await transaction.shops.put({ id: SHOP_ID, name: 'Convergence Shop', active: true });
-        for (const [id, name] of [
-          [ITEM_ID, 'Local item'],
-          [OTHER_ITEM_ID, 'Canonical item'],
-        ] as const) {
-          await transaction.inventory.putItem({
-            id,
+  it(
+    'replaces the full local projection when the canonical server row has the same movement id',
+    async () => {
+      const database = new SqliteOperationsDatabase(':memory:');
+      await database.initialize();
+      try {
+        const movementId = parseEntityId<InventoryMovementId>('88888888-8888-4888-8888-888888888888');
+        await database.transaction(async (transaction) => {
+          await transaction.shops.put({ id: SHOP_ID, name: 'Convergence Shop', active: true });
+          for (const [id, name] of [
+            [ITEM_ID, 'Local item'],
+            [OTHER_ITEM_ID, 'Canonical item'],
+          ] as const) {
+            await transaction.inventory.putItem({
+              id,
+              shopId: SHOP_ID,
+              name,
+              unitLabel: 'kg',
+              trackingMode: 'RECIPE_TRACKED',
+              active: true,
+            });
+          }
+
+          await transaction.inventory.upsertCanonicalMovement({
+            id: movementId,
             shopId: SHOP_ID,
-            name,
-            unitLabel: 'kg',
-            trackingMode: 'RECIPE_TRACKED',
-            active: true,
+            businessDayId: null,
+            itemId: ITEM_ID,
+            movementType: 'BULK_STOCK_RECEIVED',
+            quantityDeltaMicros: stockQuantityMicros(1_000_000),
+            reservedDeltaMicros: stockQuantityMicros(0),
+            idempotencyKey: 'local-placeholder',
+            workerId: null,
+            orderId: null,
+            createdAt: instant('2026-09-19T04:00:00.000Z'),
+            compensatesMovementId: null,
           });
-        }
 
-        await transaction.inventory.upsertCanonicalMovement({
-          id: movementId,
-          shopId: SHOP_ID,
-          businessDayId: null,
-          itemId: ITEM_ID,
-          movementType: 'BULK_STOCK_RECEIVED',
-          quantityDeltaMicros: stockQuantityMicros(1_000_000),
-          reservedDeltaMicros: stockQuantityMicros(0),
-          idempotencyKey: 'local-placeholder',
-          workerId: null,
-          orderId: null,
-          createdAt: instant('2026-09-19T04:00:00.000Z'),
-          compensatesMovementId: null,
+          await transaction.inventory.upsertCanonicalMovement({
+            id: movementId,
+            shopId: SHOP_ID,
+            businessDayId: REMOTE_DAY_ID,
+            itemId: OTHER_ITEM_ID,
+            movementType: 'BULK_STOCK_RECEIVED',
+            quantityDeltaMicros: stockQuantityMicros(2_000_000),
+            reservedDeltaMicros: stockQuantityMicros(0),
+            idempotencyKey: 'canonical-replacement',
+            workerId: REMOTE_WORKER_ID,
+            orderId: null,
+            createdAt: instant('2026-09-19T04:01:00.000Z'),
+            compensatesMovementId: null,
+          });
         });
 
-        await transaction.inventory.upsertCanonicalMovement({
-          id: movementId,
-          shopId: SHOP_ID,
-          businessDayId: REMOTE_DAY_ID,
-          itemId: OTHER_ITEM_ID,
-          movementType: 'BULK_STOCK_RECEIVED',
-          quantityDeltaMicros: stockQuantityMicros(2_000_000),
-          reservedDeltaMicros: stockQuantityMicros(0),
-          idempotencyKey: 'canonical-replacement',
-          workerId: REMOTE_WORKER_ID,
-          orderId: null,
-          createdAt: instant('2026-09-19T04:01:00.000Z'),
-          compensatesMovementId: null,
+        await expect(
+          database.transaction((transaction) => transaction.inventory.getBalance(ITEM_ID)),
+        ).resolves.toEqual({
+          onHandMicros: 0,
+          reservedMicros: 0,
+          availableMicros: 0,
         });
-      });
-
-      await expect(
-        database.transaction((transaction) => transaction.inventory.getBalance(ITEM_ID)),
-      ).resolves.toEqual({
-        onHandMicros: 0,
-        reservedMicros: 0,
-        availableMicros: 0,
-      });
-      await expect(
-        database.transaction((transaction) => transaction.inventory.getBalance(OTHER_ITEM_ID)),
-      ).resolves.toEqual({
-        onHandMicros: 2_000_000,
-        reservedMicros: 0,
-        availableMicros: 2_000_000,
-      });
-    } finally {
-      database.close();
-    }
-  });
+        await expect(
+          database.transaction((transaction) => transaction.inventory.getBalance(OTHER_ITEM_ID)),
+        ).resolves.toEqual({
+          onHandMicros: 2_000_000,
+          reservedMicros: 0,
+          availableMicros: 2_000_000,
+        });
+      } finally {
+        database.close();
+      }
+    },
+  );
 });
