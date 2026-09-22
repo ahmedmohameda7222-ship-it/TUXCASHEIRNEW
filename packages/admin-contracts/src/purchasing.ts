@@ -76,6 +76,7 @@ export type AdminPurchasingWorkspace = {
 
 export type CreateSupplierInput = {
   readonly shopId: string;
+  readonly commandId: string;
   readonly name: string;
   readonly contactName: string | null;
   readonly phone: string | null;
