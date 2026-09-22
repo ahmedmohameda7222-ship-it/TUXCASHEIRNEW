@@ -44,7 +44,7 @@ function storeFixture(): CustomerStore {
         : null,
     ),
     mergeCustomers: vi.fn(async (input) => ({
-      ok: true,
+      ok: true as const,
       survivorCustomerId: input.survivorCustomerId,
       mergedCustomerId: input.mergedCustomerId,
       replayed: false,
