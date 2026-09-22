@@ -241,7 +241,9 @@ test('purchasing replaces an older mutation error with the most recent failure',
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
 });
 
-test('purchasing clears an older mutation error after a later action succeeds', async ({ page }) => {
+test('purchasing clears an older mutation error after a later action succeeds', async ({
+  page,
+}) => {
   await mockPurchasing(page, {
     failCommandType: 'supplier.create',
     failureCode: 'supplier_name_conflict',
