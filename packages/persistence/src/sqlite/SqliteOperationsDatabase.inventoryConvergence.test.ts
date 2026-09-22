@@ -106,7 +106,7 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
               active: true,
             });
           }
-  
+
           await transaction.inventory.upsertCanonicalMovement({
             id: movementId,
             shopId: SHOP_ID,
@@ -121,7 +121,7 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
             createdAt: instant('2026-09-19T04:00:00.000Z'),
             compensatesMovementId: null,
           });
-  
+
           await transaction.inventory.upsertCanonicalMovement({
             id: movementId,
             shopId: SHOP_ID,
@@ -137,7 +137,7 @@ describe('SqliteOperationsDatabase canonical inventory convergence', () => {
             compensatesMovementId: null,
           });
         });
-  
+
         await expect(
           database.transaction((transaction) => transaction.inventory.getBalance(ITEM_ID)),
         ).resolves.toEqual({
