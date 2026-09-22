@@ -110,9 +110,10 @@ psql(
        shop_id, inventory_item_id, weighted_unit_cost_minor, version
      ) values ('${SHOP_ID}', '${ITEM_ID}', 100, 1);
      insert into public.suppliers(
-       id, business_id, name, created_by_employee_id
+       id, business_id, name, created_by_employee_id, create_command_id
      ) values (
-       '${SUPPLIER_ID}', '${BUSINESS_ID}', 'Test Supplier', '${EMPLOYEE_ID}'
+       '${SUPPLIER_ID}', '${BUSINESS_ID}', 'Test Supplier', '${EMPLOYEE_ID}',
+       'fixture-supplier-create'
      );
      insert into public.purchase_orders(
        id, business_id, shop_id, supplier_id, status,
