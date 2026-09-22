@@ -30,6 +30,7 @@ async function mockPurchasing(
     failCommandType?: string;
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
+    supplierCreateResponseLossOnce?: boolean;
   } = {},
 ) {
   const commands: Command[] = [];
@@ -53,6 +54,7 @@ async function mockPurchasing(
   const baseMicrosPerPurchaseUnit = 2_000_000;
   let receivedPurchaseUnitsMicros = 0;
   let returnedPurchaseUnitsMicros = 0;
+  let supplierCreateResponseLosses = 0;
 
   await page.route('**/api/admin/session', async (route) => {
     await route.fulfill({
@@ -147,6 +149,15 @@ async function mockPurchasing(
           active: true,
         },
       ];
+      if (options.supplierCreateResponseLossOnce && supplierCreateResponseLosses === 0) {
+        supplierCreateResponseLosses += 1;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'temporary_supplier_response_loss' }),
+        });
+        return;
+      }
     }
     if (command.type === 'po.order') {
       status = 'ORDERED';
@@ -228,6 +239,27 @@ test('purchasing replaces an older mutation error with the most recent failure',
 
   await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
+});
+
+test('supplier creation retains its command id across a lost response retry', async ({ page }) => {
+  const fixture = await mockPurchasing(page, {
+    startWithoutSuppliers: true,
+    supplierCreateResponseLossOnce: true,
+  });
+  await page.goto('/purchasing');
+
+  await page.getByLabel('Supplier name').fill('Prime Foods');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(page.getByRole('alert')).toContainText(/temporary supplier response loss/i);
+
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect.poll(() => fixture.commands.length).toBe(2);
+
+  const firstCommandId = fixture.commands[0]?.commandId;
+  const secondCommandId = fixture.commands[1]?.commandId;
+  expect(typeof firstCommandId).toBe('string');
+  expect(firstCommandId).not.toBe('');
+  expect(secondCommandId).toBe(firstCommandId);
 });
 
 test('purchase order creation excludes inactive suppliers from options and defaults', async ({
