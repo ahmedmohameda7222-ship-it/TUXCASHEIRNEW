@@ -656,7 +656,7 @@ begin
   if not found or v_order.business_id is distinct from v_business_id then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_found');
   end if;
-  if v_order.status = 'ORDERED' and v_order.order_command_id = p_command_id then
+  if v_order.order_command_id = p_command_id and v_order.status <> 'DRAFT' then
     return jsonb_build_object(
       'ok', true, 'purchaseOrderId', v_order.id,
       'status', v_order.status, 'version', v_order.version, 'idempotentReplay', true
