@@ -8,6 +8,7 @@ function formatQuantity(micros: number, unitLabel: string): string {
 }
 
 function toMicros(value: string): number | null {
+  if (value.trim() === '') return null;
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   const micros = Math.round(numeric * 1_000_000);
