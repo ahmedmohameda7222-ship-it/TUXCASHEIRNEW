@@ -16,9 +16,11 @@ create table public.suppliers (
   email text,
   active boolean not null default true,
   created_by_employee_id uuid not null references public.business_employees(id) on delete restrict,
+  create_command_id text not null check (btrim(create_command_id) <> ''),
   version bigint not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (business_id, create_command_id),
   foreign key (business_id, created_by_employee_id)
     references public.business_employees(business_id, id) on delete restrict
 );
@@ -253,7 +255,8 @@ create or replace function public.create_supplier_v1(
   p_name text,
   p_contact_name text,
   p_phone text,
-  p_email text
+  p_email text,
+  p_command_id text
 )
 returns jsonb
 language plpgsql
@@ -268,19 +271,36 @@ begin
     p_employee_id, p_shop_id, 'purchasing.manage'
   );
   if v_business_id is distinct from p_business_id
-     or nullif(btrim(coalesce(p_name, '')), '') is null then
+     or nullif(btrim(coalesce(p_name, '')), '') is null
+     or nullif(btrim(coalesce(p_command_id, '')), '') is null then
     return jsonb_build_object('ok', false, 'code', 'invalid_supplier_command');
   end if;
 
+  select s.id
+    into v_supplier_id
+  from public.suppliers s
+  where s.business_id = v_business_id
+    and s.create_command_id = p_command_id;
+
+  if v_supplier_id is not null then
+    return jsonb_build_object(
+      'ok', true,
+      'supplierId', v_supplier_id,
+      'idempotentReplay', true
+    );
+  end if;
+
   insert into public.suppliers(
-    business_id, name, contact_name, phone, email, created_by_employee_id
+    business_id, name, contact_name, phone, email,
+    created_by_employee_id, create_command_id
   ) values (
     v_business_id,
     btrim(p_name),
     nullif(btrim(coalesce(p_contact_name, '')), ''),
     nullif(btrim(coalesce(p_phone, '')), ''),
     nullif(btrim(coalesce(p_email, '')), ''),
-    p_employee_id
+    p_employee_id,
+    p_command_id
   )
   returning id into v_supplier_id;
 
@@ -292,7 +312,11 @@ begin
     null, null, null, '{}'::jsonb
   );
 
-  return jsonb_build_object('ok', true, 'supplierId', v_supplier_id);
+  return jsonb_build_object(
+    'ok', true,
+    'supplierId', v_supplier_id,
+    'idempotentReplay', false
+  );
 end;
 $$;
 
@@ -1241,7 +1265,7 @@ begin
 end;
 $$;
 
-revoke all on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text)
+revoke all on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text, text)
   from public, anon, authenticated;
 revoke all on function public.create_purchase_order_v1(uuid, uuid, uuid, uuid, text, date, jsonb, text)
   from public, anon, authenticated;
@@ -1254,7 +1278,7 @@ revoke all on function public.receive_purchase_order_v1(uuid, uuid, uuid, text, 
 revoke all on function public.return_purchase_order_v1(uuid, uuid, uuid, text, text, jsonb)
   from public, anon, authenticated;
 
-grant execute on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text)
+grant execute on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text, text)
   to service_role;
 grant execute on function public.create_purchase_order_v1(uuid, uuid, uuid, uuid, text, date, jsonb, text)
   to service_role;
