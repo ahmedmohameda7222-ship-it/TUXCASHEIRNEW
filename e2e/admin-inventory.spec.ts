@@ -345,6 +345,7 @@ test('inventory stocktake uses a frozen count boundary and posts immutable count
   await expect(page.getByText('Snapshot on hand')).toBeVisible();
   await expect(page.getByText('Captured before counting')).toBeVisible();
   await expect(page.getByText('Preserved after the snapshot')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Post stock count' })).toBeDisabled();
 
   await page.getByLabel('Actual count for Beef').fill('3.0');
   await expect(page.getByText('-0.2 kg')).toBeVisible();
