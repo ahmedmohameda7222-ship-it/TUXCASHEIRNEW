@@ -213,6 +213,8 @@ const PURCHASE_ORDER_HISTORY_LIMIT = 500;
 const PURCHASE_ORDER_PAGE_SIZE = 500;
 const PURCHASE_ORDER_LINE_BATCH_SIZE = 100;
 const PURCHASE_ORDER_LINE_PAGE_SIZE = 10_000;
+const PURCHASE_ORDER_ITEM_BATCH_SIZE = 100;
+const PURCHASE_ORDER_ITEM_PAGE_SIZE = 1_000;
 const PURCHASABLE_ITEM_PAGE_SIZE = 10_000;
 const SUPPLIER_PAGE_SIZE = 10_000;
 
@@ -290,6 +292,36 @@ async function loadPurchasableInventoryItems(
   }
 }
 
+async function loadPurchaseOrderItemMetadata(
+  client: AdminSupabaseClient,
+  shopId: string,
+  inventoryItemIds: readonly string[],
+): Promise<InventoryItemRow[]> {
+  const rows: InventoryItemRow[] = [];
+  const uniqueIds = [...new Set(inventoryItemIds)];
+  for (let start = 0; start < uniqueIds.length; start += PURCHASE_ORDER_ITEM_BATCH_SIZE) {
+    const batch = uniqueIds.slice(start, start + PURCHASE_ORDER_ITEM_BATCH_SIZE);
+    let offset = 0;
+    for (;;) {
+      const page = await client.select<InventoryItemRow[]>(
+        'inventory_items',
+        new URLSearchParams({
+          select: 'id,name,unit_label,active',
+          shop_id: `eq.${shopId}`,
+          id: `in.(${batch.join(',')})`,
+          order: 'id.asc',
+          limit: String(PURCHASE_ORDER_ITEM_PAGE_SIZE),
+          offset: String(offset),
+        }),
+      );
+      if (page.length === 0) break;
+      rows.push(...page);
+      offset += page.length;
+    }
+  }
+  return rows;
+}
+
 async function loadPurchaseOrderLines(
   client: AdminSupabaseClient,
   purchaseOrderIds: readonly string[],
@@ -350,6 +382,14 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       const purchaseOrderIds = purchaseOrderRows.map((row) => row.id);
       const lineRows =
         purchaseOrderIds.length === 0 ? [] : await loadPurchaseOrderLines(client, purchaseOrderIds);
+      const purchaseOrderItemRows =
+        lineRows.length === 0
+          ? []
+          : await loadPurchaseOrderItemMetadata(
+              client,
+              shopId,
+              lineRows.map((line) => line.inventory_item_id),
+            );
 
       const suppliers: AdminSupplier[] = supplierRows.map((row) => ({
         id: row.id,
@@ -362,7 +402,10 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
       }));
       const supplierNames = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
       const itemNames = new Map(
-        inventoryRows.map((item) => [item.id, { name: item.name, unitLabel: item.unit_label }]),
+        [...inventoryRows, ...purchaseOrderItemRows].map((item) => [
+          item.id,
+          { name: item.name, unitLabel: item.unit_label },
+        ]),
       );
       const linesByOrder = new Map<string, PurchaseOrderLineRow[]>();
       for (const line of lineRows) {
