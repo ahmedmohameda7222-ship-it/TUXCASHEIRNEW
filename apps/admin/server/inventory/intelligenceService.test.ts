@@ -138,8 +138,9 @@ describe('inventory intelligence purchasing integration', () => {
   });
 
   it('includes bulk consumption and its undo in actual usage', async () => {
-    const select = vi.fn(async (table: string) => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'inventory_movements') {
+        if (Number(query?.get('offset') ?? '0') !== 0) return [];
         return [
           {
             inventory_item_id: 'item-1',
