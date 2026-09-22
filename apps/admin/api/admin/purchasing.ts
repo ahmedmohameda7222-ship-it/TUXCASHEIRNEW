@@ -48,6 +48,7 @@ const commandSchema = z.discriminatedUnion('type', [
       contactName: nullableText,
       phone: nullableText,
       email: z.string().trim().email().max(240).nullable(),
+      commandId: commandIdSchema,
     })
     .strict(),
   z
@@ -469,6 +470,7 @@ export function createPurchasingStore(client: AdminSupabaseClient): PurchasingSt
         p_contact_name: input.contactName,
         p_phone: input.phone,
         p_email: input.email,
+        p_command_id: input.commandId,
       });
     },
 
