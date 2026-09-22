@@ -53,6 +53,28 @@ async function mockInventory(
     if (request.method() === 'GET') {
       const url = new URL(request.url());
       expect(url.searchParams.get('shopId')).toBe(shopId);
+      const requestedInventoryItemId = url.searchParams.get('inventoryItemId');
+      if (requestedInventoryItemId !== null) {
+        expect(requestedInventoryItemId).toBe(itemId);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            inventoryItemId: itemId,
+            history: [
+              {
+                id: '66666666-6666-4666-8666-666666666666',
+                movementType: 'BULK_STOCK_RECEIVED',
+                quantityDeltaMicros: 3_200_000,
+                reservedDeltaMicros: 0,
+                reasonLabel: null,
+                createdAt: '2026-09-19T02:00:00.000Z',
+              },
+            ],
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -69,16 +91,7 @@ async function mockInventory(
               reservedMicros,
               availableMicros: onHandMicros - reservedMicros,
               weightedUnitCostMinor: 12000,
-              history: [
-                {
-                  id: '66666666-6666-4666-8666-666666666666',
-                  movementType: 'BULK_STOCK_RECEIVED',
-                  quantityDeltaMicros: 3_200_000,
-                  reservedDeltaMicros: 0,
-                  reasonLabel: null,
-                  createdAt: '2026-09-19T02:00:00.000Z',
-                },
-              ],
+              history: [],
             },
           ],
           reasonCodes: [
