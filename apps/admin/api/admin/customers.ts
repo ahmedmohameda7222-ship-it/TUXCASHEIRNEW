@@ -207,11 +207,9 @@ export default async function handler(
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
       const phone = z.string().min(1).max(40).parse(url.searchParams.get('phone'));
       const context = await loadContext(request, client, false);
-      sendJson(
-        response,
-        200,
-        await service.findByPhone({ shopId, phone }, context.principal),
-      );
+      sendJson(response, 200, {
+        customer: await service.findByPhone({ shopId, phone }, context.principal),
+      });
       return;
     }
 
