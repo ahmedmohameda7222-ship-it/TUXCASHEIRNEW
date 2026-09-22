@@ -733,7 +733,7 @@ export default async function handler(
           inventoryItemId: parsedInventoryItemId,
           history: mapInventoryMovementHistory(historyRows),
         };
-        sendJson(response, 200, result);
+        sendJson(response, 200, { ...result });
         return;
       }
       sendJson(response, 200, { ...(await loadWorkspace(client, context, shopId)) });
