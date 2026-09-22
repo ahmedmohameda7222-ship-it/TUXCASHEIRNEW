@@ -132,8 +132,31 @@ jobs:
       - name: Plan 5 Task 2 order detail RED/behavior
         run: npx vitest run apps/admin/src/orders/OrderDetailPage.test.tsx apps/admin/src/orders/OrdersTask2.test.tsx
 
+  task3-customers-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 customer migration invariant
+        run: node scripts/test-admin-customers-migration.mjs
+
+  task3-customers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 canonical customer identity RED/behavior
+        run: npx vitest run apps/admin/server/customers/phone.test.ts apps/admin/server/customers/customerService.test.ts
+
   regression:
-    needs: task1-order-controls
+    needs: [task1-order-controls, task3-customers-static, task3-customers]
     runs-on: ubuntu-latest
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
