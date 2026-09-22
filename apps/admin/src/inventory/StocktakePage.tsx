@@ -28,17 +28,7 @@ export function StocktakePage({
   onSubmit(lines: readonly { inventoryItemId: string; actualCountMicros: number }[]): void;
 }) {
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const initial = useMemo(
-    () =>
-      Object.fromEntries(
-        snapshot.lines.map((line) => [
-          line.inventoryItemId,
-          String(line.snapshotOnHandMicros / 1_000_000),
-        ]),
-      ),
-    [snapshot],
-  );
-  const [actualByItem, setActualByItem] = useState<Record<string, string>>(initial);
+  const [actualByItem, setActualByItem] = useState<Record<string, string>>({});
 
   const parsed = snapshot.lines.map((line) => ({
     line,
