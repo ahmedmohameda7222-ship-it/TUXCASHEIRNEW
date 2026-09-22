@@ -51,7 +51,6 @@ create table public.customer_shop_links (
   canonical_customer_id uuid not null references public.business_customers(id) on delete restrict,
   legacy_customer_contact_id uuid references public.customer_contacts(id) on delete restrict,
   created_at timestamptz not null default now(),
-  unique (business_id, shop_id, canonical_customer_id),
   unique (legacy_customer_contact_id),
   foreign key (business_id, shop_id)
     references public.business_shops(business_id, shop_id) on delete restrict
