@@ -233,17 +233,17 @@ export class InventoryConvergenceService {
     this.#transport = transport;
   }
 
-  async syncShop(shopId: ShopId, maxPages = 20): Promise<number> {
-    if (!Number.isSafeInteger(maxPages) || maxPages <= 0 || maxPages > 100) {
-      throw new RangeError('Inventory convergence maxPages must be between 1 and 100.');
-    }
+  async syncShop(shopId: ShopId): Promise<number> {
     let applied = 0;
-    for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+    for (;;) {
       const cursor = await this.#database.transaction((transaction) =>
         transaction.inventory.getInventorySyncCursor(shopId),
       );
       const page = await this.#transport.pull(shopId, cursor);
       if (page.shopId !== shopId) throw new Error('Inventory convergence shop mismatch.');
+      if (page.hasMore && (page.nextCursor === null || page.nextCursor === cursor)) {
+        throw new Error('Inventory convergence cursor did not advance.');
+      }
 
       await this.#database.transaction(async (transaction) => {
         for (const item of page.items) {
@@ -268,7 +268,7 @@ export class InventoryConvergenceService {
         }
       });
       applied += page.movements.length;
-      if (!page.hasMore || page.nextCursor === null || page.nextCursor === cursor) break;
+      if (!page.hasMore) break;
     }
     return applied;
   }
