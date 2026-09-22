@@ -8,6 +8,7 @@ function formatQuantity(micros: number, unitLabel: string): string {
 }
 
 function toMicros(value: string): number | null {
+  if (value.trim() === '') return null;
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   const micros = Math.round(numeric * 1_000_000);
@@ -28,17 +29,7 @@ export function StocktakePage({
   onSubmit(lines: readonly { inventoryItemId: string; actualCountMicros: number }[]): void;
 }) {
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const initial = useMemo(
-    () =>
-      Object.fromEntries(
-        snapshot.lines.map((line) => [
-          line.inventoryItemId,
-          String(line.snapshotOnHandMicros / 1_000_000),
-        ]),
-      ),
-    [snapshot],
-  );
-  const [actualByItem, setActualByItem] = useState<Record<string, string>>(initial);
+  const [actualByItem, setActualByItem] = useState<Record<string, string>>({});
 
   const parsed = snapshot.lines.map((line) => ({
     line,

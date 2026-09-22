@@ -26,7 +26,7 @@ describe('inventory intelligence purchasing integration', () => {
               {
                 inventory_item_id: 'item-1',
                 par_level_base: 15_000,
-                reorder_point_base: 7_000,
+                reorder_point_base: 10_000,
                 preferred_supplier_id: 'supplier-1',
                 preferred_purchase_unit: 'case',
                 lead_time_days: 3,
@@ -135,6 +135,50 @@ describe('inventory intelligence purchasing integration', () => {
       onHandMicros: 6_000,
       availableMicros: 6_000,
     });
+  });
+
+  it('includes bulk consumption and its undo in actual usage', async () => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_movements') {
+        if (Number(query?.get('offset') ?? '0') !== 0) return [];
+        return [
+          {
+            inventory_item_id: 'item-1',
+            movement_type: 'BULK_UNIT_FINISHED',
+            quantity_delta_micros: -5_000,
+            order_id: null,
+          },
+          {
+            inventory_item_id: 'item-1',
+            movement_type: 'UNDO_BULK_UNIT_FINISHED',
+            quantity_delta_micros: 2_000,
+            order_id: null,
+          },
+        ];
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      if (table === 'orders') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [{ ...item, trackingMode: 'BULK_MANUAL' }],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.variances).toContainEqual(
+      expect.objectContaining({
+        inventoryItemId: 'item-1',
+        actualUsageMicros: 3_000,
+        theoreticalUsageMicros: 0,
+      }),
+    );
   });
 
   it('aggregates every movement in the reporting window beyond the first 10,000 rows', async () => {
@@ -461,33 +505,71 @@ describe('inventory intelligence purchasing integration', () => {
     expect(marginQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
-  it('uses the observed replenishment version as an atomic compare-and-swap guard', async () => {
+  it('uses the client-observed replenishment version as the compare-and-swap guard', async () => {
     const update = vi.fn(async (table: string, query: URLSearchParams) => {
       void table;
       void query;
       return [];
     });
     const client = {
-      select: vi.fn(async () => [{ version: 4 }]),
+      select: vi.fn(async (table: string) => {
+        if (table === 'inventory_items') return [{ id: 'item-1' }];
+        if (table === 'inventory_replenishment_settings') return [{ version: 4 }];
+        throw new Error('unexpected table: ' + table);
+      }),
       update,
       insert: vi.fn(),
     } as unknown as AdminSupabaseClient;
+    const input = {
+      employeeId: 'employee-1',
+      shopId: 'shop-a',
+      inventoryItemId: 'item-1',
+      expectedVersion: 3,
+      parLevelMicros: 10_000,
+      reorderPointMicros: 5_000,
+      preferredPurchaseUnit: 'case',
+      leadTimeDays: 2,
+      minimumOrderMicros: null,
+      orderMultipleMicros: null,
+    };
 
-    await expect(
-      updateReplenishmentPolicy(client, {
-        employeeId: 'employee-1',
-        shopId: 'shop-a',
-        inventoryItemId: 'item-1',
-        parLevelMicros: 10_000,
-        reorderPointMicros: 5_000,
-        preferredPurchaseUnit: 'case',
-        leadTimeDays: 2,
-        minimumOrderMicros: null,
-        orderMultipleMicros: null,
-      }),
-    ).rejects.toThrow(/inventory_replenishment_conflict/);
+    await expect(updateReplenishmentPolicy(client, input)).rejects.toThrow(
+      /inventory_replenishment_conflict/,
+    );
 
     const query = update.mock.calls[0]?.[1];
-    expect(query?.get('version')).toBe('eq.4');
+    expect(query?.get('version')).toBe('eq.3');
+  });
+
+  it('rejects replenishment writes when the inventory item belongs to another shop', async () => {
+    const insert = vi.fn(async () => []);
+    const update = vi.fn(async () => []);
+    const client = {
+      select: vi.fn(async (table: string) => {
+        if (table === 'inventory_items') return [];
+        if (table === 'inventory_replenishment_settings') return [];
+        throw new Error('unexpected table: ' + table);
+      }),
+      insert,
+      update,
+    } as unknown as AdminSupabaseClient;
+    const input = {
+      employeeId: 'employee-1',
+      shopId: 'shop-a',
+      inventoryItemId: 'item-from-shop-b',
+      expectedVersion: 0,
+      parLevelMicros: 10_000,
+      reorderPointMicros: 5_000,
+      preferredPurchaseUnit: null,
+      leadTimeDays: 2,
+      minimumOrderMicros: null,
+      orderMultipleMicros: null,
+    };
+
+    await expect(updateReplenishmentPolicy(client, input)).rejects.toThrow(
+      /inventory_replenishment_item_not_found/,
+    );
+    expect(insert).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });

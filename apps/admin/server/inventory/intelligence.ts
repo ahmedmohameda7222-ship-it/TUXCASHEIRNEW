@@ -1,6 +1,7 @@
 export type ReorderSuggestionInput = {
   readonly available: number;
   readonly par: number;
+  readonly reorderPoint: number;
   readonly incoming: number;
   readonly minimumOrder?: number | null;
   readonly orderMultiple?: number | null;
@@ -31,11 +32,15 @@ function optionalPositive(value: number | null | undefined, label: string): numb
 export function suggestOrderQuantity(input: ReorderSuggestionInput): number {
   const available = finite(input.available, 'available');
   const par = finiteNonNegative(input.par, 'par');
+  const reorderPoint = finiteNonNegative(input.reorderPoint, 'reorder point');
   const incoming = finiteNonNegative(input.incoming, 'incoming');
   const minimumOrder = optionalPositive(input.minimumOrder, 'minimum order');
   const orderMultiple = optionalPositive(input.orderMultiple, 'order multiple');
 
-  const shortage = Math.max(0, par - available - incoming);
+  const inventoryPosition = available + incoming;
+  if (inventoryPosition > reorderPoint) return 0;
+
+  const shortage = Math.max(0, par - inventoryPosition);
   if (shortage === 0) return 0;
 
   let suggestion = minimumOrder === null ? shortage : Math.max(shortage, minimumOrder);

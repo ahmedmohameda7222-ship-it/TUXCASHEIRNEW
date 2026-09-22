@@ -433,9 +433,13 @@ function createTransaction(database: DatabaseSync): OperationsTransaction {
               worker_id, unit_cost_minor, order_id, created_at, compensates_movement_id, payload_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+              shop_id = excluded.shop_id,
+              business_day_id = excluded.business_day_id,
+              item_id = excluded.item_id,
               movement_type = excluded.movement_type,
               quantity_delta_micros = excluded.quantity_delta_micros,
               reserved_delta_micros = excluded.reserved_delta_micros,
+              idempotency_key = excluded.idempotency_key,
               worker_id = excluded.worker_id,
               unit_cost_minor = excluded.unit_cost_minor,
               order_id = excluded.order_id,

@@ -16,9 +16,11 @@ create table public.suppliers (
   email text,
   active boolean not null default true,
   created_by_employee_id uuid not null references public.business_employees(id) on delete restrict,
+  create_command_id text not null check (btrim(create_command_id) <> ''),
   version bigint not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (business_id, create_command_id),
   foreign key (business_id, created_by_employee_id)
     references public.business_employees(business_id, id) on delete restrict
 );
@@ -73,6 +75,9 @@ create index purchase_orders_shop_status_idx
   on public.purchase_orders(shop_id, status, expected_delivery_date, id);
 create index purchase_orders_supplier_idx
   on public.purchase_orders(supplier_id, created_at desc, id);
+create unique index purchase_orders_shop_order_command_uq
+  on public.purchase_orders(shop_id, order_command_id)
+  where order_command_id is not null;
 
 create table public.purchase_order_lines (
   id uuid primary key default gen_random_uuid(),
@@ -253,7 +258,8 @@ create or replace function public.create_supplier_v1(
   p_name text,
   p_contact_name text,
   p_phone text,
-  p_email text
+  p_email text,
+  p_command_id text
 )
 returns jsonb
 language plpgsql
@@ -263,26 +269,85 @@ as $$
 declare
   v_business_id uuid;
   v_supplier_id uuid;
+  v_existing_supplier public.suppliers%rowtype;
 begin
   v_business_id := private.admin_purchasing_authority_v1(
     p_employee_id, p_shop_id, 'purchasing.manage'
   );
   if v_business_id is distinct from p_business_id
-     or nullif(btrim(coalesce(p_name, '')), '') is null then
+     or nullif(btrim(coalesce(p_name, '')), '') is null
+     or nullif(btrim(coalesce(p_command_id, '')), '') is null then
     return jsonb_build_object('ok', false, 'code', 'invalid_supplier_command');
   end if;
 
+  select s.*
+    into v_existing_supplier
+  from public.suppliers s
+  where s.business_id = v_business_id
+    and s.create_command_id = p_command_id;
+
+  if found then
+    if v_existing_supplier.name is distinct from btrim(p_name)
+       or v_existing_supplier.contact_name is distinct from nullif(btrim(coalesce(p_contact_name, '')), '')
+       or v_existing_supplier.phone is distinct from nullif(btrim(coalesce(p_phone, '')), '')
+       or v_existing_supplier.email is distinct from nullif(btrim(coalesce(p_email, '')), '') then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+    return jsonb_build_object(
+      'ok', true,
+      'supplierId', v_existing_supplier.id,
+      'idempotentReplay', true
+    );
+  end if;
+
   insert into public.suppliers(
-    business_id, name, contact_name, phone, email, created_by_employee_id
+    business_id, name, contact_name, phone, email,
+    created_by_employee_id, create_command_id
   ) values (
     v_business_id,
     btrim(p_name),
     nullif(btrim(coalesce(p_contact_name, '')), ''),
     nullif(btrim(coalesce(p_phone, '')), ''),
     nullif(btrim(coalesce(p_email, '')), ''),
-    p_employee_id
+    p_employee_id,
+    p_command_id
   )
+  on conflict do nothing
   returning id into v_supplier_id;
+
+  if v_supplier_id is null then
+    select s.*
+      into v_existing_supplier
+    from public.suppliers s
+    where s.business_id = v_business_id
+      and s.create_command_id = p_command_id;
+
+    if found then
+      if v_existing_supplier.name is distinct from btrim(p_name)
+         or v_existing_supplier.contact_name is distinct from nullif(btrim(coalesce(p_contact_name, '')), '')
+         or v_existing_supplier.phone is distinct from nullif(btrim(coalesce(p_phone, '')), '')
+         or v_existing_supplier.email is distinct from nullif(btrim(coalesce(p_email, '')), '') then
+        return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+      end if;
+      return jsonb_build_object(
+        'ok', true,
+        'supplierId', v_existing_supplier.id,
+        'idempotentReplay', true
+      );
+    end if;
+
+    if exists (
+      select 1
+      from public.suppliers s
+      where s.business_id = v_business_id
+        and s.active
+        and lower(s.name) = lower(btrim(p_name))
+    ) then
+      return jsonb_build_object('ok', false, 'code', 'supplier_name_conflict');
+    end if;
+
+    return jsonb_build_object('ok', false, 'code', 'supplier_create_conflict');
+  end if;
 
   perform public.append_admin_audit_event_v1(
     v_business_id, p_shop_id, p_employee_id,
@@ -292,7 +357,11 @@ begin
     null, null, null, '{}'::jsonb
   );
 
-  return jsonb_build_object('ok', true, 'supplierId', v_supplier_id);
+  return jsonb_build_object(
+    'ok', true,
+    'supplierId', v_supplier_id,
+    'idempotentReplay', false
+  );
 end;
 $$;
 
@@ -314,6 +383,8 @@ as $$
 declare
   v_business_id uuid;
   v_purchase_order_id uuid;
+  v_existing_order public.purchase_orders%rowtype;
+  v_replay_matches boolean;
   v_line jsonb;
   v_item_id uuid;
   v_ordered_purchase bigint;
@@ -337,23 +408,6 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_purchase_order_command');
   end if;
 
-  select po.id into v_purchase_order_id
-  from public.purchase_orders po
-  where po.shop_id = p_shop_id and po.create_command_id = p_command_id;
-  if v_purchase_order_id is not null then
-    return jsonb_build_object(
-      'ok', true, 'purchaseOrderId', v_purchase_order_id,
-      'status', 'DRAFT', 'version', 1, 'idempotentReplay', true
-    );
-  end if;
-
-  if not exists (
-    select 1 from public.suppliers s
-    where s.id = p_supplier_id and s.business_id = v_business_id and s.active
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'supplier_not_found');
-  end if;
-
   for v_line in select value from jsonb_array_elements(p_lines)
   loop
     begin
@@ -367,6 +421,88 @@ begin
     if v_ordered_purchase <= 0 or v_purchase_cost < 0 or v_purchase_unit is null then
       return jsonb_build_object('ok', false, 'code', 'invalid_purchase_order_line');
     end if;
+  end loop;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(p_shop_id::text || ':' || p_command_id, 0)
+  );
+
+  select po.*
+    into v_existing_order
+  from public.purchase_orders po
+  where po.shop_id = p_shop_id
+    and po.create_command_id = p_command_id;
+
+  if found then
+    select
+      v_existing_order.supplier_id = p_supplier_id
+      and v_existing_order.reference is not distinct from nullif(btrim(coalesce(p_reference, '')), '')
+      and v_existing_order.expected_delivery_date is not distinct from p_expected_delivery_date
+      and (
+        select count(*)
+        from public.purchase_order_lines pol
+        where pol.purchase_order_id = v_existing_order.id
+      ) = jsonb_array_length(p_lines)
+      and not exists (
+        select 1
+        from jsonb_array_elements(p_lines) as input_line(value)
+        where not exists (
+          select 1
+          from public.purchase_order_lines pol
+          where pol.purchase_order_id = v_existing_order.id
+            and pol.inventory_item_id = (input_line.value ->> 'inventoryItemId')::uuid
+            and lower(btrim(pol.purchase_unit_label)) =
+              lower(btrim(input_line.value ->> 'purchaseUnitLabel'))
+            and pol.ordered_purchase_units_micros =
+              (input_line.value ->> 'orderedPurchaseUnitsMicros')::bigint
+            and pol.expected_purchase_unit_cost_minor =
+              (input_line.value ->> 'expectedPurchaseUnitCostMinor')::numeric
+        )
+      )
+      and not exists (
+        select 1
+        from public.purchase_order_lines pol
+        where pol.purchase_order_id = v_existing_order.id
+          and not exists (
+            select 1
+            from jsonb_array_elements(p_lines) as input_line(value)
+            where pol.inventory_item_id = (input_line.value ->> 'inventoryItemId')::uuid
+              and lower(btrim(pol.purchase_unit_label)) =
+                lower(btrim(input_line.value ->> 'purchaseUnitLabel'))
+              and pol.ordered_purchase_units_micros =
+                (input_line.value ->> 'orderedPurchaseUnitsMicros')::bigint
+              and pol.expected_purchase_unit_cost_minor =
+                (input_line.value ->> 'expectedPurchaseUnitCostMinor')::numeric
+          )
+      )
+      into v_replay_matches;
+
+    if not coalesce(v_replay_matches, false) then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+
+    return jsonb_build_object(
+      'ok', true,
+      'purchaseOrderId', v_existing_order.id,
+      'status', v_existing_order.status,
+      'version', v_existing_order.version,
+      'idempotentReplay', true
+    );
+  end if;
+
+  if not exists (
+    select 1 from public.suppliers s
+    where s.id = p_supplier_id and s.business_id = v_business_id and s.active
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'supplier_not_found');
+  end if;
+
+  for v_line in select value from jsonb_array_elements(p_lines)
+  loop
+    v_item_id := (v_line ->> 'inventoryItemId')::uuid;
+    v_ordered_purchase := (v_line ->> 'orderedPurchaseUnitsMicros')::bigint;
+    v_purchase_cost := (v_line ->> 'expectedPurchaseUnitCostMinor')::numeric;
+    v_purchase_unit := nullif(btrim(v_line ->> 'purchaseUnitLabel'), '');
 
     select i.unit_label into v_base_unit
     from public.inventory_items i
@@ -552,10 +688,32 @@ as $$
 declare
   v_business_id uuid;
   v_order public.purchase_orders%rowtype;
+  v_existing_command_order_id uuid;
 begin
   v_business_id := private.admin_purchasing_authority_v1(
     p_employee_id, p_shop_id, 'purchasing.manage'
   );
+  if nullif(btrim(coalesce(p_command_id, '')), '') is null then
+    return jsonb_build_object('ok', false, 'code', 'invalid_order_command');
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-purchasing-order-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
+  select po.id
+    into v_existing_command_order_id
+  from public.purchase_orders po
+  where po.shop_id = p_shop_id
+    and po.order_command_id = p_command_id;
+
+  if v_existing_command_order_id is not null
+     and v_existing_command_order_id is distinct from p_purchase_order_id then
+    return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+  end if;
 
   select po.* into v_order
   from public.purchase_orders po
@@ -565,7 +723,7 @@ begin
   if not found or v_order.business_id is distinct from v_business_id then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_found');
   end if;
-  if v_order.status = 'ORDERED' and v_order.order_command_id = p_command_id then
+  if v_order.order_command_id = p_command_id and v_order.status <> 'DRAFT' then
     return jsonb_build_object(
       'ok', true, 'purchaseOrderId', v_order.id,
       'status', v_order.status, 'version', v_order.version, 'idempotentReplay', true
@@ -645,6 +803,15 @@ begin
      or jsonb_typeof(p_lines) <> 'array'
      or jsonb_array_length(p_lines) = 0 then
     return jsonb_build_object('ok', false, 'code', 'invalid_receive_command');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) line(value)
+    group by line.value ->> 'lineId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_purchase_order_line');
   end if;
 
   select po.* into v_order
@@ -922,6 +1089,15 @@ begin
      or jsonb_typeof(p_lines) <> 'array'
      or jsonb_array_length(p_lines) = 0 then
     return jsonb_build_object('ok', false, 'code', 'invalid_return_command');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) line(value)
+    group by line.value ->> 'lineId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_purchase_order_line');
   end if;
 
   select po.* into v_order
@@ -1241,7 +1417,7 @@ begin
 end;
 $$;
 
-revoke all on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text)
+revoke all on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text, text)
   from public, anon, authenticated;
 revoke all on function public.create_purchase_order_v1(uuid, uuid, uuid, uuid, text, date, jsonb, text)
   from public, anon, authenticated;
@@ -1254,7 +1430,7 @@ revoke all on function public.receive_purchase_order_v1(uuid, uuid, uuid, text, 
 revoke all on function public.return_purchase_order_v1(uuid, uuid, uuid, text, text, jsonb)
   from public, anon, authenticated;
 
-grant execute on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text)
+grant execute on function public.create_supplier_v1(uuid, uuid, uuid, text, text, text, text, text)
   to service_role;
 grant execute on function public.create_purchase_order_v1(uuid, uuid, uuid, uuid, text, date, jsonb, text)
   to service_role;

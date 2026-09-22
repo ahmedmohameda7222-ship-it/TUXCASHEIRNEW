@@ -15,6 +15,17 @@ import './inventory.css';
 
 const STOCKTAKE_BATCH_SIZE = 500;
 
+function latestMutationError(
+  mutations: readonly { error: unknown; submittedAt: number }[],
+): unknown {
+  let latest: { error: unknown; submittedAt: number } | null = null;
+  for (const mutation of mutations) {
+    if (mutation.submittedAt <= 0) continue;
+    if (latest === null || mutation.submittedAt >= latest.submittedAt) latest = mutation;
+  }
+  return latest?.error ?? null;
+}
+
 function mutationErrorMessage(error: unknown): string | null {
   if (error === null || error === undefined) return null;
   const raw = error instanceof Error ? error.message : String(error);
@@ -29,37 +40,45 @@ type ItemAction = 'adjust' | 'waste' | null;
 export function InventoryPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
-  const inventory = useInventory(shopId);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const inventory = useInventory(shopId, selectedItemId);
   const [mode, setMode] = useState<WorkspaceMode>('detail');
   const [itemAction, setItemAction] = useState<ItemAction>(null);
   const [stocktakeSnapshot, setStocktakeSnapshot] = useState<AdminStocktakeSnapshot | null>(null);
 
   const workspace = inventory.workspaceQuery.data;
-  const mutationError =
-    [
-      inventory.adjustStock.error,
-      inventory.recordWaste.error,
-      inventory.beginStocktake.error,
-      inventory.postStocktake.error,
-      inventory.updateReplenishment.error,
-      inventory.sendTransfer.error,
-      inventory.receiveTransfer.error,
-    ].find((error) => error !== null && error !== undefined) ?? null;
+  const mutationError = latestMutationError([
+    inventory.adjustStock,
+    inventory.recordWaste,
+    inventory.beginStocktake,
+    inventory.postStocktake,
+    inventory.updateReplenishment,
+    inventory.sendTransfer,
+    inventory.receiveTransfer,
+  ]);
   const mutationErrorText = mutationErrorMessage(mutationError);
   const items = workspace?.items ?? [];
   const stocktakeItems = useMemo(() => items.filter((item) => item.active), [items]);
 
   useEffect(() => {
-    if (selectedItemId && items.some((item) => item.id === selectedItemId)) return;
+    const selected = selectedItemId ? items.find((item) => item.id === selectedItemId) : null;
+    if (selected) {
+      if (!selected.active) setItemAction(null);
+      return;
+    }
     setSelectedItemId(null);
     setItemAction(null);
   }, [items, selectedItemId]);
 
-  const selectedItem = useMemo(
-    () => items.find((item) => item.id === selectedItemId) ?? null,
-    [items, selectedItemId],
-  );
+  const selectedItem = useMemo(() => {
+    const item = items.find((candidate) => candidate.id === selectedItemId) ?? null;
+    if (item === null) return null;
+    const history =
+      inventory.itemHistoryQuery.data?.inventoryItemId === item.id
+        ? inventory.itemHistoryQuery.data.history
+        : [];
+    return { ...item, history };
+  }, [inventory.itemHistoryQuery.data, items, selectedItemId]);
 
   const stocktakeBatches = useMemo(() => {
     const batches = [];
@@ -323,7 +342,7 @@ export function InventoryPage() {
                 <InventoryItemPage
                   item={selectedItem}
                   actions={
-                    canAdjust ? (
+                    canAdjust && selectedItem.active ? (
                       <>
                         <button
                           className="admin-secondary-button"
@@ -343,7 +362,7 @@ export function InventoryPage() {
                     ) : undefined
                   }
                 />
-                {itemAction === 'adjust' ? (
+                {itemAction === 'adjust' && selectedItem.active ? (
                   <AdjustStockSheet
                     item={selectedItem}
                     reasons={workspace.reasonCodes}
@@ -358,7 +377,7 @@ export function InventoryPage() {
                     }
                   />
                 ) : null}
-                {itemAction === 'waste' ? (
+                {itemAction === 'waste' && selectedItem.active ? (
                   <RecordWasteSheet
                     item={selectedItem}
                     reasons={workspace.reasonCodes}

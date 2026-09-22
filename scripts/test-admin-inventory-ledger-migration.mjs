@@ -108,6 +108,55 @@ const sendTransfer = lower.slice(
 if (!sendTransfer.includes('destination_inventory_item_id')) {
   throw new Error('send_stock_transfer_v1 must persist the resolved destination inventory item');
 }
+const adjustmentSql = lower.slice(
+  lower.indexOf('create or replace function public.post_inventory_adjustment_v1'),
+  lower.indexOf('create or replace function public.post_inventory_waste_v1'),
+);
+const wasteSql = lower.slice(
+  lower.indexOf('create or replace function public.post_inventory_waste_v1'),
+  lower.indexOf('create or replace function public.ingest_tux_operations_materialization_v1'),
+);
+const beginStocktakeSql = lower.slice(
+  lower.indexOf('create or replace function public.begin_stocktake_v1'),
+  lower.indexOf('create or replace function public.post_stocktake_v1'),
+);
+
+function assertCommandSerializationBeforeReplay(functionSql, replayNeedle, label) {
+  const lockIndex = functionSql.indexOf('pg_advisory_xact_lock');
+  const commandIdIndex = functionSql.indexOf('p_command_id', lockIndex);
+  const replayIndex = functionSql.indexOf(replayNeedle);
+  if (
+    lockIndex < 0 ||
+    commandIdIndex < 0 ||
+    replayIndex < 0 ||
+    lockIndex > replayIndex ||
+    commandIdIndex > replayIndex
+  ) {
+    throw new Error(`${label} must serialize by command ID before replay lookup`);
+  }
+}
+
+assertCommandSerializationBeforeReplay(
+  adjustmentSql,
+  "m.movement_type = 'admin_adjustment'",
+  'inventory adjustment',
+);
+assertCommandSerializationBeforeReplay(
+  wasteSql,
+  "m.movement_type = 'waste'",
+  'inventory waste',
+);
+assertCommandSerializationBeforeReplay(
+  beginStocktakeSql,
+  'from public.stocktakes s',
+  'stocktake begin',
+);
+assertCommandSerializationBeforeReplay(
+  sendTransfer,
+  'from public.stock_transfers t',
+  'transfer send',
+);
+
 const receiveTransfer = lower.slice(
   lower.indexOf('create or replace function public.receive_stock_transfer_v1'),
   lower.indexOf('revoke all on function public.reserve_inventory_for_order_v1'),
@@ -170,6 +219,17 @@ if (
   throw new Error('canonical inventory movement rows must reject post-insert rewrites');
 }
 if (
+  !lower.includes('enforce_inventory_bulk_undo_integrity_v1') ||
+  !lower.includes('inventory_bulk_undo_claims') ||
+  !lower.includes('tux_inventory_bulk_undo_mismatch') ||
+  !lower.includes('when unique_violation') ||
+  !/before\s+insert\s+on\s+public\.inventory_movements/.test(lower)
+) {
+  throw new Error(
+    'canonical bulk undo movements must claim one exact original movement atomically',
+  );
+}
+if (
   !lower.includes('assert_operations_placement_inventory_requirements_v1') ||
   !lower.includes('tux_inventory_placement_requirements_mismatch') ||
   !lower.includes('assert_order_inventory_reservations_settled_v1') ||
@@ -181,12 +241,21 @@ if (
   );
 }
 
+const inventoryHistoryStart = lower.indexOf(
+  'create or replace function public.read_admin_inventory_movement_history_v1',
+);
+const inventoryHistoryEnd = lower.indexOf(
+  'create or replace function private.inventory_reason_snapshot_v1',
+  inventoryHistoryStart,
+);
+const inventoryHistorySql = lower.slice(inventoryHistoryStart, inventoryHistoryEnd);
 if (
-  !lower.includes('read_admin_inventory_movement_history_v1') ||
-  !/row_number\s*\(\s*\)\s*over\s*\(\s*partition\s+by\s+m\.inventory_item_id/i.test(sql) ||
-  !/item_rank\s*<=\s*p_per_item_limit/i.test(sql)
+  inventoryHistoryStart < 0 ||
+  !inventoryHistorySql.includes('p_inventory_item_id uuid') ||
+  !inventoryHistorySql.includes('m.inventory_item_id = p_inventory_item_id') ||
+  !/limit\s+p_per_item_limit/i.test(inventoryHistorySql)
 ) {
-  throw new Error('Admin inventory history must be bounded independently per inventory item');
+  throw new Error('Admin inventory history must be bounded to the requested inventory item');
 }
 
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
@@ -306,6 +375,8 @@ const workerId = '24000000-0000-4000-8000-000000000001';
 const dayId = '34000000-0000-4000-8000-000000000001';
 const itemId = '44000000-0000-4000-8000-000000000001';
 const movementId = '54000000-0000-4000-8000-000000000001';
+const dependencyOriginalMovementId = '5f000000-0000-4000-8000-000000000002';
+const dependencyCompensationMovementId = '5f000000-0000-4000-8000-000000000003';
 
 psql(
   [
@@ -328,6 +399,25 @@ psql(
      ) values (
        '${movementId}', '${shopId}', '${dayId}', '${itemId}', 'ADMIN_ADJUSTMENT',
        2500000, '${workerId}', null, null, 'legacy-admin-adjustment', timestamptz '2026-09-19 01:00:00+00'
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, worker_id, order_id, compensates_movement_id,
+       idempotency_key, created_at
+     ) values (
+       '${dependencyOriginalMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'BULK_STOCK_RECEIVED', 1000000, '${workerId}', null, null,
+       'dependency-original', timestamptz '2026-09-19 03:00:00+00'
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, worker_id, order_id, compensates_movement_id,
+       idempotency_key, created_at
+     ) values (
+       '${dependencyCompensationMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -1000000, '${workerId}', null,
+       '${dependencyOriginalMovementId}', 'dependency-compensation',
+       timestamptz '2026-09-19 02:00:00+00'
      );`,
   ],
   'Legacy inventory fixture',
@@ -345,6 +435,24 @@ const legacyBefore = psql(
 ).trim();
 
 psql(['-f', migrationPath], migrationName);
+
+const dependencyFeedOrder = psql(
+  [
+    '-At',
+    '-c',
+    `select original_feed.sequence < compensation_feed.sequence
+     from public.inventory_movement_feed original_feed
+     join public.inventory_movement_feed compensation_feed on true
+     where original_feed.movement_id = '${dependencyOriginalMovementId}'
+       and compensation_feed.movement_id = '${dependencyCompensationMovementId}'`,
+  ],
+  'Inventory feed dependency ordering',
+).trim();
+if (dependencyFeedOrder !== 't') {
+  throw new Error(
+    'inventory feed backfill must place a compensated movement before its compensation',
+  );
+}
 
 const legacyAfter = psql(
   [
@@ -433,6 +541,322 @@ psql(
      end $inventory_assertions$;`,
   ],
   'Admin inventory additive compatibility assertions',
+);
+
+const transitionFenceOrderTypeId = '83000000-0000-4000-8000-000000000001';
+const transitionFenceOrderId = '83000000-0000-4000-8000-000000000002';
+
+psql(
+  [
+    '-c',
+    `insert into public.order_types(
+       id, shop_id, name, behavior, active, sort_order
+     ) values (
+       '${transitionFenceOrderTypeId}', '${shopId}', 'Transition Fence', 'TAKE_AWAY', true, 99
+     );
+     select private.apply_tux_remote_mutation(
+       $mutation$
+       {
+         "table": "orders",
+         "mode": "UPSERT",
+         "conflictColumns": ["id"],
+         "row": {
+           "id": "${transitionFenceOrderId}",
+           "shop_id": "${shopId}",
+           "business_day_id": "${dayId}",
+           "display_order_no": 99,
+           "idempotency_key": "transition-fence-order",
+           "source": "POS",
+           "status": "ACTIVE",
+           "operator_worker_id": "${workerId}",
+           "operator_name_snapshot": "Legacy Worker",
+           "order_type_id": "${transitionFenceOrderTypeId}",
+           "order_type_label_snapshot": "Transition Fence",
+           "order_type_behavior_snapshot": "TAKE_AWAY",
+           "customer_contact_id": null,
+           "customer_name_snapshot": null,
+           "normalized_phone_snapshot": null,
+           "address_snapshot": null,
+           "delivery_zone_id": null,
+           "delivery_zone_label_snapshot": null,
+           "configured_delivery_fee_minor": 0,
+           "final_delivery_fee_minor": 0,
+           "items_subtotal_minor": 1000,
+           "discount_minor": 0,
+           "service_charge_minor": 0,
+           "tax_minor": 0,
+           "total_minor": 1000,
+           "order_note": null,
+           "created_at": "2026-09-19T01:05:00.000Z",
+           "updated_at": "2026-09-19T01:05:00.000Z",
+           "configuration_version": 1,
+           "operational_revision": 2,
+           "done_at": null,
+           "cancelled_at": null,
+           "cancelled_by_worker_id": null,
+           "cancelled_by_worker_name_snapshot": null,
+           "cancellation_reason": null,
+           "cancellation_food_prepared": null,
+           "cancellation_stock_restored": null,
+           "returned_at": null,
+           "returned_by_worker_id": null,
+           "returned_by_worker_name_snapshot": null,
+           "return_reason": null,
+           "snapshot_json": {}
+         },
+         "guard": null
+       }
+       $mutation$::jsonb
+     );`,
+  ],
+  'Canonical order transition fence fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "DONE",
+             "toStatus": "ACTIVE",
+             "revision": 3
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition wrong canonical from-status fence',
+  'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "ACTIVE",
+             "toStatus": "DONE",
+             "revision": 4
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition revision jump fence',
+  'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "ACTIVE",
+             "toStatus": "DONE",
+             "revision": 3
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition exact next-state precondition',
+);
+
+const bulkItemId = '44000000-0000-4000-8000-000000000002';
+const bulkOtherItemId = '44000000-0000-4000-8000-000000000003';
+const bulkReceivedMovementId = '54000000-0000-4000-8000-000000000002';
+const wrongQuantityUndoId = '54000000-0000-4000-8000-000000000003';
+const wrongItemUndoId = '54000000-0000-4000-8000-000000000004';
+const wrongTypeUndoId = '54000000-0000-4000-8000-000000000005';
+const validReceivedUndoId = '54000000-0000-4000-8000-000000000006';
+const duplicateReceivedUndoId = '54000000-0000-4000-8000-000000000007';
+const bulkSeedMovementId = '54000000-0000-4000-8000-000000000008';
+const bulkFinishedMovementId = '54000000-0000-4000-8000-000000000009';
+const wrongFinishedUndoId = '54000000-0000-4000-8000-00000000000a';
+const validFinishedUndoId = '54000000-0000-4000-8000-00000000000b';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(id, shop_id, name, unit_label, tracking_mode, active)
+       values
+         ('${bulkItemId}', '${shopId}', 'Bulk Beef', 'kg', 'RECIPE_TRACKED', true),
+         ('${bulkOtherItemId}', '${shopId}', 'Bulk Chicken', 'kg', 'RECIPE_TRACKED', true);
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${bulkReceivedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'BULK_STOCK_RECEIVED', 5000000, 0, '${workerId}', null, null,
+       'bulk-received:canonical-original', timestamptz '2026-09-19 01:10:00+00'
+     );`,
+  ],
+  'Canonical bulk undo fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongQuantityUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -4000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:wrong-quantity',
+       timestamptz '2026-09-19 01:11:00+00'
+     );`,
+  ],
+  'Bulk undo wrong inverse quantity fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongItemUndoId}', '${shopId}', '${dayId}', '${bulkOtherItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:wrong-item',
+       timestamptz '2026-09-19 01:12:00+00'
+     );`,
+  ],
+  'Bulk undo wrong inventory item fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongTypeUndoId}', '${shopId}', '${dayId}', '${itemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -2500000, 0, '${workerId}', null,
+       '${movementId}', 'bulk-undo:wrong-original-type',
+       timestamptz '2026-09-19 01:13:00+00'
+     );`,
+  ],
+  'Bulk undo wrong original type fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${validReceivedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:valid-received',
+       timestamptz '2026-09-19 01:14:00+00'
+     );`,
+  ],
+  'Valid exact bulk stock receipt undo',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${duplicateReceivedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -5000000, 0, '${workerId}', null,
+       '${bulkReceivedMovementId}', 'bulk-undo:duplicate-received',
+       timestamptz '2026-09-19 01:15:00+00'
+     );`,
+  ],
+  'Duplicate bulk stock receipt undo fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values
+       (
+         '${bulkSeedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+         'BULK_STOCK_RECEIVED', 6000000, 0, '${workerId}', null, null,
+         'bulk-finished:seed-stock', timestamptz '2026-09-19 01:16:00+00'
+       ),
+       (
+         '${bulkFinishedMovementId}', '${shopId}', '${dayId}', '${bulkItemId}',
+         'BULK_UNIT_FINISHED', -2000000, 0, '${workerId}', null, null,
+         'bulk-finished:canonical-original', timestamptz '2026-09-19 01:17:00+00'
+       );`,
+  ],
+  'Canonical bulk unit finished fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${wrongFinishedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_UNIT_FINISHED', 3000000, 0, '${workerId}', null,
+       '${bulkFinishedMovementId}', 'bulk-undo:wrong-finished-quantity',
+       timestamptz '2026-09-19 01:18:00+00'
+     );`,
+  ],
+  'Bulk unit finished undo wrong inverse quantity fence',
+  'TUX_INVENTORY_BULK_UNDO_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '${validFinishedUndoId}', '${shopId}', '${dayId}', '${bulkItemId}',
+       'UNDO_BULK_UNIT_FINISHED', 2000000, 0, '${workerId}', null,
+       '${bulkFinishedMovementId}', 'bulk-undo:valid-finished',
+       timestamptz '2026-09-19 01:19:00+00'
+     );`,
+  ],
+  'Valid exact bulk unit finished undo',
 );
 
 const firstReservationMovementId = '64000000-0000-4000-8000-000000000001';
@@ -1098,6 +1522,145 @@ psql(
      );`,
   ],
   'Exact canonical undo reversal set',
+);
+
+const cancelRestockOrderId = '85000000-0000-4000-8000-000000000019';
+const cancelLegacyOneId = '85000000-0000-4000-8000-00000000001a';
+const cancelLegacyTwoId = '85000000-0000-4000-8000-00000000001b';
+
+psql(
+  [
+    '-c',
+    `set session_replication_role = replica;
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values
+       (
+         '${cancelLegacyOneId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -100000, 0, '${workerId}', '${cancelRestockOrderId}',
+         null, 'cancel-legacy-one', timestamptz '2026-09-19 02:30:00+00'
+       ),
+       (
+         '${cancelLegacyTwoId}', '${shopId}', '${dayId}', '${itemId}',
+         'ORDER_CONSUMPTION', -200000, 0, '${workerId}', '${cancelRestockOrderId}',
+         null, 'cancel-legacy-two', timestamptz '2026-09-19 02:30:01+00'
+       );
+     reset session_replication_role;`,
+  ],
+  'Canonical cancellation legacy-consumption fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 999999,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Oversized canonical cancellation restock',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Partial canonical cancellation restock set',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_inventory_cancel_restock_set_v1(
+       '${shopId}',
+       '${cancelRestockOrderId}',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 100000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyOneId}"
+             },
+             {
+               "itemId": "${itemId}",
+               "movementType": "CANCEL_RESTOCK",
+               "quantityDeltaMicros": 200000,
+               "reservedDeltaMicros": 0,
+               "compensatesMovementId": "${cancelLegacyTwoId}"
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Exact canonical cancellation restock set',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, created_at
+     ) values (
+       '85000000-0000-4000-8000-00000000001c', '${shopId}', '${dayId}', '${itemId}',
+       'CANCEL_RESTOCK', 999999, 0, '${workerId}', '${cancelRestockOrderId}',
+       '${cancelLegacyOneId}', 'cancel-restock-forged', timestamptz '2026-09-19 02:30:02+00'
+     );`,
+  ],
+  'Forged cancellation restock row',
+  'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH',
 );
 
 const stocktakeItemId = '86000000-0000-4000-8000-000000000001';

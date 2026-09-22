@@ -96,6 +96,74 @@ describe('Admin purchasing workspace pagination', () => {
     expect(supplierQueries.map((query) => query.get('offset'))).toEqual(['0', '1000', '1250']);
   });
 
+  it('preserves inactive item metadata for actionable purchase-order lines without exposing it for creation', async () => {
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'suppliers') return [];
+      if (table === 'purchase_orders') {
+        if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)') {
+          return Number(query.get('offset') ?? '0') === 0
+            ? [
+                {
+                  id: 'po-open',
+                  shop_id: 'shop-a',
+                  supplier_id: 'supplier-1',
+                  status: 'ORDERED',
+                  reference: null,
+                  expected_delivery_date: null,
+                  version: 1,
+                  ordered_at: '2026-09-20T00:00:00.000Z',
+                  created_at: '2026-09-20T00:00:00.000Z',
+                  updated_at: '2026-09-20T00:00:00.000Z',
+                },
+              ]
+            : [];
+        }
+        return [];
+      }
+      if (table === 'purchase_order_lines') {
+        return Number(query.get('offset') ?? '0') === 0
+          ? [
+              {
+                id: 'line-1',
+                purchase_order_id: 'po-open',
+                inventory_item_id: 'inactive-item',
+                purchase_unit_label: 'case',
+                base_micros_per_purchase_unit: 1_000_000,
+                ordered_purchase_units_micros: 2_000_000,
+                received_purchase_units_micros: 0,
+                returned_purchase_units_micros: 0,
+                ordered_base_micros: 2_000_000,
+                received_base_micros: 0,
+                returned_base_micros: 0,
+                expected_purchase_unit_cost_minor: 100,
+                expected_unit_cost_minor: 100,
+              },
+            ]
+          : [];
+      }
+      if (table === 'inventory_items') {
+        if (query.get('active') === 'eq.true') return [];
+        expect(query.get('shop_id')).toBe('eq.shop-a');
+        expect(query.get('id')).toContain('inactive-item');
+        return Number(query.get('offset') ?? '0') === 0
+          ? [{ id: 'inactive-item', name: 'Archived Beef', unit_label: 'kg', active: false }]
+          : [];
+      }
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
+
+    expect(workspace.inventoryItems).toEqual([]);
+    expect(workspace.purchaseOrders[0]?.lines[0]).toMatchObject({
+      inventoryItemId: 'inactive-item',
+      itemName: 'Archived Beef',
+      unitLabel: 'kg',
+    });
+  });
+
   it('pages every active purchasable inventory item under PostgREST caps', async () => {
     const inventoryItems = Array.from({ length: 1_250 }, (_, index) => ({
       id: `item-${index}`,

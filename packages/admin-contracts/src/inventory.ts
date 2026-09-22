@@ -34,6 +34,11 @@ export interface AdminInventoryMovement {
   readonly createdAt: string;
 }
 
+export interface AdminInventoryItemHistory {
+  readonly inventoryItemId: string;
+  readonly history: readonly AdminInventoryMovement[];
+}
+
 export interface AdminInventoryItem extends InventoryBalance {
   readonly id: string;
   readonly name: string;
@@ -184,6 +189,7 @@ export type AdminInventoryCommand =
       readonly type: 'replenishment.update';
       readonly shopId: string;
       readonly inventoryItemId: string;
+      readonly expectedVersion: number;
       readonly parLevelMicros: number;
       readonly reorderPointMicros: number;
       readonly preferredPurchaseUnit: string | null;

@@ -12,9 +12,30 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: 6_000,
         par: 15_000,
+        reorderPoint: 15_000,
         incoming: 2_000,
       }),
     ).toBe(7_000);
+  });
+
+  it('does not recommend a par refill until inventory position reaches the reorder point', () => {
+    expect(
+      suggestOrderQuantity({
+        available: 9_000,
+        par: 15_000,
+        reorderPoint: 7_000,
+        incoming: 0,
+      }),
+    ).toBe(0);
+
+    expect(
+      suggestOrderQuantity({
+        available: 7_000,
+        par: 15_000,
+        reorderPoint: 7_000,
+        incoming: 0,
+      }),
+    ).toBe(8_000);
   });
 
   it('does not subtract reservations twice because available is already on-hand minus reserved', () => {
@@ -22,6 +43,7 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: 6_000,
         par: 15_000,
+        reorderPoint: 15_000,
         incoming: 2_000,
         minimumOrder: null,
         orderMultiple: null,
@@ -34,6 +56,7 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: 6_000,
         par: 15_000,
+        reorderPoint: 15_000,
         incoming: 2_000,
         minimumOrder: 4_000,
         orderMultiple: 2_000,
@@ -46,6 +69,7 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: 13_000,
         par: 15_000,
+        reorderPoint: 15_000,
         incoming: 0,
         minimumOrder: 4_000,
         orderMultiple: 2_000,
@@ -58,6 +82,7 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: -1_000,
         par: 5_000,
+        reorderPoint: 5_000,
         incoming: 0,
       }),
     ).toBe(6_000);
@@ -68,6 +93,7 @@ describe('inventory intelligence', () => {
       suggestOrderQuantity({
         available: 13_000,
         par: 15_000,
+        reorderPoint: 15_000,
         incoming: 2_000,
         minimumOrder: 4_000,
         orderMultiple: 2_000,

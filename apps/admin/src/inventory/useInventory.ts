@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type {
   AdminInventoryCommand,
   AdminInventoryCommandResult,
+  AdminInventoryItemHistory,
   AdminInventoryWorkspace,
 } from '@tux/admin-contracts';
 
@@ -21,12 +22,16 @@ function inventoryQueryKey(shopId: string) {
   return ['admin', 'inventory', shopId] as const;
 }
 
+function inventoryHistoryQueryKey(shopId: string, inventoryItemId: string) {
+  return [...inventoryQueryKey(shopId), 'history', inventoryItemId] as const;
+}
+
 function csrfTokenForMutation(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new InventoryUiError('session_required');
   return session.state.session.csrfToken;
 }
 
-export function useInventory(shopId: string | undefined) {
+export function useInventory(shopId: string | undefined, inventoryItemId: string | null) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const commandNamespace =
@@ -42,6 +47,20 @@ export function useInventory(shopId: string | undefined) {
       if (!shopId) throw new InventoryUiError('concrete_shop_required');
       return adminFetch<AdminInventoryWorkspace>(
         `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}`,
+      );
+    },
+  });
+
+  const itemHistoryQuery = useQuery({
+    queryKey:
+      shopId && inventoryItemId
+        ? inventoryHistoryQueryKey(shopId, inventoryItemId)
+        : ['admin', 'inventory', 'no-item-history'],
+    enabled: Boolean(shopId && inventoryItemId),
+    queryFn: async () => {
+      if (!shopId || !inventoryItemId) throw new InventoryUiError('inventory_item_required');
+      return adminFetch<AdminInventoryItemHistory>(
+        `/api/admin/inventory?shopId=${encodeURIComponent(shopId)}&inventoryItemId=${encodeURIComponent(inventoryItemId)}`,
       );
     },
   });
@@ -150,6 +169,7 @@ export function useInventory(shopId: string | undefined) {
   const updateReplenishment = useMutation({
     mutationFn: async (input: {
       inventoryItemId: string;
+      expectedVersion: number;
       parLevelMicros: number;
       reorderPointMicros: number;
       preferredPurchaseUnit: string | null;
@@ -192,6 +212,7 @@ export function useInventory(shopId: string | undefined) {
 
   return {
     workspaceQuery,
+    itemHistoryQuery,
     adjustStock,
     recordWaste,
     beginStocktake,

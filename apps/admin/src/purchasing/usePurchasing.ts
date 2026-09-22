@@ -81,8 +81,12 @@ export function usePurchasing(shopId: string | undefined) {
       phone: string | null;
       email: string | null;
     }) => {
-      if (!shopId) throw new PurchasingUiError('concrete_shop_required');
-      return post({ type: 'supplier.create', shopId, ...input });
+      return postRetained('supplier.create', input, (retainedCommandId) => ({
+        type: 'supplier.create',
+        shopId: shopId!,
+        ...input,
+        commandId: retainedCommandId,
+      }));
     },
     onSuccess: invalidate,
   });

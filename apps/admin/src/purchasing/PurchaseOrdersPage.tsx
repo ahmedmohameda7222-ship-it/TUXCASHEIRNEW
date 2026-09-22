@@ -47,7 +47,11 @@ export function PurchaseOrdersPage({
     }[];
   }): void;
 }) {
-  const firstSupplier = suppliers[0]?.id ?? '';
+  const activeSuppliers = useMemo(
+    () => suppliers.filter((supplier) => supplier.active),
+    [suppliers],
+  );
+  const firstSupplier = activeSuppliers[0]?.id ?? '';
   const firstItem = inventoryItems[0]?.id ?? '';
   const [supplierId, setSupplierId] = useState(firstSupplier);
   const [itemId, setItemId] = useState(firstItem);
@@ -57,7 +61,7 @@ export function PurchaseOrdersPage({
   const [purchaseUnit, setPurchaseUnit] = useState('');
   const [unitCost, setUnitCost] = useState('');
 
-  const selectedSupplierId = suppliers.some((supplier) => supplier.id === supplierId)
+  const selectedSupplierId = activeSuppliers.some((supplier) => supplier.id === supplierId)
     ? supplierId
     : firstSupplier;
   const selectedItemId = inventoryItems.some((item) => item.id === itemId) ? itemId : firstItem;
@@ -115,7 +119,7 @@ export function PurchaseOrdersPage({
               value={selectedSupplierId}
               onChange={(event) => setSupplierId(event.currentTarget.value)}
             >
-              {suppliers.map((supplier) => (
+              {activeSuppliers.map((supplier) => (
                 <option value={supplier.id} key={supplier.id}>
                   {supplier.name}
                 </option>
@@ -174,7 +178,11 @@ export function PurchaseOrdersPage({
               onChange={(event) => setUnitCost(event.currentTarget.value)}
             />
           </label>
-          <button className="admin-secondary-button" type="submit" disabled={pending}>
+          <button
+            className="admin-secondary-button"
+            type="submit"
+            disabled={pending || !selectedSupplierId}
+          >
             Create purchase order
           </button>
         </form>

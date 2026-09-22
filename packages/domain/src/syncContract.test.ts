@@ -325,6 +325,75 @@ describe('OperationsSyncPayloadV1', () => {
     }
   });
 
+  it('rejects forged Admin and non-whole Bulk Stock generic movements', () => {
+    const adminAdjustment: InventoryMovement = {
+      ...bulkMovement,
+      id: id<InventoryMovementId>('abababab-abab-4bab-8bab-ababababab01'),
+      movementType: 'ADMIN_ADJUSTMENT',
+      quantityDeltaMicros: stockQuantityMicros(9_000_000),
+      idempotencyKey: 'forged-admin-adjustment',
+    };
+    const multiFinish: InventoryMovement = {
+      ...bulkMovement,
+      id: id<InventoryMovementId>('abababab-abab-4bab-8bab-ababababab02'),
+      movementType: 'BULK_UNIT_FINISHED',
+      quantityDeltaMicros: stockQuantityMicros(-2_000_000),
+      idempotencyKey: 'forged-multi-finish',
+    };
+    const fractionalReceive: InventoryMovement = {
+      ...bulkMovement,
+      id: id<InventoryMovementId>('abababab-abab-4bab-8bab-ababababab03'),
+      quantityDeltaMicros: stockQuantityMicros(1_500_000),
+      idempotencyKey: 'forged-fractional-receive',
+    };
+    const unscopedReceive: InventoryMovement = {
+      ...bulkMovement,
+      id: id<InventoryMovementId>('abababab-abab-4bab-8bab-ababababab04'),
+      businessDayId: null,
+      idempotencyKey: 'forged-unscoped-receive',
+    };
+
+    for (const forged of [adminAdjustment, multiFinish, fractionalReceive, unscopedReceive]) {
+      expect(() =>
+        roundTrip({
+          eventType: 'INVENTORY_MOVEMENT_RECORDED',
+          version: 1,
+          movement: forged,
+        }),
+      ).toThrow(/generic inventory movement|bulk stock/i);
+    }
+  });
+
+  it('requires event-specific order lifecycle transition semantics', () => {
+    const doneOrder: OrderSnapshot = {
+      ...order,
+      status: 'DONE',
+      lifecycle: { revision: 1, doneAt: at, cancellation: null, returned: null },
+    };
+
+    expect(() =>
+      roundTrip({
+        eventType: 'ORDER_MARKED_DONE',
+        version: 1,
+        order: doneOrder,
+        transition: {
+          eventType: 'ORDER_MARKED_DONE',
+          revision: 1,
+          fromStatus: 'DONE',
+          toStatus: 'DONE',
+          at,
+          workerId,
+          workerName: 'Dev Worker',
+          reason: null,
+          foodPrepared: null,
+          stockRestored: null,
+        },
+        inventoryMovements: [],
+        deliveryFailedExpense: null,
+      }),
+    ).toThrow(/transition|ACTIVE.*DONE/i);
+  });
+
   it('rejects reservation lifecycle deltas from generic inventory movement events', () => {
     const forgedRelease: InventoryMovement = {
       ...movement,
