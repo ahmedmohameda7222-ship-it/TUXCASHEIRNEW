@@ -383,6 +383,8 @@ as $$
 declare
   v_business_id uuid;
   v_purchase_order_id uuid;
+  v_existing_order public.purchase_orders%rowtype;
+  v_replay_matches boolean;
   v_line jsonb;
   v_item_id uuid;
   v_ordered_purchase bigint;
@@ -406,23 +408,6 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_purchase_order_command');
   end if;
 
-  select po.id into v_purchase_order_id
-  from public.purchase_orders po
-  where po.shop_id = p_shop_id and po.create_command_id = p_command_id;
-  if v_purchase_order_id is not null then
-    return jsonb_build_object(
-      'ok', true, 'purchaseOrderId', v_purchase_order_id,
-      'status', 'DRAFT', 'version', 1, 'idempotentReplay', true
-    );
-  end if;
-
-  if not exists (
-    select 1 from public.suppliers s
-    where s.id = p_supplier_id and s.business_id = v_business_id and s.active
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'supplier_not_found');
-  end if;
-
   for v_line in select value from jsonb_array_elements(p_lines)
   loop
     begin
@@ -436,6 +421,88 @@ begin
     if v_ordered_purchase <= 0 or v_purchase_cost < 0 or v_purchase_unit is null then
       return jsonb_build_object('ok', false, 'code', 'invalid_purchase_order_line');
     end if;
+  end loop;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(p_shop_id::text || ':' || p_command_id, 0)
+  );
+
+  select po.*
+    into v_existing_order
+  from public.purchase_orders po
+  where po.shop_id = p_shop_id
+    and po.create_command_id = p_command_id;
+
+  if found then
+    select
+      v_existing_order.supplier_id = p_supplier_id
+      and v_existing_order.reference is not distinct from nullif(btrim(coalesce(p_reference, '')), '')
+      and v_existing_order.expected_delivery_date is not distinct from p_expected_delivery_date
+      and (
+        select count(*)
+        from public.purchase_order_lines pol
+        where pol.purchase_order_id = v_existing_order.id
+      ) = jsonb_array_length(p_lines)
+      and not exists (
+        select 1
+        from jsonb_array_elements(p_lines) as input_line(value)
+        where not exists (
+          select 1
+          from public.purchase_order_lines pol
+          where pol.purchase_order_id = v_existing_order.id
+            and pol.inventory_item_id = (input_line.value ->> 'inventoryItemId')::uuid
+            and lower(btrim(pol.purchase_unit_label)) =
+              lower(btrim(input_line.value ->> 'purchaseUnitLabel'))
+            and pol.ordered_purchase_units_micros =
+              (input_line.value ->> 'orderedPurchaseUnitsMicros')::bigint
+            and pol.expected_purchase_unit_cost_minor =
+              (input_line.value ->> 'expectedPurchaseUnitCostMinor')::numeric
+        )
+      )
+      and not exists (
+        select 1
+        from public.purchase_order_lines pol
+        where pol.purchase_order_id = v_existing_order.id
+          and not exists (
+            select 1
+            from jsonb_array_elements(p_lines) as input_line(value)
+            where pol.inventory_item_id = (input_line.value ->> 'inventoryItemId')::uuid
+              and lower(btrim(pol.purchase_unit_label)) =
+                lower(btrim(input_line.value ->> 'purchaseUnitLabel'))
+              and pol.ordered_purchase_units_micros =
+                (input_line.value ->> 'orderedPurchaseUnitsMicros')::bigint
+              and pol.expected_purchase_unit_cost_minor =
+                (input_line.value ->> 'expectedPurchaseUnitCostMinor')::numeric
+          )
+      )
+      into v_replay_matches;
+
+    if not coalesce(v_replay_matches, false) then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
+
+    return jsonb_build_object(
+      'ok', true,
+      'purchaseOrderId', v_existing_order.id,
+      'status', v_existing_order.status,
+      'version', v_existing_order.version,
+      'idempotentReplay', true
+    );
+  end if;
+
+  if not exists (
+    select 1 from public.suppliers s
+    where s.id = p_supplier_id and s.business_id = v_business_id and s.active
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'supplier_not_found');
+  end if;
+
+  for v_line in select value from jsonb_array_elements(p_lines)
+  loop
+    v_item_id := (v_line ->> 'inventoryItemId')::uuid;
+    v_ordered_purchase := (v_line ->> 'orderedPurchaseUnitsMicros')::bigint;
+    v_purchase_cost := (v_line ->> 'expectedPurchaseUnitCostMinor')::numeric;
+    v_purchase_unit := nullif(btrim(v_line ->> 'purchaseUnitLabel'), '');
 
     select i.unit_label into v_base_unit
     from public.inventory_items i
