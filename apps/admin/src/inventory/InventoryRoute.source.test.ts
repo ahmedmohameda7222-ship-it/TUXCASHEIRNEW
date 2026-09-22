@@ -154,12 +154,13 @@ describe('Admin inventory route', () => {
     expect(source).toContain('beginStocktakeBatch(stocktakeItems)');
   });
 
-  it('loads bounded movement history independently per inventory item and pages the RPC result', async () => {
+  it('loads bounded movement history only for the requested inventory item', async () => {
     const inventoryApi = (await import('../../api/admin/inventory')) as unknown as {
       loadInventoryMovementHistoryRows?: (
         client: AdminSupabaseClient,
         employeeId: string,
         shopId: string,
+        inventoryItemId: string,
       ) => Promise<
         {
           id: string;
@@ -175,41 +176,38 @@ describe('Admin inventory route', () => {
     expect(inventoryApi.loadInventoryMovementHistoryRows).toBeTypeOf('function');
     if (!inventoryApi.loadInventoryMovementHistoryRows) return;
 
-    const rows = Array.from({ length: 1_250 }, (_, index) => ({
+    const rows = Array.from({ length: 50 }, (_, index) => ({
       id: `movement-${index}`,
-      inventory_item_id: `item-${Math.floor(index / 50)}`,
+      inventory_item_id: 'item-target',
       movement_type: 'ADMIN_ADJUSTMENT',
       quantity_delta_micros: index,
       reserved_delta_micros: 0,
       reason_label_snapshot: null,
       created_at: '2026-09-21T00:00:00.000Z',
     }));
-    const rpc = vi.fn(
-      async (name: string, payload: Record<string, unknown>, query?: URLSearchParams) => {
-        if (name !== 'read_admin_inventory_movement_history_v1') {
-          throw new Error('unexpected rpc: ' + name);
-        }
-        expect(payload).toEqual({
-          p_employee_id: 'employee-a',
-          p_shop_id: 'shop-a',
-          p_per_item_limit: 50,
-        });
-        const offset = Number(query?.get('offset') ?? '0');
-        const requested = Number(query?.get('limit') ?? '10000');
-        return rows.slice(offset, offset + Math.min(requested, 1_000));
-      },
-    );
+    const rpc = vi.fn(async (name: string, payload: Record<string, unknown>) => {
+      if (name !== 'read_admin_inventory_movement_history_v1') {
+        throw new Error('unexpected rpc: ' + name);
+      }
+      expect(payload).toEqual({
+        p_employee_id: 'employee-a',
+        p_shop_id: 'shop-a',
+        p_inventory_item_id: 'item-target',
+        p_per_item_limit: 50,
+      });
+      return rows;
+    });
 
     const result = await inventoryApi.loadInventoryMovementHistoryRows(
       { rpc } as unknown as AdminSupabaseClient,
       'employee-a',
       'shop-a',
+      'item-target',
     );
 
-    expect(result).toHaveLength(1_250);
-    expect(
-      rpc.mock.calls.map(([, , query]) => (query as URLSearchParams | undefined)?.get('offset')),
-    ).toEqual(['0', '1000', '1250']);
+    expect(result).toHaveLength(50);
+    expect(result.every((row) => row.inventory_item_id === 'item-target')).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it('excludes inactive inventory items from the transfer send selector', async () => {
