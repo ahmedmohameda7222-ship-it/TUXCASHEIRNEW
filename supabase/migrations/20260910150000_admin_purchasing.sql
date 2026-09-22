@@ -302,7 +302,22 @@ begin
     p_employee_id,
     p_command_id
   )
+  on conflict (business_id, create_command_id) do nothing
   returning id into v_supplier_id;
+
+  if v_supplier_id is null then
+    select s.id
+      into v_supplier_id
+    from public.suppliers s
+    where s.business_id = v_business_id
+      and s.create_command_id = p_command_id;
+
+    return jsonb_build_object(
+      'ok', true,
+      'supplierId', v_supplier_id,
+      'idempotentReplay', true
+    );
+  end if;
 
   perform public.append_admin_audit_event_v1(
     v_business_id, p_shop_id, p_employee_id,
