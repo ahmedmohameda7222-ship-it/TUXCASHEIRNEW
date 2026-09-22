@@ -101,20 +101,22 @@ describe('Admin purchasing workspace pagination', () => {
       if (table === 'suppliers') return [];
       if (table === 'purchase_orders') {
         if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)') {
-          return [
-            {
-              id: 'po-open',
-              shop_id: 'shop-a',
-              supplier_id: 'supplier-1',
-              status: 'ORDERED',
-              reference: null,
-              expected_delivery_date: null,
-              version: 1,
-              ordered_at: '2026-09-20T00:00:00.000Z',
-              created_at: '2026-09-20T00:00:00.000Z',
-              updated_at: '2026-09-20T00:00:00.000Z',
-            },
-          ];
+          return Number(query.get('offset') ?? '0') === 0
+            ? [
+                {
+                  id: 'po-open',
+                  shop_id: 'shop-a',
+                  supplier_id: 'supplier-1',
+                  status: 'ORDERED',
+                  reference: null,
+                  expected_delivery_date: null,
+                  version: 1,
+                  ordered_at: '2026-09-20T00:00:00.000Z',
+                  created_at: '2026-09-20T00:00:00.000Z',
+                  updated_at: '2026-09-20T00:00:00.000Z',
+                },
+              ]
+            : [];
         }
         return [];
       }
