@@ -240,7 +240,9 @@ export async function loadInventoryMovementHistoryRows(
   });
 }
 
-function mapInventoryMovementHistory(rows: readonly MovementRow[]): AdminInventoryItemHistory['history'] {
+function mapInventoryMovementHistory(
+  rows: readonly MovementRow[],
+): AdminInventoryItemHistory['history'] {
   return rows.map((movement) => ({
     id: movement.id,
     movementType: movement.movement_type,
@@ -462,17 +464,17 @@ async function loadWorkspace(
   const [itemRows, balanceRows, costRows, reasonRows, transferRows] = await Promise.all([
     loadInventoryItemRows(client, shopId),
     loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
-      loadInventoryCostRows(client, shopId),
-      client.select<ReasonRow[]>(
-        'admin_reason_codes',
-        new URLSearchParams({
-          select: 'id,shop_id,reason_key,family,label,version',
-          business_id: `eq.${context.principal.businessId}`,
-          active: 'eq.true',
-          or: `(shop_id.is.null,shop_id.eq.${shopId})`,
-          order: 'family.asc,reason_key.asc,version.desc',
-        }),
-      ),
+    loadInventoryCostRows(client, shopId),
+    client.select<ReasonRow[]>(
+      'admin_reason_codes',
+      new URLSearchParams({
+        select: 'id,shop_id,reason_key,family,label,version',
+        business_id: `eq.${context.principal.businessId}`,
+        active: 'eq.true',
+        or: `(shop_id.is.null,shop_id.eq.${shopId})`,
+        order: 'family.asc,reason_key.asc,version.desc',
+      }),
+    ),
     loadTransferRows(client, shopId),
   ]);
 
