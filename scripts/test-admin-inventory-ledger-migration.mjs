@@ -446,6 +446,145 @@ psql(
   'Admin inventory additive compatibility assertions',
 );
 
+const transitionFenceOrderTypeId = '83000000-0000-4000-8000-000000000001';
+const transitionFenceOrderId = '83000000-0000-4000-8000-000000000002';
+
+psql(
+  [
+    '-c',
+    `insert into public.order_types(
+       id, shop_id, name, behavior, active, sort_order
+     ) values (
+       '${transitionFenceOrderTypeId}', '${shopId}', 'Transition Fence', 'TAKE_AWAY', true, 99
+     );
+     select private.apply_tux_remote_mutation(
+       $mutation$
+       {
+         "table": "orders",
+         "mode": "UPSERT",
+         "conflictColumns": ["id"],
+         "row": {
+           "id": "${transitionFenceOrderId}",
+           "shop_id": "${shopId}",
+           "business_day_id": "${dayId}",
+           "display_order_no": 99,
+           "idempotency_key": "transition-fence-order",
+           "source": "POS",
+           "status": "ACTIVE",
+           "operator_worker_id": "${workerId}",
+           "operator_name_snapshot": "Legacy Worker",
+           "order_type_id": "${transitionFenceOrderTypeId}",
+           "order_type_label_snapshot": "Transition Fence",
+           "order_type_behavior_snapshot": "TAKE_AWAY",
+           "customer_contact_id": null,
+           "customer_name_snapshot": null,
+           "normalized_phone_snapshot": null,
+           "address_snapshot": null,
+           "delivery_zone_id": null,
+           "delivery_zone_label_snapshot": null,
+           "configured_delivery_fee_minor": 0,
+           "final_delivery_fee_minor": 0,
+           "items_subtotal_minor": 1000,
+           "discount_minor": 0,
+           "service_charge_minor": 0,
+           "tax_minor": 0,
+           "total_minor": 1000,
+           "order_note": null,
+           "created_at": "2026-09-19T01:05:00.000Z",
+           "updated_at": "2026-09-19T01:05:00.000Z",
+           "recognized_revenue_minor": 0,
+           "collected_payment_minor": 0,
+           "configuration_version": 1,
+           "operational_revision": 2,
+           "done_at": null,
+           "cancelled_at": null,
+           "cancelled_by_worker_id": null,
+           "cancelled_by_worker_name_snapshot": null,
+           "cancellation_reason": null,
+           "cancellation_food_prepared": null,
+           "cancellation_stock_restored": null,
+           "returned_at": null,
+           "returned_by_worker_id": null,
+           "returned_by_worker_name_snapshot": null,
+           "return_reason": null,
+           "snapshot_json": {}
+         },
+         "guard": null
+       }
+       $mutation$::jsonb
+     );`,
+  ],
+  'Canonical order transition fence fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "DONE",
+             "toStatus": "ACTIVE",
+             "revision": 3
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition wrong canonical from-status fence',
+  'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "ACTIVE",
+             "toStatus": "DONE",
+             "revision": 4
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition revision jump fence',
+  'TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_transition_precondition_v1(
+       '${shopId}',
+       $envelope$
+       {
+         "payload": {
+           "order": { "id": "${transitionFenceOrderId}" },
+           "transition": {
+             "fromStatus": "ACTIVE",
+             "toStatus": "DONE",
+             "revision": 3
+           }
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Order transition exact next-state precondition',
+);
+
 const bulkItemId = '44000000-0000-4000-8000-000000000002';
 const bulkOtherItemId = '44000000-0000-4000-8000-000000000003';
 const bulkReceivedMovementId = '54000000-0000-4000-8000-000000000002';
