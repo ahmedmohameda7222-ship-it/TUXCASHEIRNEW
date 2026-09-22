@@ -266,6 +266,7 @@ as $$
 declare
   v_business_id uuid;
   v_supplier_id uuid;
+  v_existing_supplier public.suppliers%rowtype;
 begin
   v_business_id := private.admin_purchasing_authority_v1(
     p_employee_id, p_shop_id, 'purchasing.manage'
@@ -276,16 +277,22 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_supplier_command');
   end if;
 
-  select s.id
-    into v_supplier_id
+  select s.*
+    into v_existing_supplier
   from public.suppliers s
   where s.business_id = v_business_id
     and s.create_command_id = p_command_id;
 
-  if v_supplier_id is not null then
+  if found then
+    if v_existing_supplier.name is distinct from btrim(p_name)
+       or v_existing_supplier.contact_name is distinct from nullif(btrim(coalesce(p_contact_name, '')), '')
+       or v_existing_supplier.phone is distinct from nullif(btrim(coalesce(p_phone, '')), '')
+       or v_existing_supplier.email is distinct from nullif(btrim(coalesce(p_email, '')), '') then
+      return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+    end if;
     return jsonb_build_object(
       'ok', true,
-      'supplierId', v_supplier_id,
+      'supplierId', v_existing_supplier.id,
       'idempotentReplay', true
     );
   end if;
@@ -302,21 +309,41 @@ begin
     p_employee_id,
     p_command_id
   )
-  on conflict (business_id, create_command_id) do nothing
+  on conflict do nothing
   returning id into v_supplier_id;
 
   if v_supplier_id is null then
-    select s.id
-      into v_supplier_id
+    select s.*
+      into v_existing_supplier
     from public.suppliers s
     where s.business_id = v_business_id
       and s.create_command_id = p_command_id;
 
-    return jsonb_build_object(
-      'ok', true,
-      'supplierId', v_supplier_id,
-      'idempotentReplay', true
-    );
+    if found then
+      if v_existing_supplier.name is distinct from btrim(p_name)
+         or v_existing_supplier.contact_name is distinct from nullif(btrim(coalesce(p_contact_name, '')), '')
+         or v_existing_supplier.phone is distinct from nullif(btrim(coalesce(p_phone, '')), '')
+         or v_existing_supplier.email is distinct from nullif(btrim(coalesce(p_email, '')), '') then
+        return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+      end if;
+      return jsonb_build_object(
+        'ok', true,
+        'supplierId', v_existing_supplier.id,
+        'idempotentReplay', true
+      );
+    end if;
+
+    if exists (
+      select 1
+      from public.suppliers s
+      where s.business_id = v_business_id
+        and s.active
+        and lower(s.name) = lower(btrim(p_name))
+    ) then
+      return jsonb_build_object('ok', false, 'code', 'supplier_name_conflict');
+    end if;
+
+    return jsonb_build_object('ok', false, 'code', 'supplier_create_conflict');
   end if;
 
   perform public.append_admin_audit_event_v1(
