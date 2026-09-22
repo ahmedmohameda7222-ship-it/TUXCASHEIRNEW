@@ -366,8 +366,8 @@ const workerId = '24000000-0000-4000-8000-000000000001';
 const dayId = '34000000-0000-4000-8000-000000000001';
 const itemId = '44000000-0000-4000-8000-000000000001';
 const movementId = '54000000-0000-4000-8000-000000000001';
-const dependencyOriginalMovementId = '54000000-0000-4000-8000-000000000002';
-const dependencyCompensationMovementId = '54000000-0000-4000-8000-000000000003';
+const dependencyOriginalMovementId = '5f000000-0000-4000-8000-000000000002';
+const dependencyCompensationMovementId = '5f000000-0000-4000-8000-000000000003';
 
 psql(
   [
