@@ -2,6 +2,7 @@ import type {
   AdminInventoryCommand,
   AdminInventoryCommandResult,
   AdminInventoryItem,
+  AdminInventoryItemHistory,
   AdminInventoryReasonCode,
   AdminInventoryTransfer,
   AdminInventoryWorkspace,
@@ -197,7 +198,6 @@ const INVENTORY_ITEM_PAGE_SIZE = 10_000;
 
 const INVENTORY_BALANCE_PAGE_SIZE = 10_000;
 const INVENTORY_COST_PAGE_SIZE = 10_000;
-const INVENTORY_HISTORY_PAGE_SIZE = 10_000;
 const INVENTORY_HISTORY_PER_ITEM_LIMIT = 50;
 
 export async function loadInventoryBalanceRows(
@@ -230,26 +230,25 @@ export async function loadInventoryMovementHistoryRows(
   client: AdminSupabaseClient,
   employeeId: string,
   shopId: string,
+  inventoryItemId: string,
 ): Promise<MovementRow[]> {
-  const rows: MovementRow[] = [];
-  let offset = 0;
-  for (;;) {
-    const page = await client.rpc<MovementRow[]>(
-      'read_admin_inventory_movement_history_v1',
-      {
-        p_employee_id: employeeId,
-        p_shop_id: shopId,
-        p_per_item_limit: INVENTORY_HISTORY_PER_ITEM_LIMIT,
-      },
-      new URLSearchParams({
-        limit: String(INVENTORY_HISTORY_PAGE_SIZE),
-        offset: String(offset),
-      }),
-    );
-    if (page.length === 0) return rows;
-    rows.push(...page);
-    offset += page.length;
-  }
+  return client.rpc<MovementRow[]>('read_admin_inventory_movement_history_v1', {
+    p_employee_id: employeeId,
+    p_shop_id: shopId,
+    p_inventory_item_id: inventoryItemId,
+    p_per_item_limit: INVENTORY_HISTORY_PER_ITEM_LIMIT,
+  });
+}
+
+function mapInventoryMovementHistory(rows: readonly MovementRow[]): AdminInventoryItemHistory['history'] {
+  return rows.map((movement) => ({
+    id: movement.id,
+    movementType: movement.movement_type,
+    quantityDeltaMicros: safeInteger(movement.quantity_delta_micros),
+    reservedDeltaMicros: safeInteger(movement.reserved_delta_micros),
+    reasonLabel: movement.reason_label_snapshot,
+    createdAt: movement.created_at,
+  }));
 }
 
 export async function loadInventoryCostRows(
@@ -460,11 +459,9 @@ async function loadWorkspace(
 ): Promise<AdminInventoryWorkspace> {
   requirePermission(context.principal, 'inventory.view', shopId);
 
-  const [itemRows, movementRows, balanceRows, costRows, reasonRows, transferRows] =
-    await Promise.all([
-      loadInventoryItemRows(client, shopId),
-      loadInventoryMovementHistoryRows(client, context.principal.employeeId, shopId),
-      loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
+  const [itemRows, balanceRows, costRows, reasonRows, transferRows] = await Promise.all([
+    loadInventoryItemRows(client, shopId),
+    loadInventoryBalanceRows(client, context.principal.employeeId, shopId),
       loadInventoryCostRows(client, shopId),
       client.select<ReasonRow[]>(
         'admin_reason_codes',
@@ -476,8 +473,8 @@ async function loadWorkspace(
           order: 'family.asc,reason_key.asc,version.desc',
         }),
       ),
-      loadTransferRows(client, shopId),
-    ]);
+    loadTransferRows(client, shopId),
+  ]);
 
   const transferIds = transferRows.map((row) => row.id);
   const transferLineRows =
@@ -487,12 +484,6 @@ async function loadWorkspace(
   const transferItemRows =
     transferItemIds.length === 0 ? [] : await loadTransferItems(client, transferItemIds);
 
-  const movementsByItem = new Map<string, MovementRow[]>();
-  for (const movement of movementRows) {
-    const list = movementsByItem.get(movement.inventory_item_id) ?? [];
-    list.push(movement);
-    movementsByItem.set(movement.inventory_item_id, list);
-  }
   const costs = new Map(
     costRows.map((row) => [row.inventory_item_id, finiteNumber(row.weighted_unit_cost_minor)]),
   );
@@ -508,7 +499,6 @@ async function loadWorkspace(
   );
 
   const items: AdminInventoryItem[] = itemRows.map((row) => {
-    const movements = movementsByItem.get(row.id) ?? [];
     const balance = balances.get(row.id) ?? {
       onHandMicros: 0,
       reservedMicros: 0,
@@ -525,14 +515,7 @@ async function loadWorkspace(
       reservedMicros,
       availableMicros,
       weightedUnitCostMinor: costs.get(row.id) ?? 0,
-      history: movements.slice(0, 50).map((movement) => ({
-        id: movement.id,
-        movementType: movement.movement_type,
-        quantityDeltaMicros: safeInteger(movement.quantity_delta_micros),
-        reservedDeltaMicros: safeInteger(movement.reserved_delta_micros),
-        reasonLabel: movement.reason_label_snapshot,
-        createdAt: movement.created_at,
-      })),
+      history: [],
     };
   });
 
@@ -733,7 +716,24 @@ export default async function handler(
     if (request.method === 'GET') {
       const url = new URL(request.url ?? '/', 'http://admin.local');
       const shopId = uuidSchema.parse(url.searchParams.get('shopId'));
+      const inventoryItemId = url.searchParams.get('inventoryItemId');
       const context = await loadContext(request, client, false);
+      if (inventoryItemId !== null) {
+        const parsedInventoryItemId = uuidSchema.parse(inventoryItemId);
+        requirePermission(context.principal, 'inventory.view', shopId);
+        const historyRows = await loadInventoryMovementHistoryRows(
+          client,
+          context.principal.employeeId,
+          shopId,
+          parsedInventoryItemId,
+        );
+        const result: AdminInventoryItemHistory = {
+          inventoryItemId: parsedInventoryItemId,
+          history: mapInventoryMovementHistory(historyRows),
+        };
+        sendJson(response, 200, result);
+        return;
+      }
       sendJson(response, 200, { ...(await loadWorkspace(client, context, shopId)) });
       return;
     }
