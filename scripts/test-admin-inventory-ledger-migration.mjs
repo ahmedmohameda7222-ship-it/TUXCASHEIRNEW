@@ -366,6 +366,8 @@ const workerId = '24000000-0000-4000-8000-000000000001';
 const dayId = '34000000-0000-4000-8000-000000000001';
 const itemId = '44000000-0000-4000-8000-000000000001';
 const movementId = '54000000-0000-4000-8000-000000000001';
+const dependencyOriginalMovementId = '54000000-0000-4000-8000-000000000002';
+const dependencyCompensationMovementId = '54000000-0000-4000-8000-000000000003';
 
 psql(
   [
@@ -388,6 +390,25 @@ psql(
      ) values (
        '${movementId}', '${shopId}', '${dayId}', '${itemId}', 'ADMIN_ADJUSTMENT',
        2500000, '${workerId}', null, null, 'legacy-admin-adjustment', timestamptz '2026-09-19 01:00:00+00'
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, worker_id, order_id, compensates_movement_id,
+       idempotency_key, created_at
+     ) values (
+       '${dependencyOriginalMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'BULK_STOCK_RECEIVED', 1000000, '${workerId}', null, null,
+       'dependency-original', timestamptz '2026-09-19 03:00:00+00'
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, worker_id, order_id, compensates_movement_id,
+       idempotency_key, created_at
+     ) values (
+       '${dependencyCompensationMovementId}', '${shopId}', '${dayId}', '${itemId}',
+       'UNDO_BULK_STOCK_RECEIVED', -1000000, '${workerId}', null,
+       '${dependencyOriginalMovementId}', 'dependency-compensation',
+       timestamptz '2026-09-19 02:00:00+00'
      );`,
   ],
   'Legacy inventory fixture',
@@ -405,6 +426,24 @@ const legacyBefore = psql(
 ).trim();
 
 psql(['-f', migrationPath], migrationName);
+
+const dependencyFeedOrder = psql(
+  [
+    '-At',
+    '-c',
+    `select original_feed.sequence < compensation_feed.sequence
+     from public.inventory_movement_feed original_feed
+     join public.inventory_movement_feed compensation_feed on true
+     where original_feed.movement_id = '${dependencyOriginalMovementId}'
+       and compensation_feed.movement_id = '${dependencyCompensationMovementId}'`,
+  ],
+  'Inventory feed dependency ordering',
+).trim();
+if (dependencyFeedOrder !== 't') {
+  throw new Error(
+    'inventory feed backfill must place a compensated movement before its compensation',
+  );
+}
 
 const legacyAfter = psql(
   [
