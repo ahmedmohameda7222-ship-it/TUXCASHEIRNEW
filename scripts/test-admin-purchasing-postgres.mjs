@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -23,6 +23,36 @@ function psql(args, label) {
     throw new Error(`${label} failed with exit code ${result.status ?? 'unknown'}.`);
   }
   return result.stdout;
+}
+
+function psqlAsync(args, label) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => rejectPromise(error));
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolvePromise(stdout);
+        return;
+      }
+      rejectPromise(
+        new Error(
+          `${label} failed with exit code ${code ?? 'unknown'}.\n${stdout}${stderr}`,
+        ),
+      );
+    });
+  });
 }
 
 psql(
@@ -366,6 +396,123 @@ const duplicateSupplier = JSON.parse(duplicateSupplierResult);
 if (duplicateSupplier.ok !== false || duplicateSupplier.code !== 'supplier_name_conflict') {
   throw new Error(
     `duplicate supplier name was not returned as a structured conflict: ${duplicateSupplierResult}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `create or replace function private.test_delay_purchase_order_create_v1()
+     returns trigger
+     language plpgsql
+     as $$
+     begin
+       if new.create_command_id = 'po-create-concurrent-1' then
+         perform pg_sleep(0.75);
+       end if;
+       return new;
+     end;
+     $$;
+     create trigger test_delay_purchase_order_create_v1
+       before insert on public.purchase_orders
+       for each row execute function private.test_delay_purchase_order_create_v1();`,
+  ],
+  'Concurrent purchase-order create delay fixture',
+);
+
+const concurrentPurchaseOrderSql = `select public.create_purchase_order_v1(
+  '${EMPLOYEE_ID}',
+  '${BUSINESS_ID}',
+  '${SHOP_ID}',
+  '${SUPPLIER_ID}',
+  'PO-CONCURRENT',
+  date '2026-09-24',
+  '[{"inventoryItemId":"${ITEM_ID}","purchaseUnitLabel":"kg","orderedPurchaseUnitsMicros":1000,"expectedPurchaseUnitCostMinor":180000}]'::jsonb,
+  'po-create-concurrent-1'
+)::text`;
+
+const concurrentPurchaseOrderResults = await Promise.all([
+  psqlAsync(['-At', '-c', concurrentPurchaseOrderSql], 'Concurrent purchase-order create A'),
+  psqlAsync(['-At', '-c', concurrentPurchaseOrderSql], 'Concurrent purchase-order create B'),
+]);
+const concurrentPurchaseOrders = concurrentPurchaseOrderResults.map((result) =>
+  JSON.parse(result.trim()),
+);
+if (
+  concurrentPurchaseOrders.some((result) => result.ok !== true) ||
+  concurrentPurchaseOrders[0]?.purchaseOrderId !== concurrentPurchaseOrders[1]?.purchaseOrderId ||
+  concurrentPurchaseOrders
+    .map((result) => result.idempotentReplay)
+    .sort()
+    .join(',') !== 'false,true'
+) {
+  throw new Error(
+    `concurrent purchase-order create was not idempotent: ${JSON.stringify(
+      concurrentPurchaseOrders,
+    )}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `drop trigger test_delay_purchase_order_create_v1 on public.purchase_orders;
+     drop function private.test_delay_purchase_order_create_v1();`,
+  ],
+  'Concurrent purchase-order create delay cleanup',
+);
+
+const concurrentPurchaseOrderId = concurrentPurchaseOrders[0].purchaseOrderId;
+const concurrentPurchaseOrderShape = psql(
+  [
+    '-At',
+    '-c',
+    `select
+       count(*)::text || ':' ||
+       (select count(*)::text from public.purchase_order_lines where purchase_order_id = '${concurrentPurchaseOrderId}') || ':' ||
+       (select count(*)::text
+        from public.admin_audit_events
+        where action_type = 'PURCHASING_PO_CREATED'
+          and entity_id = '${concurrentPurchaseOrderId}')
+     from public.purchase_orders
+     where shop_id = '${SHOP_ID}'
+       and create_command_id = 'po-create-concurrent-1'`,
+  ],
+  'Concurrent purchase-order create row shape',
+).trim();
+if (concurrentPurchaseOrderShape !== '1:1:1') {
+  throw new Error(
+    `concurrent purchase-order create duplicated canonical rows: ${concurrentPurchaseOrderShape}`,
+  );
+}
+
+const mismatchedPurchaseOrderReplay = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.create_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${BUSINESS_ID}',
+         '${SHOP_ID}',
+         '${SUPPLIER_ID}',
+         'PO-CONCURRENT-CHANGED',
+         date '2026-09-24',
+         '[{"inventoryItemId":"${ITEM_ID}","purchaseUnitLabel":"kg","orderedPurchaseUnitsMicros":1000,"expectedPurchaseUnitCostMinor":180000}]'::jsonb,
+         'po-create-concurrent-1'
+       )::text`,
+    ],
+    'Purchase-order create idempotency mismatch',
+  ).trim(),
+);
+if (
+  mismatchedPurchaseOrderReplay.ok !== false ||
+  mismatchedPurchaseOrderReplay.code !== 'idempotency_conflict'
+) {
+  throw new Error(
+    `purchase-order create command accepted a different intent: ${JSON.stringify(
+      mismatchedPurchaseOrderReplay,
+    )}`,
   );
 }
 
