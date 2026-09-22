@@ -993,4 +993,136 @@ psql(
   'Cheaper purchase return variance assertions',
 );
 
+const DUPLICATE_RETURN_ITEM_ID = '35000000-0000-4000-8000-000000000004';
+const DUPLICATE_RETURN_PO_ID = '55000000-0000-4000-8000-000000000004';
+const DUPLICATE_RETURN_LINE_ID = '65000000-0000-4000-8000-000000000004';
+const DUPLICATE_RETURN_RECEIPT_ID = '85000000-0000-4000-8000-000000000004';
+const DUPLICATE_RETURN_RECEIPT_LINE_ID = '95000000-0000-4000-8000-000000000004';
+
+psql(
+  [
+    '-c',
+    `insert into public.inventory_items(
+       id, shop_id, name, unit_label, tracking_mode, active
+     ) values (
+       '${DUPLICATE_RETURN_ITEM_ID}', '${SHOP_ID}', 'Duplicate Return Item', 'ea',
+       'RECIPE_TRACKED', true
+     );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       compensates_movement_id, idempotency_key, admin_employee_id,
+       source_kind, command_id, unit_cost_minor, created_at
+     ) values (
+       '75000000-0000-4000-8000-000000000004',
+       '${SHOP_ID}', null, '${DUPLICATE_RETURN_ITEM_ID}', 'ADMIN_ADJUSTMENT',
+       7000000, 0, null, null, null, 'duplicate-return-opening-stock',
+       '${EMPLOYEE_ID}', 'ADMIN', 'duplicate-return-opening-stock', 100,
+       timestamptz '2026-09-19 05:00:00+00'
+     );
+     insert into public.inventory_cost_state(
+       shop_id, inventory_item_id, weighted_unit_cost_minor, version
+     ) values ('${SHOP_ID}', '${DUPLICATE_RETURN_ITEM_ID}', 100, 1);
+     insert into public.purchase_orders(
+       id, business_id, shop_id, supplier_id, status, reference, version,
+       created_by_employee_id, ordered_at, create_command_id, order_command_id
+     ) values (
+       '${DUPLICATE_RETURN_PO_ID}', '${BUSINESS_ID}', '${SHOP_ID}', '${SUPPLIER_ID}',
+       'RECEIVED', 'PO-DUPLICATE-RETURN', 4, '${EMPLOYEE_ID}',
+       timestamptz '2026-09-19 04:00:00+00',
+       'create-po-duplicate-return', 'order-po-duplicate-return'
+     );
+     insert into public.purchase_order_lines(
+       id, purchase_order_id, inventory_item_id, purchase_unit_label,
+       base_micros_per_purchase_unit, ordered_purchase_units_micros,
+       received_purchase_units_micros, ordered_base_micros, received_base_micros,
+       expected_purchase_unit_cost_minor, expected_unit_cost_minor
+     ) values (
+       '${DUPLICATE_RETURN_LINE_ID}', '${DUPLICATE_RETURN_PO_ID}',
+       '${DUPLICATE_RETURN_ITEM_ID}', 'ea',
+       1000000, 10000000, 10000000, 10000000, 10000000, 100, 100
+     );
+     insert into public.purchase_receipts(
+       id, purchase_order_id, shop_id, supplier_id, supplier_reference,
+       command_id, received_by_employee_id, received_at
+     ) values (
+       '${DUPLICATE_RETURN_RECEIPT_ID}', '${DUPLICATE_RETURN_PO_ID}', '${SHOP_ID}',
+       '${SUPPLIER_ID}', 'INV-DUPLICATE-RETURN', 'receive-duplicate-return',
+       '${EMPLOYEE_ID}', timestamptz '2026-09-19 04:30:00+00'
+     );
+     insert into public.purchase_receipt_lines(
+       id, purchase_receipt_id, purchase_order_line_id, inventory_item_id,
+       received_purchase_units_micros, received_base_micros,
+       purchase_unit_cost_minor, unit_cost_minor
+     ) values (
+       '${DUPLICATE_RETURN_RECEIPT_LINE_ID}', '${DUPLICATE_RETURN_RECEIPT_ID}',
+       '${DUPLICATE_RETURN_LINE_ID}', '${DUPLICATE_RETURN_ITEM_ID}',
+       10000000, 10000000, 100, 100
+     );`,
+  ],
+  'Duplicate purchase-return line fixture',
+);
+
+const duplicateReturnResult = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.return_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${DUPLICATE_RETURN_PO_ID}',
+         'return-duplicate-line',
+         'CN-DUPLICATE-LINE',
+         '[
+           {"lineId":"${DUPLICATE_RETURN_LINE_ID}","returnedPurchaseUnitsMicros":4000000},
+           {"lineId":"${DUPLICATE_RETURN_LINE_ID}","returnedPurchaseUnitsMicros":4000000}
+         ]'::jsonb
+       )::text`,
+    ],
+    'Duplicate purchase-return line rejection',
+  ).trim(),
+);
+if (
+  duplicateReturnResult.ok !== false ||
+  duplicateReturnResult.code !== 'duplicate_purchase_order_line'
+) {
+  throw new Error(
+    `duplicate purchase-return line was not rejected: ${JSON.stringify(duplicateReturnResult)}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `do $duplicate_return_assertions$
+     declare
+       v_on_hand bigint;
+       v_returned bigint;
+     begin
+       select b.on_hand_micros into v_on_hand
+       from private.inventory_balance_v1('${SHOP_ID}', '${DUPLICATE_RETURN_ITEM_ID}') b;
+       if v_on_hand <> 7000000 then
+         raise exception 'duplicate return mutated canonical stock: %', v_on_hand;
+       end if;
+
+       select returned_base_micros into v_returned
+       from public.purchase_order_lines
+       where id = '${DUPLICATE_RETURN_LINE_ID}';
+       if v_returned <> 0 then
+         raise exception 'duplicate return mutated PO line: %', v_returned;
+       end if;
+
+       if exists (
+         select 1
+         from public.purchase_returns
+         where shop_id = '${SHOP_ID}' and command_id = 'return-duplicate-line'
+       ) then
+         raise exception 'duplicate return persisted a return header';
+       end if;
+     end $duplicate_return_assertions$;`,
+  ],
+  'Duplicate purchase-return no-mutation assertion',
+);
+
 console.log('Admin purchasing PostgreSQL partial-receipt/return behavior passed.');
