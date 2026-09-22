@@ -215,6 +215,45 @@ if (reusedOrderCommand.ok !== false || reusedOrderCommand.code !== 'idempotency_
   );
 }
 
+psql(
+  [
+    '-c',
+    `update public.purchase_orders
+     set status = 'PARTIALLY_RECEIVED', version = 2
+     where id = '${ORDER_COMMAND_PO_A_ID}';`,
+  ],
+  'Advance ordered purchase order after command acknowledgement loss',
+);
+
+const advancedOrderReplay = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.order_purchase_order_v1(
+         '${EMPLOYEE_ID}',
+         '${SHOP_ID}',
+         '${ORDER_COMMAND_PO_A_ID}',
+         1,
+         'order-command-reuse'
+       )::text`,
+    ],
+    'Purchase order command replay after later state advance',
+  ).trim(),
+);
+if (
+  advancedOrderReplay.ok !== true ||
+  advancedOrderReplay.idempotentReplay !== true ||
+  advancedOrderReplay.status !== 'PARTIALLY_RECEIVED' ||
+  advancedOrderReplay.version !== 2
+) {
+  throw new Error(
+    `applied order command stopped replaying after later state advance: ${JSON.stringify(
+      advancedOrderReplay,
+    )}`,
+  );
+}
+
 const supplierCreateResult = psql(
   [
     '-At',
