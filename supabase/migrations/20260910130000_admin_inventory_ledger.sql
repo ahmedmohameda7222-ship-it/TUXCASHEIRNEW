@@ -463,6 +463,90 @@ create trigger inventory_movements_bulk_undo_integrity
 before insert on public.inventory_movements
 for each row execute function private.enforce_inventory_bulk_undo_integrity_v1();
 
+create table private.inventory_cancel_restock_claims (
+  original_movement_id uuid primary key,
+  restock_movement_id uuid not null unique
+);
+
+revoke all on private.inventory_cancel_restock_claims
+  from public, anon, authenticated;
+
+insert into private.inventory_cancel_restock_claims(original_movement_id, restock_movement_id)
+select distinct on (original.id)
+  original.id,
+  restock.id
+from public.inventory_movements restock
+join public.inventory_movements original
+  on original.id = restock.compensates_movement_id
+where restock.movement_type = 'CANCEL_RESTOCK'
+  and original.movement_type = 'ORDER_CONSUMPTION'
+  and original.shop_id = restock.shop_id
+  and original.inventory_item_id = restock.inventory_item_id
+  and original.order_id is not null
+  and original.order_id = restock.order_id
+  and original.quantity_delta_micros < 0
+  and coalesce(original.reserved_delta_micros, 0) = 0
+  and coalesce(restock.reserved_delta_micros, 0) = 0
+  and restock.quantity_delta_micros::numeric = -(original.quantity_delta_micros::numeric)
+order by original.id, restock.created_at, restock.id;
+
+create or replace function private.enforce_inventory_cancel_restock_integrity_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $cancel_restock_integrity$
+declare
+  v_original public.inventory_movements%rowtype;
+begin
+  if new.movement_type <> 'CANCEL_RESTOCK' then
+    return new;
+  end if;
+
+  if new.compensates_movement_id is null then
+    raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+  end if;
+
+  select m.*
+    into v_original
+  from public.inventory_movements m
+  where m.id = new.compensates_movement_id
+  for update;
+
+  if not found
+     or v_original.movement_type is distinct from 'ORDER_CONSUMPTION'
+     or v_original.shop_id is distinct from new.shop_id
+     or v_original.inventory_item_id is distinct from new.inventory_item_id
+     or v_original.order_id is null
+     or v_original.order_id is distinct from new.order_id
+     or v_original.quantity_delta_micros >= 0
+     or coalesce(v_original.reserved_delta_micros, 0) <> 0
+     or coalesce(new.reserved_delta_micros, 0) <> 0
+     or v_original.compensates_movement_id is not null
+     or new.quantity_delta_micros <= 0
+     or new.quantity_delta_micros::numeric <> -(v_original.quantity_delta_micros::numeric) then
+    raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+  end if;
+
+  begin
+    insert into private.inventory_cancel_restock_claims(original_movement_id, restock_movement_id)
+    values (v_original.id, new.id);
+  exception
+    when unique_violation then
+      raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+  end;
+
+  return new;
+end;
+$cancel_restock_integrity$;
+
+revoke all on function private.enforce_inventory_cancel_restock_integrity_v1()
+  from public, anon, authenticated;
+
+create trigger inventory_movements_cancel_restock_integrity
+before insert on public.inventory_movements
+for each row execute function private.enforce_inventory_cancel_restock_integrity_v1();
+
 create or replace function private.enforce_inventory_movement_immutability_v1()
 returns trigger
 language plpgsql
@@ -816,6 +900,88 @@ end;
 $undo_reversal_set$;
 
 revoke all on function private.assert_order_inventory_undo_reversal_set_v1(uuid, uuid, jsonb)
+  from public, anon, authenticated;
+
+create or replace function private.assert_order_inventory_cancel_restock_set_v1(
+  p_shop_id uuid,
+  p_order_id uuid,
+  p_envelope jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $cancel_restock_set$
+declare
+  v_mismatch boolean;
+begin
+  if p_shop_id is null
+     or p_order_id is null
+     or jsonb_typeof(p_envelope #> '{payload,inventoryMovements}') is distinct from 'array' then
+    raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+  end if;
+
+  begin
+    with canonical as (
+      select
+        m.id as consumption_id,
+        m.inventory_item_id,
+        -(m.quantity_delta_micros::numeric) as quantity_micros
+      from public.inventory_movements m
+      where m.shop_id = p_shop_id
+        and m.order_id = p_order_id
+        and m.movement_type = 'ORDER_CONSUMPTION'
+        and m.quantity_delta_micros < 0
+        and coalesce(m.reserved_delta_micros, 0) = 0
+        and not exists (
+          select 1
+          from public.inventory_movements restock
+          where restock.shop_id = p_shop_id
+            and restock.order_id = p_order_id
+            and restock.inventory_item_id = m.inventory_item_id
+            and restock.movement_type = 'CANCEL_RESTOCK'
+            and restock.compensates_movement_id = m.id
+            and coalesce(restock.reserved_delta_micros, 0) = 0
+            and restock.quantity_delta_micros::numeric = -(m.quantity_delta_micros::numeric)
+        )
+    ),
+    submitted as (
+      select
+        (movement.value ->> 'compensatesMovementId')::uuid as consumption_id,
+        (movement.value ->> 'itemId')::uuid as inventory_item_id,
+        (movement.value ->> 'quantityDeltaMicros')::numeric as quantity_micros,
+        coalesce((movement.value ->> 'reservedDeltaMicros')::numeric, 0) as reserved_micros
+      from jsonb_array_elements(p_envelope #> '{payload,inventoryMovements}') movement
+      where movement.value ->> 'movementType' = 'CANCEL_RESTOCK'
+    )
+    select
+      exists (
+        select 1
+        from canonical c
+        full join submitted s using (consumption_id)
+        where c.consumption_id is null
+           or s.consumption_id is null
+           or s.inventory_item_id is distinct from c.inventory_item_id
+           or s.quantity_micros is distinct from c.quantity_micros
+           or s.reserved_micros <> 0
+      )
+      or (
+        select count(*) <> count(distinct s.consumption_id)
+        from submitted s
+      )
+    into v_mismatch;
+
+    if coalesce(v_mismatch, false) then
+      raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+    end if;
+  exception
+    when invalid_text_representation or numeric_value_out_of_range then
+      raise exception 'TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH';
+  end;
+end;
+$cancel_restock_set$;
+
+revoke all on function private.assert_order_inventory_cancel_restock_set_v1(uuid, uuid, jsonb)
   from public, anon, authenticated;
 
 create or replace function private.assert_order_inventory_reservations_settled_v1(
@@ -1840,6 +2006,21 @@ begin
       raise exception 'TUX_SYNC_PROTOCOL_INVALID';
     end;
     perform private.assert_order_inventory_undo_reversal_set_v1(
+      v_shop_id,
+      v_order_id,
+      p_envelope
+    );
+  end if;
+
+  if v_event_type = 'ORDER_CANCELLED'
+     and p_envelope #>> '{payload,transition,foodPrepared}' = 'false'
+     and p_envelope #>> '{payload,transition,stockRestored}' = 'true' then
+    begin
+      v_order_id := (p_envelope #>> '{payload,order,id}')::uuid;
+    exception when others then
+      raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+    end;
+    perform private.assert_order_inventory_cancel_restock_set_v1(
       v_shop_id,
       v_order_id,
       p_envelope
