@@ -1673,6 +1673,13 @@ begin
     return jsonb_build_object('ok', false, 'code', 'invalid_adjustment_command');
   end if;
 
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-admin-adjustment-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
   if exists (
     select 1 from public.inventory_movements m
     where m.shop_id = p_shop_id
@@ -1827,6 +1834,13 @@ begin
      or p_command_id is null or btrim(p_command_id) = '' then
     return jsonb_build_object('ok', false, 'code', 'invalid_waste_command');
   end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-admin-waste-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
 
   select m.id into v_movement_id
   from public.inventory_movements m
@@ -2191,6 +2205,13 @@ begin
     p_employee_id, p_shop_id, 'inventory.stocktake'
   );
 
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-stocktake-begin-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
   select s.id into v_stocktake_id
   from public.stocktakes s
   where s.shop_id = p_shop_id and s.command_id = p_command_id;
@@ -2544,6 +2565,13 @@ begin
   if v_source_business is distinct from v_destination_business then
     return jsonb_build_object('ok', false, 'code', 'cross_business_transfer_forbidden');
   end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-stock-transfer-send-command:' || p_source_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
 
   select t.* into v_existing_transfer
   from public.stock_transfers t
