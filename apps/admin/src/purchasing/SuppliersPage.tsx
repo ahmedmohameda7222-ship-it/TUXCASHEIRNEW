@@ -11,12 +11,15 @@ export function SuppliersPage({
   suppliers: readonly AdminSupplier[];
   canManage: boolean;
   pending: boolean;
-  onCreate(input: {
-    name: string;
-    contactName: string | null;
-    phone: string | null;
-    email: string | null;
-  }): void;
+  onCreate(
+    input: {
+      name: string;
+      contactName: string | null;
+      phone: string | null;
+      email: string | null;
+    },
+    onSuccess: () => void,
+  ): void;
 }) {
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -42,16 +45,20 @@ export function SuppliersPage({
             event.preventDefault();
             const trimmed = name.trim();
             if (!trimmed) return;
-            onCreate({
-              name: trimmed,
-              contactName: contactName.trim() || null,
-              phone: phone.trim() || null,
-              email: email.trim() || null,
-            });
-            setName('');
-            setContactName('');
-            setPhone('');
-            setEmail('');
+            onCreate(
+              {
+                name: trimmed,
+                contactName: contactName.trim() || null,
+                phone: phone.trim() || null,
+                email: email.trim() || null,
+              },
+              () => {
+                setName('');
+                setContactName('');
+                setPhone('');
+                setEmail('');
+              },
+            );
           }}
         >
           <label>
