@@ -492,8 +492,6 @@ psql(
            "order_note": null,
            "created_at": "2026-09-19T01:05:00.000Z",
            "updated_at": "2026-09-19T01:05:00.000Z",
-           "recognized_revenue_minor": 0,
-           "collected_payment_minor": 0,
            "configuration_version": 1,
            "operational_revision": 2,
            "done_at": null,
