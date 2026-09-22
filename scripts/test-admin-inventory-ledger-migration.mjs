@@ -241,12 +241,21 @@ if (
   );
 }
 
+const inventoryHistoryStart = lower.indexOf(
+  'create or replace function public.read_admin_inventory_movement_history_v1',
+);
+const inventoryHistoryEnd = lower.indexOf(
+  'create or replace function private.inventory_reason_snapshot_v1',
+  inventoryHistoryStart,
+);
+const inventoryHistorySql = lower.slice(inventoryHistoryStart, inventoryHistoryEnd);
 if (
-  !lower.includes('read_admin_inventory_movement_history_v1') ||
-  !/row_number\s*\(\s*\)\s*over\s*\(\s*partition\s+by\s+m\.inventory_item_id/i.test(sql) ||
-  !/item_rank\s*<=\s*p_per_item_limit/i.test(sql)
+  inventoryHistoryStart < 0 ||
+  !inventoryHistorySql.includes('p_inventory_item_id uuid') ||
+  !inventoryHistorySql.includes('m.inventory_item_id = p_inventory_item_id') ||
+  !/limit\s+p_per_item_limit/i.test(inventoryHistorySql)
 ) {
-  throw new Error('Admin inventory history must be bounded independently per inventory item');
+  throw new Error('Admin inventory history must be bounded to the requested inventory item');
 }
 
 const beginStocktake = lower.indexOf('create or replace function public.begin_stocktake_v1');
