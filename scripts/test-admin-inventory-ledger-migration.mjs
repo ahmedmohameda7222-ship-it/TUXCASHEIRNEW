@@ -108,6 +108,55 @@ const sendTransfer = lower.slice(
 if (!sendTransfer.includes('destination_inventory_item_id')) {
   throw new Error('send_stock_transfer_v1 must persist the resolved destination inventory item');
 }
+const adjustmentSql = lower.slice(
+  lower.indexOf('create or replace function public.post_inventory_adjustment_v1'),
+  lower.indexOf('create or replace function public.post_inventory_waste_v1'),
+);
+const wasteSql = lower.slice(
+  lower.indexOf('create or replace function public.post_inventory_waste_v1'),
+  lower.indexOf('create or replace function public.ingest_tux_operations_materialization_v1'),
+);
+const beginStocktakeSql = lower.slice(
+  lower.indexOf('create or replace function public.begin_stocktake_v1'),
+  lower.indexOf('create or replace function public.post_stocktake_v1'),
+);
+
+function assertCommandSerializationBeforeReplay(functionSql, replayNeedle, label) {
+  const lockIndex = functionSql.indexOf('pg_advisory_xact_lock');
+  const commandIdIndex = functionSql.indexOf('p_command_id', lockIndex);
+  const replayIndex = functionSql.indexOf(replayNeedle);
+  if (
+    lockIndex < 0 ||
+    commandIdIndex < 0 ||
+    replayIndex < 0 ||
+    lockIndex > replayIndex ||
+    commandIdIndex > replayIndex
+  ) {
+    throw new Error(`${label} must serialize by command ID before replay lookup`);
+  }
+}
+
+assertCommandSerializationBeforeReplay(
+  adjustmentSql,
+  "m.movement_type = 'admin_adjustment'",
+  'inventory adjustment',
+);
+assertCommandSerializationBeforeReplay(
+  wasteSql,
+  "m.movement_type = 'waste'",
+  'inventory waste',
+);
+assertCommandSerializationBeforeReplay(
+  beginStocktakeSql,
+  'from public.stocktakes s',
+  'stocktake begin',
+);
+assertCommandSerializationBeforeReplay(
+  sendTransfer,
+  'from public.stock_transfers t',
+  'transfer send',
+);
+
 const receiveTransfer = lower.slice(
   lower.indexOf('create or replace function public.receive_stock_transfer_v1'),
   lower.indexOf('revoke all on function public.reserve_inventory_for_order_v1'),
