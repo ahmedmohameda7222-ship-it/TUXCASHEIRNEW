@@ -103,7 +103,9 @@ export function PurchasingPage() {
             suppliers={workspace.suppliers}
             canManage={canManage}
             pending={purchasing.createSupplier.isPending}
-            onCreate={(input) => purchasing.createSupplier.mutate(input)}
+            onCreate={(input, onSuccess) =>
+              purchasing.createSupplier.mutate(input, { onSuccess })
+            }
           />
           <PurchaseOrdersPage
             purchaseOrders={workspace.purchaseOrders}
