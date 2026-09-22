@@ -3,6 +3,7 @@ import type { AdminSupplier } from '@tux/admin-contracts';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const supplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const inactiveSupplierId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const itemId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const poId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const lineId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -25,6 +26,7 @@ async function mockPurchasing(
   page: Page,
   options: {
     startWithoutSuppliers?: boolean;
+    initialSuppliers?: readonly AdminSupplier[];
     failCommandType?: string;
     failureCode?: string;
     failureCodesByCommand?: Readonly<Record<string, string>>;
@@ -33,17 +35,19 @@ async function mockPurchasing(
   const commands: Command[] = [];
   let suppliers: AdminSupplier[] = options.startWithoutSuppliers
     ? []
-    : [
-        {
-          id: supplierId,
-          businessId: session.principal.businessId,
-          name: 'Prime Foods',
-          contactName: 'Sara',
-          phone: '01000000000',
-          email: 'orders@prime.test',
-          active: true,
-        },
-      ];
+    : options.initialSuppliers
+      ? [...options.initialSuppliers]
+      : [
+          {
+            id: supplierId,
+            businessId: session.principal.businessId,
+            name: 'Prime Foods',
+            contactName: 'Sara',
+            phone: '01000000000',
+            email: 'orders@prime.test',
+            active: true,
+          },
+        ];
   let status: 'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'DRAFT';
   let version = 1;
   const baseMicrosPerPurchaseUnit = 2_000_000;
@@ -224,6 +228,48 @@ test('purchasing replaces an older mutation error with the most recent failure',
 
   await page.getByRole('button', { name: 'Mark ordered' }).click();
   await expect(page.getByRole('alert')).toContainText(/stale purchase order version/i);
+});
+
+test('purchase order creation excludes inactive suppliers from options and defaults', async ({
+  page,
+}) => {
+  const fixture = await mockPurchasing(page, {
+    initialSuppliers: [
+      {
+        id: inactiveSupplierId,
+        businessId: session.principal.businessId,
+        name: 'Archived Foods',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: false,
+      },
+      {
+        id: supplierId,
+        businessId: session.principal.businessId,
+        name: 'Prime Foods',
+        contactName: null,
+        phone: null,
+        email: null,
+        active: true,
+      },
+    ],
+  });
+  await page.goto('/purchasing');
+
+  await expect(page.getByText('Archived Foods').first()).toBeVisible();
+  const supplierSelect = page.getByLabel('Supplier');
+  await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
+  await expect(supplierSelect).toHaveValue(supplierId);
+
+  await page.getByLabel('Order quantity (purchase units)').fill('1');
+  await page.getByRole('button', { name: 'Create purchase order' }).click();
+
+  await expect.poll(() => fixture.commands.length).toBe(1);
+  expect(fixture.commands[0]).toMatchObject({
+    type: 'po.create',
+    supplierId,
+  });
 });
 
 test('purchase order defaults adopt the first supplier created after an initially empty workspace', async ({
