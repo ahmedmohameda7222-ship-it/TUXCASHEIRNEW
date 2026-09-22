@@ -204,6 +204,30 @@ if (
   throw new Error(`unexpected supplier replay result: ${supplierReplayResult}`);
 }
 
+const supplierMismatchResult = psql(
+  [
+    '-At',
+    '-c',
+    `select public.create_supplier_v1(
+       '${EMPLOYEE_ID}',
+       '${BUSINESS_ID}',
+       '${SHOP_ID}',
+       'Retry Supplier Changed',
+       null,
+       null,
+       null,
+       'supplier-create-retry-1'
+     )::text`,
+  ],
+  'Supplier create idempotency mismatch',
+).trim();
+const supplierMismatch = JSON.parse(supplierMismatchResult);
+if (supplierMismatch.ok !== false || supplierMismatch.code !== 'idempotency_conflict') {
+  throw new Error(
+    `supplier command id accepted a different intent: ${supplierMismatchResult}`,
+  );
+}
+
 const supplierReplayCount = psql(
   [
     '-At',
