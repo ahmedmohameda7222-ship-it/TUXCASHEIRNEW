@@ -34,10 +34,7 @@ class MemoryDatabase implements OperationsDatabase {
   }
 }
 
-function emptyPage(input: {
-  cursor: string;
-  hasMore: boolean;
-}): InventoryConvergencePage {
+function emptyPage(input: { cursor: string; hasMore: boolean }): InventoryConvergencePage {
   return {
     shopId: SHOP_ID,
     items: [],
