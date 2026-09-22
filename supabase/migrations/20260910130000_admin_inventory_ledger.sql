@@ -93,10 +93,32 @@ create table public.inventory_movement_feed (
 create index inventory_movement_feed_shop_sequence_idx
   on public.inventory_movement_feed(shop_id, sequence);
 
+with recursive inventory_movement_feed_backfill as (
+  select
+    m.id,
+    m.shop_id,
+    m.created_at,
+    m.compensates_movement_id,
+    0::bigint as dependency_depth
+  from public.inventory_movements m
+  where m.compensates_movement_id is null
+
+  union all
+
+  select
+    child.id,
+    child.shop_id,
+    child.created_at,
+    child.compensates_movement_id,
+    parent.dependency_depth + 1
+  from public.inventory_movements child
+  join inventory_movement_feed_backfill parent
+    on parent.id = child.compensates_movement_id
+)
 insert into public.inventory_movement_feed(movement_id, shop_id)
 select m.id, m.shop_id
-from public.inventory_movements m
-order by m.created_at, m.id;
+from inventory_movement_feed_backfill m
+order by m.dependency_depth, m.created_at, m.id;
 
 create or replace function private.capture_inventory_movement_feed_v1()
 returns trigger
