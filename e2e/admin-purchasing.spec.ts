@@ -258,7 +258,8 @@ test('purchase order creation excludes inactive suppliers from options and defau
   await page.goto('/purchasing');
 
   await expect(page.getByText('Archived Foods').first()).toBeVisible();
-  const supplierSelect = page.getByLabel('Supplier');
+  const purchaseOrders = page.getByRole('region', { name: 'Purchase orders' });
+  const supplierSelect = purchaseOrders.getByRole('combobox').first();
   await expect(supplierSelect.getByRole('option', { name: 'Archived Foods' })).toHaveCount(0);
   await expect(supplierSelect).toHaveValue(supplierId);
 
