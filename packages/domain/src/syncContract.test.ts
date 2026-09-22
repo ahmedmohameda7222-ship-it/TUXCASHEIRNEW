@@ -353,12 +353,7 @@ describe('OperationsSyncPayloadV1', () => {
       idempotencyKey: 'forged-unscoped-receive',
     };
 
-    for (const forged of [
-      adminAdjustment,
-      multiFinish,
-      fractionalReceive,
-      unscopedReceive,
-    ]) {
+    for (const forged of [adminAdjustment, multiFinish, fractionalReceive, unscopedReceive]) {
       expect(() =>
         roundTrip({
           eventType: 'INVENTORY_MOVEMENT_RECORDED',
