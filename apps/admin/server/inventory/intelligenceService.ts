@@ -401,6 +401,8 @@ export async function loadInventoryIntelligence(
     'ORDER_CONSUMPTION',
     'ORDER_CONSUMPTION_REVERSAL',
     'CANCEL_RESTOCK',
+    'BULK_UNIT_FINISHED',
+    'UNDO_BULK_UNIT_FINISHED',
     'WASTE',
     'ADMIN_ADJUSTMENT',
     'STOCKTAKE_ADJUSTMENT',
