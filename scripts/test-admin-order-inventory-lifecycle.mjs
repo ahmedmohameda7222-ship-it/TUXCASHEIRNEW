@@ -145,6 +145,19 @@ if (!operationsSync.includes('TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH')) {
     'operations-sync must classify forged cancellation restock rejection as protocol failure',
   );
 }
+if (
+  !inventoryMigration.includes('assert_order_transition_precondition_v1') ||
+  !inventoryMigration.includes('TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH')
+) {
+  throw new Error(
+    'canonical Operations sync must fence every order transition against current status and revision',
+  );
+}
+if (!operationsSync.includes('TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH')) {
+  throw new Error(
+    'operations-sync must classify canonical order transition precondition rejection as permanent',
+  );
+}
 
 if (
   !operationsInventory.includes('loadAllInventoryItems') ||
