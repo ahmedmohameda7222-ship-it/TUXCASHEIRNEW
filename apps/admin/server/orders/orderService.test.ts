@@ -31,6 +31,19 @@ function fixtureStore(): OrderStore {
     async searchOrders(input) {
       return { rows: [], nextCursor: null, shopId: input.shopId };
     },
+    async listActionReasons() {
+      return [
+        {
+          id: cancellationReasonId,
+          scope: 'BUSINESS' as const,
+          key: 'CUSTOMER_REQUEST',
+          family: 'CANCELLATION' as const,
+          label: 'Customer request',
+          active: true,
+          version: 1,
+        },
+      ];
+    },
     async getOrderDetail(input) {
       return {
         id: input.orderId,
@@ -83,6 +96,35 @@ function fixtureStore(): OrderStore {
 }
 
 describe('Admin order service', () => {
+  it('loads active order-action reason codes without requiring settings.manage', async () => {
+    let captured: Parameters<OrderStore['listActionReasons']>[0] | null = null;
+    const store = fixtureStore();
+    store.listActionReasons = async (input) => {
+      captured = input;
+      return [
+        {
+          id: cancellationReasonId,
+          scope: 'BUSINESS',
+          key: 'CUSTOMER_REQUEST',
+          family: 'CANCELLATION',
+          label: 'Customer request',
+          active: true,
+          version: 1,
+        },
+      ];
+    };
+
+    const service = createOrderService(store);
+    await expect(service.listActionReasons({ shopId }, principal(['orders.view']))).resolves.toEqual([
+      expect.objectContaining({
+        id: cancellationReasonId,
+        family: 'CANCELLATION',
+        active: true,
+      }),
+    ]);
+    expect(captured).toEqual({ shopId, businessId });
+  });
+
   it('requires orders.cancel and forwards CAS revision plus structured cancellation reason', async () => {
     let captured: Parameters<OrderStore['cancelActiveOrder']>[0] | null = null;
     const store = fixtureStore();
