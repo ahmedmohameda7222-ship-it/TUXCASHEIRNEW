@@ -75,6 +75,9 @@ create index purchase_orders_shop_status_idx
   on public.purchase_orders(shop_id, status, expected_delivery_date, id);
 create index purchase_orders_supplier_idx
   on public.purchase_orders(supplier_id, created_at desc, id);
+create unique index purchase_orders_shop_order_command_uq
+  on public.purchase_orders(shop_id, order_command_id)
+  where order_command_id is not null;
 
 create table public.purchase_order_lines (
   id uuid primary key default gen_random_uuid(),
@@ -618,10 +621,32 @@ as $$
 declare
   v_business_id uuid;
   v_order public.purchase_orders%rowtype;
+  v_existing_command_order_id uuid;
 begin
   v_business_id := private.admin_purchasing_authority_v1(
     p_employee_id, p_shop_id, 'purchasing.manage'
   );
+  if nullif(btrim(coalesce(p_command_id, '')), '') is null then
+    return jsonb_build_object('ok', false, 'code', 'invalid_order_command');
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-purchasing-order-command:' || p_shop_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
+  select po.id
+    into v_existing_command_order_id
+  from public.purchase_orders po
+  where po.shop_id = p_shop_id
+    and po.order_command_id = p_command_id;
+
+  if v_existing_command_order_id is not null
+     and v_existing_command_order_id is distinct from p_purchase_order_id then
+    return jsonb_build_object('ok', false, 'code', 'idempotency_conflict');
+  end if;
 
   select po.* into v_order
   from public.purchase_orders po
