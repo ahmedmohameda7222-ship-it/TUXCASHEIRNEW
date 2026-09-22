@@ -34,6 +34,11 @@ export interface AdminInventoryMovement {
   readonly createdAt: string;
 }
 
+export interface AdminInventoryItemHistory {
+  readonly inventoryItemId: string;
+  readonly history: readonly AdminInventoryMovement[];
+}
+
 export interface AdminInventoryItem extends InventoryBalance {
   readonly id: string;
   readonly name: string;
