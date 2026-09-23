@@ -52,6 +52,8 @@ interface PendingRequest {
   readonly trustedItems: readonly unknown[];
   readonly itemsSubtotalMinor: number;
   readonly orderNote: string | null;
+  readonly promotionId: string | null;
+  readonly loyaltyPointsToRedeem: number;
   readonly createdAt: string;
   readonly processingOrderId: string | null;
   readonly processingStartedAt: string | null;
@@ -116,6 +118,8 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
   const normalizedPhone = nullableString(source.normalizedPhone, 50);
   const deliveryAddress = nullableString(source.deliveryAddress, 500);
   const orderNote = nullableString(source.orderNote, 1000);
+  const promotionId = nullableUuid(source.promotionId);
+  const loyaltyPointsToRedeem = source.loyaltyPointsToRedeem;
   const createdAt = isoInstant(source.createdAt);
   const processingOrderId = source.processingOrderId === null ? null : uuid(source.processingOrderId);
   const processingStartedAt =
@@ -141,6 +145,10 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     normalizedPhone === undefined ||
     deliveryAddress === undefined ||
     orderNote === undefined ||
+    promotionId === undefined ||
+    typeof loyaltyPointsToRedeem !== 'number' ||
+    !Number.isSafeInteger(loyaltyPointsToRedeem) ||
+    loyaltyPointsToRedeem < 0 ||
     processingDeviceId === undefined ||
     reservationOriginDeviceId === undefined ||
     !Array.isArray(source.trustedItems) ||
@@ -179,6 +187,8 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     trustedItems: source.trustedItems,
     itemsSubtotalMinor: subtotal,
     orderNote,
+    promotionId,
+    loyaltyPointsToRedeem,
     createdAt,
     processingOrderId,
     processingStartedAt,
