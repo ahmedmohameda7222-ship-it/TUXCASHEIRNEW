@@ -249,6 +249,18 @@ if (
   );
 }
 
+const terminalSettlementValidationIndex = materializationSql.indexOf(
+  'assert_order_terminal_inventory_set_v1',
+);
+if (
+  terminalSettlementValidationIndex < 0 ||
+  terminalSettlementValidationIndex > firstMaterializationMutation
+) {
+  throw new Error(
+    'terminal Operations transitions must validate the exact canonical inventory settlement set before applying mutations',
+  );
+}
+
 const reservationCapacityStart = lower.indexOf(
   'create or replace function private.enforce_inventory_order_reservation_capacity_v1',
 );
@@ -287,12 +299,14 @@ if (
 if (
   !lower.includes('assert_operations_placement_inventory_requirements_v1') ||
   !lower.includes('tux_inventory_placement_requirements_mismatch') ||
+  !lower.includes('assert_order_terminal_inventory_set_v1') ||
+  !lower.includes('tux_inventory_terminal_settlement_mismatch') ||
   !lower.includes('assert_order_inventory_reservations_settled_v1') ||
   !lower.includes('tux_inventory_reservation_not_settled') ||
   !lower.includes('operations_sync_event_receipts')
 ) {
   throw new Error(
-    'canonical sync receipt must validate complete placement requirements and terminal settlement',
+    'canonical sync receipt must validate exact terminal inventory policy and complete settlement',
   );
 }
 
@@ -1058,6 +1072,9 @@ const placementOrderId = '85000000-0000-4000-8000-000000000002';
 const terminalOrderId = '85000000-0000-4000-8000-000000000003';
 const terminalReservationMovementId = '85000000-0000-4000-8000-000000000004';
 const terminalSettlementMovementId = '85000000-0000-4000-8000-000000000005';
+const donePolicyOrderId = '85000000-0000-4000-8000-000000000030';
+const cancelUnpreparedPolicyOrderId = '85000000-0000-4000-8000-000000000031';
+const cancelPreparedPolicyOrderId = '85000000-0000-4000-8000-000000000032';
 
 psql(
   [
@@ -1420,9 +1437,197 @@ psql(
        'ORDER_RESERVATION', 0, 100000, '${workerId}', '${terminalOrderId}',
        'terminal-reservation-fixture', timestamptz '2026-09-19 02:11:00+00'
      );
+     insert into public.inventory_movements(
+       id, shop_id, business_day_id, inventory_item_id, movement_type,
+       quantity_delta_micros, reserved_delta_micros, worker_id, order_id,
+       idempotency_key, created_at
+     ) values
+       (
+         '85000000-0000-4000-8000-000000000033',
+         '${shopId}', '${dayId}', '${itemId}', 'ORDER_RESERVATION',
+         0, 110000, '${workerId}', '${donePolicyOrderId}',
+         'terminal-policy-done-reservation', timestamptz '2026-09-19 02:11:01+00'
+       ),
+       (
+         '85000000-0000-4000-8000-000000000034',
+         '${shopId}', '${dayId}', '${itemId}', 'ORDER_RESERVATION',
+         0, 120000, '${workerId}', '${cancelUnpreparedPolicyOrderId}',
+         'terminal-policy-cancel-unprepared-reservation',
+         timestamptz '2026-09-19 02:11:02+00'
+       ),
+       (
+         '85000000-0000-4000-8000-000000000035',
+         '${shopId}', '${dayId}', '${itemId}', 'ORDER_RESERVATION',
+         0, 130000, '${workerId}', '${cancelPreparedPolicyOrderId}',
+         'terminal-policy-cancel-prepared-reservation',
+         timestamptz '2026-09-19 02:11:03+00'
+       );
      set session_replication_role = origin;`,
   ],
   'Terminal reservation fixture',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${donePolicyOrderId}',
+       'ORDER_MARKED_DONE',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION_RELEASE",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": -110000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'DONE cannot release an outstanding reservation',
+  'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${donePolicyOrderId}',
+       'ORDER_MARKED_DONE',
+       $envelope$
+       {
+         "payload": {
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION",
+               "quantityDeltaMicros": -110000,
+               "reservedDeltaMicros": -110000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'DONE consumes the exact outstanding reservation set',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${cancelUnpreparedPolicyOrderId}',
+       'ORDER_CANCELLED',
+       $envelope$
+       {
+         "payload": {
+           "transition": { "foodPrepared": false, "stockRestored": true },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION",
+               "quantityDeltaMicros": -120000,
+               "reservedDeltaMicros": -120000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Unprepared cancellation cannot consume an outstanding reservation',
+  'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${cancelUnpreparedPolicyOrderId}',
+       'ORDER_CANCELLED',
+       $envelope$
+       {
+         "payload": {
+           "transition": { "foodPrepared": false, "stockRestored": true },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION_RELEASE",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": -120000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Unprepared cancellation releases the exact outstanding reservation set',
+);
+
+psqlExpectFailure(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${cancelPreparedPolicyOrderId}',
+       'ORDER_CANCELLED',
+       $envelope$
+       {
+         "payload": {
+           "transition": { "foodPrepared": true, "stockRestored": false },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_RESERVATION_RELEASE",
+               "quantityDeltaMicros": 0,
+               "reservedDeltaMicros": -130000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Prepared cancellation cannot release an outstanding reservation',
+  'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH',
+);
+
+psql(
+  [
+    '-c',
+    `select private.assert_order_terminal_inventory_set_v1(
+       '${shopId}',
+       '${cancelPreparedPolicyOrderId}',
+       'ORDER_CANCELLED',
+       $envelope$
+       {
+         "payload": {
+           "transition": { "foodPrepared": true, "stockRestored": false },
+           "inventoryMovements": [
+             {
+               "itemId": "${itemId}",
+               "movementType": "ORDER_CONSUMPTION",
+               "quantityDeltaMicros": -130000,
+               "reservedDeltaMicros": -130000
+             }
+           ]
+         }
+       }
+       $envelope$::jsonb
+     );`,
+  ],
+  'Prepared cancellation consumes the exact outstanding reservation set',
 );
 
 psqlExpectFailure(
