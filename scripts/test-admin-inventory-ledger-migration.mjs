@@ -185,6 +185,18 @@ if (!receiveTransfer.includes('v_source_line.destination_inventory_item_id')) {
   throw new Error('receive_stock_transfer_v1 must use the immutable destination item snapshot');
 }
 
+const receiveApplyLoopIndex = receiveTransfer.indexOf('for v_source_line in');
+if (
+  receiveApplyLoopIndex < 0 ||
+  !/for\s+v_destination_item_id\s+in[\s\S]*?destination_inventory_item_id[\s\S]*?order\s+by\s+l\.destination_inventory_item_id[\s\S]*?pg_advisory_xact_lock/.test(
+    receiveTransfer.slice(0, receiveApplyLoopIndex),
+  )
+) {
+  throw new Error(
+    'receive_stock_transfer_v1 must pre-lock destination inventory items in stable destination order',
+  );
+}
+
 const sendReplayIndex = sendTransfer.indexOf("'idempotentreplay'");
 const sendFirstAuthority = sendTransfer.indexOf('admin_inventory_authority_v1');
 const sendSecondAuthority = sendTransfer.indexOf(
