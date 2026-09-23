@@ -197,6 +197,7 @@ declare
   v_state public.delivery_order_states%rowtype;
   v_existing public.delivery_order_state_events%rowtype;
   v_next_rider_id uuid;
+  v_old_state text;
   v_valid boolean := false;
 begin
   if btrim(coalesce(p_command_id, '')) = '' then
@@ -311,6 +312,8 @@ begin
     );
   end if;
 
+  v_old_state := v_state.state;
+
   v_valid := case v_state.state
     when 'UNASSIGNED' then p_to_state = 'ASSIGNED'
     when 'ASSIGNED' then p_to_state in ('UNASSIGNED', 'OUT_FOR_DELIVERY')
@@ -395,17 +398,7 @@ begin
     p_shop_id,
     p_order_id,
     v_next_rider_id,
-    case
-      when p_to_state = 'UNASSIGNED' then 'ASSIGNED'
-      else (
-        select e.to_state
-        from public.delivery_order_state_events e
-        where e.order_id = p_order_id
-          and e.command_id <> p_command_id || ':init'
-        order by e.created_at desc, e.id desc
-        limit 1
-      )
-    end,
+    v_old_state,
     p_to_state,
     p_employee_id,
     nullif(btrim(coalesce(p_note, '')), ''),
