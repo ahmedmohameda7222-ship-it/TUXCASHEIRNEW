@@ -123,6 +123,23 @@ export function OrderDetailPage({
         )}
       </section>
 
+      <section aria-labelledby="admin-order-financial-title">
+        <h2 id="admin-order-financial-title">Financial corrections</h2>
+        {order.financialEvents.length === 0 ? (
+          <p>No refund or return events</p>
+        ) : (
+          <ol>
+            {order.financialEvents.map((event) => (
+              <li key={event.id}>
+                <strong>{event.kind}</strong> · {label(event.state)} · {money(event.amountMinor)} ·{' '}
+                {event.reason.label} · reason v{event.reason.configurationVersion}
+                {event.note ? <> · {event.note}</> : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       <section aria-labelledby="admin-order-inventory-title">
         <h2 id="admin-order-inventory-title">Inventory effect</h2>
         {order.inventoryMovements.length === 0 ? (
