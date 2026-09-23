@@ -468,8 +468,8 @@ test('orders search filters real Admin list and exposes status-contextual action
   await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
 
   await page.getByLabel('Search').fill('Mona');
-  await page.getByLabel('Status').selectOption('DONE');
-  await page.getByLabel('Source').selectOption('ONLINE');
+  await page.getByRole('combobox', { name: 'Status' }).first().selectOption('DONE');
+  await page.getByRole('combobox', { name: 'Source' }).first().selectOption('ONLINE');
 
   await expect
     .poll(() =>
