@@ -63,6 +63,74 @@ describe('Admin purchasing workspace pagination', () => {
     expect(workspace.purchaseOrders.some((order) => order.id === 'old-actionable')).toBe(true);
   });
 
+  it('keeps older received purchase orders available for returns beyond the history window', async () => {
+    const recent = Array.from({ length: 500 }, (_, index) => ({
+      id: `recent-${index}`,
+      shop_id: 'shop-a',
+      supplier_id: 'supplier-1',
+      status: 'CANCELLED',
+      reference: null,
+      expected_delivery_date: null,
+      version: 1,
+      ordered_at: null,
+      created_at: `2026-09-20T00:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      updated_at: '2026-09-20T00:00:00.000Z',
+    }));
+    const oldReceived = {
+      id: 'old-received',
+      shop_id: 'shop-a',
+      supplier_id: 'supplier-1',
+      status: 'RECEIVED',
+      reference: 'RETURNABLE',
+      expected_delivery_date: null,
+      version: 8,
+      ordered_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'suppliers') return [];
+      if (table === 'inventory_items') return [];
+      if (table === 'purchase_orders') {
+        const status = query.get('status');
+        if (status !== null) {
+          if (!status.includes('RECEIVED')) return [];
+          return Number(query.get('offset') ?? '0') === 0 ? [oldReceived] : [];
+        }
+        return recent;
+      }
+      if (table === 'purchase_order_lines') {
+        expect(query.get('purchase_order_id')).toContain('old-received');
+        return Number(query.get('offset') ?? '0') === 0
+          ? [
+              {
+                id: 'line-returnable',
+                purchase_order_id: 'old-received',
+                inventory_item_id: 'item-1',
+                purchase_unit_label: 'unit',
+                base_micros_per_purchase_unit: 1_000_000,
+                ordered_purchase_units_micros: 2_000_000,
+                received_purchase_units_micros: 2_000_000,
+                returned_purchase_units_micros: 500_000,
+                ordered_base_micros: 2_000_000,
+                received_base_micros: 2_000_000,
+                returned_base_micros: 500_000,
+                expected_purchase_unit_cost_minor: 100,
+                expected_unit_cost_minor: 100,
+              },
+            ]
+          : [];
+      }
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const workspace = await createPurchasingStore({
+      select,
+    } as unknown as AdminSupabaseClient).loadWorkspace('shop-a', 'business-1');
+
+    expect(workspace.purchaseOrders.some((order) => order.id === 'old-received')).toBe(true);
+  });
+
   it('pages every supplier under PostgREST caps', async () => {
     const suppliers = Array.from({ length: 1_250 }, (_, index) => ({
       id: `supplier-${index}`,
