@@ -380,14 +380,16 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
   }
 
   async findByIdempotency(
-    shopId: string,
+    requestedShopId: string,
     idempotencyKey: string,
   ): Promise<OnlineOrderStoredRequest | null> {
     const { data, error } = await this.client
       .from('online_order_requests')
       .select('id,shop_id,idempotency_key,request_sha256,status')
-      .eq('shop_id', shopId)
       .eq('idempotency_key', idempotencyKey)
+      .or(
+        `requested_shop_id.eq.${requestedShopId},and(requested_shop_id.is.null,shop_id.eq.${requestedShopId})`,
+      )
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
@@ -432,7 +434,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       delivery_minimum_order_minor: recordToInsert.deliveryMinimumOrderMinor,
       delivery_fallback_used: recordToInsert.deliveryFallbackUsed,
       delivery_routing_snapshot: recordToInsert.deliveryRoutingSnapshot,
-      requested_shop_id: recordToInsert.shopId,
+      requested_shop_id: recordToInsert.requestedShopId,
       trusted_items: recordToInsert.trustedItems,
       items_subtotal_minor: recordToInsert.itemsSubtotalMinor,
       order_note: recordToInsert.orderNote,

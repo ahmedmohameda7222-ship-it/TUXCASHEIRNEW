@@ -58,7 +58,7 @@ class MemoryStore implements OnlineOrderIntakeStore {
   }
   async insertPending(record: OnlineOrderPendingInsert): Promise<void> {
     this.inserted.push(record);
-    this.rows.set(`${record.shopId}:${record.idempotencyKey}`, {
+    this.rows.set(`${record.requestedShopId}:${record.idempotencyKey}`, {
       id: record.id, shopId: record.shopId, idempotencyKey: record.idempotencyKey,
       requestSha256: record.requestSha256, status: 'PENDING',
     });

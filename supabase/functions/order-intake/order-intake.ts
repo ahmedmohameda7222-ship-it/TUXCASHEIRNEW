@@ -80,6 +80,7 @@ export type OnlineOrderDeliveryRouteResult =
 
 export interface OnlineOrderPendingInsert {
   id: string;
+  requestedShopId: string;
   shopId: string;
   idempotencyKey: string;
   requestSha256: string;
@@ -169,7 +170,7 @@ export interface OnlineOrderIntakeStore {
     at: string;
   }): Promise<OnlineOrderDeliveryRouteResult>;
   findByIdempotency(
-    shopId: string,
+    requestedShopId: string,
     idempotencyKey: string,
   ): Promise<OnlineOrderStoredRequest | null>;
   insertPending(record: OnlineOrderPendingInsert): Promise<void>;
@@ -773,22 +774,25 @@ export async function handleOrderIntakeRequest(
       return successResponse(200, existing.id);
     }
 
-    const catalog = await store.loadCatalog(parsed.shopId);
-    if (!catalog || !catalog.shop.active) return errorResponse(404, 'shop_not_found');
-    validateCatalogTenant(catalog, parsed.shopId);
+    const requestedShopId = parsed.shopId;
+    let finalShopId = requestedShopId;
+    let finalRequest = parsed;
+    let finalCatalog = await store.loadCatalog(requestedShopId);
+    if (!finalCatalog || !finalCatalog.shop.active) return errorResponse(404, 'shop_not_found');
+    validateCatalogTenant(finalCatalog, requestedShopId);
 
-    const trusted = buildTrustedItems(parsed, catalog);
-    if (trusted instanceof Response) return trusted;
+    let finalTrusted = buildTrustedItems(finalRequest, finalCatalog);
+    if (finalTrusted instanceof Response) return finalTrusted;
 
     const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
     if (!loadPublishedCheckoutAuthority) {
       return errorResponse(503, 'published_configuration_unavailable');
     }
-    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
+    let checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, requestedShopId);
     if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
-    const policyError = publishedCheckoutPolicyError(
-      parsed,
-      trusted.itemsSubtotalMinor,
+    let policyError = publishedCheckoutPolicyError(
+      finalRequest,
+      finalTrusted.itemsSubtotalMinor,
       normalizedPhone,
       checkoutAuthority,
     );
@@ -803,25 +807,62 @@ export async function handleOrderIntakeRequest(
       if (!resolveDeliveryRoute) {
         return errorResponse(503, 'delivery_configuration_unavailable');
       }
-      const resolved = await resolveDeliveryRoute.call(store, {
-        requestedShopId: parsed.shopId,
-        latitude: parsed.deliveryLocation.latitude,
-        longitude: parsed.deliveryLocation.longitude,
-        subtotalMinor: trusted.itemsSubtotalMinor,
-        at: new Date().toISOString(),
-      });
+      const routingAt = new Date().toISOString();
+      const resolve = (subtotalMinor: number) =>
+        resolveDeliveryRoute.call(store, {
+          requestedShopId,
+          latitude: parsed.deliveryLocation!.latitude,
+          longitude: parsed.deliveryLocation!.longitude,
+          subtotalMinor,
+          at: routingAt,
+        });
+      let resolved = await resolve(finalTrusted.itemsSubtotalMinor);
       if (!resolved.ok) return errorResponse(409, resolved.code);
-      if (resolved.shopId !== parsed.shopId) {
-        return errorResponse(409, 'delivery_unavailable');
+
+      if (resolved.shopId !== requestedShopId) {
+        finalShopId = resolved.shopId;
+        finalRequest = { ...parsed, shopId: finalShopId };
+        finalCatalog = await store.loadCatalog(finalShopId);
+        if (!finalCatalog || !finalCatalog.shop.active) {
+          return errorResponse(409, 'delivery_unavailable');
+        }
+        validateCatalogTenant(finalCatalog, finalShopId);
+        finalTrusted = buildTrustedItems(finalRequest, finalCatalog);
+        if (finalTrusted instanceof Response) return errorResponse(409, 'delivery_unavailable');
+
+        checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, finalShopId);
+        if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
+        policyError = publishedCheckoutPolicyError(
+          finalRequest,
+          finalTrusted.itemsSubtotalMinor,
+          normalizedPhone,
+          checkoutAuthority,
+        );
+        if (policyError) return policyError;
+
+        const revalidated = await resolve(finalTrusted.itemsSubtotalMinor);
+        if (
+          !revalidated.ok ||
+          revalidated.shopId !== finalShopId ||
+          revalidated.zoneId !== resolved.zoneId ||
+          !revalidated.fallbackUsed
+        ) {
+          return errorResponse(
+            409,
+            revalidated.ok ? 'delivery_unavailable' : revalidated.code,
+          );
+        }
+        resolved = revalidated;
       }
+
       deliveryRoute = resolved;
     }
 
-
-    const catalogRevision = await sha256Hex(canonicalCatalogForRevision(catalog));
+    const catalogRevision = await sha256Hex(canonicalCatalogForRevision(finalCatalog));
     const record: OnlineOrderPendingInsert = {
       id: crypto.randomUUID(),
-      shopId: parsed.shopId,
+      requestedShopId,
+      shopId: finalShopId,
       idempotencyKey: parsed.idempotencyKey,
       requestSha256,
       sourceFingerprint: requestSourceFingerprint,
@@ -851,8 +892,8 @@ export async function handleOrderIntakeRequest(
               minimumOrderMinor: deliveryRoute.minimumOrderMinor,
               fallbackUsed: deliveryRoute.fallbackUsed,
             },
-      trustedItems: trusted.trustedItems,
-      itemsSubtotalMinor: trusted.itemsSubtotalMinor,
+      trustedItems: finalTrusted.trustedItems,
+      itemsSubtotalMinor: finalTrusted.itemsSubtotalMinor,
       orderNote: parsed.orderNote,
       promotionId: parsed.reward?.promotionId ?? null,
       loyaltyPointsToRedeem: parsed.reward?.loyaltyPointsToRedeem ?? 0,
