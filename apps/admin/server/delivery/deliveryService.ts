@@ -1,4 +1,5 @@
 import type {
+  AdminDeliveryConfigMutationResult,
   AdminDeliveryMutationResult,
   AdminDeliveryOrder,
   AdminDeliveryOrderState,
@@ -37,6 +38,32 @@ export interface DeliveryStore {
       zones: readonly AdminDeliveryZone[];
     }>>;
   }>;
+  upsertZone(input: {
+    businessId: string;
+    employeeId: string;
+    shopId: string;
+    zoneId: string | null;
+    expectedVersion: number | null;
+    name: string;
+    feeMinor: number;
+    minimumOrderMinor: number;
+    priority: number;
+    active: boolean;
+    boundary: AdminDeliveryZone['boundary'];
+    fallbackShopId: string | null;
+    fallbackEnabled: boolean;
+  }): Promise<AdminDeliveryConfigMutationResult>;
+  upsertRider(input: {
+    businessId: string;
+    employeeId: string;
+    shopId: string;
+    riderId: string | null;
+    expectedVersion: number | null;
+    displayName: string;
+    phone: string | null;
+    active: boolean;
+    state: AdminDeliveryRider['state'];
+  }): Promise<AdminDeliveryConfigMutationResult>;
   transitionOrder(input: {
     businessId: string;
     employeeId: string;
@@ -244,6 +271,50 @@ export function createDeliveryService(store: DeliveryStore) {
         }
       }
       return { ok: false, code: 'delivery_unavailable' };
+    },
+
+    upsertZone(
+      input: {
+        shopId: string;
+        zoneId: string | null;
+        expectedVersion: number | null;
+        name: string;
+        feeMinor: number;
+        minimumOrderMinor: number;
+        priority: number;
+        active: boolean;
+        boundary: AdminDeliveryZone['boundary'];
+        fallbackShopId: string | null;
+        fallbackEnabled: boolean;
+      },
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminDeliveryConfigMutationResult> {
+      requirePermission(principal, 'delivery.manage', input.shopId);
+      return store.upsertZone({
+        ...input,
+        businessId: principal.businessId,
+        employeeId: principal.employeeId,
+      });
+    },
+
+    upsertRider(
+      input: {
+        shopId: string;
+        riderId: string | null;
+        expectedVersion: number | null;
+        displayName: string;
+        phone: string | null;
+        active: boolean;
+        state: AdminDeliveryRider['state'];
+      },
+      principal: AdminSessionPrincipal,
+    ): Promise<AdminDeliveryConfigMutationResult> {
+      requirePermission(principal, 'delivery.manage', input.shopId);
+      return store.upsertRider({
+        ...input,
+        businessId: principal.businessId,
+        employeeId: principal.employeeId,
+      });
     },
 
     transitionOrder(
