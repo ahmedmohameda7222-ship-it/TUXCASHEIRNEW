@@ -137,6 +137,67 @@ describe('inventory intelligence purchasing integration', () => {
     });
   });
 
+  it('counts prepared cancellations but not unprepared cancellations as theoretical usage', async () => {
+    const select = vi.fn(async (table: string, query?: URLSearchParams) => {
+      if (table === 'inventory_movements') {
+        return Number(query?.get('offset') ?? '0') === 0
+          ? [
+              {
+                inventory_item_id: 'item-1',
+                movement_type: 'ORDER_CONSUMPTION',
+                quantity_delta_micros: -4_000,
+                order_id: 'order-prepared-cancelled',
+              },
+              {
+                inventory_item_id: 'item-1',
+                movement_type: 'ORDER_CONSUMPTION',
+                quantity_delta_micros: -3_000,
+                order_id: 'order-unprepared-cancelled',
+              },
+            ]
+          : [];
+      }
+      if (table === 'orders') {
+        expect(query?.get('select')).toContain('cancellation_food_prepared');
+        const ids = query?.get('id') ?? '';
+        return [
+          {
+            id: 'order-prepared-cancelled',
+            status: 'CANCELLED',
+            cancellation_food_prepared: true,
+          },
+          {
+            id: 'order-unprepared-cancelled',
+            status: 'CANCELLED',
+            cancellation_food_prepared: false,
+          },
+        ].filter((row) => ids.includes(row.id));
+      }
+      if (table === 'inventory_replenishment_settings') return [];
+      if (table === 'purchase_orders') return [];
+      if (table === 'products') return [];
+      if (table === 'recipe_lines') return [];
+      if (table === 'inventory_margin_settings') return [];
+      throw new Error('unexpected table: ' + table);
+    });
+
+    const result = await loadInventoryIntelligence(
+      { select } as unknown as AdminSupabaseClient,
+      'shop-a',
+      [item],
+      Date.parse('2026-09-19T06:00:00.000Z'),
+    );
+
+    expect(result.variances).toContainEqual(
+      expect.objectContaining({
+        inventoryItemId: 'item-1',
+        actualUsageMicros: 7_000,
+        theoreticalUsageMicros: 4_000,
+        varianceMicros: 3_000,
+      }),
+    );
+  });
+
   it('includes bulk consumption and its undo in actual usage', async () => {
     const select = vi.fn(async (table: string, query?: URLSearchParams) => {
       if (table === 'inventory_movements') {
