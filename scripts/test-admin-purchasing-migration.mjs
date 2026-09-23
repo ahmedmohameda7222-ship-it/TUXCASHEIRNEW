@@ -108,4 +108,23 @@ if (lower.includes('1000000, v_unit_cost')) {
   throw new Error('supplier purchase-unit conversion must not be hard-coded to one base unit');
 }
 
+
+function functionBody(name) {
+  const start = lower.indexOf(`create or replace function public.${name}`);
+  if (start < 0) throw new Error(`missing purchasing function: ${name}`);
+  const next = lower.indexOf('create or replace function public.', start + 1);
+  return lower.slice(start, next < 0 ? lower.length : next);
+}
+
+for (const fn of ['receive_purchase_order_v1', 'return_purchase_order_v1']) {
+  const body = functionBody(fn);
+  if (
+    !/for\s+v_inventory_item_id\s+in[\s\S]*?join\s+public\.purchase_order_lines\s+pol[\s\S]*?order\s+by\s+pol\.inventory_item_id[\s\S]*?pg_advisory_xact_lock[\s\S]*?v_inventory_item_id/.test(
+      body,
+    )
+  ) {
+    throw new Error(`${fn} must acquire inventory locks in stable inventory-item order`);
+  }
+}
+
 console.log('Admin purchasing migration static invariant passed.');
