@@ -84,6 +84,7 @@ const fixture: AdminOrderDetail = {
       createdAt: '2026-09-21T03:00:00.000Z',
     },
   ],
+  financialEvents: [],
   auditEvents: [
     {
       id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
@@ -116,6 +117,59 @@ describe('OrderDetailPage', () => {
     const done = render({ ...fixture, status: 'DONE' });
     expect(done).toContain('Refund / return');
     expect(done).not.toContain('Cancel order');
+  });
+
+  it('renders approval-pending refund and return reason snapshots without rewriting history', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [
+        {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          kind: 'REFUND',
+          state: 'PENDING_APPROVAL',
+          amountMinor: 5000,
+          approvalRequestId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          reason: {
+            id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            key: 'CUSTOMER_REQUEST',
+            label: 'Customer requested refund',
+            family: 'REFUND_RETURN',
+            configurationVersion: 3,
+          },
+          createdAt: '2026-09-21T03:10:00.000Z',
+        },
+        {
+          id: '12121212-1212-4121-8121-121212121212',
+          kind: 'RETURN',
+          state: 'POSTED',
+          amountMinor: 11000,
+          approvalRequestId: null,
+          reason: {
+            id: '13131313-1313-4131-8131-131313131313',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 5,
+          },
+          createdAt: '2026-09-21T03:15:00.000Z',
+        },
+      ],
+    });
+
+    for (const value of [
+      'Financial corrections',
+      'REFUND',
+      'PENDING APPROVAL',
+      'Customer requested refund',
+      'reason v3',
+      'RETURN',
+      'POSTED',
+      'Quality issue',
+      'reason v5',
+    ]) {
+      expect(html).toContain(value);
+    }
   });
 
   it('renders immutable order context needed to investigate a lifecycle action', () => {
