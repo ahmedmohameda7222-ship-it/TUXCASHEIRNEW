@@ -600,14 +600,16 @@ function parseAppliedRewardSnapshot(
           if (kind !== 'PERCENT' && kind !== 'FIXED' && kind !== 'FREE_ITEM') {
             throw new TypeError('Operations sync reward promotion kind is unsupported.');
           }
+          const parsedKind: 'PERCENT' | 'FIXED' | 'FREE_ITEM' = kind;
           const channel = promotionSource['channel'];
           if (channel !== 'POS' && channel !== 'ONLINE' && channel !== 'BOTH') {
             throw new TypeError('Operations sync reward promotion channel is unsupported.');
           }
+          const parsedChannel: 'POS' | 'ONLINE' | 'BOTH' = channel;
           return {
             id: fieldString(promotionSource, 'id'),
             name: fieldString(promotionSource, 'name'),
-            kind,
+            kind: parsedKind,
             version: safeInteger(promotionSource['version'], 'reward promotion version', 1),
             percentBasisPoints: nullableSafeInteger(
               promotionSource['percentBasisPoints'],
@@ -632,7 +634,7 @@ function parseAppliedRewardSnapshot(
               promotionSource['minimumOrderMinor'],
               'reward promotion minimumOrderMinor',
             ),
-            channel,
+            channel: parsedChannel,
             promotionDiscountMinor: money(
               promotionSource['promotionDiscountMinor'],
               'reward promotion discount',
