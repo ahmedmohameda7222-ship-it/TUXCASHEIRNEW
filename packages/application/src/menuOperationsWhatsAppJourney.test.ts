@@ -177,6 +177,21 @@ class MemoryIntakeStore implements OnlineOrderIntakeStore {
     };
   }
 
+  async resolveDeliveryRoute(input: { requestedShopId: string; subtotalMinor: number }) {
+    if (input.requestedShopId !== SHOP_ID || input.subtotalMinor < 19_000) {
+      return { ok: false as const, code: 'delivery_unavailable' as const };
+    }
+    return {
+      ok: true as const,
+      shopId: SHOP_ID,
+      zoneId: ZONE_ID,
+      zoneName: 'Nasr City',
+      feeMinor: 3_000,
+      minimumOrderMinor: 0,
+      fallbackUsed: false,
+    };
+  }
+
   async findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -219,6 +234,10 @@ function menuPayload() {
       },
     ],
     orderNote: 'Call on arrival',
+    deliveryLocation: {
+      latitude: 30.0566,
+      longitude: 31.3301,
+    },
   };
 }
 
