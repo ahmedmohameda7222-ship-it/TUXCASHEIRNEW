@@ -142,6 +142,12 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
     customerName: 'Online Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: ZONE_ID,
+    deliveryZoneName: 'Nasr City',
+    deliveryFeeMinor: 3_000,
+    deliveryMinimumOrderMinor: 15_000,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: PRODUCT_ID,
@@ -293,17 +299,17 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
     ).toThrow(/configured delivery zone fee|checkout policy/i);
   });
 
-  it('allows a delivery-fee override only when the published policy enables it', () => {
+  it('keeps the canonical intake fee when generic delivery-fee overrides are enabled', () => {
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: request(),
       workspace: workspace(
         configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': true }),
       ),
-      confirmation: deliveryConfirmation(25_000, 2_500),
+      confirmation: deliveryConfirmation(),
       runtime,
     });
 
-    expect(draft.delivery.finalFeeMinor).toBe(moneyMinor(2_500));
+    expect(draft.delivery.finalFeeMinor).toBe(moneyMinor(3_000));
     expect(draft.delivery.configuredFeeMinor).toBe(moneyMinor(3_000));
   });
 
