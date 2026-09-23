@@ -40,6 +40,12 @@ function cachedRequest(
     processingStartedAt: null,
     processingExpiresAt: null,
     ...overrides,
+    requestedShopId: overrides.requestedShopId ?? shopId,
+    deliveryZoneId: overrides.deliveryZoneId ?? null,
+    deliveryZoneName: overrides.deliveryZoneName ?? null,
+    deliveryFeeMinor: overrides.deliveryFeeMinor ?? null,
+    deliveryMinimumOrderMinor: overrides.deliveryMinimumOrderMinor ?? null,
+    deliveryFallbackUsed: overrides.deliveryFallbackUsed ?? false,
   };
 }
 
