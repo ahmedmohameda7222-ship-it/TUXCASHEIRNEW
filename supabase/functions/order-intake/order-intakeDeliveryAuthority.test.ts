@@ -13,23 +13,24 @@ const SHOP_ID = '11111111-1111-4111-8111-111111111191';
 const CATEGORY_ID = '22222222-2222-4222-8222-222222222191';
 const PRODUCT_ID = '33333333-3333-4333-8333-333333333191';
 const CASH_METHOD_ID = '44444444-4444-4444-8444-444444444191';
+const FALLBACK_SHOP_ID = '11111111-1111-4111-8111-111111111192';
 const IDEMPOTENCY_KEY = '55555555-5555-4555-8555-555555555191';
 
-function catalog(): OnlineOrderCatalogAuthority {
+function catalog(shopId = SHOP_ID): OnlineOrderCatalogAuthority {
   return {
-    shop: { id: SHOP_ID, active: true },
-    categories: [{ id: CATEGORY_ID, shopId: SHOP_ID, active: true }],
+    shop: { id: shopId, active: true },
+    categories: [{ id: CATEGORY_ID, shopId, active: true }],
     products: [{
-      id: PRODUCT_ID, shopId: SHOP_ID, categoryId: CATEGORY_ID, name: 'Delivery Burger',
+      id: PRODUCT_ID, shopId, categoryId: CATEGORY_ID, name: 'Delivery Burger',
       priceMinor: 19_000, active: true, soldOut: false, isCombo: false,
     }],
     modifiers: [], productModifierLinks: [], comboBeverageOptions: [],
   };
 }
 
-function authority(): OnlineOrderPublishedCheckoutAuthority {
+function authority(shopId = SHOP_ID): OnlineOrderPublishedCheckoutAuthority {
   return {
-    shopId: SHOP_ID, configurationVersion: 19, settingsVersion: 19,
+    shopId, configurationVersion: 19, settingsVersion: 19,
     lifecycleState: 'ACTIVE', temporaryClosed: false, onlineOrdersPaused: false,
     minimumOrderMinor: 0, serviceChargeBps: 0, taxBps: 0, requireCustomerPhone: false,
     weeklyHours: [], specialHours: [],
@@ -47,10 +48,10 @@ class MemoryStore implements OnlineOrderIntakeStore {
   readonly resolveDeliveryRoute = vi.fn();
 
   async loadCatalog(shopId: string) {
-    return shopId === SHOP_ID ? catalog() : null;
+    return shopId === SHOP_ID || shopId === FALLBACK_SHOP_ID ? catalog(shopId) : null;
   }
   async loadPublishedCheckoutAuthority(shopId: string) {
-    return shopId === SHOP_ID ? authority() : null;
+    return shopId === SHOP_ID || shopId === FALLBACK_SHOP_ID ? authority(shopId) : null;
   }
   async findByIdempotency(shopId: string, idempotencyKey: string) {
     return this.rows.get(`${shopId}:${idempotencyKey}`) ?? null;
@@ -122,5 +123,31 @@ describe('order-intake trusted delivery routing authority', () => {
       shopId: SHOP_ID, deliveryZoneId: '66666666-6666-4666-8666-666666666191',
       deliveryFeeMinor: 3_000, deliveryMinimumOrderMinor: 15_000, deliveryFallbackUsed: false,
     });
+  });
+
+  it('accepts an explicit trusted fallback only after revalidating the resolved shop', async () => {
+    const store = new MemoryStore();
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: FALLBACK_SHOP_ID,
+      zoneId: '66666666-6666-4666-8666-666666666192',
+      zoneName: 'Fallback Core',
+      feeMinor: 3_500,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: true,
+    });
+
+    const response = await handleOrderIntakeRequest(request(true), store);
+
+    expect(response.status).toBe(202);
+    expect(store.inserted).toHaveLength(1);
+    expect(store.inserted[0]).toMatchObject({
+      requestedShopId: SHOP_ID,
+      shopId: FALLBACK_SHOP_ID,
+      deliveryZoneId: '66666666-6666-4666-8666-666666666192',
+      deliveryFeeMinor: 3_500,
+      deliveryFallbackUsed: true,
+    });
+    expect(store.resolveDeliveryRoute).toHaveBeenCalledTimes(2);
   });
 });
