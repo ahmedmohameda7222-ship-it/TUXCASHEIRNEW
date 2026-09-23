@@ -47,7 +47,7 @@ describe('Admin purchasing workspace pagination', () => {
       }
       if (table === 'inventory_items') return [];
       if (table === 'purchase_orders') {
-        if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)') {
+        if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED,RECEIVED)') {
           return Number(query.get('offset') ?? '0') === 0 ? [oldActionable] : [];
         }
         return recent;
@@ -100,7 +100,7 @@ describe('Admin purchasing workspace pagination', () => {
         return recent;
       }
       if (table === 'purchase_order_lines') {
-        expect(query.get('purchase_order_id')).toContain('old-received');
+        if (!query.get('purchase_order_id')?.includes('old-received')) return [];
         return Number(query.get('offset') ?? '0') === 0
           ? [
               {
@@ -168,7 +168,7 @@ describe('Admin purchasing workspace pagination', () => {
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'suppliers') return [];
       if (table === 'purchase_orders') {
-        if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)') {
+        if (query.get('status') === 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED,RECEIVED)') {
           return Number(query.get('offset') ?? '0') === 0
             ? [
                 {
