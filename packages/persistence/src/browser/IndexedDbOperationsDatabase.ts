@@ -184,6 +184,16 @@ function createRepositories(transaction: IDBTransaction): OperationsTransaction 
             : { ...existing, status: order.status, lifecycle: order.lifecycle };
         await requestResult(orders.put(updated));
       },
+      async getLifecycleSyncCursor(shopId) {
+        const row = await recordOrNull<{ shopId: string; cursor: string }>(
+          store('orderLifecycleSyncCursor').get(shopId),
+        );
+        return row?.cursor ?? null;
+      },
+      async setLifecycleSyncCursor(shopId, cursor) {
+        if (!cursor) throw new Error('Order lifecycle sync cursor must not be empty.');
+        await requestResult(store('orderLifecycleSyncCursor').put({ shopId, cursor }));
+      },
     },
     expenses: {
       async put(expense: Expense) {

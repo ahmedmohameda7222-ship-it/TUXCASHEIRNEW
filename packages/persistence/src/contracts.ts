@@ -57,6 +57,8 @@ export interface OrderRepository {
   listByBusinessDay(businessDayId: BusinessDayId): Promise<readonly OrderSnapshot[]>;
   insert(order: OrderSnapshot): Promise<void>;
   updateOperationalState(order: OrderSnapshot): Promise<void>;
+  getLifecycleSyncCursor(shopId: ShopId): Promise<string | null>;
+  setLifecycleSyncCursor(shopId: ShopId, cursor: string): Promise<void>;
 }
 export interface ExpenseRepository {
   put(expense: Expense): Promise<void>;

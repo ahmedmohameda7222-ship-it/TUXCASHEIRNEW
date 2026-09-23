@@ -1,11 +1,19 @@
 import { toOperationsSyncEnvelopeV1, type OutboxEvent } from '@tux/domain';
 import { OutboxDeliveryError, type OutboxTransport } from './outboxSync';
 
+export interface HttpOutboxConflict {
+  readonly error: string;
+  readonly canonicalStatus: string | null;
+  readonly canonicalOperationalRevision: number | null;
+}
+
 export interface HttpOutboxTransportOptions {
   readonly endpoint: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly headerProvider?: () =>
     Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
+  readonly beforeDeliver?: (event: OutboxEvent) => void | Promise<void>;
+  readonly onConflict?: (event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>;
   readonly fetcher?: typeof fetch;
   readonly timeoutMs?: number;
 }
@@ -46,6 +54,10 @@ export class HttpOutboxTransport implements OutboxTransport {
   readonly #headerProvider:
     | (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>> | null)
     | null;
+  readonly #beforeDeliver: ((event: OutboxEvent) => void | Promise<void>) | null;
+  readonly #onConflict:
+    | ((event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>)
+    | null;
   readonly #fetcher: typeof fetch;
   readonly #timeoutMs: number;
 
@@ -53,6 +65,8 @@ export class HttpOutboxTransport implements OutboxTransport {
     this.#endpoint = normalizeEndpoint(options.endpoint);
     this.#headers = options.headers ?? {};
     this.#headerProvider = options.headerProvider ?? null;
+    this.#beforeDeliver = options.beforeDeliver ?? null;
+    this.#onConflict = options.onConflict ?? null;
     this.#fetcher = options.fetcher ?? fetch;
     this.#timeoutMs = normalizeTimeout(options.timeoutMs);
   }
@@ -65,6 +79,17 @@ export class HttpOutboxTransport implements OutboxTransport {
       throw new OutboxDeliveryError(
         'Local outbox event does not satisfy the supported Operations sync contract.',
         'PERMANENT',
+        null,
+        { cause },
+      );
+    }
+
+    try {
+      await this.#beforeDeliver?.(event);
+    } catch (cause) {
+      throw new OutboxDeliveryError(
+        'Canonical order lifecycle preflight is temporarily unavailable.',
+        'TRANSIENT',
         null,
         { cause },
       );
@@ -97,7 +122,36 @@ export class HttpOutboxTransport implements OutboxTransport {
         body: JSON.stringify(envelope),
         signal: controller.signal,
       });
-      if (!response.ok) throw responseFailure(response.status);
+      if (!response.ok) {
+        if (response.status === 409) {
+          let conflict: HttpOutboxConflict = {
+            error: 'sync_conflict',
+            canonicalStatus: null,
+            canonicalOperationalRevision: null,
+          };
+          try {
+            const body = (await response.json()) as Record<string, unknown>;
+            conflict = {
+              error: typeof body['error'] === 'string' ? body['error'] : 'sync_conflict',
+              canonicalStatus:
+                typeof body['canonicalStatus'] === 'string' ? body['canonicalStatus'] : null,
+              canonicalOperationalRevision:
+                typeof body['canonicalOperationalRevision'] === 'number' &&
+                Number.isSafeInteger(body['canonicalOperationalRevision'])
+                  ? body['canonicalOperationalRevision']
+                  : null,
+            };
+          } catch {
+            // A 409 is still a permanent rejected mutation even if the response body is malformed.
+          }
+          try {
+            await this.#onConflict?.(event, conflict);
+          } catch {
+            // Do not retry a stale mutation forever; periodic convergence remains active.
+          }
+        }
+        throw responseFailure(response.status);
+      }
     } catch (cause) {
       if (cause instanceof OutboxDeliveryError) throw cause;
       if (controller.signal.aborted) {
