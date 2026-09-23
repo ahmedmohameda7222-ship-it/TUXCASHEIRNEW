@@ -225,7 +225,8 @@ async function mockOrders(page: Page, options: { staleCancellation?: boolean } =
 
       const requestedOrderId = url.searchParams.get('orderId');
       if (requestedOrderId) {
-        const selected = requestedOrderId === active.id ? active : requestedOrderId === done.id ? done : null;
+        const selected =
+          requestedOrderId === active.id ? active : requestedOrderId === done.id ? done : null;
         await route.fulfill({
           status: selected ? 200 : 404,
           contentType: 'application/json',
@@ -452,7 +453,9 @@ async function mockOrders(page: Page, options: { staleCancellation?: boolean } =
   };
 }
 
-test('orders search filters real Admin list and exposes status-contextual actions', async ({ page }) => {
+test('orders search filters real Admin list and exposes status-contextual actions', async ({
+  page,
+}) => {
   const fixture = await mockOrders(page);
   await page.goto('/orders');
 
