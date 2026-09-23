@@ -402,6 +402,20 @@ jobs:
       - name: Plan 5 delivery PostgreSQL behavior
         run: node scripts/test-admin-delivery-postgres.mjs
 
+  task5-delivery-checkout-authority:
+    needs: task5-delivery-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 trusted ONLINE delivery routing authority
+        run: npx vitest run supabase/functions/order-intake/order-intakeDeliveryAuthority.test.ts
+
   task5-delivery-e2e:
     needs: task5-delivery-service
     runs-on: ubuntu-latest
@@ -433,6 +447,7 @@ jobs:
         task4-reward-placement-integration,
         task4-crm-promotions-e2e,
         task5-delivery-service,
+        task5-delivery-checkout-authority,
         task5-delivery-postgres,
         task5-delivery-e2e,
       ]
