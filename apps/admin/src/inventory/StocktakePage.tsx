@@ -99,11 +99,11 @@ export function StocktakePage({
                 />
               </label>
               <div className="admin-inventory-variance">
-                <span>Quantity variance</span>
+                <span>Count vs snapshot</span>
                 <strong>
                   {variance === null ? '—' : formatQuantity(variance, item.unitLabel)}
                 </strong>
-                <span>Value variance</span>
+                <span>Snapshot value delta</span>
                 <strong>
                   {valueVariance === null
                     ? '—'
@@ -111,6 +111,8 @@ export function StocktakePage({
                         maximumFractionDigits: 2,
                       }).format(valueVariance)}
                 </strong>
+                <span>Snapshot comparison only</span>
+                <strong>Final posted adjustment uses live on-hand at posting</strong>
               </div>
             </article>
           );
