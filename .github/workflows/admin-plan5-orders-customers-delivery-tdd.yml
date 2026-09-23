@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feat/admin-05-orders-customers-delivery
+      - feat/admin-05-orders-customers-delivery-v2
     paths:
       - 'supabase/migrations/**'
       - 'apps/admin/server/orders/**'
@@ -41,6 +41,8 @@ on:
       - 'e2e/admin-customers-promotions.spec.ts'
       - 'e2e/admin-delivery.spec.ts'
       - 'scripts/test-admin-order-controls-migration.mjs'
+      - 'scripts/test-admin-order-approval-postgres.mjs'
+      - 'scripts/test-admin-order-approval-postgres.mjs'
       - 'scripts/test-admin-customers-migration.mjs'
       - 'scripts/test-admin-loyalty-promotions-migration.mjs'
       - 'scripts/test-admin-delivery-migration.mjs'
@@ -119,6 +121,37 @@ jobs:
       - name: Plan 5 typecheck
         run: npm run typecheck
 
+  task1-approval-postgres:
+    needs: task1-order-controls
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 refund approval PostgreSQL behavior
+        run: node scripts/test-admin-order-approval-postgres.mjs
+
   task2-orders-ui:
     runs-on: ubuntu-latest
     steps:
@@ -179,7 +212,7 @@ jobs:
         run: npx vitest run apps/admin/server/customers/loyaltyService.test.ts
 
   regression:
-    needs: [task1-order-controls, task3-customers-static, task3-customers, task4-loyalty-static, task4-loyalty]
+    needs: [task1-approval-postgres, task3-customers-static, task3-customers, task4-loyalty-static, task4-loyalty]
     runs-on: ubuntu-latest
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
