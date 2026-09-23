@@ -2176,3 +2176,669 @@ revoke all on function public.claim_tux_online_order_request_v1(uuid, uuid, uuid
   from public, anon, authenticated;
 grant execute on function public.claim_tux_online_order_request_v1(uuid, uuid, uuid)
   to service_role;
+
+-- Immutable loyalty/promotion compensation for canonical order corrections.
+create table public.order_reward_compensation_events (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  shop_id uuid not null references public.shops(id) on delete restrict,
+  order_id uuid not null references public.orders(id) on delete restrict,
+  source_key text not null check (btrim(source_key) <> ''),
+  event_type text not null check (event_type in (
+    'CANCEL_COMPENSATION',
+    'REFUND_COMPENSATION',
+    'RETURN_COMPENSATION'
+  )),
+  requested_amount_minor bigint not null check (requested_amount_minor > 0),
+  effective_amount_minor bigint not null check (effective_amount_minor >= 0),
+  created_at timestamptz not null default now(),
+  unique (business_id, source_key),
+  foreign key (business_id, shop_id)
+    references public.business_shops(business_id, shop_id) on delete restrict
+);
+create index order_reward_compensation_order_idx
+  on public.order_reward_compensation_events(order_id, created_at, id);
+
+alter table public.order_reward_compensation_events enable row level security;
+revoke all on public.order_reward_compensation_events from public, anon, authenticated;
+grant select, insert on public.order_reward_compensation_events to service_role;
+
+drop trigger if exists order_reward_compensation_events_immutable
+  on public.order_reward_compensation_events;
+create trigger order_reward_compensation_events_immutable
+before update or delete on public.order_reward_compensation_events
+for each row execute function private.reject_loyalty_history_mutation_v1();
+
+create or replace function private.apply_order_reward_compensation_v1(
+  p_order_id uuid,
+  p_event_type text,
+  p_source_key text,
+  p_amount_minor bigint,
+  p_now timestamptz
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $apply_order_reward_compensation$
+declare
+  v_order public.orders%rowtype;
+  v_business_id uuid;
+  v_order_value_minor bigint;
+  v_prior_effective_minor bigint := 0;
+  v_effective_minor bigint := 0;
+  v_cumulative_effective_minor bigint := 0;
+  v_customer_id uuid;
+  v_earn_points bigint := 0;
+  v_redeem_points bigint := 0;
+  v_earn_expiry timestamptz;
+  v_prior_earn_reversed bigint := 0;
+  v_prior_redeem_restored bigint := 0;
+  v_target_earn_reversed bigint := 0;
+  v_target_redeem_restored bigint := 0;
+  v_delta bigint := 0;
+  v_promotion record;
+begin
+  if p_order_id is null
+     or p_event_type not in (
+       'CANCEL_COMPENSATION',
+       'REFUND_COMPENSATION',
+       'RETURN_COMPENSATION'
+     )
+     or nullif(btrim(coalesce(p_source_key, '')), '') is null
+     or p_amount_minor is null
+     or p_amount_minor <= 0
+     or p_now is null then
+    raise exception 'TUX_ORDER_REWARD_COMPENSATION_INVALID';
+  end if;
+
+  select o.*
+    into v_order
+  from public.orders o
+  where o.id = p_order_id
+  for update;
+  if not found then
+    return;
+  end if;
+
+  select bs.business_id
+    into v_business_id
+  from public.business_shops bs
+  where bs.shop_id = v_order.shop_id
+  limit 1;
+  if v_business_id is null then
+    return;
+  end if;
+
+  if exists (
+    select 1
+    from public.order_reward_compensation_events e
+    where e.business_id = v_business_id
+      and e.source_key = p_source_key
+  ) then
+    return;
+  end if;
+
+  v_order_value_minor := greatest(v_order.total_minor, 1);
+
+  select coalesce(sum(e.effective_amount_minor), 0)
+    into v_prior_effective_minor
+  from public.order_reward_compensation_events e
+  where e.business_id = v_business_id
+    and e.order_id = p_order_id;
+
+  v_effective_minor := least(
+    p_amount_minor,
+    greatest(v_order_value_minor - v_prior_effective_minor, 0)
+  );
+  v_cumulative_effective_minor := least(
+    v_order_value_minor,
+    v_prior_effective_minor + v_effective_minor
+  );
+
+  insert into public.order_reward_compensation_events(
+    business_id,
+    shop_id,
+    order_id,
+    source_key,
+    event_type,
+    requested_amount_minor,
+    effective_amount_minor,
+    created_at
+  ) values (
+    v_business_id,
+    v_order.shop_id,
+    p_order_id,
+    p_source_key,
+    p_event_type,
+    p_amount_minor,
+    v_effective_minor,
+    p_now
+  );
+
+  if v_effective_minor = 0 then
+    return;
+  end if;
+
+  select coalesce(c.merged_into_customer_id, c.id)
+    into v_customer_id
+  from public.loyalty_ledger l
+  join public.business_customers c
+    on c.id = l.customer_id
+   and c.business_id = l.business_id
+  where l.business_id = v_business_id
+    and l.order_id = p_order_id
+    and l.event_type in ('EARN', 'REDEEM')
+  order by l.created_at, l.id
+  limit 1;
+
+  if v_customer_id is not null then
+    perform 1
+    from public.business_customers c
+    where c.business_id = v_business_id
+      and c.id = v_customer_id
+      and c.merged_into_customer_id is null
+    for update;
+  end if;
+
+  select
+    coalesce(sum(case when l.event_type = 'EARN' then greatest(l.points_delta, 0) else 0 end), 0),
+    coalesce(sum(case when l.event_type = 'REDEEM' then greatest(-l.points_delta, 0) else 0 end), 0),
+    max(l.earn_expires_at) filter (where l.event_type = 'EARN')
+    into v_earn_points, v_redeem_points, v_earn_expiry
+  from public.loyalty_ledger l
+  where l.business_id = v_business_id
+    and l.order_id = p_order_id;
+
+  select
+    coalesce(sum(
+      case
+        when l.event_type in (
+          'CANCEL_COMPENSATION',
+          'REFUND_COMPENSATION',
+          'RETURN_COMPENSATION'
+        ) and l.points_delta < 0
+        then -l.points_delta
+        else 0
+      end
+    ), 0),
+    coalesce(sum(
+      case
+        when l.event_type in (
+          'CANCEL_COMPENSATION',
+          'REFUND_COMPENSATION',
+          'RETURN_COMPENSATION'
+        ) and l.points_delta > 0
+        then l.points_delta
+        else 0
+      end
+    ), 0)
+    into v_prior_earn_reversed, v_prior_redeem_restored
+  from public.loyalty_ledger l
+  where l.business_id = v_business_id
+    and l.order_id = p_order_id;
+
+  if v_customer_id is not null and v_earn_points > 0 then
+    v_target_earn_reversed := floor(
+      (v_earn_points::numeric * v_cumulative_effective_minor::numeric)
+      / v_order_value_minor::numeric
+    )::bigint;
+    v_delta := greatest(v_target_earn_reversed - v_prior_earn_reversed, 0);
+
+    if v_delta > 0 then
+      insert into public.loyalty_ledger(
+        business_id,
+        shop_id,
+        customer_id,
+        order_id,
+        entry_key,
+        event_type,
+        points_delta,
+        monetary_value_minor,
+        earn_expires_at,
+        reason_note,
+        source_event_id,
+        created_at
+      ) values (
+        v_business_id,
+        v_order.shop_id,
+        v_customer_id,
+        p_order_id,
+        'order-reward-compensation:' || p_source_key || ':earn',
+        p_event_type,
+        -v_delta,
+        0,
+        v_earn_expiry,
+        'Derived immutable order reward compensation',
+        p_source_key,
+        p_now
+      )
+      on conflict (business_id, entry_key) do nothing;
+    end if;
+  end if;
+
+  if v_customer_id is not null and v_redeem_points > 0 then
+    v_target_redeem_restored := floor(
+      (v_redeem_points::numeric * v_cumulative_effective_minor::numeric)
+      / v_order_value_minor::numeric
+    )::bigint;
+    v_delta := greatest(v_target_redeem_restored - v_prior_redeem_restored, 0);
+
+    if v_delta > 0 then
+      insert into public.loyalty_ledger(
+        business_id,
+        shop_id,
+        customer_id,
+        order_id,
+        entry_key,
+        event_type,
+        points_delta,
+        monetary_value_minor,
+        reason_note,
+        source_event_id,
+        created_at
+      ) values (
+        v_business_id,
+        v_order.shop_id,
+        v_customer_id,
+        p_order_id,
+        'order-reward-compensation:' || p_source_key || ':redeem',
+        p_event_type,
+        v_delta,
+        0,
+        'Derived immutable order reward compensation',
+        p_source_key,
+        p_now
+      )
+      on conflict (business_id, entry_key) do nothing;
+    end if;
+  end if;
+
+  if v_cumulative_effective_minor >= v_order_value_minor then
+    for v_promotion in
+      select distinct on (u.promotion_id)
+        u.promotion_id,
+        u.customer_id,
+        u.applied_rule_snapshot
+      from public.promotion_usage_ledger u
+      where u.business_id = v_business_id
+        and u.order_id = p_order_id
+        and u.event_type = 'APPLY'
+        and u.usage_delta = 1
+      order by u.promotion_id, u.created_at, u.id
+    loop
+      perform 1
+      from public.promotion_rules p
+      where p.id = v_promotion.promotion_id
+        and p.business_id = v_business_id
+      for update;
+
+      insert into public.promotion_usage_ledger(
+        business_id,
+        shop_id,
+        promotion_id,
+        customer_id,
+        order_id,
+        entry_key,
+        usage_delta,
+        event_type,
+        applied_rule_snapshot,
+        created_at
+      ) values (
+        v_business_id,
+        v_order.shop_id,
+        v_promotion.promotion_id,
+        v_promotion.customer_id,
+        p_order_id,
+        'order-reward-compensation:promotion:' || p_order_id::text || ':' ||
+          v_promotion.promotion_id::text,
+        -1,
+        p_event_type,
+        v_promotion.applied_rule_snapshot,
+        p_now
+      )
+      on conflict (business_id, entry_key) do nothing;
+    end loop;
+  end if;
+end;
+$apply_order_reward_compensation$;
+
+revoke all on function private.apply_order_reward_compensation_v1(
+  uuid, text, text, bigint, timestamptz
+) from public, anon, authenticated;
+
+create or replace function private.compensate_terminal_order_rewards_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $compensate_terminal_order_rewards$
+begin
+  if new.status is distinct from old.status and new.status = 'CANCELLED' then
+    perform private.apply_order_reward_compensation_v1(
+      new.id,
+      'CANCEL_COMPENSATION',
+      'order-status:CANCELLED:' || new.id::text,
+      greatest(new.total_minor, 1),
+      coalesce(new.updated_at, now())
+    );
+  elsif new.status is distinct from old.status and new.status = 'RETURNED' then
+    perform private.apply_order_reward_compensation_v1(
+      new.id,
+      'RETURN_COMPENSATION',
+      'order-status:RETURNED:' || new.id::text,
+      greatest(new.total_minor, 1),
+      coalesce(new.updated_at, now())
+    );
+  end if;
+  return new;
+end;
+$compensate_terminal_order_rewards$;
+
+revoke all on function private.compensate_terminal_order_rewards_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists orders_compensate_terminal_rewards on public.orders;
+create trigger orders_compensate_terminal_rewards
+after update of status on public.orders
+for each row execute function private.compensate_terminal_order_rewards_v1();
+
+create or replace function private.compensate_posted_refund_rewards_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $compensate_posted_refund_rewards$
+begin
+  if new.state = 'POSTED'
+     and (tg_op = 'INSERT' or old.state is distinct from 'POSTED') then
+    perform private.apply_order_reward_compensation_v1(
+      new.order_id,
+      'REFUND_COMPENSATION',
+      'admin-refund:' || new.id::text,
+      new.amount_minor,
+      now()
+    );
+  end if;
+  return new;
+end;
+$compensate_posted_refund_rewards$;
+
+revoke all on function private.compensate_posted_refund_rewards_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists admin_order_refunds_compensate_rewards
+  on public.admin_order_refunds;
+create trigger admin_order_refunds_compensate_rewards
+after insert or update of state on public.admin_order_refunds
+for each row execute function private.compensate_posted_refund_rewards_v1();
+
+create or replace function private.compensate_posted_return_item_rewards_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $compensate_posted_return_item_rewards$
+declare
+  v_return public.admin_order_returns%rowtype;
+begin
+  select r.*
+    into v_return
+  from public.admin_order_returns r
+  where r.id = new.return_id;
+
+  if found and v_return.state = 'POSTED' then
+    perform private.apply_order_reward_compensation_v1(
+      v_return.order_id,
+      'RETURN_COMPENSATION',
+      'admin-return-item:' || new.id::text,
+      greatest(new.amount_minor, 1),
+      now()
+    );
+  end if;
+  return new;
+end;
+$compensate_posted_return_item_rewards$;
+
+revoke all on function private.compensate_posted_return_item_rewards_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists admin_order_return_items_compensate_rewards
+  on public.admin_order_return_items;
+create trigger admin_order_return_items_compensate_rewards
+after insert on public.admin_order_return_items
+for each row execute function private.compensate_posted_return_item_rewards_v1();
+
+create or replace function private.compensate_approved_return_rewards_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $compensate_approved_return_rewards$
+declare
+  v_item public.admin_order_return_items%rowtype;
+begin
+  if new.state = 'POSTED' and old.state is distinct from 'POSTED' then
+    for v_item in
+      select i.*
+      from public.admin_order_return_items i
+      where i.return_id = new.id
+      order by i.id
+    loop
+      perform private.apply_order_reward_compensation_v1(
+        new.order_id,
+        'RETURN_COMPENSATION',
+        'admin-return-item:' || v_item.id::text,
+        greatest(v_item.amount_minor, 1),
+        now()
+      );
+    end loop;
+  end if;
+  return new;
+end;
+$compensate_approved_return_rewards$;
+
+revoke all on function private.compensate_approved_return_rewards_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists admin_order_returns_compensate_rewards
+  on public.admin_order_returns;
+create trigger admin_order_returns_compensate_rewards
+after update of state on public.admin_order_returns
+for each row execute function private.compensate_approved_return_rewards_v1();
+
+-- Point expiry is append-only. Debits consume the earliest-expiring earned pool first,
+-- while reward compensation rows carrying an earn expiry reverse their original earn pool.
+create or replace function private.expire_customer_loyalty_points_for_customer_v1(
+  p_business_id uuid,
+  p_customer_id uuid,
+  p_now timestamptz
+)
+returns bigint
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $expire_customer_loyalty_points_for_customer$
+declare
+  v_event record;
+  v_expired_bucket bigint := 0;
+  v_other_bucket bigint := 0;
+  v_debit bigint := 0;
+  v_balance bigint := 0;
+  v_reserved bigint := 0;
+  v_expire_points bigint := 0;
+begin
+  if p_business_id is null or p_customer_id is null or p_now is null then
+    return 0;
+  end if;
+
+  perform 1
+  from public.business_customers c
+  where c.business_id = p_business_id
+    and c.id = p_customer_id
+    and c.merged_into_customer_id is null
+  for update;
+  if not found then
+    return 0;
+  end if;
+
+  for v_event in
+    select
+      l.points_delta,
+      l.earn_expires_at,
+      l.created_at,
+      l.id
+    from public.loyalty_ledger l
+    where l.business_id = p_business_id
+      and l.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = p_business_id
+          and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
+      )
+    order by l.created_at, l.id
+  loop
+    v_balance := v_balance + v_event.points_delta;
+
+    if v_event.points_delta > 0 then
+      if v_event.earn_expires_at is not null
+         and v_event.earn_expires_at <= p_now then
+        v_expired_bucket := v_expired_bucket + v_event.points_delta;
+      else
+        v_other_bucket := v_other_bucket + v_event.points_delta;
+      end if;
+    else
+      v_debit := -v_event.points_delta;
+
+      if v_event.earn_expires_at is not null then
+        if v_event.earn_expires_at <= p_now then
+          v_expired_bucket := greatest(v_expired_bucket - v_debit, 0);
+        else
+          v_other_bucket := greatest(v_other_bucket - v_debit, 0);
+        end if;
+      else
+        if v_expired_bucket >= v_debit then
+          v_expired_bucket := v_expired_bucket - v_debit;
+        else
+          v_debit := v_debit - v_expired_bucket;
+          v_expired_bucket := 0;
+          v_other_bucket := greatest(v_other_bucket - v_debit, 0);
+        end if;
+      end if;
+    end if;
+  end loop;
+
+  select coalesce(sum(r.loyalty_points_reserved), 0)
+    into v_reserved
+  from public.reward_reservations r
+  where r.business_id = p_business_id
+    and r.customer_id = p_customer_id
+    and r.status = 'RESERVED'
+    and r.expires_at > p_now;
+
+  v_expire_points := least(
+    v_expired_bucket,
+    greatest(v_balance - v_reserved, 0)
+  );
+
+  if v_expire_points <= 0 then
+    return 0;
+  end if;
+
+  insert into public.loyalty_ledger(
+    business_id,
+    shop_id,
+    customer_id,
+    order_id,
+    entry_key,
+    event_type,
+    points_delta,
+    monetary_value_minor,
+    reason_note,
+    source_event_id,
+    created_at
+  ) values (
+    p_business_id,
+    null,
+    p_customer_id,
+    null,
+    'loyalty-expiry:' || p_customer_id::text || ':' ||
+      floor(extract(epoch from p_now) * 1000)::bigint::text,
+    'EXPIRY',
+    -v_expire_points,
+    0,
+    'Configured loyalty point expiry',
+    'loyalty-expiry:' || p_customer_id::text,
+    p_now
+  );
+
+  return v_expire_points;
+end;
+$expire_customer_loyalty_points_for_customer$;
+
+revoke all on function private.expire_customer_loyalty_points_for_customer_v1(
+  uuid, uuid, timestamptz
+) from public, anon, authenticated;
+
+create or replace function public.expire_customer_loyalty_points_v1(
+  p_now timestamptz,
+  p_limit integer default 100
+)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $expire_customer_loyalty_points$
+declare
+  v_customer record;
+  v_expired_points bigint;
+  v_count integer := 0;
+begin
+  if p_now is null or p_limit is null or p_limit < 1 or p_limit > 1000 then
+    raise exception 'TUX_LOYALTY_EXPIRY_LIMIT_INVALID';
+  end if;
+
+  for v_customer in
+    select c.business_id, c.id
+    from public.business_customers c
+    where c.merged_into_customer_id is null
+      and exists (
+        select 1
+        from public.loyalty_ledger l
+        join public.business_customers source_customer
+          on source_customer.id = l.customer_id
+         and source_customer.business_id = l.business_id
+        where l.business_id = c.business_id
+          and (
+            source_customer.id = c.id
+            or source_customer.merged_into_customer_id = c.id
+          )
+          and l.points_delta > 0
+          and l.earn_expires_at is not null
+          and l.earn_expires_at <= p_now
+      )
+    order by c.business_id, c.id
+  loop
+    v_expired_points := private.expire_customer_loyalty_points_for_customer_v1(
+      v_customer.business_id,
+      v_customer.id,
+      p_now
+    );
+
+    if v_expired_points > 0 then
+      v_count := v_count + 1;
+      if v_count >= p_limit then
+        exit;
+      end if;
+    end if;
+  end loop;
+
+  return v_count;
+end;
+$expire_customer_loyalty_points$;
+
+revoke all on function public.expire_customer_loyalty_points_v1(timestamptz, integer)
+  from public, anon, authenticated;
+grant execute on function public.expire_customer_loyalty_points_v1(timestamptz, integer)
+  to service_role;
+
