@@ -2624,6 +2624,15 @@ begin
     );
   end if;
 
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) line(value)
+    group by line.value ->> 'inventoryItemId'
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_transfer_item');
+  end if;
+
   for v_line in
     select value from jsonb_array_elements(p_lines)
     order by value ->> 'inventoryItemId'
