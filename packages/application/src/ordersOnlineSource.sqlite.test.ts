@@ -26,6 +26,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import { OperationsOrdersService } from './orders';
+import type { OrderRewardAuthority } from './orderRewards';
 
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const WORKER_ID = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -127,7 +128,7 @@ function configuration(
   };
 }
 
-function draft(intentKey: string): OrderDraft {
+function draft(intentKey: string, reward?: OrderDraft['reward']): OrderDraft {
   return {
     shopId: SHOP_ID,
     businessDayId: DAY_ID,
@@ -151,6 +152,7 @@ function draft(intentKey: string): OrderDraft {
     ],
     orderNote: null,
     discountMinor: moneyMinor(0),
+    ...(reward === undefined ? {} : { reward }),
     delivery: {
       displayPhone: '',
       normalizedPhone: '',
@@ -173,6 +175,7 @@ async function fixture(
   paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
   checkout?: CheckoutFixtureSettings,
   configurationVersion = 1,
+  rewardAuthority?: OrderRewardAuthority,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-source-'));
   temporaryDirectories.push(directory);
@@ -225,6 +228,7 @@ async function fixture(
     },
     new ApplicationCommandCoordinator(),
     { print: async () => ({ ok: true as const }) },
+    rewardAuthority,
   );
 
   return { database, readModel, draftStore, service };
