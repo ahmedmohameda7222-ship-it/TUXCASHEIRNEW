@@ -9,6 +9,7 @@ const EXPECTED_VERIFY_JWT = {
   'operations-config': true,
   'operations-inventory': true,
   'operations-order-lifecycle': true,
+  'operations-order-rewards': true,
   'operations-sync': true,
   'order-intake': false,
   'worker-auth': true,
