@@ -234,7 +234,7 @@ async function loadActionablePurchaseOrders(
           'id,shop_id,supplier_id,status,reference,expected_delivery_date,version,ordered_at,created_at,updated_at',
         business_id: `eq.${businessId}`,
         shop_id: `eq.${shopId}`,
-        status: 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED)',
+        status: 'in.(DRAFT,ORDERED,PARTIALLY_RECEIVED,RECEIVED)',
         order: 'created_at.desc,id.desc',
         limit: String(PURCHASE_ORDER_PAGE_SIZE),
         offset: String(offset),
