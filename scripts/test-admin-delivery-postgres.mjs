@@ -294,7 +294,12 @@ psql(
   [
     '-c',
     `update public.orders
-     set status = 'RETURNED', operational_revision = operational_revision + 1
+     set status = 'RETURNED',
+         operational_revision = operational_revision + 1,
+         returned_at = '2026-09-23T05:20:00Z',
+         returned_by_worker_id = '${WORKER_ID}'::uuid,
+         returned_by_worker_name_snapshot = 'Delivery Worker',
+         return_reason = 'Customer rejected delivery'
      where id = '${ORDER_ID}'::uuid;`,
   ],
   'Simulate canonical Operations delivery return',
