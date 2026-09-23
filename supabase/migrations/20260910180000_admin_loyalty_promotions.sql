@@ -234,6 +234,8 @@ declare
   v_total_reserved bigint := 0;
   v_customer_reserved bigint := 0;
   v_promotion_discount bigint := 0;
+  v_loyalty_discount bigint := 0;
+  v_free_item_price bigint := 0;
   v_snapshot jsonb;
   v_expires_at timestamptz;
 begin
@@ -450,14 +452,36 @@ begin
         floor((p_subtotal_minor::numeric * v_promotion.percent_basis_points) / 10000)::bigint
       );
     else
-      v_promotion_discount := 0;
+      if v_promotion.free_product_id is null
+         or not (v_promotion.free_product_id = any(coalesce(p_product_ids, '{}'::uuid[]))) then
+        return jsonb_build_object('ok', false, 'code', 'reward_not_available');
+      end if;
+      select p.price_minor
+        into v_free_item_price
+      from public.products p
+      where p.id = v_promotion.free_product_id
+        and p.shop_id = p_shop_id
+        and p.active
+        and not p.sold_out;
+      if not found then
+        return jsonb_build_object('ok', false, 'code', 'reward_not_available');
+      end if;
+      v_promotion_discount := least(p_subtotal_minor, v_free_item_price);
     end if;
+  end if;
+
+  if p_loyalty_points > 0 then
+    v_loyalty_discount := p_loyalty_points * v_program.redemption_minor_per_point;
+  end if;
+  if v_promotion_discount + v_loyalty_discount > p_subtotal_minor then
+    return jsonb_build_object('ok', false, 'code', 'reward_exceeds_order_total');
   end if;
 
   v_expires_at := p_now + interval '10 minutes';
   v_snapshot := jsonb_strip_nulls(jsonb_build_object(
     'configurationVersion',
       greatest(coalesce(v_program.version, 0), coalesce(v_promotion.version, 0)),
+    'rewardDiscountMinor', v_promotion_discount + v_loyalty_discount,
     'promotion',
       case when p_promotion_id is null then null else jsonb_build_object(
         'id', v_promotion.id,
@@ -475,7 +499,7 @@ begin
       case when p_loyalty_points = 0 then null else jsonb_build_object(
         'pointsRedeemed', p_loyalty_points,
         'redemptionMinorPerPoint', v_program.redemption_minor_per_point,
-        'redemptionValueMinor', p_loyalty_points * v_program.redemption_minor_per_point
+        'redemptionValueMinor', v_loyalty_discount
       ) end
   ));
 
