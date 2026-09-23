@@ -1,3 +1,5 @@
+import type { AdminOrderFinancialMutationResult } from '@tux/admin-contracts';
+
 import { getAdminServerEnv } from '../env.js';
 import {
   createOrderApprovalExecutionEntries,
@@ -62,7 +64,7 @@ export async function runApprovalExecutionRunner(input: {
 function createOrderApprovalPersistence(client: AdminSupabaseClient) {
   return {
     executeRefund(input: ApprovedRefundExecutionInput) {
-      return client.rpc('execute_approved_admin_order_refund_v1', {
+      return client.rpc<AdminOrderFinancialMutationResult>('execute_approved_admin_order_refund_v1', {
         p_approval_request_id: input.approvalRequestId,
         p_business_id: input.businessId,
         p_shop_id: input.shopId,
@@ -77,7 +79,7 @@ function createOrderApprovalPersistence(client: AdminSupabaseClient) {
       });
     },
     executeReturn(input: ApprovedReturnExecutionInput) {
-      return client.rpc('execute_approved_admin_order_return_v1', {
+      return client.rpc<AdminOrderFinancialMutationResult>('execute_approved_admin_order_return_v1', {
         p_approval_request_id: input.approvalRequestId,
         p_business_id: input.businessId,
         p_shop_id: input.shopId,
