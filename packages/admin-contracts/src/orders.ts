@@ -83,6 +83,17 @@ export type AdminOrderStatusEvent = {
   createdAt: string;
 };
 
+export type AdminOrderFinancialEvent = {
+  id: string;
+  kind: 'REFUND' | 'RETURN';
+  state: 'PENDING_APPROVAL' | 'POSTED';
+  amountMinor: number;
+  approvalRequestId: string | null;
+  reason: AdminOrderReasonSnapshot;
+  note?: string | null;
+  createdAt: string;
+};
+
 export type AdminOrderDetail = {
   id: string;
   shopId: string;
@@ -108,6 +119,7 @@ export type AdminOrderDetail = {
   payments: readonly AdminOrderPayment[];
   items: readonly AdminOrderItem[];
   statusHistory: readonly AdminOrderStatusEvent[];
+  financialEvents: readonly AdminOrderFinancialEvent[];
   inventoryMovements: readonly {
     id: string;
     inventoryItemId: string;
