@@ -627,10 +627,12 @@ function fakeOperationsDatabase() {
       async updateOperationalState(next: OrderSnapshot) {
         stored = next;
       },
-      async getLifecycleSyncCursor(_shopId: ShopId) {
+      async getLifecycleSyncCursor(shopId: ShopId) {
+        void shopId;
         return cursor;
       },
-      async setLifecycleSyncCursor(_shopId: ShopId, next: string) {
+      async setLifecycleSyncCursor(shopId: ShopId, next: string) {
+        void shopId;
         cursor = next;
       },
     },

@@ -6,7 +6,7 @@ export class CustomerPhoneError extends Error {
 }
 
 export function canonicalizeEgyptPhone(input: string): string {
-  const compact = input.trim().replace(/[\s()\-]/g, '');
+  const compact = input.trim().replace(/[\s()-]/g, '');
   let canonical: string;
 
   if (compact.startsWith('+20')) {

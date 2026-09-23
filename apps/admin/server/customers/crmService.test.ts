@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type {
   AdminCustomerDetail,
-  AdminLoyaltyProgram,
   AdminPromotion,
   AdminSessionPrincipal,
 } from '@tux/admin-contracts';

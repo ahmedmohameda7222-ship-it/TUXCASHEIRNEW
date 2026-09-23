@@ -37,29 +37,25 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
     mutationFn: async (promotion: AdminPromotionUpsertInput) => {
       const intent = { shopId, promotion };
       const commandId = commandIds.forIntent('promotion.upsert', intent);
-      try {
-        const result = await adminFetch<{
-          ok: boolean;
-          code?: string;
-          promotionId?: string;
-        }>(
-          '/api/admin/customers?surface=crm',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              type: 'promotion.upsert',
-              shopId,
-              promotion,
-              commandId,
-            }),
-          },
-          csrfToken(session),
-        );
-        commandIds.complete('promotion.upsert', intent);
-        return result;
-      } catch (error) {
-        throw error;
-      }
+      const result = await adminFetch<{
+        ok: boolean;
+        code?: string;
+        promotionId?: string;
+      }>(
+        '/api/admin/customers?surface=crm',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'promotion.upsert',
+            shopId,
+            promotion,
+            commandId,
+          }),
+        },
+        csrfToken(session),
+      );
+      commandIds.complete('promotion.upsert', intent);
+      return result;
     },
     onSuccess: async () => {
       setCreating(false);

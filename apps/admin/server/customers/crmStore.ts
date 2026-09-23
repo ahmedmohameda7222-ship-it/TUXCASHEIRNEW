@@ -1,7 +1,6 @@
 import type {
   AdminLoyaltyAdjustmentResult,
   AdminLoyaltyLedgerEvent,
-  AdminLoyaltyProgram,
   AdminPromotion,
   AdminPromotionMutationResult,
 } from '@tux/admin-contracts';
