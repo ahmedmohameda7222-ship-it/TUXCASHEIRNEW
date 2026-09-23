@@ -49,14 +49,14 @@ describe('loyalty and promotion rules', () => {
           | { ok: true; discountMinor: number; freeProductId: string | null }
           | { ok: false; code: string };
         validatePromotionStack?: (
-          rules: readonly Array<{ stackingPolicy: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' }>,
+          rules: ReadonlyArray<{ stackingPolicy: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' }>,
         ) => { ok: true } | { ok: false; code: string };
       }
     ).evaluatePromotionReward;
     const validatePromotionStack = (
       loyaltyModule as unknown as {
         validatePromotionStack?: (
-          rules: readonly Array<{ stackingPolicy: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' }>,
+          rules: ReadonlyArray<{ stackingPolicy: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' }>,
         ) => { ok: true } | { ok: false; code: string };
       }
     ).validatePromotionStack;
