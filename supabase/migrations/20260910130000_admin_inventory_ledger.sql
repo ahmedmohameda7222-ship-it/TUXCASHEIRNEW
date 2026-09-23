@@ -2286,6 +2286,15 @@ begin
     );
   end loop;
 
+  if exists (
+    select 1
+    from jsonb_array_elements(p_inventory_item_ids) submitted(value)
+    group by trim(both '"' from submitted.value::text)::uuid
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_stocktake_item');
+  end if;
+
   v_stocktake_id := gen_random_uuid();
   insert into public.stocktakes(
     id, shop_id, created_by_employee_id, status, command_id
