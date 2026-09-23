@@ -1006,6 +1006,107 @@ $cancel_restock_set$;
 revoke all on function private.assert_order_inventory_cancel_restock_set_v1(uuid, uuid, jsonb)
   from public, anon, authenticated;
 
+create or replace function private.assert_order_terminal_inventory_set_v1(
+  p_shop_id uuid,
+  p_order_id uuid,
+  p_event_type text,
+  p_envelope jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $terminal_inventory_set$
+declare
+  v_expected_movement_type text;
+  v_mismatch boolean;
+begin
+  if p_shop_id is null
+     or p_order_id is null
+     or jsonb_typeof(p_envelope #> '{payload,inventoryMovements}') is distinct from 'array' then
+    raise exception 'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH';
+  end if;
+
+  if p_event_type = 'ORDER_MARKED_DONE' then
+    v_expected_movement_type := 'ORDER_CONSUMPTION';
+  elsif p_event_type = 'ORDER_CANCELLED' then
+    if p_envelope #>> '{payload,transition,foodPrepared}' = 'true'
+       and p_envelope #>> '{payload,transition,stockRestored}' = 'false' then
+      v_expected_movement_type := 'ORDER_CONSUMPTION';
+    elsif p_envelope #>> '{payload,transition,foodPrepared}' = 'false'
+       and p_envelope #>> '{payload,transition,stockRestored}' = 'true' then
+      v_expected_movement_type := 'ORDER_RESERVATION_RELEASE';
+    else
+      raise exception 'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH';
+    end if;
+  elsif p_event_type = 'DELIVERY_RETURNED' then
+    v_expected_movement_type := null;
+  else
+    raise exception 'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH';
+  end if;
+
+  begin
+    with canonical as (
+      select
+        m.inventory_item_id,
+        sum(m.reserved_delta_micros) as reserved_micros
+      from public.inventory_movements m
+      where m.shop_id = p_shop_id
+        and m.order_id = p_order_id
+      group by m.inventory_item_id
+      having coalesce(sum(m.reserved_delta_micros), 0) <> 0
+    ),
+    submitted as (
+      select
+        (movement.value ->> 'itemId')::uuid as inventory_item_id,
+        movement.value ->> 'movementType' as movement_type,
+        (movement.value ->> 'quantityDeltaMicros')::numeric as quantity_micros,
+        coalesce((movement.value ->> 'reservedDeltaMicros')::numeric, 0) as reserved_micros
+      from jsonb_array_elements(p_envelope #> '{payload,inventoryMovements}') movement
+      where movement.value ->> 'movementType' in (
+        'ORDER_CONSUMPTION',
+        'ORDER_RESERVATION_RELEASE'
+      )
+    )
+    select
+      exists (
+        select 1
+        from canonical c
+        full join submitted s using (inventory_item_id)
+        where c.inventory_item_id is null
+           or s.inventory_item_id is null
+           or c.reserved_micros <= 0
+           or s.movement_type is distinct from v_expected_movement_type
+           or s.reserved_micros is distinct from -c.reserved_micros
+           or (
+             v_expected_movement_type = 'ORDER_CONSUMPTION'
+             and s.quantity_micros is distinct from -c.reserved_micros
+           )
+           or (
+             v_expected_movement_type = 'ORDER_RESERVATION_RELEASE'
+             and s.quantity_micros is distinct from 0::numeric
+           )
+           or v_expected_movement_type is null
+      )
+      or (
+        select count(*) <> count(distinct s.inventory_item_id)
+        from submitted s
+      )
+    into v_mismatch;
+
+    if coalesce(v_mismatch, false) then
+      raise exception 'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH';
+    end if;
+  exception
+    when invalid_text_representation or numeric_value_out_of_range then
+      raise exception 'TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH';
+  end;
+end;
+$terminal_inventory_set$;
+
+revoke all on function private.assert_order_terminal_inventory_set_v1(uuid, uuid, text, jsonb)
+  from public, anon, authenticated;
+
 create or replace function private.assert_order_inventory_reservations_settled_v1(
   p_shop_id uuid,
   p_order_id uuid
@@ -2091,6 +2192,20 @@ begin
   ) then
     perform private.assert_order_transition_precondition_v1(
       v_shop_id,
+      p_envelope
+    );
+  end if;
+
+  if v_event_type in ('ORDER_MARKED_DONE', 'ORDER_CANCELLED', 'DELIVERY_RETURNED') then
+    begin
+      v_order_id := (p_envelope #>> '{payload,order,id}')::uuid;
+    exception when others then
+      raise exception 'TUX_SYNC_PROTOCOL_INVALID';
+    end;
+    perform private.assert_order_terminal_inventory_set_v1(
+      v_shop_id,
+      v_order_id,
+      v_event_type,
       p_envelope
     );
   end if;

@@ -104,6 +104,7 @@ Deno.serve(async (request) => {
       message.includes('TUX_SYNC_') ||
       message.includes('TUX_CONFIGURATION_') ||
       message.includes('TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH') ||
+      message.includes('TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH') ||
       message.includes('TUX_INVENTORY_RESERVATION_NOT_SETTLED') ||
       message.includes('TUX_INVENTORY_UNDO_REVERSAL_MISMATCH') ||
       message.includes('TUX_INVENTORY_BULK_UNDO_MISMATCH') ||
