@@ -147,7 +147,6 @@ export function validatePromotion(
   return { ok: true };
 }
 
-
 export type PromotionRewardResult =
   | {
       readonly ok: true;
@@ -202,7 +201,11 @@ export function evaluatePromotionReward(
     }
     case 'FREE_ITEM': {
       const freeProductId = rule.freeProductId;
-      if (freeProductId === null || freeProductId === undefined || freeProductId.trim().length === 0) {
+      if (
+        freeProductId === null ||
+        freeProductId === undefined ||
+        freeProductId.trim().length === 0
+      ) {
         return { ok: false, code: 'promotion_invalid_configuration' };
       }
       return { ok: true, discountMinor: 0, freeProductId };
@@ -212,7 +215,9 @@ export function evaluatePromotionReward(
 
 export function validatePromotionStack(
   rules: readonly Pick<PromotionRule, 'stackingPolicy'>[],
-): { readonly ok: true } | { readonly ok: false; readonly code: 'promotion_stacking_not_allowed' } {
+):
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: 'promotion_stacking_not_allowed' } {
   if (rules.length <= 1) return { ok: true };
   const allExplicitlyStackable = rules.every(
     (rule) => rule.stackingPolicy === 'ALLOW_CONFIGURED',
