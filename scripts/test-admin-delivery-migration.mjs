@@ -26,6 +26,12 @@ const requiredPatterns = [
   [/unique\s*\(business_id,\s*command_id\)/i, 'durable transition idempotency'],
   [/revoke all on function public\.transition_admin_delivery_order_v1/i, 'browser transition RPC denial'],
   [/grant execute on function public\.transition_admin_delivery_order_v1/i, 'trusted transition grant'],
+  [/create or replace function public\.list_tux_online_order_requests_v1/i, 'delivery authority inbox projection'],
+  [/create or replace function public\.claim_tux_online_order_request_v1/i, 'delivery authority claim projection'],
+  [/deliveryZoneId/i, 'canonical delivery zone transport'],
+  [/deliveryFeeMinor/i, 'canonical delivery fee transport'],
+  [/deliveryMinimumOrderMinor/i, 'canonical delivery minimum transport'],
+  [/deliveryFallbackUsed/i, 'canonical delivery fallback transport'],
 ];
 
 for (const [pattern, label] of requiredPatterns) {
