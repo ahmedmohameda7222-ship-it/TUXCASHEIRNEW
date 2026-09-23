@@ -12,7 +12,7 @@ import {
   type ShopId,
 } from './ids';
 import { moneyMinor } from './money';
-import type { DraftOrderLine, OrderDraft, PaymentDraft } from './orderDraft';
+import type { DraftOrderLine, OrderDraft, OrderRewardRequest, PaymentDraft } from './orderDraft';
 import { instant } from './time';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -147,6 +147,22 @@ function nullableMoney(value: unknown, path: string) {
   return moneyMinor(safeInteger(value, path));
 }
 
+function parseReward(value: unknown): OrderRewardRequest | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const reward = record(value, 'OrderDraft.reward');
+  const promotionId = reward['promotionId'];
+  return {
+    promotionId:
+      promotionId === null ? null : uuid(promotionId, 'OrderDraft.reward.promotionId'),
+    loyaltyPointsToRedeem: safeInteger(
+      reward['loyaltyPointsToRedeem'],
+      'OrderDraft.reward.loyaltyPointsToRedeem',
+      0,
+    ),
+  };
+}
+
 function parsePayment(value: unknown): PaymentDraft {
   const payment = record(value, 'OrderDraft.payment');
   const mode = stringValue(payment['mode'], 'OrderDraft.payment.mode', false);
@@ -207,6 +223,7 @@ export function parseOrderDraft(value: unknown): OrderDraft {
     const delivery = record(draft['delivery'], 'OrderDraft.delivery');
     const zoneId = delivery['zoneId'];
     const orderTypeId = draft['orderTypeId'];
+    const reward = parseReward(draft['reward']);
     return {
       shopId: entityId<ShopId>(draft['shopId'], 'OrderDraft.shopId'),
       businessDayId: entityId<BusinessDayId>(draft['businessDayId'], 'OrderDraft.businessDayId'),
@@ -219,6 +236,7 @@ export function parseOrderDraft(value: unknown): OrderDraft {
       lines: parseLines(draft['lines']),
       orderNote: nullableString(draft['orderNote'], 'OrderDraft.orderNote'),
       discountMinor: moneyMinor(safeInteger(draft['discountMinor'], 'OrderDraft.discountMinor')),
+      ...(reward === undefined ? {} : { reward }),
       delivery: {
         displayPhone: stringValue(delivery['displayPhone'], 'OrderDraft.delivery.displayPhone'),
         normalizedPhone: stringValue(
