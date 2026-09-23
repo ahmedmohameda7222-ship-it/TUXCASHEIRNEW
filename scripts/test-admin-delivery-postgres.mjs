@@ -80,6 +80,7 @@ const DAY_ID = '84000000-0000-4000-8000-000000000001';
 const CATEGORY_ID = '85000000-0000-4000-8000-000000000001';
 const PRODUCT_ID = '86000000-0000-4000-8000-000000000001';
 const ORDER_TYPE_ID = '87000000-0000-4000-8000-000000000001';
+const ZONE_ID = '87500000-0000-4000-8000-000000000001';
 const ORDER_ID = '88000000-0000-4000-8000-000000000001';
 
 psql(
@@ -114,6 +115,8 @@ psql(
      );
      insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
        values ('${ORDER_TYPE_ID}', '${SHOP_ID}', 'Delivery', 'DELIVERY', true, 0);
+     insert into public.delivery_zones(id, shop_id, name, fee_minor, active, sort_order)
+       values ('${ZONE_ID}', '${SHOP_ID}', 'Maadi Core', 2500, true, 0);
      insert into public.orders(
        id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
        operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
@@ -124,7 +127,8 @@ psql(
      ) values (
        '${ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 1, 'delivery-order-1', 'POS', 'DONE',
        '${WORKER_ID}', 'Delivery Worker', '${ORDER_TYPE_ID}', 'Delivery',
-       'DELIVERY', null, null, null, 'Road 9, Maadi', null, null, 2500, 2500,
+       'DELIVERY', null, 'Test Customer', '+201000000003', 'Road 9, Maadi',
+       '${ZONE_ID}', 'Maadi Core', 2500, 2500,
        5000, 0, 7500, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
      );`,
   ],
