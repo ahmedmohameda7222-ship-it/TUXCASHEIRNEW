@@ -86,6 +86,8 @@ function storeWith(input: {
           }
         : {},
     }),
+    upsertZone: vi.fn(),
+    upsertRider: vi.fn(),
     transitionOrder: vi.fn(),
   };
 }
