@@ -1,3 +1,42 @@
+-- Trusted ONLINE delivery checkout snapshots.
+alter table public.online_order_requests
+  add column if not exists requested_shop_id uuid references public.shops(id) on delete restrict,
+  add column if not exists delivery_latitude double precision,
+  add column if not exists delivery_longitude double precision,
+  add column if not exists delivery_zone_id uuid references public.delivery_zones(id) on delete restrict,
+  add column if not exists delivery_zone_name text,
+  add column if not exists delivery_fee_minor bigint,
+  add column if not exists delivery_minimum_order_minor bigint,
+  add column if not exists delivery_fallback_used boolean not null default false,
+  add column if not exists delivery_routing_snapshot jsonb;
+
+alter table public.online_order_requests
+  drop constraint if exists online_order_requests_delivery_coordinates_check;
+alter table public.online_order_requests
+  add constraint online_order_requests_delivery_coordinates_check
+  check (
+    (delivery_latitude is null and delivery_longitude is null)
+    or (
+      delivery_latitude between -90 and 90
+      and delivery_longitude between -180 and 180
+    )
+  );
+
+alter table public.online_order_requests
+  drop constraint if exists online_order_requests_delivery_fee_check;
+alter table public.online_order_requests
+  add constraint online_order_requests_delivery_fee_check
+  check (
+    (delivery_fee_minor is null or delivery_fee_minor >= 0)
+    and (delivery_minimum_order_minor is null or delivery_minimum_order_minor >= 0)
+  );
+
+create unique index if not exists online_order_requests_requested_shop_idempotency_uidx
+  on public.online_order_requests (
+    coalesce(requested_shop_id, shop_id),
+    idempotency_key
+  );
+
 -- TUX Admin Plan 5: delivery routing authority and rider lifecycle.
 -- Repository-only migration. Production promotion is a separate checkpoint.
 

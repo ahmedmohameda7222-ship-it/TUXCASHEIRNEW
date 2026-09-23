@@ -1,11 +1,18 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
+  resolveDeliveryRouting,
+  type DeliveryRoutingBoundary,
+  type DeliveryRoutingHours,
+  type DeliveryRoutingZone,
+} from '../../../packages/domain/src/deliveryRouting.ts';
+import {
   handleOrderIntakeRequest,
   type OnlineOrderCatalogAuthority,
   type OnlineOrderCatalogCategory,
   type OnlineOrderCatalogModifier,
   type OnlineOrderCatalogProduct,
   type OnlineOrderComboBeverageOption,
+  type OnlineOrderDeliveryRouteResult,
   type OnlineOrderIntakeStore,
   type OnlineOrderPendingInsert,
   type OnlineOrderProductModifierLink,
@@ -42,6 +49,87 @@ function nullablePositiveInteger(value: unknown, label: string): number | null {
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error(`${label} is invalid`);
   return parsed;
+}
+
+function integerField(value: unknown, label: string): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${label} is invalid`);
+  return parsed;
+}
+
+function deliveryBoundary(value: unknown): DeliveryRoutingBoundary | null {
+  if (value === null) return null;
+  const source = record(value, 'delivery zone boundary');
+  if (source.kind === 'RADIUS') {
+    const latitude = Number(source.latitude);
+    const longitude = Number(source.longitude);
+    const radiusMeters = Number(source.radiusMeters);
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180 ||
+      !Number.isFinite(radiusMeters) ||
+      radiusMeters <= 0
+    ) {
+      throw new Error('delivery zone radius boundary is invalid');
+    }
+    return { kind: 'RADIUS', latitude, longitude, radiusMeters };
+  }
+  if (source.kind === 'POLYGON' && Array.isArray(source.points) && source.points.length >= 3) {
+    const points = source.points.map((value) => {
+      const point = record(value, 'delivery zone polygon point');
+      const latitude = Number(point.latitude);
+      const longitude = Number(point.longitude);
+      if (
+        !Number.isFinite(latitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        !Number.isFinite(longitude) ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        throw new Error('delivery zone polygon point is invalid');
+      }
+      return { latitude, longitude };
+    });
+    return { kind: 'POLYGON', points };
+  }
+  throw new Error('delivery zone boundary is invalid');
+}
+
+function mapDeliveryZone(value: unknown): DeliveryRoutingZone {
+  const row = record(value, 'delivery zone');
+  return {
+    id: stringField(row.id, 'delivery zone.id'),
+    name: stringField(row.name, 'delivery zone.name'),
+    feeMinor: moneyField(row.fee_minor, 'delivery zone.fee_minor'),
+    minimumOrderMinor: moneyField(
+      row.minimum_order_minor,
+      'delivery zone.minimum_order_minor',
+    ),
+    priority: integerField(row.priority, 'delivery zone.priority'),
+    active: booleanField(row.active, 'delivery zone.active'),
+    boundary: deliveryBoundary(row.boundary_json),
+    fallbackShopId:
+      row.fallback_shop_id === null
+        ? null
+        : stringField(row.fallback_shop_id, 'delivery zone.fallback_shop_id'),
+    fallbackEnabled: booleanField(row.fallback_enabled, 'delivery zone.fallback_enabled'),
+    sortOrder: integerField(row.sort_order, 'delivery zone.sort_order'),
+  };
+}
+
+function mapDeliveryHours(value: unknown): DeliveryRoutingHours {
+  const row = record(value, 'delivery hours');
+  return {
+    dayOfWeek: integerField(row.day_of_week, 'delivery hours.day_of_week'),
+    opensLocal: stringField(row.opens_local, 'delivery hours.opens_local'),
+    closesLocal: stringField(row.closes_local, 'delivery hours.closes_local'),
+    active: booleanField(row.active, 'delivery hours.active'),
+  };
 }
 
 class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
@@ -182,6 +270,115 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
     return projectPublishedCheckoutAuthority(row.bundle_json, shopId);
   }
 
+  async resolveDeliveryRoute(input: {
+    requestedShopId: string;
+    latitude: number;
+    longitude: number;
+    subtotalMinor: number;
+    at: string;
+  }): Promise<OnlineOrderDeliveryRouteResult> {
+    const membership = await this.client
+      .from('business_shops')
+      .select('business_id')
+      .eq('shop_id', input.requestedShopId)
+      .limit(1)
+      .maybeSingle();
+    if (membership.error) throw membership.error;
+    if (!membership.data) return { ok: false, code: 'delivery_unavailable' };
+    const businessId = stringField(record(membership.data, 'business shop').business_id, 'business_id');
+
+    const loadShop = async (shopId: string): Promise<boolean> => {
+      const result = await this.client
+        .from('shops')
+        .select('active,lifecycle_state,temporary_closed')
+        .eq('id', shopId)
+        .maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) return false;
+      const row = record(result.data, 'delivery shop');
+      return (
+        booleanField(row.active, 'delivery shop.active') &&
+        row.lifecycle_state !== 'ARCHIVED' &&
+        !booleanField(row.temporary_closed, 'delivery shop.temporary_closed')
+      );
+    };
+    const loadHours = async (shopId: string): Promise<DeliveryRoutingHours[]> => {
+      const result = await this.client
+        .from('shop_weekly_hours')
+        .select('day_of_week,opens_local,closes_local,active')
+        .eq('business_id', businessId)
+        .eq('shop_id', shopId)
+        .eq('service_kind', 'DELIVERY');
+      if (result.error) throw result.error;
+      return (result.data ?? []).map(mapDeliveryHours);
+    };
+    const loadZones = async (shopId: string): Promise<DeliveryRoutingZone[]> => {
+      const result = await this.client
+        .from('delivery_zones')
+        .select(
+          'id,name,fee_minor,minimum_order_minor,priority,active,boundary_json,fallback_shop_id,fallback_enabled,sort_order',
+        )
+        .eq('shop_id', shopId);
+      if (result.error) throw result.error;
+      return (result.data ?? []).map(mapDeliveryZone);
+    };
+
+    const [requestedShopAvailable, requestedShopHours, zones] = await Promise.all([
+      loadShop(input.requestedShopId),
+      loadHours(input.requestedShopId),
+      loadZones(input.requestedShopId),
+    ]);
+    const fallbackIds = [
+      ...new Set(
+        zones
+          .filter((zone) => zone.fallbackEnabled && zone.fallbackShopId !== null)
+          .map((zone) => zone.fallbackShopId!),
+      ),
+    ];
+    const fallbackShops: Record<
+      string,
+      {
+        available: boolean;
+        hours: DeliveryRoutingHours[];
+        zones: DeliveryRoutingZone[];
+      }
+    > = {};
+    if (fallbackIds.length > 0) {
+      const allowed = await this.client
+        .from('business_shops')
+        .select('shop_id')
+        .eq('business_id', businessId)
+        .in('shop_id', fallbackIds);
+      if (allowed.error) throw allowed.error;
+      const allowedIds = new Set(
+        (allowed.data ?? []).map((value) =>
+          stringField(record(value, 'fallback membership').shop_id, 'fallback shop_id'),
+        ),
+      );
+      await Promise.all(
+        fallbackIds
+          .filter((shopId) => allowedIds.has(shopId))
+          .map(async (shopId) => {
+            const [available, hours, fallbackZones] = await Promise.all([
+              loadShop(shopId),
+              loadHours(shopId),
+              loadZones(shopId),
+            ]);
+            fallbackShops[shopId] = { available, hours, zones: fallbackZones };
+          }),
+      );
+    }
+    return resolveDeliveryRouting(
+      {
+        requestedShopAvailable,
+        requestedShopHours,
+        zones,
+        fallbackShops,
+      },
+      input,
+    );
+  }
+
   async findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -227,6 +424,15 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       customer_name: recordToInsert.customerName,
       normalized_phone: recordToInsert.normalizedPhone,
       delivery_address: recordToInsert.deliveryAddress,
+      delivery_latitude: recordToInsert.deliveryLatitude,
+      delivery_longitude: recordToInsert.deliveryLongitude,
+      delivery_zone_id: recordToInsert.deliveryZoneId,
+      delivery_zone_name: recordToInsert.deliveryZoneName,
+      delivery_fee_minor: recordToInsert.deliveryFeeMinor,
+      delivery_minimum_order_minor: recordToInsert.deliveryMinimumOrderMinor,
+      delivery_fallback_used: recordToInsert.deliveryFallbackUsed,
+      delivery_routing_snapshot: recordToInsert.deliveryRoutingSnapshot,
+      requested_shop_id: recordToInsert.shopId,
       trusted_items: recordToInsert.trustedItems,
       items_subtotal_minor: recordToInsert.itemsSubtotalMinor,
       order_note: recordToInsert.orderNote,

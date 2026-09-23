@@ -780,6 +780,20 @@ export async function handleOrderIntakeRequest(
     const trusted = buildTrustedItems(parsed, catalog);
     if (trusted instanceof Response) return trusted;
 
+    const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
+    if (!loadPublishedCheckoutAuthority) {
+      return errorResponse(503, 'published_configuration_unavailable');
+    }
+    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
+    if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
+    const policyError = publishedCheckoutPolicyError(
+      parsed,
+      trusted.itemsSubtotalMinor,
+      normalizedPhone,
+      checkoutAuthority,
+    );
+    if (policyError) return policyError;
+
     let deliveryRoute: Extract<OnlineOrderDeliveryRouteResult, { ok: true }> | null = null;
     if (parsed.fulfillmentPreference === 'DELIVERY') {
       if (parsed.deliveryLocation === undefined) {
@@ -803,19 +817,6 @@ export async function handleOrderIntakeRequest(
       deliveryRoute = resolved;
     }
 
-    const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
-    if (!loadPublishedCheckoutAuthority) {
-      return errorResponse(503, 'published_configuration_unavailable');
-    }
-    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
-    if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
-    const policyError = publishedCheckoutPolicyError(
-      parsed,
-      trusted.itemsSubtotalMinor,
-      normalizedPhone,
-      checkoutAuthority,
-    );
-    if (policyError) return policyError;
 
     const catalogRevision = await sha256Hex(canonicalCatalogForRevision(catalog));
     const record: OnlineOrderPendingInsert = {
