@@ -23,7 +23,7 @@ function request(
     customerName: 'Online Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: null,
-    requestedShopId: SHOP_ID,
+    requestedShopId: shopId,
     deliveryZoneId: null,
     deliveryZoneName: null,
     deliveryFeeMinor: null,
