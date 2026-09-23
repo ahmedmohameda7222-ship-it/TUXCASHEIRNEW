@@ -207,6 +207,7 @@ export function CustomersPage() {
   const detail = detailQuery.data;
   const canMerge = principal.permissions.includes('customers.merge');
   const canManageLoyalty = principal.permissions.includes('loyalty.manage');
+  const canManagePromotions = principal.permissions.includes('promotions.manage');
 
   return (
     <PageScaffold
@@ -388,7 +389,7 @@ export function CustomersPage() {
         </form>
       ) : null}
 
-      <PromotionsPage shopId={shopId} />
+      {canManagePromotions ? <PromotionsPage shopId={shopId} /> : null}
 
       {adjustLoyalty.isError ||
       mergeCustomer.isError ||
