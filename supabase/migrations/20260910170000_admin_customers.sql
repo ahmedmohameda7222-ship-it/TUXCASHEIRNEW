@@ -41,6 +41,7 @@ create table public.business_customers (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (business_id, normalized_phone),
+  unique (business_id, id),
   check (merged_into_customer_id is null or merged_into_customer_id <> id)
 );
 
