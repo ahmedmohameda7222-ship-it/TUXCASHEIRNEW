@@ -61,6 +61,7 @@ function fixtureStore(): OrderStore {
         items: [],
         statusHistory: [],
         inventoryMovements: [],
+        financialEvents: [],
         auditEvents: [],
       };
     },
