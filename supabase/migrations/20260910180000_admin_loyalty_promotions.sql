@@ -478,7 +478,7 @@ begin
   end if;
 
   v_expires_at := p_now + interval '10 minutes';
-  v_snapshot := jsonb_strip_nulls(jsonb_build_object(
+  v_snapshot := jsonb_build_object(
     'configurationVersion',
       greatest(coalesce(v_program.version, 0), coalesce(v_promotion.version, 0)),
     'rewardDiscountMinor', v_promotion_discount + v_loyalty_discount,
@@ -501,7 +501,7 @@ begin
         'redemptionMinorPerPoint', v_program.redemption_minor_per_point,
         'redemptionValueMinor', v_loyalty_discount
       ) end
-  ));
+  );
 
   if v_existing.id is null then
     insert into public.reward_reservations(
