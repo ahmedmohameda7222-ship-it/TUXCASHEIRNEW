@@ -88,7 +88,9 @@ export function DeliveryOrderPanel({
                 riderId:
                   next === 'ASSIGNED'
                     ? riderId || null
-                    : order.riderId,
+                    : next === 'UNASSIGNED'
+                      ? null
+                      : order.riderId,
                 expectedVersion: order.version,
                 toState: next,
                 note: note.trim() || null,
