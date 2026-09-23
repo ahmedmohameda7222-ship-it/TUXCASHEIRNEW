@@ -65,6 +65,7 @@ type PeriodMovementRow = {
 type OrderStatusRow = {
   id: string;
   status: string;
+  cancellation_food_prepared: boolean | null;
 };
 
 type PurchaseOrderRow = {
@@ -278,7 +279,7 @@ async function loadOrderStatuses(
       const page = await client.select<OrderStatusRow[]>(
         'orders',
         new URLSearchParams({
-          select: 'id,status',
+          select: 'id,status,cancellation_food_prepared',
           id: `in.(${batch.join(',')})`,
           order: 'id.asc',
           limit: String(batch.length),
@@ -324,7 +325,7 @@ export async function loadInventoryIntelligence(
     ),
   ];
   const orderRows = orderIds.length === 0 ? [] : await loadOrderStatuses(client, orderIds);
-  const orderStatus = new Map(orderRows.map((row) => [row.id, row.status]));
+  const orderStatus = new Map(orderRows.map((row) => [row.id, row]));
 
   const openPurchaseOrderIds = new Set(
     purchaseOrderRows
@@ -417,8 +418,14 @@ export async function loadInventoryIntelligence(
     }
     if (
       movement.order_id !== null &&
-      (orderStatus.get(movement.order_id) === 'DONE' ||
-        orderStatus.get(movement.order_id) === 'RETURNED') &&
+      (() => {
+        const order = orderStatus.get(movement.order_id);
+        return (
+          order?.status === 'DONE' ||
+          order?.status === 'RETURNED' ||
+          (order?.status === 'CANCELLED' && order.cancellation_food_prepared === true)
+        );
+      })() &&
       (movement.movement_type === 'ORDER_CONSUMPTION' ||
         movement.movement_type === 'ORDER_CONSUMPTION_REVERSAL')
     ) {
