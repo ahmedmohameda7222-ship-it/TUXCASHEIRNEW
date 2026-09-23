@@ -439,6 +439,14 @@ export function prepareOnlineOrderAcceptanceDraft(
     lines,
     orderNote: request.orderNote,
     discountMinor: moneyMinor(0),
+    ...((request.promotionId ?? null) === null && (request.loyaltyPointsToRedeem ?? 0) === 0
+      ? {}
+      : {
+          reward: {
+            promotionId: request.promotionId ?? null,
+            loyaltyPointsToRedeem: request.loyaltyPointsToRedeem ?? 0,
+          },
+        }),
     delivery,
     payment: confirmation.payment,
   };
