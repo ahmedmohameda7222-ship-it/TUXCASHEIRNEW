@@ -86,6 +86,7 @@ const ITEM_ID = '5a000000-0000-4000-8000-000000000001';
 const PAYMENT_ID = '5b000000-0000-4000-8000-000000000001';
 const REASON_ID = '5c000000-0000-4000-8000-000000000001';
 const RULE_ID = '5d000000-0000-4000-8000-000000000001';
+const RETURN_RULE_ID = '5d000000-0000-4000-8000-000000000002';
 
 psql(
   [
@@ -113,7 +114,7 @@ psql(
        id, shop_id, category_id, name, price_minor, active, sold_out, is_combo, sort_order
      ) values (
        '${PRODUCT_ID}', '${SHOP_ID}', '${CATEGORY_ID}', 'Approval Burger',
-       10000, true, false, false, 0
+       5000, true, false, false, 0
      );
      insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
        values ('${ORDER_TYPE_ID}', '${SHOP_ID}', 'Take Away', 'TAKE_AWAY', true, 0);
@@ -133,14 +134,14 @@ psql(
        '${ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 1, 'approval-order-1', 'POS', 'DONE',
        '${WORKER_ID}', 'Order Worker', '${ORDER_TYPE_ID}', 'Take Away',
        'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
-       10000, 0, 10000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
+       20000, 0, 20000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
      );
      insert into public.order_items(
        id, shop_id, order_id, product_id, product_name_snapshot,
        unit_price_minor, quantity, item_note, line_position
      ) values (
        '${ITEM_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PRODUCT_ID}',
-       'Approval Burger', 10000, 1, null, 0
+       'Approval Burger', 5000, 4, null, 0
      );
      insert into public.payments(
        id, shop_id, order_id, part_index, payment_method_id,
@@ -148,7 +149,7 @@ psql(
        received_minor, change_minor, created_at
      ) values (
        '${PAYMENT_ID}', '${SHOP_ID}', '${ORDER_ID}', 1, '${PAYMENT_METHOD_ID}',
-       'Card', 'CARD', 10000, null, null, '2026-09-23T05:10:00Z'
+       'Card', 'CARD', 20000, null, null, '2026-09-23T05:10:00Z'
      );
      insert into public.admin_reason_codes(
        id, business_id, shop_id, reason_key, family, label, active,
@@ -160,10 +161,16 @@ psql(
      insert into public.admin_approval_rules(
        id, business_id, shop_id, action_type, requester_permission,
        approver_permission, requires_second_person, threshold_context, active
-     ) values (
-       '${RULE_ID}', '${BUSINESS_ID}', '${SHOP_ID}', 'ORDER_REFUND',
-       'orders.refund', 'approvals.review', true, '{"minimumMinor":5000}'::jsonb, true
-     );`,
+     ) values
+       (
+         '${RULE_ID}', '${BUSINESS_ID}', '${SHOP_ID}', 'ORDER_REFUND',
+         'orders.refund', 'approvals.review', true, '{"minimumMinor":5000}'::jsonb, true
+       ),
+       (
+         '${RETURN_RULE_ID}', '${BUSINESS_ID}', '${SHOP_ID}', 'ORDER_RETURN',
+         'orders.refund', 'approvals.review', true,
+         '{"minimumQuantityImpact":2}'::jsonb, true
+       );`,
   ],
   'Order approval fixture seed',
 );
@@ -255,6 +262,277 @@ if (
   Number(heldRow.reasonVersion) !== 3
 ) {
   throw new Error(`held refund snapshot is invalid: ${JSON.stringify(heldRow)}`);
+}
+
+
+const heldRefundReplay = rpc(
+  `public.request_admin_order_refund_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PAYMENT_ID}',
+    5000, '${REASON_ID}', 'Needs approval', 'refund-held-1', '${BUSINESS_ID}'
+  )`,
+  'Above-threshold refund replay',
+);
+if (
+  heldRefundReplay.ok !== true ||
+  heldRefundReplay.state !== 'PENDING_APPROVAL' ||
+  heldRefundReplay.replayed !== true ||
+  heldRefundReplay.refundId !== heldRefund.refundId ||
+  heldRefundReplay.approvalRequestId !== heldRefund.approvalRequestId
+) {
+  throw new Error(`held refund replay changed result: ${JSON.stringify(heldRefundReplay)}`);
+}
+
+const selfApproval = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${heldRefund.approvalRequestId}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    null,
+    'APPROVE',
+    'self approval attempt'
+  )`,
+  'Refund self approval attempt',
+);
+if (selfApproval.ok !== false || selfApproval.code !== 'self_approval_forbidden') {
+  throw new Error(`requester bypassed second-person approval: ${JSON.stringify(selfApproval)}`);
+}
+
+const approvedRefund = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${heldRefund.approvalRequestId}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    null,
+    'APPROVE',
+    'approved by second employee'
+  )`,
+  'Refund approval decision',
+);
+if (approvedRefund.ok !== true || approvedRefund.status !== 'APPROVED') {
+  throw new Error(`refund approval failed: ${JSON.stringify(approvedRefund)}`);
+}
+
+const refundClaimOutput = psql(
+  [
+    '-At',
+    '-c',
+    `select to_jsonb(claim)::text
+     from public.claim_admin_approval_execution_v1(
+       'plan5-order-approval-test',
+       now(),
+       25,
+       300
+     ) claim
+     where claim.approval_request_id = '${heldRefund.approvalRequestId}'::uuid`,
+  ],
+  'Refund approval execution claim',
+).trim();
+if (!refundClaimOutput) throw new Error('approved refund did not produce an execution claim');
+const refundClaim = JSON.parse(refundClaimOutput);
+
+const postedRefund = rpc(
+  `public.execute_approved_admin_order_refund_v1(
+    '${heldRefund.approvalRequestId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    '${PAYMENT_ID}'::uuid,
+    5000,
+    '${REASON_ID}'::uuid,
+    'Needs approval',
+    'refund-held-1'
+  )`,
+  'Execute approved refund',
+);
+if (postedRefund.ok !== true || postedRefund.state !== 'POSTED' || postedRefund.replayed !== false) {
+  throw new Error(`approved refund did not post: ${JSON.stringify(postedRefund)}`);
+}
+
+const postedRefundReplay = rpc(
+  `public.execute_approved_admin_order_refund_v1(
+    '${heldRefund.approvalRequestId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    '${PAYMENT_ID}'::uuid,
+    5000,
+    '${REASON_ID}'::uuid,
+    'Needs approval',
+    'refund-held-1'
+  )`,
+  'Execute approved refund replay',
+);
+if (
+  postedRefundReplay.ok !== true ||
+  postedRefundReplay.state !== 'POSTED' ||
+  postedRefundReplay.replayed !== true ||
+  postedRefundReplay.refundId !== postedRefund.refundId
+) {
+  throw new Error(`approved refund execution was not idempotent: ${JSON.stringify(postedRefundReplay)}`);
+}
+
+const completeRefund = rpc(
+  `public.complete_admin_approval_execution_v1(
+    '${heldRefund.approvalRequestId}'::uuid,
+    '${refundClaim.claim_token}',
+    'EXECUTED',
+    null,
+    jsonb_build_object('refundId', '${postedRefund.refundId}'),
+    now()
+  )`,
+  'Complete refund approval execution',
+);
+if (completeRefund.ok !== true || completeRefund.status !== 'EXECUTED') {
+  throw new Error(`refund approval completion failed: ${JSON.stringify(completeRefund)}`);
+}
+
+const rejectedRefund = rpc(
+  `public.request_admin_order_refund_v1(
+    '${REQUESTER_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PAYMENT_ID}',
+    5000, '${REASON_ID}', 'Reject this refund', 'refund-rejected-1', '${BUSINESS_ID}'
+  )`,
+  'Refund awaiting rejection',
+);
+if (rejectedRefund.ok !== true || rejectedRefund.state !== 'PENDING_APPROVAL') {
+  throw new Error(`rejected-refund fixture was not held: ${JSON.stringify(rejectedRefund)}`);
+}
+const rejectDecision = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${rejectedRefund.approvalRequestId}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    null,
+    'REJECT',
+    'refund rejected'
+  )`,
+  'Reject refund approval',
+);
+if (rejectDecision.ok !== true || rejectDecision.status !== 'REJECTED') {
+  throw new Error(`refund rejection failed: ${JSON.stringify(rejectDecision)}`);
+}
+const rejectedRefundState = psql(
+  [
+    '-At',
+    '-c',
+    `select state from public.admin_order_refunds where id = '${rejectedRefund.refundId}'::uuid`,
+  ],
+  'Rejected refund state',
+).trim();
+if (rejectedRefundState !== 'PENDING_APPROVAL') {
+  throw new Error(`rejected refund unexpectedly posted: ${rejectedRefundState}`);
+}
+
+const directReturn = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 1)),
+    '${REASON_ID}'::uuid,
+    'Below return threshold',
+    'return-direct-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Below-threshold return',
+);
+if (directReturn.ok !== true || directReturn.state !== 'POSTED' || directReturn.replayed !== false) {
+  throw new Error(`below-threshold return should post directly: ${JSON.stringify(directReturn)}`);
+}
+
+const heldReturn = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 2)),
+    '${REASON_ID}'::uuid,
+    'Needs return approval',
+    'return-held-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Above-threshold return',
+);
+if (
+  heldReturn.ok !== true ||
+  heldReturn.state !== 'PENDING_APPROVAL' ||
+  typeof heldReturn.approvalRequestId !== 'string'
+) {
+  throw new Error(`above-threshold return should be held: ${JSON.stringify(heldReturn)}`);
+}
+
+const approvedReturn = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${heldReturn.approvalRequestId}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    null,
+    'APPROVE',
+    'return approved'
+  )`,
+  'Return approval decision',
+);
+if (approvedReturn.ok !== true || approvedReturn.status !== 'APPROVED') {
+  throw new Error(`return approval failed: ${JSON.stringify(approvedReturn)}`);
+}
+
+const returnClaimOutput = psql(
+  [
+    '-At',
+    '-c',
+    `select to_jsonb(claim)::text
+     from public.claim_admin_approval_execution_v1(
+       'plan5-order-return-approval-test',
+       now(),
+       25,
+       300
+     ) claim
+     where claim.approval_request_id = '${heldReturn.approvalRequestId}'::uuid`,
+  ],
+  'Return approval execution claim',
+).trim();
+if (!returnClaimOutput) throw new Error('approved return did not produce an execution claim');
+
+const postedReturn = rpc(
+  `public.execute_approved_admin_order_return_v1(
+    '${heldReturn.approvalRequestId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 2)),
+    '${REASON_ID}'::uuid,
+    'Needs return approval',
+    'return-held-1'
+  )`,
+  'Execute approved return',
+);
+if (postedReturn.ok !== true || postedReturn.state !== 'POSTED' || postedReturn.replayed !== false) {
+  throw new Error(`approved return did not post: ${JSON.stringify(postedReturn)}`);
+}
+
+const postedReturnReplay = rpc(
+  `public.execute_approved_admin_order_return_v1(
+    '${heldReturn.approvalRequestId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 2)),
+    '${REASON_ID}'::uuid,
+    'Needs return approval',
+    'return-held-1'
+  )`,
+  'Execute approved return replay',
+);
+if (
+  postedReturnReplay.ok !== true ||
+  postedReturnReplay.state !== 'POSTED' ||
+  postedReturnReplay.replayed !== true ||
+  postedReturnReplay.returnId !== postedReturn.returnId
+) {
+  throw new Error(`approved return execution was not idempotent: ${JSON.stringify(postedReturnReplay)}`);
 }
 
 console.log('Admin order approval PostgreSQL threshold behavior passed.');
