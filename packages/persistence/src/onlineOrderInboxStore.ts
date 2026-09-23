@@ -21,6 +21,10 @@ export interface CachedOnlineOrderRequest {
   readonly trustedItems: readonly unknown[];
   readonly itemsSubtotalMinor: number;
   readonly orderNote: string | null;
+  /** Optional for cached rows written before Plan 5 ONLINE rewards. */
+  readonly promotionId?: string | null | undefined;
+  /** Optional for cached rows written before Plan 5 ONLINE rewards. */
+  readonly loyaltyPointsToRedeem?: number | undefined;
   readonly createdAt: Instant;
   readonly processingOrderId: string | null;
   readonly processingStartedAt: Instant | null;
@@ -56,6 +60,14 @@ function uuid(value: unknown, label: string): string {
 function optionalNullableUuid(value: unknown, label: string): string | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : uuid(value, label);
+}
+
+function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Cached online-order ${label} is invalid.`);
+  }
+  return value;
 }
 
 function nullableString(value: unknown, label: string, max: number): string | null {
@@ -158,6 +170,11 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     source.reservationOriginDeviceId,
     'reservationOriginDeviceId',
   );
+  const promotionId = optionalNullableUuid(source.promotionId, 'promotionId');
+  const loyaltyPointsToRedeem = optionalNonNegativeInteger(
+    source.loyaltyPointsToRedeem,
+    'loyaltyPointsToRedeem',
+  );
 
   if (
     status === 'PENDING' &&
@@ -203,6 +220,8 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     trustedItems: jsonArray(source.trustedItems),
     itemsSubtotalMinor,
     orderNote,
+    promotionId,
+    loyaltyPointsToRedeem,
     createdAt,
     processingOrderId,
     processingStartedAt,
