@@ -3,13 +3,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { instant, parseEntityId, type ShopId } from '@tux/domain';
+import { instant, parseEntityId, type DeliveryZoneId, type ShopId } from '@tux/domain';
 import { IndexedDbOnlineOrderInboxStore } from './browser/IndexedDbOnlineOrderInboxStore';
 import type { CachedOnlineOrderRequest } from './onlineOrderInboxStore';
 import { SqliteOnlineOrderInboxStore } from './sqlite/SqliteOnlineOrderInboxStore';
 
 const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const otherShopId = parseEntityId<ShopId>('22222222-2222-4222-8222-222222222222');
+const deliveryZoneId = parseEntityId<DeliveryZoneId>('66666666-6666-4666-8666-666666666666');
 const requestId = '33333333-3333-4333-8333-333333333333';
 const secondRequestId = '44444444-4444-4444-8444-444444444444';
 const processingOrderId = '55555555-5555-4555-8555-555555555555';
@@ -32,6 +33,12 @@ function pending(
     customerName: 'Ahmed Mohamed',
     normalizedPhone: '01001234567',
     deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: requestShopId,
+    deliveryZoneId,
+    deliveryZoneName: 'Nasr City',
+    deliveryFeeMinor: 3_000,
+    deliveryMinimumOrderMinor: 15_000,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: '66666666-6666-4666-8666-666666666666',
