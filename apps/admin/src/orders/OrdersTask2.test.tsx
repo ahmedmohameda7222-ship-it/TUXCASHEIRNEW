@@ -61,6 +61,7 @@ const order: AdminOrderDetail = {
     },
   ],
   statusHistory: [],
+  financialEvents: [],
   inventoryMovements: [],
   auditEvents: [],
 };
