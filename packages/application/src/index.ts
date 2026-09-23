@@ -54,6 +54,15 @@ export type {
 } from './onlineOrderInbox';
 export { OnlineOrderMutationLock, onlineOrderMutationLock } from './onlineOrderMutationLock';
 export { unavailableOrderPrinter } from './orderPrinter';
+export { unavailableOrderRewardAuthority } from './orderRewards';
+export type {
+  OrderRewardAuthority,
+  OrderRewardAuthorityError,
+  OrderRewardAuthorityErrorCode,
+  OrderRewardReservation,
+  OrderRewardReservationInput,
+  OrderRewardReservationResult,
+} from './orderRewards';
 export {
   DEFAULT_RECEIPT_PRINTER_CONFIGURATION,
   parseReceiptPrinterConfiguration,
