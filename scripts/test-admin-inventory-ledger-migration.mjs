@@ -121,6 +121,16 @@ const beginStocktakeSql = lower.slice(
   lower.indexOf('create or replace function public.post_stocktake_v1'),
 );
 
+const stocktakeDuplicateGuardIndex = beginStocktakeSql.indexOf("'duplicate_stocktake_item'");
+const stocktakeHeaderInsertIndex = beginStocktakeSql.indexOf('insert into public.stocktakes');
+if (
+  stocktakeDuplicateGuardIndex < 0 ||
+  stocktakeHeaderInsertIndex < 0 ||
+  stocktakeDuplicateGuardIndex > stocktakeHeaderInsertIndex
+) {
+  throw new Error('begin_stocktake_v1 must reject duplicate inventory items before header insert');
+}
+
 function assertCommandSerializationBeforeReplay(functionSql, replayNeedle, label) {
   const lockIndex = functionSql.indexOf('pg_advisory_xact_lock');
   const commandIdIndex = functionSql.indexOf('p_command_id', lockIndex);
