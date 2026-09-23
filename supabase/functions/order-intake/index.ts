@@ -230,6 +230,8 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       trusted_items: recordToInsert.trustedItems,
       items_subtotal_minor: recordToInsert.itemsSubtotalMinor,
       order_note: recordToInsert.orderNote,
+      promotion_id: recordToInsert.promotionId,
+      loyalty_points_to_redeem: recordToInsert.loyaltyPointsToRedeem,
       accepted_order_id: recordToInsert.acceptedOrderId,
     });
     if (error) throw error;
