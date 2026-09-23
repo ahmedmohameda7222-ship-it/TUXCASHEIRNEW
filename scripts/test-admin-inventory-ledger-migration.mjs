@@ -194,6 +194,29 @@ if (
   throw new Error('transfer receive replay must authorize its destination before returning success');
 }
 
+const materializationStart = lower.indexOf(
+  'create or replace function public.ingest_tux_operations_materialization_v1',
+);
+const materializationEnd = lower.indexOf(
+  'revoke all on function public.ingest_tux_operations_materialization_v1',
+  materializationStart,
+);
+const materializationSql = lower.slice(materializationStart, materializationEnd);
+const firstMaterializationMutation = materializationSql.indexOf(
+  'for v_mutation in select value from jsonb_array_elements',
+);
+if (
+  materializationStart < 0 ||
+  firstMaterializationMutation < 0 ||
+  !/for\s+v_inventory_item_id\s+in[\s\S]*?inventory_movements[\s\S]*?order\s+by[\s\S]*?inventory_item_id[\s\S]*?pg_advisory_xact_lock/.test(
+    materializationSql.slice(0, firstMaterializationMutation),
+  )
+) {
+  throw new Error(
+    'operations materialization must pre-lock distinct inventory items in stable item order',
+  );
+}
+
 const reservationCapacityStart = lower.indexOf(
   'create or replace function private.enforce_inventory_order_reservation_capacity_v1',
 );
