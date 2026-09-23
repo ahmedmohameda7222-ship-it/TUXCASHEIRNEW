@@ -642,6 +642,7 @@ begin
          cancelled_at = now(),
          cancelled_by_admin_employee_id = p_employee_id,
          cancellation_reason = v_reason.reason_label,
+         cancellation_food_prepared = false,
          cancellation_stock_restored = false
    where id = p_order_id
      and shop_id = p_shop_id
