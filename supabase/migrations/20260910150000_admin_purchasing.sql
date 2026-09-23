@@ -791,6 +791,7 @@ declare
   v_receipt_id uuid;
   v_line jsonb;
   v_line_id uuid;
+  v_inventory_item_id uuid;
   v_received_purchase bigint;
   v_received_base_numeric numeric;
   v_received bigint;
@@ -849,6 +850,21 @@ begin
   if v_order.status not in ('ORDERED', 'PARTIALLY_RECEIVED') then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_receivable');
   end if;
+
+  for v_inventory_item_id in
+    select distinct pol.inventory_item_id
+    from jsonb_array_elements(p_lines) line(value)
+    join public.purchase_order_lines pol
+      on pol.purchase_order_id = v_order.id
+     and pol.id::text = line.value ->> 'lineId'
+    order by pol.inventory_item_id
+  loop
+    perform pg_advisory_xact_lock(
+      hashtextextended(
+        'tux-inventory:' || p_shop_id::text || ':' || v_inventory_item_id::text, 0
+      )
+    );
+  end loop;
 
   for v_line in
     select value from jsonb_array_elements(p_lines)
@@ -1067,6 +1083,7 @@ declare
   v_return_id uuid;
   v_line jsonb;
   v_line_id uuid;
+  v_inventory_item_id uuid;
   v_returned_purchase bigint;
   v_returned_base_numeric numeric;
   v_returned bigint;
@@ -1135,6 +1152,21 @@ begin
   if v_order.status not in ('PARTIALLY_RECEIVED', 'RECEIVED') then
     return jsonb_build_object('ok', false, 'code', 'purchase_order_not_returnable');
   end if;
+
+  for v_inventory_item_id in
+    select distinct pol.inventory_item_id
+    from jsonb_array_elements(p_lines) line(value)
+    join public.purchase_order_lines pol
+      on pol.purchase_order_id = v_order.id
+     and pol.id::text = line.value ->> 'lineId'
+    order by pol.inventory_item_id
+  loop
+    perform pg_advisory_xact_lock(
+      hashtextextended(
+        'tux-inventory:' || p_shop_id::text || ':' || v_inventory_item_id::text, 0
+      )
+    );
+  end loop;
 
   for v_line in
     select value from jsonb_array_elements(p_lines)
