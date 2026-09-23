@@ -219,6 +219,16 @@ describe('Admin inventory route', () => {
     expect(source).not.toContain('{items.map((item) => (');
   });
 
+  it('revalidates the transfer destination when the active shop changes', async () => {
+    const source = await readFile(resolve('apps/admin/src/inventory/TransferPage.tsx'), 'utf8');
+    expect(source).toContain(
+      'const selectedDestinationShopId = destinations.includes(destinationShopId)',
+    );
+    expect(source).toContain('value={selectedDestinationShopId}');
+    expect(source).toContain('selectedDestinationShopId.length === 0');
+    expect(source).toContain('destinationShopId: selectedDestinationShopId');
+  });
+
   it('retains one command ID for retries of the same inventory or purchasing intent', async () => {
     const inventorySource = await readFile(
       resolve('apps/admin/src/inventory/useInventory.ts'),
