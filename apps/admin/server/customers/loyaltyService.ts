@@ -45,8 +45,7 @@ export type PromotionValidationCode =
   | 'promotion_category_mismatch';
 
 export type PromotionValidationResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly code: PromotionValidationCode };
+  { readonly ok: true } | { readonly ok: false; readonly code: PromotionValidationCode };
 
 export type RedemptionValidationResult =
   | { readonly ok: true }
@@ -216,13 +215,9 @@ export function evaluatePromotionReward(
 
 export function validatePromotionStack(
   rules: readonly Pick<PromotionRule, 'stackingPolicy'>[],
-):
-  | { readonly ok: true }
-  | { readonly ok: false; readonly code: 'promotion_stacking_not_allowed' } {
+): { readonly ok: true } | { readonly ok: false; readonly code: 'promotion_stacking_not_allowed' } {
   if (rules.length <= 1) return { ok: true };
-  const allExplicitlyStackable = rules.every(
-    (rule) => rule.stackingPolicy === 'ALLOW_CONFIGURED',
-  );
+  const allExplicitlyStackable = rules.every((rule) => rule.stackingPolicy === 'ALLOW_CONFIGURED');
   return allExplicitlyStackable
     ? { ok: true }
     : { ok: false, code: 'promotion_stacking_not_allowed' };
