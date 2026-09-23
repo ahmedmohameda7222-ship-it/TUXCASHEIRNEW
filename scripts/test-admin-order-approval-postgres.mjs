@@ -440,6 +440,103 @@ if (directReturn.ok !== true || directReturn.state !== 'POSTED' || directReturn.
   throw new Error(`below-threshold return should post directly: ${JSON.stringify(directReturn)}`);
 }
 
+const directReturnReplay = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 1)),
+    '${REASON_ID}'::uuid,
+    'Below return threshold',
+    'return-direct-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Below-threshold return replay',
+);
+if (
+  directReturnReplay.ok !== true ||
+  directReturnReplay.state !== 'POSTED' ||
+  directReturnReplay.replayed !== true ||
+  directReturnReplay.returnId !== directReturn.returnId
+) {
+  throw new Error(`direct return replay changed result: ${JSON.stringify(directReturnReplay)}`);
+}
+
+const directReturnConflict = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 1)),
+    '${REASON_ID}'::uuid,
+    'Changed payload',
+    'return-direct-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Return command conflict',
+);
+if (directReturnConflict.ok !== false || directReturnConflict.code !== 'command_id_conflict') {
+  throw new Error(`changed return payload should conflict: ${JSON.stringify(directReturnConflict)}`);
+}
+
+const rejectedReturn = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 2)),
+    '${REASON_ID}'::uuid,
+    'Reject this return',
+    'return-rejected-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Return requiring rejection',
+);
+if (
+  rejectedReturn.ok !== true ||
+  rejectedReturn.state !== 'PENDING_APPROVAL' ||
+  typeof rejectedReturn.approvalRequestId !== 'string'
+) {
+  throw new Error(`return requiring approval should be held before rejection: ${JSON.stringify(rejectedReturn)}`);
+}
+
+const rejectedReturnDecision = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${rejectedReturn.approvalRequestId}'::uuid,
+    '${APPROVER_ID}'::uuid,
+    null,
+    'REJECT',
+    'return rejected'
+  )`,
+  'Return rejection decision',
+);
+if (rejectedReturnDecision.ok !== true || rejectedReturnDecision.status !== 'REJECTED') {
+  throw new Error(`return rejection failed: ${JSON.stringify(rejectedReturnDecision)}`);
+}
+
+const rejectedReturnState = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+         'returnState', r.state,
+         'approvalStatus', a.status
+       )::text
+       from public.admin_order_returns r
+       join public.admin_approval_requests a on a.id = r.approval_request_id
+       where r.id = '${rejectedReturn.returnId}'::uuid`,
+    ],
+    'Rejected return state readback',
+  ).trim(),
+);
+if (
+  rejectedReturnState.returnState !== 'PENDING_APPROVAL' ||
+  rejectedReturnState.approvalStatus !== 'REJECTED'
+) {
+  throw new Error(`rejected return posted unexpectedly: ${JSON.stringify(rejectedReturnState)}`);
+}
+
 const heldReturn = rpc(
   `public.return_admin_order_items_v1(
     '${REQUESTER_ID}'::uuid,
@@ -459,6 +556,43 @@ if (
   typeof heldReturn.approvalRequestId !== 'string'
 ) {
   throw new Error(`above-threshold return should be held: ${JSON.stringify(heldReturn)}`);
+}
+
+const heldReturnReplay = rpc(
+  `public.return_admin_order_items_v1(
+    '${REQUESTER_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${ORDER_ID}'::uuid,
+    jsonb_build_array(jsonb_build_object('orderItemId', '${ITEM_ID}', 'quantity', 2)),
+    '${REASON_ID}'::uuid,
+    'Needs return approval',
+    'return-held-1',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Above-threshold return replay',
+);
+if (
+  heldReturnReplay.ok !== true ||
+  heldReturnReplay.state !== 'PENDING_APPROVAL' ||
+  heldReturnReplay.replayed !== true ||
+  heldReturnReplay.returnId !== heldReturn.returnId ||
+  heldReturnReplay.approvalRequestId !== heldReturn.approvalRequestId
+) {
+  throw new Error(`held return replay changed result: ${JSON.stringify(heldReturnReplay)}`);
+}
+
+const returnSelfApproval = rpc(
+  `public.decide_admin_approval_request_v1(
+    '${heldReturn.approvalRequestId}'::uuid,
+    '${REQUESTER_ID}'::uuid,
+    null,
+    'APPROVE',
+    'self approval attempt'
+  )`,
+  'Return self approval attempt',
+);
+if (returnSelfApproval.ok !== false || returnSelfApproval.code !== 'self_approval_forbidden') {
+  throw new Error(`requester bypassed return second-person approval: ${JSON.stringify(returnSelfApproval)}`);
 }
 
 const approvedReturn = rpc(
