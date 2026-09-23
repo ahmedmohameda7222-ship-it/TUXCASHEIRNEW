@@ -30,6 +30,8 @@ jobs:
           apps/admin/server/customers/customerService.test.ts
           apps/admin/server/customers/customerService.ts
           apps/admin/server/customers/loyaltyService.ts
+          apps/admin/server/approvals/approvalExecutionRunner.ts
+          apps/admin/server/orders/orderApproval.test.ts
           apps/admin/server/orders/orderService.test.ts
           apps/admin/src/orders/CancelOrderSheet.tsx
           apps/admin/src/orders/OrdersPage.tsx
