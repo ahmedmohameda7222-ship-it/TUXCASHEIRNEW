@@ -127,7 +127,7 @@ export function createCrmService(store: CrmStore) {
       return facts ? withSegments(facts, input.now ?? new Date().toISOString()) : null;
     },
 
-    getLoyaltyProgram(
+    async getLoyaltyProgram(
       input: { shopId: string },
       principal: AdminSessionPrincipal,
     ): Promise<AdminLoyaltyProgram | null> {
@@ -135,7 +135,7 @@ export function createCrmService(store: CrmStore) {
       return store.getLoyaltyProgram({ businessId: principal.businessId });
     },
 
-    listPromotions(
+    async listPromotions(
       input: { shopId: string },
       principal: AdminSessionPrincipal,
     ): Promise<readonly AdminPromotion[]> {
@@ -143,7 +143,7 @@ export function createCrmService(store: CrmStore) {
       return store.listPromotions({ businessId: principal.businessId });
     },
 
-    upsertLoyaltyProgram(
+    async upsertLoyaltyProgram(
       input: {
         shopId: string;
         enabled: boolean;
@@ -164,7 +164,7 @@ export function createCrmService(store: CrmStore) {
       });
     },
 
-    adjustLoyalty(
+    async adjustLoyalty(
       input: {
         shopId: string;
         customerId: string;
@@ -183,7 +183,7 @@ export function createCrmService(store: CrmStore) {
       });
     },
 
-    upsertPromotion(
+    async upsertPromotion(
       input: {
         shopId: string;
         promotion: AdminPromotionUpsertInput;
