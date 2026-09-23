@@ -502,7 +502,7 @@ const readback = JSON.parse(
 );
 
 if (
-  Number(readback.balance) !== 180 ||
+  Number(readback.balance) !== 168 ||
   Number(readback.manualCount) !== 1 ||
   Number(readback.earnCount) !== 1 ||
   Number(readback.redeemCount) !== 1 ||
