@@ -550,6 +550,22 @@ function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['check
     taxMinor: money(source['taxMinor'], 'checkout taxMinor'),
     deliveryFeeMinor: money(source['deliveryFeeMinor'], 'checkout deliveryFeeMinor'),
     discountMinor: money(source['discountMinor'], 'checkout discountMinor'),
+    ...(source['manualDiscountMinor'] === undefined
+      ? {}
+      : {
+          manualDiscountMinor: money(
+            source['manualDiscountMinor'],
+            'checkout manualDiscountMinor',
+          ),
+        }),
+    ...(source['rewardDiscountMinor'] === undefined
+      ? {}
+      : {
+          rewardDiscountMinor: money(
+            source['rewardDiscountMinor'],
+            'checkout rewardDiscountMinor',
+          ),
+        }),
     paymentRules: arrayValue(source['paymentRules'], 'checkout paymentRules').map((rawRule) => {
       const rule = record(rawRule, 'checkout payment rule');
       return {
@@ -565,6 +581,99 @@ function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['check
         zoneAllowed: booleanValue(rule['zoneAllowed'], 'checkout zoneAllowed'),
       };
     }),
+  };
+}
+
+function parseAppliedRewardSnapshot(
+  value: unknown,
+): NonNullable<OrderSnapshot['appliedRewardSnapshot']> {
+  const source = record(value, 'order applied reward snapshot');
+  const promotionValue = source['promotion'];
+  const loyaltyValue = source['loyalty'];
+
+  const promotion =
+    promotionValue === null
+      ? null
+      : (() => {
+          const promotionSource = record(promotionValue, 'order promotion reward snapshot');
+          const kind = promotionSource['kind'];
+          if (kind !== 'PERCENT' && kind !== 'FIXED' && kind !== 'FREE_ITEM') {
+            throw new TypeError('Operations sync reward promotion kind is unsupported.');
+          }
+          const channel = promotionSource['channel'];
+          if (channel !== 'POS' && channel !== 'ONLINE' && channel !== 'BOTH') {
+            throw new TypeError('Operations sync reward promotion channel is unsupported.');
+          }
+          return {
+            id: fieldString(promotionSource, 'id'),
+            name: fieldString(promotionSource, 'name'),
+            kind,
+            version: safeInteger(promotionSource['version'], 'reward promotion version', 1),
+            percentBasisPoints: nullableSafeInteger(
+              promotionSource['percentBasisPoints'],
+              'reward promotion percentBasisPoints',
+              1,
+            ),
+            fixedDiscountMinor:
+              promotionSource['fixedDiscountMinor'] === null
+                ? null
+                : money(
+                    promotionSource['fixedDiscountMinor'],
+                    'reward promotion fixedDiscountMinor',
+                  ),
+            freeProductId:
+              promotionSource['freeProductId'] === null
+                ? null
+                : entityId<ProductId>(
+                    promotionSource['freeProductId'],
+                    'reward promotion freeProductId',
+                  ),
+            minimumOrderMinor: money(
+              promotionSource['minimumOrderMinor'],
+              'reward promotion minimumOrderMinor',
+            ),
+            channel,
+            promotionDiscountMinor: money(
+              promotionSource['promotionDiscountMinor'],
+              'reward promotion discount',
+            ),
+          };
+        })();
+
+  const loyalty =
+    loyaltyValue === null
+      ? null
+      : (() => {
+          const loyaltySource = record(loyaltyValue, 'order loyalty reward snapshot');
+          return {
+            pointsRedeemed: safeInteger(
+              loyaltySource['pointsRedeemed'],
+              'reward loyalty pointsRedeemed',
+              1,
+            ),
+            redemptionMinorPerPoint: money(
+              loyaltySource['redemptionMinorPerPoint'],
+              'reward loyalty redemptionMinorPerPoint',
+            ),
+            redemptionValueMinor: money(
+              loyaltySource['redemptionValueMinor'],
+              'reward loyalty redemptionValueMinor',
+            ),
+          };
+        })();
+
+  return {
+    configurationVersion: safeInteger(
+      source['configurationVersion'],
+      'reward configurationVersion',
+      1,
+    ),
+    rewardDiscountMinor: money(
+      source['rewardDiscountMinor'],
+      'reward discount',
+    ),
+    promotion,
+    loyalty,
   };
 }
 
@@ -618,6 +727,18 @@ function parseOrder(value: unknown): OrderSnapshot {
     source['checkoutSnapshot'] === undefined
       ? undefined
       : parseCheckoutSnapshot(source['checkoutSnapshot']);
+  const rewardReservationId =
+    source['rewardReservationId'] === undefined
+      ? undefined
+      : source['rewardReservationId'] === null
+        ? null
+        : stringValue(source['rewardReservationId'], 'order rewardReservationId');
+  const appliedRewardSnapshot =
+    source['appliedRewardSnapshot'] === undefined
+      ? undefined
+      : source['appliedRewardSnapshot'] === null
+        ? null
+        : parseAppliedRewardSnapshot(source['appliedRewardSnapshot']);
   const order: OrderSnapshot = {
     id: entityId<OrderId>(source['id'], 'order id'),
     shopId: entityId<ShopId>(source['shopId'], 'order shopId'),
@@ -641,6 +762,8 @@ function parseOrder(value: unknown): OrderSnapshot {
     ...(serviceChargeMinor === undefined ? {} : { serviceChargeMinor }),
     ...(taxMinor === undefined ? {} : { taxMinor }),
     ...(checkoutSnapshot === undefined ? {} : { checkoutSnapshot }),
+    ...(rewardReservationId === undefined ? {} : { rewardReservationId }),
+    ...(appliedRewardSnapshot === undefined ? {} : { appliedRewardSnapshot }),
     totalMinor: money(source['totalMinor'], 'order totalMinor'),
     payments: arrayValue(source['payments'], 'order payments').map(parsePayment),
   };
