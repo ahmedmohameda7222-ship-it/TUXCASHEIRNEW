@@ -2779,14 +2779,12 @@ begin
     return jsonb_build_object('ok', false, 'code', 'transfer_not_receivable');
   end if;
 
-  for v_source_line in
-    select l.*
+  for v_destination_item_id in
+    select l.destination_inventory_item_id
     from public.stock_transfer_lines l
     where l.transfer_id = p_transfer_id
-    order by l.inventory_item_id
+    order by l.destination_inventory_item_id
   loop
-    v_destination_item_id := v_source_line.destination_inventory_item_id;
-
     perform pg_advisory_xact_lock(
       hashtextextended(
         'tux-inventory:' || v_transfer.destination_shop_id::text || ':'
@@ -2794,6 +2792,15 @@ begin
         0
       )
     );
+  end loop;
+
+  for v_source_line in
+    select l.*
+    from public.stock_transfer_lines l
+    where l.transfer_id = p_transfer_id
+    order by l.destination_inventory_item_id, l.inventory_item_id
+  loop
+    v_destination_item_id := v_source_line.destination_inventory_item_id;
 
     select b.on_hand_micros into v_on_hand
     from private.inventory_balance_v1(
