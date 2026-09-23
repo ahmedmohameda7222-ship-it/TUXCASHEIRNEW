@@ -423,6 +423,15 @@ begin
     end if;
   end loop;
 
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) as input_line(value)
+    group by (input_line.value ->> 'inventoryItemId')::uuid
+    having count(*) > 1
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'duplicate_inventory_item');
+  end if;
+
   perform pg_advisory_xact_lock(
     hashtextextended(p_shop_id::text || ':' || p_command_id, 0)
   );
