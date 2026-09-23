@@ -66,6 +66,26 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
       throw new DomainInvariantError('Checkout fee and discount snapshot must match the order.');
     }
     if (
+      (snapshot.manualDiscountMinor === undefined) !==
+      (snapshot.rewardDiscountMinor === undefined)
+    ) {
+      throw new DomainInvariantError(
+        'Checkout manual/reward discount classification must be complete when present.',
+      );
+    }
+    if (
+      snapshot.manualDiscountMinor !== undefined &&
+      snapshot.rewardDiscountMinor !== undefined
+    ) {
+      assertNonNegativeMoney(snapshot.manualDiscountMinor, 'Manual discount');
+      assertNonNegativeMoney(snapshot.rewardDiscountMinor, 'Reward discount');
+      if (addMoney(snapshot.manualDiscountMinor, snapshot.rewardDiscountMinor) !== order.discountMinor) {
+        throw new DomainInvariantError(
+          'Checkout manual and reward discounts must sum to the order discount.',
+        );
+      }
+    }
+    if (
       snapshot.allowDeliveryFeeOverride === false &&
       order.fulfillment.behavior === 'DELIVERY' &&
       order.fulfillment.delivery.finalFeeMinor !== order.fulfillment.delivery.configuredFeeMinor
@@ -76,6 +96,28 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
     }
     if (snapshot.minimumOrderSatisfied !== order.itemsSubtotalMinor >= snapshot.minimumOrderMinor) {
       throw new DomainInvariantError('Checkout minimum-order snapshot is inconsistent.');
+    }
+  }
+
+  const rewardReservationId = order.rewardReservationId ?? null;
+  const appliedRewardSnapshot = order.appliedRewardSnapshot ?? null;
+  if ((rewardReservationId === null) !== (appliedRewardSnapshot === null)) {
+    throw new DomainInvariantError(
+      'Reward reservation identity and applied reward snapshot must be persisted together.',
+    );
+  }
+  if (rewardReservationId !== null && rewardReservationId.trim().length === 0) {
+    throw new DomainInvariantError('Reward reservation identity cannot be blank.');
+  }
+  if (appliedRewardSnapshot !== null) {
+    assertNonNegativeMoney(appliedRewardSnapshot.rewardDiscountMinor, 'Reward discount');
+    if (
+      order.checkoutSnapshot?.rewardDiscountMinor !== undefined &&
+      order.checkoutSnapshot.rewardDiscountMinor !== appliedRewardSnapshot.rewardDiscountMinor
+    ) {
+      throw new DomainInvariantError(
+        'Applied reward snapshot discount must match the checkout reward discount.',
+      );
     }
   }
 
