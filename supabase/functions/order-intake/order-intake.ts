@@ -79,6 +79,8 @@ export interface OnlineOrderPendingInsert {
   trustedItems: Array<Record<string, unknown>>;
   itemsSubtotalMinor: number;
   orderNote: string | null;
+  promotionId: string | null;
+  loyaltyPointsToRedeem: number;
   acceptedOrderId: null;
 }
 
@@ -262,6 +264,7 @@ function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string
       note: item.note,
     })),
     orderNote: request.orderNote,
+    ...(request.reward === undefined ? {} : { reward: request.reward }),
   };
 }
 
@@ -770,6 +773,8 @@ export async function handleOrderIntakeRequest(
       trustedItems: trusted.trustedItems,
       itemsSubtotalMinor: trusted.itemsSubtotalMinor,
       orderNote: parsed.orderNote,
+      promotionId: parsed.reward?.promotionId ?? null,
+      loyaltyPointsToRedeem: parsed.reward?.loyaltyPointsToRedeem ?? 0,
       acceptedOrderId: null,
     };
 
