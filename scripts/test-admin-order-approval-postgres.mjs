@@ -128,14 +128,12 @@ psql(
        order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
        normalized_phone_snapshot, address_snapshot, delivery_zone_id,
        delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
-       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
-       recognized_revenue_minor, collected_payment_minor
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
      ) values (
        '${ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 1, 'approval-order-1', 'POS', 'DONE',
        '${WORKER_ID}', 'Order Worker', '${ORDER_TYPE_ID}', 'Take Away',
        'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
-       10000, 0, 10000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z',
-       10000, 10000
+       10000, 0, 10000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
      );
      insert into public.order_items(
        id, shop_id, order_id, product_id, product_name_snapshot,
