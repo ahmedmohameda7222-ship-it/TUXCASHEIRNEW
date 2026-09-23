@@ -767,6 +767,39 @@ grant execute on function public.cancel_admin_order_v1(
   uuid, uuid, uuid, uuid, bigint, text, text, uuid
 ) to service_role;
 
+create or replace function private.admin_order_approval_command_id_v1(
+  p_business_id uuid,
+  p_shop_id uuid,
+  p_action_type text,
+  p_command_id text
+)
+returns uuid
+language sql
+immutable
+set search_path = pg_catalog, public, private
+as $$
+  with digest_value as (
+    select md5(
+      p_business_id::text || '|' ||
+      p_shop_id::text || '|' ||
+      upper(btrim(p_action_type)) || '|' ||
+      p_command_id
+    ) as value
+  )
+  select (
+    substr(value, 1, 8) || '-' ||
+    substr(value, 9, 4) || '-' ||
+    '4' || substr(value, 14, 3) || '-' ||
+    '8' || substr(value, 18, 3) || '-' ||
+    substr(value, 21, 12)
+  )::uuid
+  from digest_value
+$$;
+
+revoke all on function private.admin_order_approval_command_id_v1(
+  uuid, uuid, text, text
+) from public, anon, authenticated;
+
 create or replace function public.request_admin_order_refund_v1(
   p_employee_id uuid,
   p_shop_id uuid,
@@ -793,6 +826,12 @@ declare
   v_refunded bigint;
   v_refund_id uuid;
   v_result jsonb;
+  v_rule public.admin_approval_rules%rowtype;
+  v_requires_approval boolean := false;
+  v_approval_command_id uuid;
+  v_approval_result jsonb;
+  v_approval_request_id uuid;
+  v_minimum_minor bigint;
 begin
   if p_employee_id is null or p_shop_id is null or p_order_id is null
      or p_payment_id is null or p_amount_minor is null or p_amount_minor <= 0
@@ -863,50 +902,157 @@ begin
   select coalesce(sum(r.amount_minor), 0)
     into v_refunded
   from public.admin_order_refunds r
-  where r.payment_id = p_payment_id and r.state = 'POSTED';
+  left join public.admin_approval_requests approval
+    on approval.id = r.approval_request_id
+   and approval.business_id = r.business_id
+  where r.payment_id = p_payment_id
+    and (
+      r.state = 'POSTED'
+      or (
+        r.state = 'PENDING_APPROVAL'
+        and approval.status in ('PENDING', 'APPROVED', 'EXECUTING')
+      )
+    );
 
   if v_refunded + p_amount_minor > v_payment.allocated_minor then
     return jsonb_build_object('ok', false, 'code', 'refund_exceeds_payment');
   end if;
 
+  select * into v_rule
+  from public.admin_approval_rules rule
+  where rule.business_id = v_business_id
+    and rule.action_type = 'ORDER_REFUND'
+    and rule.active
+    and (rule.shop_id is null or rule.shop_id = p_shop_id)
+  order by (rule.shop_id = p_shop_id) desc, rule.id
+  limit 1;
+
+  if found then
+    if jsonb_typeof(v_rule.threshold_context -> 'minimumMinor') = 'number' then
+      begin
+        v_minimum_minor := (v_rule.threshold_context ->> 'minimumMinor')::bigint;
+      exception when others then
+        v_minimum_minor := null;
+      end;
+      v_requires_approval := v_minimum_minor is null or p_amount_minor >= v_minimum_minor;
+    else
+      v_requires_approval := true;
+    end if;
+  end if;
+
   v_refund_id := gen_random_uuid();
-  insert into public.admin_order_refunds(
-    id, business_id, shop_id, order_id, payment_id, amount_minor,
-    reason_code_id, reason_code_key, reason_label_snapshot,
-    reason_family_snapshot, reason_config_version, note, state,
-    command_id, created_by_employee_id
-  ) values (
-    v_refund_id, v_business_id, p_shop_id, p_order_id, p_payment_id, p_amount_minor,
-    p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
-    v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''), 'POSTED',
-    p_command_id, p_employee_id
-  );
 
-  perform public.append_admin_audit_event_v1(
-    v_business_id, p_shop_id, p_employee_id,
-    'ORDER_REFUND_POSTED', 'ORDER', p_order_id::text,
-    null,
-    jsonb_build_object(
+  if v_requires_approval then
+    v_approval_command_id := private.admin_order_approval_command_id_v1(
+      v_business_id, p_shop_id, 'ORDER_REFUND', p_command_id
+    );
+
+    v_approval_result := public.create_admin_approval_request_v1(
+      v_business_id,
+      p_shop_id,
+      p_employee_id,
+      null,
+      v_rule.id,
+      'ORDER_REFUND',
+      v_approval_command_id,
+      jsonb_build_object(
+        'orderId', p_order_id,
+        'paymentId', p_payment_id,
+        'amountMinor', p_amount_minor,
+        'reasonCodeId', p_reason_code_id,
+        'note', nullif(btrim(p_note), ''),
+        'orderCommandId', p_command_id
+      ),
+      v_reason.reason_label
+    );
+
+    if not coalesce((v_approval_result ->> 'ok')::boolean, false) then
+      return jsonb_build_object(
+        'ok', false,
+        'code', coalesce(v_approval_result ->> 'code', 'approval_request_failed')
+      );
+    end if;
+
+    v_approval_request_id := (v_approval_result ->> 'requestId')::uuid;
+
+    insert into public.admin_order_refunds(
+      id, business_id, shop_id, order_id, payment_id, amount_minor,
+      reason_code_id, reason_code_key, reason_label_snapshot,
+      reason_family_snapshot, reason_config_version, note, state,
+      approval_request_id, command_id, created_by_employee_id
+    ) values (
+      v_refund_id, v_business_id, p_shop_id, p_order_id, p_payment_id, p_amount_minor,
+      p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
+      v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''),
+      'PENDING_APPROVAL', v_approval_request_id, p_command_id, p_employee_id
+    );
+
+    perform public.append_admin_audit_event_v1(
+      v_business_id, p_shop_id, p_employee_id,
+      'ORDER_REFUND_APPROVAL_PENDING', 'ORDER', p_order_id::text,
+      null,
+      jsonb_build_object(
+        'refundId', v_refund_id,
+        'approvalRequestId', v_approval_request_id,
+        'paymentId', p_payment_id,
+        'amountMinor', p_amount_minor,
+        'reasonCodeId', p_reason_code_id,
+        'reasonCodeKey', v_reason.reason_code_key,
+        'reasonLabel', v_reason.reason_label,
+        'reasonFamily', v_reason.reason_family,
+        'reasonConfigVersion', v_reason.reason_version
+      ),
+      nullif(btrim(p_note), ''), v_approval_request_id, null,
+      jsonb_build_object('commandId', p_command_id)
+    );
+
+    v_result := jsonb_build_object(
+      'ok', true,
+      'orderId', p_order_id,
       'refundId', v_refund_id,
-      'paymentId', p_payment_id,
-      'amountMinor', p_amount_minor,
-      'reasonCodeId', p_reason_code_id,
-      'reasonCodeKey', v_reason.reason_code_key,
-      'reasonLabel', v_reason.reason_label,
-      'reasonFamily', v_reason.reason_family,
-      'reasonConfigVersion', v_reason.reason_version
-    ),
-    nullif(btrim(p_note), ''), null, null,
-    jsonb_build_object('commandId', p_command_id)
-  );
+      'state', 'PENDING_APPROVAL',
+      'approvalRequestId', v_approval_request_id,
+      'replayed', false
+    );
+  else
+    insert into public.admin_order_refunds(
+      id, business_id, shop_id, order_id, payment_id, amount_minor,
+      reason_code_id, reason_code_key, reason_label_snapshot,
+      reason_family_snapshot, reason_config_version, note, state,
+      command_id, created_by_employee_id
+    ) values (
+      v_refund_id, v_business_id, p_shop_id, p_order_id, p_payment_id, p_amount_minor,
+      p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
+      v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''), 'POSTED',
+      p_command_id, p_employee_id
+    );
 
-  v_result := jsonb_build_object(
-    'ok', true,
-    'orderId', p_order_id,
-    'refundId', v_refund_id,
-    'state', 'POSTED',
-    'replayed', false
-  );
+    perform public.append_admin_audit_event_v1(
+      v_business_id, p_shop_id, p_employee_id,
+      'ORDER_REFUND_POSTED', 'ORDER', p_order_id::text,
+      null,
+      jsonb_build_object(
+        'refundId', v_refund_id,
+        'paymentId', p_payment_id,
+        'amountMinor', p_amount_minor,
+        'reasonCodeId', p_reason_code_id,
+        'reasonCodeKey', v_reason.reason_code_key,
+        'reasonLabel', v_reason.reason_label,
+        'reasonFamily', v_reason.reason_family,
+        'reasonConfigVersion', v_reason.reason_version
+      ),
+      nullif(btrim(p_note), ''), null, null,
+      jsonb_build_object('commandId', p_command_id)
+    );
+
+    v_result := jsonb_build_object(
+      'ok', true,
+      'orderId', p_order_id,
+      'refundId', v_refund_id,
+      'state', 'POSTED',
+      'replayed', false
+    );
+  end if;
 
   insert into public.admin_order_command_receipts(
     business_id, shop_id, command_id, command_type, order_id,
