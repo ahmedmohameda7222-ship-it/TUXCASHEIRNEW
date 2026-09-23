@@ -40,6 +40,7 @@ jobs:
           packages/sync/src/httpTransport.ts
           packages/sync/src/orderLifecycleConvergence.test.ts
           packages/sync/src/orderLifecycleConvergence.ts
+          e2e/admin-orders.spec.ts
       - name: Commit formatting
         shell: bash
         run: |
