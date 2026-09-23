@@ -31,6 +31,33 @@ import {
 } from './deliveryService.js';
 
 const uuidSchema = z.string().uuid();
+const boundarySchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('RADIUS'),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      radiusMeters: z.number().positive().max(200_000),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('POLYGON'),
+      points: z
+        .array(
+          z
+            .object({
+              latitude: z.number().min(-90).max(90),
+              longitude: z.number().min(-180).max(180),
+            })
+            .strict(),
+        )
+        .min(3)
+        .max(500),
+    })
+    .strict(),
+]);
+
 const routeSchema = z.object({
   view: z.literal('route'),
   shopId: uuidSchema,
@@ -39,6 +66,36 @@ const routeSchema = z.object({
   subtotalMinor: z.coerce.number().int().safe().nonnegative(),
   at: z.string().datetime(),
 });
+const zoneUpsertSchema = z
+  .object({
+    type: z.literal('delivery.zone.upsert'),
+    shopId: uuidSchema,
+    zoneId: uuidSchema.nullable(),
+    expectedVersion: z.number().int().safe().positive().nullable(),
+    name: z.string().trim().min(1).max(160),
+    feeMinor: z.number().int().safe().nonnegative(),
+    minimumOrderMinor: z.number().int().safe().nonnegative(),
+    priority: z.number().int().safe(),
+    active: z.boolean(),
+    boundary: boundarySchema,
+    fallbackShopId: uuidSchema.nullable(),
+    fallbackEnabled: z.boolean(),
+  })
+  .strict();
+
+const riderUpsertSchema = z
+  .object({
+    type: z.literal('delivery.rider.upsert'),
+    shopId: uuidSchema,
+    riderId: uuidSchema.nullable(),
+    expectedVersion: z.number().int().safe().positive().nullable(),
+    displayName: z.string().trim().min(1).max(160),
+    phone: z.string().trim().max(40).nullable(),
+    active: z.boolean(),
+    state: z.enum(['AVAILABLE', 'UNAVAILABLE']),
+  })
+  .strict();
+
 const transitionSchema = z
   .object({
     type: z.literal('delivery.transition'),
@@ -305,6 +362,36 @@ export function createDeliveryStore(
       };
     },
 
+    upsertZone(input) {
+      return client.rpc('upsert_admin_delivery_zone_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_zone_id: input.zoneId,
+        p_expected_version: input.expectedVersion,
+        p_name: input.name,
+        p_fee_minor: input.feeMinor,
+        p_minimum_order_minor: input.minimumOrderMinor,
+        p_priority: input.priority,
+        p_active: input.active,
+        p_boundary_json: input.boundary,
+        p_fallback_shop_id: input.fallbackShopId,
+        p_fallback_enabled: input.fallbackEnabled,
+      });
+    },
+
+    upsertRider(input) {
+      return client.rpc('upsert_admin_delivery_rider_v1', {
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_rider_id: input.riderId,
+        p_expected_version: input.expectedVersion,
+        p_display_name: input.displayName,
+        p_phone: input.phone,
+        p_active: input.active,
+        p_state: input.state,
+      });
+    },
+
     transitionOrder(input) {
       return client.rpc('transition_admin_delivery_order_v1', {
         p_employee_id: input.employeeId,
@@ -419,19 +506,32 @@ export async function handleDeliveryRequest(
     }
 
     if (!requireSameOrigin(request, response)) return;
-    const command = transitionSchema.parse(await readJsonObject(request));
+    const payload = await readJsonObject(request);
+    const type = typeof payload.type === 'string' ? payload.type : '';
     const context = await loadContext(request, client, true);
-    const result = await service.transitionOrder(
-      command,
-      context.principal,
-    );
+    const result =
+      type === 'delivery.zone.upsert'
+        ? await service.upsertZone(
+            zoneUpsertSchema.parse(payload),
+            context.principal,
+          )
+        : type === 'delivery.rider.upsert'
+          ? await service.upsertRider(
+              riderUpsertSchema.parse(payload),
+              context.principal,
+            )
+          : await service.transitionOrder(
+              transitionSchema.parse(payload),
+              context.principal,
+            );
     const status = result.ok
       ? 200
       : result.code.includes('stale') ||
           result.code.includes('conflict') ||
           result.code.includes('transition')
         ? 409
-        : result.code.includes('permission')
+        : result.code.includes('permission') ||
+            result.code.includes('forbidden')
           ? 403
           : 400;
     sendJson(response, status, result);
