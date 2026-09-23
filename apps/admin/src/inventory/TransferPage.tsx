@@ -54,6 +54,9 @@ export function TransferPage({
   const [itemId, setItemId] = useState(transferableItems[0]?.id ?? '');
   const [quantity, setQuantity] = useState('');
   const quantityMicros = positiveMicros(quantity);
+  const selectedDestinationShopId = destinations.includes(destinationShopId)
+    ? destinationShopId
+    : (destinations[0] ?? '');
   const selectedItemId = transferableItems.some((item) => item.id === itemId)
     ? itemId
     : (transferableItems[0]?.id ?? '');
@@ -108,7 +111,7 @@ export function TransferPage({
             <label className="admin-select-field">
               <span>Destination shop</span>
               <select
-                value={destinationShopId}
+                value={selectedDestinationShopId}
                 onChange={(event) => setDestinationShopId(event.target.value)}
               >
                 {destinations.map((destination) => (
@@ -141,14 +144,14 @@ export function TransferPage({
               type="button"
               disabled={
                 sending ||
-                destinationShopId.length === 0 ||
+                selectedDestinationShopId.length === 0 ||
                 selectedItemId.length === 0 ||
                 quantityMicros === null
               }
               onClick={() => {
                 if (quantityMicros === null) return;
                 onSend({
-                  destinationShopId,
+                  destinationShopId: selectedDestinationShopId,
                   lines: [{ inventoryItemId: selectedItemId, quantityMicros }],
                 });
               }}
