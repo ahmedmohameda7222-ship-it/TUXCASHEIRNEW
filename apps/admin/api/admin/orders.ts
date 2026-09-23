@@ -168,6 +168,38 @@ type AuditRow = {
   created_at: string;
 };
 
+type RefundRow = {
+  id: string;
+  amount_minor: number | string;
+  reason_code_id: string;
+  reason_code_key: string;
+  reason_label_snapshot: string;
+  reason_family_snapshot: 'REFUND_RETURN';
+  reason_config_version: number | string;
+  note: string | null;
+  state: 'PENDING_APPROVAL' | 'POSTED';
+  approval_request_id: string | null;
+  created_at: string;
+};
+
+type ReturnRow = {
+  id: string;
+  reason_code_id: string;
+  reason_code_key: string;
+  reason_label_snapshot: string;
+  reason_family_snapshot: 'REFUND_RETURN';
+  reason_config_version: number | string;
+  note: string | null;
+  state: 'PENDING_APPROVAL' | 'POSTED';
+  approval_request_id: string | null;
+  created_at: string;
+};
+
+type ReturnItemRow = {
+  return_id: string;
+  amount_minor: number | string;
+};
+
 type ReasonCodeRow = {
   id: string;
   shop_id: string | null;
@@ -352,7 +384,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       const order = orders[0];
       if (!order) return null;
 
-      const [payments, items, statusRows, movementRows, auditRows] = await Promise.all([
+      const [payments, items, statusRows, movementRows, auditRows, refundRows, returnRows] =
+        await Promise.all([
         client.select<PaymentRow[]>(
           'payments',
           new URLSearchParams({
@@ -404,6 +437,28 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
             order: 'created_at.asc,id.asc',
           }),
         ),
+        client.select<RefundRow[]>(
+          'admin_order_refunds',
+          new URLSearchParams({
+            select:
+              'id,amount_minor,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+            business_id: `eq.${input.businessId}`,
+            shop_id: `eq.${input.shopId}`,
+            order_id: `eq.${input.orderId}`,
+            order: 'created_at.asc,id.asc',
+          }),
+        ),
+        client.select<ReturnRow[]>(
+          'admin_order_returns',
+          new URLSearchParams({
+            select:
+              'id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+            business_id: `eq.${input.businessId}`,
+            shop_id: `eq.${input.shopId}`,
+            order_id: `eq.${input.orderId}`,
+            order: 'created_at.asc,id.asc',
+          }),
+        ),
       ]);
 
       const itemIds = items.map((item) => item.id);
@@ -431,6 +486,56 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
                 }),
               ),
             ]);
+
+      const returnIds = returnRows.map((row) => row.id);
+      const returnItemRows =
+        returnIds.length === 0
+          ? []
+          : await client.select<ReturnItemRow[]>(
+              'admin_order_return_items',
+              new URLSearchParams({
+                select: 'return_id,amount_minor',
+                return_id: `in.(${returnIds.join(',')})`,
+                order: 'created_at.asc,id.asc',
+              }),
+            );
+
+      const financialEvents = [
+        ...refundRows.map((refund) => ({
+          id: refund.id,
+          kind: 'REFUND' as const,
+          state: refund.state,
+          amountMinor: safeInteger(refund.amount_minor),
+          approvalRequestId: refund.approval_request_id,
+          reason: {
+            id: refund.reason_code_id,
+            key: refund.reason_code_key,
+            label: refund.reason_label_snapshot,
+            family: refund.reason_family_snapshot,
+            configurationVersion: safeInteger(refund.reason_config_version),
+          },
+          note: refund.note,
+          createdAt: refund.created_at,
+        })),
+        ...returnRows.map((orderReturn) => ({
+          id: orderReturn.id,
+          kind: 'RETURN' as const,
+          state: orderReturn.state,
+          amountMinor: returnItemRows
+            .filter((item) => item.return_id === orderReturn.id)
+            .reduce((total, item) => total + safeInteger(item.amount_minor), 0),
+          approvalRequestId: orderReturn.approval_request_id,
+          reason: {
+            id: orderReturn.reason_code_id,
+            key: orderReturn.reason_code_key,
+            label: orderReturn.reason_label_snapshot,
+            family: orderReturn.reason_family_snapshot,
+            configurationVersion: safeInteger(orderReturn.reason_config_version),
+          },
+          note: orderReturn.note,
+          createdAt: orderReturn.created_at,
+        })),
+      ].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 
       return {
         id: order.id,
@@ -515,6 +620,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           note: event.note,
           createdAt: event.created_at,
         })),
+        financialEvents,
         inventoryMovements: movementRows.map((movement) => ({
           id: movement.id,
           inventoryItemId: movement.inventory_item_id,
