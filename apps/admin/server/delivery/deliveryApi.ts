@@ -71,6 +71,7 @@ type ZoneRow = {
   fallback_shop_id: string | null;
   fallback_enabled: boolean;
   sort_order: number | string;
+  admin_version: number | string;
 };
 
 type RiderRow = {
@@ -80,6 +81,7 @@ type RiderRow = {
   phone: string | null;
   active: boolean;
   state: AdminDeliveryRider['state'];
+  version: number | string;
 };
 
 type DeliveryOrderRow = {
@@ -126,6 +128,7 @@ function mapZone(row: ZoneRow): AdminDeliveryZone {
     fallbackShopId: row.fallback_shop_id,
     fallbackEnabled: row.fallback_enabled,
     sortOrder: safeInteger(row.sort_order),
+    version: safeInteger(row.admin_version),
   };
 }
 
@@ -154,7 +157,7 @@ async function loadZones(
     'delivery_zones',
     new URLSearchParams({
       select:
-        'id,shop_id,name,fee_minor,minimum_order_minor,priority,active,boundary_json,fallback_shop_id,fallback_enabled,sort_order',
+        'id,shop_id,name,fee_minor,minimum_order_minor,priority,active,boundary_json,fallback_shop_id,fallback_enabled,sort_order,admin_version',
       shop_id: `eq.${shopId}`,
       order: 'priority.desc,sort_order.asc,id.asc',
     }),
@@ -205,7 +208,7 @@ export function createDeliveryStore(
         client.select<RiderRow[]>(
           'delivery_riders',
           new URLSearchParams({
-            select: 'id,shop_id,display_name,phone,active,state',
+            select: 'id,shop_id,display_name,phone,active,state,version',
             business_id: `eq.${input.businessId}`,
             shop_id: `eq.${input.shopId}`,
             order: 'display_name.asc,id.asc',
@@ -233,6 +236,7 @@ export function createDeliveryStore(
           phone: row.phone,
           active: row.active,
           state: row.state,
+          version: safeInteger(row.version),
         })),
         orders: orderRows.map((row) => ({
           orderId: row.order_id,
