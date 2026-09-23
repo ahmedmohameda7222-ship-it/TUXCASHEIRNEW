@@ -111,3 +111,12 @@ export type AdminDeliveryMutationResult =
       replayed: boolean;
     }
   | { ok: false; code: string };
+
+export type AdminDeliveryConfigMutationResult =
+  | {
+      ok: true;
+      version: number;
+      zoneId?: string;
+      riderId?: string;
+    }
+  | { ok: false; code: string; currentVersion?: number };
