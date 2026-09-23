@@ -17,6 +17,7 @@ describe('cached online-order delivery authority', () => {
       customerName: 'Delivery Customer',
       normalizedPhone: '01012345678',
       deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: SHOP_ID,
       deliveryZoneId: ZONE_ID,
       deliveryZoneName: 'Nasr City',
       deliveryFeeMinor: 3000,
