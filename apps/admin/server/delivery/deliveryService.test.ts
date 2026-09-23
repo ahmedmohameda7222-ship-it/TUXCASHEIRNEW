@@ -45,6 +45,7 @@ function zone(
     fallbackShopId: null,
     fallbackEnabled: false,
     sortOrder: 0,
+    version: 1,
     ...overrides,
   };
 }
