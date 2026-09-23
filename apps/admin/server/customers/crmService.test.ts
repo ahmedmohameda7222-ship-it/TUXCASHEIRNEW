@@ -58,13 +58,13 @@ function storeFixture(): CrmStore {
     listPromotions: vi.fn(async () => []),
     upsertLoyaltyProgram: vi.fn(async () => ({ ok: true, version: 1 })),
     adjustLoyalty: vi.fn(async () => ({
-      ok: true,
+      ok: true as const,
       ledgerEventId: '50000000-0000-4000-8000-000000000001',
       balance: 130,
       replayed: false,
     })),
     upsertPromotion: vi.fn(async () => ({
-      ok: true,
+      ok: true as const,
       promotionId: '60000000-0000-4000-8000-000000000001',
       version: 1,
       replayed: false,
