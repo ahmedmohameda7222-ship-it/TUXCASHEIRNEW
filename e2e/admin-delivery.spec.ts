@@ -151,9 +151,12 @@ test('routes delivery mutations through the trusted BFF and clears rider on unas
     priority: 20,
   });
 
-  await page.getByLabel(`Delivery order ${orderId}`).getByRole('button', {
-    name: 'UNASSIGNED',
-  }).click();
+  await page
+    .getByLabel(`Delivery order ${orderId}`)
+    .getByRole('button', {
+      name: 'UNASSIGNED',
+    })
+    .click();
 
   await expect.poll(() => commands.length).toBeGreaterThanOrEqual(2);
   expect(commands[1]).toMatchObject({

@@ -1,7 +1,4 @@
-import type {
-  AdminDeliveryZone,
-  AdminSessionPrincipal,
-} from '@tux/admin-contracts';
+import type { AdminDeliveryZone, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -50,12 +47,14 @@ function zone(
   };
 }
 
-function storeWith(input: {
-  available?: boolean;
-  zones?: readonly AdminDeliveryZone[];
-  fallback?: boolean;
-  open?: boolean;
-} = {}): DeliveryStore {
+function storeWith(
+  input: {
+    available?: boolean;
+    zones?: readonly AdminDeliveryZone[];
+    fallback?: boolean;
+    open?: boolean;
+  } = {},
+): DeliveryStore {
   const fallbackZone = zone('f', fallbackShopId, 5);
   return {
     loadWorkspace: vi.fn(),
@@ -125,9 +124,7 @@ describe('Plan 5 delivery authority', () => {
   });
 
   it('never falls back unless the primary zone explicitly enables it', async () => {
-    const service = createDeliveryService(
-      storeWith({ available: false, fallback: true }),
-    );
+    const service = createDeliveryService(storeWith({ available: false, fallback: true }));
     await expect(
       service.routeAddress(
         {

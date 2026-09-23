@@ -553,18 +553,12 @@ function parseCheckoutSnapshot(value: unknown): NonNullable<OrderSnapshot['check
     ...(source['manualDiscountMinor'] === undefined
       ? {}
       : {
-          manualDiscountMinor: money(
-            source['manualDiscountMinor'],
-            'checkout manualDiscountMinor',
-          ),
+          manualDiscountMinor: money(source['manualDiscountMinor'], 'checkout manualDiscountMinor'),
         }),
     ...(source['rewardDiscountMinor'] === undefined
       ? {}
       : {
-          rewardDiscountMinor: money(
-            source['rewardDiscountMinor'],
-            'checkout rewardDiscountMinor',
-          ),
+          rewardDiscountMinor: money(source['rewardDiscountMinor'], 'checkout rewardDiscountMinor'),
         }),
     paymentRules: arrayValue(source['paymentRules'], 'checkout paymentRules').map((rawRule) => {
       const rule = record(rawRule, 'checkout payment rule');
@@ -670,10 +664,7 @@ function parseAppliedRewardSnapshot(
       'reward configurationVersion',
       1,
     ),
-    rewardDiscountMinor: money(
-      source['rewardDiscountMinor'],
-      'reward discount',
-    ),
+    rewardDiscountMinor: money(source['rewardDiscountMinor'], 'reward discount'),
     promotion,
     loyalty,
   };

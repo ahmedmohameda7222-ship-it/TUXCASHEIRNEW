@@ -880,8 +880,7 @@ export class OperationsOrdersService {
                 deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
                 discountMinor: validation.value.pricing.discountMinor,
                 manualDiscountMinor: draft.discountMinor,
-                rewardDiscountMinor:
-                  rewardReservation?.snapshot.rewardDiscountMinor ?? ZERO_MONEY,
+                rewardDiscountMinor: rewardReservation?.snapshot.rewardDiscountMinor ?? ZERO_MONEY,
                 paymentRules: checkoutPaymentRules,
               },
               rewardReservationId: rewardReservation?.id ?? null,

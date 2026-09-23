@@ -1,7 +1,4 @@
-import type {
-  AdminCustomerDetail,
-  AdminLoyaltyProgram,
-} from '@tux/admin-contracts';
+import type { AdminCustomerDetail, AdminLoyaltyProgram } from '@tux/admin-contracts';
 import { useState, type FormEvent } from 'react';
 
 export type LoyaltyAdjustmentInput = {
@@ -30,11 +27,7 @@ export function LoyaltyPanel({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsed = Number(pointsDelta);
-    if (
-      !Number.isSafeInteger(parsed) ||
-      parsed === 0 ||
-      !reasonCodeId.trim()
-    ) {
+    if (!Number.isSafeInteger(parsed) || parsed === 0 || !reasonCodeId.trim()) {
       return;
     }
     onAdjust({
@@ -72,9 +65,7 @@ export function LoyaltyPanel({
           <div>
             <dt>Point expiry</dt>
             <dd>
-              {program.pointExpiryDays === null
-                ? 'No expiry'
-                : `${program.pointExpiryDays} days`}
+              {program.pointExpiryDays === null ? 'No expiry' : `${program.pointExpiryDays} days`}
             </dd>
           </div>
         </dl>
@@ -89,8 +80,7 @@ export function LoyaltyPanel({
         <ul>
           {customer.loyaltyHistory.map((event) => (
             <li key={event.id}>
-              <strong>{event.eventType}</strong> ·{' '}
-              {event.pointsDelta > 0 ? '+' : ''}
+              <strong>{event.eventType}</strong> · {event.pointsDelta > 0 ? '+' : ''}
               {event.pointsDelta}
               {event.note ? ` · ${event.note}` : ''}
             </li>
@@ -119,16 +109,9 @@ export function LoyaltyPanel({
           </label>
           <label className="admin-field">
             <span>Note</span>
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
-          <button
-            className="admin-primary-button"
-            type="submit"
-            disabled={saving}
-          >
+          <button className="admin-primary-button" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Adjust points'}
           </button>
         </form>

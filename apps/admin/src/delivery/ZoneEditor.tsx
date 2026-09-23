@@ -1,7 +1,4 @@
-import type {
-  AdminDeliveryZone,
-  AdminDeliveryZoneBoundary,
-} from '@tux/admin-contracts';
+import type { AdminDeliveryZone, AdminDeliveryZoneBoundary } from '@tux/admin-contracts';
 import { useEffect, useState, type FormEvent } from 'react';
 
 export type DeliveryZoneDraft = {
@@ -17,9 +14,7 @@ export type DeliveryZoneDraft = {
   fallbackEnabled: boolean;
 };
 
-function initialBoundary(
-  zone: AdminDeliveryZone | null,
-): AdminDeliveryZoneBoundary {
+function initialBoundary(zone: AdminDeliveryZone | null): AdminDeliveryZoneBoundary {
   return (
     zone?.boundary ?? {
       kind: 'RADIUS',
@@ -43,20 +38,12 @@ export function ZoneEditor({
 }) {
   const [name, setName] = useState(zone?.name ?? '');
   const [feeMinor, setFeeMinor] = useState(String(zone?.feeMinor ?? 0));
-  const [minimumOrderMinor, setMinimumOrderMinor] = useState(
-    String(zone?.minimumOrderMinor ?? 0),
-  );
+  const [minimumOrderMinor, setMinimumOrderMinor] = useState(String(zone?.minimumOrderMinor ?? 0));
   const [priority, setPriority] = useState(String(zone?.priority ?? 0));
   const [active, setActive] = useState(zone?.active ?? true);
-  const [boundary, setBoundary] = useState<AdminDeliveryZoneBoundary>(
-    initialBoundary(zone),
-  );
-  const [fallbackEnabled, setFallbackEnabled] = useState(
-    zone?.fallbackEnabled ?? false,
-  );
-  const [fallbackShopId, setFallbackShopId] = useState(
-    zone?.fallbackShopId ?? '',
-  );
+  const [boundary, setBoundary] = useState<AdminDeliveryZoneBoundary>(initialBoundary(zone));
+  const [fallbackEnabled, setFallbackEnabled] = useState(zone?.fallbackEnabled ?? false);
+  const [fallbackShopId, setFallbackShopId] = useState(zone?.fallbackShopId ?? '');
 
   useEffect(() => {
     setName(zone?.name ?? '');
@@ -93,10 +80,7 @@ export function ZoneEditor({
       priority: zonePriority,
       active,
       boundary,
-      fallbackShopId:
-        fallbackEnabled && fallbackShopId.trim()
-          ? fallbackShopId.trim()
-          : null,
+      fallbackShopId: fallbackEnabled && fallbackShopId.trim() ? fallbackShopId.trim() : null,
       fallbackEnabled,
     });
   }
@@ -106,11 +90,7 @@ export function ZoneEditor({
       <h3>{zone ? 'Edit delivery zone' : 'New delivery zone'}</h3>
       <label className="admin-field">
         <span>Name</span>
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
+        <input value={name} onChange={(event) => setName(event.target.value)} required />
       </label>
       <label className="admin-field">
         <span>Delivery fee minor</span>
@@ -219,9 +199,7 @@ export function ZoneEditor({
                 .split('\n')
                 .map((line) => line.split(',').map(Number))
                 .filter(
-                  (point) =>
-                    point.length === 2 &&
-                    point.every((value) => Number.isFinite(value)),
+                  (point) => point.length === 2 && point.every((value) => Number.isFinite(value)),
                 )
                 .map(([latitude, longitude]) => ({
                   latitude: latitude!,
@@ -260,18 +238,10 @@ export function ZoneEditor({
       ) : null}
 
       <div className="admin-actions">
-        <button
-          className="admin-primary-button"
-          type="submit"
-          disabled={saving}
-        >
+        <button className="admin-primary-button" type="submit" disabled={saving}>
           {saving ? 'Saving…' : 'Save delivery zone'}
         </button>
-        <button
-          className="admin-secondary-button"
-          type="button"
-          onClick={onCancel}
-        >
+        <button className="admin-secondary-button" type="button" onClick={onCancel}>
           Cancel
         </button>
       </div>

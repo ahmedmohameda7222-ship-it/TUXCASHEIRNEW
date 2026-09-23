@@ -9,12 +9,7 @@ const session = {
     employeeId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     businessId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
     role: 'OWNER',
-    permissions: [
-      'customers.view',
-      'customers.merge',
-      'loyalty.manage',
-      'promotions.manage',
-    ],
+    permissions: ['customers.view', 'customers.merge', 'loyalty.manage', 'promotions.manage'],
     shopIds: [shopId],
   },
   csrfToken,
@@ -178,20 +173,14 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('renders canonical CRM identity, loyalty history and automatic segments', async ({
-  page,
-}) => {
+test('renders canonical CRM identity, loyalty history and automatic segments', async ({ page }) => {
   await page.goto('/customers');
   await expect(page.getByRole('heading', { name: 'Customers' })).toBeVisible();
-  await expect(
-    page.getByLabel('Customer detail').getByText('+201012345678'),
-  ).toBeVisible();
+  await expect(page.getByLabel('Customer detail').getByText('+201012345678')).toBeVisible();
   await expect(page.getByText('Road 9, Maadi')).toBeVisible();
   await expect(page.getByText('VIP')).toBeVisible();
   await expect(page.getByText('Frequent Delivery')).toBeVisible();
-  await expect(
-    page.getByLabel('Customer loyalty').getByText('120 points'),
-  ).toBeVisible();
+  await expect(page.getByLabel('Customer loyalty').getByText('120 points')).toBeVisible();
   await expect(
     page.getByLabel('Customer loyalty').getByText('EARN', { exact: true }),
   ).toBeVisible();
@@ -208,9 +197,7 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
     .getByLabel('Customer ID to merge into this survivor')
     .fill('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
   await page.getByLabel('Confirm canonical merge').check();
-  await expect(
-    page.getByRole('button', { name: 'Merge customer' }).last(),
-  ).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Merge customer' }).last()).toBeEnabled();
 
   await expect(page.getByLabel('Minimum redemption points')).toBeVisible();
   await expect(page.getByLabel('Point expiry days')).toBeVisible();

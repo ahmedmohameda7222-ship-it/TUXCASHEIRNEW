@@ -32,8 +32,7 @@ export interface OrderRewardReservation {
 }
 
 export type OrderRewardAuthorityErrorCode =
-  | 'REWARD_REQUIRES_ONLINE_RESERVATION'
-  | 'REWARD_NOT_AVAILABLE';
+  'REWARD_REQUIRES_ONLINE_RESERVATION' | 'REWARD_NOT_AVAILABLE';
 
 export interface OrderRewardAuthorityError {
   readonly code: OrderRewardAuthorityErrorCode;

@@ -66,14 +66,12 @@ export function PromotionEditor({
     setProductIds(csv(promotion?.productIds ?? []));
     setCategoryIds(csv(promotion?.categoryIds ?? []));
     setTotalUsageLimit(
-      promotion?.totalUsageLimit === null ||
-      promotion?.totalUsageLimit === undefined
+      promotion?.totalUsageLimit === null || promotion?.totalUsageLimit === undefined
         ? ''
         : String(promotion.totalUsageLimit),
     );
     setPerCustomerUsageLimit(
-      promotion?.perCustomerUsageLimit === null ||
-      promotion?.perCustomerUsageLimit === undefined
+      promotion?.perCustomerUsageLimit === null || promotion?.perCustomerUsageLimit === undefined
         ? ''
         : String(promotion.perCustomerUsageLimit),
     );
@@ -117,19 +115,13 @@ export function PromotionEditor({
       <h3>{promotion ? 'Edit promotion' : 'New promotion'}</h3>
       <label className="admin-field">
         <span>Name</span>
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
+        <input value={name} onChange={(event) => setName(event.target.value)} required />
       </label>
       <label className="admin-field">
         <span>Type</span>
         <select
           value={kind}
-          onChange={(event) =>
-            setKind(event.target.value as AdminPromotionKind)
-          }
+          onChange={(event) => setKind(event.target.value as AdminPromotionKind)}
         >
           <option value="PERCENT">PERCENT</option>
           <option value="FIXED">FIXED</option>
@@ -139,18 +131,11 @@ export function PromotionEditor({
       {kind === 'FREE_ITEM' ? (
         <label className="admin-field">
           <span>Free product ID</span>
-          <input
-            value={freeProductId}
-            onChange={(event) => setFreeProductId(event.target.value)}
-          />
+          <input value={freeProductId} onChange={(event) => setFreeProductId(event.target.value)} />
         </label>
       ) : (
         <label className="admin-field">
-          <span>
-            {kind === 'PERCENT'
-              ? 'Percent basis points'
-              : 'Fixed discount minor'}
-          </span>
+          <span>{kind === 'PERCENT' ? 'Percent basis points' : 'Fixed discount minor'}</span>
           <input
             inputMode="numeric"
             value={value}
@@ -168,17 +153,11 @@ export function PromotionEditor({
       </label>
       <label className="admin-field">
         <span>Start</span>
-        <input
-          value={startsAt}
-          onChange={(event) => setStartsAt(event.target.value)}
-        />
+        <input value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
       </label>
       <label className="admin-field">
         <span>End</span>
-        <input
-          value={endsAt}
-          onChange={(event) => setEndsAt(event.target.value)}
-        />
+        <input value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
       </label>
       <label className="admin-field">
         <span>Channel</span>
@@ -193,17 +172,11 @@ export function PromotionEditor({
       </label>
       <label className="admin-field">
         <span>Product restrictions</span>
-        <input
-          value={productIds}
-          onChange={(event) => setProductIds(event.target.value)}
-        />
+        <input value={productIds} onChange={(event) => setProductIds(event.target.value)} />
       </label>
       <label className="admin-field">
         <span>Category restrictions</span>
-        <input
-          value={categoryIds}
-          onChange={(event) => setCategoryIds(event.target.value)}
-        />
+        <input value={categoryIds} onChange={(event) => setCategoryIds(event.target.value)} />
       </label>
       <label className="admin-field">
         <span>Total usage limit</span>
@@ -242,18 +215,10 @@ export function PromotionEditor({
         Active
       </label>
       <div>
-        <button
-          className="admin-primary-button"
-          type="submit"
-          disabled={saving}
-        >
+        <button className="admin-primary-button" type="submit" disabled={saving}>
           {saving ? 'Saving…' : 'Save promotion'}
         </button>
-        <button
-          className="admin-secondary-button"
-          type="button"
-          onClick={onCancel}
-        >
+        <button className="admin-secondary-button" type="button" onClick={onCancel}>
           Cancel
         </button>
       </div>

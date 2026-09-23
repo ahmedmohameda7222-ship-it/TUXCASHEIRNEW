@@ -160,7 +160,9 @@ export function DeliveryPage() {
             <header className="admin-section-header">
               <div>
                 <h2>Delivery zones</h2>
-                <p>Canonical fee, minimum, boundary, priority and explicit fallback configuration.</p>
+                <p>
+                  Canonical fee, minimum, boundary, priority and explicit fallback configuration.
+                </p>
               </div>
               {canManage ? (
                 <button

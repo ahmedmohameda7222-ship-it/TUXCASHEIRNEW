@@ -41,12 +41,7 @@ export type AdminDeliveryRider = {
 };
 
 export type AdminDeliveryOrderState =
-  | 'UNASSIGNED'
-  | 'ASSIGNED'
-  | 'OUT_FOR_DELIVERY'
-  | 'DELIVERED'
-  | 'FAILED'
-  | 'RETURNED';
+  'UNASSIGNED' | 'ASSIGNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
 
 export type AdminDeliveryOrder = {
   orderId: string;
@@ -96,10 +91,7 @@ export type DeliveryRouteResult =
     }
   | {
       ok: false;
-      code:
-        | 'delivery_unavailable'
-        | 'delivery_closed'
-        | 'minimum_order_not_met';
+      code: 'delivery_unavailable' | 'delivery_closed' | 'minimum_order_not_met';
     };
 
 export type AdminDeliveryMutationResult =

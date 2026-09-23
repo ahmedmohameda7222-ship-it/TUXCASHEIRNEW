@@ -5,9 +5,7 @@ import type {
 } from '@tux/admin-contracts';
 import { useState } from 'react';
 
-const transitions: Readonly<
-  Record<AdminDeliveryOrderState, readonly AdminDeliveryOrderState[]>
-> = {
+const transitions: Readonly<Record<AdminDeliveryOrderState, readonly AdminDeliveryOrderState[]>> = {
   UNASSIGNED: ['ASSIGNED'],
   ASSIGNED: ['UNASSIGNED', 'OUT_FOR_DELIVERY'],
   OUT_FOR_DELIVERY: ['DELIVERED', 'FAILED', 'RETURNED'],
@@ -46,15 +44,10 @@ export function DeliveryOrderPanel({
       {order.state === 'UNASSIGNED' ? (
         <label className="admin-field">
           <span>Rider</span>
-          <select
-            value={riderId}
-            onChange={(event) => setRiderId(event.target.value)}
-          >
+          <select value={riderId} onChange={(event) => setRiderId(event.target.value)}>
             <option value="">Select rider</option>
             {riders
-              .filter(
-                (rider) => rider.active && rider.state === 'AVAILABLE',
-              )
+              .filter((rider) => rider.active && rider.state === 'AVAILABLE')
               .map((rider) => (
                 <option value={rider.id} key={rider.id}>
                   {rider.displayName}
@@ -66,10 +59,7 @@ export function DeliveryOrderPanel({
 
       <label className="admin-field">
         <span>Note</span>
-        <input
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
+        <input value={note} onChange={(event) => setNote(event.target.value)} />
       </label>
 
       <div className="admin-actions">
@@ -77,10 +67,7 @@ export function DeliveryOrderPanel({
           <button
             className="admin-secondary-button"
             type="button"
-            disabled={
-              saving ||
-              (next === 'ASSIGNED' && !riderId)
-            }
+            disabled={saving || (next === 'ASSIGNED' && !riderId)}
             key={next}
             onClick={() =>
               onTransition({

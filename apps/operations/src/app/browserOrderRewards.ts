@@ -4,17 +4,11 @@ import type {
   OrderRewardReservationInput,
   OrderRewardReservationResult,
 } from '@tux/application';
-import {
-  instant,
-  moneyMinor,
-  parseEntityId,
-  type ProductId,
-} from '@tux/domain';
+import { instant, moneyMinor, parseEntityId, type ProductId } from '@tux/domain';
 
 type UnknownRecord = Record<string, unknown>;
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function object(value: unknown, label: string): UnknownRecord {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -124,9 +118,7 @@ function parseReservation(value: unknown): OrderRewardReservation {
         'Reward configuration version',
         1,
       ),
-      rewardDiscountMinor: moneyMinor(
-        integer(snapshot['rewardDiscountMinor'], 'Reward discount'),
-      ),
+      rewardDiscountMinor: moneyMinor(integer(snapshot['rewardDiscountMinor'], 'Reward discount')),
       promotion,
       loyalty,
     },
@@ -225,7 +217,10 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
     }
   }
 
-  async release(input: { readonly shopId: OrderRewardReservationInput['shopId']; readonly reservationId: string }): Promise<void> {
+  async release(input: {
+    readonly shopId: OrderRewardReservationInput['shopId'];
+    readonly reservationId: string;
+  }): Promise<void> {
     try {
       await fetch('/api/operations-order-rewards', {
         method: 'POST',

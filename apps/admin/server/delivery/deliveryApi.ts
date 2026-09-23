@@ -199,11 +199,7 @@ function mapHours(rows: readonly HoursRow[]): DeliveryHours[] {
 }
 
 function shopAvailable(row: ShopRow | undefined): boolean {
-  return Boolean(
-    row?.active &&
-      row.lifecycle_state !== 'ARCHIVED' &&
-      !row.temporary_closed,
-  );
+  return Boolean(row?.active && row.lifecycle_state !== 'ARCHIVED' && !row.temporary_closed);
 }
 
 async function loadZones(
@@ -240,10 +236,7 @@ async function loadHours(
   return mapHours(rows);
 }
 
-async function loadShop(
-  client: AdminSupabaseClient,
-  shopId: string,
-): Promise<ShopRow | undefined> {
+async function loadShop(client: AdminSupabaseClient, shopId: string): Promise<ShopRow | undefined> {
   const rows = await client.select<ShopRow[]>(
     'shops',
     new URLSearchParams({
@@ -255,9 +248,7 @@ async function loadShop(
   return rows[0];
 }
 
-export function createDeliveryStore(
-  client: AdminSupabaseClient,
-): DeliveryStore {
+export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore {
   return {
     async loadWorkspace(input): Promise<AdminDeliveryWorkspace> {
       const [zones, riderRows, orderRows] = await Promise.all([
@@ -416,10 +407,7 @@ async function loadContext(
   if (!token) throw new AdminAuthError('session_required', 401);
   const context = await loadAdminSession(token, client);
   if (csrfRequired) {
-    requireSessionCsrf(
-      context,
-      firstHeader(request.headers['x-tux-admin-csrf']).trim(),
-    );
+    requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
   }
   return context;
 }
@@ -438,9 +426,7 @@ function handleFailure(response: AdminResponse, error: unknown): void {
     return;
   }
   if (error instanceof AdminSupabaseError) {
-    if (
-      error.responseBody.includes('TUX_ADMIN_DELIVERY_PERMISSION_REQUIRED')
-    ) {
+    if (error.responseBody.includes('TUX_ADMIN_DELIVERY_PERMISSION_REQUIRED')) {
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
@@ -497,11 +483,7 @@ export async function handleDeliveryRequest(
         );
         return;
       }
-      sendJson(
-        response,
-        200,
-        await service.loadWorkspace(shopId, context.principal),
-      );
+      sendJson(response, 200, await service.loadWorkspace(shopId, context.principal));
       return;
     }
 
@@ -511,27 +493,17 @@ export async function handleDeliveryRequest(
     const context = await loadContext(request, client, true);
     const result =
       type === 'delivery.zone.upsert'
-        ? await service.upsertZone(
-            zoneUpsertSchema.parse(payload),
-            context.principal,
-          )
+        ? await service.upsertZone(zoneUpsertSchema.parse(payload), context.principal)
         : type === 'delivery.rider.upsert'
-          ? await service.upsertRider(
-              riderUpsertSchema.parse(payload),
-              context.principal,
-            )
-          : await service.transitionOrder(
-              transitionSchema.parse(payload),
-              context.principal,
-            );
+          ? await service.upsertRider(riderUpsertSchema.parse(payload), context.principal)
+          : await service.transitionOrder(transitionSchema.parse(payload), context.principal);
     const status = result.ok
       ? 200
       : result.code.includes('stale') ||
           result.code.includes('conflict') ||
           result.code.includes('transition')
         ? 409
-        : result.code.includes('permission') ||
-            result.code.includes('forbidden')
+        : result.code.includes('permission') || result.code.includes('forbidden')
           ? 403
           : 400;
     sendJson(response, status, result);

@@ -1,7 +1,4 @@
-import type {
-  AdminPromotion,
-  AdminPromotionUpsertInput,
-} from '@tux/admin-contracts';
+import type { AdminPromotion, AdminPromotionUpsertInput } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -26,10 +23,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
       : 'unauthenticated';
-  const commandIds = useMemo(
-    () => createRetainedCommandIds(namespace),
-    [namespace],
-  );
+  const commandIds = useMemo(() => createRetainedCommandIds(namespace), [namespace]);
 
   const promotionsQuery = useQuery({
     queryKey: ['admin', 'customers', shopId, 'promotions'],
@@ -83,10 +77,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       <header>
         <p className="admin-entry__eyebrow">CRM</p>
         <h2>Promotions</h2>
-        <p>
-          Server-validated promotion rules with immutable historical order
-          snapshots.
-        </p>
+        <p>Server-validated promotion rules with immutable historical order snapshots.</p>
       </header>
 
       <button
@@ -101,9 +92,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
       </button>
 
       {promotionsQuery.isLoading ? <p>Loading promotions…</p> : null}
-      {promotionsQuery.isError ? (
-        <p role="alert">Promotions could not be loaded.</p>
-      ) : null}
+      {promotionsQuery.isError ? <p role="alert">Promotions could not be loaded.</p> : null}
 
       {promotions.length === 0 && !promotionsQuery.isLoading ? (
         <p>No promotions configured.</p>
@@ -119,8 +108,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
                   setEditing(promotion);
                 }}
               >
-                {promotion.name} · {promotion.kind} ·{' '}
-                {promotion.active ? 'Active' : 'Inactive'}
+                {promotion.name} · {promotion.kind} · {promotion.active ? 'Active' : 'Inactive'}
               </button>
             </li>
           ))}
@@ -140,9 +128,7 @@ export function PromotionsPage({ shopId }: { shopId: string }) {
         />
       ) : null}
 
-      {savePromotion.isError ? (
-        <p role="alert">Promotion could not be saved.</p>
-      ) : null}
+      {savePromotion.isError ? <p role="alert">Promotion could not be saved.</p> : null}
     </section>
   );
 }

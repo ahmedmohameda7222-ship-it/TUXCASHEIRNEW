@@ -14,10 +14,7 @@ import { createRetainedCommandIds } from '../lib/retainedCommandIds';
 import { PromotionsPage } from '../promotions/PromotionsPage';
 import { useShopScope } from '../shops/ShopScopeProvider';
 import { CustomerDetailPage } from './CustomerDetailPage';
-import {
-  LoyaltyPanel,
-  type LoyaltyAdjustmentInput,
-} from './LoyaltyPanel';
+import { LoyaltyPanel, type LoyaltyAdjustmentInput } from './LoyaltyPanel';
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') {
@@ -46,10 +43,7 @@ export function CustomersPage() {
     session.state.status === 'authenticated'
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
       : 'unauthenticated';
-  const commandIds = useMemo(
-    () => createRetainedCommandIds(namespace),
-    [namespace],
-  );
+  const commandIds = useMemo(() => createRetainedCommandIds(namespace), [namespace]);
 
   const customersQuery = useQuery({
     queryKey: ['admin', 'customers', shopId, 'list', query],
@@ -66,7 +60,7 @@ export function CustomersPage() {
   const activeCustomerId =
     selectedId && customers.some((customer) => customer.id === selectedId)
       ? selectedId
-      : customers[0]?.id ?? null;
+      : (customers[0]?.id ?? null);
 
   const detailQuery = useQuery({
     queryKey: ['admin', 'customers', shopId, 'detail', activeCustomerId],
@@ -84,9 +78,7 @@ export function CustomersPage() {
     enabled: Boolean(shopId),
     queryFn: () =>
       adminFetch<{ program: AdminLoyaltyProgram | null }>(
-        `/api/admin/customers?shopId=${encodeURIComponent(
-          shopId!,
-        )}&view=loyalty-program`,
+        `/api/admin/customers?shopId=${encodeURIComponent(shopId!)}&view=loyalty-program`,
       ).then((result) => result.program),
   });
 
@@ -168,15 +160,9 @@ export function CustomersPage() {
             type: 'loyalty.program.upsert',
             shopId,
             enabled: programDraft.enabled,
-            earnPointsPer100Minor: Number(
-              programDraft.earnPointsPer100Minor,
-            ),
-            redemptionMinorPerPoint: Number(
-              programDraft.redemptionMinorPerPoint,
-            ),
-            minimumRedemptionPoints: Number(
-              programDraft.minimumRedemptionPoints,
-            ),
+            earnPointsPer100Minor: Number(programDraft.earnPointsPer100Minor),
+            redemptionMinorPerPoint: Number(programDraft.redemptionMinorPerPoint),
+            minimumRedemptionPoints: Number(programDraft.minimumRedemptionPoints),
             pointExpiryDays: programDraft.pointExpiryDays.trim()
               ? Number(programDraft.pointExpiryDays)
               : null,
@@ -227,9 +213,7 @@ export function CustomersPage() {
       <div className="admin-inventory-layout">
         <section className="admin-inventory-list" aria-label="Customers">
           {customersQuery.isLoading ? <p>Loading customers…</p> : null}
-          {customersQuery.isError ? (
-            <p role="alert">Customers could not be loaded.</p>
-          ) : null}
+          {customersQuery.isError ? <p role="alert">Customers could not be loaded.</p> : null}
           {customers.map((customer) => (
             <button
               className={
@@ -273,34 +257,24 @@ export function CustomersPage() {
                     <span>Customer ID to merge into this survivor</span>
                     <input
                       value={mergeTargetId}
-                      onChange={(event) =>
-                        setMergeTargetId(event.target.value)
-                      }
+                      onChange={(event) => setMergeTargetId(event.target.value)}
                     />
                   </label>
                   <label>
                     <input
                       type="checkbox"
                       checked={mergeConfirmed}
-                      onChange={(event) =>
-                        setMergeConfirmed(event.target.checked)
-                      }
+                      onChange={(event) => setMergeConfirmed(event.target.checked)}
                     />
                     Confirm canonical merge
                   </label>
                   <button
                     className="admin-secondary-button"
                     type="button"
-                    disabled={
-                      mergeCustomer.isPending ||
-                      !mergeConfirmed ||
-                      !mergeTargetId.trim()
-                    }
+                    disabled={mergeCustomer.isPending || !mergeConfirmed || !mergeTargetId.trim()}
                     onClick={() => mergeCustomer.mutate()}
                   >
-                    {mergeCustomer.isPending
-                      ? 'Merging…'
-                      : 'Merge customer'}
+                    {mergeCustomer.isPending ? 'Merging…' : 'Merge customer'}
                   </button>
                 </section>
               ) : null}
@@ -379,11 +353,7 @@ export function CustomersPage() {
               }
             />
           </label>
-          <button
-            className="admin-primary-button"
-            type="submit"
-            disabled={saveProgram.isPending}
-          >
+          <button className="admin-primary-button" type="submit" disabled={saveProgram.isPending}>
             {saveProgram.isPending ? 'Saving…' : 'Save loyalty program'}
           </button>
         </form>
@@ -391,9 +361,7 @@ export function CustomersPage() {
 
       {canManagePromotions ? <PromotionsPage shopId={shopId} /> : null}
 
-      {adjustLoyalty.isError ||
-      mergeCustomer.isError ||
-      saveProgram.isError ? (
+      {adjustLoyalty.isError || mergeCustomer.isError || saveProgram.isError ? (
         <p role="alert">Customer CRM action failed.</p>
       ) : null}
     </PageScaffold>

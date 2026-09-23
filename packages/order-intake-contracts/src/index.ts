@@ -196,9 +196,7 @@ function parseRewardIntent(value: unknown): OnlineOrderRewardIntentV1 {
   assertExactKeys(record, REWARD_KEYS, 'request.reward');
   return {
     promotionId:
-      record.promotionId === null
-        ? null
-        : asUuid(record.promotionId, 'request.reward.promotionId'),
+      record.promotionId === null ? null : asUuid(record.promotionId, 'request.reward.promotionId'),
     loyaltyPointsToRedeem: asNonNegativeInteger(
       record.loyaltyPointsToRedeem,
       'request.reward.loyaltyPointsToRedeem',

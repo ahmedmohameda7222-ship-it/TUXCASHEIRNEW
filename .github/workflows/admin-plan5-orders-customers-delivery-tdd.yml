@@ -298,7 +298,6 @@ jobs:
       - name: Plan 5 loyalty mutation PostgreSQL behavior
         run: node scripts/test-admin-loyalty-postgres.mjs
 
-
   task4-crm-promotions-e2e:
     needs: task4-loyalty
     runs-on: ubuntu-latest

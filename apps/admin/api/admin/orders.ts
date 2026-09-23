@@ -778,10 +778,7 @@ export default async function handler(
   if (routedUrl.searchParams.get('__adminResource') === 'customers') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
-    if (
-      routedUrl.searchParams.has('view') ||
-      routedUrl.searchParams.get('surface') === 'crm'
-    ) {
+    if (routedUrl.searchParams.has('view') || routedUrl.searchParams.get('surface') === 'crm') {
       await handleCrmRequest(request, response);
       return;
     }

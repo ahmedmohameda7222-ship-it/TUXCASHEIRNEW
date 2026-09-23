@@ -21,22 +21,21 @@ export type DeliveryHours = {
 };
 
 export interface DeliveryStore {
-  loadWorkspace(input: {
-    businessId: string;
-    shopId: string;
-  }): Promise<AdminDeliveryWorkspace>;
-  loadRoutingContext(input: {
-    businessId: string;
-    requestedShopId: string;
-  }): Promise<{
+  loadWorkspace(input: { businessId: string; shopId: string }): Promise<AdminDeliveryWorkspace>;
+  loadRoutingContext(input: { businessId: string; requestedShopId: string }): Promise<{
     requestedShopAvailable: boolean;
     requestedShopHours: readonly DeliveryHours[];
     zones: readonly AdminDeliveryZone[];
-    fallbackShops: Readonly<Record<string, {
-      available: boolean;
-      hours: readonly DeliveryHours[];
-      zones: readonly AdminDeliveryZone[];
-    }>>;
+    fallbackShops: Readonly<
+      Record<
+        string,
+        {
+          available: boolean;
+          hours: readonly DeliveryHours[];
+          zones: readonly AdminDeliveryZone[];
+        }
+      >
+    >;
   }>;
   upsertZone(input: {
     businessId: string;
@@ -89,9 +88,7 @@ function distanceMeters(
   const latitude2 = radians(right.latitude);
   const haversine =
     Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latitude1) *
-      Math.cos(latitude2) *
-      Math.sin(longitudeDelta / 2) ** 2;
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
   return earthRadius * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
@@ -100,14 +97,17 @@ function pointInPolygon(
   polygon: readonly { latitude: number; longitude: number }[],
 ): boolean {
   let inside = false;
-  for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+  for (
+    let current = 0, previous = polygon.length - 1;
+    current < polygon.length;
+    previous = current++
+  ) {
     const a = polygon[current]!;
     const b = polygon[previous]!;
     const crosses =
       a.latitude > point.latitude !== b.latitude > point.latitude &&
       point.longitude <
-        ((b.longitude - a.longitude) * (point.latitude - a.latitude)) /
-          (b.latitude - a.latitude) +
+        ((b.longitude - a.longitude) * (point.latitude - a.latitude)) / (b.latitude - a.latitude) +
           a.longitude;
     if (crosses) inside = !inside;
   }
@@ -120,14 +120,9 @@ export function zoneContains(
 ): boolean {
   if (!zone.active || zone.boundary === null) return false;
   if (zone.boundary.kind === 'RADIUS') {
-    return (
-      distanceMeters(point, zone.boundary) <= zone.boundary.radiusMeters
-    );
+    return distanceMeters(point, zone.boundary) <= zone.boundary.radiusMeters;
   }
-  return (
-    zone.boundary.points.length >= 3 &&
-    pointInPolygon(point, zone.boundary.points)
-  );
+  return zone.boundary.points.length >= 3 && pointInPolygon(point, zone.boundary.points);
 }
 
 function cairoLocalParts(at: string): { dayOfWeek: number; time: string } {
@@ -159,10 +154,7 @@ function cairoLocalParts(at: string): { dayOfWeek: number; time: string } {
   return { dayOfWeek: days[weekday]!, time: `${hour}:${minute}` };
 }
 
-export function isDeliveryOpen(
-  hours: readonly DeliveryHours[],
-  at: string,
-): boolean {
+export function isDeliveryOpen(hours: readonly DeliveryHours[], at: string): boolean {
   const local = cairoLocalParts(at);
   return hours.some((window) => {
     if (!window.active || window.dayOfWeek !== local.dayOfWeek) return false;
@@ -240,21 +232,18 @@ export function createDeliveryService(store: DeliveryStore) {
         if (!isDeliveryOpen(context.requestedShopHours, input.at)) {
           return { ok: false, code: 'delivery_closed' };
         }
-        return routeForZone(
-          primary,
-          input.requestedShopId,
-          input.subtotalMinor,
-          false,
-        );
+        return routeForZone(primary, input.requestedShopId, input.subtotalMinor, false);
       }
 
-      const fallbackIds = [...new Set(
-        context.zones
-          .filter((zone) => zoneContains(zone, point))
-          .filter((zone) => zone.fallbackEnabled && zone.fallbackShopId)
-          .sort((a, b) => b.priority - a.priority)
-          .map((zone) => zone.fallbackShopId!),
-      )];
+      const fallbackIds = [
+        ...new Set(
+          context.zones
+            .filter((zone) => zoneContains(zone, point))
+            .filter((zone) => zone.fallbackEnabled && zone.fallbackShopId)
+            .sort((a, b) => b.priority - a.priority)
+            .map((zone) => zone.fallbackShopId!),
+        ),
+      ];
       for (const fallbackShopId of fallbackIds) {
         const fallback = context.fallbackShops[fallbackShopId];
         if (!fallback?.available || !isDeliveryOpen(fallback.hours, input.at)) {
@@ -262,12 +251,7 @@ export function createDeliveryService(store: DeliveryStore) {
         }
         const zone = selectZone(fallback.zones, point);
         if (zone) {
-          return routeForZone(
-            zone,
-            fallbackShopId,
-            input.subtotalMinor,
-            true,
-          );
+          return routeForZone(zone, fallbackShopId, input.subtotalMinor, true);
         }
       }
       return { ok: false, code: 'delivery_unavailable' };
@@ -354,9 +338,7 @@ export function allowedDeliveryTransition(
   return allowed[current].includes(next);
 }
 
-export function riderCanBeAssigned(
-  rider: Pick<AdminDeliveryRider, 'active' | 'state'>,
-): boolean {
+export function riderCanBeAssigned(rider: Pick<AdminDeliveryRider, 'active' | 'state'>): boolean {
   return rider.active && rider.state === 'AVAILABLE';
 }
 

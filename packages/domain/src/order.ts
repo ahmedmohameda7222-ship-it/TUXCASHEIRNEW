@@ -73,13 +73,12 @@ export function assertOrderSnapshotIntegrity(order: OrderSnapshot): void {
         'Checkout manual/reward discount classification must be complete when present.',
       );
     }
-    if (
-      snapshot.manualDiscountMinor !== undefined &&
-      snapshot.rewardDiscountMinor !== undefined
-    ) {
+    if (snapshot.manualDiscountMinor !== undefined && snapshot.rewardDiscountMinor !== undefined) {
       assertNonNegativeMoney(snapshot.manualDiscountMinor, 'Manual discount');
       assertNonNegativeMoney(snapshot.rewardDiscountMinor, 'Reward discount');
-      if (addMoney(snapshot.manualDiscountMinor, snapshot.rewardDiscountMinor) !== order.discountMinor) {
+      if (
+        addMoney(snapshot.manualDiscountMinor, snapshot.rewardDiscountMinor) !== order.discountMinor
+      ) {
         throw new DomainInvariantError(
           'Checkout manual and reward discounts must sum to the order discount.',
         );

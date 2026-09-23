@@ -24,8 +24,7 @@ export function RidersPage({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [active, setActive] = useState(true);
-  const [state, setState] =
-    useState<AdminDeliveryRider['state']>('AVAILABLE');
+  const [state, setState] = useState<AdminDeliveryRider['state']>('AVAILABLE');
 
   function begin(rider: AdminDeliveryRider | null) {
     setEditingId(rider?.id ?? '');
@@ -54,11 +53,7 @@ export function RidersPage({
     <section aria-label="Delivery riders">
       <header>
         <h2>Riders</h2>
-        <button
-          className="admin-primary-button"
-          type="button"
-          onClick={() => begin(null)}
-        >
+        <button className="admin-primary-button" type="button" onClick={() => begin(null)}>
           New rider
         </button>
       </header>
@@ -69,13 +64,8 @@ export function RidersPage({
         <ul>
           {riders.map((rider) => (
             <li key={rider.id}>
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() => begin(rider)}
-              >
-                {rider.displayName} · {rider.state} ·{' '}
-                {rider.active ? 'Active' : 'Inactive'}
+              <button className="admin-secondary-button" type="button" onClick={() => begin(rider)}>
+                {rider.displayName} · {rider.state} · {rider.active ? 'Active' : 'Inactive'}
               </button>
             </li>
           ))}
@@ -87,26 +77,17 @@ export function RidersPage({
           <h3>{editing ? 'Edit rider' : 'New rider'}</h3>
           <label className="admin-field">
             <span>Name</span>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
+            <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
           <label className="admin-field">
             <span>Phone</span>
-            <input
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} />
           </label>
           <label className="admin-field">
             <span>Availability</span>
             <select
               value={state}
-              onChange={(event) =>
-                setState(event.target.value as AdminDeliveryRider['state'])
-              }
+              onChange={(event) => setState(event.target.value as AdminDeliveryRider['state'])}
             >
               <option value="AVAILABLE">AVAILABLE</option>
               <option value="UNAVAILABLE">UNAVAILABLE</option>
@@ -121,11 +102,7 @@ export function RidersPage({
             Active
           </label>
           <div className="admin-actions">
-            <button
-              className="admin-primary-button"
-              type="submit"
-              disabled={saving}
-            >
+            <button className="admin-primary-button" type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save rider'}
             </button>
             <button

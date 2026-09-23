@@ -153,8 +153,7 @@ function parseReward(value: unknown): OrderRewardRequest | null | undefined {
   const reward = record(value, 'OrderDraft.reward');
   const promotionId = reward['promotionId'];
   return {
-    promotionId:
-      promotionId === null ? null : uuid(promotionId, 'OrderDraft.reward.promotionId'),
+    promotionId: promotionId === null ? null : uuid(promotionId, 'OrderDraft.reward.promotionId'),
     loyaltyPointsToRedeem: safeInteger(
       reward['loyaltyPointsToRedeem'],
       'OrderDraft.reward.loyaltyPointsToRedeem',
