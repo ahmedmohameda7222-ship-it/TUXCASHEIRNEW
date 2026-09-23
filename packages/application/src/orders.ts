@@ -589,6 +589,7 @@ export class OperationsOrdersService {
   ): Promise<OrderPlacementResult> {
     const committed = await this.#coordinator.runExclusive(
       async (): Promise<Result<CommittedOrderPlacement, OrderPlacementError>> => {
+        let activeRewardReservation: { readonly shopId: ShopId; readonly id: string } | null = null;
         try {
           const existing = await this.#database.transaction((transaction) =>
             transaction.orders.getByIdempotencyKey(draft.shopId, draft.checkoutIntentKey),
@@ -619,8 +620,110 @@ export class OperationsOrdersService {
             });
           }
 
-          const validation = validateOrderDraft(draft, context.configuration, placement.source);
+          const initialValidation = validateOrderDraft(
+            draft,
+            context.configuration,
+            placement.source,
+          );
+          if (!initialValidation.valid) {
+            return err({
+              code: 'VALIDATION_ERROR',
+              message: initialValidation.issues[0]?.message ?? 'Order validation failed.',
+              validationIssues: initialValidation.issues,
+            });
+          }
+
+          let rewardReservation: OrderRewardReservation | null = null;
+          const rewardRequest = draft.reward ?? null;
+          const rewardRequested =
+            rewardRequest !== null &&
+            (rewardRequest.promotionId !== null || rewardRequest.loyaltyPointsToRedeem > 0);
+          if (rewardRequested) {
+            if (
+              !Number.isSafeInteger(rewardRequest.loyaltyPointsToRedeem) ||
+              rewardRequest.loyaltyPointsToRedeem < 0
+            ) {
+              return err({
+                code: 'VALIDATION_ERROR',
+                message: 'Loyalty redemption points are invalid.',
+              });
+            }
+
+            const reserved = await this.#rewardAuthority.reserve({
+              shopId: context.shopId,
+              checkoutIntentId: draft.checkoutIntentKey,
+              channel: placement.source,
+              customerPhone:
+                initialValidation.value.normalizedDeliveryPhone ??
+                (draft.delivery.normalizedPhone.trim() ||
+                  draft.delivery.displayPhone.trim() ||
+                  null),
+              promotionId: rewardRequest.promotionId,
+              loyaltyPointsToRedeem: rewardRequest.loyaltyPointsToRedeem,
+              items: draft.lines.map((line) => ({
+                productId: line.productId,
+                quantity: line.quantity,
+                modifiers: line.modifiers.map((modifier) => ({
+                  modifierId: modifier.modifierId,
+                  quantity: modifier.quantity,
+                })),
+                comboBeverageProductIds: line.comboBeverages.map((beverage) => beverage.productId),
+              })),
+            });
+            if (!reserved.ok) {
+              return err({
+                code: reserved.error.code,
+                message: reserved.error.message,
+              });
+            }
+
+            rewardReservation = reserved.value;
+            activeRewardReservation = { shopId: context.shopId, id: rewardReservation.id };
+            const nowMs = Date.parse(this.#runtime.now());
+            const expiryMs = Date.parse(rewardReservation.expiresAt);
+            if (!Number.isFinite(expiryMs) || expiryMs <= nowMs) {
+              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
+              activeRewardReservation = null;
+              return err({
+                code: 'REWARD_NOT_AVAILABLE',
+                message: 'The reward reservation expired before checkout could finalize.',
+              });
+            }
+            if (
+              draft.discountMinor > ZERO_MONEY &&
+              rewardReservation.snapshot.rewardDiscountMinor > ZERO_MONEY &&
+              !initialValidation.value.checkoutPolicy.allowDiscountStacking
+            ) {
+              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
+              activeRewardReservation = null;
+              return err({
+                code: 'REWARD_NOT_AVAILABLE',
+                message:
+                  'The published checkout policy does not allow reward and manual discounts to stack.',
+              });
+            }
+          }
+
+          const effectiveDraft: OrderDraft =
+            rewardReservation === null
+              ? draft
+              : {
+                  ...draft,
+                  discountMinor: addMoney(
+                    draft.discountMinor,
+                    rewardReservation.snapshot.rewardDiscountMinor,
+                  ),
+                };
+          const validation = validateOrderDraft(
+            effectiveDraft,
+            context.configuration,
+            placement.source,
+          );
           if (!validation.valid) {
+            if (rewardReservation !== null) {
+              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
+              activeRewardReservation = null;
+            }
             return err({
               code: 'VALIDATION_ERROR',
               message: validation.issues[0]?.message ?? 'Order validation failed.',
@@ -629,17 +732,22 @@ export class OperationsOrdersService {
           }
 
           const preparedPayments = preparePaymentParts(
-            draft.payment,
+            effectiveDraft.payment,
             context.configuration.paymentMethods,
             validation.value.pricing.totalMinor,
             {
               channel: placement.source,
               deliveryZoneId:
-                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+                validation.value.orderType.behavior === 'DELIVERY'
+                  ? effectiveDraft.delivery.zoneId
+                  : null,
               paymentMethodZoneRules: context.configuration.settings?.paymentMethodZoneRules,
             },
           );
-          const inventoryUsage = calculateInventoryConsumption(draft, context.configuration);
+          const inventoryUsage = calculateInventoryConsumption(
+            effectiveDraft,
+            context.configuration,
+          );
           const committedAt = this.#runtime.now();
           const operator = context.operator;
 
@@ -771,8 +879,13 @@ export class OperationsOrdersService {
                 taxMinor: validation.value.pricing.taxMinor,
                 deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
                 discountMinor: validation.value.pricing.discountMinor,
+                manualDiscountMinor: draft.discountMinor,
+                rewardDiscountMinor:
+                  rewardReservation?.snapshot.rewardDiscountMinor ?? ZERO_MONEY,
                 paymentRules: checkoutPaymentRules,
               },
+              rewardReservationId: rewardReservation?.id ?? null,
+              appliedRewardSnapshot: rewardReservation?.snapshot ?? null,
               totalMinor: validation.value.pricing.totalMinor,
               payments,
             };
@@ -815,12 +928,19 @@ export class OperationsOrdersService {
             return { order, replayed: false } as const;
           });
 
+          activeRewardReservation = null;
           return ok({
             order: commitResult.order,
             replayed: commitResult.replayed,
             configuration: context.configuration,
           });
         } catch (cause) {
+          if (activeRewardReservation !== null) {
+            await this.#releaseRewardQuietly(
+              activeRewardReservation.shopId,
+              activeRewardReservation.id,
+            );
+          }
           if (cause instanceof DomainInvariantError) {
             return err({ code: 'CONFLICT_ERROR', message: cause.message, cause });
           }
