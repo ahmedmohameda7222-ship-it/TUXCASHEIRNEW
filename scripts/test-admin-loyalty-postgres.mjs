@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -28,6 +28,41 @@ function psql(args, label) {
 function rpc(sql, label) {
   return JSON.parse(psql(['-At', '-c', `select (${sql})::text`], label).trim());
 }
+function psqlAsync(args, label) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.once('error', rejectPromise);
+    child.once('close', (code) => {
+      if (code !== 0) {
+        rejectPromise(
+          new Error(
+            `${label} failed with exit code ${code ?? 'unknown'}: ${stdout}\n${stderr}`,
+          ),
+        );
+        return;
+      }
+      resolvePromise(stdout);
+    });
+  });
+}
+
+async function rpcAsync(sql, label) {
+  const stdout = await psqlAsync(['-At', '-c', `select (${sql})::text`], label);
+  return JSON.parse(stdout.trim());
+}
+
 
 psql(
   [
@@ -283,6 +318,137 @@ const consumedReplay = rpc(
 );
 if (consumedReplay.ok !== true || consumedReplay.replayed !== true) {
   throw new Error(`reward consume replay failed: ${JSON.stringify(consumedReplay)}`);
+}
+
+const racePromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    null,
+    'Cross channel last slot',
+    true,
+    'FIXED',
+    null,
+    500,
+    null,
+    '2026-09-20T00:00:00Z'::timestamptz,
+    '2026-09-30T00:00:00Z'::timestamptz,
+    0,
+    array['${SHOP_ID}'::uuid],
+    'BOTH',
+    array[]::uuid[],
+    array[]::uuid[],
+    1,
+    null,
+    'ONE_ORDER_LEVEL',
+    null,
+    'promotion-upsert-race'
+  )`,
+  'Cross-channel promotion upsert',
+);
+if (racePromotion.ok !== true || typeof racePromotion.promotionId !== 'string') {
+  throw new Error(`cross-channel promotion upsert failed: ${JSON.stringify(racePromotion)}`);
+}
+
+const [posSlot, onlineSlot] = await Promise.all([
+  rpcAsync(
+    `public.reserve_order_rewards_v1(
+      '${BUSINESS_ID}'::uuid,
+      '${SHOP_ID}'::uuid,
+      null,
+      'race-promo-pos',
+      '${racePromotion.promotionId}'::uuid,
+      0,
+      'POS',
+      10000,
+      array['${PRODUCT_ID}'::uuid],
+      array['${CATEGORY_ID}'::uuid],
+      '2026-09-23T05:20:00Z'::timestamptz
+    )`,
+    'POS last-slot reservation',
+  ),
+  rpcAsync(
+    `public.reserve_order_rewards_v1(
+      '${BUSINESS_ID}'::uuid,
+      '${SHOP_ID}'::uuid,
+      null,
+      'race-promo-online',
+      '${racePromotion.promotionId}'::uuid,
+      0,
+      'ONLINE',
+      10000,
+      array['${PRODUCT_ID}'::uuid],
+      array['${CATEGORY_ID}'::uuid],
+      '2026-09-23T05:20:00Z'::timestamptz
+    )`,
+    'ONLINE last-slot reservation',
+  ),
+]);
+const slotResults = [posSlot, onlineSlot];
+if (
+  slotResults.filter((result) => result.ok === true).length !== 1 ||
+  slotResults.filter((result) => result.code === 'reward_not_available').length !== 1
+) {
+  throw new Error(`POS-vs-ONLINE last-slot race was not exclusive: ${JSON.stringify(slotResults)}`);
+}
+
+const [posLoyalty, onlineLoyalty] = await Promise.all([
+  rpcAsync(
+    `public.reserve_order_rewards_v1(
+      '${BUSINESS_ID}'::uuid,
+      '${SHOP_ID}'::uuid,
+      '${CUSTOMER_ID}'::uuid,
+      'race-loyalty-pos',
+      null,
+      100,
+      'POS',
+      10000,
+      array['${PRODUCT_ID}'::uuid],
+      array['${CATEGORY_ID}'::uuid],
+      '2026-09-23T05:21:00Z'::timestamptz
+    )`,
+    'POS loyalty overspend reservation',
+  ),
+  rpcAsync(
+    `public.reserve_order_rewards_v1(
+      '${BUSINESS_ID}'::uuid,
+      '${SHOP_ID}'::uuid,
+      '${CUSTOMER_ID}'::uuid,
+      'race-loyalty-online',
+      null,
+      100,
+      'ONLINE',
+      10000,
+      array['${PRODUCT_ID}'::uuid],
+      array['${CATEGORY_ID}'::uuid],
+      '2026-09-23T05:21:00Z'::timestamptz
+    )`,
+    'ONLINE loyalty overspend reservation',
+  ),
+]);
+const loyaltyRaceResults = [posLoyalty, onlineLoyalty];
+if (
+  loyaltyRaceResults.filter((result) => result.ok === true).length !== 1 ||
+  loyaltyRaceResults.filter((result) => result.code === 'loyalty_balance_changed').length !== 1
+) {
+  throw new Error(
+    `cross-device loyalty overspend race was not exclusive: ${JSON.stringify(loyaltyRaceResults)}`,
+  );
+}
+
+for (const result of [...slotResults, ...loyaltyRaceResults]) {
+  if (result.ok === true && typeof result.reservationId === 'string') {
+    const released = rpc(
+      `public.release_order_reward_reservation_v1(
+        '${result.reservationId}'::uuid,
+        '2026-09-23T05:22:00Z'::timestamptz
+      )`,
+      'Race reservation cleanup',
+    );
+    if (released.ok !== true) {
+      throw new Error(`race reservation cleanup failed: ${JSON.stringify(released)}`);
+    }
+  }
 }
 
 const readback = JSON.parse(
