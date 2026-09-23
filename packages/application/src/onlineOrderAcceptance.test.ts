@@ -220,6 +220,28 @@ function deliveryConfirmation(cashReceivedMinor = 25_000, finalDeliveryFeeMinor 
 }
 
 describe('prepareOnlineOrderAcceptanceDraft', () => {
+  it('propagates ONLINE reward intent to canonical placement without trusting a submitted discount', () => {
+    const promotionId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const rewardedRequest = {
+      ...request(),
+      promotionId,
+      loyaltyPointsToRedeem: 20,
+    } as CachedOnlineOrderRequest;
+
+    const draft = prepareOnlineOrderAcceptanceDraft({
+      request: rewardedRequest,
+      workspace: workspace(),
+      confirmation: deliveryConfirmation(),
+      runtime,
+    });
+
+    expect(draft.discountMinor).toBe(moneyMinor(0));
+    expect(draft.reward).toEqual({
+      promotionId,
+      loyaltyPointsToRedeem: 20,
+    });
+  });
+
   it('builds a worker-confirmed DELIVERY draft from a live PROCESSING request', () => {
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: request(),
