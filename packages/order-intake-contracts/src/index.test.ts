@@ -44,6 +44,32 @@ describe('online order intake transport contract', () => {
     expect(parseOnlineOrderRequestV1(validRequest())).toEqual(validRequest());
   });
 
+  it('accepts reward intent without accepting a client-authored reward result', () => {
+    const promotionId = '88888888-8888-4888-8888-888888888888';
+    const parsed = parseOnlineOrderRequestV1({
+      ...validRequest(),
+      reward: {
+        promotionId,
+        loyaltyPointsToRedeem: 20,
+      },
+    });
+
+    expect(parsed.reward).toEqual({
+      promotionId,
+      loyaltyPointsToRedeem: 20,
+    });
+    expect(() =>
+      parseOnlineOrderRequestV1({
+        ...validRequest(),
+        reward: {
+          promotionId,
+          loyaltyPointsToRedeem: 20,
+          discountMinor: 1_200,
+        },
+      }),
+    ).toThrow(OnlineOrderIntakeContractError);
+  });
+
   it('allows pickup to omit phone and address because delivery identity is not required', () => {
     const request = validRequest();
     const parsed = parseOnlineOrderRequestV1({
