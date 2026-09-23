@@ -164,6 +164,22 @@ jobs:
       - name: Plan 5 Task 2 order detail RED/behavior
         run: npx vitest run apps/admin/src/orders/OrderDetailPage.test.tsx apps/admin/src/orders/OrdersTask2.test.tsx
 
+  task2-orders-e2e:
+    needs: task2-orders-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 Task 2 Orders browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts
+
   task3-customers-static:
     runs-on: ubuntu-latest
     steps:
