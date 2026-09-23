@@ -122,7 +122,7 @@ test('renders canonical delivery zones, riders, and delivery-order state', async
   await mockDelivery(page);
   await page.goto('/delivery');
 
-  await expect(page.getByRole('heading', { name: 'Delivery' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Delivery', exact: true })).toBeVisible();
   await expect(page.getByText('Maadi Core')).toBeVisible();
   await expect(page.getByText('25.00 EGP')).toBeVisible();
   await expect(page.getByText('120.00 EGP minimum')).toBeVisible();
