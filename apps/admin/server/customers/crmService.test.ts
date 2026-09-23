@@ -101,9 +101,9 @@ describe('CRM service', () => {
     const store = storeFixture();
     const service = createCrmService(store);
 
-    await expect(
-      service.listCustomers({ shopId, query: '' }, principal([])),
-    ).rejects.toThrow(/permission_forbidden/);
+    await expect(service.listCustomers({ shopId, query: '' }, principal([]))).rejects.toThrow(
+      /permission_forbidden/,
+    );
 
     await expect(
       service.upsertLoyaltyProgram(
@@ -121,9 +121,9 @@ describe('CRM service', () => {
       ),
     ).rejects.toThrow(/permission_forbidden/);
 
-    await expect(
-      service.listPromotions({ shopId }, principal(['customers.view'])),
-    ).rejects.toThrow(/permission_forbidden/);
+    await expect(service.listPromotions({ shopId }, principal(['customers.view']))).rejects.toThrow(
+      /permission_forbidden/,
+    );
   });
 
   it('passes only trusted principal identity into loyalty and promotion mutations', async () => {
