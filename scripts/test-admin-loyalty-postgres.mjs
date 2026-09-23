@@ -528,25 +528,25 @@ if (
 psql(
   [
     '-c',
-    \`insert into public.business_customers(id, business_id, normalized_phone, display_name)
-       values ('\${EXPIRY_CUSTOMER_ID}', '\${BUSINESS_ID}', '+201000000008', 'Expiry Customer');
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values ('${EXPIRY_CUSTOMER_ID}', '${BUSINESS_ID}', '+201000000008', 'Expiry Customer');
      insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
-       values ('\${BUSINESS_ID}', '\${SHOP_ID}', '\${EXPIRY_CUSTOMER_ID}');
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${EXPIRY_CUSTOMER_ID}');
      insert into public.admin_reason_codes(
        id, business_id, shop_id, reason_key, family, label, active, version, updated_by_employee_id
      ) values
        (
-         '\${CANCELLATION_REASON_ID}', '\${BUSINESS_ID}', null, 'LOYALTY_CANCEL',
-         'CANCELLATION', 'Loyalty cancellation', true, 1, '\${EMPLOYEE_ID}'
+         '${CANCELLATION_REASON_ID}', '${BUSINESS_ID}', null, 'LOYALTY_CANCEL',
+         'CANCELLATION', 'Loyalty cancellation', true, 1, '${EMPLOYEE_ID}'
        ),
        (
-         '\${REFUND_RETURN_REASON_ID}', '\${BUSINESS_ID}', null, 'LOYALTY_REFUND_RETURN',
-         'REFUND_RETURN', 'Loyalty refund or return', true, 1, '\${EMPLOYEE_ID}'
+         '${REFUND_RETURN_REASON_ID}', '${BUSINESS_ID}', null, 'LOYALTY_REFUND_RETURN',
+         'REFUND_RETURN', 'Loyalty refund or return', true, 1, '${EMPLOYEE_ID}'
        );
      insert into public.payment_methods(
        id, shop_id, display_name, logic_type, requires_reconciliation, active, sort_order
      ) values (
-       '\${PAYMENT_METHOD_ID}', '\${SHOP_ID}', 'Reward cash', 'CASH', false, true, 0
+       '${PAYMENT_METHOD_ID}', '${SHOP_ID}', 'Reward cash', 'CASH', false, true, 0
      );
      insert into public.orders(
        id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
@@ -557,20 +557,20 @@ psql(
        items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
      ) values
        (
-         '\${CANCEL_ORDER_ID}', '\${SHOP_ID}', '\${DAY_ID}', 2, 'loyalty-cancel-order', 'POS', 'ACTIVE',
-         '\${WORKER_ID}', 'Loyalty Worker', '\${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
+         '${CANCEL_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 2, 'loyalty-cancel-order', 'POS', 'ACTIVE',
+         '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
          null, null, null, null, null, null, 0, 0, 10000, 0, 10000, null,
          '2026-09-23T05:30:00Z', '2026-09-23T05:30:00Z'
        ),
        (
-         '\${REFUND_ORDER_ID}', '\${SHOP_ID}', '\${DAY_ID}', 3, 'loyalty-refund-order', 'POS', 'DONE',
-         '\${WORKER_ID}', 'Loyalty Worker', '\${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
+         '${REFUND_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 3, 'loyalty-refund-order', 'POS', 'DONE',
+         '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
          null, null, null, null, null, null, 0, 0, 10000, 0, 10000, null,
          '2026-09-23T05:31:00Z', '2026-09-23T05:31:00Z'
        ),
        (
-         '\${RETURN_ORDER_ID}', '\${SHOP_ID}', '\${DAY_ID}', 4, 'loyalty-return-order', 'POS', 'DONE',
-         '\${WORKER_ID}', 'Loyalty Worker', '\${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
+         '${RETURN_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 4, 'loyalty-return-order', 'POS', 'DONE',
+         '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away', 'TAKE_AWAY',
          null, null, null, null, null, null, 0, 0, 10000, 0, 10000, null,
          '2026-09-23T05:32:00Z', '2026-09-23T05:32:00Z'
        );
@@ -578,7 +578,7 @@ psql(
        id, shop_id, order_id, product_id, product_name_snapshot,
        unit_price_minor, quantity, item_note, line_position
      ) values (
-       '\${RETURN_ITEM_ID}', '\${SHOP_ID}', '\${RETURN_ORDER_ID}', '\${PRODUCT_ID}',
+       '${RETURN_ITEM_ID}', '${SHOP_ID}', '${RETURN_ORDER_ID}', '${PRODUCT_ID}',
        'Reward Burger', 10000, 1, null, 0
      );
      insert into public.payments(
@@ -586,7 +586,7 @@ psql(
        payment_method_label_snapshot, logic_type_snapshot, allocated_minor,
        received_minor, change_minor, created_at
      ) values (
-       '\${REFUND_PAYMENT_ID}', '\${SHOP_ID}', '\${REFUND_ORDER_ID}', 1, '\${PAYMENT_METHOD_ID}',
+       '${REFUND_PAYMENT_ID}', '${SHOP_ID}', '${REFUND_ORDER_ID}', 1, '${PAYMENT_METHOD_ID}',
        'Reward cash', 'CASH', 10000, 10000, 0, '2026-09-23T05:31:00Z'
      );
      insert into public.loyalty_ledger(
@@ -594,31 +594,31 @@ psql(
        points_delta, monetary_value_minor, earn_expires_at, source_event_id
      ) values
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${CANCEL_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${CANCEL_ORDER_ID}',
          'fixture:cancel:earn', 'EARN', 100, 0, null, 'fixture-cancel'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${CANCEL_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${CANCEL_ORDER_ID}',
          'fixture:cancel:redeem', 'REDEEM', -20, 200, null, 'fixture-cancel'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${REFUND_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${REFUND_ORDER_ID}',
          'fixture:refund:earn', 'EARN', 100, 0, null, 'fixture-refund'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${REFUND_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${REFUND_ORDER_ID}',
          'fixture:refund:redeem', 'REDEEM', -20, 200, null, 'fixture-refund'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${RETURN_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${RETURN_ORDER_ID}',
          'fixture:return:earn', 'EARN', 100, 0, null, 'fixture-return'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CUSTOMER_ID}', '\${RETURN_ORDER_ID}',
+         '${BUSINESS_ID}', '${SHOP_ID}', '${CUSTOMER_ID}', '${RETURN_ORDER_ID}',
          'fixture:return:redeem', 'REDEEM', -20, 200, null, 'fixture-return'
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${EXPIRY_CUSTOMER_ID}', null,
+         '${BUSINESS_ID}', '${SHOP_ID}', '${EXPIRY_CUSTOMER_ID}', null,
          'fixture:expiry:earn', 'EARN', 30, 0, '2026-09-22T00:00:00Z', 'fixture-expiry'
        );
      insert into public.promotion_usage_ledger(
@@ -626,71 +626,71 @@ psql(
        entry_key, usage_delta, event_type, applied_rule_snapshot
      ) values
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${promotion.promotionId}', '\${CUSTOMER_ID}',
-         '\${CANCEL_ORDER_ID}', 'fixture:cancel:promotion', 1, 'APPLY', '{}'::jsonb
+         '${BUSINESS_ID}', '${SHOP_ID}', '${promotion.promotionId}', '${CUSTOMER_ID}',
+         '${CANCEL_ORDER_ID}', 'fixture:cancel:promotion', 1, 'APPLY', '{}'::jsonb
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${promotion.promotionId}', '\${CUSTOMER_ID}',
-         '\${REFUND_ORDER_ID}', 'fixture:refund:promotion', 1, 'APPLY', '{}'::jsonb
+         '${BUSINESS_ID}', '${SHOP_ID}', '${promotion.promotionId}', '${CUSTOMER_ID}',
+         '${REFUND_ORDER_ID}', 'fixture:refund:promotion', 1, 'APPLY', '{}'::jsonb
        ),
        (
-         '\${BUSINESS_ID}', '\${SHOP_ID}', '\${promotion.promotionId}', '\${CUSTOMER_ID}',
-         '\${RETURN_ORDER_ID}', 'fixture:return:promotion', 1, 'APPLY', '{}'::jsonb
-       );\`,
+         '${BUSINESS_ID}', '${SHOP_ID}', '${promotion.promotionId}', '${CUSTOMER_ID}',
+         '${RETURN_ORDER_ID}', 'fixture:return:promotion', 1, 'APPLY', '{}'::jsonb
+       );`,
   ],
   'Loyalty compensation fixture seed',
 );
 
 const cancelledRewardOrder = rpc(
-  \`public.cancel_admin_order_v1(
-    '\${EMPLOYEE_ID}'::uuid,
-    '\${SHOP_ID}'::uuid,
-    '\${CANCEL_ORDER_ID}'::uuid,
-    '\${CANCELLATION_REASON_ID}'::uuid,
+  `public.cancel_admin_order_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${CANCEL_ORDER_ID}'::uuid,
+    '${CANCELLATION_REASON_ID}'::uuid,
     0,
     'Reward cancellation',
     'loyalty-cancel-comp-1',
-    '\${BUSINESS_ID}'::uuid
-  )\`,
+    '${BUSINESS_ID}'::uuid
+  )`,
   'Reward cancellation compensation',
 );
 if (cancelledRewardOrder.ok !== true) {
-  throw new Error(\`reward cancellation failed: \${JSON.stringify(cancelledRewardOrder)}\`);
+  throw new Error(`reward cancellation failed: ${JSON.stringify(cancelledRewardOrder)}`);
 }
 
 const refundedRewardOrder = rpc(
-  \`public.request_admin_order_refund_v1(
-    '\${EMPLOYEE_ID}'::uuid,
-    '\${SHOP_ID}'::uuid,
-    '\${REFUND_ORDER_ID}'::uuid,
-    '\${REFUND_PAYMENT_ID}'::uuid,
+  `public.request_admin_order_refund_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${REFUND_ORDER_ID}'::uuid,
+    '${REFUND_PAYMENT_ID}'::uuid,
     10000,
-    '\${REFUND_RETURN_REASON_ID}'::uuid,
+    '${REFUND_RETURN_REASON_ID}'::uuid,
     'Full reward refund',
     'loyalty-refund-comp-1',
-    '\${BUSINESS_ID}'::uuid
-  )\`,
+    '${BUSINESS_ID}'::uuid
+  )`,
   'Reward refund compensation',
 );
 if (refundedRewardOrder.ok !== true || refundedRewardOrder.state !== 'POSTED') {
-  throw new Error(\`reward refund failed: \${JSON.stringify(refundedRewardOrder)}\`);
+  throw new Error(`reward refund failed: ${JSON.stringify(refundedRewardOrder)}`);
 }
 
 const returnedRewardOrder = rpc(
-  \`public.return_admin_order_items_v1(
-    '\${EMPLOYEE_ID}'::uuid,
-    '\${SHOP_ID}'::uuid,
-    '\${RETURN_ORDER_ID}'::uuid,
-    '[{"orderItemId":"\${RETURN_ITEM_ID}","quantity":1}]'::jsonb,
-    '\${REFUND_RETURN_REASON_ID}'::uuid,
+  `public.return_admin_order_items_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${RETURN_ORDER_ID}'::uuid,
+    '[{"orderItemId":"${RETURN_ITEM_ID}","quantity":1}]'::jsonb,
+    '${REFUND_RETURN_REASON_ID}'::uuid,
     'Full reward return',
     'loyalty-return-comp-1',
-    '\${BUSINESS_ID}'::uuid
-  )\`,
+    '${BUSINESS_ID}'::uuid
+  )`,
   'Reward return compensation',
 );
 if (returnedRewardOrder.ok !== true || returnedRewardOrder.state !== 'POSTED') {
-  throw new Error(\`reward return failed: \${JSON.stringify(returnedRewardOrder)}\`);
+  throw new Error(`reward return failed: ${JSON.stringify(returnedRewardOrder)}`);
 }
 
 const compensationReadback = JSON.parse(
@@ -698,47 +698,47 @@ const compensationReadback = JSON.parse(
     [
       '-At',
       '-c',
-      \`select jsonb_build_object(
+      `select jsonb_build_object(
          'cancelBalance', (
            select coalesce(sum(points_delta), 0) from public.loyalty_ledger
-           where order_id = '\${CANCEL_ORDER_ID}'::uuid
+           where order_id = '${CANCEL_ORDER_ID}'::uuid
          ),
          'cancelCompCount', (
            select count(*) from public.loyalty_ledger
-           where order_id = '\${CANCEL_ORDER_ID}'::uuid
+           where order_id = '${CANCEL_ORDER_ID}'::uuid
              and event_type = 'CANCEL_COMPENSATION'
          ),
          'cancelPromotionUses', (
            select coalesce(sum(usage_delta), 0) from public.promotion_usage_ledger
-           where order_id = '\${CANCEL_ORDER_ID}'::uuid
+           where order_id = '${CANCEL_ORDER_ID}'::uuid
          ),
          'refundBalance', (
            select coalesce(sum(points_delta), 0) from public.loyalty_ledger
-           where order_id = '\${REFUND_ORDER_ID}'::uuid
+           where order_id = '${REFUND_ORDER_ID}'::uuid
          ),
          'refundCompCount', (
            select count(*) from public.loyalty_ledger
-           where order_id = '\${REFUND_ORDER_ID}'::uuid
+           where order_id = '${REFUND_ORDER_ID}'::uuid
              and event_type = 'REFUND_COMPENSATION'
          ),
          'refundPromotionUses', (
            select coalesce(sum(usage_delta), 0) from public.promotion_usage_ledger
-           where order_id = '\${REFUND_ORDER_ID}'::uuid
+           where order_id = '${REFUND_ORDER_ID}'::uuid
          ),
          'returnBalance', (
            select coalesce(sum(points_delta), 0) from public.loyalty_ledger
-           where order_id = '\${RETURN_ORDER_ID}'::uuid
+           where order_id = '${RETURN_ORDER_ID}'::uuid
          ),
          'returnCompCount', (
            select count(*) from public.loyalty_ledger
-           where order_id = '\${RETURN_ORDER_ID}'::uuid
+           where order_id = '${RETURN_ORDER_ID}'::uuid
              and event_type = 'RETURN_COMPENSATION'
          ),
          'returnPromotionUses', (
            select coalesce(sum(usage_delta), 0) from public.promotion_usage_ledger
-           where order_id = '\${RETURN_ORDER_ID}'::uuid
+           where order_id = '${RETURN_ORDER_ID}'::uuid
          )
-       )::text\`,
+       )::text`,
     ],
     'Reward compensation readback',
   ).trim(),
@@ -756,7 +756,7 @@ if (
   Number(compensationReadback.returnPromotionUses) !== 0
 ) {
   throw new Error(
-    \`reward compensation ledger did not reverse finalized effects: \${JSON.stringify(compensationReadback)}\`,
+    `reward compensation ledger did not reverse finalized effects: ${JSON.stringify(compensationReadback)}`,
   );
 }
 
@@ -765,10 +765,10 @@ const expiredCount = Number(
     [
       '-At',
       '-c',
-      \`select public.expire_customer_loyalty_points_v1(
+      `select public.expire_customer_loyalty_points_v1(
         '2026-09-23T06:00:00Z'::timestamptz,
         100
-      )\`,
+      )`,
     ],
     'Loyalty point expiry',
   ).trim(),
@@ -778,19 +778,19 @@ const expiryReadback = JSON.parse(
     [
       '-At',
       '-c',
-      \`select jsonb_build_object(
+      `select jsonb_build_object(
         'balance', (
           select coalesce(sum(points_delta), 0) from public.loyalty_ledger
-          where business_id = '\${BUSINESS_ID}'::uuid
-            and customer_id = '\${EXPIRY_CUSTOMER_ID}'::uuid
+          where business_id = '${BUSINESS_ID}'::uuid
+            and customer_id = '${EXPIRY_CUSTOMER_ID}'::uuid
         ),
         'expiryCount', (
           select count(*) from public.loyalty_ledger
-          where business_id = '\${BUSINESS_ID}'::uuid
-            and customer_id = '\${EXPIRY_CUSTOMER_ID}'::uuid
+          where business_id = '${BUSINESS_ID}'::uuid
+            and customer_id = '${EXPIRY_CUSTOMER_ID}'::uuid
             and event_type = 'EXPIRY'
         )
-      )::text\`,
+      )::text`,
     ],
     'Loyalty expiry readback',
   ).trim(),
@@ -800,7 +800,7 @@ if (
   Number(expiryReadback.balance) !== 0 ||
   Number(expiryReadback.expiryCount) !== 1
 ) {
-  throw new Error(\`expired points were not appended explicitly: \${JSON.stringify(expiryReadback)}\`);
+  throw new Error(`expired points were not appended explicitly: ${JSON.stringify(expiryReadback)}`);
 }
 
 console.log('Admin loyalty PostgreSQL behavior passed.');
