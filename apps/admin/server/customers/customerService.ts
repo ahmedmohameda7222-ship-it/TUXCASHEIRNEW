@@ -10,9 +10,7 @@ import { canonicalizeEgyptPhone } from './phone.js';
 
 export class CustomerServiceError extends Error {
   constructor(
-    readonly code:
-      | 'customer_merge_confirmation_required'
-      | 'customer_merge_same_identity',
+    readonly code: 'customer_merge_confirmation_required' | 'customer_merge_same_identity',
   ) {
     super(code);
     this.name = 'CustomerServiceError';
@@ -54,9 +52,7 @@ export function createCustomerService(store: CustomerStore) {
       requireBusinessWidePermission(principal, 'customers.merge');
 
       if (!input.confirmed) {
-        return Promise.reject(
-          new CustomerServiceError('customer_merge_confirmation_required'),
-        );
+        return Promise.reject(new CustomerServiceError('customer_merge_confirmation_required'));
       }
       if (input.survivorCustomerId === input.mergedCustomerId) {
         return Promise.reject(new CustomerServiceError('customer_merge_same_identity'));

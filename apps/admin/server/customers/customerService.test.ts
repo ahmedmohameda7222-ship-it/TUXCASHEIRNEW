@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminSessionPrincipal } from '@tux/admin-contracts';
-import {
-  CustomerServiceError,
-  createCustomerService,
-  type CustomerStore,
-} from './customerService';
+import { CustomerServiceError, createCustomerService, type CustomerStore } from './customerService';
 
 const businessId = '10000000-0000-4000-8000-000000000001';
 const employeeId = '20000000-0000-4000-8000-000000000001';
@@ -91,9 +87,9 @@ describe('canonical customer service', () => {
       commandId: 'merge-customer-1',
     };
 
-    expect(() =>
-      service.mergeCustomers(input, principal(['customers.view'], 'MANAGER')),
-    ).toThrow(/permission_forbidden/);
+    expect(() => service.mergeCustomers(input, principal(['customers.view'], 'MANAGER'))).toThrow(
+      /permission_forbidden/,
+    );
 
     await expect(
       service.mergeCustomers({ ...input, confirmed: false }, principal()),

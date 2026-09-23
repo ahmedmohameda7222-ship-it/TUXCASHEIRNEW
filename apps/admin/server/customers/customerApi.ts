@@ -1,7 +1,4 @@
-import type {
-  AdminCustomerIdentity,
-  AdminCustomerMergeResult,
-} from '@tux/admin-contracts';
+import type { AdminCustomerIdentity, AdminCustomerMergeResult } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -81,8 +78,7 @@ export function createCustomerStore(client: AdminSupabaseClient): CustomerStore 
       const rows = await client.select<CustomerRow[]>(
         'business_customers',
         new URLSearchParams({
-          select:
-            'id,business_id,normalized_phone,display_name,merged_into_customer_id',
+          select: 'id,business_id,normalized_phone,display_name,merged_into_customer_id',
           business_id: `eq.${input.businessId}`,
           normalized_phone: `eq.${input.normalizedPhone}`,
           limit: '1',
@@ -96,8 +92,7 @@ export function createCustomerStore(client: AdminSupabaseClient): CustomerStore 
         const survivors = await client.select<CustomerRow[]>(
           'business_customers',
           new URLSearchParams({
-            select:
-              'id,business_id,normalized_phone,display_name,merged_into_customer_id',
+            select: 'id,business_id,normalized_phone,display_name,merged_into_customer_id',
             business_id: `eq.${input.businessId}`,
             id: `eq.${matched.merged_into_customer_id}`,
             limit: '1',

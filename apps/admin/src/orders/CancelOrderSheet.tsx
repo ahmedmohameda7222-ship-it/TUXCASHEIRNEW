@@ -81,7 +81,12 @@ export function CancelOrderSheet({
         />
       </label>
       <div className="admin-page__primary-action">
-        <button className="admin-secondary-button" type="button" disabled={pending} onClick={onCancel}>
+        <button
+          className="admin-secondary-button"
+          type="button"
+          disabled={pending}
+          onClick={onCancel}
+        >
           Back
         </button>
         <button

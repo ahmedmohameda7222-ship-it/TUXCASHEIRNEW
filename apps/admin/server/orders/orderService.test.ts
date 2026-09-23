@@ -115,7 +115,9 @@ describe('Admin order service', () => {
     };
 
     const service = createOrderService(store);
-    await expect(service.listActionReasons({ shopId }, principal(['orders.view']))).resolves.toEqual([
+    await expect(
+      service.listActionReasons({ shopId }, principal(['orders.view'])),
+    ).resolves.toEqual([
       expect.objectContaining({
         id: cancellationReasonId,
         family: 'CANCELLATION',

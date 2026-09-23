@@ -56,8 +56,7 @@ export class HttpOutboxTransport implements OutboxTransport {
     | null;
   readonly #beforeDeliver: ((event: OutboxEvent) => void | Promise<void>) | null;
   readonly #onConflict:
-    | ((event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>)
-    | null;
+    ((event: OutboxEvent, conflict: HttpOutboxConflict) => void | Promise<void>) | null;
   readonly #fetcher: typeof fetch;
   readonly #timeoutMs: number;
 

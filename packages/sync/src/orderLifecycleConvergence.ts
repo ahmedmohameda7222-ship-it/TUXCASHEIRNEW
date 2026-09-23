@@ -16,12 +16,7 @@ export interface OrderLifecycleFeedEvent {
   readonly orderId: OrderId;
   readonly operationalRevision: number;
   readonly status: OrderStatus;
-  readonly eventType:
-    | 'MARKED_DONE'
-    | 'DONE_UNDONE'
-    | 'CANCELLED'
-    | 'DELIVERY_RETURNED'
-    | 'PLACED';
+  readonly eventType: 'MARKED_DONE' | 'DONE_UNDONE' | 'CANCELLED' | 'DELIVERY_RETURNED' | 'PLACED';
   readonly occurredAt: Instant;
   readonly workerId: WorkerId | null;
   readonly workerName: string | null;
@@ -142,10 +137,7 @@ function parseEvent(value: unknown): OrderLifecycleFeedEvent {
         ? null
         : parseEntityId<WorkerId>(stringValue(rawWorker, 'Order lifecycle worker id')),
     workerName: optionalString(row['workerName'], 'Order lifecycle worker name'),
-    adminEmployeeId: optionalString(
-      row['adminEmployeeId'],
-      'Order lifecycle Admin employee id',
-    ),
+    adminEmployeeId: optionalString(row['adminEmployeeId'], 'Order lifecycle Admin employee id'),
     foodPrepared: nullableBoolean(row['foodPrepared'], 'Order lifecycle food prepared'),
     stockRestored: nullableBoolean(row['stockRestored'], 'Order lifecycle stock restored'),
     reason: parseReason(row['reason']),
@@ -158,8 +150,7 @@ export interface HttpOrderLifecycleFeedTransportOptions {
   readonly endpoint: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly headerProvider?: () =>
-    | Readonly<Record<string, string>>
-    | Promise<Readonly<Record<string, string>>>;
+    Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
   readonly fetcher?: typeof fetch;
 }
 
@@ -167,8 +158,7 @@ export class HttpOrderLifecycleFeedTransport implements OrderLifecycleFeedTransp
   readonly #endpoint: string;
   readonly #headers: Readonly<Record<string, string>>;
   readonly #headerProvider:
-    | (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>)
-    | null;
+    (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>) | null;
   readonly #fetcher: typeof fetch;
 
   constructor(options: HttpOrderLifecycleFeedTransportOptions) {
@@ -235,17 +225,13 @@ function reasonText(event: OrderLifecycleFeedEvent): string {
   return value;
 }
 
-function applyCanonicalEvent(
-  order: OrderSnapshot,
-  event: OrderLifecycleFeedEvent,
-): OrderSnapshot {
-  const current =
-    order.lifecycle ?? {
-      revision: 0,
-      doneAt: null,
-      cancellation: null,
-      returned: null,
-    };
+function applyCanonicalEvent(order: OrderSnapshot, event: OrderLifecycleFeedEvent): OrderSnapshot {
+  const current = order.lifecycle ?? {
+    revision: 0,
+    doneAt: null,
+    cancellation: null,
+    returned: null,
+  };
   if (event.operationalRevision <= current.revision) return order;
 
   const actorName = event.workerName ?? (event.adminEmployeeId ? 'Admin' : 'System');

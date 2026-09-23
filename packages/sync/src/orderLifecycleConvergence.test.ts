@@ -147,10 +147,9 @@ describe('OrderLifecycleConvergenceService', () => {
       },
     };
 
-    const applied = await new OrderLifecycleConvergenceService(
-      state.database,
-      transport,
-    ).syncShop(shopId);
+    const applied = await new OrderLifecycleConvergenceService(state.database, transport).syncShop(
+      shopId,
+    );
 
     expect(applied).toBe(1);
     expect(state.cursor).toBe('11');

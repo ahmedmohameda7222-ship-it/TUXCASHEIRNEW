@@ -41,7 +41,9 @@ describe('Plan 5 order approval execution registry', () => {
       executeRefund,
       executeReturn: vi.fn(),
     });
-    const entry = entries.find((candidate) => candidate.actionType === ORDER_REFUND_APPROVAL_ACTION);
+    const entry = entries.find(
+      (candidate) => candidate.actionType === ORDER_REFUND_APPROVAL_ACTION,
+    );
     expect(entry).toBeDefined();
 
     const result = await entry!.execute({
@@ -78,7 +80,9 @@ describe('Plan 5 order approval execution registry', () => {
       executeRefund: vi.fn(),
       executeReturn,
     });
-    const entry = entries.find((candidate) => candidate.actionType === ORDER_RETURN_APPROVAL_ACTION);
+    const entry = entries.find(
+      (candidate) => candidate.actionType === ORDER_RETURN_APPROVAL_ACTION,
+    );
     expect(entry).toBeDefined();
 
     const payload = {
@@ -88,7 +92,11 @@ describe('Plan 5 order approval execution registry', () => {
       note: null,
       orderCommandId: 'return-business-command-1',
     };
-    const claim = { ...refundClaim, actionType: ORDER_RETURN_APPROVAL_ACTION, commandPayload: payload };
+    const claim = {
+      ...refundClaim,
+      actionType: ORDER_RETURN_APPROVAL_ACTION,
+      commandPayload: payload,
+    };
 
     const result = await entry!.execute({
       commandId: claim.commandId,
@@ -116,7 +124,9 @@ describe('Plan 5 order approval execution registry', () => {
       executeRefund: vi.fn(),
       executeReturn: vi.fn(),
     });
-    const entry = entries.find((candidate) => candidate.actionType === ORDER_REFUND_APPROVAL_ACTION);
+    const entry = entries.find(
+      (candidate) => candidate.actionType === ORDER_REFUND_APPROVAL_ACTION,
+    );
 
     await expect(
       entry!.execute({

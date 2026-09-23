@@ -73,7 +73,13 @@ export function RefundReturnPage({
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amountMinor);
-    if (!paymentId || !reasonCodeId || !pin || !Number.isSafeInteger(parsedAmount) || parsedAmount <= 0) {
+    if (
+      !paymentId ||
+      !reasonCodeId ||
+      !pin ||
+      !Number.isSafeInteger(parsedAmount) ||
+      parsedAmount <= 0
+    ) {
       return;
     }
     await onRefund({
@@ -145,15 +151,24 @@ export function RefundReturnPage({
         />
       </label>
 
-      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitRefund(event)}>
+      <form
+        className="admin-catalog-editor__section is-compact"
+        onSubmit={(event) => void submitRefund(event)}
+      >
         <h3>Refund payment</h3>
         <label className="admin-field">
           <span>Payment</span>
-          <select value={paymentId} disabled={refunding || returning} onChange={(event) => {
-            setPaymentId(event.target.value);
-            const payment = order.payments.find((candidate) => candidate.id === event.target.value);
-            if (payment) setAmountMinor(String(payment.allocatedMinor));
-          }}>
+          <select
+            value={paymentId}
+            disabled={refunding || returning}
+            onChange={(event) => {
+              setPaymentId(event.target.value);
+              const payment = order.payments.find(
+                (candidate) => candidate.id === event.target.value,
+              );
+              if (payment) setAmountMinor(String(payment.allocatedMinor));
+            }}
+          >
             {order.payments.map((payment) => (
               <option key={payment.id} value={payment.id}>
                 {payment.methodLabel} · {payment.allocatedMinor} minor
@@ -181,11 +196,16 @@ export function RefundReturnPage({
         </button>
       </form>
 
-      <form className="admin-catalog-editor__section is-compact" onSubmit={(event) => void submitReturn(event)}>
+      <form
+        className="admin-catalog-editor__section is-compact"
+        onSubmit={(event) => void submitReturn(event)}
+      >
         <h3>Return items</h3>
         {order.items.map((item) => (
           <label className="admin-field" key={item.id}>
-            <span>{item.productName} · max {item.quantity}</span>
+            <span>
+              {item.productName} · max {item.quantity}
+            </span>
             <input
               aria-label={`Return quantity for ${item.productName}`}
               type="number"

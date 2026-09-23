@@ -302,7 +302,10 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
       const term = normalizedSearchTerm(input.query ?? null);
       if (term) {
         if (/^\d+$/.test(term)) {
-          query.append('or', `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`);
+          query.append(
+            'or',
+            `(display_order_no.eq.${term},normalized_phone_snapshot.ilike.*${term}*)`,
+          );
         } else {
           query.append(
             'or',
@@ -313,7 +316,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
 
       const rows = await client.select<OrderRow[]>('orders', query);
       const visible = rows.slice(0, limit);
-      const next = rows.length > limit ? visible.at(-1) ?? null : null;
+      const next = rows.length > limit ? (visible.at(-1) ?? null) : null;
       return {
         shopId: input.shopId,
         rows: visible.map((row) => ({
@@ -421,8 +424,7 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
               client.select<BeverageRow[]>(
                 'order_item_combo_beverages',
                 new URLSearchParams({
-                  select:
-                    'order_item_id,beverage_product_id,beverage_label_snapshot,unit_index',
+                  select: 'order_item_id,beverage_product_id,beverage_label_snapshot,unit_index',
                   order_item_id: `in.(${itemIds.join(',')})`,
                   shop_id: `eq.${input.shopId}`,
                   order: 'order_item_id.asc,unit_index.asc',
@@ -441,7 +443,9 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
         createdAt: order.created_at,
         totalMinor: safeInteger(order.total_minor),
         customer:
-          order.customer_contact_id || order.customer_name_snapshot || order.normalized_phone_snapshot
+          order.customer_contact_id ||
+          order.customer_name_snapshot ||
+          order.normalized_phone_snapshot
             ? {
                 contactId: order.customer_contact_id,
                 name: order.customer_name_snapshot,
@@ -460,7 +464,8 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
           methodLabel: payment.payment_method_label_snapshot,
           logicType: payment.logic_type_snapshot,
           allocatedMinor: safeInteger(payment.allocated_minor),
-          receivedMinor: payment.received_minor === null ? null : safeInteger(payment.received_minor),
+          receivedMinor:
+            payment.received_minor === null ? null : safeInteger(payment.received_minor),
           changeMinor: payment.change_minor === null ? null : safeInteger(payment.change_minor),
         })),
         items: items.map((item) => ({
@@ -629,9 +634,7 @@ function handleFailure(response: AdminResponse, error: unknown): void {
       sendJson(response, 403, { error: 'permission_forbidden' });
       return;
     }
-    const stale = error.responseBody.match(
-      /TUX_ORDER_STALE_OPERATIONAL_REVISION:([A-Z_]+):(\d+)/,
-    );
+    const stale = error.responseBody.match(/TUX_ORDER_STALE_OPERATIONAL_REVISION:([A-Z_]+):(\d+)/);
     if (stale) {
       sendJson(response, 409, {
         error: 'stale_operational_revision',
@@ -730,10 +733,7 @@ export default async function handler(
 
     switch (command.type) {
       case 'order.cancel':
-        sendMutationResult(
-          response,
-          await service.cancelActiveOrder(command, context.principal),
-        );
+        sendMutationResult(response, await service.cancelActiveOrder(command, context.principal));
         return;
       case 'order.refund':
         sendMutationResult(response, await service.requestRefund(command, context.principal));

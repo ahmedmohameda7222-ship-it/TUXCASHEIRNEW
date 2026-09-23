@@ -64,33 +64,39 @@ export async function runApprovalExecutionRunner(input: {
 function createOrderApprovalPersistence(client: AdminSupabaseClient) {
   return {
     executeRefund(input: ApprovedRefundExecutionInput) {
-      return client.rpc<AdminOrderFinancialMutationResult>('execute_approved_admin_order_refund_v1', {
-        p_approval_request_id: input.approvalRequestId,
-        p_business_id: input.businessId,
-        p_shop_id: input.shopId,
-        p_requester_employee_id: input.requesterEmployeeId,
-        p_approver_employee_id: input.approverEmployeeId,
-        p_order_id: input.orderId,
-        p_payment_id: input.paymentId,
-        p_amount_minor: input.amountMinor,
-        p_reason_code_id: input.reasonCodeId,
-        p_note: input.note,
-        p_command_id: input.orderCommandId,
-      });
+      return client.rpc<AdminOrderFinancialMutationResult>(
+        'execute_approved_admin_order_refund_v1',
+        {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_order_id: input.orderId,
+          p_payment_id: input.paymentId,
+          p_amount_minor: input.amountMinor,
+          p_reason_code_id: input.reasonCodeId,
+          p_note: input.note,
+          p_command_id: input.orderCommandId,
+        },
+      );
     },
     executeReturn(input: ApprovedReturnExecutionInput) {
-      return client.rpc<AdminOrderFinancialMutationResult>('execute_approved_admin_order_return_v1', {
-        p_approval_request_id: input.approvalRequestId,
-        p_business_id: input.businessId,
-        p_shop_id: input.shopId,
-        p_requester_employee_id: input.requesterEmployeeId,
-        p_approver_employee_id: input.approverEmployeeId,
-        p_order_id: input.orderId,
-        p_items: input.items,
-        p_reason_code_id: input.reasonCodeId,
-        p_note: input.note,
-        p_command_id: input.orderCommandId,
-      });
+      return client.rpc<AdminOrderFinancialMutationResult>(
+        'execute_approved_admin_order_return_v1',
+        {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_order_id: input.orderId,
+          p_items: input.items,
+          p_reason_code_id: input.reasonCodeId,
+          p_note: input.note,
+          p_command_id: input.orderCommandId,
+        },
+      );
     },
   };
 }

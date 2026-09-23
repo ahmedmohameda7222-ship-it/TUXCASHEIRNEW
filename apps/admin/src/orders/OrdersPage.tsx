@@ -90,7 +90,10 @@ export function OrdersPage() {
         </label>
         <label className="admin-field">
           <span>Status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as AdminOrderStatus | '')}
+          >
             <option value="">All statuses</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="DONE">DONE</option>
@@ -100,7 +103,10 @@ export function OrdersPage() {
         </label>
         <label className="admin-field">
           <span>Source</span>
-          <select value={source} onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}>
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value as AdminOrderSource | '')}
+          >
             <option value="">All sources</option>
             <option value="POS">POS</option>
             <option value="ONLINE">ONLINE</option>
@@ -122,7 +128,9 @@ export function OrdersPage() {
           ) : null}
           {rows.map((row) => (
             <button
-              className={row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'}
+              className={
+                row.id === selectedId ? 'admin-inventory-row is-selected' : 'admin-inventory-row'
+              }
               key={row.id}
               type="button"
               onClick={() => {
@@ -132,9 +140,13 @@ export function OrdersPage() {
             >
               <span>
                 <strong>{row.displayOrderLabel ?? `#${row.displayOrderNo}`}</strong>
-                <small>{row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}</small>
+                <small>
+                  {row.customerName ?? row.normalizedPhone ?? 'Walk-in'} · {row.orderTypeLabel}
+                </small>
               </span>
-              <span>{row.status} · {row.source}</span>
+              <span>
+                {row.status} · {row.source}
+              </span>
             </button>
           ))}
           {ordersApi.searchQuery.hasNextPage ? (
@@ -151,7 +163,9 @@ export function OrdersPage() {
 
         <section className="admin-inventory-inspector">
           {ordersApi.detailQuery.isLoading ? <p>Loading order detail…</p> : null}
-          {ordersApi.detailQuery.isError ? <p role="alert">Order detail could not be loaded.</p> : null}
+          {ordersApi.detailQuery.isError ? (
+            <p role="alert">Order detail could not be loaded.</p>
+          ) : null}
           {detail ? (
             <>
               <OrderDetailPage
@@ -207,7 +221,9 @@ export function OrdersPage() {
           ) : !ordersApi.detailQuery.isLoading ? (
             <div className="admin-empty-state">
               <strong>Select an order</strong>
-              <span>Review immutable payment, customer, delivery, inventory, status and audit context.</span>
+              <span>
+                Review immutable payment, customer, delivery, inventory, status and audit context.
+              </span>
             </div>
           ) : null}
         </section>

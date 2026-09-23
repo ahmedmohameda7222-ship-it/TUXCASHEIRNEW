@@ -446,10 +446,7 @@ async function callSupabaseFunction(
   config: SupabaseServerConfig,
   session: DeviceSessionSecrets,
   functionName:
-    | 'operations-config'
-    | 'operations-sync'
-    | 'operations-inventory'
-    | 'operations-order-lifecycle',
+    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle',
   request: GatewayRequest,
   body: string | null,
 ): Promise<Response> {
@@ -480,10 +477,7 @@ export async function proxyAuthenticatedFunction(
   request: GatewayRequest,
   response: GatewayResponse,
   functionName:
-    | 'operations-config'
-    | 'operations-sync'
-    | 'operations-inventory'
-    | 'operations-order-lifecycle',
+    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle',
 ): Promise<void> {
   const expectedMethod = functionName === 'operations-sync' ? 'POST' : 'GET';
   if (request.method !== expectedMethod) {
