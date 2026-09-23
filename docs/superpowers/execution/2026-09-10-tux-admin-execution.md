@@ -2,9 +2,9 @@
 
 **Program:** TUX Admin control plane  
 **Execution start:** 2026-09-10  
-**Active plan:** Plan 2 — Catalog/Publishing/Settings  
-**Active branch:** `feat/admin-02-catalog-settings`  
-**Base main commit:** `96d7bb26d5c738859036c0f75c035e664e447f31`
+**Active plan:** Plan 5 — Orders/Customers/Loyalty/Promotions/Delivery  
+**Active branch:** `feat/admin-05-orders-customers-delivery-v2`  
+**Base main commit:** `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`
 
 ## Authority and execution rules
 
@@ -540,3 +540,23 @@ Exact pre-ledger fixed head `49a330ddd8b0776a1437c90d3d7458521af8ec6d` passed:
 
 Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this hardening round. Because this ledger commit changes the PR head, the resulting ledger-inclusive exact head must pass the permanent workflow set before the seven Codex threads are resolved and another final exact-head Codex review is requested.
 
+
+
+## Plan 4 production promotion closeout — 2026-09-23
+
+Plan 4 technical closure is complete. PR #92 was squash-merged to `main` as `bc1a9d2d78e8d748bfc7725e80186721424d828b` after exact-head Plan 4 TDD and root CI were GREEN and all review threads were resolved. Post-merge TUX V2 CI run `35819964527` completed SUCCESS, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+
+Canonical Supabase project `awpdcsayuwbsruwvaosg` (`TUX V2`) was then promoted to the merged Plan 4 schema. Live migration history now contains the repository versions exactly:
+- `20260910130000 admin_inventory_ledger`
+- `20260910140000 admin_inventory_intelligence`
+- `20260910150000 admin_purchasing`
+
+Live readback confirms the Plan 4 inventory/purchasing schema is present, including inventory reservations/cost state, stocktakes/transfers, replenishment settings, suppliers/purchase orders, and the canonical reservation/consume/restore/release, adjustment, stocktake, and transfer RPC families. The promotion was not duplicated during the 2026-09-23 reconciliation check because all three repository migration versions were already present in canonical migration history.
+
+Production inventory sync deployment was closed through PR #96, merged as `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. Production Supabase Edge Functions now report:
+- `operations-sync` ACTIVE, version 3, `verify_jwt=true`, using the merged Plan 4 source contract;
+- `operations-inventory` ACTIVE, version 1, `verify_jwt=true`, with its explicit import map.
+
+PR #96 post-merge TUX V2 CI run `35821747601` completed SUCCESS. Supabase security/performance advisor output was reviewed after promotion; no new Plan-4-specific blocker was identified. Existing informational RLS/no-policy and performance/index findings remain separate hardening/maintenance scope and are not silently changed at this checkpoint.
+
+Plan 4 production promotion is therefore reconciled and closed. Plan 5 continues from clean baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e` on `feat/admin-05-orders-customers-delivery-v2` / PR #98. The original `feat/admin-05-orders-customers-delivery` branch remains preserved as implementation-history backup.
