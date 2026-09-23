@@ -127,7 +127,7 @@ test('renders canonical delivery zones, riders, and delivery-order state', async
   await expect(page.getByText('25.00 EGP')).toBeVisible();
   await expect(page.getByText('120.00 EGP minimum')).toBeVisible();
   await expect(page.getByText('Omar Rider')).toBeVisible();
-  await expect(page.getByLabel(`Delivery order ${orderId})).toContainText('ASSIGNED');
+  await expect(page.getByLabel(`Delivery order ${orderId}`)).toContainText('ASSIGNED');
 });
 
 test('routes delivery mutations through the trusted BFF and clears rider on unassign', async ({
