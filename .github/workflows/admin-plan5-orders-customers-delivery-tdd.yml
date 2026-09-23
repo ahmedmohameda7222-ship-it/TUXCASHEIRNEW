@@ -21,6 +21,8 @@ on:
       - 'apps/admin/server/delivery/**'
       - 'apps/admin/api/admin/delivery.ts'
       - 'apps/admin/src/delivery/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
       - 'packages/admin-contracts/src/orders.ts'
       - 'packages/admin-contracts/src/customers.ts'
       - 'packages/admin-contracts/src/loyalty.ts'
@@ -47,6 +49,7 @@ on:
       - 'scripts/test-admin-loyalty-promotions-migration.mjs'
       - 'scripts/test-admin-loyalty-postgres.mjs'
       - 'scripts/test-admin-delivery-migration.mjs'
+      - 'scripts/test-admin-delivery-postgres.mjs'
       - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
   pull_request:
     paths:
@@ -292,16 +295,110 @@ jobs:
       - name: Plan 5 loyalty mutation PostgreSQL behavior
         run: node scripts/test-admin-loyalty-postgres.mjs
 
+
+  task4-crm-promotions-e2e:
+    needs: task4-loyalty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 CRM and promotions browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-customers-promotions.spec.ts
+
+  task5-delivery-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 delivery migration invariant
+        run: node scripts/test-admin-delivery-migration.mjs
+
+  task5-delivery-service:
+    needs: task5-delivery-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 delivery service behavior
+        run: npx vitest run apps/admin/server/delivery/deliveryService.test.ts
+
+  task5-delivery-postgres:
+    needs: task5-delivery-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 delivery PostgreSQL behavior
+        run: node scripts/test-admin-delivery-postgres.mjs
+
+  task5-delivery-e2e:
+    needs: task5-delivery-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 delivery browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-delivery.spec.ts
+
   regression:
     needs:
       [
+        task1-order-controls,
         task1-approval-postgres,
+        task2-orders-e2e,
         task3-customers-static,
         task3-customers,
         task3-customers-postgres,
         task4-loyalty-static,
         task4-loyalty,
         task4-loyalty-postgres,
+        task4-crm-promotions-e2e,
+        task5-delivery-service,
+        task5-delivery-postgres,
+        task5-delivery-e2e,
       ]
     runs-on: ubuntu-latest
     env:
