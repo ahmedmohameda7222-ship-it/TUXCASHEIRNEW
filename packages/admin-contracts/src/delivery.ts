@@ -25,6 +25,7 @@ export type AdminDeliveryZone = {
   fallbackShopId: string | null;
   fallbackEnabled: boolean;
   sortOrder: number;
+  version: number;
 };
 
 export type AdminDeliveryRiderState = 'AVAILABLE' | 'UNAVAILABLE';
@@ -36,6 +37,7 @@ export type AdminDeliveryRider = {
   phone: string | null;
   active: boolean;
   state: AdminDeliveryRiderState;
+  version: number;
 };
 
 export type AdminDeliveryOrderState =
