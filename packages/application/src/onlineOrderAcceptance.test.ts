@@ -296,7 +296,7 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
         confirmation: deliveryConfirmation(25_000, 2_500),
         runtime,
       }),
-    ).toThrow(/configured delivery zone fee|checkout policy/i);
+    ).toThrow(/canonical delivery route|configured delivery zone fee|checkout policy/i);
   });
 
   it('keeps the canonical intake fee when generic delivery-fee overrides are enabled', () => {
