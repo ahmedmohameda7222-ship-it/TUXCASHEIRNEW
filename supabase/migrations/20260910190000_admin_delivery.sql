@@ -6,7 +6,8 @@ alter table public.delivery_zones
   add column if not exists priority integer not null default 0,
   add column if not exists minimum_order_minor bigint not null default 0,
   add column if not exists fallback_shop_id uuid,
-  add column if not exists fallback_enabled boolean not null default false;
+  add column if not exists fallback_enabled boolean not null default false,
+  add column if not exists admin_version bigint not null default 1;
 
 alter table public.delivery_zones
   drop constraint if exists delivery_zones_minimum_order_minor_check;
@@ -55,6 +56,7 @@ create table if not exists public.delivery_riders (
   active boolean not null default true,
   state text not null default 'AVAILABLE'
     check (state in ('AVAILABLE', 'UNAVAILABLE')),
+  version bigint not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   foreign key (business_id, shop_id)
@@ -434,5 +436,293 @@ grant execute on function public.transition_admin_delivery_order_v1(
   bigint,
   text,
   text,
+  text
+) to service_role;
+
+
+create or replace function public.upsert_admin_delivery_zone_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_zone_id uuid,
+  p_expected_version bigint,
+  p_name text,
+  p_fee_minor bigint,
+  p_minimum_order_minor bigint,
+  p_priority integer,
+  p_active boolean,
+  p_boundary_json jsonb,
+  p_fallback_shop_id uuid,
+  p_fallback_enabled boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_business_id uuid;
+  v_zone_id uuid;
+  v_current_version bigint;
+begin
+  v_business_id := private.assert_admin_delivery_permission_v1(
+    p_employee_id,
+    p_shop_id,
+    'delivery.manage'
+  );
+
+  if btrim(coalesce(p_name, '')) = ''
+     or p_fee_minor < 0
+     or p_minimum_order_minor < 0 then
+    return jsonb_build_object('ok', false, 'code', 'invalid_delivery_zone');
+  end if;
+
+  if p_boundary_json is null
+     or jsonb_typeof(p_boundary_json) <> 'object'
+     or (p_boundary_json ->> 'kind') not in ('RADIUS', 'POLYGON') then
+    return jsonb_build_object('ok', false, 'code', 'invalid_delivery_boundary');
+  end if;
+
+  if p_fallback_enabled then
+    if p_fallback_shop_id is null or p_fallback_shop_id = p_shop_id then
+      return jsonb_build_object('ok', false, 'code', 'invalid_delivery_fallback');
+    end if;
+    if not exists (
+      select 1
+      from public.business_shops bs
+      where bs.business_id = v_business_id
+        and bs.shop_id = p_fallback_shop_id
+    ) then
+      return jsonb_build_object('ok', false, 'code', 'fallback_shop_forbidden');
+    end if;
+  end if;
+
+  if p_zone_id is null then
+    insert into public.delivery_zones (
+      id,
+      shop_id,
+      name,
+      fee_minor,
+      active,
+      sort_order,
+      boundary_json,
+      priority,
+      minimum_order_minor,
+      fallback_shop_id,
+      fallback_enabled,
+      admin_version
+    ) values (
+      gen_random_uuid(),
+      p_shop_id,
+      btrim(p_name),
+      p_fee_minor,
+      p_active,
+      p_priority,
+      p_boundary_json,
+      p_priority,
+      p_minimum_order_minor,
+      case when p_fallback_enabled then p_fallback_shop_id else null end,
+      p_fallback_enabled,
+      1
+    )
+    returning id into v_zone_id;
+
+    return jsonb_build_object(
+      'ok', true,
+      'zoneId', v_zone_id,
+      'version', 1
+    );
+  end if;
+
+  select z.admin_version
+    into v_current_version
+  from public.delivery_zones z
+  where z.id = p_zone_id
+    and z.shop_id = p_shop_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'delivery_zone_not_found');
+  end if;
+
+  if p_expected_version is null or v_current_version <> p_expected_version then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'stale_delivery_zone_version',
+      'currentVersion', v_current_version
+    );
+  end if;
+
+  update public.delivery_zones
+  set
+    name = btrim(p_name),
+    fee_minor = p_fee_minor,
+    active = p_active,
+    sort_order = p_priority,
+    boundary_json = p_boundary_json,
+    priority = p_priority,
+    minimum_order_minor = p_minimum_order_minor,
+    fallback_shop_id = case
+      when p_fallback_enabled then p_fallback_shop_id
+      else null
+    end,
+    fallback_enabled = p_fallback_enabled,
+    admin_version = admin_version + 1,
+    updated_at = now()
+  where id = p_zone_id
+    and shop_id = p_shop_id
+  returning admin_version into v_current_version;
+
+  return jsonb_build_object(
+    'ok', true,
+    'zoneId', p_zone_id,
+    'version', v_current_version
+  );
+end;
+$$;
+
+revoke all on function public.upsert_admin_delivery_zone_v1(
+  uuid,
+  uuid,
+  uuid,
+  bigint,
+  text,
+  bigint,
+  bigint,
+  integer,
+  boolean,
+  jsonb,
+  uuid,
+  boolean
+) from public, anon, authenticated;
+grant execute on function public.upsert_admin_delivery_zone_v1(
+  uuid,
+  uuid,
+  uuid,
+  bigint,
+  text,
+  bigint,
+  bigint,
+  integer,
+  boolean,
+  jsonb,
+  uuid,
+  boolean
+) to service_role;
+
+create or replace function public.upsert_admin_delivery_rider_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_rider_id uuid,
+  p_expected_version bigint,
+  p_display_name text,
+  p_phone text,
+  p_active boolean,
+  p_state text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $$
+declare
+  v_business_id uuid;
+  v_rider_id uuid;
+  v_current_version bigint;
+begin
+  v_business_id := private.assert_admin_delivery_permission_v1(
+    p_employee_id,
+    p_shop_id,
+    'delivery.manage'
+  );
+
+  if btrim(coalesce(p_display_name, '')) = ''
+     or p_state not in ('AVAILABLE', 'UNAVAILABLE') then
+    return jsonb_build_object('ok', false, 'code', 'invalid_delivery_rider');
+  end if;
+
+  if p_rider_id is null then
+    insert into public.delivery_riders (
+      business_id,
+      shop_id,
+      display_name,
+      phone,
+      active,
+      state,
+      version
+    ) values (
+      v_business_id,
+      p_shop_id,
+      btrim(p_display_name),
+      nullif(btrim(coalesce(p_phone, '')), ''),
+      p_active,
+      p_state,
+      1
+    )
+    returning id into v_rider_id;
+
+    return jsonb_build_object(
+      'ok', true,
+      'riderId', v_rider_id,
+      'version', 1
+    );
+  end if;
+
+  select r.version
+    into v_current_version
+  from public.delivery_riders r
+  where r.id = p_rider_id
+    and r.business_id = v_business_id
+    and r.shop_id = p_shop_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'delivery_rider_not_found');
+  end if;
+
+  if p_expected_version is null or v_current_version <> p_expected_version then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'stale_delivery_rider_version',
+      'currentVersion', v_current_version
+    );
+  end if;
+
+  update public.delivery_riders
+  set
+    display_name = btrim(p_display_name),
+    phone = nullif(btrim(coalesce(p_phone, '')), ''),
+    active = p_active,
+    state = p_state,
+    version = version + 1,
+    updated_at = now()
+  where id = p_rider_id
+  returning version into v_current_version;
+
+  return jsonb_build_object(
+    'ok', true,
+    'riderId', p_rider_id,
+    'version', v_current_version
+  );
+end;
+$$;
+
+revoke all on function public.upsert_admin_delivery_rider_v1(
+  uuid,
+  uuid,
+  uuid,
+  bigint,
+  text,
+  text,
+  boolean,
+  text
+) from public, anon, authenticated;
+grant execute on function public.upsert_admin_delivery_rider_v1(
+  uuid,
+  uuid,
+  uuid,
+  bigint,
+  text,
+  text,
+  boolean,
   text
 ) to service_role;
