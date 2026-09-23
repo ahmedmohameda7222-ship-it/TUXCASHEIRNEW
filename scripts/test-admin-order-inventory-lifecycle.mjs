@@ -130,6 +130,7 @@ if (
 
 if (
   !operationsSync.includes('TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH') ||
+  !operationsSync.includes('TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH') ||
   !operationsSync.includes('TUX_INVENTORY_RESERVATION_NOT_SETTLED')
 ) {
   throw new Error(
