@@ -198,12 +198,7 @@ function parseItem(value: unknown, path: string): OnlineOrderItemV1 {
   };
 }
 
-function asCoordinate(
-  value: unknown,
-  path: string,
-  minimum: number,
-  maximum: number,
-): number {
+function asCoordinate(value: unknown, path: string, minimum: number, maximum: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
     fail(`${path} must be a finite number between ${minimum} and ${maximum}`);
   }

@@ -11,11 +11,7 @@ import type {
   DeliveryRouteResult,
 } from '@tux/admin-contracts';
 
-import {
-  deliveryZoneContains,
-  isDeliveryRoutingOpen,
-  resolveDeliveryRouting,
-} from '@tux/domain';
+import { deliveryZoneContains, isDeliveryRoutingOpen, resolveDeliveryRouting } from '@tux/domain';
 
 import { requirePermission } from '../authorization.js';
 

@@ -100,9 +100,8 @@ function pointInPolygon(
     const crosses =
       a.latitude > point.latitude !== b.latitude > point.latitude &&
       point.longitude <
-        ((b.longitude - a.longitude) * (point.latitude - a.latitude)) /
-          (b.latitude - a.latitude) +
-          a.longitude;
+        ((b.longitude - a.longitude) * (point.latitude - a.latitude)) / (b.latitude - a.latitude) +
+        a.longitude;
     if (crosses) inside = !inside;
   }
   return inside;
@@ -148,10 +147,7 @@ function cairoLocalParts(at: string): { dayOfWeek: number; time: string } {
   return { dayOfWeek: days[weekday]!, time: `${hour}:${minute}` };
 }
 
-export function isDeliveryRoutingOpen(
-  hours: readonly DeliveryRoutingHours[],
-  at: string,
-): boolean {
+export function isDeliveryRoutingOpen(hours: readonly DeliveryRoutingHours[], at: string): boolean {
   const local = cairoLocalParts(at);
   const previousDay = (local.dayOfWeek + 6) % 7;
   return hours.some((window) => {
