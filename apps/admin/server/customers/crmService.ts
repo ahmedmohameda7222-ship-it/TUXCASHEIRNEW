@@ -64,10 +64,7 @@ export interface CrmStore {
   }): Promise<AdminPromotionMutationResult>;
 }
 
-function withSegments(
-  facts: CrmCustomerFacts,
-  now: string,
-): AdminCustomerDetail {
+function withSegments(facts: CrmCustomerFacts, now: string): AdminCustomerDetail {
   const { segmentPolicy, ...detail } = facts;
   return {
     ...detail,
