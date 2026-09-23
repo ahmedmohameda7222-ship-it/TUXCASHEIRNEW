@@ -326,6 +326,8 @@ function orderPlacementMutations(
         returned_by_worker_id: lifecycle.returned?.workerId ?? null,
         returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
         return_reason: lifecycle.returned?.reason ?? null,
+        reward_reservation_id: order.rewardReservationId ?? null,
+        applied_reward_snapshot: order.appliedRewardSnapshot ?? null,
         snapshot_json: order,
       },
       {
