@@ -64,6 +64,8 @@ on:
       - 'apps/admin/server/delivery/**'
       - 'apps/admin/api/admin/delivery.ts'
       - 'apps/admin/src/delivery/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
       - 'packages/admin-contracts/src/orders.ts'
       - 'packages/admin-contracts/src/customers.ts'
       - 'packages/admin-contracts/src/loyalty.ts'
@@ -89,6 +91,7 @@ on:
       - 'scripts/test-admin-loyalty-promotions-migration.mjs'
       - 'scripts/test-admin-loyalty-postgres.mjs'
       - 'scripts/test-admin-delivery-migration.mjs'
+      - 'scripts/test-admin-delivery-postgres.mjs'
       - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
 
 jobs:
