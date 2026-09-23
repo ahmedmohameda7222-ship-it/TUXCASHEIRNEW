@@ -1084,6 +1084,14 @@ export class OperationsOrdersService {
     }
   }
 
+  async #releaseRewardQuietly(shopId: ShopId, reservationId: string): Promise<void> {
+    try {
+      await this.#rewardAuthority.release({ shopId, reservationId });
+    } catch {
+      // Canonical reservation expiry remains the fallback for abandoned leases.
+    }
+  }
+
   async #resolveContext(): Promise<Result<ResolvedContext, ApplicationError>> {
     const shops = await this.#readModel.listActiveShops();
     const shop = shops.length === 1 ? shops[0] : undefined;
