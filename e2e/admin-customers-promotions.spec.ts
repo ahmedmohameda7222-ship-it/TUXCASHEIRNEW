@@ -183,7 +183,9 @@ test('renders canonical CRM identity, loyalty history and automatic segments', a
 }) => {
   await page.goto('/customers');
   await expect(page.getByRole('heading', { name: 'Customers' })).toBeVisible();
-  await expect(page.getByText('+201012345678')).toBeVisible();
+  await expect(
+    page.getByLabel('Customer detail').getByText('+201012345678'),
+  ).toBeVisible();
   await expect(page.getByText('Road 9, Maadi')).toBeVisible();
   await expect(page.getByText('VIP')).toBeVisible();
   await expect(page.getByText('Frequent Delivery')).toBeVisible();
