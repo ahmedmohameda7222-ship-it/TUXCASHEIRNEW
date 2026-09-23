@@ -1,0 +1,53 @@
+name: Plan 5 Temporary Format Fix
+
+on:
+  push:
+    branches:
+      - feat/admin-05-orders-customers-delivery-v2
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-05-orders-customers-delivery-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format reconciled Plan 5 files
+        run: >-
+          npx prettier --write
+          server/supabaseGateway.ts
+          apps/admin/api/admin/orders.ts
+          apps/admin/server/customers/customerApi.ts
+          apps/admin/server/customers/customerService.test.ts
+          apps/admin/server/customers/customerService.ts
+          apps/admin/server/customers/loyaltyService.ts
+          apps/admin/server/orders/orderService.test.ts
+          apps/admin/src/orders/CancelOrderSheet.tsx
+          apps/admin/src/orders/OrdersPage.tsx
+          apps/admin/src/orders/RefundReturnPage.tsx
+          apps/admin/src/orders/useOrders.ts
+          packages/sync/src/httpTransport.ts
+          packages/sync/src/orderLifecycleConvergence.test.ts
+          packages/sync/src/orderLifecycleConvergence.ts
+          .github/workflows/admin-plan5-orders-customers-delivery-tdd.yml
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "style(plan5): format reconciled implementation"
+          git push origin HEAD:feat/admin-05-orders-customers-delivery-v2
