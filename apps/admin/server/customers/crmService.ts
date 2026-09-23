@@ -11,10 +11,7 @@ import type {
 } from '@tux/admin-contracts';
 
 import { requirePermission } from '../authorization.js';
-import {
-  computeAutomaticSegments,
-  type CustomerSegmentPolicy,
-} from './loyaltyService.js';
+import { computeAutomaticSegments, type CustomerSegmentPolicy } from './loyaltyService.js';
 
 export type CrmCustomerFacts = Omit<AdminCustomerDetail, 'segments'> & {
   readonly segmentPolicy: CustomerSegmentPolicy;
