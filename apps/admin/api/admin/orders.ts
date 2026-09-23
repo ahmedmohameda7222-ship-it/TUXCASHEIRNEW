@@ -24,6 +24,7 @@ import {
   type AdminRequest,
   type AdminResponse,
 } from '../../server/http.js';
+import { handleCrmRequest } from '../../server/customers/crmApi.js';
 import { handleCustomersRequest } from '../../server/customers/customerApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
@@ -769,6 +770,13 @@ export default async function handler(
   if (routedUrl.searchParams.get('__adminResource') === 'customers') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    if (
+      routedUrl.searchParams.has('view') ||
+      routedUrl.searchParams.get('surface') === 'crm'
+    ) {
+      await handleCrmRequest(request, response);
+      return;
+    }
     await handleCustomersRequest(request, response);
     return;
   }
