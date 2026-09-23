@@ -342,7 +342,15 @@ begin
       into v_balance
     from public.loyalty_ledger l
     where l.business_id = p_business_id
-      and l.customer_id = p_customer_id;
+      and l.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = p_business_id
+          and (
+            c.id = p_customer_id
+            or c.merged_into_customer_id = p_customer_id
+          )
+      );
 
     select coalesce(sum(r.loyalty_points_reserved), 0)
       into v_reserved_points
