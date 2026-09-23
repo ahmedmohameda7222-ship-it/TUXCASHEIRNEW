@@ -54,6 +54,7 @@ function storeWith(input: {
   available?: boolean;
   zones?: readonly AdminDeliveryZone[];
   fallback?: boolean;
+  open?: boolean;
 } = {}): DeliveryStore {
   const fallbackZone = zone('f', fallbackShopId, 5);
   return {
@@ -65,7 +66,7 @@ function storeWith(input: {
           dayOfWeek: 3,
           opensLocal: '00:00',
           closesLocal: '23:59',
-          active: true,
+          active: input.open ?? true,
         },
       ],
       zones: input.zones ?? [zone('a', shopId, 1)],
@@ -165,6 +166,39 @@ describe('Plan 5 delivery authority', () => {
       shopId: fallbackShopId,
       fallbackUsed: true,
     });
+  });
+
+  it('rejects delivery while the requested shop delivery hours are closed', async () => {
+    const service = createDeliveryService(storeWith({ open: false }));
+    await expect(
+      service.routeAddress(
+        {
+          requestedShopId: shopId,
+          latitude: 30,
+          longitude: 31,
+          subtotalMinor: 10000,
+          at,
+        },
+        principal,
+      ),
+    ).resolves.toEqual({ ok: false, code: 'delivery_closed' });
+  });
+
+  it('rejects routing outside the principal shop scope', async () => {
+    const service = createDeliveryService(storeWith());
+    const scopedPrincipal = { ...principal, shopIds: [fallbackShopId] };
+    await expect(
+      service.routeAddress(
+        {
+          requestedShopId: shopId,
+          latitude: 30,
+          longitude: 31,
+          subtotalMinor: 10000,
+          at,
+        },
+        scopedPrincipal,
+      ),
+    ).rejects.toThrow();
   });
 
   it('recomputes minimum order from the matched canonical zone', async () => {
