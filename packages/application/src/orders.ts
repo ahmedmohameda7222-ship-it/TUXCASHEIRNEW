@@ -1,5 +1,6 @@
 import {
   DomainInvariantError,
+  addMoney,
   allocateDisplayOrderNo,
   hasMeaningfulOrderDraft,
   normalizeEgyptianPhone,
@@ -47,6 +48,11 @@ import type {
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import type { ApplicationError } from './errors';
 import { unavailableOrderPrinter, type OrderPrinter } from './orderPrinter';
+import {
+  unavailableOrderRewardAuthority,
+  type OrderRewardAuthority,
+  type OrderRewardReservation,
+} from './orderRewards';
 import { err, ok, type Result } from './result';
 
 export interface OrdersRuntime {
@@ -173,6 +179,7 @@ export function createEmptyOrderDraft(input: {
     lines: [],
     orderNote: null,
     discountMinor: ZERO_MONEY,
+    reward: null,
     delivery: {
       displayPhone: '',
       normalizedPhone: '',
@@ -285,6 +292,7 @@ export class OperationsOrdersService {
   readonly #runtime: OrdersRuntime;
   readonly #coordinator: ApplicationCommandCoordinator;
   readonly #printer: OrderPrinter;
+  readonly #rewardAuthority: OrderRewardAuthority;
 
   constructor(
     database: OperationsDatabase,
@@ -293,6 +301,7 @@ export class OperationsOrdersService {
     runtime: OrdersRuntime,
     coordinator = new ApplicationCommandCoordinator(),
     printer: OrderPrinter = unavailableOrderPrinter,
+    rewardAuthority: OrderRewardAuthority = unavailableOrderRewardAuthority,
   ) {
     this.#database = database;
     this.#readModel = readModel;
@@ -300,6 +309,7 @@ export class OperationsOrdersService {
     this.#runtime = runtime;
     this.#coordinator = coordinator;
     this.#printer = printer;
+    this.#rewardAuthority = rewardAuthority;
   }
 
   async loadWorkspace(draftScopeId: string): Promise<OrdersWorkspaceResult> {
