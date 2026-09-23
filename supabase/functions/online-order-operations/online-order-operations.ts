@@ -118,8 +118,10 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
   const normalizedPhone = nullableString(source.normalizedPhone, 50);
   const deliveryAddress = nullableString(source.deliveryAddress, 500);
   const orderNote = nullableString(source.orderNote, 1000);
-  const promotionId = nullableUuid(source.promotionId);
-  const loyaltyPointsToRedeem = source.loyaltyPointsToRedeem;
+  const promotionId =
+    source.promotionId === undefined ? null : nullableUuid(source.promotionId);
+  const loyaltyPointsToRedeem =
+    source.loyaltyPointsToRedeem === undefined ? 0 : source.loyaltyPointsToRedeem;
   const createdAt = isoInstant(source.createdAt);
   const processingOrderId = source.processingOrderId === null ? null : uuid(source.processingOrderId);
   const processingStartedAt =
