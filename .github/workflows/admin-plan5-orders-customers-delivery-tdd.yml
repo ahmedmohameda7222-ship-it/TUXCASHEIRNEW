@@ -11,6 +11,7 @@ on:
       - feat/admin-05-orders-customers-delivery-v2
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/config.toml'
       - 'apps/admin/server/orders/**'
       - 'apps/admin/api/admin/orders.ts'
       - 'apps/admin/src/orders/**'
@@ -53,10 +54,12 @@ on:
       - 'scripts/test-admin-delivery-migration.mjs'
       - 'scripts/test-admin-delivery-postgres.mjs'
       - 'scripts/test-online-order-intake-migration.mjs'
+      - 'scripts/supabaseFunctionAuthConfig.deno.ts'
       - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
   pull_request:
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/config.toml'
       - 'apps/admin/server/orders/**'
       - 'apps/admin/api/admin/orders.ts'
       - 'apps/admin/src/orders/**'
@@ -99,6 +102,7 @@ on:
       - 'scripts/test-admin-delivery-migration.mjs'
       - 'scripts/test-admin-delivery-postgres.mjs'
       - 'scripts/test-online-order-intake-migration.mjs'
+      - 'scripts/supabaseFunctionAuthConfig.deno.ts'
       - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
 
 jobs:
