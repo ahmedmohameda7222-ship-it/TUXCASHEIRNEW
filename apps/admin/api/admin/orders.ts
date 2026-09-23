@@ -26,6 +26,7 @@ import {
 } from '../../server/http.js';
 import { handleCrmRequest } from '../../server/customers/crmApi.js';
 import { handleCustomersRequest } from '../../server/customers/customerApi.js';
+import { handleDeliveryRequest } from '../../server/delivery/deliveryApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -767,6 +768,13 @@ export default async function handler(
   response: AdminResponse,
 ): Promise<void> {
   const routedUrl = new URL(request.url ?? '/', 'http://admin.local');
+  if (routedUrl.searchParams.get('__adminResource') === 'delivery') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await handleDeliveryRequest(request, response);
+    return;
+  }
+
   if (routedUrl.searchParams.get('__adminResource') === 'customers') {
     routedUrl.searchParams.delete('__adminResource');
     request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
