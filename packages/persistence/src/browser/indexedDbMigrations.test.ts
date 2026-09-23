@@ -124,8 +124,8 @@ afterEach(async () => {
 
 describe('IndexedDB migration registry', () => {
   it('declares a contiguous production migration chain', () => {
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(INDEXED_DB_VERSION).toBe(6);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(INDEXED_DB_VERSION).toBe(7);
   });
 
   it('creates every production store and operational index on a fresh install', async () => {
@@ -137,6 +137,7 @@ describe('IndexedDB migration registry', () => {
       );
       expect([...database.objectStoreNames]).toContain('workerUiPreferences');
       expect([...database.objectStoreNames]).toContain('workerMenuLayouts');
+      expect([...database.objectStoreNames]).toContain('orderLifecycleSyncCursor');
       const transaction = database.transaction(
         ['orders', 'inventoryItems', 'inventoryMovements', 'outboxEvents', 'workerSessions'],
         'readonly',
@@ -410,6 +411,6 @@ describe('IndexedDB migration registry', () => {
         INDEXED_DB_VERSION,
         INDEXED_DB_VERSION + 1,
       ),
-    ).toThrow('IndexedDB migration v7 is missing');
+    ).toThrow('IndexedDB migration v8 is missing');
   });
 });

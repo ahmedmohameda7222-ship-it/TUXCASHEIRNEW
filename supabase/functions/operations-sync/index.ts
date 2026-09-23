@@ -94,6 +94,14 @@ Deno.serve(async (request) => {
     if (message.includes('TUX_PROTOCOL_CONFLICT')) {
       return jsonResponse(409, { error: 'sync_protocol_conflict' });
     }
+    const stale = message.match(/TUX_ORDER_STALE_OPERATIONAL_REVISION:([A-Z_]+):(-?\d+)/);
+    if (stale) {
+      return jsonResponse(409, {
+        error: 'stale_operational_revision',
+        canonicalStatus: stale[1],
+        canonicalOperationalRevision: Number(stale[2]),
+      });
+    }
     if (message.includes('TUX_DEPENDENCY_MISSING')) {
       return jsonResponse(425, { error: 'sync_dependency_not_ready' });
     }

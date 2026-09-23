@@ -511,6 +511,17 @@ CREATE TABLE inventory_sync_cursors (
 );
 `,
   },
+  {
+    version: 13,
+    name: 'order_lifecycle_remote_convergence',
+    sql: `
+CREATE TABLE order_lifecycle_sync_cursors (
+  shop_id TEXT PRIMARY KEY REFERENCES shops(id),
+  cursor TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`,
+  },
 ];
 
 export function applySqliteMigrations(database: DatabaseSync): void {

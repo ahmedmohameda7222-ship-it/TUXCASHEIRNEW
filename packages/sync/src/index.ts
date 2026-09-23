@@ -40,3 +40,5 @@ export {
   type InventoryCostProjection,
   type InventoryFeedTransport,
 } from './inventoryConvergence';
+
+export * from './orderLifecycleConvergence';
