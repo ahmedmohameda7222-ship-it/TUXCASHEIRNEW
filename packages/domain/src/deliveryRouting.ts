@@ -101,7 +101,7 @@ function pointInPolygon(
       a.latitude > point.latitude !== b.latitude > point.latitude &&
       point.longitude <
         ((b.longitude - a.longitude) * (point.latitude - a.latitude)) / (b.latitude - a.latitude) +
-        a.longitude;
+          a.longitude;
     if (crosses) inside = !inside;
   }
   return inside;
