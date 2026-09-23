@@ -844,6 +844,10 @@ declare
   v_reservation public.reward_reservations%rowtype;
   v_order_shop_id uuid;
   v_order_total_minor bigint;
+  v_order_idempotency_key text;
+  v_order_reward_reservation_id uuid;
+  v_order_reward_snapshot jsonb;
+  v_order_discount_minor bigint;
   v_program public.loyalty_programs%rowtype;
   v_earn_points bigint := 0;
 begin
@@ -877,13 +881,39 @@ begin
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_expired');
   end if;
 
-  select o.shop_id, o.total_minor
-    into v_order_shop_id, v_order_total_minor
+  select
+    o.shop_id,
+    o.total_minor,
+    o.idempotency_key,
+    o.reward_reservation_id,
+    o.applied_reward_snapshot,
+    o.discount_minor
+    into
+      v_order_shop_id,
+      v_order_total_minor,
+      v_order_idempotency_key,
+      v_order_reward_reservation_id,
+      v_order_reward_snapshot,
+      v_order_discount_minor
   from public.orders o
   where o.id = p_order_id
   for update;
 
-  if not found or v_order_shop_id <> v_reservation.shop_id then
+  if not found
+     or v_order_shop_id <> v_reservation.shop_id
+     or v_order_idempotency_key <> v_reservation.checkout_intent_id
+     or (
+       v_order_reward_reservation_id is not null
+       and v_order_reward_reservation_id <> v_reservation.id
+     )
+     or (
+       v_order_reward_snapshot is not null
+       and v_order_reward_snapshot <> v_reservation.applied_reward_snapshot
+     )
+     or coalesce(
+       (v_reservation.applied_reward_snapshot ->> 'rewardDiscountMinor')::bigint,
+       0
+     ) > v_order_discount_minor then
     return jsonb_build_object('ok', false, 'code', 'reward_order_mismatch');
   end if;
 
@@ -1027,6 +1057,45 @@ revoke all on function public.consume_order_reward_reservation_v1(uuid, uuid, ti
   from public, anon, authenticated;
 grant execute on function public.consume_order_reward_reservation_v1(uuid, uuid, timestamptz)
   to service_role;
+
+create or replace function private.consume_inserted_order_reward_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $consume_inserted_order_reward$
+declare
+  v_result jsonb;
+begin
+  if new.reward_reservation_id is null then
+    return new;
+  end if;
+
+  v_result := public.consume_order_reward_reservation_v1(
+    new.reward_reservation_id,
+    new.id,
+    coalesce(new.updated_at, new.created_at, now())
+  );
+
+  if coalesce((v_result ->> 'ok')::boolean, false) is not true then
+    raise exception 'TUX_REWARD_RESERVATION_FINALIZATION_FAILED:%',
+      coalesce(v_result ->> 'code', 'unknown');
+  end if;
+
+  return new;
+end;
+$consume_inserted_order_reward$;
+
+revoke all on function private.consume_inserted_order_reward_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists orders_consume_reward_reservation
+  on public.orders;
+create trigger orders_consume_reward_reservation
+after insert on public.orders
+for each row
+when (new.reward_reservation_id is not null)
+execute function private.consume_inserted_order_reward_v1();
 
 create or replace function public.release_order_reward_reservation_v1(
   p_reservation_id uuid,
