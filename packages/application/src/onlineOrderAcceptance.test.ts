@@ -307,6 +307,34 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
     expect(draft.delivery.configuredFeeMinor).toBe(moneyMinor(3_000));
   });
 
+  it('rejects worker delivery authority that diverges from the canonical intake route', () => {
+    const canonicalRequest = {
+      ...request(),
+      deliveryZoneId: ZONE_ID,
+      deliveryZoneName: 'Nasr City',
+      deliveryFeeMinor: 3_000,
+      deliveryMinimumOrderMinor: 15_000,
+      deliveryFallbackUsed: false,
+    } as CachedOnlineOrderRequest & {
+      readonly deliveryZoneId: DeliveryZoneId;
+      readonly deliveryZoneName: string;
+      readonly deliveryFeeMinor: number;
+      readonly deliveryMinimumOrderMinor: number;
+      readonly deliveryFallbackUsed: boolean;
+    };
+
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: canonicalRequest,
+        workspace: workspace(
+          configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': true }),
+        ),
+        confirmation: deliveryConfirmation(25_000, 2_500),
+        runtime,
+      }),
+    ).toThrow(/canonical delivery|delivery authority|delivery fee/i);
+  });
+
   it('refuses stale trusted prices instead of silently accepting an old catalog snapshot', () => {
     expect(() =>
       prepareOnlineOrderAcceptanceDraft({
