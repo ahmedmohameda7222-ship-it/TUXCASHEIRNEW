@@ -446,7 +446,7 @@ async function callSupabaseFunction(
   config: SupabaseServerConfig,
   session: DeviceSessionSecrets,
   functionName:
-    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle',
+    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle' | 'operations-order-rewards',
   request: GatewayRequest,
   body: string | null,
 ): Promise<Response> {
@@ -461,7 +461,10 @@ async function callSupabaseFunction(
   }
 
   return fetch(target, {
-    method: functionName === 'operations-sync' ? 'POST' : 'GET',
+    method:
+      functionName === 'operations-sync' || functionName === 'operations-order-rewards'
+        ? 'POST'
+        : 'GET',
     headers: {
       apikey: config.publishableKey,
       authorization: `Bearer ${session.accessToken}`,
@@ -477,9 +480,12 @@ export async function proxyAuthenticatedFunction(
   request: GatewayRequest,
   response: GatewayResponse,
   functionName:
-    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle',
+    'operations-config' | 'operations-sync' | 'operations-inventory' | 'operations-order-lifecycle' | 'operations-order-rewards',
 ): Promise<void> {
-  const expectedMethod = functionName === 'operations-sync' ? 'POST' : 'GET';
+  const expectedMethod =
+    functionName === 'operations-sync' || functionName === 'operations-order-rewards'
+      ? 'POST'
+      : 'GET';
   if (request.method !== expectedMethod) {
     sendJson(response, 405, { error: 'method_not_allowed' });
     return;
