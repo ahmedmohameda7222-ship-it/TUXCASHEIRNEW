@@ -135,6 +135,12 @@ function onlineRequest(
     customerName: 'Online Customer',
     normalizedPhone: fulfillmentPreference === 'DELIVERY' ? '01012345678' : null,
     deliveryAddress: fulfillmentPreference === 'DELIVERY' ? 'Nasr City, Cairo' : null,
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: fulfillmentPreference === 'DELIVERY' ? ZONE_ID : null,
+    deliveryZoneName: fulfillmentPreference === 'DELIVERY' ? 'Nasr City' : null,
+    deliveryFeeMinor: fulfillmentPreference === 'DELIVERY' ? 3_000 : null,
+    deliveryMinimumOrderMinor: fulfillmentPreference === 'DELIVERY' ? 15_000 : null,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: PRODUCT_ID,
