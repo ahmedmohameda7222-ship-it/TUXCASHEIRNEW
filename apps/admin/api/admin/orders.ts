@@ -386,80 +386,80 @@ export function createOrderStore(client: AdminSupabaseClient): OrderStore {
 
       const [payments, items, statusRows, movementRows, auditRows, refundRows, returnRows] =
         await Promise.all([
-        client.select<PaymentRow[]>(
-          'payments',
-          new URLSearchParams({
-            select:
-              'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor',
-            order_id: `eq.${input.orderId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'part_index.asc',
-          }),
-        ),
-        client.select<ItemRow[]>(
-          'order_items',
-          new URLSearchParams({
-            select:
-              'id,product_id,product_name_snapshot,unit_price_minor,quantity,item_note,line_position',
-            order_id: `eq.${input.orderId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'line_position.asc,id.asc',
-          }),
-        ),
-        client.select<StatusRow[]>(
-          'order_status_events',
-          new URLSearchParams({
-            select:
-              'id,event_type,worker_name_snapshot,admin_employee_id,operational_revision,from_status,to_status,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,created_at',
-            order_id: `eq.${input.orderId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'operational_revision.asc,created_at.asc,id.asc',
-          }),
-        ),
-        client.select<MovementRow[]>(
-          'inventory_movements',
-          new URLSearchParams({
-            select:
-              'id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,created_at',
-            order_id: `eq.${input.orderId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'created_at.asc,id.asc',
-          }),
-        ),
-        client.select<AuditRow[]>(
-          'admin_audit_events',
-          new URLSearchParams({
-            select: 'id,action_type,actor_employee_id,created_at',
-            business_id: `eq.${input.businessId}`,
-            shop_id: `eq.${input.shopId}`,
-            entity_type: 'eq.ORDER',
-            entity_id: `eq.${input.orderId}`,
-            order: 'created_at.asc,id.asc',
-          }),
-        ),
-        client.select<RefundRow[]>(
-          'admin_order_refunds',
-          new URLSearchParams({
-            select:
-              'id,amount_minor,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
-            business_id: `eq.${input.businessId}`,
-            shop_id: `eq.${input.shopId}`,
-            order_id: `eq.${input.orderId}`,
-            order: 'created_at.asc,id.asc',
-          }),
-        ),
-        client.select<ReturnRow[]>(
-          'admin_order_returns',
-          new URLSearchParams({
-            select:
-              'id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
-            business_id: `eq.${input.businessId}`,
-            shop_id: `eq.${input.shopId}`,
-            order_id: `eq.${input.orderId}`,
-            order: 'created_at.asc,id.asc',
-          }),
-        ),
-      ]);
+          client.select<PaymentRow[]>(
+            'payments',
+            new URLSearchParams({
+              select:
+                'id,payment_method_label_snapshot,logic_type_snapshot,allocated_minor,received_minor,change_minor',
+              order_id: `eq.${input.orderId}`,
+              shop_id: `eq.${input.shopId}`,
+              order: 'part_index.asc',
+            }),
+          ),
+          client.select<ItemRow[]>(
+            'order_items',
+            new URLSearchParams({
+              select:
+                'id,product_id,product_name_snapshot,unit_price_minor,quantity,item_note,line_position',
+              order_id: `eq.${input.orderId}`,
+              shop_id: `eq.${input.shopId}`,
+              order: 'line_position.asc,id.asc',
+            }),
+          ),
+          client.select<StatusRow[]>(
+            'order_status_events',
+            new URLSearchParams({
+              select:
+                'id,event_type,worker_name_snapshot,admin_employee_id,operational_revision,from_status,to_status,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,created_at',
+              order_id: `eq.${input.orderId}`,
+              shop_id: `eq.${input.shopId}`,
+              order: 'operational_revision.asc,created_at.asc,id.asc',
+            }),
+          ),
+          client.select<MovementRow[]>(
+            'inventory_movements',
+            new URLSearchParams({
+              select:
+                'id,inventory_item_id,movement_type,quantity_delta_micros,reserved_delta_micros,created_at',
+              order_id: `eq.${input.orderId}`,
+              shop_id: `eq.${input.shopId}`,
+              order: 'created_at.asc,id.asc',
+            }),
+          ),
+          client.select<AuditRow[]>(
+            'admin_audit_events',
+            new URLSearchParams({
+              select: 'id,action_type,actor_employee_id,created_at',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              entity_type: 'eq.ORDER',
+              entity_id: `eq.${input.orderId}`,
+              order: 'created_at.asc,id.asc',
+            }),
+          ),
+          client.select<RefundRow[]>(
+            'admin_order_refunds',
+            new URLSearchParams({
+              select:
+                'id,amount_minor,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              order_id: `eq.${input.orderId}`,
+              order: 'created_at.asc,id.asc',
+            }),
+          ),
+          client.select<ReturnRow[]>(
+            'admin_order_returns',
+            new URLSearchParams({
+              select:
+                'id,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,note,state,approval_request_id,created_at',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              order_id: `eq.${input.orderId}`,
+              order: 'created_at.asc,id.asc',
+            }),
+          ),
+        ]);
 
       const itemIds = items.map((item) => item.id);
       const [modifiers, beverages] =
