@@ -10,7 +10,10 @@ import {
   requireSessionCsrf,
   type AdminSessionContext,
 } from '../adminAuthService.js';
-import { AdminAuthorizationError, requirePermission } from '../authorization.js';
+import {
+  AdminAuthorizationError,
+  requirePermission,
+} from '../authorization.js';
 import { getAdminServerEnv } from '../env.js';
 import {
   firstHeader,
@@ -99,7 +102,9 @@ type ReasonRow = {
 
 function safeInteger(value: number | string): number {
   const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isSafeInteger(parsed)) throw new Error('crm_backend_contract_invalid');
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error('crm_backend_contract_invalid');
+  }
   return parsed;
 }
 
@@ -112,7 +117,10 @@ async function loadContext(
   if (!token) throw new AdminAuthError('session_required', 401);
   const context = await loadAdminSession(token, client);
   if (csrfRequired) {
-    requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
+    requireSessionCsrf(
+      context,
+      firstHeader(request.headers['x-tux-admin-csrf']).trim(),
+    );
   }
   return context;
 }
@@ -186,7 +194,9 @@ function handleFailure(response: AdminResponse, error: unknown): void {
       sendJson(response, 400, { error: 'invalid_reason_code' });
       return;
     }
-    console.error('Admin CRM database request failed', { status: error.status });
+    console.error('Admin CRM database request failed', {
+      status: error.status,
+    });
     sendJson(response, 502, { error: 'admin_backend_unavailable' });
     return;
   }
@@ -222,7 +232,9 @@ export async function handleCrmRequest(
           });
           return;
         case 'customer': {
-          const customerId = uuidSchema.parse(url.searchParams.get('customerId'));
+          const customerId = uuidSchema.parse(
+            url.searchParams.get('customerId'),
+          );
           const customer = await service.getCustomerDetail(
             { shopId, customerId },
             context.principal,
@@ -236,12 +248,18 @@ export async function handleCrmRequest(
         }
         case 'loyalty-program':
           sendJson(response, 200, {
-            program: await service.getLoyaltyProgram({ shopId }, context.principal),
+            program: await service.getLoyaltyProgram(
+              { shopId },
+              context.principal,
+            ),
           });
           return;
         case 'promotions':
           sendJson(response, 200, {
-            promotions: await service.listPromotions({ shopId }, context.principal),
+            promotions: await service.listPromotions(
+              { shopId },
+              context.principal,
+            ),
           });
           return;
         case 'adjustment-reasons':
@@ -261,7 +279,10 @@ export async function handleCrmRequest(
 
     switch (command.type) {
       case 'loyalty.program.upsert': {
-        const result = await service.upsertLoyaltyProgram(command, context.principal);
+        const result = await service.upsertLoyaltyProgram(
+          command,
+          context.principal,
+        );
         sendJson(response, mutationStatus(result), result);
         return;
       }
