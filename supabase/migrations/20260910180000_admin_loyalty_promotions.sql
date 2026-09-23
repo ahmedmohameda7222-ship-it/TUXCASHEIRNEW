@@ -555,6 +555,9 @@ as $consume_order_reward_reservation$
 declare
   v_reservation public.reward_reservations%rowtype;
   v_order_shop_id uuid;
+  v_order_total_minor bigint;
+  v_program public.loyalty_programs%rowtype;
+  v_earn_points bigint := 0;
 begin
   select r.*
     into v_reservation
@@ -586,8 +589,8 @@ begin
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_expired');
   end if;
 
-  select o.shop_id
-    into v_order_shop_id
+  select o.shop_id, o.total_minor
+    into v_order_shop_id, v_order_total_minor
   from public.orders o
   where o.id = p_order_id
   for update;
@@ -647,6 +650,53 @@ begin
       v_reservation.applied_reward_snapshot -> 'promotion'
     )
     on conflict (business_id, entry_key) do nothing;
+  end if;
+
+  if v_reservation.customer_id is not null then
+    select p.*
+      into v_program
+    from public.loyalty_programs p
+    where p.business_id = v_reservation.business_id
+    for share;
+
+    if found
+       and v_program.enabled
+       and (
+         coalesce(array_length(v_program.shop_ids, 1), 0) = 0
+         or v_reservation.shop_id = any(v_program.shop_ids)
+       ) then
+      v_earn_points :=
+        (v_order_total_minor / 100) * v_program.earn_points_per_100_minor;
+      if v_earn_points > 0 then
+        insert into public.loyalty_ledger(
+          business_id,
+          shop_id,
+          customer_id,
+          order_id,
+          entry_key,
+          event_type,
+          points_delta,
+          monetary_value_minor,
+          earn_expires_at,
+          source_event_id
+        ) values (
+          v_reservation.business_id,
+          v_reservation.shop_id,
+          v_reservation.customer_id,
+          p_order_id,
+          'reward-reservation:' || v_reservation.id::text || ':earn',
+          'EARN',
+          v_earn_points,
+          0,
+          case
+            when v_program.point_expiry_days is null then null
+            else p_now + make_interval(days => v_program.point_expiry_days)
+          end,
+          v_reservation.id::text
+        )
+        on conflict (business_id, entry_key) do nothing;
+      end if;
+    end if;
   end if;
 
   update public.orders
@@ -787,3 +837,711 @@ revoke all on function public.expire_order_reward_reservations_v1(timestamptz, i
   from public, anon, authenticated;
 grant execute on function public.expire_order_reward_reservations_v1(timestamptz, integer)
   to service_role;
+
+
+-- Trusted Admin CRM mutations and immutable reason snapshots.
+alter table public.loyalty_ledger
+  add column if not exists reason_code_id uuid references public.admin_reason_codes(id) on delete restrict,
+  add column if not exists reason_code_key text,
+  add column if not exists reason_label_snapshot text,
+  add column if not exists reason_family_snapshot text,
+  add column if not exists reason_config_version bigint;
+
+alter table public.loyalty_ledger
+  drop constraint if exists loyalty_ledger_reason_snapshot_ck;
+alter table public.loyalty_ledger
+  add constraint loyalty_ledger_reason_snapshot_ck check (
+    (
+      reason_code_id is null
+      and reason_code_key is null
+      and reason_label_snapshot is null
+      and reason_family_snapshot is null
+      and reason_config_version is null
+    )
+    or
+    (
+      reason_code_id is not null
+      and reason_code_key is not null
+      and reason_label_snapshot is not null
+      and reason_family_snapshot is not null
+      and reason_config_version is not null
+    )
+  );
+
+create table if not exists public.admin_loyalty_command_receipts (
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  command_id text not null check (btrim(command_id) <> ''),
+  command_type text not null check (btrim(command_type) <> ''),
+  request_fingerprint text not null check (btrim(request_fingerprint) <> ''),
+  result_json jsonb not null check (jsonb_typeof(result_json) = 'object'),
+  created_at timestamptz not null default now(),
+  primary key (business_id, command_id)
+);
+
+alter table public.admin_loyalty_command_receipts enable row level security;
+revoke all on public.admin_loyalty_command_receipts from public, anon, authenticated;
+grant select, insert on public.admin_loyalty_command_receipts to service_role;
+
+create or replace function private.admin_loyalty_authority_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_permission text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $admin_loyalty_authority$
+declare
+  v_auth record;
+begin
+  select * into v_auth
+  from public.resolve_admin_authorization_v1(
+    p_employee_id,
+    p_shop_id,
+    p_permission
+  );
+
+  if not coalesce(v_auth.authorized, false) or v_auth.business_id is null then
+    raise exception 'TUX_ADMIN_LOYALTY_FORBIDDEN:%', coalesce(v_auth.denial_code, 'unknown');
+  end if;
+  if not exists (
+    select 1
+    from public.business_shops bs
+    where bs.business_id = v_auth.business_id
+      and bs.shop_id = p_shop_id
+  ) then
+    raise exception 'TUX_ADMIN_LOYALTY_SHOP_FORBIDDEN';
+  end if;
+  return v_auth.business_id;
+end;
+$admin_loyalty_authority$;
+
+revoke all on function private.admin_loyalty_authority_v1(uuid, uuid, text)
+  from public, anon, authenticated;
+
+create or replace function private.admin_loyalty_reason_snapshot_v1(
+  p_business_id uuid,
+  p_shop_id uuid,
+  p_reason_code_id uuid
+)
+returns table(
+  reason_code_key text,
+  reason_label text,
+  reason_family text,
+  reason_version bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $admin_loyalty_reason$
+begin
+  return query
+  select r.reason_key, r.label, r.family, r.version
+  from public.admin_reason_codes r
+  where r.id = p_reason_code_id
+    and r.business_id = p_business_id
+    and r.family = 'DISCOUNT_COMP'
+    and r.active
+    and (r.shop_id is null or r.shop_id = p_shop_id)
+  limit 1;
+
+  if not found then
+    raise exception 'TUX_ADMIN_LOYALTY_REASON_INVALID';
+  end if;
+end;
+$admin_loyalty_reason$;
+
+revoke all on function private.admin_loyalty_reason_snapshot_v1(uuid, uuid, uuid)
+  from public, anon, authenticated;
+
+create or replace function public.upsert_admin_loyalty_program_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_enabled boolean,
+  p_earn_points_per_100_minor bigint,
+  p_redemption_minor_per_point bigint,
+  p_minimum_redemption_points bigint,
+  p_point_expiry_days integer,
+  p_shop_ids uuid[],
+  p_expected_version bigint
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $upsert_admin_loyalty$
+declare
+  v_business_id uuid;
+  v_existing public.loyalty_programs%rowtype;
+  v_next_version bigint;
+begin
+  if p_employee_id is null
+     or p_shop_id is null
+     or p_enabled is null
+     or p_earn_points_per_100_minor is null
+     or p_earn_points_per_100_minor < 0
+     or p_redemption_minor_per_point is null
+     or p_redemption_minor_per_point <= 0
+     or p_minimum_redemption_points is null
+     or p_minimum_redemption_points <= 0
+     or (p_point_expiry_days is not null and p_point_expiry_days <= 0)
+     or p_shop_ids is null then
+    return jsonb_build_object('ok', false, 'code', 'invalid_loyalty_program');
+  end if;
+
+  v_business_id := private.admin_loyalty_authority_v1(
+    p_employee_id, p_shop_id, 'loyalty.manage'
+  );
+
+  if exists (
+    select 1
+    from unnest(p_shop_ids) requested(shop_id)
+    where not exists (
+      select 1 from public.business_shops bs
+      where bs.business_id = v_business_id
+        and bs.shop_id = requested.shop_id
+    )
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'loyalty_shop_scope_invalid');
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended('tux-admin-loyalty-program:' || v_business_id::text, 0)
+  );
+
+  select p.* into v_existing
+  from public.loyalty_programs p
+  where p.business_id = v_business_id
+  for update;
+
+  if found then
+    if p_expected_version is null or v_existing.version <> p_expected_version then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'stale_loyalty_program_version',
+        'currentVersion', v_existing.version
+      );
+    end if;
+    v_next_version := v_existing.version + 1;
+    update public.loyalty_programs
+    set enabled = p_enabled,
+        earn_points_per_100_minor = p_earn_points_per_100_minor,
+        redemption_minor_per_point = p_redemption_minor_per_point,
+        minimum_redemption_points = p_minimum_redemption_points,
+        point_expiry_days = p_point_expiry_days,
+        shop_ids = p_shop_ids,
+        version = v_next_version,
+        updated_by_employee_id = p_employee_id,
+        updated_at = now()
+    where business_id = v_business_id;
+  else
+    if p_expected_version is not null then
+      return jsonb_build_object('ok', false, 'code', 'loyalty_program_not_found');
+    end if;
+    v_next_version := 1;
+    insert into public.loyalty_programs(
+      business_id, enabled, earn_points_per_100_minor,
+      redemption_minor_per_point, minimum_redemption_points,
+      point_expiry_days, shop_ids, version, updated_by_employee_id
+    ) values (
+      v_business_id, p_enabled, p_earn_points_per_100_minor,
+      p_redemption_minor_per_point, p_minimum_redemption_points,
+      p_point_expiry_days, p_shop_ids, v_next_version, p_employee_id
+    );
+  end if;
+
+  perform public.append_admin_audit_event_v1(
+    v_business_id,
+    p_shop_id,
+    p_employee_id,
+    'LOYALTY_PROGRAM_UPDATED',
+    'LOYALTY_PROGRAM',
+    v_business_id::text,
+    case when v_existing.business_id is null then null else jsonb_build_object(
+      'version', v_existing.version,
+      'enabled', v_existing.enabled
+    ) end,
+    jsonb_build_object(
+      'version', v_next_version,
+      'enabled', p_enabled,
+      'earnPointsPer100Minor', p_earn_points_per_100_minor,
+      'redemptionMinorPerPoint', p_redemption_minor_per_point,
+      'minimumRedemptionPoints', p_minimum_redemption_points,
+      'pointExpiryDays', p_point_expiry_days,
+      'shopIds', to_jsonb(p_shop_ids)
+    ),
+    null,
+    null,
+    null,
+    jsonb_build_object('source', 'admin_bff')
+  );
+
+  return jsonb_build_object('ok', true, 'version', v_next_version);
+end;
+$upsert_admin_loyalty$;
+
+revoke all on function public.upsert_admin_loyalty_program_v1(
+  uuid, uuid, boolean, bigint, bigint, bigint, integer, uuid[], bigint
+) from public, anon, authenticated;
+grant execute on function public.upsert_admin_loyalty_program_v1(
+  uuid, uuid, boolean, bigint, bigint, bigint, integer, uuid[], bigint
+) to service_role;
+
+create or replace function public.adjust_admin_customer_loyalty_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_customer_id uuid,
+  p_points_delta bigint,
+  p_reason_code_id uuid,
+  p_note text,
+  p_command_id text,
+  p_business_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $adjust_admin_loyalty$
+declare
+  v_business_id uuid;
+  v_reason record;
+  v_existing public.admin_loyalty_command_receipts%rowtype;
+  v_fingerprint text;
+  v_balance bigint;
+  v_event_id uuid;
+  v_result jsonb;
+begin
+  if p_employee_id is null
+     or p_shop_id is null
+     or p_customer_id is null
+     or p_points_delta is null
+     or p_points_delta = 0
+     or p_reason_code_id is null
+     or nullif(btrim(p_command_id), '') is null
+     or p_business_id is null then
+    return jsonb_build_object('ok', false, 'code', 'invalid_loyalty_adjustment');
+  end if;
+
+  v_business_id := private.admin_loyalty_authority_v1(
+    p_employee_id, p_shop_id, 'loyalty.manage'
+  );
+  if v_business_id is distinct from p_business_id then
+    return jsonb_build_object('ok', false, 'code', 'loyalty_business_mismatch');
+  end if;
+
+  perform 1
+  from public.business_customers c
+  where c.id = p_customer_id
+    and c.business_id = v_business_id
+    and c.merged_into_customer_id is null
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'customer_not_found');
+  end if;
+
+  select * into v_reason
+  from private.admin_loyalty_reason_snapshot_v1(
+    v_business_id, p_shop_id, p_reason_code_id
+  );
+
+  v_fingerprint := md5(
+    jsonb_build_object(
+      'shopId', p_shop_id,
+      'customerId', p_customer_id,
+      'pointsDelta', p_points_delta,
+      'reasonCodeId', p_reason_code_id,
+      'note', nullif(btrim(coalesce(p_note, '')), '')
+    )::text
+  );
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-admin-loyalty-command:' || v_business_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
+  select * into v_existing
+  from public.admin_loyalty_command_receipts r
+  where r.business_id = v_business_id
+    and r.command_id = p_command_id
+  for update;
+
+  if found then
+    if v_existing.command_type = 'MANUAL_ADJUSTMENT'
+       and v_existing.request_fingerprint = v_fingerprint then
+      return v_existing.result_json || jsonb_build_object('replayed', true);
+    end if;
+    return jsonb_build_object('ok', false, 'code', 'command_id_conflict');
+  end if;
+
+  select coalesce(sum(l.points_delta), 0)
+    into v_balance
+  from public.loyalty_ledger l
+  where l.business_id = v_business_id
+    and l.customer_id in (
+      select c.id
+      from public.business_customers c
+      where c.business_id = v_business_id
+        and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
+    );
+
+  if v_balance + p_points_delta < 0 then
+    return jsonb_build_object('ok', false, 'code', 'loyalty_balance_insufficient');
+  end if;
+
+  v_event_id := gen_random_uuid();
+  insert into public.loyalty_ledger(
+    id, business_id, shop_id, customer_id, entry_key, event_type,
+    points_delta, monetary_value_minor, reason_note, source_event_id,
+    created_by_employee_id, reason_code_id, reason_code_key,
+    reason_label_snapshot, reason_family_snapshot, reason_config_version
+  ) values (
+    v_event_id, v_business_id, p_shop_id, p_customer_id,
+    'admin-loyalty-adjust:' || p_command_id, 'MANUAL_ADJUSTMENT',
+    p_points_delta, 0, nullif(btrim(coalesce(p_note, '')), ''), p_command_id,
+    p_employee_id, p_reason_code_id, v_reason.reason_code_key,
+    v_reason.reason_label, v_reason.reason_family, v_reason.reason_version
+  );
+
+  v_balance := v_balance + p_points_delta;
+  v_result := jsonb_build_object(
+    'ok', true,
+    'ledgerEventId', v_event_id,
+    'balance', v_balance,
+    'replayed', false
+  );
+
+  insert into public.admin_loyalty_command_receipts(
+    business_id, command_id, command_type, request_fingerprint, result_json
+  ) values (
+    v_business_id, p_command_id, 'MANUAL_ADJUSTMENT', v_fingerprint, v_result
+  );
+
+  perform public.append_admin_audit_event_v1(
+    v_business_id,
+    p_shop_id,
+    p_employee_id,
+    'LOYALTY_MANUAL_ADJUSTMENT',
+    'CUSTOMER',
+    p_customer_id::text,
+    jsonb_build_object('balance', v_balance - p_points_delta),
+    jsonb_build_object(
+      'balance', v_balance,
+      'pointsDelta', p_points_delta,
+      'reasonCodeId', p_reason_code_id,
+      'reasonCodeKey', v_reason.reason_code_key,
+      'reasonLabel', v_reason.reason_label,
+      'reasonFamily', v_reason.reason_family,
+      'reasonConfigVersion', v_reason.reason_version
+    ),
+    nullif(btrim(coalesce(p_note, '')), ''),
+    null,
+    null,
+    jsonb_build_object('commandId', p_command_id)
+  );
+
+  return v_result;
+end;
+$adjust_admin_loyalty$;
+
+revoke all on function public.adjust_admin_customer_loyalty_v1(
+  uuid, uuid, uuid, bigint, uuid, text, text, uuid
+) from public, anon, authenticated;
+grant execute on function public.adjust_admin_customer_loyalty_v1(
+  uuid, uuid, uuid, bigint, uuid, text, text, uuid
+) to service_role;
+
+create or replace function public.upsert_admin_promotion_v1(
+  p_employee_id uuid,
+  p_shop_id uuid,
+  p_promotion_id uuid,
+  p_name text,
+  p_active boolean,
+  p_kind text,
+  p_percent_basis_points integer,
+  p_fixed_discount_minor bigint,
+  p_free_product_id uuid,
+  p_starts_at timestamptz,
+  p_ends_at timestamptz,
+  p_minimum_order_minor bigint,
+  p_shop_ids uuid[],
+  p_channel text,
+  p_product_ids uuid[],
+  p_category_ids uuid[],
+  p_total_usage_limit bigint,
+  p_per_customer_usage_limit bigint,
+  p_stacking_policy text,
+  p_expected_version bigint,
+  p_command_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $upsert_admin_promotion$
+declare
+  v_business_id uuid;
+  v_existing public.promotion_rules%rowtype;
+  v_receipt public.admin_loyalty_command_receipts%rowtype;
+  v_fingerprint text;
+  v_id uuid;
+  v_version bigint;
+  v_result jsonb;
+begin
+  if p_employee_id is null
+     or p_shop_id is null
+     or nullif(btrim(p_name), '') is null
+     or p_active is null
+     or p_kind not in ('PERCENT', 'FIXED', 'FREE_ITEM')
+     or p_minimum_order_minor is null
+     or p_minimum_order_minor < 0
+     or p_shop_ids is null
+     or p_channel not in ('POS', 'ONLINE', 'BOTH')
+     or p_product_ids is null
+     or p_category_ids is null
+     or (p_total_usage_limit is not null and p_total_usage_limit <= 0)
+     or (p_per_customer_usage_limit is not null and p_per_customer_usage_limit <= 0)
+     or p_stacking_policy not in ('ONE_ORDER_LEVEL', 'ALLOW_CONFIGURED')
+     or (p_starts_at is not null and p_ends_at is not null and p_ends_at <= p_starts_at)
+     or nullif(btrim(p_command_id), '') is null
+     or (
+       p_kind = 'PERCENT'
+       and (
+         p_percent_basis_points is null
+         or p_percent_basis_points <= 0
+         or p_percent_basis_points > 10000
+         or p_fixed_discount_minor is not null
+         or p_free_product_id is not null
+       )
+     )
+     or (
+       p_kind = 'FIXED'
+       and (
+         p_fixed_discount_minor is null
+         or p_fixed_discount_minor < 0
+         or p_percent_basis_points is not null
+         or p_free_product_id is not null
+       )
+     )
+     or (
+       p_kind = 'FREE_ITEM'
+       and (
+         p_free_product_id is null
+         or p_percent_basis_points is not null
+         or p_fixed_discount_minor is not null
+       )
+     ) then
+    return jsonb_build_object('ok', false, 'code', 'invalid_promotion');
+  end if;
+
+  v_business_id := private.admin_loyalty_authority_v1(
+    p_employee_id, p_shop_id, 'promotions.manage'
+  );
+
+  if exists (
+    select 1 from unnest(p_shop_ids) requested(shop_id)
+    where not exists (
+      select 1 from public.business_shops bs
+      where bs.business_id = v_business_id
+        and bs.shop_id = requested.shop_id
+    )
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'promotion_shop_scope_invalid');
+  end if;
+
+  if p_free_product_id is not null and not exists (
+    select 1
+    from public.products product
+    join public.business_shops bs on bs.shop_id = product.shop_id
+    where product.id = p_free_product_id
+      and bs.business_id = v_business_id
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'promotion_free_product_invalid');
+  end if;
+
+  if exists (
+    select 1
+    from unnest(p_product_ids) requested(product_id)
+    where not exists (
+      select 1
+      from public.products product
+      join public.business_shops bs on bs.shop_id = product.shop_id
+      where product.id = requested.product_id
+        and bs.business_id = v_business_id
+    )
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'promotion_product_scope_invalid');
+  end if;
+
+  if exists (
+    select 1
+    from unnest(p_category_ids) requested(category_id)
+    where not exists (
+      select 1
+      from public.menu_categories category
+      join public.business_shops bs on bs.shop_id = category.shop_id
+      where category.id = requested.category_id
+        and bs.business_id = v_business_id
+    )
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'promotion_category_scope_invalid');
+  end if;
+
+  v_fingerprint := md5(
+    jsonb_build_object(
+      'promotionId', p_promotion_id,
+      'name', btrim(p_name),
+      'active', p_active,
+      'kind', p_kind,
+      'percentBasisPoints', p_percent_basis_points,
+      'fixedDiscountMinor', p_fixed_discount_minor,
+      'freeProductId', p_free_product_id,
+      'startsAt', p_starts_at,
+      'endsAt', p_ends_at,
+      'minimumOrderMinor', p_minimum_order_minor,
+      'shopIds', to_jsonb(p_shop_ids),
+      'channel', p_channel,
+      'productIds', to_jsonb(p_product_ids),
+      'categoryIds', to_jsonb(p_category_ids),
+      'totalUsageLimit', p_total_usage_limit,
+      'perCustomerUsageLimit', p_per_customer_usage_limit,
+      'stackingPolicy', p_stacking_policy,
+      'expectedVersion', p_expected_version
+    )::text
+  );
+
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'tux-admin-promotion-command:' || v_business_id::text || ':' || p_command_id,
+      0
+    )
+  );
+
+  select * into v_receipt
+  from public.admin_loyalty_command_receipts r
+  where r.business_id = v_business_id
+    and r.command_id = p_command_id
+  for update;
+  if found then
+    if v_receipt.command_type = 'PROMOTION_UPSERT'
+       and v_receipt.request_fingerprint = v_fingerprint then
+      return v_receipt.result_json || jsonb_build_object('replayed', true);
+    end if;
+    return jsonb_build_object('ok', false, 'code', 'command_id_conflict');
+  end if;
+
+  if p_promotion_id is null then
+    if p_expected_version is not null then
+      return jsonb_build_object('ok', false, 'code', 'promotion_not_found');
+    end if;
+    v_id := gen_random_uuid();
+    v_version := 1;
+    insert into public.promotion_rules(
+      id, business_id, name, active, kind, percent_basis_points,
+      fixed_discount_minor, free_product_id, starts_at, ends_at,
+      minimum_order_minor, shop_ids, channel, product_ids, category_ids,
+      total_usage_limit, per_customer_usage_limit, stacking_policy,
+      version, updated_by_employee_id
+    ) values (
+      v_id, v_business_id, btrim(p_name), p_active, p_kind, p_percent_basis_points,
+      p_fixed_discount_minor, p_free_product_id, p_starts_at, p_ends_at,
+      p_minimum_order_minor, p_shop_ids, p_channel, p_product_ids, p_category_ids,
+      p_total_usage_limit, p_per_customer_usage_limit, p_stacking_policy,
+      v_version, p_employee_id
+    );
+  else
+    select p.* into v_existing
+    from public.promotion_rules p
+    where p.id = p_promotion_id
+      and p.business_id = v_business_id
+    for update;
+    if not found then
+      return jsonb_build_object('ok', false, 'code', 'promotion_not_found');
+    end if;
+    if p_expected_version is null or v_existing.version <> p_expected_version then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'stale_promotion_version',
+        'currentVersion', v_existing.version
+      );
+    end if;
+    v_id := v_existing.id;
+    v_version := v_existing.version + 1;
+    update public.promotion_rules
+    set name = btrim(p_name),
+        active = p_active,
+        kind = p_kind,
+        percent_basis_points = p_percent_basis_points,
+        fixed_discount_minor = p_fixed_discount_minor,
+        free_product_id = p_free_product_id,
+        starts_at = p_starts_at,
+        ends_at = p_ends_at,
+        minimum_order_minor = p_minimum_order_minor,
+        shop_ids = p_shop_ids,
+        channel = p_channel,
+        product_ids = p_product_ids,
+        category_ids = p_category_ids,
+        total_usage_limit = p_total_usage_limit,
+        per_customer_usage_limit = p_per_customer_usage_limit,
+        stacking_policy = p_stacking_policy,
+        version = v_version,
+        updated_by_employee_id = p_employee_id,
+        updated_at = now()
+    where id = v_id;
+  end if;
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'promotionId', v_id,
+    'version', v_version,
+    'replayed', false
+  );
+
+  insert into public.admin_loyalty_command_receipts(
+    business_id, command_id, command_type, request_fingerprint, result_json
+  ) values (
+    v_business_id, p_command_id, 'PROMOTION_UPSERT', v_fingerprint, v_result
+  );
+
+  perform public.append_admin_audit_event_v1(
+    v_business_id,
+    p_shop_id,
+    p_employee_id,
+    'PROMOTION_UPDATED',
+    'PROMOTION',
+    v_id::text,
+    case when v_existing.id is null then null else jsonb_build_object(
+      'version', v_existing.version,
+      'active', v_existing.active
+    ) end,
+    jsonb_build_object(
+      'version', v_version,
+      'active', p_active,
+      'kind', p_kind,
+      'shopIds', to_jsonb(p_shop_ids),
+      'channel', p_channel,
+      'stackingPolicy', p_stacking_policy
+    ),
+    null,
+    null,
+    null,
+    jsonb_build_object('commandId', p_command_id)
+  );
+
+  return v_result;
+end;
+$upsert_admin_promotion$;
+
+revoke all on function public.upsert_admin_promotion_v1(
+  uuid, uuid, uuid, text, boolean, text, integer, bigint, uuid,
+  timestamptz, timestamptz, bigint, uuid[], text, uuid[], uuid[],
+  bigint, bigint, text, bigint, text
+) from public, anon, authenticated;
+grant execute on function public.upsert_admin_promotion_v1(
+  uuid, uuid, uuid, text, boolean, text, integer, bigint, uuid,
+  timestamptz, timestamptz, bigint, uuid[], text, uuid[], uuid[],
+  bigint, bigint, text, bigint, text
+) to service_role;
