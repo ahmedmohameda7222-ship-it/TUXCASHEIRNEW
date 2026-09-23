@@ -566,6 +566,270 @@ grant execute on function public.reserve_order_rewards_v1(
   uuid, uuid, uuid, text, uuid, bigint, text, bigint, uuid[], uuid[], timestamptz
 ) to service_role;
 
+create or replace function public.reserve_operations_order_rewards_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_shop_id uuid,
+  p_checkout_intent_id text,
+  p_customer_phone text,
+  p_promotion_id uuid,
+  p_loyalty_points bigint,
+  p_channel text,
+  p_items jsonb,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $reserve_operations_order_rewards$
+declare
+  v_business_id uuid;
+  v_customer_id uuid;
+  v_normalized_phone text;
+  v_item jsonb;
+  v_modifier jsonb;
+  v_combo_value text;
+  v_product_id uuid;
+  v_modifier_id uuid;
+  v_combo_id uuid;
+  v_quantity integer;
+  v_modifier_quantity integer;
+  v_product_price bigint;
+  v_product_category_id uuid;
+  v_modifier_price bigint;
+  v_modifier_max_quantity integer;
+  v_subtotal_minor bigint := 0;
+  v_product_ids uuid[] := '{}'::uuid[];
+  v_category_ids uuid[] := '{}'::uuid[];
+begin
+  if p_channel not in ('POS', 'ONLINE')
+     or btrim(coalesce(p_checkout_intent_id, '')) = ''
+     or p_loyalty_points < 0
+     or jsonb_typeof(p_items) <> 'array'
+     or jsonb_array_length(p_items) < 1
+     or jsonb_array_length(p_items) > 200 then
+    return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+  end if;
+
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = p_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  select bs.business_id
+    into v_business_id
+  from public.business_shops bs
+  where bs.shop_id = p_shop_id
+  order by bs.business_id
+  limit 1;
+  if v_business_id is null then
+    return jsonb_build_object('ok', false, 'code', 'reward_shop_mismatch');
+  end if;
+
+  if btrim(coalesce(p_customer_phone, '')) <> '' then
+    v_normalized_phone := private.canonicalize_egypt_customer_phone_v1(p_customer_phone);
+    if v_normalized_phone is null then
+      return jsonb_build_object('ok', false, 'code', 'reward_customer_phone_invalid');
+    end if;
+    select coalesce(c.merged_into_customer_id, c.id)
+      into v_customer_id
+    from public.business_customers c
+    where c.business_id = v_business_id
+      and c.normalized_phone = v_normalized_phone
+    order by c.created_at, c.id
+    limit 1;
+  end if;
+
+  if p_loyalty_points > 0 and v_customer_id is null then
+    return jsonb_build_object('ok', false, 'code', 'loyalty_customer_required');
+  end if;
+
+  for v_item in
+    select value from jsonb_array_elements(p_items)
+  loop
+    if jsonb_typeof(v_item) <> 'object'
+       or jsonb_typeof(v_item -> 'quantity') <> 'number'
+       or coalesce(v_item ->> 'productId', '') = '' then
+      return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+    end if;
+
+    v_product_id := (v_item ->> 'productId')::uuid;
+    v_quantity := (v_item ->> 'quantity')::integer;
+    if v_quantity < 1 or v_quantity > 1000 then
+      return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+    end if;
+
+    select p.price_minor, p.category_id
+      into v_product_price, v_product_category_id
+    from public.products p
+    where p.id = v_product_id
+      and p.shop_id = p_shop_id
+      and p.active
+      and not p.sold_out;
+    if not found then
+      return jsonb_build_object('ok', false, 'code', 'reward_product_unavailable');
+    end if;
+
+    v_subtotal_minor := v_subtotal_minor + (v_product_price * v_quantity);
+    if not (v_product_id = any(v_product_ids)) then
+      v_product_ids := array_append(v_product_ids, v_product_id);
+    end if;
+    if not (v_product_category_id = any(v_category_ids)) then
+      v_category_ids := array_append(v_category_ids, v_product_category_id);
+    end if;
+
+    if coalesce(jsonb_typeof(v_item -> 'modifiers'), 'array') <> 'array' then
+      return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+    end if;
+    for v_modifier in
+      select value
+      from jsonb_array_elements(coalesce(v_item -> 'modifiers', '[]'::jsonb))
+    loop
+      if jsonb_typeof(v_modifier) <> 'object'
+         or jsonb_typeof(v_modifier -> 'quantity') <> 'number'
+         or coalesce(v_modifier ->> 'modifierId', '') = '' then
+        return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+      end if;
+      v_modifier_id := (v_modifier ->> 'modifierId')::uuid;
+      v_modifier_quantity := (v_modifier ->> 'quantity')::integer;
+      if v_modifier_quantity < 1 or v_modifier_quantity > 1000 then
+        return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+      end if;
+
+      select m.price_minor, pm.max_quantity
+        into v_modifier_price, v_modifier_max_quantity
+      from public.modifiers m
+      join public.product_modifiers pm
+        on pm.modifier_id = m.id
+       and pm.product_id = v_product_id
+       and pm.shop_id = p_shop_id
+      where m.id = v_modifier_id
+        and m.shop_id = p_shop_id
+        and m.active;
+      if not found
+         or (v_modifier_max_quantity is not null and v_modifier_quantity > v_modifier_max_quantity) then
+        return jsonb_build_object('ok', false, 'code', 'reward_modifier_unavailable');
+      end if;
+      v_subtotal_minor :=
+        v_subtotal_minor + (v_modifier_price * v_modifier_quantity * v_quantity);
+    end loop;
+
+    if coalesce(jsonb_typeof(v_item -> 'comboBeverageProductIds'), 'array') <> 'array' then
+      return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+    end if;
+    for v_combo_value in
+      select value
+      from jsonb_array_elements_text(
+        coalesce(v_item -> 'comboBeverageProductIds', '[]'::jsonb)
+      )
+    loop
+      v_combo_id := v_combo_value::uuid;
+      if not exists (
+        select 1
+        from public.combo_beverage_options option
+        join public.products beverage
+          on beverage.id = option.beverage_product_id
+         and beverage.shop_id = p_shop_id
+         and beverage.active
+         and not beverage.sold_out
+        where option.shop_id = p_shop_id
+          and option.combo_product_id = v_product_id
+          and option.beverage_product_id = v_combo_id
+      ) then
+        return jsonb_build_object('ok', false, 'code', 'reward_combo_unavailable');
+      end if;
+    end loop;
+  end loop;
+
+  return public.reserve_order_rewards_v1(
+    v_business_id,
+    p_shop_id,
+    v_customer_id,
+    p_checkout_intent_id,
+    p_promotion_id,
+    p_loyalty_points,
+    p_channel,
+    v_subtotal_minor,
+    v_product_ids,
+    v_category_ids,
+    p_now
+  );
+exception
+  when invalid_text_representation or numeric_value_out_of_range or invalid_parameter_value then
+    return jsonb_build_object('ok', false, 'code', 'invalid_reward_request');
+end;
+$reserve_operations_order_rewards$;
+
+revoke all on function public.reserve_operations_order_rewards_v1(
+  uuid, uuid, uuid, text, text, uuid, bigint, text, jsonb, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.reserve_operations_order_rewards_v1(
+  uuid, uuid, uuid, text, text, uuid, bigint, text, jsonb, timestamptz
+) to service_role;
+
+create or replace function public.release_operations_order_reward_reservation_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_shop_id uuid,
+  p_reservation_id uuid,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $release_operations_order_reward$
+begin
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = p_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  if not exists (
+    select 1
+    from public.reward_reservations r
+    where r.id = p_reservation_id
+      and r.shop_id = p_shop_id
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_mismatch');
+  end if;
+
+  return public.release_order_reward_reservation_v1(p_reservation_id, p_now);
+end;
+$release_operations_order_reward$;
+
+revoke all on function public.release_operations_order_reward_reservation_v1(
+  uuid, uuid, uuid, uuid, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.release_operations_order_reward_reservation_v1(
+  uuid, uuid, uuid, uuid, timestamptz
+) to service_role;
+
 create or replace function public.consume_order_reward_reservation_v1(
   p_reservation_id uuid,
   p_order_id uuid,
