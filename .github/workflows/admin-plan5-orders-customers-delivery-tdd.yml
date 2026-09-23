@@ -31,6 +31,13 @@ on:
       - 'packages/application/src/orders.ts'
       - 'packages/application/src/ordersBoard.ts'
       - 'packages/application/src/onlineOrderAcceptance.ts'
+      - 'packages/application/src/orderRewards.ts'
+      - 'packages/application/src/ordersOnlineSource.sqlite.test.ts'
+      - 'packages/application/src/onlineOrderAcceptance.test.ts'
+      - 'packages/order-intake-contracts/src/**'
+      - 'supabase/functions/operations-order-rewards/**'
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/functions/online-order-operations/**'
       - 'packages/sync/src/**'
       - 'packages/persistence/src/**'
       - 'packages/domain/src/**'
@@ -74,6 +81,13 @@ on:
       - 'packages/application/src/orders.ts'
       - 'packages/application/src/ordersBoard.ts'
       - 'packages/application/src/onlineOrderAcceptance.ts'
+      - 'packages/application/src/orderRewards.ts'
+      - 'packages/application/src/ordersOnlineSource.sqlite.test.ts'
+      - 'packages/application/src/onlineOrderAcceptance.test.ts'
+      - 'packages/order-intake-contracts/src/**'
+      - 'supabase/functions/operations-order-rewards/**'
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/functions/online-order-operations/**'
       - 'packages/sync/src/**'
       - 'packages/persistence/src/**'
       - 'packages/domain/src/**'
@@ -118,7 +132,7 @@ jobs:
         run: npm ci
       - name: Plan 5 order service behavior
         run: npx vitest run apps/admin/server/orders/orderService.test.ts
-      - name: Plan 5 lifecycle/sync compatibility
+      - name: Plan 5 lifecycle CAS/convergence and sync compatibility
         run: >-
           npx vitest run
           packages/application/src/orders.test.ts
@@ -295,8 +309,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Plan 5 loyalty mutation PostgreSQL behavior
+      - name: Plan 5 reward reservation PostgreSQL concurrency and POS-vs-ONLINE races
         run: node scripts/test-admin-loyalty-postgres.mjs
+
+  task4-reward-placement-integration:
+    needs: [task4-loyalty, task4-loyalty-postgres]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 POS reward placement and POS-vs-ONLINE parity
+        run: npx vitest run packages/application/src/ordersOnlineSource.sqlite.test.ts
+      - name: Plan 5 ONLINE reward acceptance and intent contract
+        run: >-
+          npx vitest run
+          packages/application/src/onlineOrderAcceptance.test.ts
+          packages/order-intake-contracts/src/index.test.ts
 
   task4-crm-promotions-e2e:
     needs: task4-loyalty
@@ -397,6 +430,7 @@ jobs:
         task4-loyalty-static,
         task4-loyalty,
         task4-loyalty-postgres,
+        task4-reward-placement-integration,
         task4-crm-promotions-e2e,
         task5-delivery-service,
         task5-delivery-postgres,
