@@ -63,6 +63,11 @@ export type PaymentDraft =
       readonly manualConfirmedB?: boolean;
     };
 
+export interface OrderRewardRequest {
+  readonly promotionId: string | null;
+  readonly loyaltyPointsToRedeem: number;
+}
+
 export interface OrderDraft {
   readonly shopId: ShopId;
   readonly businessDayId: BusinessDayId;
@@ -80,6 +85,8 @@ export interface OrderDraft {
   readonly lines: readonly DraftOrderLine[];
   readonly orderNote: string | null;
   readonly discountMinor: MoneyMinor;
+  /** Optional for backwards compatibility with drafts persisted before Plan 5 rewards. */
+  readonly reward?: OrderRewardRequest | null;
   readonly delivery: DeliveryOrderDraft;
   readonly payment: PaymentDraft;
 }
@@ -101,6 +108,8 @@ export function hasMeaningfulOrderDraft(draft: OrderDraft | null): boolean {
     draft.lines.length > 0 ||
     (draft.orderNote?.trim().length ?? 0) > 0 ||
     draft.discountMinor !== 0 ||
+    (draft.reward?.promotionId ?? null) !== null ||
+    (draft.reward?.loyaltyPointsToRedeem ?? 0) > 0 ||
     draft.payment.mode !== 'NONE' ||
     draft.delivery.displayPhone.trim().length > 0 ||
     draft.delivery.normalizedPhone.trim().length > 0 ||
