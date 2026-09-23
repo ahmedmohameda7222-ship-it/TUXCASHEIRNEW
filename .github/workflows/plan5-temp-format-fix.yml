@@ -40,7 +40,6 @@ jobs:
           packages/sync/src/httpTransport.ts
           packages/sync/src/orderLifecycleConvergence.test.ts
           packages/sync/src/orderLifecycleConvergence.ts
-          .github/workflows/admin-plan5-orders-customers-delivery-tdd.yml
       - name: Commit formatting
         shell: bash
         run: |
