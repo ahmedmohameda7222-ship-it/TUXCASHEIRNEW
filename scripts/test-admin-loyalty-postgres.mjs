@@ -131,7 +131,7 @@ psql(
      ) values (
        '${ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 1, 'loyalty-order-1', 'POS', 'DONE',
        '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
-       'TAKE_AWAY', null, 'Reward Customer', '+201000000009', null, null, null, 0, 0,
+       'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
        10000, 0, 10000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
      );`,
   ],
