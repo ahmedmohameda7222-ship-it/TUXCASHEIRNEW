@@ -1266,7 +1266,14 @@ declare
   v_quantity integer;
   v_prior_quantity bigint;
   v_amount bigint;
+  v_total_quantity bigint := 0;
   v_result jsonb;
+  v_rule public.admin_approval_rules%rowtype;
+  v_requires_approval boolean := false;
+  v_approval_command_id uuid;
+  v_approval_result jsonb;
+  v_approval_request_id uuid;
+  v_minimum_quantity bigint;
 begin
   if p_employee_id is null or p_shop_id is null or p_order_id is null
      or p_items is null or jsonb_typeof(p_items) <> 'array'
@@ -1325,6 +1332,7 @@ begin
   end if;
 
   -- Lock all requested order-item rows in a stable order before validating quantities.
+  -- Pending approvals reserve capacity while their approval remains actionable.
   for v_item in
     select value from jsonb_array_elements(p_items)
     order by value ->> 'orderItemId'
@@ -1350,25 +1358,106 @@ begin
       into v_prior_quantity
     from public.admin_order_return_items ri
     join public.admin_order_returns r on r.id = ri.return_id
-    where ri.order_item_id = v_order_item.id and r.state = 'POSTED';
+    left join public.admin_approval_requests approval
+      on approval.id = r.approval_request_id
+     and approval.business_id = r.business_id
+    where ri.order_item_id = v_order_item.id
+      and (
+        r.state = 'POSTED'
+        or (
+          r.state = 'PENDING_APPROVAL'
+          and approval.status in ('PENDING', 'APPROVED', 'EXECUTING')
+        )
+      );
 
     if v_prior_quantity + v_quantity > v_order_item.quantity then
       return jsonb_build_object('ok', false, 'code', 'return_quantity_exceeded');
     end if;
+
+    v_total_quantity := v_total_quantity + v_quantity;
   end loop;
 
+  select * into v_rule
+  from public.admin_approval_rules rule
+  where rule.business_id = v_business_id
+    and rule.action_type = 'ORDER_RETURN'
+    and rule.active
+    and (rule.shop_id is null or rule.shop_id = p_shop_id)
+  order by (rule.shop_id = p_shop_id) desc, rule.id
+  limit 1;
+
+  if found then
+    if jsonb_typeof(v_rule.threshold_context -> 'minimumQuantityImpact') = 'number' then
+      begin
+        v_minimum_quantity := (v_rule.threshold_context ->> 'minimumQuantityImpact')::bigint;
+      exception when others then
+        v_minimum_quantity := null;
+      end;
+      v_requires_approval :=
+        v_minimum_quantity is null or v_total_quantity >= v_minimum_quantity;
+    else
+      v_requires_approval := true;
+    end if;
+  end if;
+
   v_return_id := gen_random_uuid();
-  insert into public.admin_order_returns(
-    id, business_id, shop_id, order_id,
-    reason_code_id, reason_code_key, reason_label_snapshot,
-    reason_family_snapshot, reason_config_version, note, state,
-    command_id, created_by_employee_id
-  ) values (
-    v_return_id, v_business_id, p_shop_id, p_order_id,
-    p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
-    v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''), 'POSTED',
-    p_command_id, p_employee_id
-  );
+
+  if v_requires_approval then
+    v_approval_command_id := private.admin_order_approval_command_id_v1(
+      v_business_id, p_shop_id, 'ORDER_RETURN', p_command_id
+    );
+
+    v_approval_result := public.create_admin_approval_request_v1(
+      v_business_id,
+      p_shop_id,
+      p_employee_id,
+      null,
+      v_rule.id,
+      'ORDER_RETURN',
+      v_approval_command_id,
+      jsonb_build_object(
+        'orderId', p_order_id,
+        'items', p_items,
+        'reasonCodeId', p_reason_code_id,
+        'note', nullif(btrim(p_note), ''),
+        'orderCommandId', p_command_id
+      ),
+      v_reason.reason_label
+    );
+
+    if not coalesce((v_approval_result ->> 'ok')::boolean, false) then
+      return jsonb_build_object(
+        'ok', false,
+        'code', coalesce(v_approval_result ->> 'code', 'approval_request_failed')
+      );
+    end if;
+
+    v_approval_request_id := (v_approval_result ->> 'requestId')::uuid;
+
+    insert into public.admin_order_returns(
+      id, business_id, shop_id, order_id,
+      reason_code_id, reason_code_key, reason_label_snapshot,
+      reason_family_snapshot, reason_config_version, note, state,
+      approval_request_id, command_id, created_by_employee_id
+    ) values (
+      v_return_id, v_business_id, p_shop_id, p_order_id,
+      p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
+      v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''),
+      'PENDING_APPROVAL', v_approval_request_id, p_command_id, p_employee_id
+    );
+  else
+    insert into public.admin_order_returns(
+      id, business_id, shop_id, order_id,
+      reason_code_id, reason_code_key, reason_label_snapshot,
+      reason_family_snapshot, reason_config_version, note, state,
+      command_id, created_by_employee_id
+    ) values (
+      v_return_id, v_business_id, p_shop_id, p_order_id,
+      p_reason_code_id, v_reason.reason_code_key, v_reason.reason_label,
+      v_reason.reason_family, v_reason.reason_version, nullif(btrim(p_note), ''),
+      'POSTED', p_command_id, p_employee_id
+    );
+  end if;
 
   for v_item in select value from jsonb_array_elements(p_items)
   loop
@@ -1387,30 +1476,59 @@ begin
     );
   end loop;
 
-  perform public.append_admin_audit_event_v1(
-    v_business_id, p_shop_id, p_employee_id,
-    'ORDER_ITEMS_RETURNED', 'ORDER', p_order_id::text,
-    null,
-    jsonb_build_object(
-      'returnId', v_return_id,
-      'items', p_items,
-      'reasonCodeId', p_reason_code_id,
-      'reasonCodeKey', v_reason.reason_code_key,
-      'reasonLabel', v_reason.reason_label,
-      'reasonFamily', v_reason.reason_family,
-      'reasonConfigVersion', v_reason.reason_version
-    ),
-    nullif(btrim(p_note), ''), null, null,
-    jsonb_build_object('commandId', p_command_id)
-  );
+  if v_requires_approval then
+    perform public.append_admin_audit_event_v1(
+      v_business_id, p_shop_id, p_employee_id,
+      'ORDER_RETURN_APPROVAL_PENDING', 'ORDER', p_order_id::text,
+      null,
+      jsonb_build_object(
+        'returnId', v_return_id,
+        'approvalRequestId', v_approval_request_id,
+        'items', p_items,
+        'reasonCodeId', p_reason_code_id,
+        'reasonCodeKey', v_reason.reason_code_key,
+        'reasonLabel', v_reason.reason_label,
+        'reasonFamily', v_reason.reason_family,
+        'reasonConfigVersion', v_reason.reason_version
+      ),
+      nullif(btrim(p_note), ''), v_approval_request_id, null,
+      jsonb_build_object('commandId', p_command_id)
+    );
 
-  v_result := jsonb_build_object(
-    'ok', true,
-    'orderId', p_order_id,
-    'returnId', v_return_id,
-    'state', 'POSTED',
-    'replayed', false
-  );
+    v_result := jsonb_build_object(
+      'ok', true,
+      'orderId', p_order_id,
+      'returnId', v_return_id,
+      'state', 'PENDING_APPROVAL',
+      'approvalRequestId', v_approval_request_id,
+      'replayed', false
+    );
+  else
+    perform public.append_admin_audit_event_v1(
+      v_business_id, p_shop_id, p_employee_id,
+      'ORDER_ITEMS_RETURNED', 'ORDER', p_order_id::text,
+      null,
+      jsonb_build_object(
+        'returnId', v_return_id,
+        'items', p_items,
+        'reasonCodeId', p_reason_code_id,
+        'reasonCodeKey', v_reason.reason_code_key,
+        'reasonLabel', v_reason.reason_label,
+        'reasonFamily', v_reason.reason_family,
+        'reasonConfigVersion', v_reason.reason_version
+      ),
+      nullif(btrim(p_note), ''), null, null,
+      jsonb_build_object('commandId', p_command_id)
+    );
+
+    v_result := jsonb_build_object(
+      'ok', true,
+      'orderId', p_order_id,
+      'returnId', v_return_id,
+      'state', 'POSTED',
+      'replayed', false
+    );
+  end if;
 
   insert into public.admin_order_command_receipts(
     business_id, shop_id, command_id, command_type, order_id,
@@ -1429,6 +1547,145 @@ revoke all on function public.return_admin_order_items_v1(
 ) from public, anon, authenticated;
 grant execute on function public.return_admin_order_items_v1(
   uuid, uuid, uuid, jsonb, uuid, text, text, uuid
+) to service_role;
+
+create or replace function public.execute_approved_admin_order_return_v1(
+  p_approval_request_id uuid,
+  p_business_id uuid,
+  p_shop_id uuid,
+  p_requester_employee_id uuid,
+  p_approver_employee_id uuid,
+  p_order_id uuid,
+  p_items jsonb,
+  p_reason_code_id uuid,
+  p_note text,
+  p_command_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $execute_approved_return$
+declare
+  v_approval public.admin_approval_requests%rowtype;
+  v_return public.admin_order_returns%rowtype;
+  v_result jsonb;
+  v_expected_payload jsonb;
+begin
+  if p_approval_request_id is null or p_business_id is null or p_shop_id is null
+     or p_requester_employee_id is null or p_approver_employee_id is null
+     or p_order_id is null or p_items is null or jsonb_typeof(p_items) <> 'array'
+     or jsonb_array_length(p_items) = 0 or p_reason_code_id is null
+     or p_command_id is null or btrim(p_command_id) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_approved_return_command');
+  end if;
+
+  select * into v_approval
+  from public.admin_approval_requests request
+  where request.id = p_approval_request_id
+    and request.business_id = p_business_id
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'approval_request_not_found');
+  end if;
+
+  v_expected_payload := jsonb_build_object(
+    'orderId', p_order_id,
+    'items', p_items,
+    'reasonCodeId', p_reason_code_id,
+    'note', nullif(btrim(p_note), ''),
+    'orderCommandId', p_command_id
+  );
+
+  if v_approval.action_type <> 'ORDER_RETURN'
+     or v_approval.shop_id is distinct from p_shop_id
+     or v_approval.requester_employee_id <> p_requester_employee_id
+     or v_approval.approver_employee_id is distinct from p_approver_employee_id
+     or v_approval.command_payload <> v_expected_payload then
+    return jsonb_build_object('ok', false, 'code', 'approval_order_payload_mismatch');
+  end if;
+
+  if v_approval.status <> 'EXECUTING' then
+    return jsonb_build_object('ok', false, 'code', 'approval_not_executing');
+  end if;
+
+  select * into v_return
+  from public.admin_order_returns return_row
+  where return_row.business_id = p_business_id
+    and return_row.shop_id = p_shop_id
+    and return_row.approval_request_id = p_approval_request_id
+    and return_row.command_id = p_command_id
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'pending_return_not_found');
+  end if;
+
+  if v_return.order_id <> p_order_id
+     or v_return.reason_code_id <> p_reason_code_id then
+    return jsonb_build_object('ok', false, 'code', 'approval_order_payload_mismatch');
+  end if;
+
+  if v_return.state = 'POSTED' then
+    return jsonb_build_object(
+      'ok', true,
+      'orderId', v_return.order_id,
+      'returnId', v_return.id,
+      'state', 'POSTED',
+      'replayed', true
+    );
+  end if;
+  if v_return.state <> 'PENDING_APPROVAL' then
+    return jsonb_build_object('ok', false, 'code', 'return_not_pending_approval');
+  end if;
+
+  update public.admin_order_returns
+  set state = 'POSTED'
+  where id = v_return.id
+    and state = 'PENDING_APPROVAL';
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'orderId', p_order_id,
+    'returnId', v_return.id,
+    'state', 'POSTED',
+    'replayed', false
+  );
+
+  update public.admin_order_command_receipts
+  set result_json = v_result
+  where business_id = p_business_id
+    and shop_id = p_shop_id
+    and command_id = p_command_id
+    and command_type = 'RETURN'
+    and order_id = p_order_id;
+
+  perform public.append_admin_audit_event_v1(
+    p_business_id, p_shop_id, p_approver_employee_id,
+    'ORDER_ITEMS_RETURNED', 'ORDER', p_order_id::text,
+    jsonb_build_object('state', 'PENDING_APPROVAL'),
+    jsonb_build_object(
+      'state', 'POSTED',
+      'returnId', v_return.id,
+      'items', p_items,
+      'reasonCodeId', v_return.reason_code_id,
+      'reasonCodeKey', v_return.reason_code_key,
+      'reasonLabel', v_return.reason_label_snapshot,
+      'reasonFamily', v_return.reason_family_snapshot,
+      'reasonConfigVersion', v_return.reason_config_version
+    ),
+    nullif(btrim(p_note), ''), p_approval_request_id, null,
+    jsonb_build_object('commandId', p_command_id)
+  );
+
+  return v_result;
+end;
+$execute_approved_return$;
+
+revoke all on function public.execute_approved_admin_order_return_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, jsonb, uuid, text, text
+) from public, anon, authenticated;
+grant execute on function public.execute_approved_admin_order_return_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, jsonb, uuid, text, text
 ) to service_role;
 
 -- Device-authenticated, shop-scoped feed read authority for proactive Operations convergence.
