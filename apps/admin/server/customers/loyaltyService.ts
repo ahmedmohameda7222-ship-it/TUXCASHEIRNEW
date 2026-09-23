@@ -45,7 +45,8 @@ export type PromotionValidationCode =
   | 'promotion_category_mismatch';
 
 export type PromotionValidationResult =
-  { readonly ok: true } | { readonly ok: false; readonly code: PromotionValidationCode };
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: PromotionValidationCode };
 
 export type RedemptionValidationResult =
   | { readonly ok: true }
