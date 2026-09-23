@@ -52,6 +52,7 @@ import type {
 import { startBrowserAutomaticSync } from './automaticSync';
 import { VercelBrowserRemoteGateway } from './browserRemote';
 import { BrowserOrderPrinter } from './browserOrderPrinter';
+import { BrowserOrderRewardAuthority } from './browserOrderRewards';
 import { VercelBrowserWhatsAppRemote } from './browserWhatsAppRemote';
 import { BrowserPbkdf2PinVerifier } from './browserPinVerifier';
 
@@ -473,6 +474,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
           new BrowserOrderPrinter(),
+          new BrowserOrderRewardAuthority(),
         ),
         ordersBoard: new OperationsOrdersBoardService(database, readModel, runtime, coordinator),
         expenses: new OperationsExpensesService(
