@@ -28,6 +28,11 @@ export interface OnlineOrderCustomerV1 {
   address: string | null;
 }
 
+export interface OnlineOrderRewardIntentV1 {
+  promotionId: string | null;
+  loyaltyPointsToRedeem: number;
+}
+
 export interface OnlineOrderRequestV1 {
   schemaVersion: 1;
   shopId: string;
@@ -37,6 +42,7 @@ export interface OnlineOrderRequestV1 {
   paymentPreference: OnlineOrderPaymentPreferenceV1;
   items: OnlineOrderItemV1[];
   orderNote: string | null;
+  reward?: OnlineOrderRewardIntentV1;
 }
 
 export interface OnlineOrderIntakeSuccessV1 {
@@ -55,6 +61,7 @@ const ROOT_KEYS = [
   'items',
   'orderNote',
 ] as const;
+const ROOT_OPTIONAL_KEYS = ['reward'] as const;
 const CUSTOMER_KEYS = ['name', 'phone', 'address'] as const;
 const ITEM_KEYS = [
   'productId',
@@ -65,6 +72,7 @@ const ITEM_KEYS = [
   'note',
 ] as const;
 const MODIFIER_KEYS = ['modifierId', 'quantity'] as const;
+const REWARD_KEYS = ['promotionId', 'loyaltyPointsToRedeem'] as const;
 const SUCCESS_KEYS = ['schemaVersion', 'requestId', 'status'] as const;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -82,16 +90,17 @@ function asRecord(value: unknown, path: string): Record<string, unknown> {
 
 function assertExactKeys(
   value: Record<string, unknown>,
-  allowedKeys: readonly string[],
+  requiredKeys: readonly string[],
   path: string,
+  optionalKeys: readonly string[] = [],
 ): void {
-  const allowed = new Set(allowedKeys);
+  const allowed = new Set([...requiredKeys, ...optionalKeys]);
   const unexpected = Object.keys(value).filter((key) => !allowed.has(key));
   if (unexpected.length > 0) {
     fail(`${path} contains unexpected field ${unexpected[0]}`);
   }
 
-  for (const key of allowedKeys) {
+  for (const key of requiredKeys) {
     if (!Object.prototype.hasOwnProperty.call(value, key)) {
       fail(`${path}.${key} is required`);
     }
@@ -124,6 +133,13 @@ function asNullableBoundedString(value: unknown, path: string, maxLength: number
 function asPositiveInteger(value: unknown, path: string, max: number): number {
   if (!Number.isInteger(value) || typeof value !== 'number' || value < 1 || value > max) {
     fail(`${path} must be an integer between 1 and ${max}`);
+  }
+  return value;
+}
+
+function asNonNegativeInteger(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    fail(`${path} must be a non-negative safe integer`);
   }
   return value;
 }
@@ -175,9 +191,24 @@ function parseItem(value: unknown, path: string): OnlineOrderItemV1 {
   };
 }
 
+function parseRewardIntent(value: unknown): OnlineOrderRewardIntentV1 {
+  const record = asRecord(value, 'request.reward');
+  assertExactKeys(record, REWARD_KEYS, 'request.reward');
+  return {
+    promotionId:
+      record.promotionId === null
+        ? null
+        : asUuid(record.promotionId, 'request.reward.promotionId'),
+    loyaltyPointsToRedeem: asNonNegativeInteger(
+      record.loyaltyPointsToRedeem,
+      'request.reward.loyaltyPointsToRedeem',
+    ),
+  };
+}
+
 export function parseOnlineOrderRequestV1(value: unknown): OnlineOrderRequestV1 {
   const record = asRecord(value, 'request');
-  assertExactKeys(record, ROOT_KEYS, 'request');
+  assertExactKeys(record, ROOT_KEYS, 'request', ROOT_OPTIONAL_KEYS);
 
   if (record.schemaVersion !== 1) {
     fail('request.schemaVersion must equal 1');
@@ -226,6 +257,7 @@ export function parseOnlineOrderRequestV1(value: unknown): OnlineOrderRequestV1 
     paymentPreference,
     items: record.items.map((entry, index) => parseItem(entry, `request.items[${index}]`)),
     orderNote: asNullableBoundedString(record.orderNote, 'request.orderNote', 1000),
+    ...(record.reward === undefined ? {} : { reward: parseRewardIntent(record.reward) }),
   };
 }
 
