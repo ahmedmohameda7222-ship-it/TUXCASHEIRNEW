@@ -103,7 +103,9 @@ const segmentPolicy = {
 function safeInteger(value: number | string | null): number {
   if (value === null) return 0;
   const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isSafeInteger(parsed)) throw new Error('crm_backend_contract_invalid');
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error('crm_backend_contract_invalid');
+  }
   return parsed;
 }
 
@@ -199,8 +201,14 @@ async function hydrateCustomerFacts(
         ),
   ]);
 
-  const lifetimeSpendMinor = orders.reduce((sum, order) => sum + safeInteger(order.total_minor), 0);
-  const loyaltyBalance = ledger.reduce((sum, event) => sum + safeInteger(event.points_delta), 0);
+  const lifetimeSpendMinor = orders.reduce(
+    (sum, order) => sum + safeInteger(order.total_minor),
+    0,
+  );
+  const loyaltyBalance = ledger.reduce(
+    (sum, event) => sum + safeInteger(event.points_delta),
+    0,
+  );
 
   return {
     id: customer.id,
@@ -213,7 +221,10 @@ async function hydrateCustomerFacts(
       (order) => order.order_type_behavior_snapshot === 'DELIVERY',
     ).length,
     loyaltyBalance,
-    linkedShops: shops.map((shop) => ({ shopId: shop.id, shopName: shop.name })),
+    linkedShops: shops.map((shop) => ({
+      shopId: shop.id,
+      shopName: shop.name,
+    })),
     addresses: addresses.map((address) => ({
       id: address.id,
       shopId: address.shop_id,
@@ -276,7 +287,9 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
           limit: '100',
         }),
       );
-      const customerIds = [...new Set(links.map((link) => link.canonical_customer_id))];
+      const customerIds = [
+        ...new Set(links.map((link) => link.canonical_customer_id)),
+      ];
       if (customerIds.length === 0) return [];
 
       const query = new URLSearchParams({
@@ -293,9 +306,14 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
           `(display_name.ilike.*${term}*,normalized_phone.ilike.*${term}*)`,
         );
       }
-      const customers = await client.select<CustomerRow[]>('business_customers', query);
+      const customers = await client.select<CustomerRow[]>(
+        'business_customers',
+        query,
+      );
       return Promise.all(
-        customers.map((customer) => hydrateCustomerFacts(client, input.businessId, customer)),
+        customers.map((customer) =>
+          hydrateCustomerFacts(client, input.businessId, customer),
+        ),
       );
     },
 
@@ -322,7 +340,9 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
         }),
       );
       const customer = rows[0];
-      return customer ? hydrateCustomerFacts(client, input.businessId, customer) : null;
+      return customer
+        ? hydrateCustomerFacts(client, input.businessId, customer)
+        : null;
     },
 
     async getLoyaltyProgram(input) {
@@ -341,7 +361,9 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
             businessId: row.business_id,
             enabled: row.enabled,
             earnPointsPer100Minor: safeInteger(row.earn_points_per_100_minor),
-            redemptionMinorPerPoint: safeInteger(row.redemption_minor_per_point),
+            redemptionMinorPerPoint: safeInteger(
+              row.redemption_minor_per_point,
+            ),
             minimumRedemptionPoints: safeInteger(row.minimum_redemption_points),
             pointExpiryDays: nullableInteger(row.point_expiry_days),
             shopIds: row.shop_ids,
@@ -379,7 +401,9 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
     },
 
     adjustLoyalty(input) {
-      return client.rpc<AdminLoyaltyAdjustmentResult>('adjust_admin_customer_loyalty_v1', {
+      return client.rpc<AdminLoyaltyAdjustmentResult>(
+        'adjust_admin_customer_loyalty_v1',
+        {
         p_employee_id: input.employeeId,
         p_shop_id: input.shopId,
         p_customer_id: input.customerId,
@@ -387,13 +411,16 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
         p_reason_code_id: input.reasonCodeId,
         p_note: input.note,
         p_command_id: input.commandId,
-        p_business_id: input.businessId,
-      });
+          p_business_id: input.businessId,
+        },
+      );
     },
 
     upsertPromotion(input) {
       const promotion = input.promotion;
-      return client.rpc<AdminPromotionMutationResult>('upsert_admin_promotion_v1', {
+      return client.rpc<AdminPromotionMutationResult>(
+        'upsert_admin_promotion_v1',
+        {
         p_employee_id: input.employeeId,
         p_shop_id: input.shopId,
         p_promotion_id: promotion.id,
@@ -414,8 +441,9 @@ export function createCrmStore(client: AdminSupabaseClient): CrmStore {
         p_per_customer_usage_limit: promotion.perCustomerUsageLimit,
         p_stacking_policy: promotion.stackingPolicy,
         p_expected_version: promotion.expectedVersion,
-        p_command_id: input.commandId,
-      });
+          p_command_id: input.commandId,
+        },
+      );
     },
   };
 }
