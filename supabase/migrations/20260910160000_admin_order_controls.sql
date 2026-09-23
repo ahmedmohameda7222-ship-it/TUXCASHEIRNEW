@@ -7,6 +7,30 @@ alter table public.orders
   add column if not exists cancelled_by_admin_employee_id uuid
     references public.business_employees(id) on delete restrict;
 
+alter table public.orders
+  drop constraint if exists orders_cancellation_metadata_ck;
+alter table public.orders
+  add constraint orders_cancellation_metadata_ck check (
+    status <> 'CANCELLED'
+    or (
+      cancelled_at is not null
+      and btrim(coalesce(cancellation_reason, '')) <> ''
+      and cancellation_food_prepared is not null
+      and cancellation_stock_restored is not null
+      and (
+        (
+          cancelled_by_worker_id is not null
+          and btrim(coalesce(cancelled_by_worker_name_snapshot, '')) <> ''
+          and cancelled_by_admin_employee_id is null
+        )
+        or (
+          cancelled_by_worker_id is null
+          and cancelled_by_admin_employee_id is not null
+        )
+      )
+    )
+  );
+
 alter table public.order_status_events
   alter column worker_id drop not null;
 
