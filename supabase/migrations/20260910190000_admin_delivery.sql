@@ -334,6 +334,27 @@ begin
     );
   end if;
 
+  if v_order.status = 'CANCELLED' then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'order_cancelled'
+    );
+  end if;
+
+  if v_order.status = 'RETURNED' and p_to_state <> 'RETURNED' then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'order_already_returned'
+    );
+  end if;
+
+  if p_to_state = 'RETURNED' and v_order.status <> 'RETURNED' then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'order_return_required'
+    );
+  end if;
+
   if p_to_state = 'ASSIGNED' then
     if p_rider_id is null then
       return jsonb_build_object(
