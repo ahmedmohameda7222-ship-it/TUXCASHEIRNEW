@@ -1073,6 +1073,172 @@ grant execute on function public.request_admin_order_refund_v1(
   uuid, uuid, uuid, uuid, bigint, uuid, text, text, uuid
 ) to service_role;
 
+create or replace function public.execute_approved_admin_order_refund_v1(
+  p_approval_request_id uuid,
+  p_business_id uuid,
+  p_shop_id uuid,
+  p_requester_employee_id uuid,
+  p_approver_employee_id uuid,
+  p_order_id uuid,
+  p_payment_id uuid,
+  p_amount_minor bigint,
+  p_reason_code_id uuid,
+  p_note text,
+  p_command_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $execute_approved_refund$
+declare
+  v_approval public.admin_approval_requests%rowtype;
+  v_refund public.admin_order_refunds%rowtype;
+  v_payment public.payments%rowtype;
+  v_posted bigint;
+  v_result jsonb;
+  v_expected_payload jsonb;
+begin
+  if p_approval_request_id is null or p_business_id is null or p_shop_id is null
+     or p_requester_employee_id is null or p_approver_employee_id is null
+     or p_order_id is null or p_payment_id is null or p_amount_minor is null
+     or p_amount_minor <= 0 or p_reason_code_id is null
+     or p_command_id is null or btrim(p_command_id) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_approved_refund_command');
+  end if;
+
+  select * into v_approval
+  from public.admin_approval_requests request
+  where request.id = p_approval_request_id
+    and request.business_id = p_business_id
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'approval_request_not_found');
+  end if;
+
+  v_expected_payload := jsonb_build_object(
+    'orderId', p_order_id,
+    'paymentId', p_payment_id,
+    'amountMinor', p_amount_minor,
+    'reasonCodeId', p_reason_code_id,
+    'note', nullif(btrim(p_note), ''),
+    'orderCommandId', p_command_id
+  );
+
+  if v_approval.action_type <> 'ORDER_REFUND'
+     or v_approval.shop_id is distinct from p_shop_id
+     or v_approval.requester_employee_id <> p_requester_employee_id
+     or v_approval.approver_employee_id is distinct from p_approver_employee_id
+     or v_approval.command_payload <> v_expected_payload then
+    return jsonb_build_object('ok', false, 'code', 'approval_order_payload_mismatch');
+  end if;
+
+  if v_approval.status <> 'EXECUTING' then
+    return jsonb_build_object('ok', false, 'code', 'approval_not_executing');
+  end if;
+
+  select * into v_refund
+  from public.admin_order_refunds refund
+  where refund.business_id = p_business_id
+    and refund.shop_id = p_shop_id
+    and refund.approval_request_id = p_approval_request_id
+    and refund.command_id = p_command_id
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'pending_refund_not_found');
+  end if;
+
+  if v_refund.order_id <> p_order_id
+     or v_refund.payment_id <> p_payment_id
+     or v_refund.amount_minor <> p_amount_minor
+     or v_refund.reason_code_id <> p_reason_code_id then
+    return jsonb_build_object('ok', false, 'code', 'approval_order_payload_mismatch');
+  end if;
+
+  if v_refund.state = 'POSTED' then
+    return jsonb_build_object(
+      'ok', true,
+      'orderId', v_refund.order_id,
+      'refundId', v_refund.id,
+      'state', 'POSTED',
+      'replayed', true
+    );
+  end if;
+  if v_refund.state <> 'PENDING_APPROVAL' then
+    return jsonb_build_object('ok', false, 'code', 'refund_not_pending_approval');
+  end if;
+
+  select * into v_payment
+  from public.payments payment
+  where payment.id = p_payment_id
+    and payment.order_id = p_order_id
+    and payment.shop_id = p_shop_id
+  for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'payment_not_found');
+  end if;
+
+  select coalesce(sum(refund.amount_minor), 0)
+    into v_posted
+  from public.admin_order_refunds refund
+  where refund.payment_id = p_payment_id
+    and refund.state = 'POSTED';
+
+  if v_posted + p_amount_minor > v_payment.allocated_minor then
+    return jsonb_build_object('ok', false, 'code', 'refund_exceeds_payment');
+  end if;
+
+  update public.admin_order_refunds
+  set state = 'POSTED'
+  where id = v_refund.id
+    and state = 'PENDING_APPROVAL';
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'orderId', p_order_id,
+    'refundId', v_refund.id,
+    'state', 'POSTED',
+    'replayed', false
+  );
+
+  update public.admin_order_command_receipts
+  set result_json = v_result
+  where business_id = p_business_id
+    and shop_id = p_shop_id
+    and command_id = p_command_id
+    and command_type = 'REFUND'
+    and order_id = p_order_id;
+
+  perform public.append_admin_audit_event_v1(
+    p_business_id, p_shop_id, p_approver_employee_id,
+    'ORDER_REFUND_POSTED', 'ORDER', p_order_id::text,
+    jsonb_build_object('state', 'PENDING_APPROVAL'),
+    jsonb_build_object(
+      'state', 'POSTED',
+      'refundId', v_refund.id,
+      'paymentId', p_payment_id,
+      'amountMinor', p_amount_minor,
+      'reasonCodeId', v_refund.reason_code_id,
+      'reasonCodeKey', v_refund.reason_code_key,
+      'reasonLabel', v_refund.reason_label_snapshot,
+      'reasonFamily', v_refund.reason_family_snapshot,
+      'reasonConfigVersion', v_refund.reason_config_version
+    ),
+    nullif(btrim(p_note), ''), p_approval_request_id, null,
+    jsonb_build_object('commandId', p_command_id)
+  );
+
+  return v_result;
+end;
+$execute_approved_refund$;
+
+revoke all on function public.execute_approved_admin_order_refund_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, uuid, bigint, uuid, text, text
+) from public, anon, authenticated;
+grant execute on function public.execute_approved_admin_order_refund_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, uuid, bigint, uuid, text, text
+) to service_role;
+
 create or replace function public.return_admin_order_items_v1(
   p_employee_id uuid,
   p_shop_id uuid,
