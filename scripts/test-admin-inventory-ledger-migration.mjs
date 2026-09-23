@@ -105,6 +105,16 @@ const sendTransfer = lower.slice(
   lower.indexOf('create or replace function public.send_stock_transfer_v1'),
   lower.indexOf('create or replace function public.receive_stock_transfer_v1'),
 );
+
+const transferDuplicateGuardIndex = sendTransfer.indexOf("'duplicate_transfer_item'");
+const transferResolutionLoopIndex = sendTransfer.indexOf('for v_line in');
+if (
+  transferDuplicateGuardIndex < 0 ||
+  transferResolutionLoopIndex < 0 ||
+  transferDuplicateGuardIndex > transferResolutionLoopIndex
+) {
+  throw new Error('send_stock_transfer_v1 must reject duplicate inventory items before resolution');
+}
 if (!sendTransfer.includes('destination_inventory_item_id')) {
   throw new Error('send_stock_transfer_v1 must persist the resolved destination inventory item');
 }
