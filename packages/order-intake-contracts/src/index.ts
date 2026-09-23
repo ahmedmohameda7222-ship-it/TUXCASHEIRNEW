@@ -33,6 +33,11 @@ export interface OnlineOrderRewardIntentV1 {
   loyaltyPointsToRedeem: number;
 }
 
+export interface OnlineOrderDeliveryLocationV1 {
+  latitude: number;
+  longitude: number;
+}
+
 export interface OnlineOrderRequestV1 {
   schemaVersion: 1;
   shopId: string;
@@ -43,6 +48,7 @@ export interface OnlineOrderRequestV1 {
   items: OnlineOrderItemV1[];
   orderNote: string | null;
   reward?: OnlineOrderRewardIntentV1;
+  deliveryLocation?: OnlineOrderDeliveryLocationV1;
 }
 
 export interface OnlineOrderIntakeSuccessV1 {
@@ -61,7 +67,7 @@ const ROOT_KEYS = [
   'items',
   'orderNote',
 ] as const;
-const ROOT_OPTIONAL_KEYS = ['reward'] as const;
+const ROOT_OPTIONAL_KEYS = ['reward', 'deliveryLocation'] as const;
 const CUSTOMER_KEYS = ['name', 'phone', 'address'] as const;
 const ITEM_KEYS = [
   'productId',
@@ -73,6 +79,7 @@ const ITEM_KEYS = [
 ] as const;
 const MODIFIER_KEYS = ['modifierId', 'quantity'] as const;
 const REWARD_KEYS = ['promotionId', 'loyaltyPointsToRedeem'] as const;
+const DELIVERY_LOCATION_KEYS = ['latitude', 'longitude'] as const;
 const SUCCESS_KEYS = ['schemaVersion', 'requestId', 'status'] as const;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -191,6 +198,27 @@ function parseItem(value: unknown, path: string): OnlineOrderItemV1 {
   };
 }
 
+function asCoordinate(
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+    fail(`${path} must be a finite number between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
+
+function parseDeliveryLocation(value: unknown): OnlineOrderDeliveryLocationV1 {
+  const record = asRecord(value, 'request.deliveryLocation');
+  assertExactKeys(record, DELIVERY_LOCATION_KEYS, 'request.deliveryLocation');
+  return {
+    latitude: asCoordinate(record.latitude, 'request.deliveryLocation.latitude', -90, 90),
+    longitude: asCoordinate(record.longitude, 'request.deliveryLocation.longitude', -180, 180),
+  };
+}
+
 function parseRewardIntent(value: unknown): OnlineOrderRewardIntentV1 {
   const record = asRecord(value, 'request.reward');
   assertExactKeys(record, REWARD_KEYS, 'request.reward');
@@ -256,6 +284,9 @@ export function parseOnlineOrderRequestV1(value: unknown): OnlineOrderRequestV1 
     items: record.items.map((entry, index) => parseItem(entry, `request.items[${index}]`)),
     orderNote: asNullableBoundedString(record.orderNote, 'request.orderNote', 1000),
     ...(record.reward === undefined ? {} : { reward: parseRewardIntent(record.reward) }),
+    ...(record.deliveryLocation === undefined
+      ? {}
+      : { deliveryLocation: parseDeliveryLocation(record.deliveryLocation) }),
   };
 }
 

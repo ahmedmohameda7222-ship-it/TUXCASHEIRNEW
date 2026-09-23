@@ -63,6 +63,21 @@ export interface OnlineOrderStoredRequest {
   status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
 }
 
+export type OnlineOrderDeliveryRouteResult =
+  | {
+      ok: true;
+      shopId: string;
+      zoneId: string;
+      zoneName: string;
+      feeMinor: number;
+      minimumOrderMinor: number;
+      fallbackUsed: boolean;
+    }
+  | {
+      ok: false;
+      code: 'delivery_unavailable' | 'delivery_closed' | 'minimum_order_not_met';
+    };
+
 export interface OnlineOrderPendingInsert {
   id: string;
   shopId: string;
@@ -76,6 +91,14 @@ export interface OnlineOrderPendingInsert {
   customerName: string;
   normalizedPhone: string | null;
   deliveryAddress: string | null;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
+  deliveryZoneId: string | null;
+  deliveryZoneName: string | null;
+  deliveryFeeMinor: number | null;
+  deliveryMinimumOrderMinor: number | null;
+  deliveryFallbackUsed: boolean;
+  deliveryRoutingSnapshot: Record<string, unknown> | null;
   trustedItems: Array<Record<string, unknown>>;
   itemsSubtotalMinor: number;
   orderNote: string | null;
@@ -138,6 +161,13 @@ export interface OnlineOrderIntakeStore {
   loadPublishedCheckoutAuthority?(
     shopId: string,
   ): Promise<OnlineOrderPublishedCheckoutAuthority | null>;
+  resolveDeliveryRoute?(input: {
+    requestedShopId: string;
+    latitude: number;
+    longitude: number;
+    subtotalMinor: number;
+    at: string;
+  }): Promise<OnlineOrderDeliveryRouteResult>;
   findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -265,6 +295,14 @@ function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string
     })),
     orderNote: request.orderNote,
     ...(request.reward === undefined ? {} : { reward: request.reward }),
+    ...(request.deliveryLocation === undefined
+      ? {}
+      : {
+          deliveryLocation: {
+            latitude: request.deliveryLocation.latitude,
+            longitude: request.deliveryLocation.longitude,
+          },
+        }),
   };
 }
 
@@ -742,6 +780,29 @@ export async function handleOrderIntakeRequest(
     const trusted = buildTrustedItems(parsed, catalog);
     if (trusted instanceof Response) return trusted;
 
+    let deliveryRoute: Extract<OnlineOrderDeliveryRouteResult, { ok: true }> | null = null;
+    if (parsed.fulfillmentPreference === 'DELIVERY') {
+      if (parsed.deliveryLocation === undefined) {
+        return errorResponse(409, 'delivery_location_required');
+      }
+      const resolveDeliveryRoute = store.resolveDeliveryRoute;
+      if (!resolveDeliveryRoute) {
+        return errorResponse(503, 'delivery_configuration_unavailable');
+      }
+      const resolved = await resolveDeliveryRoute.call(store, {
+        requestedShopId: parsed.shopId,
+        latitude: parsed.deliveryLocation.latitude,
+        longitude: parsed.deliveryLocation.longitude,
+        subtotalMinor: trusted.itemsSubtotalMinor,
+        at: new Date().toISOString(),
+      });
+      if (!resolved.ok) return errorResponse(409, resolved.code);
+      if (resolved.shopId !== parsed.shopId) {
+        return errorResponse(409, 'delivery_unavailable');
+      }
+      deliveryRoute = resolved;
+    }
+
     const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
     if (!loadPublishedCheckoutAuthority) {
       return errorResponse(503, 'published_configuration_unavailable');
@@ -770,6 +831,25 @@ export async function handleOrderIntakeRequest(
       customerName: parsed.customer.name,
       normalizedPhone,
       deliveryAddress: parsed.customer.address,
+      deliveryLatitude: parsed.deliveryLocation?.latitude ?? null,
+      deliveryLongitude: parsed.deliveryLocation?.longitude ?? null,
+      deliveryZoneId: deliveryRoute?.zoneId ?? null,
+      deliveryZoneName: deliveryRoute?.zoneName ?? null,
+      deliveryFeeMinor: deliveryRoute?.feeMinor ?? null,
+      deliveryMinimumOrderMinor: deliveryRoute?.minimumOrderMinor ?? null,
+      deliveryFallbackUsed: deliveryRoute?.fallbackUsed ?? false,
+      deliveryRoutingSnapshot:
+        deliveryRoute === null
+          ? null
+          : {
+              requestedShopId: parsed.shopId,
+              resolvedShopId: deliveryRoute.shopId,
+              zoneId: deliveryRoute.zoneId,
+              zoneName: deliveryRoute.zoneName,
+              feeMinor: deliveryRoute.feeMinor,
+              minimumOrderMinor: deliveryRoute.minimumOrderMinor,
+              fallbackUsed: deliveryRoute.fallbackUsed,
+            },
       trustedItems: trusted.trustedItems,
       itemsSubtotalMinor: trusted.itemsSubtotalMinor,
       orderNote: parsed.orderNote,
