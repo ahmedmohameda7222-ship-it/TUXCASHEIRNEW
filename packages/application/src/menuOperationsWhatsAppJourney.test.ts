@@ -10,6 +10,7 @@ import {
   type DeliveryZoneId,
   type DeviceId,
   type InventoryItemId,
+  type InventoryMovementId,
   type MenuCategoryId,
   type OperationsConfigurationSnapshot,
   type OrderId,
@@ -382,6 +383,19 @@ describe('Menu → Operations → WhatsApp fake-provider journey', () => {
         unitLabel: 'unit',
         trackingMode: 'RECIPE_TRACKED',
         active: true,
+      });
+      await transaction.inventory.appendMovement({
+        id: parseEntityId<InventoryMovementId>('abababab-abab-4bab-8bab-abababababac'),
+        shopId: SHOP_ID,
+        businessDayId: DAY_ID,
+        itemId: INVENTORY_ID,
+        movementType: 'BULK_STOCK_RECEIVED',
+        quantityDeltaMicros: stockQuantityMicros(100_000_000),
+        idempotencyKey: 'fixture-opening-stock',
+        workerId: WORKER_ID,
+        orderId: null,
+        createdAt: AT,
+        compensatesMovementId: null,
       });
     });
 

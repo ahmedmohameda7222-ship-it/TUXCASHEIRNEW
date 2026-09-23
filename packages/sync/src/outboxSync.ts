@@ -1,5 +1,16 @@
-import type { Instant, OutboxEvent } from '@tux/domain';
-import type { OperationsDatabase } from '@tux/persistence';
+import {
+  cancelActiveOrder,
+  parseEntityId,
+  stockQuantityMicros,
+  type AuditEventId,
+  type EntityId,
+  type Instant,
+  type InventoryMovement,
+  type InventoryMovementId,
+  type OrderId,
+  type OutboxEvent,
+} from '@tux/domain';
+import type { OperationsDatabase, OperationsTransaction } from '@tux/persistence';
 
 export type OutboxFailureKind = 'TRANSIENT' | 'PERMANENT';
 
@@ -65,6 +76,145 @@ function failureKind(error: unknown): OutboxFailureKind {
   return error instanceof OutboxDeliveryError ? error.kind : 'TRANSIENT';
 }
 
+function newEntityId<Id extends EntityId>(): Id {
+  return parseEntityId<Id>(globalThis.crypto.randomUUID());
+}
+
+function isCanonicalReservationRejection(error: unknown): boolean {
+  return error instanceof OutboxDeliveryError && error.kind === 'PERMANENT' && error.status === 422;
+}
+
+async function reconcileRejectedOrderPlacement(
+  transaction: OperationsTransaction,
+  event: OutboxEvent,
+  failedAt: Instant,
+): Promise<string | null> {
+  if (event.aggregateType !== 'ORDER' || event.eventType !== 'ORDER_PLACED') return null;
+
+  let orderId: OrderId;
+  try {
+    orderId = parseEntityId<OrderId>(event.aggregateId);
+  } catch {
+    return null;
+  }
+
+  const order = await transaction.orders.getById(orderId);
+  if (order === null) return null;
+
+  const fulfilledTerminal =
+    order.status === 'DONE' ||
+    order.status === 'RETURNED' ||
+    (order.status === 'CANCELLED' && order.lifecycle?.cancellation?.foodPrepared === true);
+
+  if (fulfilledTerminal) {
+    const detail = `Order ${order.displayOrderNo} is already ${order.status} locally after canonical inventory rejection; manual reconciliation required.`;
+    await transaction.audit.append({
+      id: newEntityId<AuditEventId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      aggregateType: 'ORDER',
+      aggregateId: order.id,
+      eventType: 'ORDER_SYNC_CONFLICT',
+      workerId: order.operatorWorkerId,
+      createdAt: failedAt,
+      details: {
+        syncConflict: 'inventory_reservation_rejected_after_fulfillment',
+        localStatus: order.status,
+        manualReconciliationRequired: true,
+        rejectedOutboxEventId: event.id,
+      },
+    });
+    return detail;
+  }
+
+  if (order.status !== 'ACTIVE') return null;
+
+  const existingMovements = await transaction.inventory.listMovementsForOrder(order.id);
+  const compensatedMovementIds = new Set(
+    existingMovements
+      .map((movement) => movement.compensatesMovementId)
+      .filter((movementId): movementId is InventoryMovementId => movementId !== null),
+  );
+  const reservationByItem = new Map<InventoryMovement['itemId'], number>();
+  for (const movement of existingMovements) {
+    const reservedDelta = movement.reservedDeltaMicros ?? 0;
+    if (reservedDelta === 0) continue;
+    reservationByItem.set(
+      movement.itemId,
+      (reservationByItem.get(movement.itemId) ?? 0) + reservedDelta,
+    );
+  }
+
+  for (const [itemId, reservedMicros] of reservationByItem) {
+    if (reservedMicros <= 0) continue;
+    await transaction.inventory.appendMovement({
+      id: newEntityId<InventoryMovementId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      itemId,
+      movementType: 'ORDER_RESERVATION_RELEASE',
+      quantityDeltaMicros: stockQuantityMicros(0),
+      reservedDeltaMicros: stockQuantityMicros(-reservedMicros),
+      idempotencyKey: `sync-rejected-reservation-release:${event.id}:${itemId}`,
+      workerId: order.operatorWorkerId,
+      orderId: order.id,
+      createdAt: failedAt,
+      compensatesMovementId: null,
+    });
+  }
+
+  for (const movement of existingMovements) {
+    if (
+      movement.movementType !== 'ORDER_CONSUMPTION' ||
+      (movement.reservedDeltaMicros ?? 0) !== 0 ||
+      movement.quantityDeltaMicros >= 0 ||
+      compensatedMovementIds.has(movement.id)
+    ) {
+      continue;
+    }
+    await transaction.inventory.appendMovement({
+      id: newEntityId<InventoryMovementId>(),
+      shopId: order.shopId,
+      businessDayId: order.businessDayId,
+      itemId: movement.itemId,
+      movementType: 'CANCEL_RESTOCK',
+      quantityDeltaMicros: stockQuantityMicros(-movement.quantityDeltaMicros),
+      reservedDeltaMicros: stockQuantityMicros(0),
+      idempotencyKey: `sync-rejected-legacy-restock:${event.id}:${movement.id}`,
+      workerId: order.operatorWorkerId,
+      orderId: order.id,
+      createdAt: failedAt,
+      compensatesMovementId: movement.id,
+    });
+  }
+
+  const cancelled = cancelActiveOrder(order, {
+    at: failedAt,
+    workerId: order.operatorWorkerId,
+    workerName: order.operatorName,
+    foodPrepared: false,
+    reason: 'Inventory reservation rejected by canonical stock authority.',
+  });
+  await transaction.orders.updateOperationalState(cancelled);
+  await transaction.audit.append({
+    id: newEntityId<AuditEventId>(),
+    shopId: order.shopId,
+    businessDayId: order.businessDayId,
+    aggregateType: 'ORDER',
+    aggregateId: order.id,
+    eventType: 'ORDER_CANCELLED',
+    workerId: order.operatorWorkerId,
+    createdAt: failedAt,
+    details: {
+      reason: 'Inventory reservation rejected by canonical stock authority.',
+      stockRestored: true,
+      syncConflict: 'inventory_reservation_rejected',
+      rejectedOutboxEventId: event.id,
+    },
+  });
+  return null;
+}
+
 export class OutboxSyncService {
   readonly #database: OperationsDatabase;
   readonly #transport: OutboxTransport;
@@ -124,15 +274,20 @@ export class OutboxSyncService {
         const lastError = normalizedError(error);
         const failedAt = this.#runtime.now();
         if (failureKind(error) === 'PERMANENT') {
+          let permanentError = lastError;
           dependencyBlocked += await this.#database.transaction(async (transaction) => {
-            await transaction.outbox.quarantine(event.id, failedAt, lastError);
-            return transaction.outbox.quarantineDependents(event, failedAt, lastError);
+            if (isCanonicalReservationRejection(error)) {
+              permanentError =
+                (await reconcileRejectedOrderPlacement(transaction, event, failedAt)) ?? lastError;
+            }
+            await transaction.outbox.quarantine(event.id, failedAt, permanentError);
+            return transaction.outbox.quarantineDependents(event, failedAt, permanentError);
           });
           if (event.aggregateRevision !== null) {
             blockedAggregateRevisions.set(aggregateKey, event.aggregateRevision);
           }
           quarantined += 1;
-          lastPermanentError = lastError;
+          lastPermanentError = permanentError;
           continue;
         }
 

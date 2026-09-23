@@ -183,7 +183,7 @@ afterEach(async () => {
 });
 
 describe('IndexedDbWhatsAppStore', () => {
-  it('upgrades an existing Operations v4 database to v5 without losing Operations data', async () => {
+  it('upgrades an existing Operations v4 database to the latest schema without losing Operations data', async () => {
     const name = databaseName('upgrade');
     const v4 = await openAtVersion(name, 4);
     const write = v4.transaction(['shops'], 'readwrite');
@@ -195,9 +195,9 @@ describe('IndexedDbWhatsAppStore', () => {
     await store.initialize();
     await store.close();
 
-    const latest = await openAtVersion(name, 5);
+    const latest = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
-      expect(latest.version).toBe(5);
+      expect(latest.version).toBe(INDEXED_DB_VERSION);
       const read = latest.transaction(['shops'], 'readonly');
       await expect(requestResult(read.objectStore('shops').get(SHOP_A))).resolves.toMatchObject({
         id: SHOP_A,
@@ -208,11 +208,11 @@ describe('IndexedDbWhatsAppStore', () => {
     }
   });
 
-  it('declares migration v5 and creates deterministic WhatsApp stores and indexes', async () => {
-    expect(INDEXED_DB_VERSION).toBe(5);
-    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5]);
+  it('retains the WhatsApp v5 migration in the latest schema with deterministic stores and indexes', async () => {
+    expect(INDEXED_DB_VERSION).toBe(6);
+    expect(indexedDbMigrationVersions()).toEqual([1, 2, 3, 4, 5, 6]);
     const name = databaseName('schema');
-    const database = await openAtVersion(name, 5);
+    const database = await openAtVersion(name, INDEXED_DB_VERSION);
     try {
       expect([...database.objectStoreNames]).toEqual(
         expect.arrayContaining([

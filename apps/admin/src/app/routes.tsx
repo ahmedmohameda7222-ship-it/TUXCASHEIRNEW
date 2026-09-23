@@ -3,6 +3,8 @@ import { useLocation } from 'wouter';
 
 import { ApprovalsPage } from '../approvals/ApprovalsPage';
 import { AuditPage } from '../audit/AuditPage';
+import { InventoryPage } from '../inventory/InventoryPage';
+import { PurchasingPage } from '../purchasing/PurchasingPage';
 import { CatalogPage } from '../catalog/CatalogPage';
 import { PublishReviewPage } from '../catalog/PublishReviewPage';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -73,6 +75,8 @@ export function AdminRoutes({ principal }: { principal: AdminSessionPrincipal })
   if (route.path === '/settings') return <SettingsPage />;
   if (route.path === '/approvals') return <ApprovalsPage />;
   if (route.path === '/audit') return <AuditPage />;
+  if (route.path === '/inventory') return <InventoryPage />;
+  if (route.path === '/purchasing') return <PurchasingPage />;
 
   if (route.path === '/more') {
     const secondary = ADMIN_ROUTES.filter(

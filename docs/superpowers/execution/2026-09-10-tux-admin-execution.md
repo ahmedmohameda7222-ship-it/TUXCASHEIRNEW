@@ -291,3 +291,252 @@ The Round 17 Codex thread `PRRT_kwDOT52lwc6i7kKz` is resolved. Because the conne
 The Round 16 order-intake change remains Edge/source behavior. No independent production Edge deployment was performed during Plan 2 because the explicit Plan 2 production authorization covers the canonical migration path and the repository has no separately authorized Edge deployment workflow; source behavior remains covered by the permanent Round16/root Edge and integration gates.
 
 Final Plan 2 merge gate after this ledger mutation: the resulting exact head must pass all seven permanent workflows; a fresh exact-head Codex P0/P1/P2 review must produce no valid unresolved blocker; Master Gate 2 evidence already recorded on PR #62 must remain satisfied; PR #62 must be merged with an expected-head SHA guard; and post-merge `main` CI must pass before Plan 2 is declared complete and Plan 3 begins automatically.
+
+
+## Plan 4 execution start — 2026-09-19
+
+**Plan:** `docs/superpowers/plans/2026-09-10-tux-admin-inventory-purchasing.md`  
+**Branch:** `feat/admin-04-inventory-purchasing`  
+**Base:** `469b5291c42ec6875daf59ee3f18cb5ae9478495` (includes the formatting-only baseline repair from PR #91)
+
+Pre-flight shared interfaces:
+- Tasks 1→2: Task 1 produces the canonical reservation/consumption/restore/release RPC and additive inventory ledger schema consumed by Operations lifecycle migration in Task 2.
+- Tasks 1→3: Task 3 Admin inventory actions consume Task 1 ledger/RPC semantics; UI must never edit stock projections directly.
+- Tasks 1/2→4: intelligence consumes Available = On Hand - Reserved and completed-order theoretical usage; reservations must not be subtracted twice.
+- Tasks 1/4→5: purchasing receiving/returns post immutable movements into the same canonical ledger and feed weighted-average cost/incoming quantities.
+- Mandatory hardening: OWNER-only emergency negative override is folded into Tasks 1–3; supplier-aware replenishment into Tasks 4–5; canonical Admin-origin inventory pull/convergence into Operations is required before Gate 4; central structured reason codes apply to waste/adjustment mutations.
+
+Ruling: keep the repository migration filename `20260910130000_admin_inventory_ledger.sql` specified by the approved plan for deterministic local migration-chain ordering. Production Supabase already contains later Plan 3 history, so applying this change to production is a separate guarded side effect and must not be performed implicitly while implementing the branch. If production promotion uses an out-of-order history operation, it requires explicit deployment evidence/authorization at that checkpoint.
+
+
+### Task 1: complete
+
+Evidence at branch head `13f11221e70ca20996bcbb99bc1ee0421c19ad7a`:
+- Plan 4 `ledger-static`: GREEN.
+- Plan 4 `ledger-postgres`: GREEN; the seeded legacy `inventory_movements` row survived the additive migration unchanged apart from additive defaulted columns, legacy movement labels remained valid, and the new RLS/RPC contract applied on PostgreSQL 17.
+- `npm run test:migrations`: GREEN in `task1-regression`.
+- Baseline unit/integration regression excluding the already-authored Task 2 RED test: GREEN in `task1-regression`.
+- The unfiltered pre-Task-2 run proved 319/320 test files and all 1554 executed tests passed; the only failed suite was `apps/admin/server/inventory/costing.test.ts`, intentionally RED because `costing.ts` had not yet been implemented.
+
+Task 1 Ruling: Task 2 RED tests were authored before Task 1's final regression checkpoint, so the Task 1 completion gate excludes exactly `apps/admin/server/inventory/costing.test.ts`. This does not waive or hide any existing production regression; the file remains a mandatory RED→GREEN gate for Task 2. Cost if wrong: a non-Task-2 regression could be masked only if it were placed in that exact test file before Task 2 implementation, so Task 2 must run the file unexcluded and then the full suite.
+
+
+### Plan 4 Task 2 rulings — inventory lifecycle
+
+- Ruling: local SQLite availability follows the canonical PostgreSQL `reserve_inventory_for_order_v1` authority exactly: no prior movement means on-hand/available zero, so recipe reservations are blocked until stock is explicitly established. Existing checkout fixtures must seed opening stock rather than bypassing the rule. Cost if wrong: local Operations could accept orders that the server-side inventory authority rejects.
+- Ruling: legacy ACTIVE orders created under placement-time `ORDER_CONSUMPTION` retain the explicit pre-reservation cancellation compatibility path; new reservation-backed orders release `ORDER_RESERVATION` regardless of `foodPrepared`. Cost if wrong: historical orders could either double-restore stock or lose their pre-migration cancellation semantics.
+- Ruling: repeated `DONE → undo → DONE` cycles key each `ORDER_CONSUMPTION` by the target lifecycle revision plus item id, not by order+item alone. Cost if wrong: the second legitimate DONE transition collides with the immutable ledger idempotency key.
+- Ruling: RETURNED/no-restock acceptance is anchored by the existing OrdersBoard SQLite integration test and is included in the Plan 4 targeted regression gate; the new reservation lifecycle test covers reserve/consume/undo/cancel and composes with that canonical return path rather than duplicating a weaker synthetic DONE fixture.
+
+
+### Task 2: complete
+
+Evidence at branch head `f829d6ea398b8eab5e0cf1ab9111c482e30ce65c`, Plan 4 workflow run `35418413550`:
+- `ledger-static`: GREEN.
+- `ledger-postgres`: GREEN against PostgreSQL 17.
+- `lifecycle-static`: GREEN for ACTIVE reservation, DONE consumption, undo-DONE reservation restoration, repeated DONE→undo→DONE idempotency, cancellation release, canonical RETURNED/no-restock integration, online-order delegation, sync round-trip/materialization, weighted-average/recipe costing, and IndexedDB balance projection.
+- Plan 4 typecheck: GREEN.
+- Full migration regression: GREEN.
+- Full unfiltered `npm test`: GREEN.
+- Root TUX quality on the same code state passed formatting, lint, unit/integration tests, Admin/WhatsApp security gates, typecheck, and production builds through the migration stage.
+
+Task 2 Ruling: the inventory balance contract must be implemented by every Operations persistence adapter that satisfies `InventoryRepository`; SQLite and IndexedDB both project on-hand/reserved/available from immutable movement history. Cost if wrong: browser Operations could compile around a structurally missing method or diverge from desktop stock authority.
+
+
+### Plan 4 Task 3 rulings — inventory UI command boundaries
+
+- Ruling: Task 3's `Receive` action means receiving an already-sent inter-shop transfer through `receive_stock_transfer_v1`. Supplier / purchase-order receiving remains exclusively Task 5. Cost if wrong: purchase receipts could gain a second UI/API mutation path before the purchasing transaction and cost-history authority exists.
+
+
+### Task 3: complete
+
+Evidence at exact code head `61c8152f02be2c18c53d6a5a2bf3cf045323f68b`:
+- Plan 4 workflow run `35424323905`: 5/5 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task1-regression`).
+- `task3-ui`: formatting, Inventory unit/source UI, and rendered `e2e/admin-inventory.spec.ts` GREEN.
+- Root `TUX V2 CI` run `35424323935`: all jobs GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration, security, typecheck, production builds, migration-chain smoke, Edge typecheck, and rendered browser E2E.
+- The pre-fix rendered browser regression was traced to `seedBrowserFallback()` creating recipe-tracked inventory items with no opening inventory movements. The fixture now seeds explicit `BULK_STOCK_RECEIVED` movements; production zero-stock enforcement remains unchanged and canonical with PostgreSQL reservation authority.
+
+Task 3 Ruling: Admin inventory writes remain ledger commands only. The browser does not write stock projections directly, emergency negative override remains OWNER-only, and `Receive transfer` is the inter-shop transfer receive action rather than supplier/PO receiving.
+
+
+### Task 4: complete
+
+Evidence at exact branch head `02a954768cb72e9d6e24a1939b30812ea72838f7`:
+- Plan 4 workflow run `35425790580`: all jobs GREEN, including `task4-intelligence`, lifecycle/typecheck, PostgreSQL compatibility, and full unfiltered migration + unit/integration regression.
+- Root TUX V2 CI run `35425790584`: every job GREEN, including Required quality gate.
+- Root quality job: format, lint, full tests, security gates, typecheck, production builds, migration-chain smoke, Edge Function checks, and rendered browser E2E all GREEN.
+- Admin job: security boundary, typecheck, production build, and rendered Admin E2E GREEN.
+- Task 4 behavior covers reorder suggestions with minimum/order-multiple rounding, negative available stock, replenishment metadata, actual-vs-theoretical variance, food-cost margin alerts, and inventory intelligence UI.
+
+Task 4 Ruling: `incomingMicros` intentionally remains zero until Task 5 introduces canonical open-PO line quantities. Task 5 must replace this placeholder with open purchase-order remainder without changing on-hand stock before receiving. Replenishment suggestions remain recommendations only and never auto-create or transmit supplier orders.
+
+
+### Task 5: complete
+
+Evidence at exact code head `caa37bba117f2bce567e5dd89f992613201e83db`:
+- Plan 4 workflow run `35431388442`: 8/8 GREEN (`ledger-static`, `ledger-postgres`, `lifecycle-static`, `task3-ui`, `task4-intelligence`, `task5-purchasing`, `task5-postgres`, and `task1-regression`).
+- Task 5 service, open-PO incoming intelligence, migration invariant, and rendered Admin purchasing E2E are GREEN.
+- Task 5 PostgreSQL behavior is GREEN for partial receiving, immutable purchase-receipt movements, weighted-average cost update, supplier price history, audit creation, idempotent sequential replay, completion of the remaining PO quantity, and purchase return posting.
+- Root TUX V2 CI run `35431388443`: every job GREEN, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Root `quality` passed format, lint, full unit/integration tests, security gates, typecheck, production builds, provisioning/migration smoke, function-auth contract, Edge typecheck, and rendered browser E2E.
+- Root `admin` passed the Admin security boundary, typecheck, production build, and rendered Admin E2E including the purchasing flow.
+
+The final Task 5 rendered failure was diagnosed from the permanent Admin Playwright trace rather than by changing product behavior speculatively. The purchasing test had first been accidentally registered as an Operations `*.e2e.ts` test, which ran against the Operations Vite server. After moving it into the Admin Playwright suite, the real browser defect became visible: the page crashed after editing a keyed receive/return cost field with `Cannot read properties of null (reading 'value')`. The keyed React handlers were reading `event.currentTarget.value` from inside functional state updaters; the fix captures the input value synchronously before scheduling the updater. The corrected rendered receive/partial-receive/return flow is now GREEN in both the Plan 4 gate and the permanent Admin gate.
+
+Task 5 Ruling: supplier/PO receiving is authoritative only through the trusted Admin BFF and service-role-only transactional RPCs. Receiving posts inventory/cost/PO/price-history/audit state together; purchase returns post compensating negative inventory movements and return history; open-PO remainder contributes only to incoming intelligence and never to on-hand stock before receipt. Purchasing remains within the approved Plan 4 Task 5 scope; broader ERP-like supplier balances/payment status/attachments remain outside this task.
+
+### Plan 4 implementation completion checkpoint — 2026-09-19
+
+Tasks 1–5 are implementation-complete on PR #92. The exact pre-ledger code head is `caa37bba117f2bce567e5dd89f992613201e83db`, with dedicated Plan 4 run `35431388442` and root CI run `35431388443` fully GREEN.
+
+Production promotion remains deliberately separate:
+- Canonical Supabase project `awpdcsayuwbsruwvaosg` remains synchronized only through Plan 3 migration `20260918175515 admin_plan3_review_round13_hardening`; Plan 4 migrations `20260910130000`, `20260910140000`, and `20260910150000` have not been applied to production.
+- Admin Vercel production remains deployment `dpl_CZfC9PzpWi2PzdKadfLkGyGc5uuA` from `main` commit `b1ddf033c0401286af5f2878d9130d339f99aac8`; no Plan 4 production deployment was performed.
+- PR #92 remains draft until the explicit production-promotion/review checkpoint. This ledger mutation changes the PR head, so exact-head CI must be re-verified before any ready-for-review, merge, Supabase migration, or Admin production deployment action.
+
+
+## Plan 4 final review hardening closeout — 2026-09-20
+
+After Tasks 1–5 reached implementation completion, fresh PR #92 Codex review rounds identified material whole-branch concurrency, convergence, idempotency, reporting, and valuation gaps. Each accepted finding was handled with RED→GREEN evidence before implementation and then re-run through the permanent Plan 4 and root gates.
+
+The final review-hardening pass closed these six findings:
+
+- Canonical multi-device reservation rejection is now surfaced and reconciled locally instead of retrying forever. The canonical ledger rejects the losing reservation under the per-item advisory lock; `operations-sync` maps `TUX_INVENTORY_INSUFFICIENT_STOCK` to permanent HTTP 422; `OutboxSyncService` transactionally quarantines the rejected `ORDER_PLACED` stream, appends local `ORDER_RESERVATION_RELEASE` movements, cancels the still-ACTIVE local order with an explicit sync-conflict audit record, and quarantines dependent lifecycle events.
+- Admin mutation command IDs now survive reload/revisit recovery. Stable normalized intent keys are persisted in browser local storage and recovered by a new hook/page lifetime; an authoritative response clears the durable entry. Storage failure degrades to the existing in-memory retention rather than weakening the server idempotency contract.
+- Inventory-intelligence movement paging no longer assumes the requested 10,000-row limit equals the effective PostgREST row cap. The reader advances by the actual returned row count and continues until an empty page; the regression uses 1,250 rows behind an effective 1,000-row cap.
+- Order-status reads for actual-vs-theoretical reporting are bounded to 100 IDs per request and paginated within each batch, avoiding unbounded `in.(...)` URLs and capped-response truncation.
+- Canonical `ORDER_CONSUMPTION` cost is bound at PostgreSQL ingestion under the per-item inventory lock. A stale device-supplied cost can no longer become immutable historical COGS; replay preserves the already-stored canonical snapshot. The PostgreSQL regression sends stale cost 111 against canonical cost 777 and verifies 777 is stored.
+- Replenishment-policy updates use an observed-version compare-and-swap predicate. A concurrent writer that advances the row version causes the guarded PATCH to affect zero rows and returns `inventory_replenishment_conflict` instead of silently overwriting another Admin session.
+
+Additional review hardening completed before this final pass includes canonical Admin→Operations inventory convergence, authoritative server-side balances, stable stocktake boundaries, purchase-unit conversion snapshots, weighted purchase-return revaluation with explicit purchase-price variance, SQLite convergence without unsynchronized order/day/worker FK dependencies, and service-role/JWT deployment registration for the Operations inventory feed.
+
+Exact pre-ledger review-hardened code head `3f235e62e4768f361859d2f8bc88089327a372cc` passed the permanent gates:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35517992164` — 14/14 jobs SUCCESS, including all seven dedicated final-review gates, Task 3/4/5 UI/service gates, both PostgreSQL behavior jobs, lifecycle/typecheck, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35517992152` — SUCCESS, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. Root quality passed format, lint, full unit/integration tests, Admin/WhatsApp security and architecture, typecheck, production builds, provisioning safety, migration-chain smoke, Supabase function-auth contract, Edge Function typecheck, and rendered browser E2E.
+- All other permanent Admin workflows attached to the exact code head were SUCCESS.
+- The six latest Codex review threads were answered with exact-head RED→GREEN evidence and resolved after the green gate result.
+
+Production promotion remains a distinct guarded checkpoint. This review hardening does not authorize a Supabase migration, Vercel production deployment, ready-for-review transition, or merge.
+
+This ledger commit changes the PR head. Therefore PR #92 must not move to production promotion until the ledger-inclusive exact head passes the permanent workflow set again and a fresh Codex review of that exact final head produces no valid unresolved P0/P1/P2 finding. Any valid new finding reopens TDD.
+
+
+## Plan 4 final review follow-up — principal-scoped durable command IDs — 2026-09-20
+
+During the final exact-head review window after the prior ledger closeout, an additional targeted integrity audit found that durable Admin mutation command IDs were persisted by shop + normalized intent but not by authenticated principal. If Admin A experienced an ambiguous committed response, logged out, and Admin B later performed the same intent from the same browser, B could reuse A's retained command ID. Because canonical inventory and purchasing replay checks are scoped primarily by shop + command ID, B could receive A's idempotent replay instead of executing B's distinct authorized intent, with incorrect actor/audit semantics.
+
+TDD evidence:
+- RED head `0767ed1599d62db204aeab0d441ca11fcb3db569` added a regression requiring identical pending intent to receive distinct durable IDs for distinct employees while preserving same-employee reload recovery. The unimplemented namespace API caused the Admin typecheck to fail before the fix, proving the test was RED.
+- The fix makes `createRetainedCommandIds` require a non-empty namespace and includes it in both in-memory and durable retained keys. Inventory and Purchasing hooks bind that namespace to the authenticated `businessId:employeeId`, recreate the helper when the principal changes, and reject unauthenticated mutation attempts before creating a pending ID.
+- Same-principal reload/revisit continues to reuse an ambiguous pending command; a different authenticated principal cannot inherit it.
+
+Exact pre-ledger fixed code head `4ad0b285a6e00da22e45591208b1a845fdd718bb` passed:
+- `Admin Plan 4 Inventory Purchasing TDD` run `35519618544` — 14/14 jobs SUCCESS, including full unit/migration regression.
+- `TUX V2 CI` run `35519618573` — SUCCESS, including format, lint, full unit/integration tests, Admin/WhatsApp security, typecheck, production builds, migration-chain smoke, Edge Function checks, rendered browser E2E, all application jobs, and `Required quality gate`.
+- All other permanent Admin workflows attached to this exact head were SUCCESS.
+
+This ledger mutation changes the PR head again. Final Plan 4 review closure therefore still requires the ledger-inclusive exact head to pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding. Production Supabase/Vercel remain unchanged and are not authorized by this ledger update.
+
+
+## Plan 4 final review follow-up — transfer identity and PO paging — 2026-09-20
+
+The fresh Codex review of ledger-inclusive head `441d3b2cc5ec36530ab5c8f57728a390903f4057` identified three additional actionable issues, all handled with RED→GREEN evidence:
+
+- Transfer destination identity is now immutable after send. `stock_transfer_lines` persists `destination_inventory_item_id` when `send_stock_transfer_v1` validates the destination item; `receive_stock_transfer_v1` uses that stored UUID directly instead of re-resolving mutable item name/unit after source stock has already left. RED head `cec86e117b493eec5c43efc138a8f52671b06600` failed the new transfer invariant before this column/behavior existed.
+- Incoming purchase-order intelligence now pages open POs by actual returned row count and batches their line reads to at most 100 PO IDs per request, with each batch paged until exhaustion. RED root run `35521640087` failed `pages open purchase orders and batches their lines under PostgREST caps` with `purchase order line request too large`.
+- The purchasing workspace now keeps the newest 500 historical POs plus every actionable `DRAFT`, `ORDERED`, or `PARTIALLY_RECEIVED` PO from an independently paged query, deduplicates by PO ID, and batches/pages line reads. RED root run `35521640087` failed `keeps actionable purchase orders accessible beyond the 500-row history window` before actionable-order workspace support existed.
+
+Exact pre-ledger fixed head `548b8cdac30d76abbbd2c41476b0c64c3ab6586a` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35522323937` — 14/14 jobs SUCCESS, including ledger static/PostgreSQL, Task 4 intelligence, Task 5 purchasing, both PostgreSQL behavior jobs, lifecycle, rendered UI gates, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35522323924` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- All three review threads were answered with exact-head evidence and resolved.
+
+The earlier principal-scoped durable-command-ID hardening remains intact on this head. Production promotion remains a separate explicit checkpoint: this work does not authorize ready-for-review, merge, Supabase migration application, or Vercel production deployment.
+
+This ledger mutation changes the PR head again. The ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure.
+
+
+## Plan 4 final review follow-up — fulfilled rejection, prepared cancellation, and full-depletion return variance — 2026-09-20
+
+The Codex review of exact head `efd5dd0d771c1b4e1d8bc6b5eb8e0df9e6be25d2` identified three additional actionable lifecycle/accounting issues. Each was reproduced RED before implementation and closed GREEN:
+
+- A canonical reservation rejection that arrives after the local order is already `DONE` no longer falls through the ACTIVE-only compensator silently. The fulfilled order and local consumption remain intact, an `ORDER_SYNC_CONFLICT` audit event records `inventory_reservation_rejected_after_fulfillment` with `manualReconciliationRequired: true`, the rejected outbox stream and dependent lifecycle events are quarantined, and sync health exposes a visible manual-reconciliation detail. RED head `ae9d477edbc40210a860781585b47a2e1ea26c05` failed the fulfilled-rejection outbox and sync-health regressions.
+- Cancelling an ACTIVE order with `foodPrepared: true` now converts every active reservation into costed `ORDER_CONSUMPTION` rather than `ORDER_RESERVATION_RELEASE`. Quantity and reserved deltas both consume the reserved quantity, the current weighted unit cost is snapshotted, and cancellation remains `stockRestored: false`. The prior lifecycle test that encoded the superseded release behavior was updated to assert the corrected consumption/balance invariant. RED head `ae9d477e…` failed the prepared-cancellation integration regression.
+- A purchase return that exhausts remaining on-hand inventory now removes the entire current inventory value and books the signed difference between receipt return value and current inventory value as purchase-price variance before zeroing weighted cost. This covers both higher-cost and lower-cost full-depletion returns. RED head `ae9d477e…` failed the cheaper full-return PostgreSQL regression with variance `0` instead of `-500`.
+
+Exact pre-ledger fixed head `846d20fd513558ce7387a6028582f81c6d643206` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35529090983` — 14/14 jobs SUCCESS, including lifecycle, full regression, final-review return cost, and Task 5 PostgreSQL behavior.
+- `TUX V2 CI` run `35529090965` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- All other permanent Admin workflows attached to this exact head were SUCCESS.
+- The three review threads were answered with RED→GREEN evidence and resolved.
+
+Production promotion remains a distinct explicit checkpoint. This ledger mutation changes the PR head again, so the ledger-inclusive exact head must pass the permanent workflow set and receive a fresh Codex review with no valid unresolved P0/P1/P2 finding before Plan 4 technical review closure. No merge, Supabase production migration, or Vercel production deployment is authorized by this update.
+
+## Plan 4 final review follow-up — legacy placement capacity, pending transfer reachability, and recipe paging — 2026-09-20
+
+The final Codex review of exact head `904ce81416505fd1af4a8a34f3325a68a8272071` identified three additional actionable issues. Each was captured by a regression before closure and is now fixed:
+
+- Legacy queued `ORDER_PLACED` inventory consumption can no longer bypass canonical stock capacity. The ledger trigger now treats zero-reservation `ORDER_CONSUMPTION` with a negative quantity delta as legacy placement demand, acquires the same per-shop/per-item advisory lock used by reservations, recomputes canonical available stock, and rejects insufficient capacity with `TUX_INVENTORY_INSUFFICIENT_STOCK`. RED head `bf2d4483ccaba7a5f0fd3d918a98bd730cabeaa0` failed Plan-4 `ledger-static` job `106138077818` in run `35533393946` with the expected `canonical capacity fence must serialize legacy zero-reservation ORDER_CONSUMPTION` assertion.
+- Incoming `SENT` transfers remain reachable even after they fall outside the newest-100 transfer history window. The Admin inventory workspace now loads the bounded recent history plus an independently paged destination-scoped `SENT` set, deduplicates by transfer ID, pages/batches transfer-line reads, and batches transfer inventory-item reads. The regression also covers multiple actionable pages rather than only the first page.
+- Recipe intelligence now pages the complete shop `recipe_lines` set by actual returned row count until exhaustion. The regression places 1,250 recipe rows behind an effective 1,000-row PostgREST cap and verifies the full recipe cost and page offsets, preventing truncated recipe costs from suppressing food-cost margin alerts.
+
+Exact pre-ledger fixed head `b1599025b1cf543f6ce10b4f0498660a7a4021a0` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35533800694` — 14/14 jobs SUCCESS, including `ledger-static`, `ledger-postgres`, Task 3 transfer UI/source regression, Task 4 intelligence, Task 5 purchasing, lifecycle/typecheck, both PostgreSQL behavior jobs, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35533800647` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Foundation, Catalog, Catalog Boundary, Plan 2 rounds 15/16/17, and Plan 3 permanent workflows attached to this exact head were SUCCESS.
+
+Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this review-hardening step.
+
+This ledger plus strengthened transfer regression changes the PR head. The resulting exact head must pass the permanent workflow set again before the three Codex threads are resolved and a fresh final Codex review is requested.
+
+## Plan 4 final review follow-up — reservation lifecycle integrity and large-catalog usability — 2026-09-21
+
+The Codex review of exact head `204178cda4dba10951b414e1f416dd143c31b37d` identified four additional actionable findings. All four were reproduced RED before implementation and closed with targeted hardening:
+
+- Operations sync now validates inventory movements against their event lifecycle semantics rather than accepting any structurally valid movement. `ORDER_PLACED` accepts only positive reservations or the legacy zero-reservation consumption compatibility shape; lifecycle transitions accept only the matching consumption/reversal/release/restock combinations; generic `INVENTORY_MOVEMENT_RECORDED` is restricted to non-order Bulk Stock / legacy Admin-adjustment shapes with zero reservation delta and no order identity. RED head `3e8af2e6e38b910e57f6e67f57f2101a16aee9ef`, Plan-4 run `35535932475`, failed `lifecycle-static` job `106144900734` because a forged `ORDER_RESERVATION_RELEASE` generic event was accepted.
+- The canonical ledger now independently fences negative reservation deltas under the per-shop/per-item advisory lock and binds them to that order's existing reserved balance. A release without an order identity, a release larger than the order's remaining reservation, or a repeated over-release raises `TUX_INVENTORY_RESERVATION_UNDERFLOW`. RED head `b5ebf138aa69f9c9af7f278c3862a85025822c93`, Plan-4 run `35537422450`, failed `ledger-postgres` job `106148928610` because the forged underflow release unexpectedly succeeded before the fence.
+- Active purchase-unit conversions are unique by inventory item + `lower(btrim(purchase_unit_label))`, and PO conversion lookup uses the same normalized comparison. This removes nondeterministic `Case` / `case` resolution. RED head `3e8af2e6e38b910e57f6e67f57f2101a16aee9ef` failed `final-review-purchase-units` job `106144847572` with `purchase-unit labels must be unique case-insensitively per inventory item`.
+- The Admin inventory workspace now pages the complete inventory-item catalog by actual returned row count under PostgREST caps. The same review pass also added cap-safe paging for canonical balance RPC rows and inventory cost-state rows so catalogs above 1,000 items retain complete balance/cost projections.
+- Stocktake remains usable above the 500-item command limit. Catalogs of 500 or fewer items keep the direct flow; larger catalogs expose deterministic batches of at most 500 items, and each selected batch receives its own frozen stocktake snapshot. RED head `3e8af2e6e38b910e57f6e67f57f2101a16aee9ef` failed `task3-ui` job `106144900727` because the item loader was unpaged and the bounded stocktake selector did not exist.
+
+The first GREEN implementation was committed in `c718910b3fc2a6e7e2a7b336cd73acb350b7da5d`. Follow-up RED→GREEN hardening added balance/cost paging (`bc903176d9da7aa6c6aaa47853ed092139c5c2f0` → `c7ee7212c25085c0f7f2841117b646f594226201`) and an explicit order-bound reservation-release regression/fence (`4c3d67992dbd808536bd682ab18469fc73f3cf4a` → `5663e846236f0140efcb3ef1e1893d19333c1d9b`). Temporary Prettier diagnostics were removed after reproducing the exact formatting delta.
+
+Exact pre-ledger fixed head `e1b7a74994153f3a5c35a5eeee82bac4db550c74` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35541542736` — 14/14 jobs SUCCESS, including purchase-unit, stocktake, lifecycle/sync, canonical ledger PostgreSQL, Task 3 large-catalog UI/E2E, Task 4/5, both purchasing PostgreSQL paths, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35541542644` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. Root quality passed format, lint, unit/integration tests, security/architecture gates, typecheck, production builds, migration-chain smoke, Supabase function-auth contract, Edge Function typecheck, and rendered browser E2E.
+- Foundation `35541542742`, Catalog `35541542802`, Catalog Boundary `35541542723`, Plan 2 rounds 15/16/17 `35541542656` / `35541542648` / `35541542643`, and Plan 3 `35541542887` were SUCCESS.
+
+Production promotion remains a separate explicit checkpoint. This ledger update does not authorize ready-for-review, merge, Supabase production migration, or Vercel production deployment. Because this documentation commit changes the PR head, the ledger-inclusive exact head must pass the permanent workflow set again before the four Codex threads are resolved and another exact-head final Codex review is requested.
+
+## Plan 4 final review follow-up — immutable movement identity, terminal rejection reconciliation, and exhaustive workspace paging — 2026-09-21
+
+The Codex review of exact head `35bcf1b23e7c21f21b60fa9147107c19f5171346` identified seven additional actionable integrity and scale findings. All seven were reproduced before closure and fixed without changing the production-promotion boundary:
+
+- Canonical inventory movements are now strictly append-only. `private.enforce_inventory_movement_immutability_v1` rejects every UPDATE of `public.inventory_movements` with `TUX_INVENTORY_MOVEMENT_IMMUTABLE`, so a synced UPSERT cannot reuse a known movement UUID to rewrite an Admin receipt, reservation, or prior movement while bypassing INSERT-time capacity/underflow checks.
+- Rejected offline placements now surface manual reconciliation for every locally fulfilled terminal state, not only `DONE`. `DONE`, `RETURNED`, and prepared `CANCELLED` orders emit `ORDER_SYNC_CONFLICT` with `inventory_reservation_rejected_after_fulfillment` and `manualReconciliationRequired: true` instead of silently retaining local fulfillment/consumption after canonical rejection.
+- Stocktake entry points now use active inventory items only. Direct counts and every <=500-item batch are built from the active subset; if a shop has no active inventory items, the stock-count action is disabled.
+- `post_stocktake_v1` now validates submitted stocktake item IDs as an exact set: duplicate IDs are rejected and two-way `EXCEPT` comparisons prove that no snapshot line is omitted or replaced before any count is posted.
+- Inventory intelligence now pages `inventory_replenishment_settings` and active `products` by actual returned row count under PostgREST caps, preserving reorder policies and margin alerts for catalogs above the server row cap.
+- The purchasing workspace now pages every active purchasable inventory item so PO creation does not silently omit items beyond the PostgREST cap.
+
+The formatted RED head `b1cbfa4792a9c0d36049753eb7048c0c1e5f805a` (Plan-4 run `35543109211`) failed `final-review-stocktake` job `106164466288` and `ledger-static` job `106164466318` before the exact-set/immutability hardening. Intermediate GREEN commits `99f0da5a1f001d3b84b63c0a26c30707e6ca29af`, `590c8341c112a9b72a3feef17e428fabdf07d313`, and `a6dbc3eb54659c902bacf82fecab9552dee792b6` closed movement immutability, stocktake exact-set/active filtering, terminal placement reconciliation, replenishment/product paging, and purchasable-item paging. Their staged workflow failures were used to keep each remaining regression visible until its corresponding production fix landed.
+
+A focused large-catalog self-audit then found two adjacent readers in the same bounded-PostgREST risk class and closed them with independent RED→GREEN evidence:
+
+- Supplier paging: test-only head `716cfc77334b111c4e0dd074511d0d87f211124b`, Plan-4 run `35545193511`, `task5-purchasing` job `106169789022` failed because a 1,250-supplier workspace returned only 1,000 suppliers. `92e687271914455c7c47f277bdb139817d6393fe` added exhaustive supplier paging by actual returned row count.
+- Margin-policy paging: on supplier-fixed head `92e687271914455c7c47f277bdb139817d6393fe`, Plan-4 run `35545277507`, `task5-purchasing` job `106170003074` failed because product `product-1249` fell back to default target/alert thresholds `30/35` instead of configured `20/25`. `3da5b319cd625f7decb5e78b6fb77d66647be37a` added exhaustive `inventory_margin_settings` paging; `49a330ddd8b0776a1437c90d3d7458521af8ec6d` contains the final formatting-normalized regression.
+
+Exact pre-ledger fixed head `49a330ddd8b0776a1437c90d3d7458521af8ec6d` passed:
+
+- `Admin Plan 4 Inventory Purchasing TDD` run `35545425487` — 14/14 jobs SUCCESS, including lifecycle/sync reconciliation, stocktake UI/PostgreSQL integrity, inventory intelligence, purchasing workspace, both PostgreSQL behavior paths, rendered Task 3/5 E2E, and full migration + unit/integration regression.
+- `TUX V2 CI` run `35545425514` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`. The quality lane passed format, lint, unit/integration tests, typecheck, production builds, migration-chain smoke, Edge Function checks, and rendered browser E2E.
+- Foundation `35545425523`, Catalog `35545425512`, Catalog Boundary `35545425504`, Plan 2 rounds 15/16/17 `35545425505` / `35545425500` / `35545425503`, and Plan 3 `35545425502` were SUCCESS.
+
+Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this hardening round. Because this ledger commit changes the PR head, the resulting ledger-inclusive exact head must pass the permanent workflow set before the seven Codex threads are resolved and another final exact-head Codex review is requested.
+

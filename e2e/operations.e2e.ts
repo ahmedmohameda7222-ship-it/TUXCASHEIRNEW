@@ -231,6 +231,22 @@ function configuration() {
     { id: inventory(4), name: 'Fries Bulk Bag', unitLabel: 'bag', trackingMode: 'BULK_MANUAL' },
     { id: inventory(5), name: 'Packaging Box', unitLabel: 'box', trackingMode: 'BULK_MANUAL' },
   ].map((item) => ({ ...item, shopId: SHOP, active: true }));
+  const openingInventoryMovements = inventoryItems
+    .filter((item) => item.trackingMode === 'RECIPE_TRACKED')
+    .map((item, index) => ({
+      id: uuid('b0000000', index + 1),
+      shopId: SHOP,
+      businessDayId: null,
+      itemId: item.id,
+      movementType: 'BULK_STOCK_RECEIVED',
+      quantityDeltaMicros: 100_000_000,
+      reservedDeltaMicros: 0,
+      idempotencyKey: `e2e-opening-stock:${item.id}`,
+      workerId: WORKER,
+      orderId: null,
+      createdAt: '2026-08-20T03:00:00.000Z',
+      compensatesMovementId: null,
+    }));
   return {
     snapshot: {
       shopId: SHOP,
@@ -407,6 +423,7 @@ function configuration() {
       ],
     },
     inventoryItems,
+    openingInventoryMovements,
   };
 }
 
@@ -478,7 +495,7 @@ async function seedBrowserFallback(page: Page): Promise<void> {
       });
       await new Promise<void>((resolve, reject) => {
         const tx = database.transaction(
-          ['shops', 'workers', 'configurationSnapshots', 'inventoryItems'],
+          ['shops', 'workers', 'configurationSnapshots', 'inventoryItems', 'inventoryMovements'],
           'readwrite',
         );
         tx.objectStore('shops').put({ id: shopId, name: 'TUX E2E Shop', active: true });
@@ -498,6 +515,9 @@ async function seedBrowserFallback(page: Page): Promise<void> {
         });
         tx.objectStore('configurationSnapshots').put(bundle.snapshot);
         for (const item of bundle.inventoryItems) tx.objectStore('inventoryItems').put(item);
+        for (const movement of bundle.openingInventoryMovements) {
+          tx.objectStore('inventoryMovements').put(movement);
+        }
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);

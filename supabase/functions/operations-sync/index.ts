@@ -97,7 +97,20 @@ Deno.serve(async (request) => {
     if (message.includes('TUX_DEPENDENCY_MISSING')) {
       return jsonResponse(425, { error: 'sync_dependency_not_ready' });
     }
-    if (message.includes('TUX_SYNC_') || message.includes('TUX_CONFIGURATION_')) {
+    if (message.includes('TUX_INVENTORY_INSUFFICIENT_STOCK')) {
+      return jsonResponse(422, { error: 'inventory_reservation_rejected' });
+    }
+    if (
+      message.includes('TUX_SYNC_') ||
+      message.includes('TUX_CONFIGURATION_') ||
+      message.includes('TUX_INVENTORY_PLACEMENT_REQUIREMENTS_MISMATCH') ||
+      message.includes('TUX_INVENTORY_TERMINAL_SETTLEMENT_MISMATCH') ||
+      message.includes('TUX_INVENTORY_RESERVATION_NOT_SETTLED') ||
+      message.includes('TUX_INVENTORY_UNDO_REVERSAL_MISMATCH') ||
+      message.includes('TUX_INVENTORY_BULK_UNDO_MISMATCH') ||
+      message.includes('TUX_INVENTORY_CANCEL_RESTOCK_MISMATCH') ||
+      message.includes('TUX_ORDER_TRANSITION_PRECONDITION_MISMATCH')
+    ) {
       return jsonResponse(400, { error: 'invalid_materialization_plan' });
     }
     console.error('operations-sync RPC failed', error);

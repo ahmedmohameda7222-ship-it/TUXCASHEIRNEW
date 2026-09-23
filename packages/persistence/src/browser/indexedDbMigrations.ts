@@ -1,4 +1,4 @@
-export const INDEXED_DB_VERSION = 5;
+export const INDEXED_DB_VERSION = 6;
 
 export const INDEXED_DB_STORES = [
   'shops',
@@ -14,6 +14,8 @@ export const INDEXED_DB_STORES = [
   'expenses',
   'inventoryItems',
   'inventoryMovements',
+  'inventoryCostState',
+  'inventorySyncCursor',
   'reconciliations',
   'auditEvents',
   'outboxEvents',
@@ -262,6 +264,15 @@ const MIGRATIONS: readonly IndexedDbMigration[] = [
       database.createObjectStore('whatsappDrafts', {
         keyPath: ['shopId', 'conversationId'],
       });
+    },
+  },
+  {
+    version: 6,
+    name: 'inventory_convergence_state',
+    apply(database) {
+      const costs = database.createObjectStore('inventoryCostState', { keyPath: 'itemId' });
+      costs.createIndex('shopId', 'shopId');
+      database.createObjectStore('inventorySyncCursor', { keyPath: 'shopId' });
     },
   },
 ];

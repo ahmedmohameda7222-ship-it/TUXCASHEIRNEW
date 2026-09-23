@@ -53,6 +53,22 @@ describe('buildSyncHealth', () => {
     ).toMatchObject({ state: 'SYNC_ISSUE', attentionRequired: true });
   });
 
+  it('carries permanent conflict detail into the visible sync issue snapshot', () => {
+    const detail =
+      'Order 8 is already DONE locally after canonical inventory rejection; manual reconciliation required.';
+    expect(
+      buildSyncHealth({
+        remoteConfigured: true,
+        hasRun: true,
+        lastResult: { ...cleanSummary, quarantined: 1, lastError: detail },
+      }),
+    ).toMatchObject({
+      state: 'SYNC_ISSUE',
+      attentionRequired: true,
+      detail,
+    });
+  });
+
   it('treats a thrown sync error as a permanent visible sync issue', () => {
     expect(
       buildSyncHealth({

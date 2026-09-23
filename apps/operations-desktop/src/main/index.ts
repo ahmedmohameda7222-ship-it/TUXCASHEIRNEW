@@ -47,7 +47,6 @@ import {
   buildSyncHealth,
   SupabaseInboundConfigurationProvider,
   SupabaseWorkerAuthenticator,
-  type AutomaticOutboxScheduler,
   type OutboxSyncSummary,
 } from '@tux/sync';
 import { app, BrowserWindow, ipcMain, Notification } from 'electron';
@@ -55,6 +54,7 @@ import {
   createDesktopSupabaseDeviceSessionManager,
   ensureDesktopSupabaseDeviceSession,
   startDesktopAutomaticSync,
+  type DesktopAutomaticSyncHandle,
   SupabaseDesktopWorkerMenuLayoutGateway,
   SupabaseDesktopWorkerUiPreferencesGateway,
 } from './automaticSync';
@@ -120,7 +120,7 @@ let whatsappNotificationSessionActive = false;
 let whatsappNotificationFocusedConversationId: string | null = null;
 let workerMenuLayoutIpcRuntime: WorkerMenuLayoutIpcRuntime | null = null;
 let workerUiPreferencesIpcRuntime: WorkerUiPreferencesIpcRuntime | null = null;
-let automaticSyncScheduler: AutomaticOutboxScheduler | null = null;
+let automaticSyncScheduler: DesktopAutomaticSyncHandle | null = null;
 let workerMenuLayoutRetry: WorkerMenuLayoutRetryController | null = null;
 let workerUiPreferencesRetry: WorkerUiPreferencesRetryController | null = null;
 let activeWorkerMenuLayoutIdentity: WorkerMenuLayoutSyncIdentity | null = null;

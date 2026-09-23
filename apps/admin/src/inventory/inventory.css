@@ -1,0 +1,254 @@
+.admin-inventory-page-actions,
+.admin-inventory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-inventory-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-inventory-list,
+.admin-inventory-inspector,
+.admin-inventory-card,
+.admin-inventory-workflow,
+.admin-inventory-sheet,
+.admin-inventory-item {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: var(--admin-radius-card, 16px);
+  background: var(--tux-surface-panel);
+}
+
+.admin-inventory-list {
+  overflow: hidden;
+}
+
+.admin-inventory-list__header,
+.admin-inventory-item__header,
+.admin-inventory-sheet__heading,
+.admin-inventory-workflow__header,
+.admin-inventory-history__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-inventory-list__header {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--tux-border-subtle);
+}
+
+.admin-inventory-list__header span,
+.admin-inventory-muted,
+.admin-inventory-item__header > div > span,
+.admin-inventory-history__header span,
+.admin-inventory-row small {
+  color: var(--tux-text-secondary);
+}
+
+.admin-inventory-row {
+  width: 100%;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--tux-border-subtle);
+  padding: 0.8rem 1rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-inventory-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-inventory-row.is-selected,
+.admin-inventory-row:hover {
+  background: var(--tux-surface-subtle);
+}
+
+.admin-inventory-row > span:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-inventory-item,
+.admin-inventory-workflow {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.admin-inventory-item__header h2,
+.admin-inventory-sheet__heading h3,
+.admin-inventory-workflow__header h2,
+.admin-inventory-card h3,
+.admin-inventory-history h3 {
+  margin: 0;
+}
+
+.inventory-balance-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.inventory-balance-grid > div,
+.admin-inventory-policy-grid > div,
+.admin-inventory-stocktake-row,
+.admin-inventory-card {
+  border: 1px solid var(--tux-border-subtle);
+  border-radius: 14px;
+  padding: 0.85rem;
+}
+
+.inventory-balance-grid dt,
+.admin-inventory-policy-grid span,
+.admin-inventory-variance span {
+  color: var(--tux-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.inventory-balance-grid dd {
+  margin: 0.3rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.admin-inventory-history {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-inventory-history__list,
+.admin-inventory-stocktake-list,
+.admin-inventory-transfer-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-inventory-history__row,
+.admin-inventory-transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--tux-border-subtle);
+  padding-top: 0.65rem;
+}
+
+.admin-inventory-history__row > div,
+.admin-inventory-transfer-row > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-inventory-history__row span,
+.admin-inventory-history__row small {
+  color: var(--tux-text-secondary);
+}
+
+.admin-inventory-sheet {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0 1rem 1rem;
+  padding: 1rem;
+  background: var(--tux-surface-subtle);
+}
+
+.admin-inventory-policy-grid,
+.admin-inventory-form-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-inventory-policy-grid > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-inventory-stocktake-row {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-inventory-stocktake-row__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-inventory-stocktake-row dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.admin-inventory-stocktake-row dl div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-inventory-stocktake-row dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.admin-inventory-variance {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+}
+
+.admin-inventory-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .admin-inventory-layout {
+    grid-template-columns: minmax(260px, 34%) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .inventory-balance-grid,
+  .admin-inventory-policy-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-inventory-policy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-inventory-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-inventory-item__header,
+  .admin-inventory-workflow__header,
+  .admin-inventory-sheet__heading,
+  .admin-inventory-transfer-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-inventory-page-actions {
+    width: 100%;
+  }
+
+  .admin-inventory-page-actions > button {
+    flex: 1;
+  }
+}

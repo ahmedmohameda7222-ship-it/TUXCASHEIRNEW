@@ -31,3 +31,12 @@ export {
 } from './supabaseWorkerAuthentication';
 export { AutomaticOutboxScheduler, type AutomaticOutboxSchedulerOptions } from './scheduler';
 export { buildSyncHealth, type SyncHealthSnapshot, type SyncHealthState } from './syncHealth';
+
+export {
+  HttpInventoryFeedTransport,
+  InventoryConvergenceService,
+  type HttpInventoryFeedTransportOptions,
+  type InventoryConvergencePage,
+  type InventoryCostProjection,
+  type InventoryFeedTransport,
+} from './inventoryConvergence';

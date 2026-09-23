@@ -1,8 +1,4 @@
-import type {
-  AdminApprovalStatus,
-  AdminPermission,
-  AdminRole,
-} from '@tux/admin-contracts';
+import type { AdminApprovalStatus, AdminPermission, AdminRole } from '@tux/admin-contracts';
 
 const ADMIN_ROLE_MEMBERSHIP = {
   OWNER: true,

@@ -1,4 +1,5 @@
 import {
+  DomainInvariantError,
   allocateDisplayOrderNo,
   hasMeaningfulOrderDraft,
   normalizeEgyptianPhone,
@@ -663,6 +664,16 @@ export class OperationsOrdersService {
               throw new Error('The Current Operator is no longer valid for checkout.');
             }
 
+            for (const [itemId, requiredMicros] of inventoryUsage) {
+              if (requiredMicros === 0) continue;
+              const balance = await transaction.inventory.getBalance(itemId);
+              if (balance.availableMicros < requiredMicros) {
+                throw new DomainInvariantError(
+                  `Insufficient available stock for inventory item ${itemId}.`,
+                );
+              }
+            }
+
             const allocated = allocateDisplayOrderNo(currentDay);
             const receiptIdentity = receiptIdentityForOrder(
               currentConfiguration,
@@ -768,9 +779,10 @@ export class OperationsOrdersService {
                 shopId: context.shopId,
                 businessDayId: currentDay.id,
                 itemId,
-                movementType: 'ORDER_CONSUMPTION',
-                quantityDeltaMicros: stockQuantityMicros(-consumedMicros),
-                idempotencyKey: `order-consumption:${order.id}:${itemId}`,
+                movementType: 'ORDER_RESERVATION',
+                quantityDeltaMicros: stockQuantityMicros(0),
+                reservedDeltaMicros: stockQuantityMicros(consumedMicros),
+                idempotencyKey: `order-reservation:${order.id}:${itemId}`,
                 workerId: currentWorker.id,
                 orderId: order.id,
                 createdAt: committedAt,
@@ -799,6 +811,9 @@ export class OperationsOrdersService {
             configuration: context.configuration,
           });
         } catch (cause) {
+          if (cause instanceof DomainInvariantError) {
+            return err({ code: 'CONFLICT_ERROR', message: cause.message, cause });
+          }
           return err({
             code: 'LOCAL_PERSISTENCE_ERROR',
             message: 'The order was not placed because the local durable commit failed.',

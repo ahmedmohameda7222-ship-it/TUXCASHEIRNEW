@@ -36,8 +36,13 @@ export class AdminSupabaseClient {
     return this.request<T>(`${table}?${query.toString()}`, { method: 'GET' });
   }
 
-  rpc<T>(name: string, payload: Readonly<Record<string, unknown>>): Promise<T> {
-    return this.request<T>(`rpc/${name}`, {
+  rpc<T>(
+    name: string,
+    payload: Readonly<Record<string, unknown>>,
+    query?: URLSearchParams,
+  ): Promise<T> {
+    const queryString = query?.toString() ?? '';
+    return this.request<T>(`rpc/${name}${queryString ? `?${queryString}` : ''}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
