@@ -2006,6 +2006,7 @@ declare
   v_order_id uuid;
   v_existing public.operations_sync_event_receipts%rowtype;
   v_mutation jsonb;
+  v_inventory_item_id uuid;
 begin
   if jsonb_typeof(p_envelope) <> 'object' or jsonb_typeof(p_plan) <> 'object' then
     raise exception 'TUX_SYNC_PROTOCOL_INVALID';
@@ -2121,6 +2122,22 @@ begin
       p_envelope
     );
   end if;
+
+  for v_inventory_item_id in
+    select distinct
+      (mutation.value #>> '{row,inventory_item_id}')::uuid as inventory_item_id
+    from jsonb_array_elements(p_plan -> 'mutations') mutation(value)
+    where mutation.value ->> 'table' = 'inventory_movements'
+      and mutation.value #>> '{row,inventory_item_id}' is not null
+    order by inventory_item_id
+  loop
+    perform pg_advisory_xact_lock(
+      hashtextextended(
+        'tux-inventory:' || v_shop_id::text || ':' || v_inventory_item_id::text,
+        0
+      )
+    );
+  end loop;
 
   for v_mutation in select value from jsonb_array_elements(p_plan -> 'mutations') loop
     if v_mutation -> 'row' ? 'shop_id'
