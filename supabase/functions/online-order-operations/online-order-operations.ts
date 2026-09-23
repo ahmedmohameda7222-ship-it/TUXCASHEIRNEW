@@ -49,6 +49,12 @@ interface PendingRequest {
   readonly customerName: string;
   readonly normalizedPhone: string | null;
   readonly deliveryAddress: string | null;
+  readonly requestedShopId: string;
+  readonly deliveryZoneId: string | null;
+  readonly deliveryZoneName: string | null;
+  readonly deliveryFeeMinor: number | null;
+  readonly deliveryMinimumOrderMinor: number | null;
+  readonly deliveryFallbackUsed: boolean;
   readonly trustedItems: readonly unknown[];
   readonly itemsSubtotalMinor: number;
   readonly orderNote: string | null;
@@ -105,6 +111,12 @@ function isoInstant(value: unknown): string | null {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null;
 }
 
+function nullableNonNegativeInteger(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return undefined;
+  return value;
+}
+
 function parsePendingRequest(value: unknown): PendingRequest | null {
   const source = object(value);
   if (source === null) return null;
@@ -117,6 +129,12 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
   const customerName = source.customerName;
   const normalizedPhone = nullableString(source.normalizedPhone, 50);
   const deliveryAddress = nullableString(source.deliveryAddress, 500);
+  const requestedShopId = uuid(source.requestedShopId);
+  const deliveryZoneId = nullableUuid(source.deliveryZoneId);
+  const deliveryZoneName = nullableString(source.deliveryZoneName, 200);
+  const deliveryFeeMinor = nullableNonNegativeInteger(source.deliveryFeeMinor);
+  const deliveryMinimumOrderMinor = nullableNonNegativeInteger(source.deliveryMinimumOrderMinor);
+  const deliveryFallbackUsed = source.deliveryFallbackUsed;
   const orderNote = nullableString(source.orderNote, 1000);
   const promotionId =
     source.promotionId === undefined ? null : nullableUuid(source.promotionId);
@@ -146,6 +164,12 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     customerName.length > 200 ||
     normalizedPhone === undefined ||
     deliveryAddress === undefined ||
+    requestedShopId === null ||
+    deliveryZoneId === undefined ||
+    deliveryZoneName === undefined ||
+    deliveryFeeMinor === undefined ||
+    deliveryMinimumOrderMinor === undefined ||
+    typeof deliveryFallbackUsed !== 'boolean' ||
     orderNote === undefined ||
     promotionId === undefined ||
     typeof loyaltyPointsToRedeem !== 'number' ||
@@ -162,6 +186,23 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     return null;
   }
   if (
+    (fulfillmentPreference === 'DELIVERY' &&
+      (deliveryAddress === null ||
+        deliveryZoneId === null ||
+        deliveryZoneName === null ||
+        deliveryZoneName.trim().length === 0 ||
+        deliveryFeeMinor === null ||
+        deliveryMinimumOrderMinor === null ||
+        subtotal < deliveryMinimumOrderMinor ||
+        (!deliveryFallbackUsed && requestedShopId !== shopId) ||
+        (deliveryFallbackUsed && requestedShopId === shopId))) ||
+    (fulfillmentPreference === 'PICKUP' &&
+      (deliveryZoneId !== null ||
+        deliveryZoneName !== null ||
+        deliveryFeeMinor !== null ||
+        deliveryMinimumOrderMinor !== null ||
+        deliveryFallbackUsed ||
+        requestedShopId !== shopId)) ||
     (status === 'PENDING' &&
       (processingOrderId !== null ||
         processingStartedAt !== null ||
@@ -186,6 +227,12 @@ function parsePendingRequest(value: unknown): PendingRequest | null {
     customerName,
     normalizedPhone,
     deliveryAddress,
+    requestedShopId,
+    deliveryZoneId,
+    deliveryZoneName,
+    deliveryFeeMinor,
+    deliveryMinimumOrderMinor,
+    deliveryFallbackUsed,
     trustedItems: source.trustedItems,
     itemsSubtotalMinor: subtotal,
     orderNote,
