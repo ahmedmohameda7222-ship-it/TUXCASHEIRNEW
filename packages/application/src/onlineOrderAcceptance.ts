@@ -366,35 +366,55 @@ export function prepareOnlineOrderAcceptanceDraft(
       request.normalizedPhone.trim().length === 0 ||
       request.deliveryAddress === null ||
       request.deliveryAddress.trim().length === 0 ||
+      request.deliveryZoneId === null ||
+      request.deliveryZoneName === null ||
+      request.deliveryZoneName.trim().length === 0 ||
+      request.deliveryFeeMinor === null ||
+      request.deliveryMinimumOrderMinor === null ||
       confirmation.deliveryZoneId === null ||
       confirmation.finalDeliveryFeeMinor === null
     ) {
-      fail('Worker-confirmed delivery zone and final delivery fee are required.');
+      fail('Canonical delivery authority and worker confirmation are required.');
     }
+    if (
+      (!request.deliveryFallbackUsed && request.requestedShopId !== request.shopId) ||
+      (request.deliveryFallbackUsed && request.requestedShopId === request.shopId)
+    ) {
+      fail('The canonical delivery fallback authority is invalid.');
+    }
+
+    const canonicalDeliveryFeeMinor = moneyMinor(request.deliveryFeeMinor);
+    if (
+      confirmation.deliveryZoneId !== request.deliveryZoneId ||
+      confirmation.finalDeliveryFeeMinor !== canonicalDeliveryFeeMinor
+    ) {
+      fail('Worker-confirmed delivery authority does not match the canonical delivery route.');
+    }
+    if (reconstructedSubtotalMinor < request.deliveryMinimumOrderMinor) {
+      fail('The online order does not meet the canonical delivery minimum order amount.');
+    }
+
     const zone = workspace.configuration.deliveryZones.find(
       (candidate) =>
-        candidate.id === confirmation.deliveryZoneId &&
+        candidate.id === request.deliveryZoneId &&
         candidate.shopId === workspace.shopId &&
         candidate.active,
     );
-    if (zone === undefined) fail('The worker-confirmed delivery zone is unavailable.');
-    if (confirmation.finalDeliveryFeeMinor < 0) fail('The final delivery fee is invalid.');
-    if (
-      !checkoutPolicy.allowDeliveryFeeOverride &&
-      confirmation.finalDeliveryFeeMinor !== zone.feeMinor
-    ) {
-      fail('The published checkout policy requires the configured delivery zone fee.');
+    if (zone === undefined) fail('The canonical delivery zone is unavailable.');
+    if (zone.feeMinor !== canonicalDeliveryFeeMinor) {
+      fail('The canonical delivery route is stale against the current delivery configuration.');
     }
-    deliveryFeeMinor = confirmation.finalDeliveryFeeMinor;
+
+    deliveryFeeMinor = canonicalDeliveryFeeMinor;
     delivery = {
       displayPhone: request.normalizedPhone,
       normalizedPhone: request.normalizedPhone,
       customerName: request.customerName.trim(),
       address: request.deliveryAddress.trim(),
-      zoneId: zone.id,
-      zoneLabel: zone.name,
-      configuredFeeMinor: zone.feeMinor,
-      finalFeeMinor: confirmation.finalDeliveryFeeMinor,
+      zoneId: request.deliveryZoneId,
+      zoneLabel: request.deliveryZoneName,
+      configuredFeeMinor: canonicalDeliveryFeeMinor,
+      finalFeeMinor: canonicalDeliveryFeeMinor,
     };
   } else {
     if (confirmation.deliveryZoneId !== null || confirmation.finalDeliveryFeeMinor !== null) {
@@ -425,7 +445,7 @@ export function prepareOnlineOrderAcceptanceDraft(
     confirmation.payment,
     workspace,
     pricing.totalMinor,
-    request.fulfillmentPreference === 'DELIVERY' ? confirmation.deliveryZoneId : null,
+    request.fulfillmentPreference === 'DELIVERY' ? request.deliveryZoneId : null,
   );
 
   return {
