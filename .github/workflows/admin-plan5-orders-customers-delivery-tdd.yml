@@ -293,7 +293,16 @@ jobs:
         run: node scripts/test-admin-loyalty-postgres.mjs
 
   regression:
-    needs: [task1-approval-postgres, task3-customers-static, task3-customers, task3-customers-postgres, task4-loyalty-static, task4-loyalty, task4-loyalty-postgres]
+    needs:
+      [
+        task1-approval-postgres,
+        task3-customers-static,
+        task3-customers,
+        task3-customers-postgres,
+        task4-loyalty-static,
+        task4-loyalty,
+        task4-loyalty-postgres,
+      ]
     runs-on: ubuntu-latest
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
