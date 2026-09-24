@@ -71,6 +71,30 @@ for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve(migrationsDirectory, migration)], migration);
 }
 
+const canonicalPhoneForms = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_array(
+        private.canonicalize_egypt_customer_phone_v1('01000000001'),
+        private.canonicalize_egypt_customer_phone_v1('+201000000001'),
+        private.canonicalize_egypt_customer_phone_v1('00201000000001'),
+        private.canonicalize_egypt_customer_phone_v1('201000000001')
+      )::text`,
+    ],
+    'Canonical Egyptian phone forms',
+  ).trim(),
+);
+if (
+  canonicalPhoneForms.length !== 4 ||
+  canonicalPhoneForms.some((value) => value !== '+201000000001')
+) {
+  throw new Error(
+    `Egyptian phone forms did not converge to one canonical identity: ${JSON.stringify(canonicalPhoneForms)}`,
+  );
+}
+
 const BUSINESS_ID = '00000000-0000-4000-8000-000000000001';
 const SHOP_ID = '61000000-0000-4000-8000-000000000001';
 const EMPLOYEE_ID = '62000000-0000-4000-8000-000000000001';
