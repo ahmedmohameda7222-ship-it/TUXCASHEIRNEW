@@ -458,7 +458,10 @@ describe('OperationsOrdersService placement origin', () => {
     };
     const rewardAuthority = {
       reserve: async () => ({ ok: true as const, value: reservation }),
-      claim: async (input: { readonly reservationId: string; readonly checkoutIntentId: string }) => {
+      claim: async (input: {
+        readonly reservationId: string;
+        readonly checkoutIntentId: string;
+      }) => {
         claimed.push(`${input.reservationId}:${input.checkoutIntentId}`);
         return { ok: true as const, value: { ...reservation, replayed: true } };
       },
@@ -479,7 +482,9 @@ describe('OperationsOrdersService placement origin', () => {
     const persisted = await test.database.transaction((transaction) =>
       transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
     );
-    expect(persisted?.rewardReservationId).toBe('14141414-1414-4141-8141-141414141414');
+    expect(persisted?.rewardReservationId).toBe(
+      '14141414-1414-4141-8141-141414141414',
+    );
     await closeFixture(test);
   });
 
