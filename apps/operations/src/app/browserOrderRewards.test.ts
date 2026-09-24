@@ -41,14 +41,12 @@ afterEach(() => {
 
 describe('BrowserOrderRewardAuthority reward claim', () => {
   it('claims the canonical reservation for the checkout intent before local commit', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response(JSON.stringify(claimedRewardResponse()), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      );
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(claimedRewardResponse()), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const authority = new BrowserOrderRewardAuthority();
