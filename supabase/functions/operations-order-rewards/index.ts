@@ -117,6 +117,26 @@ Deno.serve(async (request) => {
       p_items: items,
       p_now: new Date().toISOString(),
     };
+  } else if (action === 'CLAIM') {
+    const reservationId = stringValue(body['reservationId']);
+    const checkoutIntentId = stringValue(body['checkoutIntentId']);
+    if (
+      reservationId === null ||
+      !UUID_PATTERN.test(reservationId) ||
+      checkoutIntentId === null ||
+      checkoutIntentId.length > 200
+    ) {
+      return jsonResponse(400, { error: 'invalid_reward_claim' });
+    }
+    rpcName = 'claim_operations_order_reward_reservation_v1';
+    parameters = {
+      p_auth_user_id: userData.user.id,
+      p_device_id: deviceId,
+      p_shop_id: shopId,
+      p_reservation_id: reservationId,
+      p_checkout_intent_id: checkoutIntentId,
+      p_now: new Date().toISOString(),
+    };
   } else if (action === 'RELEASE') {
     const reservationId = stringValue(body['reservationId']);
     if (reservationId === null || !UUID_PATTERN.test(reservationId)) {

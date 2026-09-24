@@ -360,35 +360,37 @@ describe('OperationsOrdersService placement origin', () => {
 
   it('applies the same authoritative reward snapshot to POS and ONLINE placement', async () => {
     const channels: string[] = [];
+    const reservation = {
+      id: '12121212-1212-4121-8121-121212121212',
+      expiresAt: instant('2026-09-08T10:40:00.000Z'),
+      replayed: false,
+      snapshot: {
+        configurationVersion: 3,
+        rewardDiscountMinor: moneyMinor(2_000),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'Plan 5 reward',
+          kind: 'FIXED' as const,
+          version: 3,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(2_000),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(2_000),
+        },
+        loyalty: null,
+      },
+    };
     const rewardAuthority: OrderRewardAuthority = {
       reserve: async (input) => {
         channels.push(input.channel);
-        return {
-          ok: true as const,
-          value: {
-            id: '12121212-1212-4121-8121-121212121212',
-            expiresAt: instant('2026-09-08T10:40:00.000Z'),
-            replayed: false,
-            snapshot: {
-              configurationVersion: 3,
-              rewardDiscountMinor: moneyMinor(2_000),
-              promotion: {
-                id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
-                name: 'Plan 5 reward',
-                kind: 'FIXED' as const,
-                version: 3,
-                percentBasisPoints: null,
-                fixedDiscountMinor: moneyMinor(2_000),
-                freeProductId: null,
-                minimumOrderMinor: moneyMinor(0),
-                channel: 'BOTH' as const,
-                promotionDiscountMinor: moneyMinor(2_000),
-              },
-              loyalty: null,
-            },
-          },
-        };
+        return { ok: true as const, value: reservation };
       },
+      claim: async () => ({
+        ok: true as const,
+        value: { ...reservation, replayed: true },
+      }),
       release: async () => undefined,
     };
 
@@ -432,12 +434,12 @@ describe('OperationsOrdersService placement origin', () => {
     await closeFixture(online);
   });
 
-  it('durably claims a reward reservation before committing the local order', async () => {
+  it('replays a durable reward claim before local commit after the original lease expires', async () => {
     const claimed: string[] = [];
     const reservation = {
       id: '14141414-1414-4141-8141-141414141414',
-      expiresAt: instant('2026-09-08T10:40:00.000Z'),
-      replayed: false,
+      expiresAt: instant('2026-09-08T10:20:00.000Z'),
+      replayed: true,
       snapshot: {
         configurationVersion: 4,
         rewardDiscountMinor: moneyMinor(500),
@@ -456,17 +458,14 @@ describe('OperationsOrdersService placement origin', () => {
         loyalty: null,
       },
     };
-    const rewardAuthority = {
+    const rewardAuthority: OrderRewardAuthority = {
       reserve: async () => ({ ok: true as const, value: reservation }),
-      claim: async (input: {
-        readonly reservationId: string;
-        readonly checkoutIntentId: string;
-      }) => {
+      claim: async (input) => {
         claimed.push(`${input.reservationId}:${input.checkoutIntentId}`);
-        return { ok: true as const, value: { ...reservation, replayed: true } };
+        return { ok: true as const, value: reservation };
       },
       release: async () => undefined,
-    } as unknown as OrderRewardAuthority;
+    };
 
     const test = await fixture('BOTH', undefined, 1, rewardAuthority);
     const requested = draft('99999999-aaaa-4aaa-8aaa-999999999999', {
@@ -482,9 +481,7 @@ describe('OperationsOrdersService placement origin', () => {
     const persisted = await test.database.transaction((transaction) =>
       transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
     );
-    expect(persisted?.rewardReservationId).toBe(
-      '14141414-1414-4141-8141-141414141414',
-    );
+    expect(persisted?.rewardReservationId).toBe('14141414-1414-4141-8141-141414141414');
     await closeFixture(test);
   });
 
@@ -509,6 +506,9 @@ describe('OperationsOrdersService placement origin', () => {
           },
         },
       }),
+      claim: async () => {
+        throw new Error('claim must not run before stacking validation');
+      },
       release: async ({ reservationId }) => {
         released.push(reservationId);
       },

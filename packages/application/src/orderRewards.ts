@@ -24,6 +24,12 @@ export interface OrderRewardReservationInput {
   }[];
 }
 
+export interface OrderRewardClaimInput {
+  readonly shopId: ShopId;
+  readonly reservationId: string;
+  readonly checkoutIntentId: string;
+}
+
 export interface OrderRewardReservation {
   readonly id: string;
   readonly expiresAt: Instant;
@@ -45,6 +51,7 @@ export type OrderRewardReservationResult =
 
 export interface OrderRewardAuthority {
   reserve(input: OrderRewardReservationInput): Promise<OrderRewardReservationResult>;
+  claim(input: OrderRewardClaimInput): Promise<OrderRewardReservationResult>;
   release(input: { readonly shopId: ShopId; readonly reservationId: string }): Promise<void>;
 }
 
@@ -55,6 +62,15 @@ export const unavailableOrderRewardAuthority: OrderRewardAuthority = {
       error: {
         code: 'REWARD_REQUIRES_ONLINE_RESERVATION',
         message: 'This reward requires an online canonical reservation before checkout.',
+      },
+    };
+  },
+  async claim() {
+    return {
+      ok: false,
+      error: {
+        code: 'REWARD_REQUIRES_ONLINE_RESERVATION',
+        message: 'Reward checkout requires the canonical reservation service to be online.',
       },
     };
   },

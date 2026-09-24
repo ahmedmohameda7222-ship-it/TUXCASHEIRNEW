@@ -679,16 +679,6 @@ export class OperationsOrdersService {
 
             rewardReservation = reserved.value;
             activeRewardReservation = { shopId: context.shopId, id: rewardReservation.id };
-            const nowMs = Date.parse(this.#runtime.now());
-            const expiryMs = Date.parse(rewardReservation.expiresAt);
-            if (!Number.isFinite(expiryMs) || expiryMs <= nowMs) {
-              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
-              activeRewardReservation = null;
-              return err({
-                code: 'REWARD_NOT_AVAILABLE',
-                message: 'The reward reservation expired before checkout could finalize.',
-              });
-            }
             if (
               draft.discountMinor > ZERO_MONEY &&
               rewardReservation.snapshot.rewardDiscountMinor > ZERO_MONEY &&
@@ -748,6 +738,23 @@ export class OperationsOrdersService {
             effectiveDraft,
             context.configuration,
           );
+
+          if (rewardReservation !== null) {
+            const claimed = await this.#rewardAuthority.claim({
+              shopId: context.shopId,
+              reservationId: rewardReservation.id,
+              checkoutIntentId: draft.checkoutIntentKey,
+            });
+            if (!claimed.ok) {
+              return err({
+                code: claimed.error.code,
+                message: claimed.error.message,
+              });
+            }
+            rewardReservation = claimed.value;
+            activeRewardReservation = { shopId: context.shopId, id: rewardReservation.id };
+          }
+
           const committedAt = this.#runtime.now();
           const operator = context.operator;
 

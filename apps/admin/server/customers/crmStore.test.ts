@@ -96,9 +96,7 @@ describe('CRM store canonical customer lineage', () => {
     expect(facts?.loyaltyBalance).toBe(300);
 
     const ledgerCall = select.mock.calls.find(([table]) => table === 'loyalty_ledger');
-    expect(ledgerCall?.[1].get('customer_id')).toBe(
-      `in.(${survivorId},${retiredId})`,
-    );
+    expect(ledgerCall?.[1].get('customer_id')).toBe(`in.(${survivorId},${retiredId})`);
     expect(ledgerCall?.[1].get('limit')).toBe('250');
     expect(rpc).toHaveBeenCalledWith('get_admin_customer_loyalty_balance_v1', {
       p_business_id: businessId,

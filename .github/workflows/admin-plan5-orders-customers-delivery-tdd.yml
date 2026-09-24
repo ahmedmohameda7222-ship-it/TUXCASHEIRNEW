@@ -323,8 +323,12 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Plan 5 POS reward placement and POS-vs-ONLINE parity
-        run: npx vitest run packages/application/src/ordersOnlineSource.sqlite.test.ts
+      - name: Plan 5 POS reward placement, durable claim bridge, and POS-vs-ONLINE parity
+        run: >-
+          npx vitest run
+          packages/application/src/ordersOnlineSource.sqlite.test.ts
+          apps/operations/src/app/browserOrderRewards.test.ts
+          supabase/functions/operations-order-rewards/operations-order-rewardsClaim.source.test.ts
       - name: Plan 5 ONLINE reward acceptance and intent contract
         run: >-
           npx vitest run

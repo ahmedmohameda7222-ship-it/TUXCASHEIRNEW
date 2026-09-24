@@ -1,5 +1,6 @@
 import type {
   OrderRewardAuthority,
+  OrderRewardClaimInput,
   OrderRewardReservation,
   OrderRewardReservationInput,
   OrderRewardReservationResult,
@@ -198,6 +199,78 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
             response.status >= 500 || response.status === 401 || response.status === 403
               ? 'Reward checkout requires the canonical reservation service to be online.'
               : 'The requested reward could not be reserved.',
+        },
+      };
+    }
+
+    const failure = businessFailure(parsed);
+    if (failure !== null) return failure;
+    try {
+      return { ok: true, value: parseReservation(parsed) };
+    } catch {
+      return {
+        ok: false,
+        error: {
+          code: 'REWARD_REQUIRES_ONLINE_RESERVATION',
+          message: 'Reward checkout received an invalid canonical reservation response.',
+        },
+      };
+    }
+  }
+
+  async claim(input: OrderRewardClaimInput): Promise<OrderRewardReservationResult> {
+    let response: Response;
+    try {
+      response = await fetch('/api/operations-order-rewards', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'CLAIM',
+          shopId: input.shopId,
+          reservationId: input.reservationId,
+          checkoutIntentId: input.checkoutIntentId,
+        }),
+      });
+    } catch {
+      return {
+        ok: false,
+        error: {
+          code: 'REWARD_REQUIRES_ONLINE_RESERVATION',
+          message: 'Reward checkout requires the canonical reservation service to be online.',
+        },
+      };
+    }
+
+    let parsed: UnknownRecord;
+    try {
+      parsed = object(await response.json(), 'Reward response');
+    } catch {
+      return {
+        ok: false,
+        error: {
+          code: 'REWARD_REQUIRES_ONLINE_RESERVATION',
+          message: 'Reward checkout could not verify the canonical reservation response.',
+        },
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          code:
+            response.status >= 500 || response.status === 401 || response.status === 403
+              ? 'REWARD_REQUIRES_ONLINE_RESERVATION'
+              : 'REWARD_NOT_AVAILABLE',
+          message:
+            response.status >= 500 || response.status === 401 || response.status === 403
+              ? 'Reward checkout requires the canonical reservation service to be online.'
+              : 'The requested reward could not be claimed.',
         },
       };
     }

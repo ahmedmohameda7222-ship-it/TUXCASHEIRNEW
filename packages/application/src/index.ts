@@ -59,6 +59,7 @@ export type {
   OrderRewardAuthority,
   OrderRewardAuthorityError,
   OrderRewardAuthorityErrorCode,
+  OrderRewardClaimInput,
   OrderRewardReservation,
   OrderRewardReservationInput,
   OrderRewardReservationResult,
