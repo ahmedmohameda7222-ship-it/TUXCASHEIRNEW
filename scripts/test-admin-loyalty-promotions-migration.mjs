@@ -25,6 +25,15 @@ const requiredPatterns = [
     /perform\s+private\.expire_customer_loyalty_points_for_customer_v1\(/i,
     'reservation-time loyalty expiry materialization',
   ],
+  [
+    /create or replace function private\.post_order_loyalty_earn_v1/i,
+    'idempotent canonical order loyalty earning',
+  ],
+  [
+    /create trigger orders_post_loyalty_earn[\s\S]*post_inserted_order_loyalty_earn_v1/i,
+    'ordinary order loyalty earn trigger',
+  ],
+  [/order-loyalty-earn:/i, 'stable order loyalty earn idempotency key'],
   [/create or replace function public\.consume_order_reward_reservation_v1/i, 'single-consumption finalization RPC'],
   [/create or replace function public\.release_order_reward_reservation_v1/i, 'safe reservation release RPC'],
   [/for update/i, 'canonical reward-state row locking'],
@@ -45,6 +54,12 @@ assert.doesNotMatch(
   sql,
   /update\s+public\.loyalty_ledger/i,
   'Loyalty history must be append-only; corrections use compensating events',
+);
+
+assert.doesNotMatch(
+  sql,
+  /reward-reservation:[^\n]*:earn/i,
+  'Reward consumption must reuse the canonical order earn path instead of double-crediting',
 );
 
 console.log('Admin Plan 5 loyalty/promotions migration source invariants passed.');
