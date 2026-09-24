@@ -760,6 +760,31 @@ if (
   );
 }
 
+const expiredRedemption = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${EXPIRY_CUSTOMER_ID}'::uuid,
+    'expired-loyalty-reservation',
+    null,
+    10,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T06:00:00Z'::timestamptz
+  )`,
+  'Reject expired loyalty before reservation',
+);
+if (
+  expiredRedemption.ok !== false ||
+  expiredRedemption.code !== 'loyalty_balance_changed'
+) {
+  throw new Error(
+    `expired loyalty was reservable before expiry materialization: ${JSON.stringify(expiredRedemption)}`,
+  );
+}
+
 const expiredCount = Number(
   psql(
     [
@@ -796,7 +821,7 @@ const expiryReadback = JSON.parse(
   ).trim(),
 );
 if (
-  expiredCount !== 1 ||
+  expiredCount !== 0 ||
   Number(expiryReadback.balance) !== 0 ||
   Number(expiryReadback.expiryCount) !== 1
 ) {
