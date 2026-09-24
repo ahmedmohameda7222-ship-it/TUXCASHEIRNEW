@@ -1,6 +1,8 @@
 import type { AdminDeliveryZone, AdminSessionPrincipal } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
+import { createDeliveryStore } from './deliveryApi.js';
 import {
   allowedDeliveryTransition,
   createDeliveryService,
@@ -95,6 +97,45 @@ function storeWith(
 const at = '2026-09-23T10:00:00.000Z';
 
 describe('Plan 5 delivery authority', () => {
+  it('surfaces a newly placed delivery order before its first dispatch transition', async () => {
+    const newOrderId = '88000000-0000-4000-8000-000000000099';
+    const updatedAt = '2026-09-24T06:45:00.000Z';
+    const select = vi.fn(async (table: string) => {
+      if (
+        table === 'delivery_zones' ||
+        table === 'delivery_riders' ||
+        table === 'delivery_order_states'
+      ) {
+        return [];
+      }
+      if (table === 'orders') {
+        return [
+          {
+            id: newOrderId,
+            shop_id: shopId,
+            updated_at: updatedAt,
+          },
+        ];
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+    const store = createDeliveryStore({ select } as unknown as AdminSupabaseClient);
+
+    await expect(
+      store.loadWorkspace({ businessId: principal.businessId, shopId }),
+    ).resolves.toMatchObject({
+      orders: [
+        {
+          orderId: newOrderId,
+          shopId,
+          riderId: null,
+          state: 'UNASSIGNED',
+          version: 1,
+          updatedAt,
+        },
+      ],
+    });
+  });
   it('uses priority when delivery zones overlap', async () => {
     const service = createDeliveryService(
       storeWith({

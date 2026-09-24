@@ -79,6 +79,8 @@ const WORKER_ID = '53000000-0000-4000-8000-000000000001';
 const DAY_ID = '54000000-0000-4000-8000-000000000001';
 const CATEGORY_ID = '55000000-0000-4000-8000-000000000001';
 const PRODUCT_ID = '56000000-0000-4000-8000-000000000001';
+const MODIFIER_ID = '56500000-0000-4000-8000-000000000001';
+const ORDER_ITEM_MODIFIER_ID = '56500000-0000-4000-8000-000000000002';
 const ORDER_TYPE_ID = '57000000-0000-4000-8000-000000000001';
 const PAYMENT_METHOD_ID = '58000000-0000-4000-8000-000000000001';
 const ORDER_ID = '59000000-0000-4000-8000-000000000001';
@@ -116,6 +118,8 @@ psql(
        '${PRODUCT_ID}', '${SHOP_ID}', '${CATEGORY_ID}', 'Approval Burger',
        5000, true, false, false, 0
      );
+     insert into public.modifiers(id, shop_id, name, price_minor, active, sort_order)
+       values ('${MODIFIER_ID}', '${SHOP_ID}', 'Extra cheese', 500, true, 0);
      insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
        values ('${ORDER_TYPE_ID}', '${SHOP_ID}', 'Take Away', 'TAKE_AWAY', true, 0);
      insert into public.payment_methods(
@@ -134,7 +138,7 @@ psql(
        '${ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 1, 'approval-order-1', 'POS', 'DONE',
        '${WORKER_ID}', 'Order Worker', '${ORDER_TYPE_ID}', 'Take Away',
        'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
-       20000, 0, 20000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
+       22000, 0, 22000, null, '2026-09-23T05:10:00Z', '2026-09-23T05:10:00Z'
      );
      insert into public.order_items(
        id, shop_id, order_id, product_id, product_name_snapshot,
@@ -143,13 +147,20 @@ psql(
        '${ITEM_ID}', '${SHOP_ID}', '${ORDER_ID}', '${PRODUCT_ID}',
        'Approval Burger', 5000, 4, null, 0
      );
+     insert into public.order_item_modifiers(
+       id, shop_id, order_item_id, modifier_id, modifier_label_snapshot,
+       unit_price_minor, quantity, position
+     ) values (
+       '${ORDER_ITEM_MODIFIER_ID}', '${SHOP_ID}', '${ITEM_ID}', '${MODIFIER_ID}',
+       'Extra cheese', 500, 1, 0
+     );
      insert into public.payments(
        id, shop_id, order_id, part_index, payment_method_id,
        payment_method_label_snapshot, logic_type_snapshot, allocated_minor,
        received_minor, change_minor, created_at
      ) values (
        '${PAYMENT_ID}', '${SHOP_ID}', '${ORDER_ID}', 1, '${PAYMENT_METHOD_ID}',
-       'Card', 'CARD', 20000, null, null, '2026-09-23T05:10:00Z'
+       'Card', 'CARD', 22000, null, null, '2026-09-23T05:10:00Z'
      );
      insert into public.admin_reason_codes(
        id, business_id, shop_id, reason_key, family, label, active,
@@ -645,6 +656,24 @@ if (postedReturn.ok !== true || postedReturn.state !== 'POSTED' || postedReturn.
   throw new Error(`approved return did not post: ${JSON.stringify(postedReturn)}`);
 }
 
+const returnedItemAmount = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select amount_minor
+       from public.admin_order_return_items
+       where return_id = '${postedReturn.returnId}'::uuid
+         and order_item_id = '${ITEM_ID}'::uuid`,
+    ],
+    'Returned item modifier-inclusive amount',
+  ).trim(),
+);
+if (returnedItemAmount !== 11000) {
+  throw new Error(
+    `returned item amount omitted immutable modifier charges: ${returnedItemAmount}`,
+  );
+}
 const postedReturnReplay = rpc(
   `public.execute_approved_admin_order_return_v1(
     '${heldReturn.approvalRequestId}'::uuid,

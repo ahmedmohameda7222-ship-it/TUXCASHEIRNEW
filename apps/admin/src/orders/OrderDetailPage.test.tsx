@@ -119,6 +119,11 @@ describe('OrderDetailPage', () => {
     expect(done).not.toContain('Cancel order');
   });
 
+  it('does not expose refund or return actions for cancelled orders', () => {
+    const cancelled = render({ ...fixture, status: 'CANCELLED' });
+    expect(cancelled).not.toContain('Refund / return');
+    expect(cancelled).not.toContain('Return items');
+  });
   it('renders approval-pending refund and return reason snapshots without rewriting history', () => {
     const html = render({
       ...fixture,
