@@ -140,7 +140,21 @@ async function hydrateCustomerFacts(
   businessId: string,
   customer: CustomerRow,
 ): Promise<CrmCustomerFacts> {
-  const [links, addresses, ledger] = await Promise.all([
+  const lineage = await client.select<Array<Pick<CustomerRow, 'id'>>>(
+    'business_customers',
+    new URLSearchParams({
+      select: 'id',
+      business_id: `eq.${businessId}`,
+      or: `(id.eq.${customer.id},merged_into_customer_id.eq.${customer.id})`,
+      order: 'created_at.asc,id.asc',
+    }),
+  );
+  const lineageIds = [...new Set(lineage.map((identity) => identity.id))];
+  if (!lineageIds.includes(customer.id)) {
+    lineageIds.unshift(customer.id);
+  }
+
+  const [links, addresses, ledger, loyaltyBalanceValue] = await Promise.all([
     client.select<LinkRow[]>(
       'customer_shop_links',
       new URLSearchParams({
@@ -165,11 +179,15 @@ async function hydrateCustomerFacts(
         select:
           'id,shop_id,order_id,event_type,points_delta,monetary_value_minor,earn_expires_at,reason_code_id,reason_code_key,reason_label_snapshot,reason_family_snapshot,reason_config_version,reason_note,source_event_id,created_at',
         business_id: `eq.${businessId}`,
-        customer_id: `eq.${customer.id}`,
+        customer_id: inFilter(lineageIds),
         order: 'created_at.desc,id.desc',
         limit: '250',
       }),
     ),
+    client.rpc<number | string>('get_admin_customer_loyalty_balance_v1', {
+      p_business_id: businessId,
+      p_customer_id: customer.id,
+    }),
   ]);
 
   const shopIds = [...new Set(links.map((link) => link.shop_id))];
@@ -201,7 +219,7 @@ async function hydrateCustomerFacts(
   ]);
 
   const lifetimeSpendMinor = orders.reduce((sum, order) => sum + safeInteger(order.total_minor), 0);
-  const loyaltyBalance = ledger.reduce((sum, event) => sum + safeInteger(event.points_delta), 0);
+  const loyaltyBalance = safeInteger(loyaltyBalanceValue);
 
   return {
     id: customer.id,
