@@ -421,7 +421,15 @@ begin
       into v_customer_uses
     from public.promotion_usage_ledger u
     where u.promotion_id = p_promotion_id
-      and u.customer_id = p_customer_id;
+      and u.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = p_business_id
+          and (
+            c.id = p_customer_id
+            or c.merged_into_customer_id = p_customer_id
+          )
+      );
 
     select count(*)
       into v_total_reserved
@@ -435,7 +443,15 @@ begin
       into v_customer_reserved
     from public.reward_reservations r
     where r.promotion_id = p_promotion_id
-      and r.customer_id = p_customer_id
+      and r.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = p_business_id
+          and (
+            c.id = p_customer_id
+            or c.merged_into_customer_id = p_customer_id
+          )
+      )
       and r.status = 'RESERVED'
       and r.expires_at > p_now
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -2972,3 +2988,49 @@ revoke all on function public.expire_customer_loyalty_points_v1(timestamptz, int
 grant execute on function public.expire_customer_loyalty_points_v1(timestamptz, integer)
   to service_role;
 
+
+create or replace function public.get_admin_customer_loyalty_balance_v1(
+  p_business_id uuid,
+  p_customer_id uuid
+)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $get_admin_customer_loyalty_balance$
+declare
+  v_balance bigint;
+begin
+  if not exists (
+    select 1
+    from public.business_customers c
+    where c.business_id = p_business_id
+      and c.id = p_customer_id
+      and c.merged_into_customer_id is null
+  ) then
+    raise exception 'TUX_CRM_CUSTOMER_NOT_FOUND';
+  end if;
+
+  select coalesce(sum(l.points_delta), 0)
+    into v_balance
+  from public.loyalty_ledger l
+  where l.business_id = p_business_id
+    and l.customer_id in (
+      select c.id
+      from public.business_customers c
+      where c.business_id = p_business_id
+        and (
+          c.id = p_customer_id
+          or c.merged_into_customer_id = p_customer_id
+        )
+    );
+
+  return v_balance;
+end;
+$get_admin_customer_loyalty_balance$;
+
+revoke all on function public.get_admin_customer_loyalty_balance_v1(uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.get_admin_customer_loyalty_balance_v1(uuid, uuid)
+  to service_role;
