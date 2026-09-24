@@ -34,7 +34,7 @@ export function OrderDetailPage({
   onReturn(): void;
 }) {
   const canCancelActive = order.status === 'ACTIVE' && canCancel;
-  const canRefundOrReturn = order.status !== 'ACTIVE' && canRefund;
+  const canRefundOrReturn = ['DONE', 'RETURNED'].includes(order.status) && canRefund;
 
   return (
     <article aria-labelledby="admin-order-detail-title">

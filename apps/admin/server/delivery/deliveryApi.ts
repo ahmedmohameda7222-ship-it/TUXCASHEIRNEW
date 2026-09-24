@@ -149,6 +149,11 @@ type DeliveryOrderRow = {
   version: number | string;
   updated_at: string;
 };
+type CanonicalDeliveryOrderRow = {
+  id: string;
+  shop_id: string;
+  updated_at: string;
+};
 
 type HoursRow = {
   day_of_week: number | string;
@@ -251,7 +256,7 @@ async function loadShop(client: AdminSupabaseClient, shopId: string): Promise<Sh
 export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore {
   return {
     async loadWorkspace(input): Promise<AdminDeliveryWorkspace> {
-      const [zones, riderRows, orderRows] = await Promise.all([
+      const [zones, riderRows, orderRows, canonicalOrderRows] = await Promise.all([
         loadZones(client, input.shopId),
         client.select<RiderRow[]>(
           'delivery_riders',
@@ -272,7 +277,44 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
             limit: '500',
           }),
         ),
+        client.select<CanonicalDeliveryOrderRow[]>(
+          'orders',
+          new URLSearchParams({
+            select: 'id,shop_id,updated_at',
+            shop_id: `eq.${input.shopId}`,
+            order_type_behavior_snapshot: 'eq.DELIVERY',
+            status: 'in.(ACTIVE,DONE)',
+            order: 'updated_at.desc,id.desc',
+            limit: '500',
+          }),
+        ),
       ]);
+
+      const orders: AdminDeliveryOrder[] = orderRows.map((row) => ({
+        orderId: row.order_id,
+        shopId: row.shop_id,
+        riderId: row.rider_id,
+        state: row.state,
+        version: safeInteger(row.version),
+        updatedAt: row.updated_at,
+      }));
+      const initializedOrderIds = new Set(orders.map((order) => order.orderId));
+      for (const row of canonicalOrderRows) {
+        if (!initializedOrderIds.has(row.id)) {
+          orders.push({
+            orderId: row.id,
+            shopId: row.shop_id,
+            riderId: null,
+            state: 'UNASSIGNED',
+            version: 1,
+            updatedAt: row.updated_at,
+          });
+        }
+      }
+      orders.sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) || right.orderId.localeCompare(left.orderId),
+      );
 
       return {
         shopId: input.shopId,
@@ -286,14 +328,7 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
           state: row.state,
           version: safeInteger(row.version),
         })),
-        orders: orderRows.map((row) => ({
-          orderId: row.order_id,
-          shopId: row.shop_id,
-          riderId: row.rider_id,
-          state: row.state,
-          version: safeInteger(row.version),
-          updatedAt: row.updated_at,
-        })),
+        orders,
       };
     },
 

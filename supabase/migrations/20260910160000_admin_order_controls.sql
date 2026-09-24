@@ -1291,6 +1291,7 @@ declare
   v_quantity integer;
   v_prior_quantity bigint;
   v_amount bigint;
+  v_modifier_unit_amount bigint;
   v_total_quantity bigint := 0;
   v_result jsonb;
   v_rule public.admin_approval_rules%rowtype;
@@ -1493,7 +1494,14 @@ begin
       and i.order_id = p_order_id
       and i.shop_id = p_shop_id;
 
-    v_amount := v_order_item.unit_price_minor * v_quantity;
+    select coalesce(sum(m.unit_price_minor * m.quantity), 0)::bigint
+      into v_modifier_unit_amount
+    from public.order_item_modifiers m
+    where m.order_item_id = v_order_item.id
+      and m.shop_id = p_shop_id;
+
+    v_amount :=
+      (v_order_item.unit_price_minor + v_modifier_unit_amount) * v_quantity;
     insert into public.admin_order_return_items(
       return_id, order_item_id, quantity, amount_minor
     ) values (
