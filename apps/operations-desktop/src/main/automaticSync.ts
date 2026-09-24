@@ -22,8 +22,10 @@ import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
   HttpInventoryFeedTransport,
+  HttpOrderLifecycleFeedTransport,
   HttpOutboxTransport,
   InventoryConvergenceService,
+  OrderLifecycleConvergenceService,
   OutboxSyncService,
   SupabaseDeviceSessionManager,
   type OutboxSyncSummary,
@@ -360,7 +362,9 @@ export function startDesktopAutomaticSync(input: {
   });
 
   let inventoryTimer: ReturnType<typeof setInterval> | null = null;
+  let lifecycleTimer: ReturnType<typeof setInterval> | null = null;
   let inventoryRunning = false;
+  let lifecycleRunning = false;
   if (supabaseUrl && supabaseUrl.length > 0) {
     const inventoryEndpoint = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/operations-inventory`;
     const convergence = new InventoryConvergenceService(
@@ -385,8 +389,34 @@ export function startDesktopAutomaticSync(input: {
         inventoryRunning = false;
       }
     };
+    const lifecycleEndpoint = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/operations-order-lifecycle`;
+    const lifecycleConvergence = new OrderLifecycleConvergenceService(
+      input.database,
+      new HttpOrderLifecycleFeedTransport({
+        endpoint: lifecycleEndpoint,
+        headerProvider,
+      }),
+    );
+    const synchronizeLifecycle = async (): Promise<void> => {
+      if (lifecycleRunning) return;
+      lifecycleRunning = true;
+      try {
+        const session = await ensureDesktopSupabaseDeviceSession(sessionManager);
+        await lifecycleConvergence.syncShop(session.shopId);
+      } catch (cause) {
+        console.warn(
+          'TUX canonical order lifecycle feed is unavailable; using the last known-good local projection.',
+          cause,
+        );
+      } finally {
+        lifecycleRunning = false;
+      }
+    };
+
     void synchronizeInventory();
+    void synchronizeLifecycle();
     inventoryTimer = setInterval(() => void synchronizeInventory(), INVENTORY_SYNC_INTERVAL_MS);
+    lifecycleTimer = setInterval(() => void synchronizeLifecycle(), INVENTORY_SYNC_INTERVAL_MS);
   }
 
   input.onConfigured?.();
@@ -395,7 +425,9 @@ export function startDesktopAutomaticSync(input: {
     stop(): void {
       scheduler.stop();
       if (inventoryTimer !== null) clearInterval(inventoryTimer);
+      if (lifecycleTimer !== null) clearInterval(lifecycleTimer);
       inventoryTimer = null;
+      lifecycleTimer = null;
     },
   };
 }
