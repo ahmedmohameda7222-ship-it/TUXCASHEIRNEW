@@ -121,6 +121,9 @@ const REASON_ID = '7a000000-0000-4000-8000-000000000001';
 const EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000002';
 const ORDINARY_EARN_CUSTOMER_ID = '79000000-0000-4000-8000-000000000003';
 const ORDINARY_EARN_ORDER_ID = '78000000-0000-4000-8000-000000000002';
+const ORDINARY_EARN_CONTACT_ID = '7f000000-0000-4000-8000-000000000001';
+const ORDINARY_EARN_ZONE_ID = '7f000000-0000-4000-8000-000000000002';
+const DELIVERY_ORDER_TYPE_ID = '77000000-0000-4000-8000-000000000002';
 const CANCELLATION_REASON_ID = '7a000000-0000-4000-8000-000000000002';
 const REFUND_RETURN_REASON_ID = '7a000000-0000-4000-8000-000000000003';
 const PAYMENT_METHOD_ID = '7b000000-0000-4000-8000-000000000001';
@@ -214,6 +217,18 @@ psql(
        );
      insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
        values ('${BUSINESS_ID}', '${SHOP_ID}', '${ORDINARY_EARN_CUSTOMER_ID}');
+     insert into public.delivery_zones(id, shop_id, name, fee_minor, active, sort_order)
+       values ('${ORDINARY_EARN_ZONE_ID}', '${SHOP_ID}', 'Ordinary Earn Zone', 0, true, 10);
+     insert into public.order_types(id, shop_id, name, behavior, active, sort_order)
+       values ('${DELIVERY_ORDER_TYPE_ID}', '${SHOP_ID}', 'Delivery', 'DELIVERY', true, 10);
+     insert into public.customer_contacts(
+       id, shop_id, normalized_phone, display_phone, name,
+       latest_address, latest_zone_id, last_order_at, updated_at
+     ) values (
+       '${ORDINARY_EARN_CONTACT_ID}', '${SHOP_ID}', '+201000000007', '+201000000007',
+       'Ordinary Earn Customer', 'Earn Street 1', '${ORDINARY_EARN_ZONE_ID}',
+       '2026-09-23T05:12:00Z', '2026-09-23T05:12:00Z'
+     );
      insert into public.orders(
        id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
        operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
@@ -224,9 +239,9 @@ psql(
      ) values (
        '${ORDINARY_EARN_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 10,
        'loyalty-ordinary-earn-1', 'POS', 'ACTIVE',
-       '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
-       'TAKE_AWAY', null, 'Ordinary Earn Customer', '+201000000007',
-       null, null, null, 0, 0,
+       '${WORKER_ID}', 'Loyalty Worker', '${DELIVERY_ORDER_TYPE_ID}', 'Delivery',
+       'DELIVERY', '${ORDINARY_EARN_CONTACT_ID}', 'Ordinary Earn Customer', '+201000000007',
+       'Earn Street 1', '${ORDINARY_EARN_ZONE_ID}', 'Ordinary Earn Zone', 0, 0,
        10000, 0, 10000, null,
        '2026-09-23T05:12:00Z', '2026-09-23T05:12:00Z'
      );`,
