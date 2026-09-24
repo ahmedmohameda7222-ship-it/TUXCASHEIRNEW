@@ -17,12 +17,12 @@ const request: CachedOnlineOrderRequest = {
   customerName: 'Online Customer',
   normalizedPhone: '01012345678',
   deliveryAddress: 'Nasr City, Cairo',
-    requestedShopId: SHOP_ID,
-    deliveryZoneId: ZONE_ID,
-    deliveryZoneName: 'Nasr City',
-    deliveryFeeMinor: 3_000,
-    deliveryMinimumOrderMinor: 15_000,
-    deliveryFallbackUsed: false,
+  requestedShopId: SHOP_ID,
+  deliveryZoneId: ZONE_ID,
+  deliveryZoneName: 'Nasr City',
+  deliveryFeeMinor: 3_000,
+  deliveryMinimumOrderMinor: 15_000,
+  deliveryFallbackUsed: false,
   trustedItems: [
     {
       productId: '77777777-7777-4777-8777-777777777777',
