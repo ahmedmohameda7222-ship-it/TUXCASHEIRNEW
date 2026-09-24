@@ -43,11 +43,13 @@ describe('CRM store canonical customer lineage', () => {
 
     const select = vi.fn(async (table: string, query: URLSearchParams) => {
       if (table === 'customer_shop_links') {
-        return [{
-          shop_id: shopId,
-          canonical_customer_id: survivorId,
-          legacy_customer_contact_id: null,
-        }];
+        return [
+          {
+            shop_id: shopId,
+            canonical_customer_id: survivorId,
+            legacy_customer_contact_id: null,
+          },
+        ];
       }
       if (table === 'business_customers') {
         if (query.get('or')) {
@@ -56,11 +58,13 @@ describe('CRM store canonical customer lineage', () => {
             { id: retiredId, normalized_phone: '+201000000002', display_name: 'Retired' },
           ];
         }
-        return [{
-          id: survivorId,
-          normalized_phone: '+201000000001',
-          display_name: 'Survivor',
-        }];
+        return [
+          {
+            id: survivorId,
+            normalized_phone: '+201000000001',
+            display_name: 'Survivor',
+          },
+        ];
       }
       if (table === 'customer_addresses') return [];
       if (table === 'loyalty_ledger') {
@@ -79,7 +83,11 @@ describe('CRM store canonical customer lineage', () => {
     const client = { select, rpc } as unknown as AdminSupabaseClient;
     const store = createCrmStore(client);
 
-    const facts = await store.getCustomerFacts({ businessId, shopId, customerId: survivorId });
+    const facts = await store.getCustomerFacts({
+      businessId,
+      shopId,
+      customerId: survivorId,
+    });
 
     expect(facts?.loyaltyHistory.map((entry) => entry.id)).toEqual([
       survivorEvent.id,
@@ -88,7 +96,9 @@ describe('CRM store canonical customer lineage', () => {
     expect(facts?.loyaltyBalance).toBe(300);
 
     const ledgerCall = select.mock.calls.find(([table]) => table === 'loyalty_ledger');
-    expect(ledgerCall?.[1].get('customer_id')).toBe(`in.(${survivorId},${retiredId})`);
+    expect(ledgerCall?.[1].get('customer_id')).toBe(
+      `in.(${survivorId},${retiredId})`,
+    );
     expect(ledgerCall?.[1].get('limit')).toBe('250');
     expect(rpc).toHaveBeenCalledWith('get_admin_customer_loyalty_balance_v1', {
       p_business_id: businessId,
