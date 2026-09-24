@@ -269,6 +269,14 @@ begin
     return jsonb_build_object('ok', false, 'code', 'loyalty_customer_required');
   end if;
 
+  if p_customer_id is not null and p_loyalty_points > 0 then
+    perform private.expire_customer_loyalty_points_for_customer_v1(
+      p_business_id,
+      p_customer_id,
+      p_now
+    );
+  end if;
+
   v_fingerprint := md5(
     jsonb_build_object(
       'businessId', p_business_id,
