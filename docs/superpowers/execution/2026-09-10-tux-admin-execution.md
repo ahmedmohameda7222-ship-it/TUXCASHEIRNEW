@@ -596,3 +596,21 @@ The same SHA's root `TUX V2 CI` run `35955734696` completed SUCCESS. The `qualit
 
 Current PR #98 review state at this checkpoint: no submitted reviews and no unresolved review threads. A fresh exact-head Codex review is still required by the later review-hardening gate before technical closure.
 
+## Plan 5 final review follow-up — reward claim durability and canonical customer lineage — 2026-09-24
+
+The Codex review of ledger checkpoint `fec6a56010a3fbb4667330eea5ac80865f439958` identified four actionable Plan 5 hardening findings. The active branch was hardened without changing approved Plan 5 scope:
+
+- POS scarce rewards are now durably claimed through the canonical reservation service before local commit. Expiry only releases abandoned `RESERVED` rows; `CLAIMED` reservations remain exclusive beyond the original lease until delayed sync consumes them. PostgreSQL coverage proves a claimed reservation survives expiry, blocks a competing POS/ONLINE claimant, and can still be consumed exactly once by delayed materialization.
+- Per-customer promotion usage now counts the canonical survivor together with retired identities merged into it, preventing a customer merge from resetting a promotion usage limit. PostgreSQL coverage seeds usage on a retired identity and proves the survivor cannot redeem the exhausted one-use promotion again.
+- Admin CRM loyalty history now hydrates the survivor plus identities merged into it, preserving immutable pre-merge ledger visibility.
+- CRM loyalty balance is no longer derived from the bounded 250-row display history. The canonical unpaginated balance is fetched independently through `get_admin_customer_loyalty_balance_v1`, while the visible history remains paginated/bounded.
+
+Exact pre-ledger hardened HEAD `49b435283ac5427d0af02be561c256ae82bd2478` passed:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `35961906388` — SUCCESS across all 19 permanent Plan 5 jobs, including order controls/approval PostgreSQL, customer canonicalization/merge, loyalty/promotion PostgreSQL behavior, reward placement/races, rendered Orders/CRM/Delivery E2E, delivery checkout authority, regression, and typecheck.
+- `TUX V2 CI` run `35961906228` — SUCCESS across `menu`, `monorepo-architecture`, `admin`, `windows-package`, `quality`, `edge-security`, and `Required quality gate`.
+- The branch was 241 commits ahead and 0 behind `main`, mergeable, and still based on promoted Plan 4 baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`.
+- All four Codex review threads were answered with implementation/test evidence and resolved.
+
+This ledger commit changes the exact PR head again. Plan 5 must therefore obtain fresh ledger-inclusive permanent CI and a fresh exact-head Codex review with no valid unresolved serious finding before the branch can be declared technically ready for final review/squash merge. No merge, Supabase production migration, or production deployment is authorized by this checkpoint.
+
