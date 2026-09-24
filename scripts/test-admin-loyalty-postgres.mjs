@@ -119,6 +119,8 @@ const ORDER_ID = '78000000-0000-4000-8000-000000000001';
 const CUSTOMER_ID = '79000000-0000-4000-8000-000000000001';
 const REASON_ID = '7a000000-0000-4000-8000-000000000001';
 const EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000002';
+const ORDINARY_EARN_CUSTOMER_ID = '79000000-0000-4000-8000-000000000003';
+const ORDINARY_EARN_ORDER_ID = '78000000-0000-4000-8000-000000000002';
 const CANCELLATION_REASON_ID = '7a000000-0000-4000-8000-000000000002';
 const REFUND_RETURN_REASON_ID = '7a000000-0000-4000-8000-000000000003';
 const PAYMENT_METHOD_ID = '7b000000-0000-4000-8000-000000000001';
@@ -198,6 +200,69 @@ const program = rpc(
 );
 if (program.ok !== true || Number(program.version) !== 1) {
   throw new Error(`loyalty program upsert failed: ${JSON.stringify(program)}`);
+}
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${ORDINARY_EARN_CUSTOMER_ID}',
+         '${BUSINESS_ID}',
+         '+201000000007',
+         'Ordinary Earn Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${ORDINARY_EARN_CUSTOMER_ID}');
+     insert into public.orders(
+       id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
+       operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
+       order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
+       normalized_phone_snapshot, address_snapshot, delivery_zone_id,
+       delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at
+     ) values (
+       '${ORDINARY_EARN_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 10,
+       'loyalty-ordinary-earn-1', 'POS', 'ACTIVE',
+       '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
+       'TAKE_AWAY', null, 'Ordinary Earn Customer', '+201000000007',
+       null, null, null, 0, 0,
+       10000, 0, 10000, null,
+       '2026-09-23T05:12:00Z', '2026-09-23T05:12:00Z'
+     );`,
+  ],
+  'Ordinary loyalty earn fixture',
+);
+
+const ordinaryEarn = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+        'points', coalesce(sum(points_delta), 0),
+        'earnCount', count(*) filter (where event_type = 'EARN'),
+        'entryKeys', coalesce(
+          jsonb_agg(entry_key order by created_at, id) filter (where event_type = 'EARN'),
+          '[]'::jsonb
+        )
+      )::text
+      from public.loyalty_ledger
+      where business_id = '${BUSINESS_ID}'::uuid
+        and customer_id = '${ORDINARY_EARN_CUSTOMER_ID}'::uuid
+        and order_id = '${ORDINARY_EARN_ORDER_ID}'::uuid`,
+    ],
+    'Ordinary loyalty earn readback',
+  ).trim(),
+);
+if (
+  Number(ordinaryEarn.points) !== 100 ||
+  Number(ordinaryEarn.earnCount) !== 1 ||
+  ordinaryEarn.entryKeys?.[0] !== `order-loyalty-earn:${ORDINARY_EARN_ORDER_ID}`
+) {
+  throw new Error(
+    `ordinary finalized customer order did not earn loyalty exactly once: ${JSON.stringify(ordinaryEarn)}`,
+  );
 }
 
 const adjustment = rpc(
