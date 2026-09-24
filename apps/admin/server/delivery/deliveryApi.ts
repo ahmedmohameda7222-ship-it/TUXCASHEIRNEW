@@ -313,7 +313,8 @@ export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore 
       }
       orders.sort(
         (left, right) =>
-          right.updatedAt.localeCompare(left.updatedAt) || right.orderId.localeCompare(left.orderId),
+          right.updatedAt.localeCompare(left.updatedAt) ||
+          right.orderId.localeCompare(left.orderId),
       );
 
       return {
