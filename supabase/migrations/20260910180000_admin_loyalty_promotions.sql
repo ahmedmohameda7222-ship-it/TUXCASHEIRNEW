@@ -838,6 +838,148 @@ grant execute on function public.release_operations_order_reward_reservation_v1(
   uuid, uuid, uuid, uuid, timestamptz
 ) to service_role;
 
+create or replace function private.post_order_loyalty_earn_v1(
+  p_order_id uuid,
+  p_customer_id uuid,
+  p_now timestamptz
+)
+returns bigint
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $post_order_loyalty_earn$
+declare
+  v_order public.orders%rowtype;
+  v_business_id uuid;
+  v_customer_id uuid;
+  v_inserted integer := 0;
+begin
+  if p_order_id is null or p_now is null then
+    return 0;
+  end if;
+
+  select o.*
+    into v_order
+  from public.orders o
+  where o.id = p_order_id;
+  if not found then
+    return 0;
+  end if;
+
+  select bs.business_id
+    into v_business_id
+  from public.business_shops bs
+  where bs.shop_id = v_order.shop_id
+  limit 1;
+  if v_business_id is null then
+    return 0;
+  end if;
+
+  if p_customer_id is not null then
+    select coalesce(c.merged_into_customer_id, c.id)
+      into v_customer_id
+    from public.business_customers c
+    where c.business_id = v_business_id
+      and c.id = p_customer_id
+    limit 1;
+  end if;
+
+  if v_customer_id is null and v_order.customer_contact_id is not null then
+    select coalesce(c.merged_into_customer_id, c.id)
+      into v_customer_id
+    from public.customer_contacts contact
+    join public.business_customers c
+      on c.id = contact.canonical_customer_id
+     and c.business_id = v_business_id
+    where contact.id = v_order.customer_contact_id
+      and contact.shop_id = v_order.shop_id
+    limit 1;
+  end if;
+
+  if v_customer_id is null
+     and nullif(btrim(coalesce(v_order.normalized_phone_snapshot, '')), '') is not null then
+    select coalesce(c.merged_into_customer_id, c.id)
+      into v_customer_id
+    from public.business_customers c
+    where c.business_id = v_business_id
+      and c.normalized_phone =
+        private.canonicalize_egypt_customer_phone_v1(v_order.normalized_phone_snapshot)
+    limit 1;
+  end if;
+
+  if v_customer_id is null then
+    return 0;
+  end if;
+
+  perform 1
+  from public.business_customers c
+  where c.business_id = v_business_id
+    and c.id = v_customer_id
+    and c.merged_into_customer_id is null
+  for update;
+  if not found then
+    return 0;
+  end if;
+
+  select p.*
+    into v_program
+  from public.loyalty_programs p
+  where p.business_id = v_business_id
+  for share;
+
+  if not found
+     or not v_program.enabled
+     or (
+       coalesce(array_length(v_program.shop_ids, 1), 0) > 0
+       and not (v_order.shop_id = any(v_program.shop_ids))
+     ) then
+    return 0;
+  end if;
+
+  v_earn_points :=
+    (v_order.total_minor / 100) * v_program.earn_points_per_100_minor;
+  if v_earn_points <= 0 then
+    return 0;
+  end if;
+
+  insert into public.loyalty_ledger(
+    business_id,
+    shop_id,
+    customer_id,
+    order_id,
+    entry_key,
+    event_type,
+    points_delta,
+    monetary_value_minor,
+    earn_expires_at,
+    source_event_id,
+    created_at
+  ) values (
+    v_business_id,
+    v_order.shop_id,
+    v_customer_id,
+    p_order_id,
+    'order-loyalty-earn:' || p_order_id::text,
+    'EARN',
+    v_earn_points,
+    0,
+    case
+      when v_program.point_expiry_days is null then null
+      else p_now + make_interval(days => v_program.point_expiry_days)
+    end,
+    p_order_id::text,
+    p_now
+  )
+  on conflict (business_id, entry_key) do nothing;
+
+  get diagnostics v_inserted = row_count;
+  return case when v_inserted = 1 then v_earn_points else 0 end;
+end;
+$post_order_loyalty_earn$;
+
+revoke all on function private.post_order_loyalty_earn_v1(uuid, uuid, timestamptz)
+  from public, anon, authenticated;
+
 create or replace function public.consume_order_reward_reservation_v1(
   p_reservation_id uuid,
   p_order_id uuid,
@@ -851,7 +993,6 @@ as $consume_order_reward_reservation$
 declare
   v_reservation public.reward_reservations%rowtype;
   v_order_shop_id uuid;
-  v_order_total_minor bigint;
   v_order_idempotency_key text;
   v_order_reward_reservation_id uuid;
   v_order_reward_snapshot jsonb;
@@ -891,14 +1032,12 @@ begin
 
   select
     o.shop_id,
-    o.total_minor,
     o.idempotency_key,
     o.reward_reservation_id,
     o.applied_reward_snapshot,
     o.discount_minor
     into
       v_order_shop_id,
-      v_order_total_minor,
       v_order_idempotency_key,
       v_order_reward_reservation_id,
       v_order_reward_snapshot,
@@ -978,52 +1117,11 @@ begin
     on conflict (business_id, entry_key) do nothing;
   end if;
 
-  if v_reservation.customer_id is not null then
-    select p.*
-      into v_program
-    from public.loyalty_programs p
-    where p.business_id = v_reservation.business_id
-    for share;
-
-    if found
-       and v_program.enabled
-       and (
-         coalesce(array_length(v_program.shop_ids, 1), 0) = 0
-         or v_reservation.shop_id = any(v_program.shop_ids)
-       ) then
-      v_earn_points :=
-        (v_order_total_minor / 100) * v_program.earn_points_per_100_minor;
-      if v_earn_points > 0 then
-        insert into public.loyalty_ledger(
-          business_id,
-          shop_id,
-          customer_id,
-          order_id,
-          entry_key,
-          event_type,
-          points_delta,
-          monetary_value_minor,
-          earn_expires_at,
-          source_event_id
-        ) values (
-          v_reservation.business_id,
-          v_reservation.shop_id,
-          v_reservation.customer_id,
-          p_order_id,
-          'reward-reservation:' || v_reservation.id::text || ':earn',
-          'EARN',
-          v_earn_points,
-          0,
-          case
-            when v_program.point_expiry_days is null then null
-            else p_now + make_interval(days => v_program.point_expiry_days)
-          end,
-          v_reservation.id::text
-        )
-        on conflict (business_id, entry_key) do nothing;
-      end if;
-    end if;
-  end if;
+  perform private.post_order_loyalty_earn_v1(
+    p_order_id,
+    v_reservation.customer_id,
+    p_now
+  );
 
   update public.orders
   set
@@ -1104,6 +1202,30 @@ after insert on public.orders
 for each row
 when (new.reward_reservation_id is not null)
 execute function private.consume_inserted_order_reward_v1();
+
+create or replace function private.post_inserted_order_loyalty_earn_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $post_inserted_order_loyalty_earn$
+begin
+  perform private.post_order_loyalty_earn_v1(
+    new.id,
+    null,
+    coalesce(new.created_at, new.updated_at, now())
+  );
+  return new;
+end;
+$post_inserted_order_loyalty_earn$;
+
+revoke all on function private.post_inserted_order_loyalty_earn_v1()
+  from public, anon, authenticated;
+
+drop trigger if exists orders_post_loyalty_earn on public.orders;
+create trigger orders_post_loyalty_earn
+after insert on public.orders
+for each row execute function private.post_inserted_order_loyalty_earn_v1();
 
 create or replace function public.release_order_reward_reservation_v1(
   p_reservation_id uuid,
