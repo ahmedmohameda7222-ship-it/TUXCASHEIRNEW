@@ -305,6 +305,30 @@ if (reserved.ok !== true || reserved.status !== 'RESERVED') {
   throw new Error(`reward reservation failed: ${JSON.stringify(reserved)}`);
 }
 
+const reservedReplay = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${CUSTOMER_ID}'::uuid,
+    'loyalty-checkout-1',
+    '${promotion.promotionId}'::uuid,
+    20,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T05:09:30Z'::timestamptz
+  )`,
+  'Reward reservation same-intent replay',
+);
+if (
+  reservedReplay.ok !== true ||
+  reservedReplay.replayed !== true ||
+  reservedReplay.reservationId !== reserved.reservationId
+) {
+  throw new Error(`same checkout intent did not replay reservation: ${JSON.stringify(reservedReplay)}`);
+}
+
 const consumed = rpc(
   `public.consume_order_reward_reservation_v1(
     '${reserved.reservationId}'::uuid,
@@ -458,6 +482,125 @@ for (const result of [...slotResults, ...loyaltyRaceResults]) {
       throw new Error(`race reservation cleanup failed: ${JSON.stringify(released)}`);
     }
   }
+}
+
+const releaseCapacity = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    null,
+    'release-capacity-holder',
+    '${racePromotion.promotionId}'::uuid,
+    0,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T05:23:00Z'::timestamptz
+  )`,
+  'Reserve last slot for release capacity',
+);
+if (releaseCapacity.ok !== true) {
+  throw new Error(`release-capacity reservation failed: ${JSON.stringify(releaseCapacity)}`);
+}
+const releasedCapacity = rpc(
+  `public.release_order_reward_reservation_v1(
+    '${releaseCapacity.reservationId}'::uuid,
+    '2026-09-23T05:24:00Z'::timestamptz
+  )`,
+  'Release last-slot capacity',
+);
+const releasedCapacityReplay = rpc(
+  `public.release_order_reward_reservation_v1(
+    '${releaseCapacity.reservationId}'::uuid,
+    '2026-09-23T05:24:30Z'::timestamptz
+  )`,
+  'Replay last-slot capacity release',
+);
+if (
+  releasedCapacity.ok !== true ||
+  releasedCapacity.replayed !== false ||
+  releasedCapacity.status !== 'RELEASED' ||
+  releasedCapacityReplay.ok !== true ||
+  releasedCapacityReplay.replayed !== true
+) {
+  throw new Error(
+    `reservation release was not exactly-once: ${JSON.stringify({ releasedCapacity, releasedCapacityReplay })}`,
+  );
+}
+
+const expiringCapacity = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    null,
+    'expiry-capacity-holder',
+    '${racePromotion.promotionId}'::uuid,
+    0,
+    'ONLINE',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T05:25:00Z'::timestamptz
+  )`,
+  'Reserve last slot for expiry capacity',
+);
+if (expiringCapacity.ok !== true || expiringCapacity.status !== 'RESERVED') {
+  throw new Error(`expiry-capacity reservation failed: ${JSON.stringify(expiringCapacity)}`);
+}
+const expiredReservationCount = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.expire_order_reward_reservations_v1(
+        '2026-09-23T05:36:00Z'::timestamptz,
+        100
+      )`,
+    ],
+    'Expire reward reservation capacity',
+  ).trim(),
+);
+if (expiredReservationCount !== 1) {
+  throw new Error(`reward reservation expiry count was unexpected: ${expiredReservationCount}`);
+}
+const reacquiredCapacity = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    null,
+    'expiry-capacity-holder',
+    '${racePromotion.promotionId}'::uuid,
+    0,
+    'ONLINE',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T05:36:00Z'::timestamptz
+  )`,
+  'Reacquire expired reward reservation capacity',
+);
+if (
+  reacquiredCapacity.ok !== true ||
+  reacquiredCapacity.replayed !== false ||
+  reacquiredCapacity.reservationId !== expiringCapacity.reservationId ||
+  reacquiredCapacity.status !== 'RESERVED'
+) {
+  throw new Error(
+    `expired reservation was not safely reacquired: ${JSON.stringify(reacquiredCapacity)}`,
+  );
+}
+const releasedReacquiredCapacity = rpc(
+  `public.release_order_reward_reservation_v1(
+    '${reacquiredCapacity.reservationId}'::uuid,
+    '2026-09-23T05:37:00Z'::timestamptz
+  )`,
+  'Release reacquired reward capacity',
+);
+if (releasedReacquiredCapacity.ok !== true) {
+  throw new Error(
+    `reacquired reward reservation cleanup failed: ${JSON.stringify(releasedReacquiredCapacity)}`,
+  );
 }
 
 const readback = JSON.parse(
