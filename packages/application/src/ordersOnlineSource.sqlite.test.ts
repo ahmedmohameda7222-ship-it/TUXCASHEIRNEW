@@ -432,6 +432,57 @@ describe('OperationsOrdersService placement origin', () => {
     await closeFixture(online);
   });
 
+  it('durably claims a reward reservation before committing the local order', async () => {
+    const claimed: string[] = [];
+    const reservation = {
+      id: '14141414-1414-4141-8141-141414141414',
+      expiresAt: instant('2026-09-08T10:40:00.000Z'),
+      replayed: false,
+      snapshot: {
+        configurationVersion: 4,
+        rewardDiscountMinor: moneyMinor(500),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'Claimed reward',
+          kind: 'FIXED' as const,
+          version: 4,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(500),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(500),
+        },
+        loyalty: null,
+      },
+    };
+    const rewardAuthority = {
+      reserve: async () => ({ ok: true as const, value: reservation }),
+      claim: async (input: { readonly reservationId: string; readonly checkoutIntentId: string }) => {
+        claimed.push(`${input.reservationId}:${input.checkoutIntentId}`);
+        return { ok: true as const, value: { ...reservation, replayed: true } };
+      },
+      release: async () => undefined,
+    } as unknown as OrderRewardAuthority;
+
+    const test = await fixture('BOTH', undefined, 1, rewardAuthority);
+    const requested = draft('99999999-aaaa-4aaa-8aaa-999999999999', {
+      promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      loyaltyPointsToRedeem: 0,
+    });
+    const result = await test.service.placeOrder(requested);
+
+    expect(result.ok).toBe(true);
+    expect(claimed).toEqual([
+      '14141414-1414-4141-8141-141414141414:99999999-aaaa-4aaa-8aaa-999999999999',
+    ]);
+    const persisted = await test.database.transaction((transaction) =>
+      transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
+    );
+    expect(persisted?.rewardReservationId).toBe('14141414-1414-4141-8141-141414141414');
+    await closeFixture(test);
+  });
+
   it('releases a reward before local commit when stacking is forbidden', async () => {
     const released: string[] = [];
     const rewardAuthority: OrderRewardAuthority = {
