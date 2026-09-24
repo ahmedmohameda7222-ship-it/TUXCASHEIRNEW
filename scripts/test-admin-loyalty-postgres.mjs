@@ -1082,4 +1082,191 @@ if (
   throw new Error(`expired points were not appended explicitly: ${JSON.stringify(expiryReadback)}`);
 }
 
+
+const MERGED_PROMO_CUSTOMER_ID = '79000000-0000-4000-8000-000000000099';
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(
+       id, business_id, normalized_phone, display_name, merged_into_customer_id
+     ) values (
+       '${MERGED_PROMO_CUSTOMER_ID}', '${BUSINESS_ID}', '+201000000099',
+       'Merged Promotion Customer', '${CUSTOMER_ID}'
+     );`,
+  ],
+  'Merged promotion customer fixture',
+);
+
+const mergedIdentityPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Merged identity one-use promotion', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], null, 1, 'ONE_ORDER_LEVEL',
+    null, 'promotion-merged-identity-limit'
+  )`,
+  'Merged-identity promotion upsert',
+);
+if (mergedIdentityPromotion.ok !== true) {
+  throw new Error(
+    `merged-identity promotion upsert failed: ${JSON.stringify(mergedIdentityPromotion)}`,
+  );
+}
+psql(
+  [
+    '-c',
+    `insert into public.promotion_usage_ledger(
+       business_id, shop_id, promotion_id, customer_id, order_id,
+       entry_key, usage_delta, event_type, applied_rule_snapshot
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${mergedIdentityPromotion.promotionId}',
+       '${MERGED_PROMO_CUSTOMER_ID}', null, 'merged-identity-prior-use',
+       1, 'APPLY', '{}'::jsonb
+     );`,
+  ],
+  'Merged-identity promotion usage seed',
+);
+const mergedIdentityRetry = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${CUSTOMER_ID}'::uuid,
+    'merged-identity-retry', '${mergedIdentityPromotion.promotionId}'::uuid,
+    0, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T06:30:00Z'::timestamptz
+  )`,
+  'Merged-identity per-customer promotion limit',
+);
+if (mergedIdentityRetry.ok !== false || mergedIdentityRetry.code !== 'reward_not_available') {
+  throw new Error(
+    `merged customer bypassed per-customer promotion limit: ${JSON.stringify(mergedIdentityRetry)}`,
+  );
+}
+
+const committedPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Committed local reward lease', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], 1, null, 'ONE_ORDER_LEVEL',
+    null, 'promotion-committed-lease'
+  )`,
+  'Committed local reward promotion upsert',
+);
+if (committedPromotion.ok !== true) {
+  throw new Error(`committed reward promotion upsert failed: ${JSON.stringify(committedPromotion)}`);
+}
+const committedReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'committed-local-intent', '${committedPromotion.promotionId}'::uuid,
+    0, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T07:00:00Z'::timestamptz
+  )`,
+  'Committed local reward reservation',
+);
+if (committedReservation.ok !== true) {
+  throw new Error(`committed reward reservation failed: ${JSON.stringify(committedReservation)}`);
+}
+const claimedReservation = rpc(
+  `public.claim_order_reward_reservation_v1(
+    '${committedReservation.reservationId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    'committed-local-intent',
+    '2026-09-23T07:01:00Z'::timestamptz
+  )`,
+  'Claim reward reservation before local commit',
+);
+if (claimedReservation.ok !== true || claimedReservation.status !== 'CLAIMED') {
+  throw new Error(
+    `reward reservation was not durably claimed before local commit: ${JSON.stringify(claimedReservation)}`,
+  );
+}
+const claimedExpiryCount = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.expire_order_reward_reservations_v1(
+        '2026-09-23T07:20:00Z'::timestamptz, 100
+      )`,
+    ],
+    'Expire only abandoned reward reservations',
+  ).trim(),
+);
+if (claimedExpiryCount !== 0) {
+  throw new Error(`claimed reward reservation was incorrectly expired: ${claimedExpiryCount}`);
+}
+const claimedCapacityContender = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'committed-local-contender', '${committedPromotion.promotionId}'::uuid,
+    0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T07:20:00Z'::timestamptz
+  )`,
+  'Claimed reward capacity remains exclusive after original lease',
+);
+if (
+  claimedCapacityContender.ok !== false ||
+  claimedCapacityContender.code !== 'reward_not_available'
+) {
+  throw new Error(
+    `claimed reward capacity was reused before delayed sync: ${JSON.stringify(claimedCapacityContender)}`,
+  );
+}
+
+const CLAIMED_ORDER_ID = '78000000-0000-4000-8000-000000000099';
+psql(
+  [
+    '-c',
+    `insert into public.orders(
+       id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
+       operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
+       order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
+       normalized_phone_snapshot, address_snapshot, delivery_zone_id,
+       delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
+       reward_reservation_id, applied_reward_snapshot
+     )
+     select
+       '${CLAIMED_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 99, 'committed-local-intent',
+       'POS', 'ACTIVE', '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
+       'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
+       10000, 500, 9500, null,
+       '2026-09-23T07:02:00Z', '2026-09-23T07:02:00Z',
+       r.id, r.applied_reward_snapshot
+     from public.reward_reservations r
+     where r.id = '${committedReservation.reservationId}'::uuid;`,
+  ],
+  'Delayed canonical sync of claimed local reward order',
+);
+const claimedReadback = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+        'status', r.status,
+        'consumedOrderId', r.consumed_order_id,
+        'promotionUses', (
+          select coalesce(sum(u.usage_delta), 0)
+          from public.promotion_usage_ledger u
+          where u.promotion_id = '${committedPromotion.promotionId}'::uuid
+        )
+      )::text
+      from public.reward_reservations r
+      where r.id = '${committedReservation.reservationId}'::uuid`,
+    ],
+    'Claimed reward delayed-sync readback',
+  ).trim(),
+);
+if (
+  claimedReadback.status !== 'CONSUMED' ||
+  claimedReadback.consumedOrderId !== CLAIMED_ORDER_ID ||
+  Number(claimedReadback.promotionUses) !== 1
+) {
+  throw new Error(
+    `claimed reward did not converge exactly once after lease expiry: ${JSON.stringify(claimedReadback)}`,
+  );
+}
+
 console.log('Admin loyalty PostgreSQL behavior passed.');
