@@ -560,3 +560,39 @@ Production inventory sync deployment was closed through PR #96, merged as `cfa19
 PR #96 post-merge TUX V2 CI run `35821747601` completed SUCCESS. Supabase security/performance advisor output was reviewed after promotion; no new Plan-4-specific blocker was identified. Existing informational RLS/no-policy and performance/index findings remain separate hardening/maintenance scope and are not silently changed at this checkpoint.
 
 Plan 4 production promotion is therefore reconciled and closed. Plan 5 continues from clean baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e` on `feat/admin-05-orders-customers-delivery-v2` / PR #98. The original `feat/admin-05-orders-customers-delivery` branch remains preserved as implementation-history backup.
+
+## Plan 5 implementation checkpoint — final-review preflight
+
+Plan 5 implementation continued on PR #98 from the clean promoted Plan 4 baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. The historical `feat/admin-05-orders-customers-delivery` branch remains a RED→GREEN backup only; active work is on `feat/admin-05-orders-customers-delivery-v2`.
+
+The pre-ledger final-review checkpoint is `fa3c07e1f98743ece9f5461754f3b1a9c9dde0c0`. At that SHA the branch is 228 commits ahead and 0 behind `main`, with the merge base still exactly the promoted Plan 4 baseline. PR #98 is mergeable and remains draft. No Plan 5 production Supabase migration, production deployment, or merge has been performed.
+
+### Plan 5 implementation status
+
+- [x] Task 1 — controlled order supervision is implemented with immutable cancellation/refund/return history, central reason snapshots, shop/permission authority, durable command idempotency, transactional limits, Plan 3 approval-engine routing, second-person approval protection, rejected-approval non-posting, and exactly-once approved execution.
+- [x] Task 2 — Admin Orders search/detail/action UI and `e2e/admin-orders.spec.ts` cover status-contextual actions, cancellation reason validation, stale operational-revision handling, immutable refund/return reason history, pending approval display, and proactive Operations lifecycle convergence for an idle online client.
+- [x] Task 3 — canonical Egyptian-phone customer identity and merge preserve historical order/contact evidence, shop links, addresses/segments/loyalty state, survivor redirects, permission/confirmation/audit/idempotency, and locked merge serialization. PostgreSQL behavior verifies canonical phone forms and merge invariants.
+- [x] Task 4 — CRM/customer detail, loyalty history/configuration/manual adjustment, automatic segments, promotion management, immutable loyalty/promotion ledgers, expiry/compensation events, canonical promotion validation, POS/ONLINE reward placement, immutable applied-reward snapshots, online reservation for shared scarce state, offline fail-closed behavior, idempotent consume/release/expiry, and cross-device/cross-channel race protection are implemented.
+- [x] Task 5 — delivery zones/routing, priority, canonical delivery hours/availability, explicit fallback, fee/minimum authority, trusted ONLINE checkout recomputation, riders, append-oriented delivery state history, shop/permission/version fencing, and canonical RETURNED convergence are implemented.
+- [x] The temporary Plan 5 formatter workflow is absent from the final product diff.
+- [x] The permanent Plan 5 workflow targets the active `v2` branch and permanently exercises Tasks 1–5 plus full migration/unit regression and typecheck.
+- [ ] Final ledger-inclusive exact-head CI and fresh exact-head review remain before Plan 5 can be declared technically ready for squash merge.
+
+### Plan 5 RED→GREEN / behavioral evidence at `fa3c07e1…`
+
+The permanent `Admin Plan 5 Orders Customers Delivery TDD` run `35955734829` completed SUCCESS. Its green jobs include:
+
+- order-control migration/service behavior, lifecycle CAS/convergence, and typecheck;
+- refund/return approval PostgreSQL behavior, including direct-vs-held thresholds, command replay/conflict, second-person approval, rejection, and exactly-once execution;
+- Orders rendered Playwright acceptance;
+- customer migration/unit/PostgreSQL canonicalization and merge behavior;
+- loyalty/promotion migration/unit behavior and reward-reservation PostgreSQL concurrency;
+- POS reward placement, ONLINE reward acceptance, and POS-vs-ONLINE parity;
+- CRM/promotions rendered Playwright acceptance;
+- delivery migration/service/PostgreSQL behavior, trusted ONLINE delivery checkout authority, and rendered Playwright acceptance;
+- full `npm run test:migrations` plus `npm test` regression.
+
+The same SHA's root `TUX V2 CI` run `35955734696` completed SUCCESS. The `quality` job passed repository `Format check`, `Lint`, unit/integration tests, Admin security, typecheck, production builds, migration-chain smoke, Edge Function typecheck, and rendered browser E2E. The `Required quality gate` job also completed SUCCESS. Foundation/Plan 2/Plan 3/Plan 4 compatibility workflows associated with this SHA are green.
+
+Current PR #98 review state at this checkpoint: no submitted reviews and no unresolved review threads. A fresh exact-head Codex review is still required by the later review-hardening gate before technical closure.
+
