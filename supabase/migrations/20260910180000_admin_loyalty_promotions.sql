@@ -852,6 +852,8 @@ declare
   v_order public.orders%rowtype;
   v_business_id uuid;
   v_customer_id uuid;
+  v_program public.loyalty_programs%rowtype;
+  v_earn_points bigint := 0;
   v_inserted integer := 0;
 begin
   if p_order_id is null or p_now is null then
@@ -997,8 +999,6 @@ declare
   v_order_reward_reservation_id uuid;
   v_order_reward_snapshot jsonb;
   v_order_discount_minor bigint;
-  v_program public.loyalty_programs%rowtype;
-  v_earn_points bigint := 0;
 begin
   select r.*
     into v_reservation
