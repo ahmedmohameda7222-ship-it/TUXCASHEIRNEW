@@ -125,12 +125,12 @@ const request: CachedOnlineOrderRequest = {
   customerName: 'Online Customer',
   normalizedPhone: null,
   deliveryAddress: null,
-    requestedShopId: SHOP_ID,
-    deliveryZoneId: null,
-    deliveryZoneName: null,
-    deliveryFeeMinor: null,
-    deliveryMinimumOrderMinor: null,
-    deliveryFallbackUsed: false,
+  requestedShopId: SHOP_ID,
+  deliveryZoneId: null,
+  deliveryZoneName: null,
+  deliveryFeeMinor: null,
+  deliveryMinimumOrderMinor: null,
+  deliveryFallbackUsed: false,
   trustedItems: [
     {
       productId: PRODUCT_ID,
