@@ -8,7 +8,7 @@ immutable
 set search_path = pg_catalog
 as $canonicalize$
 declare
-  v_phone text := regexp_replace(coalesce(btrim(p_phone), ''), '[[:space:]()\-]', '', 'g');
+  v_phone text := regexp_replace(coalesce(btrim(p_phone), ''), '[[:space:]()-]', '', 'g');
 begin
   if left(v_phone, 3) = '+20' then
     null;
@@ -22,7 +22,8 @@ begin
     return null;
   end if;
 
-  if v_phone !~ '^\\+20(10|11|12|15)[0-9]{8}$' then
+  if left(v_phone, 3) <> '+20'
+     or substr(v_phone, 4) !~ '^(10|11|12|15)[0-9]{8}$' then
     return null;
   end if;
   return v_phone;
