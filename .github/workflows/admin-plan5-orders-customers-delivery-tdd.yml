@@ -276,7 +276,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Plan 5 loyalty and promotion rule RED/behavior
-        run: npx vitest run apps/admin/server/customers/loyaltyService.test.ts
+        run: >-
+          npx vitest run
+          apps/admin/server/customers/loyaltyService.test.ts
+          apps/admin/server/customers/crmStore.test.ts
 
   task4-loyalty-postgres:
     needs: task4-loyalty-static
