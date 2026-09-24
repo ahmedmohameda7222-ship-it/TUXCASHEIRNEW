@@ -132,8 +132,11 @@ create table public.reward_reservations (
   loyalty_points_reserved bigint not null default 0 check (loyalty_points_reserved >= 0),
   promotion_use_reserved boolean not null default false,
   applied_reward_snapshot jsonb not null,
-  status text not null check (status in ('RESERVED', 'CONSUMED', 'RELEASED', 'EXPIRED')),
+  status text not null check (
+    status in ('RESERVED', 'CLAIMED', 'CONSUMED', 'RELEASED', 'EXPIRED')
+  ),
   expires_at timestamptz not null,
+  claimed_at timestamptz,
   consumed_order_id uuid references public.orders(id) on delete restrict,
   consumed_at timestamptz,
   released_at timestamptz,
@@ -143,6 +146,10 @@ create table public.reward_reservations (
   check (
     (status = 'CONSUMED' and consumed_order_id is not null and consumed_at is not null)
     or status <> 'CONSUMED'
+  ),
+  check (
+    (status = 'CLAIMED' and claimed_at is not null)
+    or status <> 'CLAIMED'
   )
 );
 create index reward_reservations_customer_active_idx
@@ -303,7 +310,7 @@ begin
     if v_existing.request_fingerprint <> v_fingerprint then
       return jsonb_build_object('ok', false, 'code', 'checkout_intent_conflict');
     end if;
-    if v_existing.status = 'CONSUMED' then
+    if v_existing.status in ('CLAIMED', 'CONSUMED') then
       return jsonb_build_object(
         'ok', true,
         'replayed', true,
@@ -366,9 +373,19 @@ begin
       into v_reserved_points
     from public.reward_reservations r
     where r.business_id = p_business_id
-      and r.customer_id = p_customer_id
-      and r.status = 'RESERVED'
-      and r.expires_at > p_now
+      and r.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = p_business_id
+          and (
+            c.id = p_customer_id
+            or c.merged_into_customer_id = p_customer_id
+          )
+      )
+      and (
+        r.status = 'CLAIMED'
+        or (r.status = 'RESERVED' and r.expires_at > p_now)
+      )
       and (v_existing.id is null or r.id <> v_existing.id);
 
     if v_balance - v_reserved_points < p_loyalty_points then
@@ -435,8 +452,10 @@ begin
       into v_total_reserved
     from public.reward_reservations r
     where r.promotion_id = p_promotion_id
-      and r.status = 'RESERVED'
-      and r.expires_at > p_now
+      and (
+        r.status = 'CLAIMED'
+        or (r.status = 'RESERVED' and r.expires_at > p_now)
+      )
       and (v_existing.id is null or r.id <> v_existing.id);
 
     select count(*)
@@ -452,8 +471,10 @@ begin
             or c.merged_into_customer_id = p_customer_id
           )
       )
-      and r.status = 'RESERVED'
-      and r.expires_at > p_now
+      and (
+        r.status = 'CLAIMED'
+        or (r.status = 'RESERVED' and r.expires_at > p_now)
+      )
       and (v_existing.id is null or r.id <> v_existing.id);
 
     if v_promotion.total_usage_limit is not null
@@ -564,6 +585,7 @@ begin
       applied_reward_snapshot = v_snapshot,
       status = 'RESERVED',
       expires_at = v_expires_at,
+      claimed_at = null,
       consumed_order_id = null,
       consumed_at = null,
       released_at = null,
@@ -588,6 +610,102 @@ revoke all on function public.reserve_order_rewards_v1(
 ) from public, anon, authenticated;
 grant execute on function public.reserve_order_rewards_v1(
   uuid, uuid, uuid, text, uuid, bigint, text, bigint, uuid[], uuid[], timestamptz
+) to service_role;
+
+
+create or replace function public.claim_order_reward_reservation_v1(
+  p_reservation_id uuid,
+  p_business_id uuid,
+  p_shop_id uuid,
+  p_checkout_intent_id text,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $claim_order_reward_reservation$
+declare
+  v_reservation public.reward_reservations%rowtype;
+begin
+  if p_reservation_id is null
+     or p_business_id is null
+     or p_shop_id is null
+     or p_now is null
+     or btrim(coalesce(p_checkout_intent_id, '')) = '' then
+    return jsonb_build_object('ok', false, 'code', 'invalid_reward_claim');
+  end if;
+
+  select r.*
+    into v_reservation
+  from public.reward_reservations r
+  where r.id = p_reservation_id
+  for update;
+
+  if not found
+     or v_reservation.business_id <> p_business_id
+     or v_reservation.shop_id <> p_shop_id
+     or v_reservation.checkout_intent_id <> p_checkout_intent_id then
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_mismatch');
+  end if;
+
+  if v_reservation.status = 'CONSUMED' then
+    return jsonb_build_object(
+      'ok', true,
+      'replayed', true,
+      'reservationId', v_reservation.id,
+      'status', v_reservation.status,
+      'expiresAt', v_reservation.expires_at,
+      'snapshot', v_reservation.applied_reward_snapshot
+    );
+  end if;
+
+  if v_reservation.status = 'CLAIMED' then
+    return jsonb_build_object(
+      'ok', true,
+      'replayed', true,
+      'reservationId', v_reservation.id,
+      'status', v_reservation.status,
+      'expiresAt', v_reservation.expires_at,
+      'snapshot', v_reservation.applied_reward_snapshot
+    );
+  end if;
+
+  if v_reservation.status <> 'RESERVED' then
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_unavailable');
+  end if;
+
+  if v_reservation.expires_at <= p_now then
+    update public.reward_reservations
+    set status = 'EXPIRED', updated_at = p_now
+    where id = v_reservation.id;
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_expired');
+  end if;
+
+  update public.reward_reservations
+  set
+    status = 'CLAIMED',
+    claimed_at = p_now,
+    updated_at = p_now
+  where id = v_reservation.id
+  returning * into v_reservation;
+
+  return jsonb_build_object(
+    'ok', true,
+    'replayed', false,
+    'reservationId', v_reservation.id,
+    'status', v_reservation.status,
+    'expiresAt', v_reservation.expires_at,
+    'snapshot', v_reservation.applied_reward_snapshot
+  );
+end;
+$claim_order_reward_reservation$;
+
+revoke all on function public.claim_order_reward_reservation_v1(
+  uuid, uuid, uuid, text, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.claim_order_reward_reservation_v1(
+  uuid, uuid, uuid, text, timestamptz
 ) to service_role;
 
 create or replace function public.reserve_operations_order_rewards_v1(
@@ -802,6 +920,68 @@ revoke all on function public.reserve_operations_order_rewards_v1(
 ) from public, anon, authenticated;
 grant execute on function public.reserve_operations_order_rewards_v1(
   uuid, uuid, uuid, text, text, uuid, bigint, text, jsonb, timestamptz
+) to service_role;
+
+
+create or replace function public.claim_operations_order_reward_reservation_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_shop_id uuid,
+  p_reservation_id uuid,
+  p_checkout_intent_id text,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $claim_operations_order_reward$
+declare
+  v_business_id uuid;
+begin
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = p_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  select r.business_id
+    into v_business_id
+  from public.reward_reservations r
+  where r.id = p_reservation_id
+    and r.shop_id = p_shop_id
+  limit 1;
+
+  if v_business_id is null then
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_mismatch');
+  end if;
+
+  return public.claim_order_reward_reservation_v1(
+    p_reservation_id,
+    v_business_id,
+    p_shop_id,
+    p_checkout_intent_id,
+    p_now
+  );
+end;
+$claim_operations_order_reward$;
+
+revoke all on function public.claim_operations_order_reward_reservation_v1(
+  uuid, uuid, uuid, uuid, text, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.claim_operations_order_reward_reservation_v1(
+  uuid, uuid, uuid, uuid, text, timestamptz
 ) to service_role;
 
 create or replace function public.release_operations_order_reward_reservation_v1(
@@ -1036,10 +1216,10 @@ begin
     end if;
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_consumed');
   end if;
-  if v_reservation.status <> 'RESERVED' then
+  if v_reservation.status not in ('RESERVED', 'CLAIMED') then
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_unavailable');
   end if;
-  if v_reservation.expires_at <= p_now then
+  if v_reservation.status = 'RESERVED' and v_reservation.expires_at <= p_now then
     update public.reward_reservations
     set status = 'EXPIRED', updated_at = p_now
     where id = v_reservation.id;
@@ -1196,7 +1376,7 @@ begin
   v_result := public.consume_order_reward_reservation_v1(
     new.reward_reservation_id,
     new.id,
-    coalesce(new.updated_at, new.created_at, now())
+    now()
   );
 
   if coalesce((v_result ->> 'ok')::boolean, false) is not true then
