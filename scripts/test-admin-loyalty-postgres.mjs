@@ -255,17 +255,48 @@ const ordinaryEarn = JSON.parse(
       '-At',
       '-c',
       `select jsonb_build_object(
-        'points', coalesce(sum(points_delta), 0),
-        'earnCount', count(*) filter (where event_type = 'EARN'),
+        'points', coalesce(sum(l.points_delta), 0),
+        'earnCount', count(*) filter (where l.event_type = 'EARN'),
         'entryKeys', coalesce(
-          jsonb_agg(entry_key order by created_at, id) filter (where event_type = 'EARN'),
+          jsonb_agg(l.entry_key order by l.created_at, l.id) filter (where l.event_type = 'EARN'),
           '[]'::jsonb
+        ),
+        'contactCustomerId', (
+          select canonical_customer_id
+          from public.customer_contacts
+          where id = '${ORDINARY_EARN_CONTACT_ID}'::uuid
+        ),
+        'phoneCustomerId', (
+          select coalesce(merged_into_customer_id, id)
+          from public.business_customers
+          where business_id = '${BUSINESS_ID}'::uuid
+            and normalized_phone = '+201000000007'
+        ),
+        'programEnabled', (
+          select enabled from public.loyalty_programs
+          where business_id = '${BUSINESS_ID}'::uuid
+        ),
+        'earnRate', (
+          select earn_points_per_100_minor from public.loyalty_programs
+          where business_id = '${BUSINESS_ID}'::uuid
+        ),
+        'programShopMatch', (
+          select cardinality(shop_ids) = 0 or '${SHOP_ID}'::uuid = any(shop_ids)
+          from public.loyalty_programs
+          where business_id = '${BUSINESS_ID}'::uuid
+        ),
+        'triggerCount', (
+          select count(*)
+          from pg_trigger
+          where tgrelid = 'public.orders'::regclass
+            and tgname = 'orders_post_loyalty_earn'
+            and not tgisinternal
         )
       )::text
-      from public.loyalty_ledger
-      where business_id = '${BUSINESS_ID}'::uuid
-        and customer_id = '${ORDINARY_EARN_CUSTOMER_ID}'::uuid
-        and order_id = '${ORDINARY_EARN_ORDER_ID}'::uuid`,
+      from public.loyalty_ledger l
+      where l.business_id = '${BUSINESS_ID}'::uuid
+        and l.customer_id = '${ORDINARY_EARN_CUSTOMER_ID}'::uuid
+        and l.order_id = '${ORDINARY_EARN_ORDER_ID}'::uuid`,
     ],
     'Ordinary loyalty earn readback',
   ).trim(),
