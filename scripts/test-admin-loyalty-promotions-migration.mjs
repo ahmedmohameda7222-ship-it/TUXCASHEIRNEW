@@ -21,6 +21,10 @@ const requiredPatterns = [
   [/checkout_intent/i, 'stable checkout/order-intent idempotency key'],
   [/expires_at/i, 'bounded reservation expiry'],
   [/create or replace function public\.reserve_order_rewards_v1/i, 'atomic reward reservation RPC'],
+  [
+    /perform\s+private\.expire_customer_loyalty_points_for_customer_v1\(/i,
+    'reservation-time loyalty expiry materialization',
+  ],
   [/create or replace function public\.consume_order_reward_reservation_v1/i, 'single-consumption finalization RPC'],
   [/create or replace function public\.release_order_reward_reservation_v1/i, 'safe reservation release RPC'],
   [/for update/i, 'canonical reward-state row locking'],
