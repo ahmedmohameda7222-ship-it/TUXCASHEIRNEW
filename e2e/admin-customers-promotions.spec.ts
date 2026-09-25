@@ -221,53 +221,54 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Stacking policy')).toBeVisible();
 });
 
-test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
-  page,
-}) => {
-  await page.goto('/customers');
+test(
+  'hydrates canonical loyalty values and preserves hidden multi-shop scopes on save',
+  async ({ page }) => {
+    await page.goto('/customers');
 
-  await expect(page.getByLabel('Enabled')).not.toBeChecked();
-  await expect(page.getByLabel('Earn points per 1 EGP')).toHaveValue('3');
-  await expect(page.getByLabel('Redemption minor per point')).toHaveValue('17');
-  await expect(page.getByLabel('Minimum redemption points')).toHaveValue('75');
-  await expect(page.getByLabel('Point expiry days')).toHaveValue('180');
+    await expect(page.getByLabel('Enabled')).not.toBeChecked();
+    await expect(page.getByLabel('Earn points per 1 EGP')).toHaveValue('3');
+    await expect(page.getByLabel('Redemption minor per point')).toHaveValue('17');
+    await expect(page.getByLabel('Minimum redemption points')).toHaveValue('75');
+    await expect(page.getByLabel('Point expiry days')).toHaveValue('180');
 
-  await page.getByLabel('Minimum redemption points').fill('80');
-  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+    await page.getByLabel('Minimum redemption points').fill('80');
+    await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
-  await expect
-    .poll(() => postedCommands.some((command) => command.type === 'loyalty.program.upsert'))
-    .toBe(true);
-  const loyaltyCommand = postedCommands.find(
-    (command) => command.type === 'loyalty.program.upsert',
-  );
-  expect(loyaltyCommand).toMatchObject({
-    type: 'loyalty.program.upsert',
-    shopId,
-    enabled: false,
-    earnPointsPer100Minor: 3,
-    redemptionMinorPerPoint: 17,
-    minimumRedemptionPoints: 80,
-    pointExpiryDays: 180,
-    shopIds: [shopId, otherShopId],
-    expectedVersion: 3,
-  });
-
-  await page.getByRole('button', { name: /Lunch 10%/ }).click();
-  await page.getByLabel('Name').fill('Lunch scoped edit');
-  await page.getByRole('button', { name: 'Save promotion' }).click();
-
-  await expect
-    .poll(() => postedCommands.some((command) => command.type === 'promotion.upsert'))
-    .toBe(true);
-  const promotionCommand = postedCommands.find(
-    (command) => command.type === 'promotion.upsert',
-  );
-  expect(promotionCommand).toMatchObject({
-    type: 'promotion.upsert',
-    promotion: {
-      name: 'Lunch scoped edit',
+    await expect
+      .poll(() => postedCommands.some((command) => command.type === 'loyalty.program.upsert'))
+      .toBe(true);
+    const loyaltyCommand = postedCommands.find(
+      (command) => command.type === 'loyalty.program.upsert',
+    );
+    expect(loyaltyCommand).toMatchObject({
+      type: 'loyalty.program.upsert',
+      shopId,
+      enabled: false,
+      earnPointsPer100Minor: 3,
+      redemptionMinorPerPoint: 17,
+      minimumRedemptionPoints: 80,
+      pointExpiryDays: 180,
       shopIds: [shopId, otherShopId],
-    },
-  });
-});
+      expectedVersion: 3,
+    });
+
+    await page.getByRole('button', { name: /Lunch 10%/ }).click();
+    await page.getByLabel('Name').fill('Lunch scoped edit');
+    await page.getByRole('button', { name: 'Save promotion' }).click();
+
+    await expect
+      .poll(() => postedCommands.some((command) => command.type === 'promotion.upsert'))
+      .toBe(true);
+    const promotionCommand = postedCommands.find(
+      (command) => command.type === 'promotion.upsert',
+    );
+      expect(promotionCommand).toMatchObject({
+        type: 'promotion.upsert',
+        promotion: {
+          name: 'Lunch scoped edit',
+          shopIds: [shopId, otherShopId],
+        },
+      });
+  },
+);
