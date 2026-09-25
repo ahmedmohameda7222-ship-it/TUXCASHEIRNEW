@@ -236,7 +236,9 @@ test(
     await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
     await expect
-      .poll(() => postedCommands.some((command) => command.type === 'loyalty.program.upsert'))
+      .poll(() =>
+        postedCommands.some((command) => command.type === 'loyalty.program.upsert'),
+      )
       .toBe(true);
     const loyaltyCommand = postedCommands.find(
       (command) => command.type === 'loyalty.program.upsert',
@@ -258,7 +260,9 @@ test(
     await page.getByRole('button', { name: 'Save promotion' }).click();
 
     await expect
-      .poll(() => postedCommands.some((command) => command.type === 'promotion.upsert'))
+      .poll(() =>
+        postedCommands.some((command) => command.type === 'promotion.upsert'),
+      )
       .toBe(true);
     const promotionCommand = postedCommands.find(
       (command) => command.type === 'promotion.upsert',

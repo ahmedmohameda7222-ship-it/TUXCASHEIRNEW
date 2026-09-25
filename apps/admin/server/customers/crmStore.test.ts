@@ -156,7 +156,9 @@ describe('CRM store canonical customer lineage', () => {
       if (name === 'get_admin_customer_loyalty_balance_v1') return 0;
       throw new Error(`unexpected_rpc:${name}`);
     });
-    const store = createCrmStore({ select, rpc } as unknown as AdminSupabaseClient);
+    const store = createCrmStore(
+      { select, rpc } as unknown as AdminSupabaseClient,
+    );
 
     const facts = await store.listCustomerFacts({
       businessId,
