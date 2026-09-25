@@ -105,11 +105,10 @@ describe('CRM store canonical customer lineage', () => {
   });
 
   it('pages all shop links before applying an exact customer search', async () => {
-    const linkedIds = Array.from(
-      { length: 101 },
-      (_, index) =>
-        `31000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
-    );
+    const linkedIds = Array.from({ length: 101 }, (_, index) => {
+      const suffix = String(index + 1).padStart(12, '0');
+      return `31000000-0000-4000-8000-${suffix}`;
+    });
     const targetId = linkedIds[100]!;
     const links = linkedIds.map((canonicalCustomerId) => ({
       shop_id: shopId,
@@ -170,6 +169,9 @@ describe('CRM store canonical customer lineage', () => {
       ([table, query]) =>
         table === 'customer_shop_links' && !query.get('canonical_customer_id'),
     );
-    expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual(['0', '100']);
+    expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual([
+      '0',
+      '100',
+    ]);
   });
 });
