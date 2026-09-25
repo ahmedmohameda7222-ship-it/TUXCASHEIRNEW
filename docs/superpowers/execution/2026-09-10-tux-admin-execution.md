@@ -614,3 +614,19 @@ Exact pre-ledger hardened HEAD `49b435283ac5427d0af02be561c256ae82bd2478` passed
 
 This ledger commit changes the exact PR head again. Plan 5 must therefore obtain fresh ledger-inclusive permanent CI and a fresh exact-head Codex review with no valid unresolved serious finding before the branch can be declared technically ready for final review/squash merge. No merge, Supabase production migration, or production deployment is authorized by this checkpoint.
 
+## Plan 5 final review follow-up — delivery dispatch, return valuation, and order action parity — 2026-09-25
+
+The fresh Codex review of commit `83c9eb2246` identified three actionable Plan 5 findings. All three were reproduced with focused RED coverage and fixed without expanding approved Plan 5 scope:
+
+- Delivery dispatch now includes newly placed canonical DELIVERY orders even before a durable `delivery_order_states` row exists. The Admin delivery workspace synthesizes the exact initial dispatch state `UNASSIGNED` (version 1, no rider) only for eligible ACTIVE/DONE delivery orders lacking durable state, so they can enter the rider workflow without inventing parallel order history.
+- Returned-item financial amounts now include immutable paid modifier price × quantity snapshots in addition to the base item snapshot. This keeps return amounts and downstream loyalty/reward compensation aligned with the canonical amount originally paid for customized items.
+- Order-detail refund/return actions now match the trusted RPC status contract exactly: controls are exposed only for `DONE` and `RETURNED`, not `CANCELLED` orders that the backend will always reject.
+
+The three review threads were answered with exact-head evidence and resolved. Exact pre-ledger head `c0addaebfc57052cba4d9cf69477129bd03ffbed` is 245 commits ahead and 0 behind `main`, with merge base `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. At that head:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `35966685616` completed SUCCESS across all 19 permanent jobs, including order controls/approval PostgreSQL, Orders UI/E2E, canonical customers/merge, loyalty/promotions and reward concurrency/placement, CRM/promotions E2E, delivery static/service/PostgreSQL/checkout authority/E2E, and full regression.
+- Root `TUX V2 CI` run `35966685635` completed SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Vercel status checks for both `tuxcasheirnew` and `tux-menu` were SUCCESS.
+
+This ledger commit changes the exact PR head once more. The resulting ledger-inclusive head must pass the permanent workflow set and receive a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 is declared technically ready for final review/squash merge. No merge, Supabase production migration, or Vercel production deployment is authorized by this checkpoint.
+
