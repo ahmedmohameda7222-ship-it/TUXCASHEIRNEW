@@ -132,6 +132,8 @@ const REFUND_ORDER_ID = '7c000000-0000-4000-8000-000000000002';
 const RETURN_ORDER_ID = '7c000000-0000-4000-8000-000000000003';
 const REFUND_PAYMENT_ID = '7d000000-0000-4000-8000-000000000001';
 const RETURN_ITEM_ID = '7e000000-0000-4000-8000-000000000001';
+const RESERVED_ADJUSTMENT_CUSTOMER_ID = '79000000-0000-4000-8000-000000000004';
+const CLAIMED_EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000005';
 
 psql(
   [
@@ -364,6 +366,107 @@ const adjustmentConflict = rpc(
 );
 if (adjustmentConflict.ok !== false || adjustmentConflict.code !== 'command_id_conflict') {
   throw new Error(`changed loyalty adjustment payload should conflict: ${JSON.stringify(adjustmentConflict)}`);
+}
+
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${RESERVED_ADJUSTMENT_CUSTOMER_ID}',
+         '${BUSINESS_ID}',
+         '+201000000004',
+         'Reserved Adjustment Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${RESERVED_ADJUSTMENT_CUSTOMER_ID}');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${RESERVED_ADJUSTMENT_CUSTOMER_ID}',
+       'reserved-adjustment-credit', 'MANUAL_ADJUSTMENT',
+       100, 0, 'reserved-adjustment-credit', '2026-09-23T05:13:00Z'
+     );`,
+  ],
+  'Reserved loyalty adjustment fixture',
+);
+
+const adjustmentHoldReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${RESERVED_ADJUSTMENT_CUSTOMER_ID}'::uuid,
+    'reserved-adjustment-intent',
+    null,
+    100,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T05:14:00Z'::timestamptz
+  )`,
+  'Reserve loyalty before manual debit',
+);
+if (adjustmentHoldReservation.ok !== true || adjustmentHoldReservation.status !== 'RESERVED') {
+  throw new Error(
+    `failed to reserve loyalty before manual debit: ${JSON.stringify(adjustmentHoldReservation)}`,
+  );
+}
+
+const reservedDebit = rpc(
+  `public.adjust_admin_customer_loyalty_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${RESERVED_ADJUSTMENT_CUSTOMER_ID}'::uuid,
+    -1,
+    '${REASON_ID}'::uuid,
+    'Must not spend reserved points',
+    'loyalty-adjust-held-reserved',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Reject manual debit against reserved loyalty',
+);
+if (reservedDebit.ok !== false || reservedDebit.code !== 'loyalty_balance_insufficient') {
+  throw new Error(
+    `manual debit spent reserved loyalty points: ${JSON.stringify(reservedDebit)}`,
+  );
+}
+
+const adjustmentHoldClaim = rpc(
+  `public.claim_order_reward_reservation_v1(
+    '${adjustmentHoldReservation.reservationId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    'reserved-adjustment-intent',
+    '2026-09-23T05:15:00Z'::timestamptz
+  )`,
+  'Claim loyalty before manual debit',
+);
+if (adjustmentHoldClaim.ok !== true || adjustmentHoldClaim.status !== 'CLAIMED') {
+  throw new Error(
+    `failed to claim loyalty before manual debit: ${JSON.stringify(adjustmentHoldClaim)}`,
+  );
+}
+
+const claimedDebit = rpc(
+  `public.adjust_admin_customer_loyalty_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${RESERVED_ADJUSTMENT_CUSTOMER_ID}'::uuid,
+    -1,
+    '${REASON_ID}'::uuid,
+    'Must not spend claimed points',
+    'loyalty-adjust-held-claimed',
+    '${BUSINESS_ID}'::uuid
+  )`,
+  'Reject manual debit against claimed loyalty',
+);
+if (claimedDebit.ok !== false || claimedDebit.code !== 'loyalty_balance_insufficient') {
+  throw new Error(
+    `manual debit spent claimed loyalty points: ${JSON.stringify(claimedDebit)}`,
+  );
 }
 
 const promotion = rpc(
@@ -1082,6 +1185,113 @@ if (
   throw new Error(`expired points were not appended explicitly: ${JSON.stringify(expiryReadback)}`);
 }
 
+
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${CLAIMED_EXPIRY_CUSTOMER_ID}',
+         '${BUSINESS_ID}',
+         '+201000000005',
+         'Claimed Expiry Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${CLAIMED_EXPIRY_CUSTOMER_ID}');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, earn_expires_at, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${CLAIMED_EXPIRY_CUSTOMER_ID}',
+       'claimed-expiry-credit', 'EARN',
+       100, 0, '2026-09-23T07:10:00Z', 'claimed-expiry-credit',
+       '2026-09-23T06:59:00Z'
+     );`,
+  ],
+  'Claimed loyalty expiry fixture',
+);
+
+const claimedExpiryReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${CLAIMED_EXPIRY_CUSTOMER_ID}'::uuid,
+    'claimed-expiry-intent',
+    null,
+    100,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T07:00:00Z'::timestamptz
+  )`,
+  'Reserve expiring loyalty',
+);
+if (claimedExpiryReservation.ok !== true || claimedExpiryReservation.status !== 'RESERVED') {
+  throw new Error(
+    `failed to reserve expiring loyalty: ${JSON.stringify(claimedExpiryReservation)}`,
+  );
+}
+
+const claimedExpiryClaim = rpc(
+  `public.claim_order_reward_reservation_v1(
+    '${claimedExpiryReservation.reservationId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    'claimed-expiry-intent',
+    '2026-09-23T07:01:00Z'::timestamptz
+  )`,
+  'Claim expiring loyalty before local commit',
+);
+if (claimedExpiryClaim.ok !== true || claimedExpiryClaim.status !== 'CLAIMED') {
+  throw new Error(
+    `failed to claim expiring loyalty: ${JSON.stringify(claimedExpiryClaim)}`,
+  );
+}
+
+const claimedProtectedExpiry = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select private.expire_customer_loyalty_points_for_customer_v1(
+        '${BUSINESS_ID}'::uuid,
+        '${CLAIMED_EXPIRY_CUSTOMER_ID}'::uuid,
+        '2026-09-23T07:20:00Z'::timestamptz
+      )`,
+    ],
+    'Protect claimed loyalty from point expiry',
+  ).trim(),
+);
+const claimedProtectedReadback = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+        'balance', coalesce(sum(points_delta), 0),
+        'expiryCount', count(*) filter (where event_type = 'EXPIRY')
+      )::text
+      from public.loyalty_ledger
+      where business_id = '${BUSINESS_ID}'::uuid
+        and customer_id = '${CLAIMED_EXPIRY_CUSTOMER_ID}'::uuid`,
+    ],
+    'Claimed loyalty expiry readback',
+  ).trim(),
+);
+if (
+  claimedProtectedExpiry !== 0 ||
+  Number(claimedProtectedReadback.balance) !== 100 ||
+  Number(claimedProtectedReadback.expiryCount) !== 0
+) {
+  throw new Error(
+    `claimed loyalty was expired before delayed sync: ${JSON.stringify({
+      claimedProtectedExpiry,
+      claimedProtectedReadback,
+    })}`,
+  );
+}
 
 const MERGED_PROMO_CUSTOMER_ID = '79000000-0000-4000-8000-000000000099';
 psql(
