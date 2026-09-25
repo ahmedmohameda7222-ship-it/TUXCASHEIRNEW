@@ -630,3 +630,20 @@ The three review threads were answered with exact-head evidence and resolved. Ex
 
 This ledger commit changes the exact PR head once more. The resulting ledger-inclusive head must pass the permanent workflow set and receive a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 is declared technically ready for final review/squash merge. No merge, Supabase production migration, or Vercel production deployment is authorized by this checkpoint.
 
+## Plan 5 final review follow-up — loyalty reservation capacity, CRM scope/search, and formatter reconciliation — 2026-09-25
+
+The Codex review of ledger checkpoint `69c0a75d78e5e3c5ebfc37d54187b1877eb5b8a4` identified six additional Plan 5 hardening findings. All six were reproduced or covered with focused regression evidence and fixed within approved Plan 5 scope:
+
+- Loyalty expiry now protects both durable `CLAIMED` reward reservations and still-live `RESERVED` reservations, so points already committed to a checkout cannot expire before delayed materialization consumes the reservation.
+- Negative Admin loyalty adjustments now subtract active reserved/claimed loyalty capacity from spendable balance before permitting the debit, preventing the same points from being spent by an adjustment and an order.
+- The Admin loyalty editor hydrates its draft from the canonical fetched program instead of hard-coded defaults, preserving enabled state, earn/redemption rates, minimum redemption, and expiry when an unrelated field is changed.
+- Loyalty program saves preserve the existing canonical multi-shop `shop_ids` scope when the UI does not expose scope editing.
+- Promotion edits preserve the existing canonical multi-shop scope instead of replacing it with only the currently selected shop.
+- CRM customer search now pages all `customer_shop_links` before applying exact name/phone filtering, so customers outside the first PostgREST page remain reachable.
+
+Focused RED coverage landed in `7045928cf90594e53f1c7272b4f147b2815c0b26`, `e97aaf7f6901759cc0ea74b0a95ae8c8413a81ba`, and `05342af7f79a1d0c8722aa45ed4908bfa83648de`. The corresponding production fixes landed in `607cdc08dd113571570ddf189e93b3e68281910f`, `0186cdebba3db56a7324dfe1656a4ffbcceb9319`, `55c2753a09383135eb67ff5f6608c5bbb56b6c1a`, and `6ba41b0b40ef1fabccf7d4860f83be3ff7dc7f5c`, with subsequent test/format normalization commits preserving the same behavior. All six Codex threads were answered with regression evidence and resolved.
+
+Root CI later exposed formatting-only drift in `apps/admin/server/customers/crmStore.test.ts` and `e2e/admin-customers-promotions.spec.ts`. A temporary non-pushing diagnostic change to the existing root workflow at `b854fed6034675a47f96ab27aa0edbca2cd7d701` ran repository Prettier 3.9.6 against only those files and printed the exact formatter diff. The exact generated blobs were committed in `da7353de4fadbc4355f05207e637bbe461299bdf` and `ea8fd78d058d599058ab0ebe79cf2c5383e52824`; the diagnostic workflow instrumentation was then fully removed in `7b56bfd787425a65737460bb677829d194122479`. No self-mutating formatter workflow remains in the Plan 5 product diff.
+
+This ledger update intentionally precedes the final ledger-inclusive gate. The resulting exact HEAD must still pass root `TUX V2 CI` including `format:check`, `lint`, tests, typecheck, migration and rendered-browser gates; the permanent Plan 5 workflow; all required compatibility workflows; and a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 can be declared technically ready for final review/squash merge. No merge, production Supabase migration, or Vercel/Supabase production deployment is authorized by this checkpoint.
+
