@@ -263,12 +263,12 @@ test(
     const promotionCommand = postedCommands.find(
       (command) => command.type === 'promotion.upsert',
     );
-      expect(promotionCommand).toMatchObject({
-        type: 'promotion.upsert',
-        promotion: {
-          name: 'Lunch scoped edit',
-          shopIds: [shopId, otherShopId],
-        },
-      });
+    expect(promotionCommand).toMatchObject({
+      type: 'promotion.upsert',
+      promotion: {
+        name: 'Lunch scoped edit',
+        shopIds: [shopId, otherShopId],
+      },
+    });
   },
 );
