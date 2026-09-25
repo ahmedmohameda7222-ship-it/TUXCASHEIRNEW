@@ -123,7 +123,9 @@ describe('CRM store canonical customer lineage', () => {
           return [links[100]];
         }
         const offset = Number(query.get('offset') ?? '0');
-        return offset === 0 ? links.slice(0, 100) : offset === 100 ? links.slice(100) : [];
+        if (offset === 0) return links.slice(0, 100);
+        if (offset === 100) return links.slice(100);
+        return [];
       }
       if (table === 'business_customers') {
         if (query.get('select') === 'id') {
@@ -141,7 +143,11 @@ describe('CRM store canonical customer lineage', () => {
             ]
           : [];
       }
-      if (table === 'customer_addresses' || table === 'loyalty_ledger' || table === 'orders') {
+      if (
+        table === 'customer_addresses' ||
+        table === 'loyalty_ledger' ||
+        table === 'orders'
+      ) {
         return [];
       }
       if (table === 'shops') return [{ id: shopId, name: 'Maadi' }];
@@ -161,9 +167,9 @@ describe('CRM store canonical customer lineage', () => {
 
     expect(facts.map((customer) => customer.id)).toEqual([targetId]);
     const listLinkCalls = select.mock.calls.filter(
-      ([table, query]) => table === 'customer_shop_links' && !query.get('canonical_customer_id'),
+      ([table, query]) =>
+        table === 'customer_shop_links' && !query.get('canonical_customer_id'),
     );
     expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual(['0', '100']);
   });
-
 });
