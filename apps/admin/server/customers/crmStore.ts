@@ -12,6 +12,7 @@ type CustomerRow = {
   id: string;
   normalized_phone: string;
   display_name: string | null;
+  updated_at?: string;
 };
 
 type LinkRow = {
@@ -284,37 +285,93 @@ function promotionFor(row: PromotionRow): AdminPromotion {
   };
 }
 
+const CUSTOMER_LINK_PAGE_SIZE = 100;
+const CUSTOMER_SEARCH_BATCH_SIZE = 100;
+const CUSTOMER_SEARCH_RESULT_LIMIT = 100;
+
+async function loadAllCustomerShopLinks(
+  client: AdminSupabaseClient,
+  businessId: string,
+  shopId: string,
+): Promise<LinkRow[]> {
+  const links: LinkRow[] = [];
+  let offset = 0;
+
+  for (;;) {
+    const page = await client.select<LinkRow[]>(
+      'customer_shop_links',
+      new URLSearchParams({
+        select: 'shop_id,canonical_customer_id,legacy_customer_contact_id',
+        business_id: `eq.${businessId}`,
+        shop_id: `eq.${shopId}`,
+        order: 'created_at.desc,id.desc',
+        limit: String(CUSTOMER_LINK_PAGE_SIZE),
+        offset: String(offset),
+      }),
+    );
+    links.push(...page);
+    if (page.length < CUSTOMER_LINK_PAGE_SIZE) break;
+    offset += page.length;
+  }
+
+  return links;
+}
+
+async function loadCustomerSearchMatches(
+  client: AdminSupabaseClient,
+  businessId: string,
+  customerIds: readonly string[],
+  term: string,
+): Promise<CustomerRow[]> {
+  const batches: string[][] = [];
+  for (let index = 0; index < customerIds.length; index += CUSTOMER_SEARCH_BATCH_SIZE) {
+    batches.push(customerIds.slice(index, index + CUSTOMER_SEARCH_BATCH_SIZE));
+  }
+
+  const pages = await Promise.all(
+    batches.map((ids) => {
+      const query = new URLSearchParams({
+        select: 'id,normalized_phone,display_name,updated_at',
+        business_id: `eq.${businessId}`,
+        id: inFilter(ids),
+        merged_into_customer_id: 'is.null',
+        order: 'updated_at.desc,id.desc',
+        limit: String(CUSTOMER_SEARCH_BATCH_SIZE),
+      });
+      if (term) {
+        query.set('or', `(display_name.ilike.*${term}*,normalized_phone.ilike.*${term}*)`);
+      }
+      return client.select<CustomerRow[]>('business_customers', query);
+    }),
+  );
+
+  return pages
+    .flat()
+    .sort(
+      (left, right) =>
+        (right.updated_at ?? '').localeCompare(left.updated_at ?? '') ||
+        right.id.localeCompare(left.id),
+    )
+    .slice(0, CUSTOMER_SEARCH_RESULT_LIMIT);
+}
+
 export function createCrmStore(client: AdminSupabaseClient): CrmStore {
   return {
     async listCustomerFacts(input) {
-      const links = await client.select<LinkRow[]>(
-        'customer_shop_links',
-        new URLSearchParams({
-          select: 'shop_id,canonical_customer_id,legacy_customer_contact_id',
-          business_id: `eq.${input.businessId}`,
-          shop_id: `eq.${input.shopId}`,
-          order: 'created_at.desc,id.desc',
-          limit: '100',
-        }),
-      );
+      const links = await loadAllCustomerShopLinks(client, input.businessId, input.shopId);
       const customerIds = [...new Set(links.map((link) => link.canonical_customer_id))];
       if (customerIds.length === 0) return [];
 
-      const query = new URLSearchParams({
-        select: 'id,normalized_phone,display_name',
-        business_id: `eq.${input.businessId}`,
-        id: inFilter(customerIds),
-        merged_into_customer_id: 'is.null',
-        order: 'updated_at.desc,id.desc',
-      });
       const term = input.query
         .trim()
         .slice(0, 80)
         .replace(/[,*().%]/g, '');
-      if (term) {
-        query.set('or', `(display_name.ilike.*${term}*,normalized_phone.ilike.*${term}*)`);
-      }
-      const customers = await client.select<CustomerRow[]>('business_customers', query);
+      const customers = await loadCustomerSearchMatches(
+        client,
+        input.businessId,
+        customerIds,
+        term,
+      );
       return Promise.all(
         customers.map((customer) => hydrateCustomerFacts(client, input.businessId, customer)),
       );
