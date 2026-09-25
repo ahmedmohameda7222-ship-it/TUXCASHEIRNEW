@@ -332,7 +332,7 @@ function canonicalCatalogForRevision(catalog: OnlineOrderCatalogAuthority): unkn
 }
 
 function validateCatalogTenant(catalog: OnlineOrderCatalogAuthority, shopId: string): void {
-  if (catalog.shop.id !== shopId || !catalog.shop.active) throw new Error('catalog shop mismatch');
+  if (catalog.shop.id !== shopId) throw new Error('catalog shop mismatch');
   if (catalog.categories.some((category) => category.shopId !== shopId)) {
     throw new Error('cross-shop category authority');
   }
