@@ -32,7 +32,9 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(request.url());
     if (request.method() === 'POST') {
       expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
-      const command = request.postDataJSON() as Record<string, unknown> & { type: string };
+      const command = request.postDataJSON() as Record<string, unknown> & {
+        type: string;
+      };
       postedCommands.push(command);
       await route.fulfill({
         status: 200,
@@ -219,7 +221,6 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Stacking policy')).toBeVisible();
 });
 
-
 test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
   page,
 }) => {
@@ -261,14 +262,12 @@ test('hydrates canonical loyalty values and preserves hidden multi-shop scopes o
     .toBe(true);
   const promotionCommand = postedCommands.find(
     (command) => command.type === 'promotion.upsert',
-  ) as
-    | (Record<string, unknown> & {
-        type: string;
-        promotion?: { shopIds?: string[]; name?: string };
-      })
-    | undefined;
-  expect(promotionCommand?.promotion).toMatchObject({
-    name: 'Lunch scoped edit',
-    shopIds: [shopId, otherShopId],
+  );
+  expect(promotionCommand).toMatchObject({
+    type: 'promotion.upsert',
+    promotion: {
+      name: 'Lunch scoped edit',
+      shopIds: [shopId, otherShopId],
+    },
   });
 });
