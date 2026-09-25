@@ -253,43 +253,74 @@ async function loadShop(client: AdminSupabaseClient, shopId: string): Promise<Sh
   return rows[0];
 }
 
+async function selectAllPages<Row>(
+  client: AdminSupabaseClient,
+  table: string,
+  baseQuery: URLSearchParams,
+  pageSize = 500,
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const query = new URLSearchParams(baseQuery);
+    query.set('limit', String(pageSize));
+    query.set('offset', String(offset));
+    const page = await client.select<Row[]>(table, query);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 export function createDeliveryStore(client: AdminSupabaseClient): DeliveryStore {
   return {
     async loadWorkspace(input): Promise<AdminDeliveryWorkspace> {
-      const [zones, riderRows, orderRows, canonicalOrderRows] = await Promise.all([
-        loadZones(client, input.shopId),
-        client.select<RiderRow[]>(
-          'delivery_riders',
-          new URLSearchParams({
-            select: 'id,shop_id,display_name,phone,active,state,version',
-            business_id: `eq.${input.businessId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'display_name.asc,id.asc',
-          }),
-        ),
-        client.select<DeliveryOrderRow[]>(
-          'delivery_order_states',
-          new URLSearchParams({
-            select: 'order_id,shop_id,rider_id,state,version,updated_at',
-            business_id: `eq.${input.businessId}`,
-            shop_id: `eq.${input.shopId}`,
-            order: 'updated_at.desc,order_id.desc',
-            limit: '500',
-          }),
-        ),
-        client.select<CanonicalDeliveryOrderRow[]>(
-          'orders',
-          new URLSearchParams({
-            select: 'id,shop_id,updated_at',
-            shop_id: `eq.${input.shopId}`,
-            order_type_behavior_snapshot: 'eq.DELIVERY',
-            status: 'in.(ACTIVE,DONE)',
-            order: 'updated_at.desc,id.desc',
-            limit: '500',
-          }),
-        ),
-      ]);
+      const [zones, riderRows, actionableOrderRows, terminalOrderRows, canonicalOrderRows] =
+        await Promise.all([
+          loadZones(client, input.shopId),
+          client.select<RiderRow[]>(
+            'delivery_riders',
+            new URLSearchParams({
+              select: 'id,shop_id,display_name,phone,active,state,version',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              order: 'display_name.asc,id.asc',
+            }),
+          ),
+          selectAllPages<DeliveryOrderRow>(
+            client,
+            'delivery_order_states',
+            new URLSearchParams({
+              select: 'order_id,shop_id,rider_id,state,version,updated_at',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              state: 'in.(UNASSIGNED,ASSIGNED,OUT_FOR_DELIVERY)',
+              order: 'updated_at.desc,order_id.desc',
+            }),
+          ),
+          client.select<DeliveryOrderRow[]>(
+            'delivery_order_states',
+            new URLSearchParams({
+              select: 'order_id,shop_id,rider_id,state,version,updated_at',
+              business_id: `eq.${input.businessId}`,
+              shop_id: `eq.${input.shopId}`,
+              state: 'in.(DELIVERED,FAILED,RETURNED)',
+              order: 'updated_at.desc,order_id.desc',
+              limit: '500',
+            }),
+          ),
+          selectAllPages<CanonicalDeliveryOrderRow>(
+            client,
+            'orders',
+            new URLSearchParams({
+              select: 'id,shop_id,updated_at',
+              shop_id: `eq.${input.shopId}`,
+              order_type_behavior_snapshot: 'eq.DELIVERY',
+              status: 'in.(ACTIVE,DONE)',
+              order: 'updated_at.desc,id.desc',
+            }),
+          ),
+        ]);
 
+      const orderRows = [...actionableOrderRows, ...terminalOrderRows];
       const orders: AdminDeliveryOrder[] = orderRows.map((row) => ({
         orderId: row.order_id,
         shopId: row.shop_id,
