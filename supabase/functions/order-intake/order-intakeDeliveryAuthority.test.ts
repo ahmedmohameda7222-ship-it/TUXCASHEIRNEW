@@ -12,16 +12,21 @@ import {
 const SHOP_ID = '11111111-1111-4111-8111-111111111191';
 const CATEGORY_ID = '22222222-2222-4222-8222-222222222191';
 const PRODUCT_ID = '33333333-3333-4333-8333-333333333191';
+const FALLBACK_CATEGORY_ID = '22222222-2222-4222-8222-222222222192';
+const FALLBACK_PRODUCT_ID = '33333333-3333-4333-8333-333333333192';
 const CASH_METHOD_ID = '44444444-4444-4444-8444-444444444191';
 const FALLBACK_SHOP_ID = '11111111-1111-4111-8111-111111111192';
 const IDEMPOTENCY_KEY = '55555555-5555-4555-8555-555555555191';
 
 function catalog(shopId = SHOP_ID): OnlineOrderCatalogAuthority {
+  const fallback = shopId === FALLBACK_SHOP_ID;
+  const categoryId = fallback ? FALLBACK_CATEGORY_ID : CATEGORY_ID;
+  const productId = fallback ? FALLBACK_PRODUCT_ID : PRODUCT_ID;
   return {
     shop: { id: shopId, active: true },
-    categories: [{ id: CATEGORY_ID, shopId, active: true }],
+    categories: [{ id: categoryId, shopId, active: true }],
     products: [{
-      id: PRODUCT_ID, shopId, categoryId: CATEGORY_ID, name: 'Delivery Burger',
+      id: productId, shopId, categoryId, name: 'Delivery Burger',
       priceMinor: 19_000, active: true, soldOut: false, isCombo: false,
     }],
     modifiers: [], productModifierLinks: [], comboBeverageOptions: [],
@@ -46,12 +51,17 @@ class MemoryStore implements OnlineOrderIntakeStore {
   readonly inserted: OnlineOrderPendingInsert[] = [];
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly resolveDeliveryRoute = vi.fn();
+  primaryTemporarilyClosed = false;
 
   async loadCatalog(shopId: string) {
     return shopId === SHOP_ID || shopId === FALLBACK_SHOP_ID ? catalog(shopId) : null;
   }
   async loadPublishedCheckoutAuthority(shopId: string) {
-    return shopId === SHOP_ID || shopId === FALLBACK_SHOP_ID ? authority(shopId) : null;
+    if (shopId !== SHOP_ID && shopId !== FALLBACK_SHOP_ID) return null;
+    return {
+      ...authority(shopId),
+      temporaryClosed: shopId === SHOP_ID ? this.primaryTemporarilyClosed : false,
+    };
   }
   async findByIdempotency(shopId: string, idempotencyKey: string) {
     return this.rows.get(`${shopId}:${idempotencyKey}`) ?? null;
@@ -122,6 +132,30 @@ describe('order-intake trusted delivery routing authority', () => {
     expect(store.inserted[0]).toMatchObject({
       shopId: SHOP_ID, deliveryZoneId: '66666666-6666-4666-8666-666666666191',
       deliveryFeeMinor: 3_000, deliveryMinimumOrderMinor: 15_000, deliveryFallbackUsed: false,
+    });
+  });
+
+  it('routes an explicitly configured delivery fallback before rejecting a closed primary shop', async () => {
+    const store = new MemoryStore();
+    store.primaryTemporarilyClosed = true;
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: FALLBACK_SHOP_ID,
+      zoneId: '66666666-6666-4666-8666-666666666193',
+      zoneName: 'Closed-primary fallback',
+      feeMinor: 3_500,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: true,
+    });
+
+    const response = await handleOrderIntakeRequest(request(true), store);
+
+    expect(response.status).toBe(202);
+    expect(store.inserted).toHaveLength(1);
+    expect(store.inserted[0]).toMatchObject({
+      requestedShopId: SHOP_ID,
+      shopId: FALLBACK_SHOP_ID,
+      deliveryFallbackUsed: true,
     });
   });
 

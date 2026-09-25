@@ -136,6 +136,96 @@ describe('Plan 5 delivery authority', () => {
       ],
     });
   });
+
+  it('keeps actionable delivery state visible beyond recent terminal history', async () => {
+    const actionableOrderId = '88000000-0000-4000-8000-000000000098';
+    const terminalRows = Array.from({ length: 500 }, (_, index) => ({
+      order_id: `87000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      shop_id: shopId,
+      rider_id: null,
+      state: 'DELIVERED' as const,
+      version: 2,
+      updated_at: `2026-09-24T${String(23 - (index % 20)).padStart(2, '0')}:00:00.000Z`,
+    }));
+    const actionableRow = {
+      order_id: actionableOrderId,
+      shop_id: shopId,
+      rider_id: null,
+      state: 'ASSIGNED' as const,
+      version: 3,
+      updated_at: '2026-09-20T06:00:00.000Z',
+    };
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'delivery_zones' || table === 'delivery_riders') return [];
+      if (table === 'delivery_order_states') {
+        if (query.get('state') === 'in.(UNASSIGNED,ASSIGNED,OUT_FOR_DELIVERY)') {
+          return Number(query.get('offset') ?? '0') === 0 ? [actionableRow] : [];
+        }
+        if (query.get('state') === 'in.(DELIVERED,FAILED,RETURNED)') return terminalRows;
+        return terminalRows;
+      }
+      if (table === 'orders') return [];
+      throw new Error(`unexpected table ${table}`);
+    });
+    const store = createDeliveryStore({ select } as unknown as AdminSupabaseClient);
+
+    const workspace = await store.loadWorkspace({
+      businessId: principal.businessId,
+      shopId,
+    });
+
+    expect(workspace.orders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ orderId: actionableOrderId, state: 'ASSIGNED' }),
+      ]),
+    );
+  });
+
+  it('pages canonical delivery orders so an older uninitialized order stays dispatchable', async () => {
+    const olderOrderId = '88000000-0000-4000-8000-000000000097';
+    const recentOrders = Array.from({ length: 500 }, (_, index) => ({
+      id: `86000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      shop_id: shopId,
+      updated_at: '2026-09-24T08:00:00.000Z',
+    }));
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (
+        table === 'delivery_zones' ||
+        table === 'delivery_riders' ||
+        table === 'delivery_order_states'
+      ) {
+        return [];
+      }
+      if (table === 'orders') {
+        const offset = Number(query.get('offset') ?? '0');
+        if (offset === 0) return recentOrders;
+        if (offset === 500) {
+          return [
+            {
+              id: olderOrderId,
+              shop_id: shopId,
+              updated_at: '2026-09-20T08:00:00.000Z',
+            },
+          ];
+        }
+        return [];
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+    const store = createDeliveryStore({ select } as unknown as AdminSupabaseClient);
+
+    const workspace = await store.loadWorkspace({
+      businessId: principal.businessId,
+      shopId,
+    });
+
+    expect(workspace.orders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ orderId: olderOrderId, state: 'UNASSIGNED' }),
+      ]),
+    );
+  });
+
   it('uses priority when delivery zones overlap', async () => {
     const service = createDeliveryService(
       storeWith({

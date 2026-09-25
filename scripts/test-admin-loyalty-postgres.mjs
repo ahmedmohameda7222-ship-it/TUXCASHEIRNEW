@@ -134,6 +134,8 @@ const REFUND_PAYMENT_ID = '7d000000-0000-4000-8000-000000000001';
 const RETURN_ITEM_ID = '7e000000-0000-4000-8000-000000000001';
 const RESERVED_ADJUSTMENT_CUSTOMER_ID = '79000000-0000-4000-8000-000000000004';
 const CLAIMED_EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000005';
+const MERGED_EXPIRY_SURVIVOR_ID = '79000000-0000-4000-8000-000000000006';
+const MERGED_EXPIRY_RETIRED_ID = '79000000-0000-4000-8000-000000000007';
 
 psql(
   [
@@ -1289,6 +1291,116 @@ if (
     `claimed loyalty was expired before delayed sync: ${JSON.stringify({
       claimedProtectedExpiry,
       claimedProtectedReadback,
+    })}`,
+  );
+}
+
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values
+         ('${MERGED_EXPIRY_SURVIVOR_ID}', '${BUSINESS_ID}', '+201000000006', 'Merged Expiry Survivor'),
+         ('${MERGED_EXPIRY_RETIRED_ID}', '${BUSINESS_ID}', '+201000000007', 'Merged Expiry Retired');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, earn_expires_at, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${MERGED_EXPIRY_RETIRED_ID}',
+       'merged-expiry-credit', 'EARN',
+       100, 0, '2026-09-23T07:10:00Z', 'merged-expiry-credit',
+       '2026-09-23T06:59:00Z'
+     );`,
+  ],
+  'Merged-customer loyalty expiry fixture',
+);
+
+const mergedExpiryReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${MERGED_EXPIRY_RETIRED_ID}'::uuid,
+    'merged-expiry-intent',
+    null,
+    100,
+    'POS',
+    10000,
+    array['${PRODUCT_ID}'::uuid],
+    array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T07:00:00Z'::timestamptz
+  )`,
+  'Reserve loyalty before customer merge',
+);
+if (mergedExpiryReservation.ok !== true) {
+  throw new Error(
+    `failed to reserve loyalty before merge: ${JSON.stringify(mergedExpiryReservation)}`,
+  );
+}
+const mergedExpiryClaim = rpc(
+  `public.claim_order_reward_reservation_v1(
+    '${mergedExpiryReservation.reservationId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    'merged-expiry-intent',
+    '2026-09-23T07:01:00Z'::timestamptz
+  )`,
+  'Claim loyalty before customer merge',
+);
+if (mergedExpiryClaim.ok !== true || mergedExpiryClaim.status !== 'CLAIMED') {
+  throw new Error(
+    `failed to claim loyalty before merge: ${JSON.stringify(mergedExpiryClaim)}`,
+  );
+}
+psql(
+  [
+    '-c',
+    `update public.business_customers
+       set merged_into_customer_id = '${MERGED_EXPIRY_SURVIVOR_ID}'::uuid
+       where id = '${MERGED_EXPIRY_RETIRED_ID}'::uuid;`,
+  ],
+  'Merge customer after reward claim',
+);
+
+const mergedExpiryProtected = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select private.expire_customer_loyalty_points_for_customer_v1(
+        '${BUSINESS_ID}'::uuid,
+        '${MERGED_EXPIRY_SURVIVOR_ID}'::uuid,
+        '2026-09-23T07:20:00Z'::timestamptz
+      )`,
+    ],
+    'Protect merged-identity reward capacity from point expiry',
+  ).trim(),
+);
+const mergedExpiryReadback = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_build_object(
+        'balance', coalesce(sum(l.points_delta), 0),
+        'expiryCount', count(*) filter (where l.event_type = 'EXPIRY')
+      )::text
+      from public.loyalty_ledger l
+      where l.business_id = '${BUSINESS_ID}'::uuid
+        and l.customer_id in ('${MERGED_EXPIRY_SURVIVOR_ID}'::uuid, '${MERGED_EXPIRY_RETIRED_ID}'::uuid)`,
+    ],
+    'Merged-identity loyalty expiry readback',
+  ).trim(),
+);
+if (
+  mergedExpiryProtected !== 0 ||
+  Number(mergedExpiryReadback.balance) !== 100 ||
+  Number(mergedExpiryReadback.expiryCount) !== 0
+) {
+  throw new Error(
+    `merged identity reservation did not protect expiring points: ${JSON.stringify({
+      mergedExpiryProtected,
+      mergedExpiryReadback,
     })}`,
   );
 }
