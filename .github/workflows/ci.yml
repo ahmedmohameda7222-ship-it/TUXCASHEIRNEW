@@ -60,7 +60,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Format check
-        run: npm run format:check
+        shell: bash
+        run: |
+          npx prettier --write apps/admin/server/customers/crmStore.test.ts e2e/admin-customers-promotions.spec.ts
+          git diff -- apps/admin/server/customers/crmStore.test.ts e2e/admin-customers-promotions.spec.ts
+          exit 1
       - name: Lint
         run: npm run lint
       - name: Unit and integration tests
