@@ -1695,7 +1695,10 @@ const loyaltyBlockedByClaim = rpc(
   )`,
   'Claimed loyalty blocks contender',
 );
-if (loyaltyBlockedByClaim.ok !== false || loyaltyBlockedByClaim.code !== 'reward_not_available') {
+if (
+  loyaltyBlockedByClaim.ok !== false ||
+  loyaltyBlockedByClaim.code !== 'loyalty_balance_changed'
+) {
   throw new Error(
     `claimed loyalty capacity was reused too early: ${JSON.stringify(loyaltyBlockedByClaim)}`,
   );
