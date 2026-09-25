@@ -76,9 +76,14 @@ class MemoryStore implements OnlineOrderIntakeStore {
     },
   );
   primaryTemporarilyClosed = false;
+  primaryCatalogActive = true;
 
   async loadCatalog(shopId: string) {
-    return shopId === SHOP_ID || shopId === FALLBACK_SHOP_ID ? catalog(shopId) : null;
+    if (shopId !== SHOP_ID && shopId !== FALLBACK_SHOP_ID) return null;
+    const loaded = catalog(shopId);
+    return shopId === SHOP_ID
+      ? { ...loaded, shop: { ...loaded.shop, active: this.primaryCatalogActive } }
+      : loaded;
   }
   async loadPublishedCheckoutAuthority(shopId: string) {
     if (shopId !== SHOP_ID && shopId !== FALLBACK_SHOP_ID) return null;
@@ -180,6 +185,31 @@ describe('order-intake trusted delivery routing authority', () => {
       requestedShopId: SHOP_ID,
       shopId: FALLBACK_SHOP_ID,
       deliveryFallbackUsed: true,
+    });
+  });
+
+  it('routes an explicitly configured fallback before rejecting an inactive primary catalog shop', async () => {
+    const store = new MemoryStore();
+    store.primaryCatalogActive = false;
+    store.resolveDeliveryRoute.mockResolvedValue({
+      ok: true,
+      shopId: FALLBACK_SHOP_ID,
+      zoneId: '66666666-6666-4666-8666-666666666194',
+      zoneName: 'Inactive-primary fallback',
+      feeMinor: 3_500,
+      minimumOrderMinor: 15_000,
+      fallbackUsed: true,
+    });
+
+    const response = await handleOrderIntakeRequest(request(true), store);
+
+    expect(response.status).toBe(202);
+    expect(store.inserted).toHaveLength(1);
+    expect(store.inserted[0]).toMatchObject({
+      requestedShopId: SHOP_ID,
+      shopId: FALLBACK_SHOP_ID,
+      deliveryFallbackUsed: true,
+      trustedItems: [expect.objectContaining({ productId: FALLBACK_PRODUCT_ID })],
     });
   });
 
