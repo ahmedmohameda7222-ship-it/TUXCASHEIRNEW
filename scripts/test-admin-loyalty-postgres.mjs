@@ -1302,7 +1302,7 @@ psql(
     `insert into public.business_customers(id, business_id, normalized_phone, display_name)
        values
          ('${MERGED_EXPIRY_SURVIVOR_ID}', '${BUSINESS_ID}', '+201000000006', 'Merged Expiry Survivor'),
-         ('${MERGED_EXPIRY_RETIRED_ID}', '${BUSINESS_ID}', '+201000000007', 'Merged Expiry Retired');
+         ('${MERGED_EXPIRY_RETIRED_ID}', '${BUSINESS_ID}', '+201000000017', 'Merged Expiry Retired');
      insert into public.loyalty_ledger(
        business_id, shop_id, customer_id, entry_key, event_type,
        points_delta, monetary_value_minor, earn_expires_at, source_event_id, created_at
