@@ -137,6 +137,7 @@ create table public.reward_reservations (
   ),
   expires_at timestamptz not null,
   claimed_at timestamptz,
+  claim_expires_at timestamptz,
   consumed_order_id uuid references public.orders(id) on delete restrict,
   consumed_at timestamptz,
   released_at timestamptz,
@@ -148,7 +149,12 @@ create table public.reward_reservations (
     or status <> 'CONSUMED'
   ),
   check (
-    (status = 'CLAIMED' and claimed_at is not null)
+    (
+      status = 'CLAIMED'
+      and claimed_at is not null
+      and claim_expires_at is not null
+      and claim_expires_at > claimed_at
+    )
     or status <> 'CLAIMED'
   )
 );
@@ -310,7 +316,7 @@ begin
     if v_existing.request_fingerprint <> v_fingerprint then
       return jsonb_build_object('ok', false, 'code', 'checkout_intent_conflict');
     end if;
-    if v_existing.status in ('CLAIMED', 'CONSUMED') then
+    if v_existing.status = 'CONSUMED' then
       return jsonb_build_object(
         'ok', true,
         'replayed', true,
@@ -319,6 +325,21 @@ begin
         'expiresAt', v_existing.expires_at,
         'snapshot', v_existing.applied_reward_snapshot
       );
+    end if;
+    if v_existing.status = 'CLAIMED' and v_existing.claim_expires_at > p_now then
+      return jsonb_build_object(
+        'ok', true,
+        'replayed', true,
+        'reservationId', v_existing.id,
+        'status', v_existing.status,
+        'expiresAt', v_existing.claim_expires_at,
+        'snapshot', v_existing.applied_reward_snapshot
+      );
+    end if;
+    if v_existing.status = 'CLAIMED' and v_existing.claim_expires_at <= p_now then
+      update public.reward_reservations
+      set status = 'EXPIRED', updated_at = p_now
+      where id = v_existing.id;
     end if;
     if v_existing.status = 'RESERVED' and v_existing.expires_at > p_now then
       return jsonb_build_object(
@@ -383,7 +404,7 @@ begin
           )
       )
       and (
-        r.status = 'CLAIMED'
+        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -453,7 +474,7 @@ begin
     from public.reward_reservations r
     where r.promotion_id = p_promotion_id
       and (
-        r.status = 'CLAIMED'
+        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -472,7 +493,7 @@ begin
           )
       )
       and (
-        r.status = 'CLAIMED'
+        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -586,6 +607,7 @@ begin
       status = 'RESERVED',
       expires_at = v_expires_at,
       claimed_at = null,
+      claim_expires_at = null,
       consumed_order_id = null,
       consumed_at = null,
       released_at = null,
@@ -661,12 +683,18 @@ begin
   end if;
 
   if v_reservation.status = 'CLAIMED' then
+    if v_reservation.claim_expires_at <= p_now then
+      update public.reward_reservations
+      set status = 'EXPIRED', updated_at = p_now
+      where id = v_reservation.id;
+      return jsonb_build_object('ok', false, 'code', 'reward_reservation_expired');
+    end if;
     return jsonb_build_object(
       'ok', true,
       'replayed', true,
       'reservationId', v_reservation.id,
       'status', v_reservation.status,
-      'expiresAt', v_reservation.expires_at,
+      'expiresAt', v_reservation.claim_expires_at,
       'snapshot', v_reservation.applied_reward_snapshot
     );
   end if;
@@ -686,6 +714,7 @@ begin
   set
     status = 'CLAIMED',
     claimed_at = p_now,
+    claim_expires_at = p_now + interval '24 hours',
     updated_at = p_now
   where id = v_reservation.id
   returning * into v_reservation;
@@ -695,7 +724,7 @@ begin
     'replayed', false,
     'reservationId', v_reservation.id,
     'status', v_reservation.status,
-    'expiresAt', v_reservation.expires_at,
+    'expiresAt', v_reservation.claim_expires_at,
     'snapshot', v_reservation.applied_reward_snapshot
   );
 end;
@@ -1219,7 +1248,13 @@ begin
   if v_reservation.status not in ('RESERVED', 'CLAIMED') then
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_unavailable');
   end if;
-  if v_reservation.status = 'RESERVED' and v_reservation.expires_at <= p_now then
+  if (
+    (v_reservation.status = 'RESERVED' and v_reservation.expires_at <= p_now)
+    or (
+      v_reservation.status = 'CLAIMED'
+      and v_reservation.claim_expires_at <= p_now
+    )
+  ) then
     update public.reward_reservations
     set status = 'EXPIRED', updated_at = p_now
     where id = v_reservation.id;
@@ -1494,20 +1529,30 @@ begin
     raise exception 'TUX_REWARD_EXPIRY_LIMIT_INVALID';
   end if;
 
-  with claimed as (
+  with expirable as (
     select r.id
     from public.reward_reservations r
-    where r.status = 'RESERVED'
+    where (
+      r.status = 'RESERVED'
       and r.expires_at <= p_now
-    order by r.expires_at, r.id
+    ) or (
+      r.status = 'CLAIMED'
+      and r.claim_expires_at <= p_now
+    )
+    order by
+      case
+        when r.status = 'CLAIMED' then r.claim_expires_at
+        else r.expires_at
+      end,
+      r.id
     for update skip locked
     limit p_limit
   ),
   expired as (
     update public.reward_reservations r
     set status = 'EXPIRED', updated_at = p_now
-    from claimed c
-    where r.id = c.id
+    from expirable e
+    where r.id = e.id
     returning r.id
   )
   select count(*)::integer into v_count from expired;
@@ -1884,7 +1929,7 @@ begin
           and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
       )
       and (
-        r.status = 'CLAIMED'
+        (r.status = 'CLAIMED' and r.claim_expires_at > now())
         or (r.status = 'RESERVED' and r.expires_at > now())
       );
   end if;
@@ -3086,7 +3131,7 @@ begin
         )
     )
     and (
-      r.status = 'CLAIMED'
+      (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
       or (r.status = 'RESERVED' and r.expires_at > p_now)
     );
 
