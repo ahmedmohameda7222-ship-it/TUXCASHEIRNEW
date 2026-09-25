@@ -1793,6 +1793,7 @@ declare
   v_existing public.admin_loyalty_command_receipts%rowtype;
   v_fingerprint text;
   v_balance bigint;
+  v_reserved_points bigint := 0;
   v_event_id uuid;
   v_result jsonb;
 begin
@@ -1871,7 +1872,24 @@ begin
         and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
     );
 
-  if v_balance + p_points_delta < 0 then
+  if p_points_delta < 0 then
+    select coalesce(sum(r.loyalty_points_reserved), 0)
+      into v_reserved_points
+    from public.reward_reservations r
+    where r.business_id = v_business_id
+      and r.customer_id in (
+        select c.id
+        from public.business_customers c
+        where c.business_id = v_business_id
+          and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
+      )
+      and (
+        r.status = 'CLAIMED'
+        or (r.status = 'RESERVED' and r.expires_at > now())
+      );
+  end if;
+
+  if v_balance - v_reserved_points + p_points_delta < 0 then
     return jsonb_build_object('ok', false, 'code', 'loyalty_balance_insufficient');
   end if;
 
@@ -3059,8 +3077,10 @@ begin
   from public.reward_reservations r
   where r.business_id = p_business_id
     and r.customer_id = p_customer_id
-    and r.status = 'RESERVED'
-    and r.expires_at > p_now;
+    and (
+      r.status = 'CLAIMED'
+      or (r.status = 'RESERVED' and r.expires_at > p_now)
+    );
 
   v_expire_points := least(
     v_expired_bucket,
