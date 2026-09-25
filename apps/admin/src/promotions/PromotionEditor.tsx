@@ -100,7 +100,7 @@ export function PromotionEditor({
       startsAt: startsAt.trim() || null,
       endsAt: endsAt.trim() || null,
       minimumOrderMinor: minimum,
-      shopIds: [shopId],
+      shopIds: promotion?.shopIds ?? [shopId],
       channel,
       productIds: list(productIds),
       categoryIds: list(categoryIds),
