@@ -5,7 +5,7 @@ import type {
   AdminLoyaltyProgram,
 } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -81,6 +81,19 @@ export function CustomersPage() {
         `/api/admin/customers?shopId=${encodeURIComponent(shopId!)}&view=loyalty-program`,
       ).then((result) => result.program),
   });
+
+  useEffect(() => {
+    const program = programQuery.data;
+    if (!program) return;
+    setProgramDraft({
+      enabled: program.enabled,
+      earnPointsPer100Minor: String(program.earnPointsPer100Minor),
+      redemptionMinorPerPoint: String(program.redemptionMinorPerPoint),
+      minimumRedemptionPoints: String(program.minimumRedemptionPoints),
+      pointExpiryDays:
+        program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
+    });
+  }, [programQuery.data]);
 
   const adjustLoyalty = useMutation({
     mutationFn: async (input: LoyaltyAdjustmentInput) => {
@@ -166,7 +179,7 @@ export function CustomersPage() {
             pointExpiryDays: programDraft.pointExpiryDays.trim()
               ? Number(programDraft.pointExpiryDays)
               : null,
-            shopIds: [shopId],
+            shopIds: existing?.shopIds ?? [shopId],
             expectedVersion: existing?.version ?? null,
           }),
         },
