@@ -51,6 +51,30 @@ class MemoryStore implements OnlineOrderIntakeStore {
   readonly inserted: OnlineOrderPendingInsert[] = [];
   readonly rows = new Map<string, OnlineOrderStoredRequest>();
   readonly resolveDeliveryRoute = vi.fn();
+  readonly translateRequestToShop = vi.fn(
+    async (
+      input: Parameters<NonNullable<OnlineOrderIntakeStore['translateRequestToShop']>>[0],
+    ) => {
+      if (input.requestedShopId !== SHOP_ID || input.targetShopId !== FALLBACK_SHOP_ID) {
+        return null;
+      }
+      return {
+        ...input.request,
+        shopId: FALLBACK_SHOP_ID,
+        items: input.request.items.map((item) => ({
+          ...item,
+          productId: item.productId === PRODUCT_ID ? FALLBACK_PRODUCT_ID : item.productId,
+          addonProductIds: item.addonProductIds.map((productId) =>
+            productId === PRODUCT_ID ? FALLBACK_PRODUCT_ID : productId,
+          ),
+          comboBeverageProductId:
+            item.comboBeverageProductId === PRODUCT_ID
+              ? FALLBACK_PRODUCT_ID
+              : item.comboBeverageProductId,
+        })),
+      };
+    },
+  );
   primaryTemporarilyClosed = false;
 
   async loadCatalog(shopId: string) {
@@ -181,6 +205,12 @@ describe('order-intake trusted delivery routing authority', () => {
       deliveryZoneId: '66666666-6666-4666-8666-666666666192',
       deliveryFeeMinor: 3_500,
       deliveryFallbackUsed: true,
+      trustedItems: [expect.objectContaining({ productId: FALLBACK_PRODUCT_ID })],
+    });
+    expect(store.translateRequestToShop).toHaveBeenCalledWith({
+      requestedShopId: SHOP_ID,
+      targetShopId: FALLBACK_SHOP_ID,
+      request: expect.objectContaining({ shopId: SHOP_ID }),
     });
     expect(store.resolveDeliveryRoute).toHaveBeenCalledTimes(2);
   });
