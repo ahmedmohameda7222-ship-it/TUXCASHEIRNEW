@@ -3076,7 +3076,15 @@ begin
     into v_reserved
   from public.reward_reservations r
   where r.business_id = p_business_id
-    and r.customer_id = p_customer_id
+    and r.customer_id in (
+      select c.id
+      from public.business_customers c
+      where c.business_id = p_business_id
+        and (
+          c.id = p_customer_id
+          or c.merged_into_customer_id = p_customer_id
+        )
+    )
     and (
       r.status = 'CLAIMED'
       or (r.status = 'RESERVED' and r.expires_at > p_now)
