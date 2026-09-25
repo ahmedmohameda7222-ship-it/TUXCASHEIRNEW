@@ -1482,7 +1482,7 @@ const committedReservation = rpc(
     '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
     'committed-local-intent', '${committedPromotion.promotionId}'::uuid,
     0, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
-    '2026-09-23T07:00:00Z'::timestamptz
+    now()
   )`,
   'Committed local reward reservation',
 );
@@ -1495,7 +1495,7 @@ const claimedReservation = rpc(
     '${BUSINESS_ID}'::uuid,
     '${SHOP_ID}'::uuid,
     'committed-local-intent',
-    '2026-09-23T07:01:00Z'::timestamptz
+    now()
   )`,
   'Claim reward reservation before local commit',
 );
@@ -1504,27 +1504,35 @@ if (claimedReservation.ok !== true || claimedReservation.status !== 'CLAIMED') {
     `reward reservation was not durably claimed before local commit: ${JSON.stringify(claimedReservation)}`,
   );
 }
-const claimedExpiryCount = Number(
-  psql(
-    [
-      '-At',
-      '-c',
-      `select public.expire_order_reward_reservations_v1(
-        '2026-09-23T07:20:00Z'::timestamptz, 100
-      )`,
-    ],
-    'Expire only abandoned reward reservations',
-  ).trim(),
+psql(
+  [
+    '-At',
+    '-c',
+    `select public.expire_order_reward_reservations_v1(
+      now() + interval '20 minutes', 100
+    )`,
+  ],
+  'Expire only abandoned reward reservations',
 );
-if (claimedExpiryCount !== 0) {
-  throw new Error(`claimed reward reservation was incorrectly expired: ${claimedExpiryCount}`);
+const committedClaimStatus = psql(
+  [
+    '-At',
+    '-c',
+    `select status
+     from public.reward_reservations
+     where id = '${committedReservation.reservationId}'::uuid`,
+  ],
+  'Committed claim survives original reservation lease',
+).trim();
+if (committedClaimStatus !== 'CLAIMED') {
+  throw new Error(`claimed reward reservation was incorrectly expired: ${committedClaimStatus}`);
 }
 const claimedCapacityContender = rpc(
   `public.reserve_order_rewards_v1(
     '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
     'committed-local-contender', '${committedPromotion.promotionId}'::uuid,
     0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
-    '2026-09-23T07:20:00Z'::timestamptz
+    now() + interval '20 minutes'
   )`,
   'Claimed reward capacity remains exclusive after original lease',
 );
@@ -1555,7 +1563,7 @@ psql(
        'POS', 'ACTIVE', '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
        'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
        10000, 500, 9500, null,
-       '2026-09-23T07:02:00Z', '2026-09-23T07:02:00Z',
+       now(), now(),
        r.id, r.applied_reward_snapshot
      from public.reward_reservations r
      where r.id = '${committedReservation.reservationId}'::uuid;`,
