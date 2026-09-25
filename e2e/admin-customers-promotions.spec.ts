@@ -32,9 +32,7 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(request.url());
     if (request.method() === 'POST') {
       expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
-      const command = request.postDataJSON() as Record<string, unknown> & {
-        type: string;
-      };
+      const command = request.postDataJSON() as Record<string, unknown> & { type: string };
       postedCommands.push(command);
       await route.fulfill({
         status: 200,
@@ -221,9 +219,7 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Stacking policy')).toBeVisible();
 });
 
-test(
-  'hydrates canonical loyalty values and preserves hidden multi-shop scopes on save',
-  async ({ page }) => {
+test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({ page }) => {
     await page.goto('/customers');
 
     await expect(page.getByLabel('Enabled')).not.toBeChecked();
@@ -236,9 +232,7 @@ test(
     await page.getByRole('button', { name: 'Save loyalty program' }).click();
 
     await expect
-      .poll(() =>
-        postedCommands.some((command) => command.type === 'loyalty.program.upsert'),
-      )
+      .poll(() => postedCommands.some((command) => command.type === 'loyalty.program.upsert'))
       .toBe(true);
     const loyaltyCommand = postedCommands.find(
       (command) => command.type === 'loyalty.program.upsert',
@@ -260,13 +254,9 @@ test(
     await page.getByRole('button', { name: 'Save promotion' }).click();
 
     await expect
-      .poll(() =>
-        postedCommands.some((command) => command.type === 'promotion.upsert'),
-      )
+      .poll(() => postedCommands.some((command) => command.type === 'promotion.upsert'))
       .toBe(true);
-    const promotionCommand = postedCommands.find(
-      (command) => command.type === 'promotion.upsert',
-    );
+    const promotionCommand = postedCommands.find((command) => command.type === 'promotion.upsert');
     expect(promotionCommand).toMatchObject({
       type: 'promotion.upsert',
       promotion: {
@@ -274,5 +264,4 @@ test(
         shopIds: [shopId, otherShopId],
       },
     });
-  },
-);
+});

@@ -142,11 +142,7 @@ describe('CRM store canonical customer lineage', () => {
             ]
           : [];
       }
-      if (
-        table === 'customer_addresses' ||
-        table === 'loyalty_ledger' ||
-        table === 'orders'
-      ) {
+      if (table === 'customer_addresses' || table === 'loyalty_ledger' || table === 'orders') {
         return [];
       }
       if (table === 'shops') return [{ id: shopId, name: 'Maadi' }];
@@ -156,9 +152,7 @@ describe('CRM store canonical customer lineage', () => {
       if (name === 'get_admin_customer_loyalty_balance_v1') return 0;
       throw new Error(`unexpected_rpc:${name}`);
     });
-    const store = createCrmStore(
-      { select, rpc } as unknown as AdminSupabaseClient,
-    );
+    const store = createCrmStore({ select, rpc } as unknown as AdminSupabaseClient);
 
     const facts = await store.listCustomerFacts({
       businessId,
@@ -171,9 +165,6 @@ describe('CRM store canonical customer lineage', () => {
       ([table, query]) =>
         table === 'customer_shop_links' && !query.get('canonical_customer_id'),
     );
-    expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual([
-      '0',
-      '100',
-    ]);
+    expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual(['0', '100']);
   });
 });
