@@ -90,8 +90,7 @@ export function CustomersPage() {
       earnPointsPer100Minor: String(program.earnPointsPer100Minor),
       redemptionMinorPerPoint: String(program.redemptionMinorPerPoint),
       minimumRedemptionPoints: String(program.minimumRedemptionPoints),
-      pointExpiryDays:
-        program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
+      pointExpiryDays: program.pointExpiryDays === null ? '' : String(program.pointExpiryDays),
     });
   }, [programQuery.data]);
 
