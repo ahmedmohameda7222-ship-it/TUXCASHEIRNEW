@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 const shopId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const otherShopId = '99999999-9999-4999-8999-999999999999';
 const customerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const csrfToken = 'c'.repeat(64);
+let postedCommands: Array<Record<string, unknown> & { type: string }> = [];
 
 const session = {
   principal: {
@@ -16,6 +18,7 @@ const session = {
 };
 
 test.beforeEach(async ({ page }) => {
+  postedCommands = [];
   await page.route('**/api/admin/session', (route) =>
     route.fulfill({
       status: 200,
@@ -29,7 +32,8 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(request.url());
     if (request.method() === 'POST') {
       expect(request.headers()['x-tux-admin-csrf']).toBe(csrfToken);
-      const command = request.postDataJSON() as { type: string };
+      const command = request.postDataJSON() as Record<string, unknown> & { type: string };
+      postedCommands.push(command);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -127,12 +131,12 @@ test.beforeEach(async ({ page }) => {
             ? {
                 program: {
                   businessId: session.principal.businessId,
-                  enabled: true,
-                  earnPointsPer100Minor: 1,
-                  redemptionMinorPerPoint: 10,
-                  minimumRedemptionPoints: 50,
-                  pointExpiryDays: 365,
-                  shopIds: [shopId],
+                  enabled: false,
+                  earnPointsPer100Minor: 3,
+                  redemptionMinorPerPoint: 17,
+                  minimumRedemptionPoints: 75,
+                  pointExpiryDays: 180,
+                  shopIds: [shopId, otherShopId],
                   version: 3,
                   updatedAt: '2026-09-20T12:00:00.000Z',
                 },
@@ -152,7 +156,7 @@ test.beforeEach(async ({ page }) => {
                       startsAt: null,
                       endsAt: null,
                       minimumOrderMinor: 5000,
-                      shopIds: [shopId],
+                      shopIds: [shopId, otherShopId],
                       channel: 'BOTH',
                       productIds: [],
                       categoryIds: [],
@@ -213,4 +217,58 @@ test('exposes controlled merge, loyalty configuration and full promotion editor'
   await expect(page.getByLabel('Total usage limit')).toBeVisible();
   await expect(page.getByLabel('Per-customer usage limit')).toBeVisible();
   await expect(page.getByLabel('Stacking policy')).toBeVisible();
+});
+
+
+test('hydrates canonical loyalty values and preserves hidden multi-shop scopes on save', async ({
+  page,
+}) => {
+  await page.goto('/customers');
+
+  await expect(page.getByLabel('Enabled')).not.toBeChecked();
+  await expect(page.getByLabel('Earn points per 1 EGP')).toHaveValue('3');
+  await expect(page.getByLabel('Redemption minor per point')).toHaveValue('17');
+  await expect(page.getByLabel('Minimum redemption points')).toHaveValue('75');
+  await expect(page.getByLabel('Point expiry days')).toHaveValue('180');
+
+  await page.getByLabel('Minimum redemption points').fill('80');
+  await page.getByRole('button', { name: 'Save loyalty program' }).click();
+
+  await expect
+    .poll(() => postedCommands.some((command) => command.type === 'loyalty.program.upsert'))
+    .toBe(true);
+  const loyaltyCommand = postedCommands.find(
+    (command) => command.type === 'loyalty.program.upsert',
+  );
+  expect(loyaltyCommand).toMatchObject({
+    type: 'loyalty.program.upsert',
+    shopId,
+    enabled: false,
+    earnPointsPer100Minor: 3,
+    redemptionMinorPerPoint: 17,
+    minimumRedemptionPoints: 80,
+    pointExpiryDays: 180,
+    shopIds: [shopId, otherShopId],
+    expectedVersion: 3,
+  });
+
+  await page.getByRole('button', { name: /Lunch 10%/ }).click();
+  await page.getByLabel('Name').fill('Lunch scoped edit');
+  await page.getByRole('button', { name: 'Save promotion' }).click();
+
+  await expect
+    .poll(() => postedCommands.some((command) => command.type === 'promotion.upsert'))
+    .toBe(true);
+  const promotionCommand = postedCommands.find(
+    (command) => command.type === 'promotion.upsert',
+  ) as
+    | (Record<string, unknown> & {
+        type: string;
+        promotion?: { shopIds?: string[]; name?: string };
+      })
+    | undefined;
+  expect(promotionCommand?.promotion).toMatchObject({
+    name: 'Lunch scoped edit',
+    shopIds: [shopId, otherShopId],
+  });
 });
