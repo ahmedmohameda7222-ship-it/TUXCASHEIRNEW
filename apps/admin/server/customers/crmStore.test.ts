@@ -103,4 +103,67 @@ describe('CRM store canonical customer lineage', () => {
       p_customer_id: survivorId,
     });
   });
+
+  it('pages all shop links before applying an exact customer search', async () => {
+    const linkedIds = Array.from(
+      { length: 101 },
+      (_, index) =>
+        `31000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    );
+    const targetId = linkedIds[100]!;
+    const links = linkedIds.map((canonicalCustomerId) => ({
+      shop_id: shopId,
+      canonical_customer_id: canonicalCustomerId,
+      legacy_customer_contact_id: null,
+    }));
+
+    const select = vi.fn(async (table: string, query: URLSearchParams) => {
+      if (table === 'customer_shop_links') {
+        if (query.get('canonical_customer_id')) {
+          return [links[100]];
+        }
+        const offset = Number(query.get('offset') ?? '0');
+        return offset === 0 ? links.slice(0, 100) : offset === 100 ? links.slice(100) : [];
+      }
+      if (table === 'business_customers') {
+        if (query.get('select') === 'id') {
+          return [{ id: targetId }];
+        }
+        const ids = query.get('id') ?? '';
+        const search = query.get('or') ?? '';
+        return ids.includes(targetId) && search.includes('Hidden exact customer')
+          ? [
+              {
+                id: targetId,
+                normalized_phone: '+201099999999',
+                display_name: 'Hidden exact customer',
+              },
+            ]
+          : [];
+      }
+      if (table === 'customer_addresses' || table === 'loyalty_ledger' || table === 'orders') {
+        return [];
+      }
+      if (table === 'shops') return [{ id: shopId, name: 'Maadi' }];
+      throw new Error(`unexpected_select:${table}:${query.toString()}`);
+    });
+    const rpc = vi.fn(async (name: string) => {
+      if (name === 'get_admin_customer_loyalty_balance_v1') return 0;
+      throw new Error(`unexpected_rpc:${name}`);
+    });
+    const store = createCrmStore({ select, rpc } as unknown as AdminSupabaseClient);
+
+    const facts = await store.listCustomerFacts({
+      businessId,
+      shopId,
+      query: 'Hidden exact customer',
+    });
+
+    expect(facts.map((customer) => customer.id)).toEqual([targetId]);
+    const listLinkCalls = select.mock.calls.filter(
+      ([table, query]) => table === 'customer_shop_links' && !query.get('canonical_customer_id'),
+    );
+    expect(listLinkCalls.map(([, query]) => query.get('offset'))).toEqual(['0', '100']);
+  });
+
 });
