@@ -136,6 +136,7 @@ const RESERVED_ADJUSTMENT_CUSTOMER_ID = '79000000-0000-4000-8000-000000000004';
 const CLAIMED_EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000005';
 const MERGED_EXPIRY_SURVIVOR_ID = '79000000-0000-4000-8000-000000000006';
 const MERGED_EXPIRY_RETIRED_ID = '79000000-0000-4000-8000-000000000007';
+const ABANDONED_CLAIM_CUSTOMER_ID = '79000000-0000-4000-8000-000000000008';
 
 psql(
   [
@@ -1588,6 +1589,207 @@ if (
 ) {
   throw new Error(
     `claimed reward did not converge exactly once after lease expiry: ${JSON.stringify(claimedReadback)}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${ABANDONED_CLAIM_CUSTOMER_ID}',
+         '${BUSINESS_ID}',
+         '+201000000018',
+         'Abandoned Claim Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${ABANDONED_CLAIM_CUSTOMER_ID}');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${ABANDONED_CLAIM_CUSTOMER_ID}',
+       'abandoned-claim-credit', 'EARN',
+       100, 0, 'abandoned-claim-credit', '2026-09-23T08:59:00Z'
+     );`,
+  ],
+  'Abandoned reward claim fixture',
+);
+
+const abandonedClaimPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Abandoned claim one-slot promotion', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], 1, null, 'ONE_ORDER_LEVEL',
+    null, 'promotion-abandoned-claim'
+  )`,
+  'Abandoned claim promotion upsert',
+);
+if (abandonedClaimPromotion.ok !== true) {
+  throw new Error(
+    `abandoned-claim promotion upsert failed: ${JSON.stringify(abandonedClaimPromotion)}`,
+  );
+}
+
+const abandonedClaimReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${ABANDONED_CLAIM_CUSTOMER_ID}'::uuid,
+    'abandoned-claim-intent', '${abandonedClaimPromotion.promotionId}'::uuid,
+    100, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:00:00Z'::timestamptz
+  )`,
+  'Reserve abandoned claim reward',
+);
+if (abandonedClaimReservation.ok !== true) {
+  throw new Error(
+    `failed to reserve abandoned-claim reward: ${JSON.stringify(abandonedClaimReservation)}`,
+  );
+}
+const abandonedClaim = rpc(
+  `public.claim_order_reward_reservation_v1(
+    '${abandonedClaimReservation.reservationId}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    'abandoned-claim-intent',
+    '2026-09-23T09:01:00Z'::timestamptz
+  )`,
+  'Claim reward before simulated process crash',
+);
+if (abandonedClaim.ok !== true || abandonedClaim.status !== 'CLAIMED') {
+  throw new Error(`failed to claim abandoned reward: ${JSON.stringify(abandonedClaim)}`);
+}
+
+const promotionBlockedByClaim = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${ABANDONED_CLAIM_CUSTOMER_ID}'::uuid,
+    'abandoned-claim-promo-contender', '${abandonedClaimPromotion.promotionId}'::uuid,
+    0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:30:00Z'::timestamptz
+  )`,
+  'Claimed promotion blocks contender',
+);
+if (
+  promotionBlockedByClaim.ok !== false ||
+  promotionBlockedByClaim.code !== 'reward_not_available'
+) {
+  throw new Error(
+    `claimed promotion capacity was reused too early: ${JSON.stringify(promotionBlockedByClaim)}`,
+  );
+}
+
+const loyaltyBlockedByClaim = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${ABANDONED_CLAIM_CUSTOMER_ID}'::uuid,
+    'abandoned-claim-loyalty-contender', null,
+    100, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:30:00Z'::timestamptz
+  )`,
+  'Claimed loyalty blocks contender',
+);
+if (loyaltyBlockedByClaim.ok !== false || loyaltyBlockedByClaim.code !== 'reward_not_available') {
+  throw new Error(
+    `claimed loyalty capacity was reused too early: ${JSON.stringify(loyaltyBlockedByClaim)}`,
+  );
+}
+
+psql(
+  [
+    '-At',
+    '-c',
+    `select public.expire_order_reward_reservations_v1(
+      '2026-09-23T10:00:00Z'::timestamptz, 100
+    )`,
+  ],
+  'Keep recent claimed reward protected',
+);
+const recentClaimStatus = psql(
+  [
+    '-At',
+    '-c',
+    `select status
+     from public.reward_reservations
+     where id = '${abandonedClaimReservation.reservationId}'::uuid`,
+  ],
+  'Recent claim status readback',
+).trim();
+if (recentClaimStatus !== 'CLAIMED') {
+  throw new Error(`recent claim expired before reconciliation grace: ${recentClaimStatus}`);
+}
+
+psql(
+  [
+    '-At',
+    '-c',
+    `select public.expire_order_reward_reservations_v1(
+      '2026-09-24T09:02:00Z'::timestamptz, 100
+    )`,
+  ],
+  'Expire abandoned claimed reward after reconciliation grace',
+);
+const abandonedClaimStatus = psql(
+  [
+    '-At',
+    '-c',
+    `select status
+     from public.reward_reservations
+     where id = '${abandonedClaimReservation.reservationId}'::uuid`,
+  ],
+  'Abandoned claim status readback',
+).trim();
+if (abandonedClaimStatus !== 'EXPIRED') {
+  throw new Error(
+    `abandoned claimed reward did not expire after reconciliation grace: ${abandonedClaimStatus}`,
+  );
+}
+
+const repeatedAbandonedExpiry = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select public.expire_order_reward_reservations_v1(
+        '2026-09-24T09:02:00Z'::timestamptz, 100
+      )`,
+    ],
+    'Replay abandoned claim expiry',
+  ).trim(),
+);
+if (repeatedAbandonedExpiry !== 0) {
+  throw new Error(`abandoned claim expiry was not idempotent: ${repeatedAbandonedExpiry}`);
+}
+
+const promotionAfterAbandonedExpiry = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${ABANDONED_CLAIM_CUSTOMER_ID}'::uuid,
+    'abandoned-claim-promo-after-expiry', '${abandonedClaimPromotion.promotionId}'::uuid,
+    0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-24T09:03:00Z'::timestamptz
+  )`,
+  'Promotion capacity restored after abandoned claim expiry',
+);
+if (promotionAfterAbandonedExpiry.ok !== true) {
+  throw new Error(
+    `promotion capacity was not restored after abandoned claim expiry: ${JSON.stringify(
+      promotionAfterAbandonedExpiry,
+    )}`,
+  );
+}
+
+const loyaltyAfterAbandonedExpiry = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${ABANDONED_CLAIM_CUSTOMER_ID}'::uuid,
+    'abandoned-claim-loyalty-after-expiry', null,
+    100, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-24T09:03:00Z'::timestamptz
+  )`,
+  'Loyalty capacity restored after abandoned claim expiry',
+);
+if (loyaltyAfterAbandonedExpiry.ok !== true) {
+  throw new Error(
+    `loyalty capacity was not restored after abandoned claim expiry: ${JSON.stringify(
+      loyaltyAfterAbandonedExpiry,
+    )}`,
   );
 }
 
