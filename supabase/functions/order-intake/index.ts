@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { OnlineOrderRequestV1 } from '../../../packages/order-intake-contracts/src/index.ts';
 import {
   resolveDeliveryRouting,
   type DeliveryRoutingBoundary,
@@ -377,6 +378,175 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
       },
       input,
     );
+  }
+
+  async translateRequestToShop(input: {
+    requestedShopId: string;
+    targetShopId: string;
+    request: OnlineOrderRequestV1;
+  }): Promise<OnlineOrderRequestV1 | null> {
+    if (input.requestedShopId === input.targetShopId) {
+      return { ...input.request, shopId: input.targetShopId };
+    }
+
+    const productIds = new Set<string>();
+    const modifierIds = new Set<string>();
+    for (const item of input.request.items) {
+      productIds.add(item.productId);
+      for (const addonProductId of item.addonProductIds) productIds.add(addonProductId);
+      if (item.comboBeverageProductId !== null) productIds.add(item.comboBeverageProductId);
+      for (const selection of item.modifierSelections) modifierIds.add(selection.modifierId);
+    }
+
+    const sourceStandaloneByModifier = new Map<string, string>();
+    const selectedModifierIds = [...modifierIds];
+    for (let offset = 0; offset < selectedModifierIds.length; offset += 100) {
+      const result = await this.client
+        .from('modifiers')
+        .select('id,standalone_product_id')
+        .eq('shop_id', input.requestedShopId)
+        .in('id', selectedModifierIds.slice(offset, offset + 100));
+      if (result.error) throw result.error;
+      for (const value of result.data ?? []) {
+        const row = record(value, 'source modifier mapping');
+        const id = stringField(row.id, 'source modifier mapping.id');
+        if (row.standalone_product_id === null) return null;
+        const standaloneProductId = stringField(
+          row.standalone_product_id,
+          'source modifier mapping.standalone_product_id',
+        );
+        sourceStandaloneByModifier.set(id, standaloneProductId);
+        productIds.add(standaloneProductId);
+      }
+    }
+    if (sourceStandaloneByModifier.size !== modifierIds.size) return null;
+
+    const sourceProductIds = [...productIds];
+    const masterBySourceProduct = new Map<string, string>();
+    for (let offset = 0; offset < sourceProductIds.length; offset += 100) {
+      const result = await this.client
+        .from('catalog_product_shop_overrides')
+        .select('master_product_id,canonical_product_id')
+        .eq('shop_id', input.requestedShopId)
+        .in('canonical_product_id', sourceProductIds.slice(offset, offset + 100));
+      if (result.error) throw result.error;
+      for (const value of result.data ?? []) {
+        const row = record(value, 'source product master mapping');
+        masterBySourceProduct.set(
+          stringField(row.canonical_product_id, 'source product mapping.canonical_product_id'),
+          stringField(row.master_product_id, 'source product mapping.master_product_id'),
+        );
+      }
+    }
+    if (masterBySourceProduct.size !== productIds.size) return null;
+
+    const masterProductIds = [...new Set(masterBySourceProduct.values())];
+    const targetProductByMaster = new Map<string, string>();
+    for (let offset = 0; offset < masterProductIds.length; offset += 100) {
+      const result = await this.client
+        .from('catalog_product_shop_overrides')
+        .select('master_product_id,canonical_product_id')
+        .eq('shop_id', input.targetShopId)
+        .in('master_product_id', masterProductIds.slice(offset, offset + 100));
+      if (result.error) throw result.error;
+      for (const value of result.data ?? []) {
+        const row = record(value, 'target product master mapping');
+        targetProductByMaster.set(
+          stringField(row.master_product_id, 'target product mapping.master_product_id'),
+          stringField(row.canonical_product_id, 'target product mapping.canonical_product_id'),
+        );
+      }
+    }
+    if (targetProductByMaster.size !== masterProductIds.length) return null;
+
+    const translatedProduct = (sourceProductId: string): string | null => {
+      const masterProductId = masterBySourceProduct.get(sourceProductId);
+      return masterProductId === undefined
+        ? null
+        : (targetProductByMaster.get(masterProductId) ?? null);
+    };
+
+    const targetStandaloneIds = [
+      ...new Set(
+        [...sourceStandaloneByModifier.values()]
+          .map((sourceProductId) => translatedProduct(sourceProductId))
+          .filter((value): value is string => value !== null),
+      ),
+    ];
+    if (targetStandaloneIds.length !== new Set(sourceStandaloneByModifier.values()).size) {
+      return null;
+    }
+
+    const targetModifierByStandaloneProduct = new Map<string, string>();
+    for (let offset = 0; offset < targetStandaloneIds.length; offset += 100) {
+      const result = await this.client
+        .from('modifiers')
+        .select('id,standalone_product_id')
+        .eq('shop_id', input.targetShopId)
+        .in('standalone_product_id', targetStandaloneIds.slice(offset, offset + 100));
+      if (result.error) throw result.error;
+      for (const value of result.data ?? []) {
+        const row = record(value, 'target modifier mapping');
+        const standaloneProductId = stringField(
+          row.standalone_product_id,
+          'target modifier mapping.standalone_product_id',
+        );
+        if (targetModifierByStandaloneProduct.has(standaloneProductId)) return null;
+        targetModifierByStandaloneProduct.set(
+          standaloneProductId,
+          stringField(row.id, 'target modifier mapping.id'),
+        );
+      }
+    }
+    if (targetModifierByStandaloneProduct.size !== targetStandaloneIds.length) return null;
+
+    const translatedModifierBySource = new Map<string, string>();
+    for (const [sourceModifierId, sourceStandaloneProductId] of sourceStandaloneByModifier) {
+      const targetStandaloneProductId = translatedProduct(sourceStandaloneProductId);
+      if (targetStandaloneProductId === null) return null;
+      const targetModifierId = targetModifierByStandaloneProduct.get(targetStandaloneProductId);
+      if (targetModifierId === undefined) return null;
+      translatedModifierBySource.set(sourceModifierId, targetModifierId);
+    }
+
+    const translatedItems: OnlineOrderRequestV1['items'] = [];
+    for (const item of input.request.items) {
+      const productId = translatedProduct(item.productId);
+      if (productId === null) return null;
+
+      const addonProductIds: string[] = [];
+      for (const addonProductId of item.addonProductIds) {
+        const translated = translatedProduct(addonProductId);
+        if (translated === null) return null;
+        addonProductIds.push(translated);
+      }
+
+      const comboBeverageProductId =
+        item.comboBeverageProductId === null
+          ? null
+          : translatedProduct(item.comboBeverageProductId);
+      if (item.comboBeverageProductId !== null && comboBeverageProductId === null) return null;
+
+      const modifierSelections = item.modifierSelections.map((selection) => {
+        const modifierId = translatedModifierBySource.get(selection.modifierId);
+        return modifierId === undefined ? null : { ...selection, modifierId };
+      });
+      if (modifierSelections.some((selection) => selection === null)) return null;
+
+      translatedItems.push({
+        ...item,
+        productId,
+        addonProductIds,
+        modifierSelections: modifierSelections as OnlineOrderRequestV1['items'][number]['modifierSelections'],
+        comboBeverageProductId,
+      });
+    }
+
+    return {
+      ...input.request,
+      shopId: input.targetShopId,
+      items: translatedItems,
+    };
   }
 
   async findByIdempotency(
