@@ -783,7 +783,10 @@ export async function handleOrderIntakeRequest(
     let finalShopId = requestedShopId;
     let finalRequest = parsed;
     let finalCatalog = await store.loadCatalog(requestedShopId);
-    if (!finalCatalog || !finalCatalog.shop.active) return errorResponse(404, 'shop_not_found');
+    if (!finalCatalog) return errorResponse(404, 'shop_not_found');
+    if (!finalCatalog.shop.active && parsed.fulfillmentPreference !== 'DELIVERY') {
+      return errorResponse(404, 'shop_not_found');
+    }
     validateCatalogTenant(finalCatalog, requestedShopId);
 
     let finalTrusted = buildTrustedItems(finalRequest, finalCatalog);
