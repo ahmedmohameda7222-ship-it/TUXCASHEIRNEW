@@ -405,7 +405,7 @@ const adjustmentHoldReservation = rpc(
     10000,
     array['${PRODUCT_ID}'::uuid],
     array['${CATEGORY_ID}'::uuid],
-    '2026-09-23T05:14:00Z'::timestamptz
+    clock_timestamp()
   )`,
   'Reserve loyalty before manual debit',
 );
@@ -440,7 +440,7 @@ const adjustmentHoldClaim = rpc(
     '${BUSINESS_ID}'::uuid,
     '${SHOP_ID}'::uuid,
     'reserved-adjustment-intent',
-    '2026-09-23T05:15:00Z'::timestamptz
+    clock_timestamp()
   )`,
   'Claim loyalty before manual debit',
 );
