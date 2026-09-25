@@ -169,6 +169,11 @@ export interface OnlineOrderIntakeStore {
     subtotalMinor: number;
     at: string;
   }): Promise<OnlineOrderDeliveryRouteResult>;
+  translateRequestToShop?(input: {
+    requestedShopId: string;
+    targetShopId: string;
+    request: OnlineOrderRequestV1;
+  }): Promise<OnlineOrderRequestV1 | null>;
   findByIdempotency(
     requestedShopId: string,
     idempotencyKey: string,
@@ -790,13 +795,6 @@ export async function handleOrderIntakeRequest(
     }
     let checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, requestedShopId);
     if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
-    let policyError = publishedCheckoutPolicyError(
-      finalRequest,
-      finalTrusted.itemsSubtotalMinor,
-      normalizedPhone,
-      checkoutAuthority,
-    );
-    if (policyError) return policyError;
 
     let deliveryRoute: Extract<OnlineOrderDeliveryRouteResult, { ok: true }> | null = null;
     if (parsed.fulfillmentPreference === 'DELIVERY') {
@@ -821,7 +819,18 @@ export async function handleOrderIntakeRequest(
 
       if (resolved.shopId !== requestedShopId) {
         finalShopId = resolved.shopId;
-        finalRequest = { ...parsed, shopId: finalShopId };
+        const translateRequestToShop = store.translateRequestToShop;
+        if (!translateRequestToShop) {
+          return errorResponse(503, 'delivery_configuration_unavailable');
+        }
+        const translated = await translateRequestToShop.call(store, {
+          requestedShopId,
+          targetShopId: finalShopId,
+          request: parsed,
+        });
+        if (!translated) return errorResponse(409, 'delivery_unavailable');
+        finalRequest = translated;
+
         finalCatalog = await store.loadCatalog(finalShopId);
         if (!finalCatalog || !finalCatalog.shop.active) {
           return errorResponse(409, 'delivery_unavailable');
@@ -832,13 +841,6 @@ export async function handleOrderIntakeRequest(
 
         checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, finalShopId);
         if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
-        policyError = publishedCheckoutPolicyError(
-          finalRequest,
-          finalTrusted.itemsSubtotalMinor,
-          normalizedPhone,
-          checkoutAuthority,
-        );
-        if (policyError) return policyError;
 
         const revalidated = await resolve(finalTrusted.itemsSubtotalMinor);
         if (
@@ -855,7 +857,22 @@ export async function handleOrderIntakeRequest(
         resolved = revalidated;
       }
 
+      const policyError = publishedCheckoutPolicyError(
+        finalRequest,
+        finalTrusted.itemsSubtotalMinor,
+        normalizedPhone,
+        checkoutAuthority,
+      );
+      if (policyError) return policyError;
       deliveryRoute = resolved;
+    } else {
+      const policyError = publishedCheckoutPolicyError(
+        finalRequest,
+        finalTrusted.itemsSubtotalMinor,
+        normalizedPhone,
+        checkoutAuthority,
+      );
+      if (policyError) return policyError;
     }
 
     const catalogRevision = await sha256Hex(canonicalCatalogForRevision(finalCatalog));
