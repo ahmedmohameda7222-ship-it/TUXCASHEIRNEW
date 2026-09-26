@@ -146,6 +146,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             .from('menu_categories')
             .select('id,shop_id,active')
             .eq('shop_id', shopId)
+            .order('id', { ascending: true })
             .range(from, to);
           if (result.error) throw result.error;
           return result.data ?? [];
@@ -155,6 +156,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             .from('products')
             .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
             .eq('shop_id', shopId)
+            .order('id', { ascending: true })
             .range(from, to);
           if (result.error) throw result.error;
           return result.data ?? [];
@@ -164,6 +166,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             .from('modifiers')
             .select('id,shop_id,name,price_minor,active,standalone_product_id')
             .eq('shop_id', shopId)
+            .order('id', { ascending: true })
             .range(from, to);
           if (result.error) throw result.error;
           return result.data ?? [];
@@ -173,6 +176,8 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             .from('product_modifiers')
             .select('product_id,modifier_id,max_quantity')
             .eq('shop_id', shopId)
+            .order('product_id', { ascending: true })
+            .order('modifier_id', { ascending: true })
             .range(from, to);
           if (result.error) throw result.error;
           return result.data ?? [];
@@ -182,6 +187,8 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             .from('combo_beverage_options')
             .select('combo_product_id,beverage_product_id')
             .eq('shop_id', shopId)
+            .order('combo_product_id', { ascending: true })
+            .order('beverage_product_id', { ascending: true })
             .range(from, to);
           if (result.error) throw result.error;
           return result.data ?? [];
