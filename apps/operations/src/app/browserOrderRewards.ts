@@ -46,9 +46,7 @@ function promotionChannel(value: unknown): 'POS' | 'ONLINE' | 'BOTH' {
   throw new TypeError('Reward promotion channel is unsupported.');
 }
 
-function promotionStackingPolicy(
-  value: unknown,
-): 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' {
+function promotionStackingPolicy(value: unknown): 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED' {
   if (value === undefined || value === 'ONE_ORDER_LEVEL') return 'ONE_ORDER_LEVEL';
   if (value === 'ALLOW_CONFIGURED') return value;
   throw new TypeError('Reward promotion stacking policy is unsupported.');
