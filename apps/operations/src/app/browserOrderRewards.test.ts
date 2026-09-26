@@ -137,4 +137,30 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
       committedCheckoutIntentIds: [CHECKOUT_INTENT_ID],
     });
   });
+  it('surfaces a failed canonical reconciliation response so the caller can retry', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            claims: [{ reservationId: RESERVATION_ID, checkoutIntentId: CHECKOUT_INTENT_ID }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'reward_authority_failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const authority = new BrowserOrderRewardAuthority();
+    await expect(
+      authority.reconcileClaims(SHOP_ID, async () => true),
+    ).rejects.toThrow('Reward claim reconciliation failed');
+  });
+
 });
