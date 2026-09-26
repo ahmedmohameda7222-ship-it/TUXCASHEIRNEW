@@ -130,6 +130,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
         now: () => instant(new Date()),
         createUuid: () => crypto.randomUUID(),
       };
+      const rewardAuthority = new BrowserOrderRewardAuthority();
 
       const remoteGateway = new VercelBrowserRemoteGateway();
       const configurationService = new OperationsConfigurationSyncService(
@@ -189,7 +190,12 @@ async function browserRuntime(): Promise<BrowserRuntime> {
 
       const startRemoteRuntime = (shopId: ShopId): void => {
         if (!automaticSyncStarted) {
-          startBrowserAutomaticSync({ database, now: runtime.now, shopId });
+          startBrowserAutomaticSync({
+            database,
+            now: runtime.now,
+            shopId,
+            rewardClaims: rewardAuthority,
+          });
           automaticSyncStarted = true;
         }
         if (!configurationTimerStarted) {
@@ -474,7 +480,7 @@ async function browserRuntime(): Promise<BrowserRuntime> {
           runtime,
           coordinator,
           new BrowserOrderPrinter(),
-          new BrowserOrderRewardAuthority(),
+          rewardAuthority,
         ),
         ordersBoard: new OperationsOrdersBoardService(database, readModel, runtime, coordinator),
         expenses: new OperationsExpensesService(
