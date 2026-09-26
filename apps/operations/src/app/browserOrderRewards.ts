@@ -299,7 +299,10 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
 
   async reconcileClaims(
     shopId: OrderRewardReservationInput['shopId'],
-    hasCommittedCheckoutIntent: (checkoutIntentId: string) => Promise<boolean>,
+    hasCommittedCheckoutIntent: (
+      checkoutIntentId: string,
+      reservationId: string,
+    ) => Promise<boolean>,
   ): Promise<void> {
     let listResponse: Response;
     try {
@@ -337,7 +340,7 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
           claim['checkoutIntentId'],
           'Reward claim checkout intent id',
         );
-        if (await hasCommittedCheckoutIntent(checkoutIntentId)) {
+        if (await hasCommittedCheckoutIntent(checkoutIntentId, reservationId)) {
           committedCheckoutIntentIds.push(checkoutIntentId);
         }
       }
@@ -346,8 +349,9 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
       return;
     }
 
+    let reconcileResponse: Response;
     try {
-      await fetch('/api/operations-order-rewards', {
+      reconcileResponse = await fetch('/api/operations-order-rewards', {
         method: 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
@@ -362,7 +366,16 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
         }),
       });
     } catch {
-      // A later reconnect/startup retry can reconcile the same idempotent claims.
+      throw new Error('Reward claim reconciliation failed.');
+    }
+    if (!reconcileResponse.ok) {
+      throw new Error('Reward claim reconciliation failed.');
+    }
+    try {
+      const parsed = object(await reconcileResponse.json(), 'Reward reconciliation response');
+      if (parsed['ok'] !== true) throw new Error('Reward claim reconciliation failed.');
+    } catch {
+      throw new Error('Reward claim reconciliation failed.');
     }
   }
 
