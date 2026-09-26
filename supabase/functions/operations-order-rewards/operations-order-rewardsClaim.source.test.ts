@@ -14,4 +14,18 @@ describe('operations reward claim bridge', () => {
     expect(source).toContain('p_reservation_id: reservationId');
     expect(source).toContain('p_checkout_intent_id: checkoutIntentId');
   });
+
+
+  it('exposes authenticated claim listing and reconciliation actions for crash recovery', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'supabase/functions/operations-order-rewards/index.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain("action === 'LIST_CLAIMS'");
+    expect(source).toContain("'list_operations_reward_claims_v1'");
+    expect(source).toContain("action === 'RECONCILE'");
+    expect(source).toContain("'reconcile_operations_reward_claims_v1'");
+    expect(source).toContain('p_committed_checkout_intent_ids');
+  });
 });
