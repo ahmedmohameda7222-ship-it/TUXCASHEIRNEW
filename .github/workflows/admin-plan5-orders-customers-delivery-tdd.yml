@@ -328,6 +328,7 @@ jobs:
           npx vitest run
           packages/application/src/ordersOnlineSource.sqlite.test.ts
           apps/operations/src/app/browserOrderRewards.test.ts
+          apps/operations/src/app/automaticSync.test.ts
           supabase/functions/operations-order-rewards/operations-order-rewardsClaim.source.test.ts
       - name: Plan 5 ONLINE reward acceptance and intent contract
         run: >-
