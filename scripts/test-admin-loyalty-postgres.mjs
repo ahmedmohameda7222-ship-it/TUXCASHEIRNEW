@@ -508,7 +508,7 @@ const promotion = rpc(
     array['${CATEGORY_ID}'::uuid],
     1,
     1,
-    'ONE_ORDER_LEVEL',
+    'ALLOW_CONFIGURED',
     null,
     'promotion-upsert-1'
   )`,
