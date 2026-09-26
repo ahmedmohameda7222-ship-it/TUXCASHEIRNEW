@@ -137,6 +137,32 @@ Deno.serve(async (request) => {
       p_checkout_intent_id: checkoutIntentId,
       p_now: new Date().toISOString(),
     };
+  } else if (action === 'LIST_CLAIMS') {
+    rpcName = 'list_operations_reward_claims_v1';
+    parameters = {
+      p_auth_user_id: userData.user.id,
+      p_device_id: deviceId,
+      p_shop_id: shopId,
+    };
+  } else if (action === 'RECONCILE') {
+    const committedCheckoutIntentIds = body['committedCheckoutIntentIds'];
+    if (
+      !Array.isArray(committedCheckoutIntentIds) ||
+      committedCheckoutIntentIds.length > 2000 ||
+      committedCheckoutIntentIds.some(
+        (value) => typeof value !== 'string' || value.trim().length === 0 || value.length > 200,
+      )
+    ) {
+      return jsonResponse(400, { error: 'invalid_reward_reconciliation' });
+    }
+    rpcName = 'reconcile_operations_reward_claims_v1';
+    parameters = {
+      p_auth_user_id: userData.user.id,
+      p_device_id: deviceId,
+      p_shop_id: shopId,
+      p_committed_checkout_intent_ids: [...new Set(committedCheckoutIntentIds)],
+      p_now: new Date().toISOString(),
+    };
   } else if (action === 'RELEASE') {
     const reservationId = stringValue(body['reservationId']);
     if (reservationId === null || !UUID_PATTERN.test(reservationId)) {
