@@ -137,6 +137,11 @@ const CLAIMED_EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000005';
 const MERGED_EXPIRY_SURVIVOR_ID = '79000000-0000-4000-8000-000000000006';
 const MERGED_EXPIRY_RETIRED_ID = '79000000-0000-4000-8000-000000000007';
 const ABANDONED_CLAIM_CUSTOMER_ID = '79000000-0000-4000-8000-000000000008';
+const AUTH_USER_ID = '70000000-0000-4000-8000-000000000001';
+const DEVICE_MEMBERSHIP_ID = '70000000-0000-4000-8000-000000000002';
+const DEVICE_ID = '70000000-0000-4000-8000-000000000003';
+const DEVICE_COMMITTED_ORDER_ID = '78000000-0000-4000-8000-000000000098';
+const STACKING_CUSTOMER_ID = '79000000-0000-4000-8000-000000000009';
 
 psql(
   [
@@ -145,6 +150,17 @@ psql(
        values ('${SHOP_ID}', 'Loyalty Test Shop', true);
      insert into public.business_shops(business_id, shop_id)
        values ('${BUSINESS_ID}', '${SHOP_ID}');
+     insert into auth.users(id) values ('${AUTH_USER_ID}');
+     insert into public.shop_memberships(id, shop_id, auth_user_id, role, active)
+       values (
+         '${DEVICE_MEMBERSHIP_ID}', '${SHOP_ID}', '${AUTH_USER_ID}',
+         'OPERATIONS_DEVICE', true
+       );
+     insert into public.devices(id, shop_id, label, active, last_seen_at, auth_user_id)
+       values (
+         '${DEVICE_ID}', '${SHOP_ID}', 'Reward Test Device', true,
+         '2026-09-23T09:00:00Z', '${AUTH_USER_ID}'
+       );
      insert into public.business_employees(id, business_id, display_name, role, active)
        values ('${EMPLOYEE_ID}', '${BUSINESS_ID}', 'Loyalty Owner', 'OWNER', true);
      insert into public.workers(id, shop_id, display_name, pin_hash, active)
