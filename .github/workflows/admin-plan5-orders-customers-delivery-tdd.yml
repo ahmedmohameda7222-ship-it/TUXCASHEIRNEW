@@ -418,7 +418,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Plan 5 trusted ONLINE delivery routing authority
-        run: npx vitest run supabase/functions/order-intake/order-intakeDeliveryAuthority.test.ts
+        run: >-
+          npx vitest run
+          supabase/functions/order-intake/order-intakeDeliveryAuthority.test.ts
+          supabase/functions/order-intake/order-intakePagination.test.ts
 
   task5-delivery-e2e:
     needs: task5-delivery-service
