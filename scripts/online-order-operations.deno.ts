@@ -9,6 +9,7 @@ const DEVICE_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const SHOP_ID = '44444444-4444-4444-8444-444444444444';
 const ORDER_ID = '55555555-5555-4555-8555-555555555555';
+const ZONE_ID = '66666666-6666-4666-8666-666666666666';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -29,6 +30,12 @@ function pending(status: 'PENDING' | 'PROCESSING' = 'PENDING'): Record<string, u
     customerName: 'Ahmed Mohamed',
     normalizedPhone: '01001234567',
     deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: ZONE_ID,
+    deliveryZoneName: 'Nasr City',
+    deliveryFeeMinor: 3000,
+    deliveryMinimumOrderMinor: 15000,
+    deliveryFallbackUsed: false,
     trustedItems: [],
     itemsSubtotalMinor: 19000,
     orderNote: null,

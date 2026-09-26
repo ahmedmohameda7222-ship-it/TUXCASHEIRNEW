@@ -20,6 +20,14 @@ export type RemoteMutationGuard =
       readonly incomingRevision: number;
     }
   | {
+      readonly kind: 'COMPARE_AND_SWAP_REVISION';
+      readonly column: 'operational_revision';
+      readonly incomingRevision: number;
+      readonly expectedRevision: number;
+      readonly statusColumn: 'status';
+      readonly expectedStatus: string;
+    }
+  | {
       readonly kind: 'MONOTONIC_TIMESTAMP';
       readonly column: 'last_order_at' | 'ended_at';
       readonly incomingTimestamp: Instant | null;
@@ -83,6 +91,18 @@ export function shouldApplyRemoteMutation(
       Number.isSafeInteger(current) &&
       current >= 0 &&
       guard.incomingRevision >= current
+    );
+  }
+
+  if (guard.kind === 'COMPARE_AND_SWAP_REVISION') {
+    const currentRevision = existing[guard.column];
+    const currentStatus = existing[guard.statusColumn];
+    return (
+      typeof currentRevision === 'number' &&
+      Number.isSafeInteger(currentRevision) &&
+      currentRevision === guard.expectedRevision &&
+      currentStatus === guard.expectedStatus &&
+      guard.incomingRevision === guard.expectedRevision + 1
     );
   }
 
@@ -306,6 +326,8 @@ function orderPlacementMutations(
         returned_by_worker_id: lifecycle.returned?.workerId ?? null,
         returned_by_worker_name_snapshot: lifecycle.returned?.workerName ?? null,
         return_reason: lifecycle.returned?.reason ?? null,
+        reward_reservation_id: order.rewardReservationId ?? null,
+        applied_reward_snapshot: order.appliedRewardSnapshot ?? null,
         snapshot_json: order,
       },
       {
@@ -381,7 +403,10 @@ function orderPlacementMutations(
   return result;
 }
 
-function orderLifecycleMutation(order: OrderSnapshot): RemoteTableMutation {
+function orderLifecycleMutation(
+  order: OrderSnapshot,
+  transition: OrderTransitionSyncSnapshotV1,
+): RemoteTableMutation {
   const lifecycle = orderLifecycle(order);
   const lastOperationalAt =
     lifecycle.returned?.at ?? lifecycle.cancellation?.at ?? lifecycle.doneAt ?? order.createdAt;
@@ -410,9 +435,12 @@ function orderLifecycleMutation(order: OrderSnapshot): RemoteTableMutation {
     {
       mode: 'UPDATE',
       guard: {
-        kind: 'MONOTONIC_REVISION',
+        kind: 'COMPARE_AND_SWAP_REVISION',
         column: 'operational_revision',
         incomingRevision: lifecycle.revision,
+        expectedRevision: transition.revision - 1,
+        statusColumn: 'status',
+        expectedStatus: transition.fromStatus,
       },
     },
   );
@@ -535,7 +563,7 @@ export function buildRemoteMaterializationPlanV1(envelope: unknown): RemoteMater
     case 'ORDER_DONE_UNDONE':
     case 'ORDER_CANCELLED':
     case 'DELIVERY_RETURNED':
-      mutations.push(orderLifecycleMutation(payload.order));
+      mutations.push(orderLifecycleMutation(payload.order, payload.transition));
       mutations.push(statusEventMutation(normalizedEnvelope, payload.order, payload.transition));
       mutations.push(...payload.inventoryMovements.map(movementMutation));
       if (payload.deliveryFailedExpense !== null) {

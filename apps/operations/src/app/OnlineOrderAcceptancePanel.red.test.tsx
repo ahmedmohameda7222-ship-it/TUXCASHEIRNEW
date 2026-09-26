@@ -1,10 +1,11 @@
-import { instant, parseEntityId, type ShopId } from '@tux/domain';
+import { instant, parseEntityId, type DeliveryZoneId, type ShopId } from '@tux/domain';
 import type { CachedOnlineOrderRequest } from '@tux/persistence';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { OnlineOrderInboxPanel } from './OnlineOrderInboxPanel';
 
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
+const ZONE_ID = parseEntityId<DeliveryZoneId>('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 
 const request: CachedOnlineOrderRequest = {
   requestId: '33333333-3333-4333-8333-333333333333',
@@ -16,6 +17,12 @@ const request: CachedOnlineOrderRequest = {
   customerName: 'Online Customer',
   normalizedPhone: '01012345678',
   deliveryAddress: 'Nasr City, Cairo',
+  requestedShopId: SHOP_ID,
+  deliveryZoneId: ZONE_ID,
+  deliveryZoneName: 'Nasr City',
+  deliveryFeeMinor: 3_000,
+  deliveryMinimumOrderMinor: 15_000,
+  deliveryFallbackUsed: false,
   trustedItems: [
     {
       productId: '77777777-7777-4777-8777-777777777777',

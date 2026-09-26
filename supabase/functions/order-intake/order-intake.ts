@@ -63,8 +63,24 @@ export interface OnlineOrderStoredRequest {
   status: 'PENDING' | 'PROCESSING' | 'ACCEPTED' | 'REJECTED';
 }
 
+export type OnlineOrderDeliveryRouteResult =
+  | {
+      ok: true;
+      shopId: string;
+      zoneId: string;
+      zoneName: string;
+      feeMinor: number;
+      minimumOrderMinor: number;
+      fallbackUsed: boolean;
+    }
+  | {
+      ok: false;
+      code: 'delivery_unavailable' | 'delivery_closed' | 'minimum_order_not_met';
+    };
+
 export interface OnlineOrderPendingInsert {
   id: string;
+  requestedShopId: string;
   shopId: string;
   idempotencyKey: string;
   requestSha256: string;
@@ -76,9 +92,19 @@ export interface OnlineOrderPendingInsert {
   customerName: string;
   normalizedPhone: string | null;
   deliveryAddress: string | null;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
+  deliveryZoneId: string | null;
+  deliveryZoneName: string | null;
+  deliveryFeeMinor: number | null;
+  deliveryMinimumOrderMinor: number | null;
+  deliveryFallbackUsed: boolean;
+  deliveryRoutingSnapshot: Record<string, unknown> | null;
   trustedItems: Array<Record<string, unknown>>;
   itemsSubtotalMinor: number;
   orderNote: string | null;
+  promotionId: string | null;
+  loyaltyPointsToRedeem: number;
   acceptedOrderId: null;
 }
 
@@ -136,8 +162,20 @@ export interface OnlineOrderIntakeStore {
   loadPublishedCheckoutAuthority?(
     shopId: string,
   ): Promise<OnlineOrderPublishedCheckoutAuthority | null>;
+  resolveDeliveryRoute?(input: {
+    requestedShopId: string;
+    latitude: number;
+    longitude: number;
+    subtotalMinor: number;
+    at: string;
+  }): Promise<OnlineOrderDeliveryRouteResult>;
+  translateRequestToShop?(input: {
+    requestedShopId: string;
+    targetShopId: string;
+    request: OnlineOrderRequestV1;
+  }): Promise<OnlineOrderRequestV1 | null>;
   findByIdempotency(
-    shopId: string,
+    requestedShopId: string,
     idempotencyKey: string,
   ): Promise<OnlineOrderStoredRequest | null>;
   insertPending(record: OnlineOrderPendingInsert): Promise<void>;
@@ -262,6 +300,15 @@ function canonicalRequest(request: OnlineOrderRequestV1, normalizedPhone: string
       note: item.note,
     })),
     orderNote: request.orderNote,
+    ...(request.reward === undefined ? {} : { reward: request.reward }),
+    ...(request.deliveryLocation === undefined
+      ? {}
+      : {
+          deliveryLocation: {
+            latitude: request.deliveryLocation.latitude,
+            longitude: request.deliveryLocation.longitude,
+          },
+        }),
   };
 }
 
@@ -285,7 +332,7 @@ function canonicalCatalogForRevision(catalog: OnlineOrderCatalogAuthority): unkn
 }
 
 function validateCatalogTenant(catalog: OnlineOrderCatalogAuthority, shopId: string): void {
-  if (catalog.shop.id !== shopId || !catalog.shop.active) throw new Error('catalog shop mismatch');
+  if (catalog.shop.id !== shopId) throw new Error('catalog shop mismatch');
   if (catalog.categories.some((category) => category.shopId !== shopId)) {
     throw new Error('cross-shop category authority');
   }
@@ -732,31 +779,110 @@ export async function handleOrderIntakeRequest(
       return successResponse(200, existing.id);
     }
 
-    const catalog = await store.loadCatalog(parsed.shopId);
-    if (!catalog || !catalog.shop.active) return errorResponse(404, 'shop_not_found');
-    validateCatalogTenant(catalog, parsed.shopId);
+    const requestedShopId = parsed.shopId;
+    let finalShopId = requestedShopId;
+    let finalRequest = parsed;
+    let finalCatalog = await store.loadCatalog(requestedShopId);
+    if (!finalCatalog) return errorResponse(404, 'shop_not_found');
+    if (!finalCatalog.shop.active && parsed.fulfillmentPreference !== 'DELIVERY') {
+      return errorResponse(404, 'shop_not_found');
+    }
+    validateCatalogTenant(finalCatalog, requestedShopId);
 
-    const trusted = buildTrustedItems(parsed, catalog);
-    if (trusted instanceof Response) return trusted;
+    let finalTrusted = buildTrustedItems(finalRequest, finalCatalog);
+    if (finalTrusted instanceof Response) return finalTrusted;
 
     const loadPublishedCheckoutAuthority = store.loadPublishedCheckoutAuthority;
     if (!loadPublishedCheckoutAuthority) {
       return errorResponse(503, 'published_configuration_unavailable');
     }
-    const checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, parsed.shopId);
+    let checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, requestedShopId);
     if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
-    const policyError = publishedCheckoutPolicyError(
-      parsed,
-      trusted.itemsSubtotalMinor,
-      normalizedPhone,
-      checkoutAuthority,
-    );
-    if (policyError) return policyError;
 
-    const catalogRevision = await sha256Hex(canonicalCatalogForRevision(catalog));
+    let deliveryRoute: Extract<OnlineOrderDeliveryRouteResult, { ok: true }> | null = null;
+    if (parsed.fulfillmentPreference === 'DELIVERY') {
+      if (parsed.deliveryLocation === undefined) {
+        return errorResponse(409, 'delivery_location_required');
+      }
+      const resolveDeliveryRoute = store.resolveDeliveryRoute;
+      if (!resolveDeliveryRoute) {
+        return errorResponse(503, 'delivery_configuration_unavailable');
+      }
+      const routingAt = new Date().toISOString();
+      const resolve = (subtotalMinor: number) =>
+        resolveDeliveryRoute.call(store, {
+          requestedShopId,
+          latitude: parsed.deliveryLocation!.latitude,
+          longitude: parsed.deliveryLocation!.longitude,
+          subtotalMinor,
+          at: routingAt,
+        });
+      let resolved = await resolve(finalTrusted.itemsSubtotalMinor);
+      if (!resolved.ok) return errorResponse(409, resolved.code);
+
+      if (resolved.shopId !== requestedShopId) {
+        finalShopId = resolved.shopId;
+        const translateRequestToShop = store.translateRequestToShop;
+        if (!translateRequestToShop) {
+          return errorResponse(503, 'delivery_configuration_unavailable');
+        }
+        const translated = await translateRequestToShop.call(store, {
+          requestedShopId,
+          targetShopId: finalShopId,
+          request: parsed,
+        });
+        if (!translated) return errorResponse(409, 'delivery_unavailable');
+        finalRequest = translated;
+
+        finalCatalog = await store.loadCatalog(finalShopId);
+        if (!finalCatalog || !finalCatalog.shop.active) {
+          return errorResponse(409, 'delivery_unavailable');
+        }
+        validateCatalogTenant(finalCatalog, finalShopId);
+        finalTrusted = buildTrustedItems(finalRequest, finalCatalog);
+        if (finalTrusted instanceof Response) return errorResponse(409, 'delivery_unavailable');
+
+        checkoutAuthority = await loadPublishedCheckoutAuthority.call(store, finalShopId);
+        if (!checkoutAuthority) return errorResponse(503, 'published_configuration_unavailable');
+
+        const revalidated = await resolve(finalTrusted.itemsSubtotalMinor);
+        if (
+          !revalidated.ok ||
+          revalidated.shopId !== finalShopId ||
+          revalidated.zoneId !== resolved.zoneId ||
+          !revalidated.fallbackUsed
+        ) {
+          return errorResponse(
+            409,
+            revalidated.ok ? 'delivery_unavailable' : revalidated.code,
+          );
+        }
+        resolved = revalidated;
+      }
+
+      const policyError = publishedCheckoutPolicyError(
+        finalRequest,
+        finalTrusted.itemsSubtotalMinor,
+        normalizedPhone,
+        checkoutAuthority,
+      );
+      if (policyError) return policyError;
+      deliveryRoute = resolved;
+    } else {
+      const policyError = publishedCheckoutPolicyError(
+        finalRequest,
+        finalTrusted.itemsSubtotalMinor,
+        normalizedPhone,
+        checkoutAuthority,
+      );
+      if (policyError) return policyError;
+    }
+
+    const catalogRevision = await sha256Hex(canonicalCatalogForRevision(finalCatalog));
     const record: OnlineOrderPendingInsert = {
       id: crypto.randomUUID(),
-      shopId: parsed.shopId,
+      requestedShopId,
+      shopId: finalShopId,
       idempotencyKey: parsed.idempotencyKey,
       requestSha256,
       sourceFingerprint: requestSourceFingerprint,
@@ -767,9 +893,30 @@ export async function handleOrderIntakeRequest(
       customerName: parsed.customer.name,
       normalizedPhone,
       deliveryAddress: parsed.customer.address,
-      trustedItems: trusted.trustedItems,
-      itemsSubtotalMinor: trusted.itemsSubtotalMinor,
+      deliveryLatitude: parsed.deliveryLocation?.latitude ?? null,
+      deliveryLongitude: parsed.deliveryLocation?.longitude ?? null,
+      deliveryZoneId: deliveryRoute?.zoneId ?? null,
+      deliveryZoneName: deliveryRoute?.zoneName ?? null,
+      deliveryFeeMinor: deliveryRoute?.feeMinor ?? null,
+      deliveryMinimumOrderMinor: deliveryRoute?.minimumOrderMinor ?? null,
+      deliveryFallbackUsed: deliveryRoute?.fallbackUsed ?? false,
+      deliveryRoutingSnapshot:
+        deliveryRoute === null
+          ? null
+          : {
+              requestedShopId: parsed.shopId,
+              resolvedShopId: deliveryRoute.shopId,
+              zoneId: deliveryRoute.zoneId,
+              zoneName: deliveryRoute.zoneName,
+              feeMinor: deliveryRoute.feeMinor,
+              minimumOrderMinor: deliveryRoute.minimumOrderMinor,
+              fallbackUsed: deliveryRoute.fallbackUsed,
+            },
+      trustedItems: finalTrusted.trustedItems,
+      itemsSubtotalMinor: finalTrusted.itemsSubtotalMinor,
       orderNote: parsed.orderNote,
+      promotionId: parsed.reward?.promotionId ?? null,
+      loyaltyPointsToRedeem: parsed.reward?.loyaltyPointsToRedeem ?? 0,
       acceptedOrderId: null,
     };
 

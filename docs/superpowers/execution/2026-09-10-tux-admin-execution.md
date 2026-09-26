@@ -2,9 +2,9 @@
 
 **Program:** TUX Admin control plane  
 **Execution start:** 2026-09-10  
-**Active plan:** Plan 2 — Catalog/Publishing/Settings  
-**Active branch:** `feat/admin-02-catalog-settings`  
-**Base main commit:** `96d7bb26d5c738859036c0f75c035e664e447f31`
+**Active plan:** Plan 5 — Orders/Customers/Loyalty/Promotions/Delivery  
+**Active branch:** `feat/admin-05-orders-customers-delivery-v2`  
+**Base main commit:** `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`
 
 ## Authority and execution rules
 
@@ -539,4 +539,129 @@ Exact pre-ledger fixed head `49a330ddd8b0776a1437c90d3d7458521af8ec6d` passed:
 - Foundation `35545425523`, Catalog `35545425512`, Catalog Boundary `35545425504`, Plan 2 rounds 15/16/17 `35545425505` / `35545425500` / `35545425503`, and Plan 3 `35545425502` were SUCCESS.
 
 Production promotion remains a separate explicit checkpoint. No ready-for-review transition, merge, Supabase production migration, or Vercel production deployment is authorized by this hardening round. Because this ledger commit changes the PR head, the resulting ledger-inclusive exact head must pass the permanent workflow set before the seven Codex threads are resolved and another final exact-head Codex review is requested.
+
+
+
+## Plan 4 production promotion closeout — 2026-09-23
+
+Plan 4 technical closure is complete. PR #92 was squash-merged to `main` as `bc1a9d2d78e8d748bfc7725e80186721424d828b` after exact-head Plan 4 TDD and root CI were GREEN and all review threads were resolved. Post-merge TUX V2 CI run `35819964527` completed SUCCESS, including `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+
+Canonical Supabase project `awpdcsayuwbsruwvaosg` (`TUX V2`) was then promoted to the merged Plan 4 schema. Live migration history now contains the repository versions exactly:
+- `20260910130000 admin_inventory_ledger`
+- `20260910140000 admin_inventory_intelligence`
+- `20260910150000 admin_purchasing`
+
+Live readback confirms the Plan 4 inventory/purchasing schema is present, including inventory reservations/cost state, stocktakes/transfers, replenishment settings, suppliers/purchase orders, and the canonical reservation/consume/restore/release, adjustment, stocktake, and transfer RPC families. The promotion was not duplicated during the 2026-09-23 reconciliation check because all three repository migration versions were already present in canonical migration history.
+
+Production inventory sync deployment was closed through PR #96, merged as `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. Production Supabase Edge Functions now report:
+- `operations-sync` ACTIVE, version 3, `verify_jwt=true`, using the merged Plan 4 source contract;
+- `operations-inventory` ACTIVE, version 1, `verify_jwt=true`, with its explicit import map.
+
+PR #96 post-merge TUX V2 CI run `35821747601` completed SUCCESS. Supabase security/performance advisor output was reviewed after promotion; no new Plan-4-specific blocker was identified. Existing informational RLS/no-policy and performance/index findings remain separate hardening/maintenance scope and are not silently changed at this checkpoint.
+
+Plan 4 production promotion is therefore reconciled and closed. Plan 5 continues from clean baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e` on `feat/admin-05-orders-customers-delivery-v2` / PR #98. The original `feat/admin-05-orders-customers-delivery` branch remains preserved as implementation-history backup.
+
+## Plan 5 implementation checkpoint — final-review preflight
+
+Plan 5 implementation continued on PR #98 from the clean promoted Plan 4 baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. The historical `feat/admin-05-orders-customers-delivery` branch remains a RED→GREEN backup only; active work is on `feat/admin-05-orders-customers-delivery-v2`.
+
+The pre-ledger final-review checkpoint is `fa3c07e1f98743ece9f5461754f3b1a9c9dde0c0`. At that SHA the branch is 228 commits ahead and 0 behind `main`, with the merge base still exactly the promoted Plan 4 baseline. PR #98 is mergeable and remains draft. No Plan 5 production Supabase migration, production deployment, or merge has been performed.
+
+### Plan 5 implementation status
+
+- [x] Task 1 — controlled order supervision is implemented with immutable cancellation/refund/return history, central reason snapshots, shop/permission authority, durable command idempotency, transactional limits, Plan 3 approval-engine routing, second-person approval protection, rejected-approval non-posting, and exactly-once approved execution.
+- [x] Task 2 — Admin Orders search/detail/action UI and `e2e/admin-orders.spec.ts` cover status-contextual actions, cancellation reason validation, stale operational-revision handling, immutable refund/return reason history, pending approval display, and proactive Operations lifecycle convergence for an idle online client.
+- [x] Task 3 — canonical Egyptian-phone customer identity and merge preserve historical order/contact evidence, shop links, addresses/segments/loyalty state, survivor redirects, permission/confirmation/audit/idempotency, and locked merge serialization. PostgreSQL behavior verifies canonical phone forms and merge invariants.
+- [x] Task 4 — CRM/customer detail, loyalty history/configuration/manual adjustment, automatic segments, promotion management, immutable loyalty/promotion ledgers, expiry/compensation events, canonical promotion validation, POS/ONLINE reward placement, immutable applied-reward snapshots, online reservation for shared scarce state, offline fail-closed behavior, idempotent consume/release/expiry, and cross-device/cross-channel race protection are implemented.
+- [x] Task 5 — delivery zones/routing, priority, canonical delivery hours/availability, explicit fallback, fee/minimum authority, trusted ONLINE checkout recomputation, riders, append-oriented delivery state history, shop/permission/version fencing, and canonical RETURNED convergence are implemented.
+- [x] The temporary Plan 5 formatter workflow is absent from the final product diff.
+- [x] The permanent Plan 5 workflow targets the active `v2` branch and permanently exercises Tasks 1–5 plus full migration/unit regression and typecheck.
+- [ ] Final ledger-inclusive exact-head CI and fresh exact-head review remain before Plan 5 can be declared technically ready for squash merge.
+
+### Plan 5 RED→GREEN / behavioral evidence at `fa3c07e1…`
+
+The permanent `Admin Plan 5 Orders Customers Delivery TDD` run `35955734829` completed SUCCESS. Its green jobs include:
+
+- order-control migration/service behavior, lifecycle CAS/convergence, and typecheck;
+- refund/return approval PostgreSQL behavior, including direct-vs-held thresholds, command replay/conflict, second-person approval, rejection, and exactly-once execution;
+- Orders rendered Playwright acceptance;
+- customer migration/unit/PostgreSQL canonicalization and merge behavior;
+- loyalty/promotion migration/unit behavior and reward-reservation PostgreSQL concurrency;
+- POS reward placement, ONLINE reward acceptance, and POS-vs-ONLINE parity;
+- CRM/promotions rendered Playwright acceptance;
+- delivery migration/service/PostgreSQL behavior, trusted ONLINE delivery checkout authority, and rendered Playwright acceptance;
+- full `npm run test:migrations` plus `npm test` regression.
+
+The same SHA's root `TUX V2 CI` run `35955734696` completed SUCCESS. The `quality` job passed repository `Format check`, `Lint`, unit/integration tests, Admin security, typecheck, production builds, migration-chain smoke, Edge Function typecheck, and rendered browser E2E. The `Required quality gate` job also completed SUCCESS. Foundation/Plan 2/Plan 3/Plan 4 compatibility workflows associated with this SHA are green.
+
+Current PR #98 review state at this checkpoint: no submitted reviews and no unresolved review threads. A fresh exact-head Codex review is still required by the later review-hardening gate before technical closure.
+
+## Plan 5 final review follow-up — reward claim durability and canonical customer lineage — 2026-09-24
+
+The Codex review of ledger checkpoint `fec6a56010a3fbb4667330eea5ac80865f439958` identified four actionable Plan 5 hardening findings. The active branch was hardened without changing approved Plan 5 scope:
+
+- POS scarce rewards are now durably claimed through the canonical reservation service before local commit. Expiry only releases abandoned `RESERVED` rows; `CLAIMED` reservations remain exclusive beyond the original lease until delayed sync consumes them. PostgreSQL coverage proves a claimed reservation survives expiry, blocks a competing POS/ONLINE claimant, and can still be consumed exactly once by delayed materialization.
+- Per-customer promotion usage now counts the canonical survivor together with retired identities merged into it, preventing a customer merge from resetting a promotion usage limit. PostgreSQL coverage seeds usage on a retired identity and proves the survivor cannot redeem the exhausted one-use promotion again.
+- Admin CRM loyalty history now hydrates the survivor plus identities merged into it, preserving immutable pre-merge ledger visibility.
+- CRM loyalty balance is no longer derived from the bounded 250-row display history. The canonical unpaginated balance is fetched independently through `get_admin_customer_loyalty_balance_v1`, while the visible history remains paginated/bounded.
+
+Exact pre-ledger hardened HEAD `49b435283ac5427d0af02be561c256ae82bd2478` passed:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `35961906388` — SUCCESS across all 19 permanent Plan 5 jobs, including order controls/approval PostgreSQL, customer canonicalization/merge, loyalty/promotion PostgreSQL behavior, reward placement/races, rendered Orders/CRM/Delivery E2E, delivery checkout authority, regression, and typecheck.
+- `TUX V2 CI` run `35961906228` — SUCCESS across `menu`, `monorepo-architecture`, `admin`, `windows-package`, `quality`, `edge-security`, and `Required quality gate`.
+- The branch was 241 commits ahead and 0 behind `main`, mergeable, and still based on promoted Plan 4 baseline `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`.
+- All four Codex review threads were answered with implementation/test evidence and resolved.
+
+This ledger commit changes the exact PR head again. Plan 5 must therefore obtain fresh ledger-inclusive permanent CI and a fresh exact-head Codex review with no valid unresolved serious finding before the branch can be declared technically ready for final review/squash merge. No merge, Supabase production migration, or production deployment is authorized by this checkpoint.
+
+## Plan 5 final review follow-up — delivery dispatch, return valuation, and order action parity — 2026-09-25
+
+The fresh Codex review of commit `83c9eb2246` identified three actionable Plan 5 findings. All three were reproduced with focused RED coverage and fixed without expanding approved Plan 5 scope:
+
+- Delivery dispatch now includes newly placed canonical DELIVERY orders even before a durable `delivery_order_states` row exists. The Admin delivery workspace synthesizes the exact initial dispatch state `UNASSIGNED` (version 1, no rider) only for eligible ACTIVE/DONE delivery orders lacking durable state, so they can enter the rider workflow without inventing parallel order history.
+- Returned-item financial amounts now include immutable paid modifier price × quantity snapshots in addition to the base item snapshot. This keeps return amounts and downstream loyalty/reward compensation aligned with the canonical amount originally paid for customized items.
+- Order-detail refund/return actions now match the trusted RPC status contract exactly: controls are exposed only for `DONE` and `RETURNED`, not `CANCELLED` orders that the backend will always reject.
+
+The three review threads were answered with exact-head evidence and resolved. Exact pre-ledger head `c0addaebfc57052cba4d9cf69477129bd03ffbed` is 245 commits ahead and 0 behind `main`, with merge base `cfa19b2926c8f9f7448077b7ffe830c9ae7af13e`. At that head:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `35966685616` completed SUCCESS across all 19 permanent jobs, including order controls/approval PostgreSQL, Orders UI/E2E, canonical customers/merge, loyalty/promotions and reward concurrency/placement, CRM/promotions E2E, delivery static/service/PostgreSQL/checkout authority/E2E, and full regression.
+- Root `TUX V2 CI` run `35966685635` completed SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Vercel status checks for both `tuxcasheirnew` and `tux-menu` were SUCCESS.
+
+This ledger commit changes the exact PR head once more. The resulting ledger-inclusive head must pass the permanent workflow set and receive a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 is declared technically ready for final review/squash merge. No merge, Supabase production migration, or Vercel production deployment is authorized by this checkpoint.
+
+## Plan 5 final review follow-up — loyalty reservation capacity, CRM scope/search, and formatter reconciliation — 2026-09-25
+
+The Codex review of ledger checkpoint `69c0a75d78e5e3c5ebfc37d54187b1877eb5b8a4` identified six additional Plan 5 hardening findings. All six were reproduced or covered with focused regression evidence and fixed within approved Plan 5 scope:
+
+- Loyalty expiry now protects both durable `CLAIMED` reward reservations and still-live `RESERVED` reservations, so points already committed to a checkout cannot expire before delayed materialization consumes the reservation.
+- Negative Admin loyalty adjustments now subtract active reserved/claimed loyalty capacity from spendable balance before permitting the debit, preventing the same points from being spent by an adjustment and an order.
+- The Admin loyalty editor hydrates its draft from the canonical fetched program instead of hard-coded defaults, preserving enabled state, earn/redemption rates, minimum redemption, and expiry when an unrelated field is changed.
+- Loyalty program saves preserve the existing canonical multi-shop `shop_ids` scope when the UI does not expose scope editing.
+- Promotion edits preserve the existing canonical multi-shop scope instead of replacing it with only the currently selected shop.
+- CRM customer search now pages all `customer_shop_links` before applying exact name/phone filtering, so customers outside the first PostgREST page remain reachable.
+
+Focused RED coverage landed in `7045928cf90594e53f1c7272b4f147b2815c0b26`, `e97aaf7f6901759cc0ea74b0a95ae8c8413a81ba`, and `05342af7f79a1d0c8722aa45ed4908bfa83648de`. The corresponding production fixes landed in `607cdc08dd113571570ddf189e93b3e68281910f`, `0186cdebba3db56a7324dfe1656a4ffbcceb9319`, `55c2753a09383135eb67ff5f6608c5bbb56b6c1a`, and `6ba41b0b40ef1fabccf7d4860f83be3ff7dc7f5c`, with subsequent test/format normalization commits preserving the same behavior. All six Codex threads were answered with regression evidence and resolved.
+
+Root CI later exposed formatting-only drift in `apps/admin/server/customers/crmStore.test.ts` and `e2e/admin-customers-promotions.spec.ts`. A temporary non-pushing diagnostic change to the existing root workflow at `b854fed6034675a47f96ab27aa0edbca2cd7d701` ran repository Prettier 3.9.6 against only those files and printed the exact formatter diff. The exact generated blobs were committed in `da7353de4fadbc4355f05207e637bbe461299bdf` and `ea8fd78d058d599058ab0ebe79cf2c5383e52824`; the diagnostic workflow instrumentation was then fully removed in `7b56bfd787425a65737460bb677829d194122479`. No self-mutating formatter workflow remains in the Plan 5 product diff.
+
+This ledger update intentionally precedes the final ledger-inclusive gate. The resulting exact HEAD must still pass root `TUX V2 CI` including `format:check`, `lint`, tests, typecheck, migration and rendered-browser gates; the permanent Plan 5 workflow; all required compatibility workflows; and a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 can be declared technically ready for final review/squash merge. No merge, production Supabase migration, or Vercel/Supabase production deployment is authorized by this checkpoint.
+
+## Plan 5 reviewer hardening — reward reconciliation, flat merge lineage, intake paging, and stacking authority — 2026-09-26
+
+A fresh reviewer pass on exact head `d28aa95d09d3e1a79468e33e13e9c82fbbb509e0` identified four remaining Plan 5 correctness risks. The active branch was hardened without expanding approved Plan 5 scope:
+
+- POS scarce-reward durability now distinguishes transient pre-commit claims from durable local checkout intent. Operations claims are device-bound; startup/reconnect reconciliation compares canonical claims with durable local orders, promotes locally committed claims to `COMMITTED`, releases expired abandoned claims, and lets `COMMITTED` reservations materialize canonically later without reopening scarce promotion/loyalty capacity. Application/browser/PostgreSQL coverage exercises durable local commit, delayed reconciliation, abandoned-claim release, ownership, and late canonical consumption.
+- Customer merge lineage is kept flat. When an already-canonical survivor is merged again, every retired identity that pointed at the old survivor is repointed directly at the new survivor, preserving one-hop CRM lookup and canonical loyalty/reward/per-customer-promotion aggregation across chained merges. PostgreSQL coverage verifies `B -> A -> C` flattening, combined loyalty balance, and exhausted per-customer promotion usage.
+- Trusted ONLINE catalog authority now exhaustively pages menu categories, products, modifiers, product-modifier links, and combo-beverage options by actual returned row count. The same loader is used for fallback-shop revalidation, preventing valid large-catalog items or relationships beyond the PostgREST row cap from disappearing during trusted intake.
+- Promotion `stacking_policy` now participates in real checkout authority. `ONE_ORDER_LEVEL` rejects promotion-plus-loyalty and promotion-plus-manual-discount stacking; `ALLOW_CONFIGURED` permits the configured combination only when the published checkout policy also allows discount stacking. Canonical reward snapshots persist the effective stacking policy, with PostgreSQL and application regressions covering both rejected and allowed paths.
+
+Exact pre-ledger hardened head `80b0583ff3608f3c7c27ad1e64228de2eaa1c257` passed:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `36236180335` — all 19 permanent jobs SUCCESS, including customer PostgreSQL merge behavior, loyalty/reward PostgreSQL behavior, reward placement integration, ONLINE delivery checkout authority, Orders/CRM/Delivery E2E, regression, and static/typecheck gates.
+- Root `TUX V2 CI` run `36236180352` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Foundation, Catalog/Boundary, Plan 2 rounds 15/16/17, Plan 3, and Plan 4 compatibility workflows attached to the same exact head were SUCCESS.
+- PR #98 remained draft and mergeable; no production Supabase migration, Vercel deployment, or merge was performed.
+
+This ledger commit changes the exact PR head. The resulting ledger-inclusive head must therefore pass the permanent workflow set again and receive the required fresh exact-head review before Plan 5 can be declared technically ready for final review/squash merge. Production promotion remains a separate explicit checkpoint.
 

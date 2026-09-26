@@ -1,4 +1,10 @@
-import { instant, parseEntityId, type Instant, type ShopId } from '@tux/domain';
+import {
+  instant,
+  parseEntityId,
+  type DeliveryZoneId,
+  type Instant,
+  type ShopId,
+} from '@tux/domain';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REVISION_PATTERN = /^[0-9a-f]{64}$/i;
@@ -18,9 +24,19 @@ export interface CachedOnlineOrderRequest {
   readonly customerName: string;
   readonly normalizedPhone: string | null;
   readonly deliveryAddress: string | null;
+  readonly requestedShopId: ShopId;
+  readonly deliveryZoneId: DeliveryZoneId | null;
+  readonly deliveryZoneName: string | null;
+  readonly deliveryFeeMinor: number | null;
+  readonly deliveryMinimumOrderMinor: number | null;
+  readonly deliveryFallbackUsed: boolean;
   readonly trustedItems: readonly unknown[];
   readonly itemsSubtotalMinor: number;
   readonly orderNote: string | null;
+  /** Optional for cached rows written before Plan 5 ONLINE rewards. */
+  readonly promotionId?: string | null | undefined;
+  /** Optional for cached rows written before Plan 5 ONLINE rewards. */
+  readonly loyaltyPointsToRedeem?: number | undefined;
   readonly createdAt: Instant;
   readonly processingOrderId: string | null;
   readonly processingStartedAt: Instant | null;
@@ -56,6 +72,22 @@ function uuid(value: unknown, label: string): string {
 function optionalNullableUuid(value: unknown, label: string): string | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : uuid(value, label);
+}
+
+function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Cached online-order ${label} is invalid.`);
+  }
+  return value;
+}
+
+function nullableNonNegativeInteger(value: unknown, label: string): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Cached online-order ${label} is invalid.`);
+  }
+  return value;
 }
 
 function nullableString(value: unknown, label: string, max: number): string | null {
@@ -138,6 +170,33 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     throw new Error('Cached online-order normalizedPhone is invalid.');
   }
   const deliveryAddress = nullableString(source.deliveryAddress, 'deliveryAddress', 500);
+  const requestedShopIdValue = uuid(source.requestedShopId, 'requestedShopId');
+  let requestedShopId: ShopId;
+  try {
+    requestedShopId = parseEntityId<ShopId>(requestedShopIdValue);
+  } catch {
+    throw new Error('Cached online-order requestedShopId must be a UUID.');
+  }
+  const deliveryZoneIdValue =
+    source.deliveryZoneId === null ? null : uuid(source.deliveryZoneId, 'deliveryZoneId');
+  let deliveryZoneId: DeliveryZoneId | null = null;
+  if (deliveryZoneIdValue !== null) {
+    try {
+      deliveryZoneId = parseEntityId<DeliveryZoneId>(deliveryZoneIdValue);
+    } catch {
+      throw new Error('Cached online-order deliveryZoneId must be a UUID.');
+    }
+  }
+  const deliveryZoneName = nullableString(source.deliveryZoneName, 'deliveryZoneName', 200);
+  const deliveryFeeMinor = nullableNonNegativeInteger(source.deliveryFeeMinor, 'deliveryFeeMinor');
+  const deliveryMinimumOrderMinor = nullableNonNegativeInteger(
+    source.deliveryMinimumOrderMinor,
+    'deliveryMinimumOrderMinor',
+  );
+  const deliveryFallbackUsed = source.deliveryFallbackUsed;
+  if (typeof deliveryFallbackUsed !== 'boolean') {
+    throw new Error('Cached online-order deliveryFallbackUsed is invalid.');
+  }
   const orderNote = nullableString(source.orderNote, 'orderNote', 1000);
   const itemsSubtotalMinor = source.itemsSubtotalMinor;
   if (
@@ -146,6 +205,31 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     itemsSubtotalMinor < 0
   ) {
     throw new Error('Cached online-order itemsSubtotalMinor is invalid.');
+  }
+
+  if (fulfillmentPreference === 'DELIVERY') {
+    if (
+      deliveryAddress === null ||
+      deliveryZoneId === null ||
+      deliveryZoneName === null ||
+      deliveryZoneName.trim().length === 0 ||
+      deliveryFeeMinor === null ||
+      deliveryMinimumOrderMinor === null ||
+      itemsSubtotalMinor < deliveryMinimumOrderMinor ||
+      (!deliveryFallbackUsed && requestedShopId !== shopId) ||
+      (deliveryFallbackUsed && requestedShopId === shopId)
+    ) {
+      throw new Error('Cached DELIVERY online order is missing canonical delivery authority.');
+    }
+  } else if (
+    deliveryZoneId !== null ||
+    deliveryZoneName !== null ||
+    deliveryFeeMinor !== null ||
+    deliveryMinimumOrderMinor !== null ||
+    deliveryFallbackUsed ||
+    requestedShopId !== shopId
+  ) {
+    throw new Error('Cached PICKUP online order cannot contain delivery authority.');
   }
 
   const createdAt = parseInstant(source.createdAt, 'createdAt');
@@ -157,6 +241,11 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
   const reservationOriginDeviceId = optionalNullableUuid(
     source.reservationOriginDeviceId,
     'reservationOriginDeviceId',
+  );
+  const promotionId = optionalNullableUuid(source.promotionId, 'promotionId');
+  const loyaltyPointsToRedeem = optionalNonNegativeInteger(
+    source.loyaltyPointsToRedeem,
+    'loyaltyPointsToRedeem',
   );
 
   if (
@@ -200,9 +289,17 @@ export function parseCachedOnlineOrderRequest(value: unknown): CachedOnlineOrder
     customerName,
     normalizedPhone,
     deliveryAddress,
+    requestedShopId,
+    deliveryZoneId,
+    deliveryZoneName,
+    deliveryFeeMinor,
+    deliveryMinimumOrderMinor,
+    deliveryFallbackUsed,
     trustedItems: jsonArray(source.trustedItems),
     itemsSubtotalMinor,
     orderNote,
+    promotionId,
+    loyaltyPointsToRedeem,
     createdAt,
     processingOrderId,
     processingStartedAt,

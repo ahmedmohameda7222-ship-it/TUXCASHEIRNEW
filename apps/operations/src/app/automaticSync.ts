@@ -3,18 +3,31 @@ import type { OperationsDatabase } from '@tux/persistence';
 import {
   AutomaticOutboxScheduler,
   HttpInventoryFeedTransport,
+  HttpOrderLifecycleFeedTransport,
   HttpOutboxTransport,
   InventoryConvergenceService,
+  OrderLifecycleConvergenceService,
   OutboxSyncService,
 } from '@tux/sync';
 import { browserSyncStatusStore } from './syncStatus';
 
 const INVENTORY_SYNC_INTERVAL_MS = 15_000;
 
+export interface BrowserRewardClaimReconciler {
+  reconcileClaims(
+    shopId: ShopId,
+    hasCommittedCheckoutIntent: (
+      checkoutIntentId: string,
+      reservationId: string,
+    ) => Promise<boolean>,
+  ): Promise<void>;
+}
+
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
   readonly shopId?: ShopId;
+  readonly rewardClaims?: BrowserRewardClaimReconciler;
 }): AutomaticOutboxScheduler {
   const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
   const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
@@ -26,6 +39,29 @@ export function startBrowserAutomaticSync(input: {
   });
 
   let inventoryRunning = false;
+  let lifecycleRunning = false;
+  let rewardClaimsRunning = false;
+  const synchronizeRewardClaims = async (): Promise<void> => {
+    if (input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) {
+      return;
+    }
+    rewardClaimsRunning = true;
+    try {
+      await input.rewardClaims.reconcileClaims(
+        input.shopId,
+        async (checkoutIntentId, reservationId) => {
+          const order = await input.database.transaction((transaction) =>
+            transaction.orders.getByIdempotencyKey(input.shopId!, checkoutIntentId),
+          );
+          return order?.rewardReservationId === reservationId;
+        },
+      );
+    } catch {
+      // Canonical claims remain protected until a later startup/reconnect reconciliation succeeds.
+    } finally {
+      rewardClaimsRunning = false;
+    }
+  };
   const synchronizeInventory = async (): Promise<void> => {
     if (input.shopId === undefined || inventoryRunning) return;
     inventoryRunning = true;
@@ -46,11 +82,37 @@ export function startBrowserAutomaticSync(input: {
     }
   };
 
+  const synchronizeLifecycle = async (): Promise<void> => {
+    if (input.shopId === undefined || lifecycleRunning) return;
+    lifecycleRunning = true;
+    try {
+      const lifecycleEndpoint = new URL(
+        '/api/operations-order-lifecycle',
+        window.location.origin,
+      ).toString();
+      const convergence = new OrderLifecycleConvergenceService(
+        input.database,
+        new HttpOrderLifecycleFeedTransport({ endpoint: lifecycleEndpoint }),
+      );
+      await convergence.syncShop(input.shopId);
+    } catch {
+      // Operations remains usable from its last known-good local lifecycle projection.
+    } finally {
+      lifecycleRunning = false;
+    }
+  };
+
   browserSyncStatusStore.markRemoteConfigured();
   if (input.shopId !== undefined) {
+    void synchronizeRewardClaims();
     void synchronizeInventory();
+    void synchronizeLifecycle();
     if (typeof window.setInterval === 'function') {
-      window.setInterval(() => void synchronizeInventory(), INVENTORY_SYNC_INTERVAL_MS);
+      window.setInterval(() => {
+        void synchronizeRewardClaims();
+        void synchronizeInventory();
+        void synchronizeLifecycle();
+      }, INVENTORY_SYNC_INTERVAL_MS);
     }
   }
 
@@ -58,7 +120,9 @@ export function startBrowserAutomaticSync(input: {
     browserSyncStatusStore.setOnline(navigator.onLine);
     window.addEventListener('online', () => {
       browserSyncStatusStore.setOnline(true);
+      void synchronizeRewardClaims();
       void synchronizeInventory();
+      void synchronizeLifecycle();
     });
     window.addEventListener('offline', () => browserSyncStatusStore.setOnline(false));
   }

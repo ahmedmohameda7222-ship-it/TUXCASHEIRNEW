@@ -6,3 +6,8 @@ export * from './approvals';
 export * from './audit';
 export * from './inventory';
 export * from './purchasing';
+export * from './orders';
+export * from './customers';
+export * from './loyalty';
+
+export * from './delivery';

@@ -1,0 +1,494 @@
+name: Admin Plan 5 Orders Customers Delivery TDD
+
+concurrency:
+  group: admin-plan5-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/admin-05-orders-customers-delivery-v2
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - 'apps/admin/server/orders/**'
+      - 'apps/admin/api/admin/orders.ts'
+      - 'apps/admin/src/orders/**'
+      - 'apps/admin/server/customers/**'
+      - 'apps/admin/api/admin/customers.ts'
+      - 'apps/admin/src/customers/**'
+      - 'apps/admin/src/promotions/**'
+      - 'apps/admin/server/delivery/**'
+      - 'apps/admin/api/admin/delivery.ts'
+      - 'apps/admin/src/delivery/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
+      - 'packages/admin-contracts/src/orders.ts'
+      - 'packages/admin-contracts/src/customers.ts'
+      - 'packages/admin-contracts/src/loyalty.ts'
+      - 'packages/admin-contracts/src/delivery.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - 'packages/application/src/**'
+      - 'packages/order-intake-contracts/src/**'
+      - 'supabase/functions/operations-order-rewards/**'
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/functions/online-order-operations/**'
+      - 'packages/sync/src/**'
+      - 'packages/persistence/src/**'
+      - 'packages/domain/src/**'
+      - 'apps/menu/src/**'
+      - 'apps/operations/src/**'
+      - 'apps/operations-desktop/src/**'
+      - 'api/**'
+      - 'server/**'
+      - 'e2e/admin-orders.spec.ts'
+      - 'e2e/admin-customers-promotions.spec.ts'
+      - 'e2e/admin-delivery.spec.ts'
+      - 'scripts/test-admin-order-controls-migration.mjs'
+      - 'scripts/test-admin-order-approval-postgres.mjs'
+      - 'scripts/test-admin-customers-migration.mjs'
+      - 'scripts/test-admin-customers-postgres.mjs'
+      - 'scripts/test-admin-loyalty-promotions-migration.mjs'
+      - 'scripts/test-admin-loyalty-postgres.mjs'
+      - 'scripts/test-admin-delivery-migration.mjs'
+      - 'scripts/test-admin-delivery-postgres.mjs'
+      - 'scripts/test-online-order-intake-migration.mjs'
+      - 'scripts/supabaseFunctionAuthConfig.deno.ts'
+      - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - 'apps/admin/server/orders/**'
+      - 'apps/admin/api/admin/orders.ts'
+      - 'apps/admin/src/orders/**'
+      - 'apps/admin/server/customers/**'
+      - 'apps/admin/api/admin/customers.ts'
+      - 'apps/admin/src/customers/**'
+      - 'apps/admin/src/promotions/**'
+      - 'apps/admin/server/delivery/**'
+      - 'apps/admin/api/admin/delivery.ts'
+      - 'apps/admin/src/delivery/**'
+      - 'apps/admin/src/app/routes.tsx'
+      - 'apps/admin/vercel.json'
+      - 'packages/admin-contracts/src/orders.ts'
+      - 'packages/admin-contracts/src/customers.ts'
+      - 'packages/admin-contracts/src/loyalty.ts'
+      - 'packages/admin-contracts/src/delivery.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - 'packages/application/src/**'
+      - 'packages/order-intake-contracts/src/**'
+      - 'supabase/functions/operations-order-rewards/**'
+      - 'supabase/functions/order-intake/**'
+      - 'supabase/functions/online-order-operations/**'
+      - 'packages/sync/src/**'
+      - 'packages/persistence/src/**'
+      - 'packages/domain/src/**'
+      - 'apps/menu/src/**'
+      - 'apps/operations/src/**'
+      - 'apps/operations-desktop/src/**'
+      - 'api/**'
+      - 'server/**'
+      - 'e2e/admin-orders.spec.ts'
+      - 'e2e/admin-customers-promotions.spec.ts'
+      - 'e2e/admin-delivery.spec.ts'
+      - 'scripts/test-admin-order-controls-migration.mjs'
+      - 'scripts/test-admin-order-approval-postgres.mjs'
+      - 'scripts/test-admin-customers-migration.mjs'
+      - 'scripts/test-admin-customers-postgres.mjs'
+      - 'scripts/test-admin-loyalty-promotions-migration.mjs'
+      - 'scripts/test-admin-loyalty-postgres.mjs'
+      - 'scripts/test-admin-delivery-migration.mjs'
+      - 'scripts/test-admin-delivery-postgres.mjs'
+      - 'scripts/test-online-order-intake-migration.mjs'
+      - 'scripts/supabaseFunctionAuthConfig.deno.ts'
+      - '.github/workflows/admin-plan5-orders-customers-delivery-tdd.yml'
+
+jobs:
+  task1-order-controls-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 order controls migration invariant
+        run: node scripts/test-admin-order-controls-migration.mjs
+
+  task1-order-controls:
+    needs: task1-order-controls-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 order service behavior
+        run: npx vitest run apps/admin/server/orders/orderService.test.ts
+      - name: Plan 5 lifecycle CAS/convergence and sync compatibility
+        run: >-
+          npx vitest run
+          packages/application/src/orders.test.ts
+          packages/application/src/ordersBoard.reasonCodes.sqlite.test.ts
+          packages/sync/src/remoteMaterializer.test.ts
+          packages/sync/src/remoteReceipt.test.ts
+          packages/sync/src/httpTransport.test.ts
+          packages/sync/src/orderLifecycleConvergence.test.ts
+      - name: Plan 5 typecheck
+        run: npm run typecheck
+
+  task1-approval-postgres:
+    needs: task1-order-controls-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 refund approval PostgreSQL behavior
+        run: node scripts/test-admin-order-approval-postgres.mjs
+
+  task2-orders-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 Task 2 order detail RED/behavior
+        run: npx vitest run apps/admin/src/orders/OrderDetailPage.test.tsx apps/admin/src/orders/OrdersTask2.test.tsx
+
+  task2-orders-e2e:
+    needs: task2-orders-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 Task 2 Orders browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-orders.spec.ts
+
+  task3-customers-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 customer migration invariant
+        run: node scripts/test-admin-customers-migration.mjs
+
+  task3-customers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 canonical customer identity RED/behavior
+        run: npx vitest run apps/admin/server/customers/phone.test.ts apps/admin/server/customers/customerService.test.ts
+
+  task3-customers-postgres:
+    needs: task3-customers-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 canonical customer merge PostgreSQL behavior
+        run: node scripts/test-admin-customers-postgres.mjs
+
+  task4-loyalty-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 loyalty promotions migration invariant
+        run: node scripts/test-admin-loyalty-promotions-migration.mjs
+
+  task4-loyalty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 loyalty and promotion rule RED/behavior
+        run: >-
+          npx vitest run
+          apps/admin/server/customers/loyaltyService.test.ts
+          apps/admin/server/customers/crmStore.test.ts
+
+  task4-loyalty-postgres:
+    needs: task4-loyalty-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 reward reservation PostgreSQL concurrency and POS-vs-ONLINE races
+        run: node scripts/test-admin-loyalty-postgres.mjs
+
+  task4-reward-placement-integration:
+    needs: [task4-loyalty, task4-loyalty-postgres]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 POS reward placement, durable claim bridge, and POS-vs-ONLINE parity
+        run: >-
+          npx vitest run
+          packages/application/src/ordersOnlineSource.sqlite.test.ts
+          apps/operations/src/app/browserOrderRewards.test.ts
+          apps/operations/src/app/automaticSync.test.ts
+          supabase/functions/operations-order-rewards/operations-order-rewardsClaim.source.test.ts
+      - name: Plan 5 ONLINE reward acceptance and intent contract
+        run: >-
+          npx vitest run
+          packages/application/src/onlineOrderAcceptance.test.ts
+          packages/order-intake-contracts/src/index.test.ts
+
+  task4-crm-promotions-e2e:
+    needs: task4-loyalty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 CRM and promotions browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-customers-promotions.spec.ts
+
+  task5-delivery-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Plan 5 delivery migration invariant
+        run: node scripts/test-admin-delivery-migration.mjs
+
+  task5-delivery-service:
+    needs: task5-delivery-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 delivery service behavior
+        run: npx vitest run apps/admin/server/delivery/deliveryService.test.ts
+
+  task5-delivery-postgres:
+    needs: task5-delivery-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Plan 5 delivery PostgreSQL behavior
+        run: node scripts/test-admin-delivery-postgres.mjs
+
+  task5-delivery-checkout-authority:
+    needs: task5-delivery-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Plan 5 trusted ONLINE delivery routing authority
+        run: >-
+          npx vitest run
+          supabase/functions/order-intake/order-intakeDeliveryAuthority.test.ts
+          supabase/functions/order-intake/order-intakePagination.test.ts
+
+  task5-delivery-e2e:
+    needs: task5-delivery-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Plan 5 delivery browser acceptance
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-delivery.spec.ts
+
+  regression:
+    needs:
+      [
+        task1-order-controls,
+        task1-approval-postgres,
+        task2-orders-e2e,
+        task3-customers-static,
+        task3-customers,
+        task3-customers-postgres,
+        task4-loyalty-static,
+        task4-loyalty,
+        task4-loyalty-postgres,
+        task4-reward-placement-integration,
+        task4-crm-promotions-e2e,
+        task5-delivery-service,
+        task5-delivery-checkout-authority,
+        task5-delivery-postgres,
+        task5-delivery-e2e,
+      ]
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Full migration regression
+        run: npm run test:migrations
+      - name: Full unit and integration regression
+        run: npm test

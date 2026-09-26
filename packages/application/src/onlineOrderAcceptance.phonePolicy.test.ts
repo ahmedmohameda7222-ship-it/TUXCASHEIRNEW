@@ -140,6 +140,12 @@ function request(): CachedOnlineOrderRequest {
     customerName: 'Pickup Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: null,
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: null,
+    deliveryZoneName: null,
+    deliveryFeeMinor: null,
+    deliveryMinimumOrderMinor: null,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: PRODUCT_ID,

@@ -85,6 +85,21 @@ class MemoryStore implements OnlineOrderIntakeStore {
     return shopId === SHOP_ID ? this.published : null;
   }
 
+  async resolveDeliveryRoute(input: {
+    requestedShopId: string;
+    subtotalMinor: number;
+  }) {
+    return {
+      ok: true as const,
+      shopId: input.requestedShopId,
+      zoneId: '66666666-6666-4666-8666-666666666161',
+      zoneName: 'Test Delivery Zone',
+      feeMinor: 1500,
+      minimumOrderMinor: 0,
+      fallbackUsed: false,
+    };
+  }
+
   async findByIdempotency(
     shopId: string,
     idempotencyKey: string,
@@ -130,6 +145,9 @@ function request(fulfillmentPreference: 'DELIVERY' | 'PICKUP', keySuffix: string
         },
       ],
       orderNote: null,
+      ...(fulfillmentPreference === 'DELIVERY'
+        ? { deliveryLocation: { latitude: 30, longitude: 31 } }
+        : {}),
     }),
   });
 }

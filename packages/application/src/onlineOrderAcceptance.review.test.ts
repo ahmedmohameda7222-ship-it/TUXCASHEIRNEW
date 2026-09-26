@@ -132,6 +132,12 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
     customerName: 'Online Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: ZONE_ID,
+    deliveryZoneName: 'Nasr City',
+    deliveryFeeMinor: 3_000,
+    deliveryMinimumOrderMinor: 15_000,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: PRODUCT_ID,
@@ -220,6 +226,12 @@ describe('online-order acceptance reviewed authority', () => {
       fulfillmentPreference: 'PICKUP',
       normalizedPhone: null,
       deliveryAddress: null,
+      requestedShopId: SHOP_ID,
+      deliveryZoneId: null,
+      deliveryZoneName: null,
+      deliveryFeeMinor: null,
+      deliveryMinimumOrderMinor: null,
+      deliveryFallbackUsed: false,
     });
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: pickup,

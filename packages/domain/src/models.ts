@@ -174,8 +174,10 @@ export type OrderReasonCodeSnapshot = ReasonCodeSnapshot;
 
 export interface OrderCancellationSnapshot {
   readonly at: Instant;
-  readonly workerId: WorkerId;
+  readonly workerId: WorkerId | null;
   readonly workerName: string;
+  /** Present when the canonical transition was authored by TUX Admin rather than Operations. */
+  readonly adminEmployeeId?: string;
   readonly foodPrepared: boolean;
   readonly stockRestored: boolean;
   readonly reason: string;
@@ -187,8 +189,10 @@ export interface OrderCancellationSnapshot {
 
 export interface OrderReturnSnapshot {
   readonly at: Instant;
-  readonly workerId: WorkerId;
+  readonly workerId: WorkerId | null;
   readonly workerName: string;
+  /** Present when the canonical transition was authored by TUX Admin rather than Operations. */
+  readonly adminEmployeeId?: string;
   readonly reason: string;
   /** Present for configured future mutations; absent on legacy returns. */
   readonly reasonCode?: OrderReasonCodeSnapshot;
@@ -219,6 +223,34 @@ export interface OrderCheckoutPaymentRuleSnapshot {
   readonly zoneAllowed: boolean;
 }
 
+export interface OrderPromotionRewardSnapshot {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'PERCENT' | 'FIXED' | 'FREE_ITEM';
+  readonly version: number;
+  readonly percentBasisPoints: number | null;
+  readonly fixedDiscountMinor: MoneyMinor | null;
+  readonly freeProductId: ProductId | null;
+  readonly minimumOrderMinor: MoneyMinor;
+  readonly channel: 'POS' | 'ONLINE' | 'BOTH';
+  /** Present on Plan 5 reward snapshots; omitted by legacy persisted rewards. */
+  readonly stackingPolicy?: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED';
+  readonly promotionDiscountMinor: MoneyMinor;
+}
+
+export interface OrderLoyaltyRewardSnapshot {
+  readonly pointsRedeemed: number;
+  readonly redemptionMinorPerPoint: MoneyMinor;
+  readonly redemptionValueMinor: MoneyMinor;
+}
+
+export interface OrderAppliedRewardSnapshot {
+  readonly configurationVersion: number;
+  readonly rewardDiscountMinor: MoneyMinor;
+  readonly promotion: OrderPromotionRewardSnapshot | null;
+  readonly loyalty: OrderLoyaltyRewardSnapshot | null;
+}
+
 export interface OrderCheckoutSnapshot {
   readonly configurationVersion: number;
   readonly settingsVersion: number | null;
@@ -235,6 +267,10 @@ export interface OrderCheckoutSnapshot {
   readonly taxMinor: MoneyMinor;
   readonly deliveryFeeMinor: MoneyMinor;
   readonly discountMinor: MoneyMinor;
+  /** Present on reward-aware snapshots; omitted by legacy orders. */
+  readonly manualDiscountMinor?: MoneyMinor;
+  /** Present on reward-aware snapshots; omitted by legacy orders. */
+  readonly rewardDiscountMinor?: MoneyMinor;
   readonly paymentRules: readonly OrderCheckoutPaymentRuleSnapshot[];
 }
 
@@ -264,6 +300,8 @@ export interface OrderSnapshot {
   readonly serviceChargeMinor?: MoneyMinor;
   readonly taxMinor?: MoneyMinor;
   readonly checkoutSnapshot?: OrderCheckoutSnapshot;
+  readonly rewardReservationId?: string | null;
+  readonly appliedRewardSnapshot?: OrderAppliedRewardSnapshot | null;
   readonly totalMinor: MoneyMinor;
   readonly payments: readonly PaymentPart[];
 }

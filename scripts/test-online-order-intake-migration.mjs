@@ -98,10 +98,10 @@ begin
   ) then raise exception 'delivery identity constraint missing'; end if;
 
   select count(*) into v_unique_count
-  from pg_indexes
-  where schemaname = 'public'
-    and tablename = 'online_order_requests'
-    and indexdef ilike '%unique%shop_id%idempotency_key%';
+  from pg_constraint
+  where conrelid = 'public.online_order_requests'::regclass
+    and contype = 'u'
+    and conname = 'online_order_requests_shop_idempotency_unique';
   if v_unique_count <> 1 then
     raise exception 'shop-scoped online-order idempotency uniqueness missing';
   end if;

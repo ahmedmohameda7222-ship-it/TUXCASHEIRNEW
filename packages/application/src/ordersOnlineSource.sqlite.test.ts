@@ -26,6 +26,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import { OperationsOrdersService } from './orders';
+import type { OrderRewardAuthority } from './orderRewards';
 
 const SHOP_ID = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const WORKER_ID = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
@@ -43,6 +44,7 @@ interface CheckoutFixtureSettings {
   readonly minimumOrderMinor: number;
   readonly serviceChargeBps: number;
   readonly taxBps: number;
+  readonly allowDiscountStacking?: boolean;
 }
 
 function configuration(
@@ -106,6 +108,7 @@ function configuration(
               'checkout.minimumOrderMinor': checkout.minimumOrderMinor,
               'checkout.serviceChargeBps': checkout.serviceChargeBps,
               'checkout.taxBps': checkout.taxBps,
+              'checkout.allowDiscountStacking': checkout.allowDiscountStacking ?? false,
             },
             shopIdentity: {
               shopId: SHOP_ID,
@@ -127,7 +130,7 @@ function configuration(
   };
 }
 
-function draft(intentKey: string): OrderDraft {
+function draft(intentKey: string, reward?: OrderDraft['reward']): OrderDraft {
   return {
     shopId: SHOP_ID,
     businessDayId: DAY_ID,
@@ -151,6 +154,7 @@ function draft(intentKey: string): OrderDraft {
     ],
     orderNote: null,
     discountMinor: moneyMinor(0),
+    ...(reward === undefined ? {} : { reward }),
     delivery: {
       displayPhone: '',
       normalizedPhone: '',
@@ -173,6 +177,7 @@ async function fixture(
   paymentChannel: 'POS' | 'ONLINE' | 'BOTH' = 'BOTH',
   checkout?: CheckoutFixtureSettings,
   configurationVersion = 1,
+  rewardAuthority?: OrderRewardAuthority,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'tux-order-source-'));
   temporaryDirectories.push(directory);
@@ -225,6 +230,7 @@ async function fixture(
     },
     new ApplicationCommandCoordinator(),
     { print: async () => ({ ok: true as const }) },
+    rewardAuthority,
   );
 
   return { database, readModel, draftStore, service };
@@ -336,6 +342,255 @@ describe('OperationsOrdersService placement origin', () => {
       taxMinor: 2_926,
     });
 
+    await closeFixture(test);
+  });
+
+  it('fails closed when a reward is requested without an online reservation authority', async () => {
+    const test = await fixture();
+    const result = await test.service.placeOrder(
+      draft('55555555-aaaa-4aaa-8aaa-555555555555', {
+        promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        loyaltyPointsToRedeem: 0,
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('REWARD_REQUIRES_ONLINE_RESERVATION');
+    }
+    await closeFixture(test);
+  });
+
+  it('applies the same authoritative reward snapshot to POS and ONLINE placement', async () => {
+    const channels: string[] = [];
+    const reservation = {
+      id: '12121212-1212-4121-8121-121212121212',
+      expiresAt: instant('2026-09-08T10:40:00.000Z'),
+      replayed: false,
+      snapshot: {
+        configurationVersion: 3,
+        rewardDiscountMinor: moneyMinor(2_000),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'Plan 5 reward',
+          kind: 'FIXED' as const,
+          version: 3,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(2_000),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(2_000),
+        },
+        loyalty: null,
+      },
+    };
+    const rewardAuthority: OrderRewardAuthority = {
+      reserve: async (input) => {
+        channels.push(input.channel);
+        return { ok: true as const, value: reservation };
+      },
+      claim: async () => ({
+        ok: true as const,
+        value: { ...reservation, replayed: true },
+      }),
+      release: async () => undefined,
+    };
+
+    const pos = await fixture('BOTH', undefined, 1, rewardAuthority);
+    const posResult = await pos.service.placeOrder(
+      draft('66666666-aaaa-4aaa-8aaa-666666666666', {
+        promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        loyaltyPointsToRedeem: 0,
+      }),
+    );
+    expect(posResult.ok).toBe(true);
+    if (posResult.ok) {
+      expect(posResult.value.order.discountMinor).toBe(2_000);
+      expect(posResult.value.order.totalMinor).toBe(17_000);
+      expect(posResult.value.order.rewardReservationId).toBe(
+        '12121212-1212-4121-8121-121212121212',
+      );
+      expect(posResult.value.order.checkoutSnapshot).toMatchObject({
+        manualDiscountMinor: 0,
+        rewardDiscountMinor: 2_000,
+      });
+    }
+    await closeFixture(pos);
+
+    const online = await fixture('BOTH', undefined, 1, rewardAuthority);
+    const onlineResult = await online.service.placeOrder(
+      draft('77777777-aaaa-4aaa-8aaa-777777777777', {
+        promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        loyaltyPointsToRedeem: 0,
+      }),
+      { source: 'ONLINE', orderId: RESERVED_ORDER_ID },
+    );
+    expect(onlineResult.ok).toBe(true);
+    if (onlineResult.ok) {
+      expect(onlineResult.value.order.discountMinor).toBe(2_000);
+      expect(onlineResult.value.order.appliedRewardSnapshot).toEqual(
+        posResult.ok ? posResult.value.order.appliedRewardSnapshot : null,
+      );
+    }
+    expect(channels).toEqual(['POS', 'ONLINE']);
+    await closeFixture(online);
+  });
+
+  it('replays a durable reward claim before local commit after the original lease expires', async () => {
+    const claimed: string[] = [];
+    const reservation = {
+      id: '14141414-1414-4141-8141-141414141414',
+      expiresAt: instant('2026-09-08T10:20:00.000Z'),
+      replayed: true,
+      snapshot: {
+        configurationVersion: 4,
+        rewardDiscountMinor: moneyMinor(500),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'Claimed reward',
+          kind: 'FIXED' as const,
+          version: 4,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(500),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(500),
+        },
+        loyalty: null,
+      },
+    };
+    const rewardAuthority: OrderRewardAuthority = {
+      reserve: async () => ({ ok: true as const, value: reservation }),
+      claim: async (input) => {
+        claimed.push(`${input.reservationId}:${input.checkoutIntentId}`);
+        return { ok: true as const, value: reservation };
+      },
+      release: async () => undefined,
+    };
+
+    const test = await fixture('BOTH', undefined, 1, rewardAuthority);
+    const requested = draft('99999999-aaaa-4aaa-8aaa-999999999999', {
+      promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      loyaltyPointsToRedeem: 0,
+    });
+    const result = await test.service.placeOrder(requested);
+
+    expect(result.ok).toBe(true);
+    expect(claimed).toEqual([
+      '14141414-1414-4141-8141-141414141414:99999999-aaaa-4aaa-8aaa-999999999999',
+    ]);
+    const persisted = await test.database.transaction((transaction) =>
+      transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
+    );
+    expect(persisted?.rewardReservationId).toBe('14141414-1414-4141-8141-141414141414');
+    await closeFixture(test);
+  });
+
+  it('releases a reward before local commit when stacking is forbidden', async () => {
+    const released: string[] = [];
+    const rewardAuthority: OrderRewardAuthority = {
+      reserve: async () => ({
+        ok: true as const,
+        value: {
+          id: '13131313-1313-4131-8131-131313131313',
+          expiresAt: instant('2026-09-08T10:40:00.000Z'),
+          replayed: false,
+          snapshot: {
+            configurationVersion: 1,
+            rewardDiscountMinor: moneyMinor(1_000),
+            promotion: null,
+            loyalty: {
+              pointsRedeemed: 10,
+              redemptionMinorPerPoint: moneyMinor(100),
+              redemptionValueMinor: moneyMinor(1_000),
+            },
+          },
+        },
+      }),
+      claim: async () => {
+        throw new Error('claim must not run before stacking validation');
+      },
+      release: async ({ reservationId }) => {
+        released.push(reservationId);
+      },
+    };
+    const test = await fixture('BOTH', undefined, 1, rewardAuthority);
+    const requested = {
+      ...draft('88888888-aaaa-4aaa-8aaa-888888888888', {
+        promotionId: null,
+        loyaltyPointsToRedeem: 10,
+      }),
+      discountMinor: moneyMinor(500),
+    };
+    const result = await test.service.placeOrder(requested);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('REWARD_NOT_AVAILABLE');
+    expect(released).toEqual(['13131313-1313-4131-8131-131313131313']);
+    const persisted = await test.database.transaction((transaction) =>
+      transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
+    );
+    expect(persisted).toBeNull();
+    await closeFixture(test);
+  });
+
+  it('requires promotion-level configured stacking before combining a promotion with a manual discount', async () => {
+    const released: string[] = [];
+    const reservation = {
+      id: '15151515-1515-4151-8151-151515151515',
+      expiresAt: instant('2026-09-08T10:40:00.000Z'),
+      replayed: false,
+      snapshot: {
+        configurationVersion: 5,
+        rewardDiscountMinor: moneyMinor(1_000),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'One-level promotion',
+          kind: 'FIXED' as const,
+          version: 5,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(1_000),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(1_000),
+          stackingPolicy: 'ONE_ORDER_LEVEL' as const,
+        },
+        loyalty: null,
+      },
+    };
+    const rewardAuthority: OrderRewardAuthority = {
+      reserve: async () => ({ ok: true as const, value: reservation }),
+      claim: async () => ({ ok: true as const, value: reservation }),
+      release: async ({ reservationId }) => {
+        released.push(reservationId);
+      },
+    };
+    const test = await fixture(
+      'BOTH',
+      {
+        settingsVersion: 6,
+        minimumOrderMinor: 0,
+        serviceChargeBps: 0,
+        taxBps: 0,
+        allowDiscountStacking: true,
+      },
+      6,
+      rewardAuthority,
+    );
+    const requested = {
+      ...draft('abababab-aaaa-4aaa-8aaa-abababababab', {
+        promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        loyaltyPointsToRedeem: 0,
+      }),
+      discountMinor: moneyMinor(500),
+    };
+
+    const result = await test.service.placeOrder(requested);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('REWARD_NOT_AVAILABLE');
+    expect(released).toEqual(['15151515-1515-4151-8151-151515151515']);
     await closeFixture(test);
   });
 

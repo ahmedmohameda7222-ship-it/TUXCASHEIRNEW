@@ -1,5 +1,6 @@
 import {
   DomainInvariantError,
+  addMoney,
   allocateDisplayOrderNo,
   hasMeaningfulOrderDraft,
   normalizeEgyptianPhone,
@@ -47,6 +48,11 @@ import type {
 import { ApplicationCommandCoordinator } from './commandCoordinator';
 import type { ApplicationError } from './errors';
 import { unavailableOrderPrinter, type OrderPrinter } from './orderPrinter';
+import {
+  unavailableOrderRewardAuthority,
+  type OrderRewardAuthority,
+  type OrderRewardReservation,
+} from './orderRewards';
 import { err, ok, type Result } from './result';
 
 export interface OrdersRuntime {
@@ -173,6 +179,7 @@ export function createEmptyOrderDraft(input: {
     lines: [],
     orderNote: null,
     discountMinor: ZERO_MONEY,
+    reward: null,
     delivery: {
       displayPhone: '',
       normalizedPhone: '',
@@ -285,6 +292,7 @@ export class OperationsOrdersService {
   readonly #runtime: OrdersRuntime;
   readonly #coordinator: ApplicationCommandCoordinator;
   readonly #printer: OrderPrinter;
+  readonly #rewardAuthority: OrderRewardAuthority;
 
   constructor(
     database: OperationsDatabase,
@@ -293,6 +301,7 @@ export class OperationsOrdersService {
     runtime: OrdersRuntime,
     coordinator = new ApplicationCommandCoordinator(),
     printer: OrderPrinter = unavailableOrderPrinter,
+    rewardAuthority: OrderRewardAuthority = unavailableOrderRewardAuthority,
   ) {
     this.#database = database;
     this.#readModel = readModel;
@@ -300,6 +309,7 @@ export class OperationsOrdersService {
     this.#runtime = runtime;
     this.#coordinator = coordinator;
     this.#printer = printer;
+    this.#rewardAuthority = rewardAuthority;
   }
 
   async loadWorkspace(draftScopeId: string): Promise<OrdersWorkspaceResult> {
@@ -579,6 +589,7 @@ export class OperationsOrdersService {
   ): Promise<OrderPlacementResult> {
     const committed = await this.#coordinator.runExclusive(
       async (): Promise<Result<CommittedOrderPlacement, OrderPlacementError>> => {
+        let activeRewardReservation: { readonly shopId: ShopId; readonly id: string } | null = null;
         try {
           const existing = await this.#database.transaction((transaction) =>
             transaction.orders.getByIdempotencyKey(draft.shopId, draft.checkoutIntentKey),
@@ -609,8 +620,102 @@ export class OperationsOrdersService {
             });
           }
 
-          const validation = validateOrderDraft(draft, context.configuration, placement.source);
+          const initialValidation = validateOrderDraft(
+            draft,
+            context.configuration,
+            placement.source,
+          );
+          if (!initialValidation.valid) {
+            return err({
+              code: 'VALIDATION_ERROR',
+              message: initialValidation.issues[0]?.message ?? 'Order validation failed.',
+              validationIssues: initialValidation.issues,
+            });
+          }
+
+          let rewardReservation: OrderRewardReservation | null = null;
+          const rewardRequest = draft.reward ?? null;
+          const rewardRequested =
+            rewardRequest !== null &&
+            (rewardRequest.promotionId !== null || rewardRequest.loyaltyPointsToRedeem > 0);
+          if (rewardRequested) {
+            if (
+              !Number.isSafeInteger(rewardRequest.loyaltyPointsToRedeem) ||
+              rewardRequest.loyaltyPointsToRedeem < 0
+            ) {
+              return err({
+                code: 'VALIDATION_ERROR',
+                message: 'Loyalty redemption points are invalid.',
+              });
+            }
+
+            const reserved = await this.#rewardAuthority.reserve({
+              shopId: context.shopId,
+              checkoutIntentId: draft.checkoutIntentKey,
+              channel: placement.source,
+              customerPhone:
+                initialValidation.value.normalizedDeliveryPhone ??
+                (draft.delivery.normalizedPhone.trim() ||
+                  draft.delivery.displayPhone.trim() ||
+                  null),
+              promotionId: rewardRequest.promotionId,
+              loyaltyPointsToRedeem: rewardRequest.loyaltyPointsToRedeem,
+              items: draft.lines.map((line) => ({
+                productId: line.productId,
+                quantity: line.quantity,
+                modifiers: line.modifiers.map((modifier) => ({
+                  modifierId: modifier.modifierId,
+                  quantity: modifier.quantity,
+                })),
+                comboBeverageProductIds: line.comboBeverages.map((beverage) => beverage.productId),
+              })),
+            });
+            if (!reserved.ok) {
+              return err({
+                code: reserved.error.code,
+                message: reserved.error.message,
+              });
+            }
+
+            rewardReservation = reserved.value;
+            activeRewardReservation = { shopId: context.shopId, id: rewardReservation.id };
+            if (
+              draft.discountMinor > ZERO_MONEY &&
+              rewardReservation.snapshot.rewardDiscountMinor > ZERO_MONEY &&
+              (!initialValidation.value.checkoutPolicy.allowDiscountStacking ||
+                (rewardReservation.snapshot.promotion !== null &&
+                  rewardReservation.snapshot.promotion.stackingPolicy !== 'ALLOW_CONFIGURED'))
+            ) {
+              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
+              activeRewardReservation = null;
+              return err({
+                code: 'REWARD_NOT_AVAILABLE',
+                message:
+                  'The published checkout and promotion policies do not allow reward and manual discounts to stack.',
+              });
+            }
+          }
+
+          const effectiveDraft: OrderDraft =
+            rewardReservation === null
+              ? draft
+              : {
+                  ...draft,
+                  discountMinor: addMoney(
+                    draft.discountMinor,
+                    rewardReservation.snapshot.rewardDiscountMinor,
+                  ),
+                };
+          const validation = validateOrderDraft(
+            effectiveDraft,
+            context.configuration,
+            placement.source,
+          );
           if (!validation.valid) {
+            if (rewardReservation !== null) {
+              await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
+              activeRewardReservation = null;
+            }
             return err({
               code: 'VALIDATION_ERROR',
               message: validation.issues[0]?.message ?? 'Order validation failed.',
@@ -619,17 +724,39 @@ export class OperationsOrdersService {
           }
 
           const preparedPayments = preparePaymentParts(
-            draft.payment,
+            effectiveDraft.payment,
             context.configuration.paymentMethods,
             validation.value.pricing.totalMinor,
             {
               channel: placement.source,
               deliveryZoneId:
-                validation.value.orderType.behavior === 'DELIVERY' ? draft.delivery.zoneId : null,
+                validation.value.orderType.behavior === 'DELIVERY'
+                  ? effectiveDraft.delivery.zoneId
+                  : null,
               paymentMethodZoneRules: context.configuration.settings?.paymentMethodZoneRules,
             },
           );
-          const inventoryUsage = calculateInventoryConsumption(draft, context.configuration);
+          const inventoryUsage = calculateInventoryConsumption(
+            effectiveDraft,
+            context.configuration,
+          );
+
+          if (rewardReservation !== null) {
+            const claimed = await this.#rewardAuthority.claim({
+              shopId: context.shopId,
+              reservationId: rewardReservation.id,
+              checkoutIntentId: draft.checkoutIntentKey,
+            });
+            if (!claimed.ok) {
+              return err({
+                code: claimed.error.code,
+                message: claimed.error.message,
+              });
+            }
+            rewardReservation = claimed.value;
+            activeRewardReservation = { shopId: context.shopId, id: rewardReservation.id };
+          }
+
           const committedAt = this.#runtime.now();
           const operator = context.operator;
 
@@ -761,8 +888,12 @@ export class OperationsOrdersService {
                 taxMinor: validation.value.pricing.taxMinor,
                 deliveryFeeMinor: validation.value.pricing.deliveryFeeMinor,
                 discountMinor: validation.value.pricing.discountMinor,
+                manualDiscountMinor: draft.discountMinor,
+                rewardDiscountMinor: rewardReservation?.snapshot.rewardDiscountMinor ?? ZERO_MONEY,
                 paymentRules: checkoutPaymentRules,
               },
+              rewardReservationId: rewardReservation?.id ?? null,
+              appliedRewardSnapshot: rewardReservation?.snapshot ?? null,
               totalMinor: validation.value.pricing.totalMinor,
               payments,
             };
@@ -805,12 +936,19 @@ export class OperationsOrdersService {
             return { order, replayed: false } as const;
           });
 
+          activeRewardReservation = null;
           return ok({
             order: commitResult.order,
             replayed: commitResult.replayed,
             configuration: context.configuration,
           });
         } catch (cause) {
+          if (activeRewardReservation !== null) {
+            await this.#releaseRewardQuietly(
+              activeRewardReservation.shopId,
+              activeRewardReservation.id,
+            );
+          }
           if (cause instanceof DomainInvariantError) {
             return err({ code: 'CONFLICT_ERROR', message: cause.message, cause });
           }
@@ -951,6 +1089,14 @@ export class OperationsOrdersService {
     } catch {
       warnings.push('DRAFT_RESET_FAILED');
       return { nextDraft: candidate, warnings };
+    }
+  }
+
+  async #releaseRewardQuietly(shopId: ShopId, reservationId: string): Promise<void> {
+    try {
+      await this.#rewardAuthority.release({ shopId, reservationId });
+    } catch {
+      // Canonical reservation expiry remains the fallback for abandoned leases.
     }
   }
 

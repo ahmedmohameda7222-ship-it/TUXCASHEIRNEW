@@ -1,4 +1,11 @@
+import type { AdminOrderFinancialMutationResult } from '@tux/admin-contracts';
+
 import { getAdminServerEnv } from '../env.js';
+import {
+  createOrderApprovalExecutionEntries,
+  type ApprovedRefundExecutionInput,
+  type ApprovedReturnExecutionInput,
+} from '../orders/orderApproval.js';
 import { AdminSupabaseClient } from '../supabaseAdmin.js';
 import {
   createApprovalExecutionRegistry,
@@ -54,14 +61,52 @@ export async function runApprovalExecutionRunner(input: {
   return input.execute();
 }
 
+function createOrderApprovalPersistence(client: AdminSupabaseClient) {
+  return {
+    executeRefund(input: ApprovedRefundExecutionInput) {
+      return client.rpc<AdminOrderFinancialMutationResult>(
+        'execute_approved_admin_order_refund_v1',
+        {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_order_id: input.orderId,
+          p_payment_id: input.paymentId,
+          p_amount_minor: input.amountMinor,
+          p_reason_code_id: input.reasonCodeId,
+          p_note: input.note,
+          p_command_id: input.orderCommandId,
+        },
+      );
+    },
+    executeReturn(input: ApprovedReturnExecutionInput) {
+      return client.rpc<AdminOrderFinancialMutationResult>(
+        'execute_approved_admin_order_return_v1',
+        {
+          p_approval_request_id: input.approvalRequestId,
+          p_business_id: input.businessId,
+          p_shop_id: input.shopId,
+          p_requester_employee_id: input.requesterEmployeeId,
+          p_approver_employee_id: input.approverEmployeeId,
+          p_order_id: input.orderId,
+          p_items: input.items,
+          p_reason_code_id: input.reasonCodeId,
+          p_note: input.note,
+          p_command_id: input.orderCommandId,
+        },
+      );
+    },
+  };
+}
+
 export async function runProductionApprovalExecutionRunner(): Promise<ApprovalExecutionRunResult> {
   const client = new AdminSupabaseClient(getAdminServerEnv());
   const persistence = createSupabaseApprovalExecutionDependencies(client);
-
-  // Plan 3 intentionally ships the durable generic executor without inventing business-domain
-  // commands. Plans 4+ register approved commands here as their authoritative idempotent
-  // handlers are implemented. An unregistered persisted action fails closed in the executor.
-  const registry = createApprovalExecutionRegistry([]);
+  const registry = createApprovalExecutionRegistry(
+    createOrderApprovalExecutionEntries(createOrderApprovalPersistence(client)),
+  );
   const service = createApprovalExecutionService({
     ...persistence,
     registry,

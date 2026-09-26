@@ -142,6 +142,12 @@ function request(overrides: Partial<CachedOnlineOrderRequest> = {}): CachedOnlin
     customerName: 'Online Customer',
     normalizedPhone: '01012345678',
     deliveryAddress: 'Nasr City, Cairo',
+    requestedShopId: SHOP_ID,
+    deliveryZoneId: ZONE_ID,
+    deliveryZoneName: 'Nasr City',
+    deliveryFeeMinor: 3_000,
+    deliveryMinimumOrderMinor: 15_000,
+    deliveryFallbackUsed: false,
     trustedItems: [
       {
         productId: PRODUCT_ID,
@@ -220,6 +226,28 @@ function deliveryConfirmation(cashReceivedMinor = 25_000, finalDeliveryFeeMinor 
 }
 
 describe('prepareOnlineOrderAcceptanceDraft', () => {
+  it('propagates ONLINE reward intent to canonical placement without trusting a submitted discount', () => {
+    const promotionId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const rewardedRequest = {
+      ...request(),
+      promotionId,
+      loyaltyPointsToRedeem: 20,
+    } as CachedOnlineOrderRequest;
+
+    const draft = prepareOnlineOrderAcceptanceDraft({
+      request: rewardedRequest,
+      workspace: workspace(),
+      confirmation: deliveryConfirmation(),
+      runtime,
+    });
+
+    expect(draft.discountMinor).toBe(moneyMinor(0));
+    expect(draft.reward).toEqual({
+      promotionId,
+      loyaltyPointsToRedeem: 20,
+    });
+  });
+
   it('builds a worker-confirmed DELIVERY draft from a live PROCESSING request', () => {
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: request(),
@@ -268,21 +296,49 @@ describe('prepareOnlineOrderAcceptanceDraft', () => {
         confirmation: deliveryConfirmation(25_000, 2_500),
         runtime,
       }),
-    ).toThrow(/configured delivery zone fee|checkout policy/i);
+    ).toThrow(/canonical delivery route|configured delivery zone fee|checkout policy/i);
   });
 
-  it('allows a delivery-fee override only when the published policy enables it', () => {
+  it('keeps the canonical intake fee when generic delivery-fee overrides are enabled', () => {
     const draft = prepareOnlineOrderAcceptanceDraft({
       request: request(),
       workspace: workspace(
         configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': true }),
       ),
-      confirmation: deliveryConfirmation(25_000, 2_500),
+      confirmation: deliveryConfirmation(),
       runtime,
     });
 
-    expect(draft.delivery.finalFeeMinor).toBe(moneyMinor(2_500));
+    expect(draft.delivery.finalFeeMinor).toBe(moneyMinor(3_000));
     expect(draft.delivery.configuredFeeMinor).toBe(moneyMinor(3_000));
+  });
+
+  it('rejects worker delivery authority that diverges from the canonical intake route', () => {
+    const canonicalRequest = {
+      ...request(),
+      deliveryZoneId: ZONE_ID,
+      deliveryZoneName: 'Nasr City',
+      deliveryFeeMinor: 3_000,
+      deliveryMinimumOrderMinor: 15_000,
+      deliveryFallbackUsed: false,
+    } as CachedOnlineOrderRequest & {
+      readonly deliveryZoneId: DeliveryZoneId;
+      readonly deliveryZoneName: string;
+      readonly deliveryFeeMinor: number;
+      readonly deliveryMinimumOrderMinor: number;
+      readonly deliveryFallbackUsed: boolean;
+    };
+
+    expect(() =>
+      prepareOnlineOrderAcceptanceDraft({
+        request: canonicalRequest,
+        workspace: workspace(
+          configurationWithCheckout({ 'checkout.allowDeliveryFeeOverride': true }),
+        ),
+        confirmation: deliveryConfirmation(25_000, 2_500),
+        runtime,
+      }),
+    ).toThrow(/canonical delivery|delivery authority|delivery fee/i);
   });
 
   it('refuses stale trusted prices instead of silently accepting an old catalog snapshot', () => {

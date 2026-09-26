@@ -33,6 +33,18 @@ export {
   type OperationsConfigurationBundle,
 } from './configurationBundle';
 export {
+  deliveryZoneContains,
+  isDeliveryRoutingOpen,
+  resolveDeliveryRouting,
+  type DeliveryRoutingBoundary,
+  type DeliveryRoutingContext,
+  type DeliveryRoutingHours,
+  type DeliveryRoutingInput,
+  type DeliveryRoutingResult,
+  type DeliveryRoutingShop,
+  type DeliveryRoutingZone,
+} from './deliveryRouting';
+export {
   addProductUnit,
   applyDeliveryZone,
   decrementDraftLine,
