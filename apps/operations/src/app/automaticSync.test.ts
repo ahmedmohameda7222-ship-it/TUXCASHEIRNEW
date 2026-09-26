@@ -148,7 +148,7 @@ describe('startBrowserAutomaticSync', () => {
       rewardClaims: { reconcileClaims },
     });
 
-    await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
-    expect(getByIdempotencyKey).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(getByIdempotencyKey).toHaveBeenCalledTimes(2));
+    expect(reconcileClaims).toHaveBeenCalledTimes(1);
   });
 });
