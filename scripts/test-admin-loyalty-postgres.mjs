@@ -142,6 +142,7 @@ const DEVICE_MEMBERSHIP_ID = '70000000-0000-4000-8000-000000000002';
 const DEVICE_ID = '70000000-0000-4000-8000-000000000003';
 const DEVICE_COMMITTED_ORDER_ID = '78000000-0000-4000-8000-000000000098';
 const STACKING_CUSTOMER_ID = '79000000-0000-4000-8000-000000000009';
+const COMMITTED_EXPIRY_CUSTOMER_ID = '79000000-0000-4000-8000-000000000010';
 
 psql(
   [
@@ -1963,6 +1964,91 @@ if (
     `device claims did not reconcile to committed/expired states: ${JSON.stringify(
       reconciledClaimStatuses,
     )}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${COMMITTED_EXPIRY_CUSTOMER_ID}', '${BUSINESS_ID}',
+         '+201000000020', 'Committed Expiry Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${COMMITTED_EXPIRY_CUSTOMER_ID}');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, earn_expires_at, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${COMMITTED_EXPIRY_CUSTOMER_ID}',
+       'committed-expiry-credit', 'EARN', 100, 0,
+       '2026-09-24T09:00:00Z', 'committed-expiry-credit',
+       '2026-09-23T08:59:00Z'
+     );`,
+  ],
+  'Committed loyalty expiry fixture',
+);
+
+const committedExpiryReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${COMMITTED_EXPIRY_CUSTOMER_ID}'::uuid,
+    'committed-expiry-intent', null, 100, 'POS', 10000,
+    array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:10:00Z'::timestamptz
+  )`,
+  'Reserve loyalty that will expire during delayed sync',
+);
+if (committedExpiryReservation.ok !== true) {
+  throw new Error(
+    `committed expiry reservation failed: ${JSON.stringify(committedExpiryReservation)}`,
+  );
+}
+const committedExpiryClaim = rpc(
+  `public.claim_operations_order_reward_reservation_v1(
+    '${AUTH_USER_ID}'::uuid, '${DEVICE_ID}'::uuid, '${SHOP_ID}'::uuid,
+    '${committedExpiryReservation.reservationId}'::uuid,
+    'committed-expiry-intent',
+    '2026-09-23T09:11:00Z'::timestamptz
+  )`,
+  'Claim loyalty before durable local commit',
+);
+if (committedExpiryClaim.ok !== true || committedExpiryClaim.status !== 'CLAIMED') {
+  throw new Error(
+    `committed expiry claim failed: ${JSON.stringify(committedExpiryClaim)}`,
+  );
+}
+const committedExpiryReconcile = rpc(
+  `public.reconcile_operations_reward_claims_v1(
+    '${AUTH_USER_ID}'::uuid, '${DEVICE_ID}'::uuid, '${SHOP_ID}'::uuid,
+    array['committed-expiry-intent']::text[],
+    '2026-09-23T09:12:00Z'::timestamptz
+  )`,
+  'Mark durable local loyalty checkout committed',
+);
+if (committedExpiryReconcile.ok !== true || Number(committedExpiryReconcile.committed) !== 1) {
+  throw new Error(
+    `committed expiry reconciliation failed: ${JSON.stringify(committedExpiryReconcile)}`,
+  );
+}
+
+const committedExpiryProtected = Number(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select private.expire_customer_loyalty_points_for_customer_v1(
+        '${BUSINESS_ID}'::uuid,
+        '${COMMITTED_EXPIRY_CUSTOMER_ID}'::uuid,
+        '2026-09-30T09:00:00Z'::timestamptz
+      )`,
+    ],
+    'Committed reward capacity survives loyalty expiry before delayed sync',
+  ).trim(),
+);
+if (committedExpiryProtected !== 0) {
+  throw new Error(
+    `committed reward loyalty was expired before delayed sync: ${committedExpiryProtected}`,
   );
 }
 
