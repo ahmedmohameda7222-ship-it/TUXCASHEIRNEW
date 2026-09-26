@@ -269,24 +269,24 @@ if (combinedLoyalty.ok !== true || combinedLoyalty.status !== 'RESERVED') {
 
 
 const releasedCombinedLoyalty = rpc(
-  \`public.release_order_reward_reservation_v1(
-    '\${combinedLoyalty.reservationId}'::uuid,
+  `public.release_order_reward_reservation_v1(
+    '${combinedLoyalty.reservationId}'::uuid,
     '2026-09-23T07:01:00Z'::timestamptz
-  )\`,
+  )`,
   'Release first-merge loyalty reservation',
 );
 if (releasedCombinedLoyalty.ok !== true) {
   throw new Error(
-    \`first-merge loyalty reservation did not release: \${JSON.stringify(releasedCombinedLoyalty)}\`,
+    `first-merge loyalty reservation did not release: ${JSON.stringify(releasedCombinedLoyalty)}`,
   );
 }
 
 psql(
   [
     '-c',
-    \`insert into public.business_customers(id, business_id, normalized_phone, display_name)
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
        values (
-         '\${CHAIN_SURVIVOR_ID}', '\${BUSINESS_ID}', '+201000000003', 'Mona Canonical'
+         '${CHAIN_SURVIVOR_ID}', '${BUSINESS_ID}', '+201000000003', 'Mona Canonical'
        );
      insert into public.promotion_rules(
        id, business_id, name, active, kind, fixed_discount_minor,
@@ -294,32 +294,32 @@ psql(
        total_usage_limit, per_customer_usage_limit, stacking_policy,
        version, updated_by_employee_id
      ) values (
-       '\${CHAIN_PROMOTION_ID}', '\${BUSINESS_ID}', 'Chain one-use promotion', true,
-       'FIXED', 100, 0, array['\${SHOP_ID}'::uuid], 'BOTH',
+       '${CHAIN_PROMOTION_ID}', '${BUSINESS_ID}', 'Chain one-use promotion', true,
+       'FIXED', 100, 0, array['${SHOP_ID}'::uuid], 'BOTH',
        '{}'::uuid[], '{}'::uuid[], null, 1, 'ONE_ORDER_LEVEL',
-       1, '\${EMPLOYEE_ID}'
+       1, '${EMPLOYEE_ID}'
      );
      insert into public.promotion_usage_ledger(
        business_id, shop_id, promotion_id, customer_id, order_id,
        entry_key, usage_delta, event_type, applied_rule_snapshot
      ) values (
-       '\${BUSINESS_ID}', '\${SHOP_ID}', '\${CHAIN_PROMOTION_ID}',
-       '\${MERGED_ID}', null, 'chain-retired-prior-use',
+       '${BUSINESS_ID}', '${SHOP_ID}', '${CHAIN_PROMOTION_ID}',
+       '${MERGED_ID}', null, 'chain-retired-prior-use',
        1, 'APPLY', '{}'::jsonb
-     );\`,
+     );`,
   ],
   'Chained customer merge fixture',
 );
 
 const chainedMerge = rpc(
-  \`public.merge_admin_customers_v1(
-    '\${EMPLOYEE_ID}'::uuid,
-    '\${BUSINESS_ID}'::uuid,
-    '\${CHAIN_SURVIVOR_ID}'::uuid,
-    '\${SURVIVOR_ID}'::uuid,
+  `public.merge_admin_customers_v1(
+    '${EMPLOYEE_ID}'::uuid,
+    '${BUSINESS_ID}'::uuid,
+    '${CHAIN_SURVIVOR_ID}'::uuid,
+    '${SURVIVOR_ID}'::uuid,
     true,
     'merge-loyalty-chain-2'
-  )\`,
+  )`,
   'Second customer merge in canonical chain',
 );
 if (
@@ -327,7 +327,7 @@ if (
   chainedMerge.survivorCustomerId !== CHAIN_SURVIVOR_ID ||
   chainedMerge.mergedCustomerId !== SURVIVOR_ID
 ) {
-  throw new Error(\`second customer merge failed: \${JSON.stringify(chainedMerge)}\`);
+  throw new Error(`second customer merge failed: ${JSON.stringify(chainedMerge)}`);
 }
 
 const chainedReadback = JSON.parse(
@@ -335,22 +335,22 @@ const chainedReadback = JSON.parse(
     [
       '-At',
       '-c',
-      \`select jsonb_build_object(
+      `select jsonb_build_object(
         'firstRetiredRedirect', (
           select merged_into_customer_id
           from public.business_customers
-          where id = '\${MERGED_ID}'::uuid
+          where id = '${MERGED_ID}'::uuid
         ),
         'secondRetiredRedirect', (
           select merged_into_customer_id
           from public.business_customers
-          where id = '\${SURVIVOR_ID}'::uuid
+          where id = '${SURVIVOR_ID}'::uuid
         ),
         'balance', public.get_admin_customer_loyalty_balance_v1(
-          '\${BUSINESS_ID}'::uuid,
-          '\${CHAIN_SURVIVOR_ID}'::uuid
+          '${BUSINESS_ID}'::uuid,
+          '${CHAIN_SURVIVOR_ID}'::uuid
         )
-      )::text\`,
+      )::text`,
     ],
     'Chained customer merge readback',
   ).trim(),
@@ -361,24 +361,24 @@ if (
   Number(chainedReadback.balance) !== 100
 ) {
   throw new Error(
-    \`chained customer lineage was not flattened safely: \${JSON.stringify(chainedReadback)}\`,
+    `chained customer lineage was not flattened safely: ${JSON.stringify(chainedReadback)}`,
   );
 }
 
 const chainedPromotionRetry = rpc(
-  \`public.reserve_order_rewards_v1(
-    '\${BUSINESS_ID}'::uuid,
-    '\${SHOP_ID}'::uuid,
-    '\${CHAIN_SURVIVOR_ID}'::uuid,
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    '${CHAIN_SURVIVOR_ID}'::uuid,
     'chain-promotion-retry',
-    '\${CHAIN_PROMOTION_ID}'::uuid,
+    '${CHAIN_PROMOTION_ID}'::uuid,
     0,
     'POS',
     10000,
     '{}'::uuid[],
     '{}'::uuid[],
     '2026-09-23T07:02:00Z'::timestamptz
-  )\`,
+  )`,
   'Chained identity per-customer promotion limit',
 );
 if (
@@ -386,7 +386,7 @@ if (
   chainedPromotionRetry.code !== 'reward_not_available'
 ) {
   throw new Error(
-    \`chained retired identity bypassed promotion usage limit: \${JSON.stringify(chainedPromotionRetry)}\`,
+    `chained retired identity bypassed promotion usage limit: ${JSON.stringify(chainedPromotionRetry)}`,
   );
 }
 
