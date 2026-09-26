@@ -10,6 +10,10 @@ const harness = vi.hoisted(() => ({
     void shopId;
     return 0;
   }),
+  lifecycleSyncShop: vi.fn(async (shopId: unknown) => {
+    void shopId;
+    return 0;
+  }),
   markRemoteConfigured: vi.fn(),
   markSyncStarted: vi.fn(),
   markSyncFinished: vi.fn(),
@@ -51,6 +55,21 @@ vi.mock('@tux/sync', () => ({
 
     syncShop(shopId: unknown): Promise<number> {
       return harness.inventorySyncShop(shopId);
+    }
+  },
+  HttpOrderLifecycleFeedTransport: class HttpOrderLifecycleFeedTransport {
+    constructor(options: unknown) {
+      void options;
+    }
+  },
+  OrderLifecycleConvergenceService: class OrderLifecycleConvergenceService {
+    constructor(database: unknown, transport: unknown) {
+      void database;
+      void transport;
+    }
+
+    syncShop(shopId: unknown): Promise<number> {
+      return harness.lifecycleSyncShop(shopId);
     }
   },
 }));
@@ -101,5 +120,35 @@ describe('startBrowserAutomaticSync', () => {
 
     harness.schedulerOptions?.onResult?.(cleanSummary);
     expect(harness.markSyncFinished).toHaveBeenCalledWith(cleanSummary);
+  });
+
+  it('reconciles canonical reward claims against durable local checkout intents at startup', async () => {
+    const getByIdempotencyKey = vi.fn(async (_shopId: unknown, checkoutIntentId: string) =>
+      checkoutIntentId === 'committed-intent' ? ({ id: 'order-1' } as never) : null,
+    );
+    const database = {
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({ orders: { getByIdempotencyKey } }),
+    } as unknown as OperationsDatabase;
+    const reconcileClaims = vi.fn(
+      async (
+        shopId: unknown,
+        hasCommittedCheckoutIntent: (checkoutIntentId: string) => Promise<boolean>,
+      ) => {
+        expect(shopId).toBe('14000000-0000-4000-8000-000000000001');
+        await expect(hasCommittedCheckoutIntent('committed-intent')).resolves.toBe(true);
+        await expect(hasCommittedCheckoutIntent('abandoned-intent')).resolves.toBe(false);
+      },
+    );
+
+    startBrowserAutomaticSync({
+      database,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+      rewardClaims: { reconcileClaims },
+    });
+
+    await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
+    expect(getByIdempotencyKey).toHaveBeenCalledTimes(2);
   });
 });
