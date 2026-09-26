@@ -457,6 +457,15 @@ begin
   where id = p_survivor_customer_id
     and business_id = p_business_id;
 
+  -- Keep canonical lineage flat. Immutable ledger/usage history remains attached to
+  -- retired identities, so every retired descendant must point directly at the
+  -- latest survivor for one-hop lookup and canonical aggregate queries.
+  update public.business_customers
+  set merged_into_customer_id = p_survivor_customer_id,
+      updated_at = now()
+  where business_id = p_business_id
+    and merged_into_customer_id = p_merged_customer_id;
+
   update public.business_customers
   set merged_into_customer_id = p_survivor_customer_id,
       updated_at = now()
