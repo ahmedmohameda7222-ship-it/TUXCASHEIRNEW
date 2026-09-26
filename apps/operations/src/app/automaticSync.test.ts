@@ -152,10 +152,13 @@ describe('startBrowserAutomaticSync', () => {
     expect(reconcileClaims).toHaveBeenCalledTimes(1);
   });
   it('only reconciles a canonical claim when the durable local order carries the same reservation', async () => {
-    const getByIdempotencyKey = vi.fn(async () => ({
-      id: 'order-without-this-reward',
-      rewardReservationId: '99999999-9999-4999-8999-999999999999',
-    }) as never);
+    const getByIdempotencyKey = vi.fn(
+      async () =>
+        ({
+          id: 'order-without-this-reward',
+          rewardReservationId: '99999999-9999-4999-8999-999999999999',
+        }) as never,
+    );
     const database = {
       transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
         work({ orders: { getByIdempotencyKey } }),
@@ -218,5 +221,4 @@ describe('startBrowserAutomaticSync', () => {
     intervalCallbacks[0]?.();
     await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(2));
   });
-
 });
