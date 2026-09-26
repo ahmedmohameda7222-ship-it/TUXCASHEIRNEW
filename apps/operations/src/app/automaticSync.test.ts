@@ -172,10 +172,7 @@ describe('startBrowserAutomaticSync', () => {
         ) => Promise<boolean>,
       ) => {
         await expect(
-          hasCommittedRewardReservation(
-            'same-intent',
-            '22222222-2222-4222-8222-222222222222',
-          ),
+          hasCommittedRewardReservation('same-intent', '22222222-2222-4222-8222-222222222222'),
         ).resolves.toBe(false);
       },
     );
