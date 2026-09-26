@@ -682,14 +682,20 @@ export class OperationsOrdersService {
             if (
               draft.discountMinor > ZERO_MONEY &&
               rewardReservation.snapshot.rewardDiscountMinor > ZERO_MONEY &&
-              !initialValidation.value.checkoutPolicy.allowDiscountStacking
+              (
+                !initialValidation.value.checkoutPolicy.allowDiscountStacking ||
+                (
+                  rewardReservation.snapshot.promotion !== null &&
+                  rewardReservation.snapshot.promotion.stackingPolicy !== 'ALLOW_CONFIGURED'
+                )
+              )
             ) {
               await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
               activeRewardReservation = null;
               return err({
                 code: 'REWARD_NOT_AVAILABLE',
                 message:
-                  'The published checkout policy does not allow reward and manual discounts to stack.',
+                  'The published checkout and promotion policies do not allow reward and manual discounts to stack.',
               });
             }
           }
