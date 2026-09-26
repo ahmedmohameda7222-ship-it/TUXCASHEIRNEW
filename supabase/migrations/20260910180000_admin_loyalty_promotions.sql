@@ -133,11 +133,12 @@ create table public.reward_reservations (
   promotion_use_reserved boolean not null default false,
   applied_reward_snapshot jsonb not null,
   status text not null check (
-    status in ('RESERVED', 'CLAIMED', 'CONSUMED', 'RELEASED', 'EXPIRED')
+    status in ('RESERVED', 'CLAIMED', 'COMMITTED', 'CONSUMED', 'RELEASED', 'EXPIRED')
   ),
   expires_at timestamptz not null,
   claimed_at timestamptz,
   claim_expires_at timestamptz,
+  claim_device_id uuid references public.devices(id) on delete restrict,
   consumed_order_id uuid references public.orders(id) on delete restrict,
   consumed_at timestamptz,
   released_at timestamptz,
@@ -150,12 +151,12 @@ create table public.reward_reservations (
   ),
   check (
     (
-      status = 'CLAIMED'
+      status in ('CLAIMED', 'COMMITTED')
       and claimed_at is not null
       and claim_expires_at is not null
       and claim_expires_at > claimed_at
     )
-    or status <> 'CLAIMED'
+    or status not in ('CLAIMED', 'COMMITTED')
   )
 );
 create index reward_reservations_customer_active_idx
@@ -316,17 +317,34 @@ begin
     if v_existing.request_fingerprint <> v_fingerprint then
       return jsonb_build_object('ok', false, 'code', 'checkout_intent_conflict');
     end if;
-    if v_existing.status = 'CONSUMED' then
+    if v_existing.status in ('CONSUMED', 'COMMITTED') then
       return jsonb_build_object(
         'ok', true,
         'replayed', true,
         'reservationId', v_existing.id,
         'status', v_existing.status,
-        'expiresAt', v_existing.expires_at,
+        'expiresAt', coalesce(v_existing.claim_expires_at, v_existing.expires_at),
         'snapshot', v_existing.applied_reward_snapshot
       );
     end if;
-    if v_existing.status = 'CLAIMED' and v_existing.claim_expires_at > p_now then
+    if v_existing.status = 'CLAIMED' and (
+      v_existing.claim_expires_at > p_now
+      or (
+        v_existing.claim_device_id is not null
+        and exists (
+          select 1
+          from public.devices d
+          join public.shop_memberships m
+            on m.shop_id = d.shop_id
+           and m.auth_user_id = d.auth_user_id
+          where d.id = v_existing.claim_device_id
+            and d.shop_id = v_existing.shop_id
+            and d.active
+            and m.role = 'OPERATIONS_DEVICE'
+            and m.active
+        )
+      )
+    ) then
       return jsonb_build_object(
         'ok', true,
         'replayed', true,
@@ -404,7 +422,28 @@ begin
           )
       )
       and (
-        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
+        r.status = 'COMMITTED'
+        or (
+          r.status = 'CLAIMED'
+          and (
+            r.claim_expires_at > p_now
+            or (
+              r.claim_device_id is not null
+              and exists (
+                select 1
+                from public.devices d
+                join public.shop_memberships m
+                  on m.shop_id = d.shop_id
+                 and m.auth_user_id = d.auth_user_id
+                where d.id = r.claim_device_id
+                  and d.shop_id = r.shop_id
+                  and d.active
+                  and m.role = 'OPERATIONS_DEVICE'
+                  and m.active
+              )
+            )
+          )
+        )
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -474,7 +513,28 @@ begin
     from public.reward_reservations r
     where r.promotion_id = p_promotion_id
       and (
-        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
+        r.status = 'COMMITTED'
+        or (
+          r.status = 'CLAIMED'
+          and (
+            r.claim_expires_at > p_now
+            or (
+              r.claim_device_id is not null
+              and exists (
+                select 1
+                from public.devices d
+                join public.shop_memberships m
+                  on m.shop_id = d.shop_id
+                 and m.auth_user_id = d.auth_user_id
+                where d.id = r.claim_device_id
+                  and d.shop_id = r.shop_id
+                  and d.active
+                  and m.role = 'OPERATIONS_DEVICE'
+                  and m.active
+              )
+            )
+          )
+        )
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -493,7 +553,28 @@ begin
           )
       )
       and (
-        (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
+        r.status = 'COMMITTED'
+        or (
+          r.status = 'CLAIMED'
+          and (
+            r.claim_expires_at > p_now
+            or (
+              r.claim_device_id is not null
+              and exists (
+                select 1
+                from public.devices d
+                join public.shop_memberships m
+                  on m.shop_id = d.shop_id
+                 and m.auth_user_id = d.auth_user_id
+                where d.id = r.claim_device_id
+                  and d.shop_id = r.shop_id
+                  and d.active
+                  and m.role = 'OPERATIONS_DEVICE'
+                  and m.active
+              )
+            )
+          )
+        )
         or (r.status = 'RESERVED' and r.expires_at > p_now)
       )
       and (v_existing.id is null or r.id <> v_existing.id);
@@ -536,6 +617,12 @@ begin
     end if;
   end if;
 
+  if p_promotion_id is not null
+     and p_loyalty_points > 0
+     and v_promotion.stacking_policy <> 'ALLOW_CONFIGURED' then
+    return jsonb_build_object('ok', false, 'code', 'reward_stacking_not_allowed');
+  end if;
+
   if p_loyalty_points > 0 then
     v_loyalty_discount := p_loyalty_points * v_program.redemption_minor_per_point;
   end if;
@@ -559,6 +646,7 @@ begin
         'freeProductId', v_promotion.free_product_id,
         'minimumOrderMinor', v_promotion.minimum_order_minor,
         'channel', v_promotion.channel,
+        'stackingPolicy', v_promotion.stacking_policy,
         'promotionDiscountMinor', v_promotion_discount
       ) end,
     'loyalty',
@@ -608,6 +696,7 @@ begin
       expires_at = v_expires_at,
       claimed_at = null,
       claim_expires_at = null,
+      claim_device_id = null,
       consumed_order_id = null,
       consumed_at = null,
       released_at = null,
@@ -640,7 +729,8 @@ create or replace function public.claim_order_reward_reservation_v1(
   p_business_id uuid,
   p_shop_id uuid,
   p_checkout_intent_id text,
-  p_now timestamptz
+  p_now timestamptz,
+  p_claim_device_id uuid default null
 )
 returns jsonb
 language plpgsql
@@ -671,19 +761,39 @@ begin
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_mismatch');
   end if;
 
-  if v_reservation.status = 'CONSUMED' then
+  if v_reservation.status in ('CONSUMED', 'COMMITTED') then
     return jsonb_build_object(
       'ok', true,
       'replayed', true,
       'reservationId', v_reservation.id,
       'status', v_reservation.status,
-      'expiresAt', v_reservation.expires_at,
+      'expiresAt', coalesce(v_reservation.claim_expires_at, v_reservation.expires_at),
       'snapshot', v_reservation.applied_reward_snapshot
     );
   end if;
 
   if v_reservation.status = 'CLAIMED' then
-    if v_reservation.claim_expires_at <= p_now then
+    if p_claim_device_id is not null
+       and v_reservation.claim_device_id is not null
+       and v_reservation.claim_device_id <> p_claim_device_id then
+      return jsonb_build_object('ok', false, 'code', 'reward_claim_owned');
+    end if;
+    if v_reservation.claim_expires_at <= p_now
+       and not (
+         v_reservation.claim_device_id is not null
+         and exists (
+           select 1
+           from public.devices d
+           join public.shop_memberships m
+             on m.shop_id = d.shop_id
+            and m.auth_user_id = d.auth_user_id
+           where d.id = v_reservation.claim_device_id
+             and d.shop_id = v_reservation.shop_id
+             and d.active
+             and m.role = 'OPERATIONS_DEVICE'
+             and m.active
+         )
+       ) then
       update public.reward_reservations
       set status = 'EXPIRED', updated_at = p_now
       where id = v_reservation.id;
@@ -715,6 +825,7 @@ begin
     status = 'CLAIMED',
     claimed_at = p_now,
     claim_expires_at = p_now + interval '24 hours',
+    claim_device_id = p_claim_device_id,
     updated_at = p_now
   where id = v_reservation.id
   returning * into v_reservation;
@@ -731,10 +842,10 @@ end;
 $claim_order_reward_reservation$;
 
 revoke all on function public.claim_order_reward_reservation_v1(
-  uuid, uuid, uuid, text, timestamptz
+  uuid, uuid, uuid, text, timestamptz, uuid
 ) from public, anon, authenticated;
 grant execute on function public.claim_order_reward_reservation_v1(
-  uuid, uuid, uuid, text, timestamptz
+  uuid, uuid, uuid, text, timestamptz, uuid
 ) to service_role;
 
 create or replace function public.reserve_operations_order_rewards_v1(
@@ -1001,7 +1112,8 @@ begin
     v_business_id,
     p_shop_id,
     p_checkout_intent_id,
-    p_now
+    p_now,
+    p_device_id
   );
 end;
 $claim_operations_order_reward$;
@@ -1245,16 +1357,10 @@ begin
     end if;
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_consumed');
   end if;
-  if v_reservation.status not in ('RESERVED', 'CLAIMED') then
+  if v_reservation.status not in ('RESERVED', 'CLAIMED', 'COMMITTED') then
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_unavailable');
   end if;
-  if (
-    (v_reservation.status = 'RESERVED' and v_reservation.expires_at <= p_now)
-    or (
-      v_reservation.status = 'CLAIMED'
-      and v_reservation.claim_expires_at <= p_now
-    )
-  ) then
+  if v_reservation.status = 'RESERVED' and v_reservation.expires_at <= p_now then
     update public.reward_reservations
     set status = 'EXPIRED', updated_at = p_now
     where id = v_reservation.id;
@@ -1482,6 +1588,9 @@ begin
   if v_reservation.status = 'CONSUMED' then
     return jsonb_build_object('ok', false, 'code', 'reward_reservation_consumed');
   end if;
+  if v_reservation.status = 'COMMITTED' then
+    return jsonb_build_object('ok', false, 'code', 'reward_reservation_committed');
+  end if;
   if v_reservation.status in ('RELEASED', 'EXPIRED') then
     return jsonb_build_object(
       'ok', true,
@@ -1538,6 +1647,21 @@ begin
     ) or (
       r.status = 'CLAIMED'
       and r.claim_expires_at <= p_now
+      and (
+        r.claim_device_id is null
+        or not exists (
+          select 1
+          from public.devices d
+          join public.shop_memberships m
+            on m.shop_id = d.shop_id
+           and m.auth_user_id = d.auth_user_id
+          where d.id = r.claim_device_id
+            and d.shop_id = r.shop_id
+            and d.active
+            and m.role = 'OPERATIONS_DEVICE'
+            and m.active
+        )
+      )
     )
     order by
       case
@@ -1929,7 +2053,28 @@ begin
           and (c.id = p_customer_id or c.merged_into_customer_id = p_customer_id)
       )
       and (
-        (r.status = 'CLAIMED' and r.claim_expires_at > now())
+        r.status = 'COMMITTED'
+        or (
+          r.status = 'CLAIMED'
+          and (
+            r.claim_expires_at > now()
+            or (
+              r.claim_device_id is not null
+              and exists (
+                select 1
+                from public.devices d
+                join public.shop_memberships m
+                  on m.shop_id = d.shop_id
+                 and m.auth_user_id = d.auth_user_id
+                where d.id = r.claim_device_id
+                  and d.shop_id = r.shop_id
+                  and d.active
+                  and m.role = 'OPERATIONS_DEVICE'
+                  and m.active
+              )
+            )
+          )
+        )
         or (r.status = 'RESERVED' and r.expires_at > now())
       );
   end if;
