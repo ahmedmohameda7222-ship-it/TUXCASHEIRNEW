@@ -44,6 +44,7 @@ interface CheckoutFixtureSettings {
   readonly minimumOrderMinor: number;
   readonly serviceChargeBps: number;
   readonly taxBps: number;
+  readonly allowDiscountStacking?: boolean;
 }
 
 function configuration(
@@ -107,6 +108,7 @@ function configuration(
               'checkout.minimumOrderMinor': checkout.minimumOrderMinor,
               'checkout.serviceChargeBps': checkout.serviceChargeBps,
               'checkout.taxBps': checkout.taxBps,
+              'checkout.allowDiscountStacking': checkout.allowDiscountStacking ?? false,
             },
             shopIdentity: {
               shopId: SHOP_ID,
@@ -529,6 +531,66 @@ describe('OperationsOrdersService placement origin', () => {
       transaction.orders.getByIdempotencyKey(SHOP_ID, requested.checkoutIntentKey),
     );
     expect(persisted).toBeNull();
+    await closeFixture(test);
+  });
+
+  it('requires promotion-level configured stacking before combining a promotion with a manual discount', async () => {
+    const released: string[] = [];
+    const reservation = {
+      id: '15151515-1515-4151-8151-151515151515',
+      expiresAt: instant('2026-09-08T10:40:00.000Z'),
+      replayed: false,
+      snapshot: {
+        configurationVersion: 5,
+        rewardDiscountMinor: moneyMinor(1_000),
+        promotion: {
+          id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          name: 'One-level promotion',
+          kind: 'FIXED' as const,
+          version: 5,
+          percentBasisPoints: null,
+          fixedDiscountMinor: moneyMinor(1_000),
+          freeProductId: null,
+          minimumOrderMinor: moneyMinor(0),
+          channel: 'BOTH' as const,
+          promotionDiscountMinor: moneyMinor(1_000),
+          stackingPolicy: 'ONE_ORDER_LEVEL' as const,
+        },
+        loyalty: null,
+      },
+    };
+    const rewardAuthority: OrderRewardAuthority = {
+      reserve: async () => ({ ok: true as const, value: reservation }),
+      claim: async () => ({ ok: true as const, value: reservation }),
+      release: async ({ reservationId }) => {
+        released.push(reservationId);
+      },
+    };
+    const test = await fixture(
+      'BOTH',
+      {
+        settingsVersion: 6,
+        minimumOrderMinor: 0,
+        serviceChargeBps: 0,
+        taxBps: 0,
+        allowDiscountStacking: true,
+      },
+      6,
+      rewardAuthority,
+    );
+    const requested = {
+      ...draft('abababab-aaaa-4aaa-8aaa-abababababab', {
+        promotionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        loyaltyPointsToRedeem: 0,
+      }),
+      discountMinor: moneyMinor(500),
+    };
+
+    const result = await test.service.placeOrder(requested);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('REWARD_NOT_AVAILABLE');
+    expect(released).toEqual(['15151515-1515-4151-8151-151515151515']);
     await closeFixture(test);
   });
 
