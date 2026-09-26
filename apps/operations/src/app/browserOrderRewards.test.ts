@@ -93,4 +93,48 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
       },
     });
   });
+
+
+  it('reconciles device-owned claims against durable local checkout intents after reconnect', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            claims: [
+              { reservationId: RESERVATION_ID, checkoutIntentId: CHECKOUT_INTENT_ID },
+              {
+                reservationId: '55555555-5555-4555-8555-555555555555',
+                checkoutIntentId: '66666666-6666-4666-8666-666666666666',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, committed: 1, expired: 1 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const authority = new BrowserOrderRewardAuthority();
+    await authority.reconcileClaims(SHOP_ID, async (checkoutIntentId) =>
+      checkoutIntentId === CHECKOUT_INTENT_ID,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const listBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(listBody).toEqual({ action: 'LIST_CLAIMS', shopId: SHOP_ID });
+
+    const reconcileBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(reconcileBody).toEqual({
+      action: 'RECONCILE',
+      shopId: SHOP_ID,
+      committedCheckoutIntentIds: [CHECKOUT_INTENT_ID],
+    });
+  });
 });
