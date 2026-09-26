@@ -1645,7 +1645,7 @@ const abandonedClaimPromotion = rpc(
     '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
     'Abandoned claim one-slot promotion', true, 'FIXED', null, 500, null,
     null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
-    array[]::uuid[], array[]::uuid[], 1, null, 'ONE_ORDER_LEVEL',
+    array[]::uuid[], array[]::uuid[], 1, null, 'ALLOW_CONFIGURED',
     null, 'promotion-abandoned-claim'
   )`,
   'Abandoned claim promotion upsert',
