@@ -299,6 +299,75 @@ export class BrowserOrderRewardAuthority implements OrderRewardAuthority {
     }
   }
 
+  async reconcileClaims(
+    shopId: OrderRewardReservationInput['shopId'],
+    hasCommittedCheckoutIntent: (checkoutIntentId: string) => Promise<boolean>,
+  ): Promise<void> {
+    let listResponse: Response;
+    try {
+      listResponse = await fetch('/api/operations-order-rewards', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'LIST_CLAIMS', shopId }),
+      });
+    } catch {
+      return;
+    }
+    if (!listResponse.ok) return;
+
+    let claims: unknown;
+    try {
+      const parsed = object(await listResponse.json(), 'Reward claim list response');
+      if (parsed['ok'] !== true || !Array.isArray(parsed['claims'])) return;
+      claims = parsed['claims'];
+    } catch {
+      return;
+    }
+
+    const committedCheckoutIntentIds: string[] = [];
+    try {
+      for (const value of claims as unknown[]) {
+        const claim = object(value, 'Reward claim');
+        const reservationId = stringValue(claim['reservationId'], 'Reward claim reservation id');
+        if (!UUID_PATTERN.test(reservationId)) return;
+        const checkoutIntentId = stringValue(
+          claim['checkoutIntentId'],
+          'Reward claim checkout intent id',
+        );
+        if (await hasCommittedCheckoutIntent(checkoutIntentId)) {
+          committedCheckoutIntentIds.push(checkoutIntentId);
+        }
+      }
+    } catch {
+      // Never expire canonical claims when the local durable-order read is uncertain.
+      return;
+    }
+
+    try {
+      await fetch('/api/operations-order-rewards', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'RECONCILE',
+          shopId,
+          committedCheckoutIntentIds,
+        }),
+      });
+    } catch {
+      // A later reconnect/startup retry can reconcile the same idempotent claims.
+    }
+  }
+
   async release(input: {
     readonly shopId: OrderRewardReservationInput['shopId'];
     readonly reservationId: string;
