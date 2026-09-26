@@ -151,4 +151,72 @@ describe('startBrowserAutomaticSync', () => {
     await vi.waitFor(() => expect(getByIdempotencyKey).toHaveBeenCalledTimes(2));
     expect(reconcileClaims).toHaveBeenCalledTimes(1);
   });
+  it('only reconciles a canonical claim when the durable local order carries the same reservation', async () => {
+    const getByIdempotencyKey = vi.fn(async () => ({
+      id: 'order-without-this-reward',
+      rewardReservationId: '99999999-9999-4999-8999-999999999999',
+    }) as never);
+    const database = {
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({ orders: { getByIdempotencyKey } }),
+    } as unknown as OperationsDatabase;
+    const reconcileClaims = vi.fn(
+      async (
+        _shopId: unknown,
+        hasCommittedRewardReservation: (
+          checkoutIntentId: string,
+          reservationId: string,
+        ) => Promise<boolean>,
+      ) => {
+        await expect(
+          hasCommittedRewardReservation(
+            'same-intent',
+            '22222222-2222-4222-8222-222222222222',
+          ),
+        ).resolves.toBe(false);
+      },
+    );
+
+    startBrowserAutomaticSync({
+      database,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+      rewardClaims: { reconcileClaims } as never,
+    });
+
+    await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
+  });
+
+  it('retries reward-claim reconciliation on the periodic remote sync interval', async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    vi.stubGlobal('window', {
+      location: { origin: 'https://operations.example.test' },
+      setInterval: (callback: () => void) => {
+        intervalCallbacks.push(callback);
+        return 1;
+      },
+    });
+
+    const database = {
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({ orders: { getByIdempotencyKey: async () => null } }),
+    } as unknown as OperationsDatabase;
+    const reconcileClaims = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary reconcile failure'))
+      .mockResolvedValue(undefined);
+
+    startBrowserAutomaticSync({
+      database,
+      now: () => '2026-08-24T06:00:00.000Z' as Instant,
+      shopId: '14000000-0000-4000-8000-000000000001' as never,
+      rewardClaims: { reconcileClaims },
+    });
+
+    await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(1));
+    expect(intervalCallbacks).toHaveLength(1);
+    intervalCallbacks[0]?.();
+    await vi.waitFor(() => expect(reconcileClaims).toHaveBeenCalledTimes(2));
+  });
+
 });
