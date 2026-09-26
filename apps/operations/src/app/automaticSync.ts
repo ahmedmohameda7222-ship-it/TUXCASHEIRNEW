@@ -13,10 +13,18 @@ import { browserSyncStatusStore } from './syncStatus';
 
 const INVENTORY_SYNC_INTERVAL_MS = 15_000;
 
+export interface BrowserRewardClaimReconciler {
+  reconcileClaims(
+    shopId: ShopId,
+    hasCommittedCheckoutIntent: (checkoutIntentId: string) => Promise<boolean>,
+  ): Promise<void>;
+}
+
 export function startBrowserAutomaticSync(input: {
   readonly database: OperationsDatabase;
   readonly now: () => Instant;
   readonly shopId?: ShopId;
+  readonly rewardClaims?: BrowserRewardClaimReconciler;
 }): AutomaticOutboxScheduler {
   const endpoint = new URL('/api/operations-sync', window.location.origin).toString();
   const service = new OutboxSyncService(input.database, new HttpOutboxTransport({ endpoint }), {
@@ -29,6 +37,23 @@ export function startBrowserAutomaticSync(input: {
 
   let inventoryRunning = false;
   let lifecycleRunning = false;
+  let rewardClaimsRunning = false;
+  const synchronizeRewardClaims = async (): Promise<void> => {
+    if (input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) return;
+    rewardClaimsRunning = true;
+    try {
+      await input.rewardClaims.reconcileClaims(input.shopId, async (checkoutIntentId) => {
+        const order = await input.database.transaction((transaction) =>
+          transaction.orders.getByIdempotencyKey(input.shopId!, checkoutIntentId),
+        );
+        return order !== null;
+      });
+    } catch {
+      // Canonical claims remain protected until a later startup/reconnect reconciliation succeeds.
+    } finally {
+      rewardClaimsRunning = false;
+    }
+  };
   const synchronizeInventory = async (): Promise<void> => {
     if (input.shopId === undefined || inventoryRunning) return;
     inventoryRunning = true;
@@ -71,6 +96,7 @@ export function startBrowserAutomaticSync(input: {
 
   browserSyncStatusStore.markRemoteConfigured();
   if (input.shopId !== undefined) {
+    void synchronizeRewardClaims();
     void synchronizeInventory();
     void synchronizeLifecycle();
     if (typeof window.setInterval === 'function') {
@@ -85,6 +111,7 @@ export function startBrowserAutomaticSync(input: {
     browserSyncStatusStore.setOnline(navigator.onLine);
     window.addEventListener('online', () => {
       browserSyncStatusStore.setOnline(true);
+      void synchronizeRewardClaims();
       void synchronizeInventory();
       void synchronizeLifecycle();
     });
