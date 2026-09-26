@@ -159,9 +159,8 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const authority = new BrowserOrderRewardAuthority();
-    await expect(
-      authority.reconcileClaims(SHOP_ID, async () => true),
-    ).rejects.toThrow('Reward claim reconciliation failed');
+    await expect(authority.reconcileClaims(SHOP_ID, async () => true)).rejects.toThrow(
+      'Reward claim reconciliation failed',
+    );
   });
-
 });
