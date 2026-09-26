@@ -682,13 +682,9 @@ export class OperationsOrdersService {
             if (
               draft.discountMinor > ZERO_MONEY &&
               rewardReservation.snapshot.rewardDiscountMinor > ZERO_MONEY &&
-              (
-                !initialValidation.value.checkoutPolicy.allowDiscountStacking ||
-                (
-                  rewardReservation.snapshot.promotion !== null &&
-                  rewardReservation.snapshot.promotion.stackingPolicy !== 'ALLOW_CONFIGURED'
-                )
-              )
+              (!initialValidation.value.checkoutPolicy.allowDiscountStacking ||
+                (rewardReservation.snapshot.promotion !== null &&
+                  rewardReservation.snapshot.promotion.stackingPolicy !== 'ALLOW_CONFIGURED'))
             ) {
               await this.#releaseRewardQuietly(context.shopId, rewardReservation.id);
               activeRewardReservation = null;
