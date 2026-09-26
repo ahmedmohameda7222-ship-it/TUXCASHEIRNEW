@@ -1125,6 +1125,145 @@ grant execute on function public.claim_operations_order_reward_reservation_v1(
   uuid, uuid, uuid, uuid, text, timestamptz
 ) to service_role;
 
+create or replace function public.list_operations_reward_claims_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_shop_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $list_operations_reward_claims$
+declare
+  v_claims jsonb;
+begin
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = p_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'reservationId', r.id,
+        'checkoutIntentId', r.checkout_intent_id
+      )
+      order by r.claimed_at, r.id
+    ),
+    '[]'::jsonb
+  )
+    into v_claims
+  from public.reward_reservations r
+  where r.shop_id = p_shop_id
+    and r.claim_device_id = p_device_id
+    and r.status = 'CLAIMED';
+
+  return jsonb_build_object('ok', true, 'claims', v_claims);
+end;
+$list_operations_reward_claims$;
+
+revoke all on function public.list_operations_reward_claims_v1(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.list_operations_reward_claims_v1(uuid, uuid, uuid)
+  to service_role;
+
+create or replace function public.reconcile_operations_reward_claims_v1(
+  p_auth_user_id uuid,
+  p_device_id uuid,
+  p_shop_id uuid,
+  p_committed_checkout_intent_ids text[],
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $reconcile_operations_reward_claims$
+declare
+  v_committed_ids text[] := coalesce(p_committed_checkout_intent_ids, '{}'::text[]);
+  v_committed integer := 0;
+  v_expired integer := 0;
+begin
+  if p_now is null
+     or cardinality(v_committed_ids) > 2000
+     or exists (
+       select 1
+       from unnest(v_committed_ids) value
+       where nullif(btrim(value), '') is null or length(value) > 200
+     ) then
+    return jsonb_build_object('ok', false, 'code', 'invalid_reward_reconciliation');
+  end if;
+
+  if not exists (
+    select 1
+    from public.shop_memberships membership
+    join public.devices device
+      on device.shop_id = membership.shop_id
+     and device.auth_user_id = membership.auth_user_id
+    where membership.shop_id = p_shop_id
+      and membership.auth_user_id = p_auth_user_id
+      and membership.role = 'OPERATIONS_DEVICE'
+      and membership.active
+      and device.id = p_device_id
+      and device.auth_user_id = p_auth_user_id
+      and device.active
+  ) then
+    raise exception 'TUX_DEVICE_NOT_AUTHORIZED';
+  end if;
+
+  perform 1
+  from public.reward_reservations r
+  where r.shop_id = p_shop_id
+    and r.claim_device_id = p_device_id
+    and r.status = 'CLAIMED'
+  order by r.id
+  for update;
+
+  update public.reward_reservations r
+  set status = 'COMMITTED', updated_at = p_now
+  where r.shop_id = p_shop_id
+    and r.claim_device_id = p_device_id
+    and r.status = 'CLAIMED'
+    and r.checkout_intent_id = any(v_committed_ids);
+  get diagnostics v_committed = row_count;
+
+  update public.reward_reservations r
+  set status = 'EXPIRED', updated_at = p_now
+  where r.shop_id = p_shop_id
+    and r.claim_device_id = p_device_id
+    and r.status = 'CLAIMED'
+    and r.claim_expires_at <= p_now
+    and not (r.checkout_intent_id = any(v_committed_ids));
+  get diagnostics v_expired = row_count;
+
+  return jsonb_build_object(
+    'ok', true,
+    'committed', v_committed,
+    'expired', v_expired
+  );
+end;
+$reconcile_operations_reward_claims$;
+
+revoke all on function public.reconcile_operations_reward_claims_v1(
+  uuid, uuid, uuid, text[], timestamptz
+) from public, anon, authenticated;
+grant execute on function public.reconcile_operations_reward_claims_v1(
+  uuid, uuid, uuid, text[], timestamptz
+) to service_role;
+
 create or replace function public.release_operations_order_reward_reservation_v1(
   p_auth_user_id uuid,
   p_device_id uuid,
