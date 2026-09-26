@@ -20,6 +20,7 @@ import {
   type OnlineOrderPublishedCheckoutAuthority,
   type OnlineOrderStoredRequest,
 } from './order-intake.ts';
+import { collectAllPages } from './pagedSelect.ts';
 import { projectPublishedCheckoutAuthority } from './published-checkout-authority.ts';
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -137,48 +138,61 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
   constructor(private readonly client: SupabaseClient) {}
 
   async loadCatalog(shopId: string): Promise<OnlineOrderCatalogAuthority | null> {
-    const [
-      shopResult,
-      categoriesResult,
-      productsResult,
-      modifiersResult,
-      linksResult,
-      combosResult,
-    ] = await Promise.all([
-      this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
-      this.client.from('menu_categories').select('id,shop_id,active').eq('shop_id', shopId),
-      this.client
-        .from('products')
-        .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
-        .eq('shop_id', shopId),
-      this.client
-        .from('modifiers')
-        .select('id,shop_id,name,price_minor,active,standalone_product_id')
-        .eq('shop_id', shopId),
-      this.client
-        .from('product_modifiers')
-        .select('product_id,modifier_id,max_quantity')
-        .eq('shop_id', shopId),
-      this.client
-        .from('combo_beverage_options')
-        .select('combo_product_id,beverage_product_id')
-        .eq('shop_id', shopId),
-    ]);
+    const [shopResult, categoriesRows, productsRows, modifiersRows, linksRows, combosRows] =
+      await Promise.all([
+        this.client.from('shops').select('id,active').eq('id', shopId).maybeSingle(),
+        collectAllPages(async (from, to) => {
+          const result = await this.client
+            .from('menu_categories')
+            .select('id,shop_id,active')
+            .eq('shop_id', shopId)
+            .range(from, to);
+          if (result.error) throw result.error;
+          return result.data ?? [];
+        }),
+        collectAllPages(async (from, to) => {
+          const result = await this.client
+            .from('products')
+            .select('id,shop_id,category_id,name,price_minor,active,sold_out,is_combo')
+            .eq('shop_id', shopId)
+            .range(from, to);
+          if (result.error) throw result.error;
+          return result.data ?? [];
+        }),
+        collectAllPages(async (from, to) => {
+          const result = await this.client
+            .from('modifiers')
+            .select('id,shop_id,name,price_minor,active,standalone_product_id')
+            .eq('shop_id', shopId)
+            .range(from, to);
+          if (result.error) throw result.error;
+          return result.data ?? [];
+        }),
+        collectAllPages(async (from, to) => {
+          const result = await this.client
+            .from('product_modifiers')
+            .select('product_id,modifier_id,max_quantity')
+            .eq('shop_id', shopId)
+            .range(from, to);
+          if (result.error) throw result.error;
+          return result.data ?? [];
+        }),
+        collectAllPages(async (from, to) => {
+          const result = await this.client
+            .from('combo_beverage_options')
+            .select('combo_product_id,beverage_product_id')
+            .eq('shop_id', shopId)
+            .range(from, to);
+          if (result.error) throw result.error;
+          return result.data ?? [];
+        }),
+      ]);
 
-    for (const result of [
-      shopResult,
-      categoriesResult,
-      productsResult,
-      modifiersResult,
-      linksResult,
-      combosResult,
-    ]) {
-      if (result.error) throw result.error;
-    }
+    if (shopResult.error) throw shopResult.error;
     if (!shopResult.data) return null;
 
     const shop = record(shopResult.data, 'shop');
-    const categories: OnlineOrderCatalogCategory[] = (categoriesResult.data ?? []).map((value) => {
+    const categories: OnlineOrderCatalogCategory[] = categoriesRows.map((value) => {
       const row = record(value, 'category');
       return {
         id: stringField(row.id, 'category.id'),
@@ -186,7 +200,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
         active: booleanField(row.active, 'category.active'),
       };
     });
-    const products: OnlineOrderCatalogProduct[] = (productsResult.data ?? []).map((value) => {
+    const products: OnlineOrderCatalogProduct[] = productsRows.map((value) => {
       const row = record(value, 'product');
       return {
         id: stringField(row.id, 'product.id'),
@@ -199,7 +213,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
         isCombo: booleanField(row.is_combo, 'product.is_combo'),
       };
     });
-    const modifiers: OnlineOrderCatalogModifier[] = (modifiersResult.data ?? []).map((value) => {
+    const modifiers: OnlineOrderCatalogModifier[] = modifiersRows.map((value) => {
       const row = record(value, 'modifier');
       return {
         id: stringField(row.id, 'modifier.id'),
@@ -213,7 +227,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
             : stringField(row.standalone_product_id, 'modifier.standalone_product_id'),
       };
     });
-    const productModifierLinks: OnlineOrderProductModifierLink[] = (linksResult.data ?? []).map(
+    const productModifierLinks: OnlineOrderProductModifierLink[] = linksRows.map(
       (value) => {
         const row = record(value, 'product modifier link');
         return {
@@ -226,7 +240,7 @@ class SupabaseOnlineOrderIntakeStore implements OnlineOrderIntakeStore {
         };
       },
     );
-    const comboBeverageOptions: OnlineOrderComboBeverageOption[] = (combosResult.data ?? []).map(
+    const comboBeverageOptions: OnlineOrderComboBeverageOption[] = combosRows.map(
       (value) => {
         const row = record(value, 'combo beverage option');
         return {
