@@ -647,3 +647,21 @@ Root CI later exposed formatting-only drift in `apps/admin/server/customers/crmS
 
 This ledger update intentionally precedes the final ledger-inclusive gate. The resulting exact HEAD must still pass root `TUX V2 CI` including `format:check`, `lint`, tests, typecheck, migration and rendered-browser gates; the permanent Plan 5 workflow; all required compatibility workflows; and a fresh exact-head Codex review with no valid unresolved serious finding before Plan 5 can be declared technically ready for final review/squash merge. No merge, production Supabase migration, or Vercel/Supabase production deployment is authorized by this checkpoint.
 
+## Plan 5 reviewer hardening — reward reconciliation, flat merge lineage, intake paging, and stacking authority — 2026-09-26
+
+A fresh reviewer pass on exact head `d28aa95d09d3e1a79468e33e13e9c82fbbb509e0` identified four remaining Plan 5 correctness risks. The active branch was hardened without expanding approved Plan 5 scope:
+
+- POS scarce-reward durability now distinguishes transient pre-commit claims from durable local checkout intent. Operations claims are device-bound; startup/reconnect reconciliation compares canonical claims with durable local orders, promotes locally committed claims to `COMMITTED`, releases expired abandoned claims, and lets `COMMITTED` reservations materialize canonically later without reopening scarce promotion/loyalty capacity. Application/browser/PostgreSQL coverage exercises durable local commit, delayed reconciliation, abandoned-claim release, ownership, and late canonical consumption.
+- Customer merge lineage is kept flat. When an already-canonical survivor is merged again, every retired identity that pointed at the old survivor is repointed directly at the new survivor, preserving one-hop CRM lookup and canonical loyalty/reward/per-customer-promotion aggregation across chained merges. PostgreSQL coverage verifies `B -> A -> C` flattening, combined loyalty balance, and exhausted per-customer promotion usage.
+- Trusted ONLINE catalog authority now exhaustively pages menu categories, products, modifiers, product-modifier links, and combo-beverage options by actual returned row count. The same loader is used for fallback-shop revalidation, preventing valid large-catalog items or relationships beyond the PostgREST row cap from disappearing during trusted intake.
+- Promotion `stacking_policy` now participates in real checkout authority. `ONE_ORDER_LEVEL` rejects promotion-plus-loyalty and promotion-plus-manual-discount stacking; `ALLOW_CONFIGURED` permits the configured combination only when the published checkout policy also allows discount stacking. Canonical reward snapshots persist the effective stacking policy, with PostgreSQL and application regressions covering both rejected and allowed paths.
+
+Exact pre-ledger hardened head `80b0583ff3608f3c7c27ad1e64228de2eaa1c257` passed:
+
+- `Admin Plan 5 Orders Customers Delivery TDD` run `36236180335` — all 19 permanent jobs SUCCESS, including customer PostgreSQL merge behavior, loyalty/reward PostgreSQL behavior, reward placement integration, ONLINE delivery checkout authority, Orders/CRM/Delivery E2E, regression, and static/typecheck gates.
+- Root `TUX V2 CI` run `36236180352` — SUCCESS across `quality`, `admin`, `menu`, `windows-package`, `edge-security`, `monorepo-architecture`, and `Required quality gate`.
+- Foundation, Catalog/Boundary, Plan 2 rounds 15/16/17, Plan 3, and Plan 4 compatibility workflows attached to the same exact head were SUCCESS.
+- PR #98 remained draft and mergeable; no production Supabase migration, Vercel deployment, or merge was performed.
+
+This ledger commit changes the exact PR head. The resulting ledger-inclusive head must therefore pass the permanent workflow set again and receive the required fresh exact-head review before Plan 5 can be declared technically ready for final review/squash merge. Production promotion remains a separate explicit checkpoint.
+
