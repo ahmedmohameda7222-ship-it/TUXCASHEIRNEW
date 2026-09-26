@@ -3415,7 +3415,28 @@ begin
         )
     )
     and (
-      (r.status = 'CLAIMED' and r.claim_expires_at > p_now)
+      r.status = 'COMMITTED'
+      or (
+        r.status = 'CLAIMED'
+        and (
+          r.claim_expires_at > p_now
+          or (
+            r.claim_device_id is not null
+            and exists (
+              select 1
+              from public.devices d
+              join public.shop_memberships m
+                on m.shop_id = d.shop_id
+               and m.auth_user_id = d.auth_user_id
+              where d.id = r.claim_device_id
+                and d.shop_id = r.shop_id
+                and d.active
+                and m.role = 'OPERATIONS_DEVICE'
+                and m.active
+            )
+          )
+        )
+      )
       or (r.status = 'RESERVED' and r.expires_at > p_now)
     );
 
