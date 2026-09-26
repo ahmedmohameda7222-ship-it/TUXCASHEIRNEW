@@ -94,7 +94,6 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
     });
   });
 
-
   it('reconciles device-owned claims against durable local checkout intents after reconnect', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -122,8 +121,9 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const authority = new BrowserOrderRewardAuthority();
-    await authority.reconcileClaims(SHOP_ID, async (checkoutIntentId) =>
-      checkoutIntentId === CHECKOUT_INTENT_ID,
+    await authority.reconcileClaims(
+      SHOP_ID,
+      async (checkoutIntentId) => checkoutIntentId === CHECKOUT_INTENT_ID,
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
