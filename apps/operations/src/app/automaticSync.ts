@@ -39,11 +39,7 @@ export function startBrowserAutomaticSync(input: {
   let lifecycleRunning = false;
   let rewardClaimsRunning = false;
   const synchronizeRewardClaims = async (): Promise<void> => {
-    if (
-      input.shopId === undefined ||
-      input.rewardClaims === undefined ||
-      rewardClaimsRunning
-    ) {
+    if (input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) {
       return;
     }
     rewardClaimsRunning = true;
