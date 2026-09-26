@@ -233,6 +233,8 @@ export interface OrderPromotionRewardSnapshot {
   readonly freeProductId: ProductId | null;
   readonly minimumOrderMinor: MoneyMinor;
   readonly channel: 'POS' | 'ONLINE' | 'BOTH';
+  /** Present on Plan 5 reward snapshots; omitted by legacy persisted rewards. */
+  readonly stackingPolicy?: 'ONE_ORDER_LEVEL' | 'ALLOW_CONFIGURED';
   readonly promotionDiscountMinor: MoneyMinor;
 }
 
