@@ -1820,4 +1820,304 @@ if (loyaltyAfterAbandonedExpiry.ok !== true) {
   );
 }
 
+
+const deviceCommittedPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Device committed reward', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], 1, null, 'ONE_ORDER_LEVEL',
+    null, 'promotion-device-committed'
+  )`,
+  'Device committed reward promotion upsert',
+);
+const deviceAbandonedPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Device abandoned reward', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], 1, null, 'ONE_ORDER_LEVEL',
+    null, 'promotion-device-abandoned'
+  )`,
+  'Device abandoned reward promotion upsert',
+);
+if (deviceCommittedPromotion.ok !== true || deviceAbandonedPromotion.ok !== true) {
+  throw new Error('device reward promotion setup failed');
+}
+
+const deviceCommittedReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'device-committed-intent', '${deviceCommittedPromotion.promotionId}'::uuid,
+    0, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:00:00Z'::timestamptz
+  )`,
+  'Reserve device committed reward',
+);
+const deviceAbandonedReservation = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'device-abandoned-intent', '${deviceAbandonedPromotion.promotionId}'::uuid,
+    0, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T09:00:00Z'::timestamptz
+  )`,
+  'Reserve device abandoned reward',
+);
+for (const [label, reservation, intent] of [
+  ['committed', deviceCommittedReservation, 'device-committed-intent'],
+  ['abandoned', deviceAbandonedReservation, 'device-abandoned-intent'],
+]) {
+  if (reservation.ok !== true) {
+    throw new Error(`device ${label} reservation failed: ${JSON.stringify(reservation)}`);
+  }
+  const claimed = rpc(
+    `public.claim_operations_order_reward_reservation_v1(
+      '${AUTH_USER_ID}'::uuid,
+      '${DEVICE_ID}'::uuid,
+      '${SHOP_ID}'::uuid,
+      '${reservation.reservationId}'::uuid,
+      '${intent}',
+      '2026-09-23T09:01:00Z'::timestamptz
+    )`,
+    `Claim device ${label} reward`,
+  );
+  if (claimed.ok !== true || claimed.status !== 'CLAIMED') {
+    throw new Error(`device ${label} claim failed: ${JSON.stringify(claimed)}`);
+  }
+}
+
+psql(
+  [
+    '-At',
+    '-c',
+    `select public.expire_order_reward_reservations_v1(
+      '2026-09-24T10:00:00Z'::timestamptz, 100
+    )`,
+  ],
+  'Do not blindly expire active-device reward claims',
+);
+const deviceClaimStatusesBeforeReconcile = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_object_agg(checkout_intent_id, status)::text
+       from public.reward_reservations
+       where id in (
+         '${deviceCommittedReservation.reservationId}'::uuid,
+         '${deviceAbandonedReservation.reservationId}'::uuid
+       )`,
+    ],
+    'Device claim status before reconciliation',
+  ).trim(),
+);
+if (
+  deviceClaimStatusesBeforeReconcile['device-committed-intent'] !== 'CLAIMED' ||
+  deviceClaimStatusesBeforeReconcile['device-abandoned-intent'] !== 'CLAIMED'
+) {
+  throw new Error(
+    `active-device claims expired before local reconciliation: ${JSON.stringify(
+      deviceClaimStatusesBeforeReconcile,
+    )}`,
+  );
+}
+
+const deviceReconcile = rpc(
+  `public.reconcile_operations_reward_claims_v1(
+    '${AUTH_USER_ID}'::uuid,
+    '${DEVICE_ID}'::uuid,
+    '${SHOP_ID}'::uuid,
+    array['device-committed-intent']::text[],
+    '2026-09-24T10:01:00Z'::timestamptz
+  )`,
+  'Reconcile device reward claims after reconnect',
+);
+if (
+  deviceReconcile.ok !== true ||
+  Number(deviceReconcile.committed) !== 1 ||
+  Number(deviceReconcile.expired) !== 1
+) {
+  throw new Error(`device claim reconciliation failed: ${JSON.stringify(deviceReconcile)}`);
+}
+
+const reconciledClaimStatuses = JSON.parse(
+  psql(
+    [
+      '-At',
+      '-c',
+      `select jsonb_object_agg(checkout_intent_id, status)::text
+       from public.reward_reservations
+       where id in (
+         '${deviceCommittedReservation.reservationId}'::uuid,
+         '${deviceAbandonedReservation.reservationId}'::uuid
+       )`,
+    ],
+    'Device claim status after reconciliation',
+  ).trim(),
+);
+if (
+  reconciledClaimStatuses['device-committed-intent'] !== 'COMMITTED' ||
+  reconciledClaimStatuses['device-abandoned-intent'] !== 'EXPIRED'
+) {
+  throw new Error(
+    `device claims did not reconcile to committed/expired states: ${JSON.stringify(
+      reconciledClaimStatuses,
+    )}`,
+  );
+}
+
+const abandonedDeviceCapacity = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'device-abandoned-contender', '${deviceAbandonedPromotion.promotionId}'::uuid,
+    0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-24T10:02:00Z'::timestamptz
+  )`,
+  'Abandoned device claim capacity restored after reconciliation',
+);
+if (abandonedDeviceCapacity.ok !== true) {
+  throw new Error(
+    `abandoned device claim capacity was not restored: ${JSON.stringify(abandonedDeviceCapacity)}`,
+  );
+}
+
+const committedDeviceCapacity = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'device-committed-contender', '${deviceCommittedPromotion.promotionId}'::uuid,
+    0, 'ONLINE', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-30T10:02:00Z'::timestamptz
+  )`,
+  'Committed device claim keeps scarce capacity',
+);
+if (
+  committedDeviceCapacity.ok !== false ||
+  committedDeviceCapacity.code !== 'reward_not_available'
+) {
+  throw new Error(
+    `committed device claim released scarce capacity: ${JSON.stringify(committedDeviceCapacity)}`,
+  );
+}
+
+psql(
+  [
+    '-At',
+    '-c',
+    `select public.expire_order_reward_reservations_v1(
+      '2026-09-30T10:03:00Z'::timestamptz, 100
+    )`,
+  ],
+  'Committed reward survives later expiry sweeps',
+);
+psql(
+  [
+    '-c',
+    `insert into public.orders(
+       id, shop_id, business_day_id, display_order_no, idempotency_key, source, status,
+       operator_worker_id, operator_name_snapshot, order_type_id, order_type_label_snapshot,
+       order_type_behavior_snapshot, customer_contact_id, customer_name_snapshot,
+       normalized_phone_snapshot, address_snapshot, delivery_zone_id,
+       delivery_zone_label_snapshot, configured_delivery_fee_minor, final_delivery_fee_minor,
+       items_subtotal_minor, discount_minor, total_minor, order_note, created_at, updated_at,
+       reward_reservation_id, applied_reward_snapshot
+     )
+     select
+       '${DEVICE_COMMITTED_ORDER_ID}', '${SHOP_ID}', '${DAY_ID}', 98, 'device-committed-intent',
+       'POS', 'ACTIVE', '${WORKER_ID}', 'Loyalty Worker', '${ORDER_TYPE_ID}', 'Take Away',
+       'TAKE_AWAY', null, null, null, null, null, null, 0, 0,
+       10000, 500, 9500, null,
+       '2026-09-23T09:02:00Z', '2026-09-23T09:02:00Z',
+       r.id, r.applied_reward_snapshot
+     from public.reward_reservations r
+     where r.id = '${deviceCommittedReservation.reservationId}'::uuid;`,
+  ],
+  'Materialize delayed device-committed reward order',
+);
+const delayedDeviceClaimStatus = psql(
+  [
+    '-At',
+    '-c',
+    `select status
+     from public.reward_reservations
+     where id = '${deviceCommittedReservation.reservationId}'::uuid`,
+  ],
+  'Delayed device claim materialization readback',
+).trim();
+if (delayedDeviceClaimStatus !== 'CONSUMED') {
+  throw new Error(
+    `device-committed reward did not materialize after delayed sync: ${delayedDeviceClaimStatus}`,
+  );
+}
+
+psql(
+  [
+    '-c',
+    `insert into public.business_customers(id, business_id, normalized_phone, display_name)
+       values (
+         '${STACKING_CUSTOMER_ID}', '${BUSINESS_ID}', '+201000000019', 'Stacking Customer'
+       );
+     insert into public.customer_shop_links(business_id, shop_id, canonical_customer_id)
+       values ('${BUSINESS_ID}', '${SHOP_ID}', '${STACKING_CUSTOMER_ID}');
+     insert into public.loyalty_ledger(
+       business_id, shop_id, customer_id, entry_key, event_type,
+       points_delta, monetary_value_minor, source_event_id, created_at
+     ) values (
+       '${BUSINESS_ID}', '${SHOP_ID}', '${STACKING_CUSTOMER_ID}',
+       'stacking-credit', 'EARN', 100, 0, 'stacking-credit',
+       '2026-09-23T10:00:00Z'
+     );`,
+  ],
+  'Promotion stacking fixture',
+);
+
+const oneLevelPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'One-level reward', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], null, null, 'ONE_ORDER_LEVEL',
+    null, 'promotion-stack-one'
+  )`,
+  'One-level promotion upsert',
+);
+const oneLevelStack = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${STACKING_CUSTOMER_ID}'::uuid,
+    'stack-one-intent', '${oneLevelPromotion.promotionId}'::uuid,
+    10, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T10:01:00Z'::timestamptz
+  )`,
+  'Reject one-level promotion plus loyalty stacking',
+);
+if (oneLevelStack.ok !== false || oneLevelStack.code !== 'reward_stacking_not_allowed') {
+  throw new Error(
+    `ONE_ORDER_LEVEL promotion incorrectly stacked with loyalty: ${JSON.stringify(oneLevelStack)}`,
+  );
+}
+
+const configuredStackPromotion = rpc(
+  `public.upsert_admin_promotion_v1(
+    '${EMPLOYEE_ID}'::uuid, '${SHOP_ID}'::uuid, null,
+    'Configured stack reward', true, 'FIXED', null, 500, null,
+    null, null, 0, array['${SHOP_ID}'::uuid], 'BOTH',
+    array[]::uuid[], array[]::uuid[], null, null, 'ALLOW_CONFIGURED',
+    null, 'promotion-stack-allow'
+  )`,
+  'Configured stacking promotion upsert',
+);
+const configuredStack = rpc(
+  `public.reserve_order_rewards_v1(
+    '${BUSINESS_ID}'::uuid, '${SHOP_ID}'::uuid, '${STACKING_CUSTOMER_ID}'::uuid,
+    'stack-allow-intent', '${configuredStackPromotion.promotionId}'::uuid,
+    10, 'POS', 10000, array['${PRODUCT_ID}'::uuid], array['${CATEGORY_ID}'::uuid],
+    '2026-09-23T10:02:00Z'::timestamptz
+  )`,
+  'Allow configured promotion plus loyalty stacking',
+);
+if (configuredStack.ok !== true) {
+  throw new Error(
+    `ALLOW_CONFIGURED promotion did not stack with loyalty: ${JSON.stringify(configuredStack)}`,
+  );
+}
+
 console.log('Admin loyalty PostgreSQL behavior passed.');
