@@ -39,7 +39,12 @@ export function startBrowserAutomaticSync(input: {
   let lifecycleRunning = false;
   let rewardClaimsRunning = false;
   const synchronizeRewardClaims = async (): Promise<void> => {
-    if (input.shopId === undefined || input.rewardClaims === undefined || rewardClaimsRunning) return;
+    if (
+      input.shopId === undefined ||
+      input.rewardClaims === undefined ||
+      rewardClaimsRunning
+    )
+      return;
     rewardClaimsRunning = true;
     try {
       await input.rewardClaims.reconcileClaims(input.shopId, async (checkoutIntentId) => {
