@@ -123,7 +123,8 @@ describe('BrowserOrderRewardAuthority reward claim', () => {
     const authority = new BrowserOrderRewardAuthority();
     await authority.reconcileClaims(
       SHOP_ID,
-      async (checkoutIntentId) => checkoutIntentId === CHECKOUT_INTENT_ID,
+      async (checkoutIntentId, reservationId) =>
+        checkoutIntentId === CHECKOUT_INTENT_ID && reservationId === RESERVATION_ID,
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
