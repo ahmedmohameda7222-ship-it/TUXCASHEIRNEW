@@ -16,7 +16,10 @@ const INVENTORY_SYNC_INTERVAL_MS = 15_000;
 export interface BrowserRewardClaimReconciler {
   reconcileClaims(
     shopId: ShopId,
-    hasCommittedCheckoutIntent: (checkoutIntentId: string) => Promise<boolean>,
+    hasCommittedCheckoutIntent: (
+      checkoutIntentId: string,
+      reservationId: string,
+    ) => Promise<boolean>,
   ): Promise<void>;
 }
 
@@ -44,12 +47,15 @@ export function startBrowserAutomaticSync(input: {
     }
     rewardClaimsRunning = true;
     try {
-      await input.rewardClaims.reconcileClaims(input.shopId, async (checkoutIntentId) => {
-        const order = await input.database.transaction((transaction) =>
-          transaction.orders.getByIdempotencyKey(input.shopId!, checkoutIntentId),
-        );
-        return order !== null;
-      });
+      await input.rewardClaims.reconcileClaims(
+        input.shopId,
+        async (checkoutIntentId, reservationId) => {
+          const order = await input.database.transaction((transaction) =>
+            transaction.orders.getByIdempotencyKey(input.shopId!, checkoutIntentId),
+          );
+          return order?.rewardReservationId === reservationId;
+        },
+      );
     } catch {
       // Canonical claims remain protected until a later startup/reconnect reconciliation succeeds.
     } finally {
@@ -103,6 +109,7 @@ export function startBrowserAutomaticSync(input: {
     void synchronizeLifecycle();
     if (typeof window.setInterval === 'function') {
       window.setInterval(() => {
+        void synchronizeRewardClaims();
         void synchronizeInventory();
         void synchronizeLifecycle();
       }, INVENTORY_SYNC_INTERVAL_MS);
