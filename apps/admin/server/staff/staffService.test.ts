@@ -19,28 +19,28 @@ function principal(permissions: AdminSessionPrincipal['permissions']): AdminSess
 }
 
 function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
-  const ok = () => Promise.resolve({ ok: true as const, replayed: false });
+  const ok = () => ({ ok: true as const, replayed: false });
   return {
     loadWorkspace: vi.fn(async () => ({
       employees: { rows: [], nextCursor: null },
       financeAccounts: [],
     })),
-    loadEmployeeDetail: vi.fn(async () => null),
-    createEmployee: vi.fn(ok),
-    updateEmployeeProfile: vi.fn(ok),
-    assignEmployeeShop: vi.fn(ok),
-    linkEmployeeWorker: vi.fn(ok),
-    setEmployeeRole: vi.fn(ok),
-    setEmployeePermission: vi.fn(ok),
-    suspendEmployee: vi.fn(ok),
-    reactivateEmployee: vi.fn(ok),
-    setCompensation: vi.fn(ok),
-    createShift: vi.fn(ok),
-    updateShift: vi.fn(ok),
-    cancelShift: vi.fn(ok),
-    copyPreviousWeek: vi.fn(ok),
-    createLeave: vi.fn(ok),
-    decideLeave: vi.fn(ok),
+    loadEmployeeDetail: async () => null,
+    createEmployee: async () => ok(),
+    updateEmployeeProfile: async () => ok(),
+    assignEmployeeShop: async () => ok(),
+    linkEmployeeWorker: async () => ok(),
+    setEmployeeRole: async () => ok(),
+    setEmployeePermission: async () => ok(),
+    suspendEmployee: async () => ok(),
+    reactivateEmployee: async () => ok(),
+    setCompensation: async () => ok(),
+    createShift: async () => ok(),
+    updateShift: async () => ok(),
+    cancelShift: async () => ok(),
+    copyPreviousWeek: async () => ok(),
+    createLeave: async () => ok(),
+    decideLeave: async () => ok(),
     correctAttendance: vi.fn(async () => ({
       ok: true as const,
       correctionId: '66666666-6666-4666-8666-666666666666',
