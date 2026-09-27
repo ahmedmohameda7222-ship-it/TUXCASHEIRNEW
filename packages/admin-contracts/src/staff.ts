@@ -206,7 +206,9 @@ export type StaffCommandResult =
       readonly financeMovementId?: string;
       readonly commandRef?: string;
       readonly version?: number;
+      readonly profileVersion?: number;
       readonly credentialVersion?: number;
+      readonly compensationId?: string;
       readonly copiedCount?: number;
     }
   | {
@@ -265,7 +267,23 @@ export type SetEmployeePermissionsInput = {
   readonly commandId: string;
 };
 
+export type SetEmployeePermissionInput = {
+  readonly employeeId: string;
+  readonly shopId: string;
+  readonly permissionKey: AdminPermission;
+  readonly effect: 'ALLOW' | 'DENY';
+  readonly expectedVersion: number;
+  readonly commandId: string;
+};
+
 export type SuspendEmployeeInput = {
+  readonly employeeId: string;
+  readonly shopId: string;
+  readonly expectedVersion: number;
+  readonly commandId: string;
+};
+
+export type ReactivateEmployeeInput = {
   readonly employeeId: string;
   readonly shopId: string;
   readonly expectedVersion: number;
