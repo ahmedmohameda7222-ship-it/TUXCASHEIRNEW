@@ -109,7 +109,7 @@ describe('staffService', () => {
         },
         principal([]),
       ),
-    ).rejects.toMatchObject({ code: 'permission_denied' });
+    ).rejects.toMatchObject({ code: 'permission_forbidden' });
 
     expect(store.correctAttendance).not.toHaveBeenCalled();
   });
