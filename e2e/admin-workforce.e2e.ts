@@ -77,6 +77,7 @@ function employee(): EmployeeDetail {
       },
     ],
     attendanceCorrections: [],
+    attendanceSummaries: [],
     leaveRequests: [],
     payments: [],
   };
