@@ -40,10 +40,15 @@ export function StaffPage() {
   const canManage = principal.permissions.includes('staff.manage');
   const canPay = principal.permissions.includes('staff.payments');
   const detail = staff.detailQuery.data;
-  const actionError = readableError(staff.command.error);
+  const actionError =
+    readableError(staff.sensitiveCommand.error) ?? readableError(staff.command.error);
 
   const execute = (command: StaffApiCommandDraft) => {
     staff.command.mutate(command);
+  };
+
+  const executeSensitive = (command: StaffApiCommandDraft, pin: string) => {
+    staff.sensitiveCommand.mutate({ draft: command, pin });
   };
 
   return (
@@ -106,6 +111,7 @@ export function StaffPage() {
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               onCommand={execute}
+              onSensitiveCommand={executeSensitive}
             />
           ) : !staff.detailQuery.isLoading ? (
             <div className="admin-empty-state">
