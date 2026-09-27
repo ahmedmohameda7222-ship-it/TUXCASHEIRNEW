@@ -68,11 +68,9 @@ describe('staffService', () => {
 
     await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
 
-    expect(loadWorkspace).toHaveBeenCalledWith(
+    expect(loadWorkspace).toHaveBeenCalledWith(SHOP_ID, '55555555-5555-4555-8555-555555555555', [
       SHOP_ID,
-      '55555555-5555-4555-8555-555555555555',
-      [SHOP_ID],
-    );
+    ]);
   });
 
   it('does not expose payment accounts to staff.view without staff.payments', async () => {

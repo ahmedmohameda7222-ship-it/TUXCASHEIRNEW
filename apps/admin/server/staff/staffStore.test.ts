@@ -122,9 +122,7 @@ describe('staffStore', () => {
       }
 
       if (table === 'leave_requests') {
-        expect(params.get('or')).toBe(
-          `(shop_id.in.(${SHOP_ID}),shop_id.is.null)`,
-        );
+        expect(params.get('or')).toBe(`(shop_id.in.(${SHOP_ID}),shop_id.is.null)`);
         return [];
       }
 

@@ -51,11 +51,7 @@ export function createStaffService(store: StaffStore) {
   return {
     async loadWorkspace(shopId: string, principal: AdminSessionPrincipal): Promise<StaffWorkspace> {
       requirePermission(principal, 'staff.view', shopId);
-      const workspace = await store.loadWorkspace(
-        shopId,
-        principal.businessId,
-        principal.shopIds,
-      );
+      const workspace = await store.loadWorkspace(shopId, principal.businessId, principal.shopIds);
       return {
         ...workspace,
         financeAccounts: principal.permissions.includes('staff.payments')
