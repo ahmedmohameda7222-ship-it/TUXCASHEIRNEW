@@ -104,6 +104,20 @@ if(!assign1.ok||!assign1Replay.replayed||!assign2.ok) throw new Error('multi-sho
 const cross=rpc(`public.assign_employee_to_shop_v1('${A}','${E}','${S3}','assign-cross')`,'reject cross business');
 if(cross.ok!==false||cross.code!=='shop_outside_business') throw new Error(`cross-business assignment accepted: ${JSON.stringify(cross)}`);
 
+const permissionVersion=Number(scalar(`select profile_version from public.business_employees where id='${E}'`,'permission version'));
+const permissionSet=rpc(
+  `public.set_employee_permission_v1('${A}','${E}','${S1}',${permissionVersion},'staff.view','DENY','permission-e-1')`,
+  'set employee permission'
+);
+if(!permissionSet.ok) throw new Error(`permission update failed: ${JSON.stringify(permissionSet)}`);
+const permissionStale=rpc(
+  `public.set_employee_permission_v1('${A}','${E}','${S1}',${permissionVersion},'staff.view','ALLOW','permission-e-stale')`,
+  'reject stale employee permission'
+);
+if(permissionStale.ok!==false||permissionStale.code!=='stale_employee') {
+  throw new Error(`stale permission update accepted: ${JSON.stringify(permissionStale)}`);
+}
+
 const ambiguousBefore=Number(scalar(`select count(*) from public.employee_worker_links where employee_id='${E}'`,'ambiguous mapping count'));
 if(ambiguousBefore!==0) throw new Error('ambiguous worker identity was auto-linked');
 
