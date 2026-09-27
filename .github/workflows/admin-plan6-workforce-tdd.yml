@@ -152,3 +152,19 @@ jobs:
         run: npx vitest run apps/admin/server/staff/staffService.test.ts
       - name: Admin server and API typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
+
+
+  workforce-calculations:
+    needs: workforce-services
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Workforce time and wage calculations
+        run: npx vitest run apps/admin/server/staff/timekeeping.test.ts apps/admin/server/staff/wages.test.ts
+      - name: Admin typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
