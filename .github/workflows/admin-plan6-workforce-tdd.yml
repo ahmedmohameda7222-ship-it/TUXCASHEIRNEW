@@ -183,7 +183,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Workforce component tests
-        run: npx vitest run apps/admin/src/staff/EmployeeDetailPage.test.tsx
+        run: npx vitest run apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/useStaff.test.ts apps/admin/src/staff/businessTime.test.ts
       - name: Admin workspace typecheck
         run: npm run typecheck -w @tux/admin
 
