@@ -137,3 +137,19 @@ jobs:
         run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/staff/staffApproval.test.ts apps/admin/server/reauth.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
       - name: Admin and Operations PIN format compatibility
         run: node scripts/test-admin-worker-pin-compatibility.mjs
+
+
+  workforce-services:
+    needs: employee-pin-security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Workforce service tests
+        run: npx vitest run apps/admin/server/staff/staffService.test.ts
+      - name: Admin server and API typecheck
+        run: npx tsc --noEmit -p tsconfig.api.json
