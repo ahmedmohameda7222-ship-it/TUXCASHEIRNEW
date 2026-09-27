@@ -73,7 +73,10 @@ export type StaffApprovalExecutionDependencies = {
   }): Promise<StaffApprovalExecutionResult>;
 };
 
-function record(value: unknown, code = 'approval_staff_payload_invalid'): Readonly<Record<string, unknown>> {
+function record(
+  value: unknown,
+  code = 'approval_staff_payload_invalid',
+): Readonly<Record<string, unknown>> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new ApprovalTerminalCommandError(code);
   }
@@ -168,7 +171,13 @@ function roleApprovalPayload(input: unknown): Readonly<Record<string, unknown>> 
 
 function permissionApprovalPayload(input: unknown): Readonly<Record<string, unknown>> {
   const value = record(input);
-  assertOnlyKeys(value, ['employeeId', 'shopId', 'expectedVersion', 'permissionKey', 'effect']);
+  assertOnlyKeys(value, [
+    'employeeId',
+    'shopId',
+    'expectedVersion',
+    'permissionKey',
+    'effect',
+  ]);
   const effect = requiredString(value['effect']);
   if (effect !== 'ALLOW' && effect !== 'DENY') {
     throw new ApprovalTerminalCommandError('approval_staff_payload_invalid');
@@ -370,7 +379,6 @@ export function createStaffApprovalExecutionEntries(
     },
   ];
 }
-
 
 function rpcResult(value: Readonly<Record<string, unknown>>): StaffApprovalExecutionResult {
   return {
