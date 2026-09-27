@@ -138,7 +138,6 @@ jobs:
       - name: Admin and Operations PIN format compatibility
         run: node scripts/test-admin-worker-pin-compatibility.mjs
 
-
   workforce-services:
     needs: employee-pin-security
     runs-on: ubuntu-latest
