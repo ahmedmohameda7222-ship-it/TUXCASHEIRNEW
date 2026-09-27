@@ -51,12 +51,16 @@ describe('Workforce approval security', () => {
       }),
     ).toThrowError('approval_pin_payload_unsafe');
 
-    const payload = serializeApprovalCommand(registry, EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION, {
-      employeeId: claim.commandPayload.employeeId,
-      targetShopIds: claim.commandPayload.targetShopIds,
-      expectedCredentialVersion: 7,
-      commandRef: claim.commandPayload.commandRef,
-    });
+    const payload = serializeApprovalCommand(
+      registry,
+      EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION,
+      {
+        employeeId: claim.commandPayload.employeeId,
+        targetShopIds: claim.commandPayload.targetShopIds,
+        expectedCredentialVersion: 7,
+        commandRef: claim.commandPayload.commandRef,
+      },
+    );
 
     const persisted = JSON.stringify(payload);
     expect(payload).toEqual(claim.commandPayload);
