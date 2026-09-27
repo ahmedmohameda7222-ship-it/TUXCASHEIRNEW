@@ -1,4 +1,5 @@
 import type {
+  AdminRole,
   EmployeeDetail,
   StaffFinanceAccountChoice,
 } from '@tux/admin-contracts';
@@ -20,6 +21,7 @@ export function EmployeeDetailPage({
   canPay,
   financeAccounts,
   onCommand,
+  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId?: string;
@@ -27,8 +29,12 @@ export function EmployeeDetailPage({
   canPay: boolean;
   financeAccounts: readonly StaffFinanceAccountChoice[];
   onCommand(command: StaffCommandDraft): void;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const [tab, setTab] = useState<DetailTab>('profile');
+  const [actorPin, setActorPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
@@ -94,17 +100,100 @@ export function EmployeeDetailPage({
           <StaffMetricsPanel employee={employee} />
           {canManage ? (
             <section className="admin-catalog-editor__section is-compact">
-              <h3>Access status</h3>
+              <h3>Sensitive access actions</h3>
+              <label className="admin-field">
+                <span>Your Admin PIN</span>
+                <input
+                  aria-label="Admin PIN for staff changes"
+                  inputMode="numeric"
+                  type="password"
+                  value={actorPin}
+                  onChange={(event) => setActorPin(event.target.value)}
+                />
+              </label>
+
+              <label className="admin-field">
+                <span>Role</span>
+                <select
+                  value={roleDraft}
+                  onChange={(event) => setRoleDraft(event.target.value as AdminRole)}
+                >
+                  <option value="OWNER">OWNER</option>
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="MANAGER">MANAGER</option>
+                  <option value="STAFF">STAFF</option>
+                </select>
+              </label>
               <button
                 className="admin-secondary-button"
                 type="button"
+                disabled={!actorPin || roleDraft === employee.role}
                 onClick={() =>
-                  onCommand({
-                    type: employee.active ? 'employee.suspend' : 'employee.reactivate',
-                    employeeId: employee.id,
-                    shopId,
-                    expectedVersion: employee.profileVersion,
-                  })
+                  onSensitiveCommand(
+                    {
+                      type: 'employee.role',
+                      employeeId: employee.id,
+                      shopId,
+                      role: roleDraft,
+                      expectedVersion: employee.profileVersion,
+                    },
+                    actorPin,
+                  )
+                }
+              >
+                Change role
+              </button>
+
+              <label className="admin-field">
+                <span>New employee PIN</span>
+                <input
+                  aria-label="New employee PIN"
+                  inputMode="numeric"
+                  type="password"
+                  value={newPin}
+                  onChange={(event) => setNewPin(event.target.value)}
+                />
+              </label>
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={!actorPin || !/^\d{4,12}$/.test(newPin)}
+                onClick={() =>
+                  onSensitiveCommand(
+                    {
+                      type: 'employee.pin',
+                      employeeId: employee.id,
+                      shopId,
+                      newPin,
+                    },
+                    actorPin,
+                  )
+                }
+              >
+                Reset PIN
+              </button>
+
+              <button
+                className="admin-secondary-button"
+                type="button"
+                disabled={!actorPin}
+                onClick={() =>
+                  employee.active
+                    ? onSensitiveCommand(
+                        {
+                          type: 'employee.suspend',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        },
+                        actorPin,
+                      )
+                    : onCommand({
+                        type: 'employee.reactivate',
+                        employeeId: employee.id,
+                        shopId,
+                        expectedVersion: employee.profileVersion,
+                      })
                 }
               >
                 {employee.active ? 'Suspend employee' : 'Reactivate employee'}
@@ -152,7 +241,8 @@ export function EmployeeDetailPage({
           employee={employee}
           shopId={shopId}
           canManage={canManage}
-          onCommand={onCommand}
+          actorPin={actorPin}
+          onSensitiveCommand={onSensitiveCommand}
         />
       ) : null}
     </article>
