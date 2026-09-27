@@ -12,12 +12,14 @@ export function StaffPaymentPage({
   accounts,
   canPay,
   onCommand,
+  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   accounts: readonly StaffFinanceAccountChoice[];
   canPay: boolean;
   onCommand(command: StaffCommandDraft): void;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   const available = accounts.filter((account) => account.shopId === null || account.shopId === shopId);
   const [accountId, setAccountId] = useState(available[0]?.id ?? '');
@@ -26,6 +28,7 @@ export function StaffPaymentPage({
   const [expected, setExpected] = useState('');
   const [paid, setPaid] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
+  const [approvalPin, setApprovalPin] = useState('');
 
   return (
     <section aria-label="Pay">
@@ -82,12 +85,22 @@ export function StaffPaymentPage({
             <span>Payment date</span>
             <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
           </label>
+          <label className="admin-field">
+            <span>Admin PIN for approval policy</span>
+            <input
+              aria-label="Admin PIN for staff payment approval"
+              inputMode="numeric"
+              type="password"
+              value={approvalPin}
+              onChange={(event) => setApprovalPin(event.target.value)}
+            />
+          </label>
           <button
             className="admin-primary-button"
             type="button"
             disabled={!accountId || !periodStart || !periodEnd || !paid || !paymentDate}
-            onClick={() =>
-              onCommand({
+            onClick={() => {
+              const command = {
                 type: 'payment.record',
                 employeeId: employee.id,
                 shopId,
@@ -99,7 +112,13 @@ export function StaffPaymentPage({
                 paymentDate,
                 note: null,
                 reference: null,
-              })
+              };
+              if (approvalPin) {
+                onSensitiveCommand(command, approvalPin);
+                setApprovalPin('');
+              } else {
+                onCommand(command);
+              }
             }
           >
             Record payment
