@@ -40,6 +40,7 @@ describe('EmployeeDetailPage', () => {
         canPay
         financeAccounts={[]}
         onCommand={vi.fn()}
+        onSensitiveCommand={vi.fn()}
       />,
     );
 
