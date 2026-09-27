@@ -43,28 +43,20 @@ describe('Admin sensitive reauthentication', () => {
 
     expect(updated).toBe(false);
   });
+
   it('requires a re-PIN within the configured sensitive-action window', () => {
     const now = new Date('2026-09-27T14:30:00.000Z');
 
     expect(() =>
-      requireRecentReauth(
-        { reauthenticated_at: '2026-09-27T14:26:00.000Z' },
-        300,
-        now,
-      ),
+      requireRecentReauth({ reauthenticated_at: '2026-09-27T14:26:00.000Z' }, 300, now),
     ).not.toThrow();
 
     expect(() =>
-      requireRecentReauth(
-        { reauthenticated_at: '2026-09-27T14:24:59.000Z' },
-        300,
-        now,
-      ),
+      requireRecentReauth({ reauthenticated_at: '2026-09-27T14:24:59.000Z' }, 300, now),
     ).toThrowError('reauthentication_required');
 
-    expect(() =>
-      requireRecentReauth({ reauthenticated_at: null }, 300, now),
-    ).toThrowError('reauthentication_required');
+    expect(() => requireRecentReauth({ reauthenticated_at: null }, 300, now)).toThrowError(
+      'reauthentication_required',
+    );
   });
-
 });
