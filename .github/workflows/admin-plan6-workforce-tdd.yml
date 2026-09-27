@@ -118,3 +118,18 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Workforce PostgreSQL behavior
         run: node scripts/test-admin-workforce-postgres.mjs
+
+  employee-pin-security:
+    needs: workforce-postgres
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Workforce employee PIN tests
+        run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
+      - name: Admin and Operations PIN format compatibility
+        run: node scripts/test-admin-worker-pin-compatibility.mjs
