@@ -119,7 +119,7 @@ export function StaffPaymentPage({
               } else {
                 onCommand(command);
               }
-            }
+            }}
           >
             Record payment
           </button>
