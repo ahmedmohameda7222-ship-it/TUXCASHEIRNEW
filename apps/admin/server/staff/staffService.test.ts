@@ -94,6 +94,67 @@ describe('staffService', () => {
     expect(result.financeAccounts).toEqual([]);
   });
 
+  it('redacts compensation and payment history from view-only employee detail', async () => {
+    const loadEmployeeDetail = vi.fn<StaffStore['loadEmployeeDetail']>(async () => ({
+      id: EMPLOYEE_ID,
+      businessId: '55555555-5555-4555-8555-555555555555',
+      displayName: 'Mona',
+      phone: null,
+      hireDate: null,
+      notes: null,
+      role: 'STAFF',
+      active: true,
+      profileVersion: 1,
+      credentialVersion: 1,
+      customPermissions: [],
+      assignments: [{ shopId: SHOP_ID, assigned: true }],
+      operationsIdentities: [{ kind: 'SETUP_REQUIRED', shopId: SHOP_ID }],
+      compensation: [
+        {
+          id: '99999999-9999-4999-8999-999999999991',
+          employeeId: EMPLOYEE_ID,
+          compensationType: 'MONTHLY',
+          rateMinor: 300000,
+          effectiveFrom: '2026-09-01',
+          version: 1,
+          createdAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+      shifts: [],
+      attendanceEvents: [],
+      attendanceCorrections: [],
+      attendanceSummaries: [],
+      leaveRequests: [],
+      payments: [
+        {
+          id: '99999999-9999-4999-8999-999999999992',
+          employeeId: EMPLOYEE_ID,
+          shopId: SHOP_ID,
+          payPeriodStart: '2026-09-01',
+          payPeriodEnd: '2026-09-30',
+          expectedAmountMinor: 300000,
+          paidAmountMinor: 300000,
+          financeAccountId: ACCOUNT_ID,
+          financeMovementId: '99999999-9999-4999-8999-999999999993',
+          paymentDate: '2026-09-30',
+          note: null,
+          reference: null,
+          actorEmployeeId: ACTOR_ID,
+          createdAt: '2026-09-30T00:00:00.000Z',
+        },
+      ],
+    }));
+    const service = createStaffService(storeFixture({ loadEmployeeDetail }));
+
+    const detail = await service.loadEmployeeDetail(
+      { employeeId: EMPLOYEE_ID, shopId: SHOP_ID },
+      principal(['staff.view']),
+    );
+
+    expect(detail?.compensation).toEqual([]);
+    expect(detail?.payments).toEqual([]);
+  });
+
   it('records an attendance correction without exposing an original-event update path', async () => {
     const store = storeFixture();
     const service = createStaffService(store);
