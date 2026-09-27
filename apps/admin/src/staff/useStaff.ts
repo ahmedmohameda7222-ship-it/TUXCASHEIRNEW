@@ -18,6 +18,12 @@ export function staffCommandIntentForRetention(
   return Object.fromEntries(Object.entries(draft).filter(([key]) => !SECRET_COMMAND_KEY.test(key)));
 }
 
+export function staffEphemeralCommandId(draft: StaffApiCommandDraft): string | null {
+  return draft.type === 'employee.pin' && typeof draft['commandId'] === 'string'
+    ? draft['commandId']
+    : null;
+}
+
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new Error('session_required');
   return session.state.session.csrfToken;
@@ -54,7 +60,8 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
     if (!shopId) throw new Error('concrete_shop_required');
     const intent = staffCommandIntentForRetention(draft);
     const scope = `staff.${draft.type}`;
-    const commandId = commandIds.forIntent(scope, intent);
+    const ephemeralCommandId = staffEphemeralCommandId(draft);
+    const commandId = ephemeralCommandId ?? commandIds.forIntent(scope, intent);
     const result = await adminFetch<StaffCommandResult>(
       '/api/admin/staff',
       {
@@ -67,7 +74,7 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
       },
       csrfToken(session),
     );
-    commandIds.complete(scope, intent);
+    if (ephemeralCommandId === null) commandIds.complete(scope, intent);
     return result;
   }
 
