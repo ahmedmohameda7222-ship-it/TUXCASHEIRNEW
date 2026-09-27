@@ -68,10 +68,18 @@ export function createStaffService(store: StaffStore) {
       principal: AdminSessionPrincipal,
     ): Promise<EmployeeDetail | null> {
       requirePermission(principal, 'staff.view', input.shopId);
-      return store.loadEmployeeDetail({
+      const detail = await store.loadEmployeeDetail({
         ...input,
         businessId: principal.businessId,
       });
+      if (!detail) return null;
+      const canManage = principal.permissions.includes('staff.manage');
+      const canViewPayments = principal.permissions.includes('staff.payments');
+      return {
+        ...detail,
+        compensation: canManage || canViewPayments ? detail.compensation : [],
+        payments: canViewPayments ? detail.payments : [],
+      };
     },
 
     createEmployee(
