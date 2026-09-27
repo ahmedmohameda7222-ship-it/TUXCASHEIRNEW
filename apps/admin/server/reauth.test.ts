@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { hashPin } from './pin';
-import { reauthenticateAdminSession } from './reauth';
+import { reauthenticateAdminSession, requireRecentReauth } from './reauth';
 
 describe('Admin sensitive reauthentication', () => {
   it('updates only reauthenticated_at after the acting employee confirms the correct PIN', async () => {
@@ -43,4 +43,28 @@ describe('Admin sensitive reauthentication', () => {
 
     expect(updated).toBe(false);
   });
+  it('requires a re-PIN within the configured sensitive-action window', () => {
+    const now = new Date('2026-09-27T14:30:00.000Z');
+
+    expect(() =>
+      requireRecentReauth(
+        { reauthenticated_at: '2026-09-27T14:26:00.000Z' },
+        300,
+        now,
+      ),
+    ).not.toThrow();
+
+    expect(() =>
+      requireRecentReauth(
+        { reauthenticated_at: '2026-09-27T14:24:59.000Z' },
+        300,
+        now,
+      ),
+    ).toThrowError('reauthentication_required');
+
+    expect(() =>
+      requireRecentReauth({ reauthenticated_at: null }, 300, now),
+    ).toThrowError('reauthentication_required');
+  });
+
 });
