@@ -90,7 +90,11 @@ export function LeavePage({
           </label>
           <label className="admin-field">
             <span>Start date</span>
-            <input type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} />
+            <input
+              type="date"
+              value={startsOn}
+              onChange={(event) => setStartsOn(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>End date</span>

@@ -463,9 +463,7 @@ export default async function handler(
               expectedCredentialVersion: prepared.expectedCredentialVersion,
               commandRef: prepared.commandRef,
             },
-            ...(command.requesterPin === undefined
-              ? {}
-              : { requesterPin: command.requesterPin }),
+            ...(command.requesterPin === undefined ? {} : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -499,9 +497,7 @@ export default async function handler(
               expectedVersion: input.expectedVersion,
               role: input.role,
             },
-            ...(command.requesterPin === undefined
-              ? {}
-              : { requesterPin: command.requesterPin }),
+            ...(command.requesterPin === undefined ? {} : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -531,9 +527,7 @@ export default async function handler(
               permissionKey: input.permissionKey,
               effect: input.effect,
             },
-            ...(command.requesterPin === undefined
-              ? {}
-              : { requesterPin: command.requesterPin }),
+            ...(command.requesterPin === undefined ? {} : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -559,9 +553,7 @@ export default async function handler(
               shopId: input.shopId,
               expectedVersion: input.expectedVersion,
             },
-            ...(command.requesterPin === undefined
-              ? {}
-              : { requesterPin: command.requesterPin }),
+            ...(command.requesterPin === undefined ? {} : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -629,9 +621,7 @@ export default async function handler(
               note: input.note,
               reference: input.reference,
             },
-            ...(command.requesterPin === undefined
-              ? {}
-              : { requesterPin: command.requesterPin }),
+            ...(command.requesterPin === undefined ? {} : { requesterPin: command.requesterPin }),
           },
           actor,
           client,

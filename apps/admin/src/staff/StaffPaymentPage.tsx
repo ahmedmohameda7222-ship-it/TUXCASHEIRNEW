@@ -1,7 +1,4 @@
-import type {
-  EmployeeDetail,
-  StaffFinanceAccountChoice,
-} from '@tux/admin-contracts';
+import type { EmployeeDetail, StaffFinanceAccountChoice } from '@tux/admin-contracts';
 import { useState } from 'react';
 
 import type { StaffCommandDraft } from './SchedulePage';
@@ -21,7 +18,9 @@ export function StaffPaymentPage({
   onCommand(command: StaffCommandDraft): void;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
-  const available = accounts.filter((account) => account.shopId === null || account.shopId === shopId);
+  const available = accounts.filter(
+    (account) => account.shopId === null || account.shopId === shopId,
+  );
   const [accountId, setAccountId] = useState(available[0]?.id ?? '');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
@@ -67,23 +66,43 @@ export function StaffPaymentPage({
           </label>
           <label className="admin-field">
             <span>Pay period start</span>
-            <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
+            <input
+              type="date"
+              value={periodStart}
+              onChange={(event) => setPeriodStart(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>Pay period end</span>
-            <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
+            <input
+              type="date"
+              value={periodEnd}
+              onChange={(event) => setPeriodEnd(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>Expected amount (EGP)</span>
-            <input inputMode="decimal" value={expected} onChange={(event) => setExpected(event.target.value)} />
+            <input
+              inputMode="decimal"
+              value={expected}
+              onChange={(event) => setExpected(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>Paid amount (EGP)</span>
-            <input inputMode="decimal" value={paid} onChange={(event) => setPaid(event.target.value)} />
+            <input
+              inputMode="decimal"
+              value={paid}
+              onChange={(event) => setPaid(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>Payment date</span>
-            <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(event) => setPaymentDate(event.target.value)}
+            />
           </label>
           <label className="admin-field">
             <span>Admin PIN for approval policy</span>

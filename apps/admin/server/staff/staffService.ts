@@ -22,10 +22,7 @@ import type {
   UpdateShiftInput,
 } from '@tux/admin-contracts';
 
-import {
-  requireBusinessWidePermission,
-  requirePermission,
-} from '../authorization.js';
+import { requireBusinessWidePermission, requirePermission } from '../authorization.js';
 import type { StaffStore } from './staffStore.js';
 
 export { createSupabaseStaffStore } from './staffStore.js';
@@ -52,10 +49,7 @@ function actorInput<T extends object>(
 
 export function createStaffService(store: StaffStore) {
   return {
-    async loadWorkspace(
-      shopId: string,
-      principal: AdminSessionPrincipal,
-    ): Promise<StaffWorkspace> {
+    async loadWorkspace(shopId: string, principal: AdminSessionPrincipal): Promise<StaffWorkspace> {
       requirePermission(principal, 'staff.view', shopId);
       const workspace = await store.loadWorkspace(shopId, principal.businessId);
       return principal.permissions.includes('staff.payments')

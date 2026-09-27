@@ -1,7 +1,6 @@
 export const BUSINESS_TIME_ZONE = 'Africa/Cairo';
 
-const LOCAL_DATE_TIME_PATTERN =
-  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
 function offsetMinutesAt(instantMs: number): number {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -61,15 +60,7 @@ export function businessLocalDateTimeToIso(value: string): string {
   const hour = Number(match[4]);
   const minute = Number(match[5]);
   const second = Number(match[6] ?? '0');
-  if (
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    day > 31 ||
-    hour > 23 ||
-    minute > 59 ||
-    second > 59
-  ) {
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) {
     throw new Error('invalid_business_local_datetime');
   }
 
@@ -105,7 +96,6 @@ export function formatBusinessDateTime(value: string): string {
     hourCycle: 'h23',
   }).format(date);
 }
-
 
 export function businessDateTimeInputValue(value: string): string {
   const date = new Date(value);

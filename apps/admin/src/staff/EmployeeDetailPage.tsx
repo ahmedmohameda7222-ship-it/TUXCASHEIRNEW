@@ -78,15 +78,20 @@ export function EmployeeDetailPage({
         </div>
       </header>
 
-      <nav className="admin-catalog-editor__section is-compact" aria-label="Employee detail sections">
-        {([
-          ['profile', 'Profile'],
-          ['schedule', 'Schedule'],
-          ['attendance', 'Attendance'],
-          ['leave', 'Leave'],
-          ['pay', 'Pay'],
-          ['permissions', 'Permissions'],
-        ] as const).map(([value, label]) => (
+      <nav
+        className="admin-catalog-editor__section is-compact"
+        aria-label="Employee detail sections"
+      >
+        {(
+          [
+            ['profile', 'Profile'],
+            ['schedule', 'Schedule'],
+            ['attendance', 'Attendance'],
+            ['leave', 'Leave'],
+            ['pay', 'Pay'],
+            ['permissions', 'Permissions'],
+          ] as const
+        ).map(([value, label]) => (
           <button
             className={tab === value ? 'admin-primary-button' : 'admin-secondary-button'}
             key={value}
@@ -108,7 +113,9 @@ export function EmployeeDetailPage({
               <dt>Hire date</dt>
               <dd>{employee.hireDate ?? 'Not set'}</dd>
               <dt>Assigned shops</dt>
-              <dd>{employee.assignments.map((assignment) => assignment.shopId).join(', ') || 'None'}</dd>
+              <dd>
+                {employee.assignments.map((assignment) => assignment.shopId).join(', ') || 'None'}
+              </dd>
               <dt>Credential version</dt>
               <dd>{employee.credentialVersion}</dd>
             </dl>
@@ -117,7 +124,10 @@ export function EmployeeDetailPage({
                 <h4>Edit profile</h4>
                 <label className="admin-field">
                   <span>Name</span>
-                  <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+                  <input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                  />
                 </label>
                 <label className="admin-field">
                   <span>Phone</span>
@@ -265,7 +275,10 @@ export function EmployeeDetailPage({
                   <>
                     <label className="admin-field">
                       <span>Operations worker</span>
-                      <select value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
+                      <select
+                        value={workerId}
+                        onChange={(event) => setWorkerId(event.target.value)}
+                      >
                         {availableWorkers.map((worker) => (
                           <option key={worker.id} value={worker.id}>
                             {worker.displayName}

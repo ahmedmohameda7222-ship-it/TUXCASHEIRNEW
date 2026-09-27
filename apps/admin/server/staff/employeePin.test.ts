@@ -145,14 +145,12 @@ describe('employee PIN coherence', () => {
         linkedEmployeeId: EMPLOYEE_ID,
       },
     ];
-    const stageCredentialCommand = vi.fn<EmployeePinStore['stageCredentialCommand']>(
-      async () => ({
-        ok: true as const,
-        commandRef: '50000000-0000-4000-8000-000000000001',
-        expectedCredentialVersion: 7,
-        replayed: false,
-      }),
-    );
+    const stageCredentialCommand = vi.fn<EmployeePinStore['stageCredentialCommand']>(async () => ({
+      ok: true as const,
+      commandRef: '50000000-0000-4000-8000-000000000001',
+      expectedCredentialVersion: 7,
+      replayed: false,
+    }));
     const store = storeFixture({
       listActiveWorkers: vi.fn(async () => workers),
       stageCredentialCommand,

@@ -123,10 +123,7 @@ export async function executeOrRequestStaffApproval(
   if (result['ok'] !== true) {
     return {
       ok: false,
-      code:
-        typeof result['code'] === 'string'
-          ? result['code']
-          : 'staff_approval_request_failed',
+      code: typeof result['code'] === 'string' ? result['code'] : 'staff_approval_request_failed',
     };
   }
   if (typeof result['requestId'] !== 'string') {

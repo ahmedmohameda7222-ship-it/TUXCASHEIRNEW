@@ -143,9 +143,7 @@ export function createSupabaseEmployeePinStore(client: AdminSupabaseClient): Emp
         return {
           ok: false,
           code:
-            typeof result['code'] === 'string'
-              ? result['code']
-              : 'credential_command_stage_failed',
+            typeof result['code'] === 'string' ? result['code'] : 'credential_command_stage_failed',
         };
       }
       if (

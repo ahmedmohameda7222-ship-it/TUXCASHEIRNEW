@@ -1,8 +1,4 @@
-import type {
-  AttendanceCorrection,
-  AttendanceEvent,
-  EmployeeShift,
-} from '@tux/admin-contracts';
+import type { AttendanceCorrection, AttendanceEvent, EmployeeShift } from '@tux/admin-contracts';
 import { describe, expect, it } from 'vitest';
 
 import { buildAttendanceSummaries } from './attendanceSummary';

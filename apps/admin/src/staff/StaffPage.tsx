@@ -66,7 +66,10 @@ export function StaffPage() {
       <div className="admin-inventory-layout">
         <section className="admin-inventory-list" aria-label="Employees">
           {canManage ? (
-            <section className="admin-catalog-editor__section is-compact" aria-label="Create employee">
+            <section
+              className="admin-catalog-editor__section is-compact"
+              aria-label="Create employee"
+            >
               <h3>Add employee</h3>
               <label className="admin-field">
                 <span>Name</span>
@@ -142,9 +145,7 @@ export function StaffPage() {
               </span>
               <span>
                 {employee.active ? 'Active' : 'Suspended'}
-                {employee.operationsSetupRequiredShopIds.length > 0
-                  ? ' · Ops setup required'
-                  : ''}
+                {employee.operationsSetupRequiredShopIds.length > 0 ? ' · Ops setup required' : ''}
               </span>
             </button>
           ))}

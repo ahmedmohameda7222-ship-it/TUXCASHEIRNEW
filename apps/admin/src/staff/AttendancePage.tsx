@@ -33,7 +33,9 @@ export function AttendancePage({
   return (
     <section aria-label="Attendance">
       <h3>Attendance</h3>
-      <p>Original Operations clock facts remain immutable; corrections are separate audited facts.</p>
+      <p>
+        Original Operations clock facts remain immutable; corrections are separate audited facts.
+      </p>
       {employee.attendanceSummaries.length === 0 ? (
         <p>No completed or historical attendance summaries yet.</p>
       ) : null}

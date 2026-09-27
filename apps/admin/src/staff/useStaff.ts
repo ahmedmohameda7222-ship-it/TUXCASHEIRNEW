@@ -1,8 +1,4 @@
-import type {
-  EmployeeDetail,
-  StaffCommandResult,
-  StaffWorkspace,
-} from '@tux/admin-contracts';
+import type { EmployeeDetail, StaffCommandResult, StaffWorkspace } from '@tux/admin-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
@@ -19,9 +15,7 @@ const SECRET_COMMAND_KEY = /(pin|password|passcode|secret|verifier|lookup|salt)/
 export function staffCommandIntentForRetention(
   draft: StaffApiCommandDraft,
 ): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(
-    Object.entries(draft).filter(([key]) => !SECRET_COMMAND_KEY.test(key)),
-  );
+  return Object.fromEntries(Object.entries(draft).filter(([key]) => !SECRET_COMMAND_KEY.test(key)));
 }
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
@@ -42,9 +36,7 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
     queryKey: ['admin', 'staff', shopId, 'workspace'],
     enabled: Boolean(shopId),
     queryFn: () =>
-      adminFetch<StaffWorkspace>(
-        `/api/admin/staff?shopId=${encodeURIComponent(shopId!)}`,
-      ),
+      adminFetch<StaffWorkspace>(`/api/admin/staff?shopId=${encodeURIComponent(shopId!)}`),
   });
 
   const detailQuery = useQuery({
@@ -87,13 +79,7 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
   });
 
   const sensitiveCommand = useMutation({
-    mutationFn: async ({
-      draft,
-      pin,
-    }: {
-      draft: StaffApiCommandDraft;
-      pin: string;
-    }) => {
+    mutationFn: async ({ draft, pin }: { draft: StaffApiCommandDraft; pin: string }) => {
       await adminFetch<{ ok: true; reauthenticatedAt: string }>(
         '/api/admin/reauth',
         {

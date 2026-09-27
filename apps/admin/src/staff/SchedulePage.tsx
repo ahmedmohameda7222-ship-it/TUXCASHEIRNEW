@@ -109,9 +109,7 @@ export function SchedulePage({
               type="button"
               disabled={!startsAt || !endsAt}
               onClick={() => {
-                const editingShift = employee.shifts.find(
-                  (shift) => shift.id === editingShiftId,
-                );
+                const editingShift = employee.shifts.find((shift) => shift.id === editingShiftId);
                 if (editingShift) {
                   onCommand({
                     type: 'shift.update',

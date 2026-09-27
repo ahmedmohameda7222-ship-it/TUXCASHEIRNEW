@@ -19,7 +19,9 @@ export function PermissionsEditor({
     <section aria-label="Permissions">
       <h3>Permissions</h3>
       <p>Advanced permission overrides are audited, version-fenced and require recent re-PIN.</p>
-      {!actorPin ? <p>Enter your Admin PIN on the Profile tab before changing permissions.</p> : null}
+      {!actorPin ? (
+        <p>Enter your Admin PIN on the Profile tab before changing permissions.</p>
+      ) : null}
       <div className="admin-more-grid">
         {ADMIN_PERMISSIONS.map((permission) => {
           const allowed = employee.customPermissions.includes(permission);

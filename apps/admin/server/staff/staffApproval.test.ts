@@ -35,8 +35,7 @@ describe('Workforce approval security', () => {
   it('serializes PIN approval using only opaque safe command metadata', () => {
     const registry = createApprovalCommandRegistry(createStaffApprovalCommandEntries());
     const sentinelPin = '482731';
-    const verifierHash =
-      'pbkdf2-sha256$210000$11111111111111111111111111111111$' + '2'.repeat(64);
+    const verifierHash = 'pbkdf2-sha256$210000$11111111111111111111111111111111$' + '2'.repeat(64);
     const lookupHash = '3'.repeat(64);
 
     expect(() =>

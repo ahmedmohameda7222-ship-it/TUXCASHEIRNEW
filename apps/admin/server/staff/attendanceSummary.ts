@@ -107,11 +107,9 @@ function summaryForSession(
   shift: EmployeeShift | null,
 ): AttendanceSummary {
   const breakMinutes = shift?.plannedBreakMinutes ?? 0;
-  const grossWorked =
-    facts.start && facts.end ? minuteDifference(facts.start, facts.end) : 0;
+  const grossWorked = facts.start && facts.end ? minuteDifference(facts.start, facts.end) : 0;
   const workedMinutes = Math.max(0, grossWorked - breakMinutes);
-  const scheduledGross =
-    shift === null ? 0 : minuteDifference(shift.startsAt, shift.endsAt);
+  const scheduledGross = shift === null ? 0 : minuteDifference(shift.startsAt, shift.endsAt);
   const scheduledNet = Math.max(0, scheduledGross - breakMinutes);
 
   return {
@@ -157,9 +155,7 @@ export function buildAttendanceSummaries(
     .filter((shift) => shift.shopId === input.shopId && shift.status !== 'CANCELLED')
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt));
   const events = input.events.filter((event) => event.shopId === input.shopId);
-  const corrections = input.corrections.filter(
-    (correction) => correction.shopId === input.shopId,
-  );
+  const corrections = input.corrections.filter((correction) => correction.shopId === input.shopId);
 
   const usedShiftIds = new Set<string>();
   const summaries: AttendanceSummary[] = [];

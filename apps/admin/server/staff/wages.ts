@@ -45,8 +45,7 @@ export function estimateHourlyWage(input: HourlyWageEstimateInput): number {
 
   const basis = 10_000n;
   const numerator =
-    regularMinutes * hourlyMinor * basis +
-    overtimeMinutes * hourlyMinor * multiplierBasisPoints;
+    regularMinutes * hourlyMinor * basis + overtimeMinutes * hourlyMinor * multiplierBasisPoints;
   return roundedRatio(numerator, 60n * basis);
 }
 

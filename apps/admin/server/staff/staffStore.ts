@@ -279,7 +279,9 @@ export interface StaffStore {
     shopId: string;
     businessId: string;
   }): Promise<EmployeeDetail | null>;
-  createEmployee(input: CreateEmployeeInput & { actorEmployeeId: string }): Promise<StaffCommandResult>;
+  createEmployee(
+    input: CreateEmployeeInput & { actorEmployeeId: string },
+  ): Promise<StaffCommandResult>;
   updateEmployeeProfile(
     input: UpdateEmployeeProfileInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;
@@ -390,9 +392,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         ids.push(assignment.shop_id);
         shopIdsByEmployee.set(assignment.employee_id, ids);
       }
-      const linkedKeys = new Set(
-        links.map((link) => `${link.employee_id}:${link.shop_id}`),
-      );
+      const linkedKeys = new Set(links.map((link) => `${link.employee_id}:${link.shop_id}`));
 
       const rows: EmployeeSummary[] = employees.map((employee) => {
         const shopIds = shopIdsByEmployee.get(employee.id) ?? [];
@@ -599,21 +599,23 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const workersById = new Map(workers.map((worker) => [worker.id, worker]));
       const linkByShop = new Map(links.map((link) => [link.shop_id, link]));
 
-      const operationsIdentities: LinkedOperationsIdentityState[] = assignments.map((assignment) => {
-        const link = linkByShop.get(assignment.shop_id);
-        const worker = link ? workersById.get(link.worker_id) : undefined;
-        if (!link || !worker) {
-          return { kind: 'SETUP_REQUIRED', shopId: assignment.shop_id };
-        }
-        return {
-          kind: 'LINKED',
-          shopId: assignment.shop_id,
-          workerId: worker.id,
-          workerName: worker.display_name,
-          workerActive: worker.active,
-          credentialVersion: safeInteger(worker.credential_version),
-        };
-      });
+      const operationsIdentities: LinkedOperationsIdentityState[] = assignments.map(
+        (assignment) => {
+          const link = linkByShop.get(assignment.shop_id);
+          const worker = link ? workersById.get(link.worker_id) : undefined;
+          if (!link || !worker) {
+            return { kind: 'SETUP_REQUIRED', shopId: assignment.shop_id };
+          }
+          return {
+            kind: 'LINKED',
+            shopId: assignment.shop_id,
+            workerId: worker.id,
+            workerName: worker.display_name,
+            workerActive: worker.active,
+            credentialVersion: safeInteger(worker.credential_version),
+          };
+        },
+      );
 
       const customPermissions = permissionRows
         .filter((row) => row.effect === 'ALLOW' && isAdminPermission(row.permission_key))
