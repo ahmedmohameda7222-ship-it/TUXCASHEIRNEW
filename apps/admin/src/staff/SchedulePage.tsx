@@ -1,6 +1,8 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 import { useState } from 'react';
 
+import { businessLocalDateTimeToIso, formatBusinessDateTime } from './businessTime';
+
 export type StaffCommandDraft = Readonly<Record<string, unknown>> & { readonly type: string };
 
 export function SchedulePage({
@@ -28,9 +30,9 @@ export function SchedulePage({
       {shifts.map((shift) => (
         <article className="admin-inventory-row" key={shift.id}>
           <span>
-            <strong>{new Date(shift.startsAt).toLocaleString()}</strong>
+            <strong>{formatBusinessDateTime(shift.startsAt)}</strong>
             <small>
-              {new Date(shift.endsAt).toLocaleString()} · {shift.plannedBreakMinutes} min break
+              {formatBusinessDateTime(shift.endsAt)} · {shift.plannedBreakMinutes} min break
             </small>
           </span>
           <span>
@@ -92,8 +94,8 @@ export function SchedulePage({
                   type: 'shift.create',
                   employeeId: employee.id,
                   shopId,
-                  startsAt: new Date(startsAt).toISOString(),
-                  endsAt: new Date(endsAt).toISOString(),
+                  startsAt: businessLocalDateTimeToIso(startsAt),
+                  endsAt: businessLocalDateTimeToIso(endsAt),
                   plannedBreakMinutes: Number(breakMinutes) || 0,
                 })
               }
