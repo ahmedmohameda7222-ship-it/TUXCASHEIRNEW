@@ -21,6 +21,7 @@ import type {
   StaffListResult,
   StaffPaymentRecord,
   StaffWorkspace,
+  StaffWorkerChoice,
   UpdateEmployeeProfileInput,
   UpdateShiftInput,
   CancelShiftInput,
@@ -407,16 +408,39 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         };
       });
 
-      const financeAccounts = await client.select<FinanceAccountRow[]>(
-        'finance_accounts',
-        new URLSearchParams({
-          select: 'id,shop_id,account_type,name',
-          business_id: `eq.${businessId}`,
-          active: 'eq.true',
-          or: `(shop_id.eq.${shopId},shop_id.is.null)`,
-          order: 'name.asc,id.asc',
-        }),
+      const [financeAccounts, workerChoices] = await Promise.all([
+        client.select<FinanceAccountRow[]>(
+          'finance_accounts',
+          new URLSearchParams({
+            select: 'id,shop_id,account_type,name',
+            business_id: `eq.${businessId}`,
+            active: 'eq.true',
+            or: `(shop_id.eq.${shopId},shop_id.is.null)`,
+            order: 'name.asc,id.asc',
+          }),
+        ),
+        client.select<WorkerRow[]>(
+          'workers',
+          new URLSearchParams({
+            select: 'id,shop_id,display_name,active,credential_version',
+            shop_id: `eq.${shopId}`,
+            active: 'eq.true',
+            order: 'display_name.asc,id.asc',
+          }),
+        ),
+      ]);
+
+      const linkedEmployeeByWorker = new Map(
+        links
+          .filter((link) => link.shop_id === shopId)
+          .map((link) => [link.worker_id, link.employee_id]),
       );
+      const workers: StaffWorkerChoice[] = workerChoices.map((worker) => ({
+        id: worker.id,
+        shopId: worker.shop_id,
+        displayName: worker.display_name,
+        linkedEmployeeId: linkedEmployeeByWorker.get(worker.id) ?? null,
+      }));
 
       const employeesResult: StaffListResult = { rows, nextCursor: null };
       return {
@@ -427,6 +451,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
           accountType: account.account_type,
           name: account.name,
         })),
+        workers,
       };
     },
 
