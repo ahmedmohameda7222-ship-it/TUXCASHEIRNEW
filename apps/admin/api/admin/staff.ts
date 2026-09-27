@@ -463,7 +463,9 @@ export default async function handler(
               expectedCredentialVersion: prepared.expectedCredentialVersion,
               commandRef: prepared.commandRef,
             },
-            requesterPin: command.requesterPin,
+            ...(command.requesterPin === undefined
+              ? {}
+              : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -479,7 +481,13 @@ export default async function handler(
         break;
       }
       case 'employee.role': {
-        const { requesterPin, type: _type, ...input } = command;
+        const input = {
+          employeeId: command.employeeId,
+          shopId: command.shopId,
+          expectedVersion: command.expectedVersion,
+          role: command.role,
+          commandId: command.commandId,
+        };
         result = await executeOrRequestStaffApproval(
           {
             actionType: EMPLOYEE_ROLE_CHANGE_APPROVAL_ACTION,
@@ -491,7 +499,9 @@ export default async function handler(
               expectedVersion: input.expectedVersion,
               role: input.role,
             },
-            requesterPin,
+            ...(command.requesterPin === undefined
+              ? {}
+              : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -501,7 +511,14 @@ export default async function handler(
         break;
       }
       case 'employee.permission': {
-        const { requesterPin, type: _type, ...input } = command;
+        const input = {
+          employeeId: command.employeeId,
+          shopId: command.shopId,
+          permissionKey: command.permissionKey,
+          effect: command.effect,
+          expectedVersion: command.expectedVersion,
+          commandId: command.commandId,
+        };
         result = await executeOrRequestStaffApproval(
           {
             actionType: EMPLOYEE_PERMISSION_CHANGE_APPROVAL_ACTION,
@@ -514,7 +531,9 @@ export default async function handler(
               permissionKey: input.permissionKey,
               effect: input.effect,
             },
-            requesterPin,
+            ...(command.requesterPin === undefined
+              ? {}
+              : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -524,7 +543,12 @@ export default async function handler(
         break;
       }
       case 'employee.suspend': {
-        const { requesterPin, type: _type, ...input } = command;
+        const input = {
+          employeeId: command.employeeId,
+          shopId: command.shopId,
+          expectedVersion: command.expectedVersion,
+          commandId: command.commandId,
+        };
         result = await executeOrRequestStaffApproval(
           {
             actionType: EMPLOYEE_SUSPEND_APPROVAL_ACTION,
@@ -535,7 +559,9 @@ export default async function handler(
               shopId: input.shopId,
               expectedVersion: input.expectedVersion,
             },
-            requesterPin,
+            ...(command.requesterPin === undefined
+              ? {}
+              : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
@@ -572,7 +598,19 @@ export default async function handler(
         result = await service.correctAttendance(command, context.principal);
         break;
       case 'payment.record': {
-        const { requesterPin, type: _type, ...input } = command;
+        const input = {
+          employeeId: command.employeeId,
+          shopId: command.shopId,
+          payPeriodStart: command.payPeriodStart,
+          payPeriodEnd: command.payPeriodEnd,
+          expectedAmountMinor: command.expectedAmountMinor,
+          paidAmountMinor: command.paidAmountMinor,
+          financeAccountId: command.financeAccountId,
+          paymentDate: command.paymentDate,
+          note: command.note,
+          reference: command.reference,
+          commandId: command.commandId,
+        };
         result = await executeOrRequestStaffApproval(
           {
             actionType: STAFF_PAYMENT_APPROVAL_ACTION,
@@ -591,7 +629,9 @@ export default async function handler(
               note: input.note,
               reference: input.reference,
             },
-            requesterPin,
+            ...(command.requesterPin === undefined
+              ? {}
+              : { requesterPin: command.requesterPin }),
           },
           actor,
           client,
