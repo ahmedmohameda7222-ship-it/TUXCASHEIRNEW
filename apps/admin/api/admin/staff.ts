@@ -1,4 +1,4 @@
-import type { AdminPermission, StaffCommandResult } from '@tux/admin-contracts';
+import type { AdminApprovalActor, AdminPermission, StaffCommandResult } from '@tux/admin-contracts';
 import { z } from 'zod';
 
 import {
@@ -8,9 +8,12 @@ import {
   type AdminSessionContext,
 } from '../../server/adminAuthService.js';
 import { isAdminPermission } from '../../server/adminContractRuntime.js';
-import { AdminAuthorizationError } from '../../server/authorization.js';
+import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit.js';
+import { createSupabaseApprovalServiceDependencies } from '../../server/approvals/approvalService.js';
+import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
+  clientFingerprint,
   firstHeader,
   readJsonObject,
   requireSameOrigin,
@@ -19,7 +22,18 @@ import {
   type AdminResponse,
 } from '../../server/http.js';
 import { AdminRecentReauthError, requireRecentReauth } from '../../server/reauth.js';
+import { createAdminPinRateLimitRpc } from '../../server/loginRateLimit.js';
 import { readAdminSessionToken } from '../../server/session.js';
+import { prepareEmployeePinChange } from '../../server/staff/employeePin.js';
+import { createSupabaseEmployeePinStore } from '../../server/staff/employeePinStore.js';
+import {
+  EMPLOYEE_PERMISSION_CHANGE_APPROVAL_ACTION,
+  EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION,
+  EMPLOYEE_ROLE_CHANGE_APPROVAL_ACTION,
+  EMPLOYEE_SUSPEND_APPROVAL_ACTION,
+  STAFF_PAYMENT_APPROVAL_ACTION,
+} from '../../server/staff/staffApproval.js';
+import { executeOrRequestStaffApproval } from '../../server/staff/staffApprovalRouting.js';
 import {
   createStaffService,
   createSupabaseStaffStore,
@@ -28,7 +42,8 @@ import {
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
-const commandIdSchema = z.string().trim().min(1).max(160);
+const commandIdSchema = z.string().uuid();
+const pinSchema = z.string().regex(/^\\d{4,12}$/);
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const isoTimestampSchema = z.string().datetime({ offset: true });
 const nullableTextSchema = z.string().trim().max(500).nullable();
@@ -85,7 +100,18 @@ const commandSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('employee.pin'),
+      employeeId: uuidSchema,
+      shopId: uuidSchema,
+      newPin: pinSchema,
+      requesterPin: pinSchema.optional(),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('employee.role'),
+      requesterPin: pinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       role: roleSchema,
@@ -96,6 +122,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('employee.permission'),
+      requesterPin: pinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       permissionKey: permissionSchema,
@@ -107,6 +134,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('employee.suspend'),
+      requesterPin: pinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       expectedVersion: z.number().int().positive(),
@@ -210,6 +238,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('payment.record'),
+      requesterPin: pinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       payPeriodStart: isoDateSchema,
@@ -237,6 +266,59 @@ async function loadContext(
     requireSessionCsrf(context, firstHeader(request.headers['x-tux-admin-csrf']).trim());
   }
   return context;
+}
+
+function approvalActor(context: AdminSessionContext): AdminApprovalActor {
+  return {
+    employeeId: context.principal.employeeId,
+    businessId: context.principal.businessId,
+    role: context.principal.role,
+    permissions: context.principal.permissions,
+    shopIds: context.principal.shopIds,
+    sessionId: context.session.id,
+  };
+}
+
+function approvalDependencies(
+  request: AdminRequest,
+  client: AdminSupabaseClient,
+  context: AdminSessionContext,
+) {
+  const env = getAdminServerEnv();
+  const base = createSupabaseApprovalServiceDependencies(client);
+  const limiter = createAdminPinRateLimitRpc(client);
+  return {
+    ...base,
+    verifyEmployeePin(employeeId: string, pin: string) {
+      return verifyApprovalPinWithRateLimit(
+        {
+          employeeId,
+          sessionId: context.session.id,
+          pin,
+          fingerprint: clientFingerprint(request),
+          rateLimitSecret: env.rateLimitSecret,
+        },
+        { verifyEmployeePin: base.verifyEmployeePin, limiter },
+      );
+    },
+  };
+}
+
+function rpcStaffResult(value: Readonly<Record<string, unknown>>): StaffCommandResult {
+  if (value['ok'] !== true) {
+    return {
+      ok: false,
+      code: typeof value['code'] === 'string' ? value['code'] : 'staff_command_failed',
+    };
+  }
+  return {
+    ok: true,
+    ...(value['replayed'] === true ? { replayed: true } : {}),
+    ...(typeof value['employeeId'] === 'string' ? { employeeId: value['employeeId'] } : {}),
+    ...(typeof value['credentialVersion'] === 'number'
+      ? { credentialVersion: value['credentialVersion'] }
+      : {}),
+  };
 }
 
 function failureStatus(result: StaffCommandResult): number {
@@ -326,6 +408,7 @@ export default async function handler(
     const context = await loadContext(request, client, true);
 
     if (
+      command.type === 'employee.pin' ||
       command.type === 'employee.role' ||
       command.type === 'employee.permission' ||
       command.type === 'employee.suspend'
@@ -333,6 +416,8 @@ export default async function handler(
       requireRecentReauth(context.session, 300);
     }
 
+    const actor = approvalActor(context);
+    const approvalDeps = approvalDependencies(request, client, context);
     let result: StaffCommandResult;
     switch (command.type) {
       case 'employee.create':
@@ -347,15 +432,118 @@ export default async function handler(
       case 'employee.link-worker':
         result = await service.linkEmployeeWorker(command, context.principal);
         break;
-      case 'employee.role':
-        result = await service.setEmployeeRole(command, context.principal);
+      case 'employee.pin': {
+        requirePermission(context.principal, 'staff.manage', command.shopId);
+        const env = getAdminServerEnv();
+        const prepared = await prepareEmployeePinChange(
+          {
+            actorEmployeeId: context.principal.employeeId,
+            businessId: context.principal.businessId,
+            employeeId: command.employeeId,
+            pin: command.newPin,
+            lookupSecret: env.pinLookupSecret,
+            commandId: command.commandId,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+          createSupabaseEmployeePinStore(client),
+        );
+        if (!prepared.ok) {
+          result = prepared;
+          break;
+        }
+
+        result = await executeOrRequestStaffApproval(
+          {
+            actionType: EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION,
+            shopId: command.shopId,
+            commandId: command.commandId,
+            commandInput: {
+              employeeId: command.employeeId,
+              targetShopIds: prepared.targetShopIds,
+              expectedCredentialVersion: prepared.expectedCredentialVersion,
+              commandRef: prepared.commandRef,
+            },
+            requesterPin: command.requesterPin,
+          },
+          actor,
+          client,
+          approvalDeps,
+          async () =>
+            rpcStaffResult(
+              await client.rpc<Record<string, unknown>>('apply_employee_pin_change_v1', {
+                p_actor_employee_id: context.principal.employeeId,
+                p_command_ref: prepared.commandRef,
+              }),
+            ),
+        );
         break;
-      case 'employee.permission':
-        result = await service.setEmployeePermission(command, context.principal);
+      }
+      case 'employee.role': {
+        const { requesterPin, type: _type, ...input } = command;
+        result = await executeOrRequestStaffApproval(
+          {
+            actionType: EMPLOYEE_ROLE_CHANGE_APPROVAL_ACTION,
+            shopId: input.shopId,
+            commandId: input.commandId,
+            commandInput: {
+              employeeId: input.employeeId,
+              shopId: input.shopId,
+              expectedVersion: input.expectedVersion,
+              role: input.role,
+            },
+            requesterPin,
+          },
+          actor,
+          client,
+          approvalDeps,
+          () => service.setEmployeeRole(input, context.principal),
+        );
         break;
-      case 'employee.suspend':
-        result = await service.suspendEmployee(command, context.principal);
+      }
+      case 'employee.permission': {
+        const { requesterPin, type: _type, ...input } = command;
+        result = await executeOrRequestStaffApproval(
+          {
+            actionType: EMPLOYEE_PERMISSION_CHANGE_APPROVAL_ACTION,
+            shopId: input.shopId,
+            commandId: input.commandId,
+            commandInput: {
+              employeeId: input.employeeId,
+              shopId: input.shopId,
+              expectedVersion: input.expectedVersion,
+              permissionKey: input.permissionKey,
+              effect: input.effect,
+            },
+            requesterPin,
+          },
+          actor,
+          client,
+          approvalDeps,
+          () => service.setEmployeePermission(input, context.principal),
+        );
         break;
+      }
+      case 'employee.suspend': {
+        const { requesterPin, type: _type, ...input } = command;
+        result = await executeOrRequestStaffApproval(
+          {
+            actionType: EMPLOYEE_SUSPEND_APPROVAL_ACTION,
+            shopId: input.shopId,
+            commandId: input.commandId,
+            commandInput: {
+              employeeId: input.employeeId,
+              shopId: input.shopId,
+              expectedVersion: input.expectedVersion,
+            },
+            requesterPin,
+          },
+          actor,
+          client,
+          approvalDeps,
+          () => service.suspendEmployee(input, context.principal),
+        );
+        break;
+      }
       case 'employee.reactivate':
         result = await service.reactivateEmployee(command, context.principal);
         break;
@@ -383,9 +571,35 @@ export default async function handler(
       case 'attendance.correct':
         result = await service.correctAttendance(command, context.principal);
         break;
-      case 'payment.record':
-        result = await service.recordPayment(command, context.principal);
+      case 'payment.record': {
+        const { requesterPin, type: _type, ...input } = command;
+        result = await executeOrRequestStaffApproval(
+          {
+            actionType: STAFF_PAYMENT_APPROVAL_ACTION,
+            shopId: input.shopId,
+            commandId: input.commandId,
+            amountMinor: input.paidAmountMinor,
+            commandInput: {
+              employeeId: input.employeeId,
+              shopId: input.shopId,
+              payPeriodStart: input.payPeriodStart,
+              payPeriodEnd: input.payPeriodEnd,
+              expectedAmountMinor: input.expectedAmountMinor,
+              paidAmountMinor: input.paidAmountMinor,
+              financeAccountId: input.financeAccountId,
+              paymentDate: input.paymentDate,
+              note: input.note,
+              reference: input.reference,
+            },
+            requesterPin,
+          },
+          actor,
+          client,
+          approvalDeps,
+          () => service.recordPayment(input, context.principal),
+        );
         break;
+      }
     }
 
     sendJson(response, failureStatus(result), result);
