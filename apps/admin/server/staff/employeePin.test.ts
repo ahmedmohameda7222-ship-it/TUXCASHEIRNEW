@@ -27,8 +27,8 @@ function storeFixture(overrides: Partial<EmployeePinStore> = {}): EmployeePinSto
     listAssignedShopIds: vi.fn(async () => [SHOP_B, SHOP_A]),
     hasEmployeeLookupCollision: vi.fn(async () => false),
     listActiveWorkers: vi.fn(async () => []),
-    stageCredentialCommand: vi.fn(async () => ({
-      ok: true,
+    stageCredentialCommand: vi.fn<EmployeePinStore['stageCredentialCommand']>(async () => ({
+      ok: true as const,
       commandRef: '50000000-0000-4000-8000-000000000001',
       expectedCredentialVersion: 7,
       replayed: false,
@@ -145,12 +145,14 @@ describe('employee PIN coherence', () => {
         linkedEmployeeId: EMPLOYEE_ID,
       },
     ];
-    const stageCredentialCommand = vi.fn(async () => ({
-      ok: true as const,
-      commandRef: '50000000-0000-4000-8000-000000000001',
-      expectedCredentialVersion: 7,
-      replayed: false,
-    }));
+    const stageCredentialCommand = vi.fn<EmployeePinStore['stageCredentialCommand']>(
+      async () => ({
+        ok: true as const,
+        commandRef: '50000000-0000-4000-8000-000000000001',
+        expectedCredentialVersion: 7,
+        replayed: false,
+      }),
+    );
     const store = storeFixture({
       listActiveWorkers: vi.fn(async () => workers),
       stageCredentialCommand,
