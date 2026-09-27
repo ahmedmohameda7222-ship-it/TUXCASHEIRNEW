@@ -335,7 +335,7 @@ create table private.admin_employee_pin_change_commands (
   consumed_at timestamptz,
   constraint admin_employee_pin_change_commands_expiry_check check (expires_at > created_at),
   constraint admin_employee_pin_change_commands_verifier_check
-    check (pin_verifier_hash ~ '^pbkdf2-sha256\$[0-9]+\\$[0-9a-f]+\\$[0-9a-f]+$'),
+    check (pin_verifier_hash ~ '^pbkdf2-sha256\$[0-9]+\$[0-9a-f]+\$[0-9a-f]+$'),
   constraint admin_employee_pin_change_commands_target_shops_check
     check (cardinality(target_shop_ids) > 0),
   constraint admin_employee_pin_change_commands_business_employee_fkey
@@ -1420,7 +1420,7 @@ begin
   if p_actor_employee_id is null or p_employee_id is null
      or p_target_shop_ids is null or cardinality(p_target_shop_ids) = 0
      or p_pin_verifier_hash is null
-     or p_pin_verifier_hash !~ '^pbkdf2-sha256\$[0-9]+\\$[0-9a-f]+\\$[0-9a-f]+$'
+     or p_pin_verifier_hash !~ '^pbkdf2-sha256\$[0-9]+\$[0-9a-f]+\$[0-9a-f]+$'
      or p_pin_lookup_hash is null or p_pin_lookup_hash !~ '^[0-9a-f]{64}$'
      or p_expected_credential_version is null or p_expected_credential_version <= 0
      or p_expires_at is null or p_expires_at <= now()
