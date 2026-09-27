@@ -44,6 +44,18 @@ export function EmployeeDetailPage({
       (worker.linkedEmployeeId === null || worker.linkedEmployeeId === employee.id),
   );
   const [workerId, setWorkerId] = useState(availableWorkers[0]?.id ?? '');
+  const [displayName, setDisplayName] = useState(employee.displayName);
+  const [phone, setPhone] = useState(employee.phone ?? '');
+  const [hireDate, setHireDate] = useState(employee.hireDate ?? '');
+  const [notes, setNotes] = useState(employee.notes ?? '');
+  const latestCompensation = employee.compensation[0] ?? null;
+  const [compensationType, setCompensationType] = useState<'HOURLY' | 'MONTHLY'>(
+    latestCompensation?.compensationType ?? 'MONTHLY',
+  );
+  const [compensationRate, setCompensationRate] = useState(
+    latestCompensation ? String(latestCompensation.rateMinor / 100) : '',
+  );
+  const [compensationEffectiveFrom, setCompensationEffectiveFrom] = useState('');
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
@@ -94,6 +106,115 @@ export function EmployeeDetailPage({
               <dt>Credential version</dt>
               <dd>{employee.credentialVersion}</dd>
             </dl>
+            {canManage ? (
+              <section className="admin-catalog-editor__section is-compact">
+                <h4>Edit profile</h4>
+                <label className="admin-field">
+                  <span>Name</span>
+                  <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+                </label>
+                <label className="admin-field">
+                  <span>Phone</span>
+                  <input value={phone} onChange={(event) => setPhone(event.target.value)} />
+                </label>
+                <label className="admin-field">
+                  <span>Hire date</span>
+                  <input
+                    type="date"
+                    value={hireDate}
+                    onChange={(event) => setHireDate(event.target.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Notes</span>
+                  <textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+                </label>
+                <button
+                  className="admin-primary-button"
+                  type="button"
+                  disabled={!displayName.trim()}
+                  onClick={() =>
+                    onCommand({
+                      type: 'employee.update',
+                      employeeId: employee.id,
+                      shopId,
+                      expectedVersion: employee.profileVersion,
+                      displayName: displayName.trim(),
+                      phone: phone.trim() || null,
+                      hireDate: hireDate || null,
+                      notes: notes.trim() || null,
+                    })
+                  }
+                >
+                  Save profile
+                </button>
+              </section>
+            ) : null}
+
+            {canManage ? (
+              <section className="admin-catalog-editor__section is-compact">
+                <h4>Compensation</h4>
+                {latestCompensation ? (
+                  <p>
+                    Current: {latestCompensation.compensationType} ·{' '}
+                    {(latestCompensation.rateMinor / 100).toFixed(2)} EGP · effective{' '}
+                    {latestCompensation.effectiveFrom}
+                  </p>
+                ) : (
+                  <p>No compensation record yet.</p>
+                )}
+                <label className="admin-field">
+                  <span>Compensation type</span>
+                  <select
+                    value={compensationType}
+                    onChange={(event) =>
+                      setCompensationType(event.target.value as 'HOURLY' | 'MONTHLY')
+                    }
+                  >
+                    <option value="HOURLY">Hourly</option>
+                    <option value="MONTHLY">Monthly</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Rate (EGP)</span>
+                  <input
+                    inputMode="decimal"
+                    value={compensationRate}
+                    onChange={(event) => setCompensationRate(event.target.value)}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Effective from</span>
+                  <input
+                    type="date"
+                    value={compensationEffectiveFrom}
+                    onChange={(event) => setCompensationEffectiveFrom(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={
+                    !compensationEffectiveFrom ||
+                    !Number.isFinite(Number(compensationRate)) ||
+                    Number(compensationRate) < 0
+                  }
+                  onClick={() =>
+                    onCommand({
+                      type: 'compensation.set',
+                      employeeId: employee.id,
+                      shopId,
+                      compensationType,
+                      rateMinor: Math.round(Number(compensationRate) * 100),
+                      effectiveFrom: compensationEffectiveFrom,
+                    })
+                  }
+                >
+                  Record compensation
+                </button>
+              </section>
+            ) : null}
+
             {setupRequired.length > 0 ? (
               <div className="admin-empty-state">
                 <strong>Operations identity setup required</strong>
