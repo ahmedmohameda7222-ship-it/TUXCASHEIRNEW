@@ -21,7 +21,7 @@ function principal(permissions: AdminSessionPrincipal['permissions']): AdminSess
 function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
   const ok = () => ({ ok: true as const, replayed: false });
   return {
-    loadWorkspace: vi.fn(async () => ({
+    loadWorkspace: vi.fn<StaffStore['loadWorkspace']>(async () => ({
       employees: { rows: [], nextCursor: null },
       financeAccounts: [],
     })),
@@ -41,12 +41,12 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
     copyPreviousWeek: async () => ok(),
     createLeave: async () => ok(),
     decideLeave: async () => ok(),
-    correctAttendance: vi.fn(async () => ({
+    correctAttendance: vi.fn<StaffStore['correctAttendance']>(async () => ({
       ok: true as const,
       correctionId: '66666666-6666-4666-8666-666666666666',
       replayed: false,
     })),
-    recordPayment: vi.fn(async () => ({
+    recordPayment: vi.fn<StaffStore['recordPayment']>(async () => ({
       ok: true as const,
       staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
       financeMovementId: '88888888-8888-4888-8888-888888888888',
@@ -58,7 +58,7 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
 
 describe('staffService', () => {
   it('scopes staff reads through staff.view and the active shop', async () => {
-    const loadWorkspace = vi.fn(async () => ({
+    const loadWorkspace = vi.fn<StaffStore['loadWorkspace']>(async () => ({
       employees: { rows: [], nextCursor: null },
       financeAccounts: [],
     }));
@@ -100,7 +100,7 @@ describe('staffService', () => {
   });
 
   it('delegates one staff-payment command to the atomic payment RPC boundary', async () => {
-    const recordPayment = vi.fn(async () => ({
+    const recordPayment = vi.fn<StaffStore['recordPayment']>(async () => ({
       ok: true as const,
       staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
       financeMovementId: '88888888-8888-4888-8888-888888888888',
