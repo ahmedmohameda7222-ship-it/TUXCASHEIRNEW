@@ -86,13 +86,21 @@ describe('staffService', () => {
           name: 'Payroll Cash',
         },
       ],
-      workers: [],
+      workers: [
+        {
+          id: '99999999-9999-4999-8999-999999999999',
+          shopId: SHOP_ID,
+          displayName: 'Operations Worker',
+          linkedEmployeeId: null,
+        },
+      ],
     }));
     const service = createStaffService(storeFixture({ loadWorkspace }));
 
     const result = await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
 
     expect(result.financeAccounts).toEqual([]);
+    expect(result.workers).toEqual([]);
   });
 
   it('redacts compensation and payment history from view-only employee detail', async () => {
