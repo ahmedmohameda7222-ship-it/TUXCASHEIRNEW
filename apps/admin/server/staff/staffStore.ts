@@ -33,6 +33,7 @@ import type {
 } from '@tux/admin-contracts';
 
 import { isAdminPermission, isAdminRole } from '../adminContractRuntime.js';
+import { buildAttendanceSummaries } from './attendanceSummary.js';
 import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 type EmployeeRow = {
@@ -617,6 +618,16 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const customPermissions = permissionRows
         .filter((row) => row.effect === 'ALLOW' && isAdminPermission(row.permission_key))
         .map((row) => row.permission_key as AdminPermission);
+      const mappedShifts = shifts.map(mapShift);
+      const mappedAttendanceEvents = attendanceEvents.map(mapAttendanceEvent);
+      const mappedAttendanceCorrections = attendanceCorrections.map(mapAttendanceCorrection);
+      const attendanceSummaries = buildAttendanceSummaries({
+        employeeId: employee.id,
+        shopId,
+        shifts: mappedShifts,
+        events: mappedAttendanceEvents,
+        corrections: mappedAttendanceCorrections,
+      });
 
       return {
         id: employee.id,
@@ -636,9 +647,10 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         })),
         operationsIdentities,
         compensation: compensationRows.map(mapCompensation),
-        shifts: shifts.map(mapShift),
-        attendanceEvents: attendanceEvents.map(mapAttendanceEvent),
-        attendanceCorrections: attendanceCorrections.map(mapAttendanceCorrection),
+        shifts: mappedShifts,
+        attendanceEvents: mappedAttendanceEvents,
+        attendanceCorrections: mappedAttendanceCorrections,
+        attendanceSummaries,
         leaveRequests: leaveRows.map(mapLeave),
         payments: paymentRows.map(mapPayment),
       };
