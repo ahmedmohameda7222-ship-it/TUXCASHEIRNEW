@@ -79,7 +79,10 @@ values
  ('${A}','${B1}','Owner','OWNER',repeat('a',64),'pbkdf2-sha256$210000$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true),
  ('${E}','${B1}','Employee','STAFF',repeat('b',64),'pbkdf2-sha256$210000$bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',true),
  ('${E2}','${B1}','Employee 2','STAFF',repeat('c',64),'pbkdf2-sha256$210000$cccccccccccccccccccccccccccccccc$cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',true);
-insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values ('${B1}','${A}','${S1}'),('${B1}','${A}','${S2}');
+insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values
+ ('${B1}','${A}','${S1}'),('${B1}','${A}','${S2}'),('${B1}','${E2}','${S1}');
+insert into public.admin_employee_permissions(business_id,employee_id,permission_key,effect)
+values ('${B1}','${E2}','staff.manage','ALLOW');
 insert into public.workers(id,shop_id,display_name,pin_hash,active,pin_lookup_hash)
 values
  ('${W}','${S1}','Linked Worker','pbkdf2-sha256$210000$dddddddddddddddddddddddddddddddd$dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',true,repeat('d',64)),
@@ -116,6 +119,22 @@ const permissionStale=rpc(
 );
 if(permissionStale.ok!==false||permissionStale.code!=='stale_employee') {
   throw new Error(`stale permission update accepted: ${JSON.stringify(permissionStale)}`);
+}
+
+const escalationVersion=Number(scalar(`select profile_version from public.business_employees where id='${E}'`,'role escalation version'));
+const roleEscalation=rpc(
+  `public.set_employee_role_v1('${E2}','${E}','${S1}',${escalationVersion},'OWNER','role-escalation')`,
+  'reject role escalation'
+);
+if(roleEscalation.ok!==false||roleEscalation.code!=='role_escalation_forbidden') {
+  throw new Error(`shop-scoped staff manager promoted OWNER: ${JSON.stringify(roleEscalation)}`);
+}
+const permissionEscalation=rpc(
+  `public.set_employee_permission_v1('${E2}','${E}','${S1}',${escalationVersion},'finance.adjust','ALLOW','permission-escalation')`,
+  'reject permission escalation'
+);
+if(permissionEscalation.ok!==false||permissionEscalation.code!=='permission_escalation_forbidden') {
+  throw new Error(`shop-scoped staff manager granted advanced permission: ${JSON.stringify(permissionEscalation)}`);
 }
 
 const ambiguousBefore=Number(scalar(`select count(*) from public.employee_worker_links where employee_id='${E}'`,'ambiguous mapping count'));
