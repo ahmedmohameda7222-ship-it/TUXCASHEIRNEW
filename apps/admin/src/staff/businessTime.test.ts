@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BUSINESS_TIME_ZONE,
+  businessDateTimeInputValue,
   businessLocalDateTimeToIso,
   formatBusinessDateTime,
 } from './businessTime';
@@ -26,6 +27,12 @@ describe('Workforce business timezone', () => {
   it('formats an instant back in Cairo regardless of browser timezone', () => {
     expect(formatBusinessDateTime('2026-09-27T06:15:00.000Z')).toContain(
       '09:15',
+    );
+  });
+
+  it('round-trips an instant into a datetime-local value in Cairo', () => {
+    expect(businessDateTimeInputValue('2026-09-27T06:15:00.000Z')).toBe(
+      '2026-09-27T09:15',
     );
   });
 
