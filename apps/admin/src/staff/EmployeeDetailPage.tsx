@@ -274,6 +274,7 @@ export function EmployeeDetailPage({
           accounts={financeAccounts}
           canPay={canPay}
           onCommand={onCommand}
+          onSensitiveCommand={onSensitiveCommand}
         />
       ) : null}
       {tab === 'permissions' ? (
