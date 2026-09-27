@@ -121,6 +121,14 @@ if(permissionStale.ok!==false||permissionStale.code!=='stale_employee') {
   throw new Error(`stale permission update accepted: ${JSON.stringify(permissionStale)}`);
 }
 
+const createOwnerEscalation=rpc(
+  `public.create_employee_v1('${E2}','${S1}','Forbidden Owner',null,null,null,'OWNER','create-owner-escalation')`,
+  'reject OWNER creation escalation'
+);
+if(createOwnerEscalation.ok!==false||createOwnerEscalation.code!=='role_escalation_forbidden') {
+  throw new Error(`shop-scoped staff manager created OWNER: ${JSON.stringify(createOwnerEscalation)}`);
+}
+
 const escalationVersion=Number(scalar(`select profile_version from public.business_employees where id='${E}'`,'role escalation version'));
 const roleEscalation=rpc(
   `public.set_employee_role_v1('${E2}','${E}','${S1}',${escalationVersion},'OWNER','role-escalation')`,
