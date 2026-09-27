@@ -2,6 +2,7 @@ import type {
   AdminRole,
   EmployeeDetail,
   StaffFinanceAccountChoice,
+  StaffWorkerChoice,
 } from '@tux/admin-contracts';
 import { useState } from 'react';
 
@@ -20,6 +21,7 @@ export function EmployeeDetailPage({
   canManage,
   canPay,
   financeAccounts,
+  workers,
   onCommand,
   onSensitiveCommand,
 }: {
@@ -28,6 +30,7 @@ export function EmployeeDetailPage({
   canManage: boolean;
   canPay: boolean;
   financeAccounts: readonly StaffFinanceAccountChoice[];
+  workers: readonly StaffWorkerChoice[];
   onCommand(command: StaffCommandDraft): void;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
@@ -35,6 +38,12 @@ export function EmployeeDetailPage({
   const [actorPin, setActorPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
+  const availableWorkers = workers.filter(
+    (worker) =>
+      worker.shopId === shopId &&
+      (worker.linkedEmployeeId === null || worker.linkedEmployeeId === employee.id),
+  );
+  const [workerId, setWorkerId] = useState(availableWorkers[0]?.id ?? '');
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
@@ -92,6 +101,37 @@ export function EmployeeDetailPage({
                   Missing linked worker identity for {setupRequired.length} assigned shop
                   {setupRequired.length === 1 ? '' : 's'}.
                 </span>
+                {canManage && availableWorkers.length > 0 ? (
+                  <>
+                    <label className="admin-field">
+                      <span>Operations worker</span>
+                      <select value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
+                        {availableWorkers.map((worker) => (
+                          <option key={worker.id} value={worker.id}>
+                            {worker.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      className="admin-secondary-button"
+                      type="button"
+                      disabled={!workerId}
+                      onClick={() =>
+                        onCommand({
+                          type: 'employee.link-worker',
+                          employeeId: employee.id,
+                          shopId,
+                          workerId,
+                        })
+                      }
+                    >
+                      Link Operations identity
+                    </button>
+                  </>
+                ) : canManage ? (
+                  <span>No unlinked active Operations worker is available for this shop.</span>
+                ) : null}
               </div>
             ) : (
               <p>Operations identity linked for every assigned shop.</p>
