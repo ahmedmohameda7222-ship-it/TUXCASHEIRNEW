@@ -14,6 +14,8 @@ on:
       - 'scripts/test-admin-finance-core-*.mjs'
       - 'scripts/test-admin-workforce-*.mjs'
       - 'apps/admin/server/staff/**'
+      - 'apps/admin/server/reauth.ts'
+      - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
       - 'packages/admin-contracts/src/staff.ts'
@@ -27,6 +29,8 @@ on:
       - 'scripts/test-admin-finance-core-*.mjs'
       - 'scripts/test-admin-workforce-*.mjs'
       - 'apps/admin/server/staff/**'
+      - 'apps/admin/server/reauth.ts'
+      - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
       - 'packages/admin-contracts/src/staff.ts'
@@ -130,6 +134,6 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Workforce employee PIN tests
-        run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/staff/staffApproval.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
+        run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/staff/staffApproval.test.ts apps/admin/server/reauth.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
       - name: Admin and Operations PIN format compatibility
         run: node scripts/test-admin-worker-pin-compatibility.mjs
