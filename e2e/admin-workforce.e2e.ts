@@ -33,6 +33,7 @@ function workspace(withAccount = true): StaffWorkspace {
       ],
       nextCursor: null,
     },
+    workers: [],
     financeAccounts: withAccount
       ? [
           {
