@@ -273,11 +273,16 @@ function mapPayment(row: PaymentRow): StaffPaymentRecord {
 }
 
 export interface StaffStore {
-  loadWorkspace(shopId: string, businessId: string): Promise<StaffWorkspace>;
+  loadWorkspace(
+    shopId: string,
+    businessId: string,
+    visibleShopIds: readonly string[],
+  ): Promise<StaffWorkspace>;
   loadEmployeeDetail(input: {
     employeeId: string;
     shopId: string;
     businessId: string;
+    visibleShopIds: readonly string[];
   }): Promise<EmployeeDetail | null>;
   createEmployee(
     input: CreateEmployeeInput & { actorEmployeeId: string },
@@ -338,7 +343,12 @@ export interface StaffStore {
 
 export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStore {
   return {
-    async loadWorkspace(shopId, businessId): Promise<StaffWorkspace> {
+    async loadWorkspace(shopId, businessId, visibleShopIds): Promise<StaffWorkspace> {
+      const authorizedShopIds = [...new Set(visibleShopIds)].sort();
+      if (!authorizedShopIds.includes(shopId)) {
+        throw new Error('staff_shop_scope_invalid');
+      }
+
       const shopAssignments = await client.select<AssignmentRow[]>(
         'employee_shop_assignments',
         new URLSearchParams({
@@ -371,6 +381,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               select: 'employee_id,shop_id',
               business_id: `eq.${businessId}`,
               employee_id: inFilter(employeeIds),
+              shop_id: inFilter(authorizedShopIds),
               order: 'employee_id.asc,shop_id.asc',
             }),
           ),
@@ -380,6 +391,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               select: 'employee_id,shop_id,worker_id,active',
               business_id: `eq.${businessId}`,
               employee_id: inFilter(employeeIds),
+              shop_id: inFilter(authorizedShopIds),
               active: 'eq.true',
             }),
           ),
@@ -456,7 +468,12 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       };
     },
 
-    async loadEmployeeDetail({ employeeId, shopId, businessId }) {
+    async loadEmployeeDetail({ employeeId, shopId, businessId, visibleShopIds }) {
+      const authorizedShopIds = [...new Set(visibleShopIds)].sort();
+      if (!authorizedShopIds.includes(shopId)) {
+        return null;
+      }
+
       const employees = await client.select<EmployeeRow[]>(
         'business_employees',
         new URLSearchParams({
@@ -499,6 +516,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
             select: 'employee_id,shop_id',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             order: 'shop_id.asc',
           }),
         ),
@@ -508,6 +526,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
             select: 'employee_id,shop_id,worker_id,active',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             active: 'eq.true',
           }),
         ),
@@ -535,6 +554,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               'id,employee_id,shop_id,starts_at,ends_at,planned_break_minutes,status,version,source_shift_id,created_at,updated_at',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             order: 'starts_at.desc,id.desc',
             limit: '500',
           }),
@@ -546,6 +566,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               'id,employee_id,shop_id,worker_id,worker_session_id,event_type,occurred_at,created_at',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             order: 'occurred_at.desc,id.desc',
             limit: '1000',
           }),
@@ -557,6 +578,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               'id,employee_id,shop_id,attendance_event_id,original_occurred_at,corrected_occurred_at,reason,corrected_by_employee_id,created_at',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             order: 'created_at.desc,id.desc',
             limit: '1000',
           }),
@@ -568,6 +590,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               'id,employee_id,shop_id,leave_type,starts_on,ends_on,note,status,requester_employee_id,decided_by_employee_id,decision_reason,decided_at,version,created_at,updated_at',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            or: `(shop_id.in.(${authorizedShopIds.join(',')}),shop_id.is.null)`,
             order: 'starts_on.desc,id.desc',
             limit: '500',
           }),
@@ -579,6 +602,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
               'id,employee_id,shop_id,pay_period_start,pay_period_end,expected_amount_minor,paid_amount_minor,finance_account_id,finance_movement_id,payment_date,note,reference,actor_employee_id,created_at',
             business_id: `eq.${businessId}`,
             employee_id: `eq.${employeeId}`,
+            shop_id: inFilter(authorizedShopIds),
             order: 'payment_date.desc,id.desc',
             limit: '500',
           }),
