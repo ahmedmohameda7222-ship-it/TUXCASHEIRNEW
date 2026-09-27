@@ -210,6 +210,8 @@ export type StaffCommandResult =
       readonly credentialVersion?: number;
       readonly compensationId?: string;
       readonly copiedCount?: number;
+      readonly approvalRequestId?: string;
+      readonly state?: 'APPLIED' | 'PENDING_APPROVAL';
     }
   | {
       readonly ok: false;
