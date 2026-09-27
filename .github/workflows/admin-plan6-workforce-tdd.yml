@@ -18,6 +18,7 @@ on:
       - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
+      - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
       - 'e2e/admin-workforce.spec.ts'
@@ -33,6 +34,7 @@ on:
       - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
+      - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
       - 'e2e/admin-workforce.spec.ts'
@@ -168,3 +170,19 @@ jobs:
         run: npx vitest run apps/admin/server/staff/timekeeping.test.ts apps/admin/server/staff/wages.test.ts
       - name: Admin typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
+
+
+  workforce-ui:
+    needs: workforce-calculations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Workforce component tests
+        run: npx vitest run apps/admin/src/staff/EmployeeDetailPage.test.tsx
+      - name: Admin workspace typecheck
+        run: npm run typecheck -w @tux/admin
