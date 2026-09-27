@@ -102,7 +102,7 @@ const assign2=rpc(`public.assign_employee_to_shop_v1('${A}','${E}','${S2}','assi
 if(!assign1.ok||!assign1Replay.replayed||!assign2.ok) throw new Error('multi-shop assignment/idempotency failed');
 
 const cross=rpc(`public.assign_employee_to_shop_v1('${A}','${E}','${S3}','assign-cross')`,'reject cross business');
-if(cross.ok!==false||cross.code!=='shop_forbidden') throw new Error(`cross-business assignment accepted: ${JSON.stringify(cross)}`);
+if(cross.ok!==false||cross.code!=='shop_outside_business') throw new Error(`cross-business assignment accepted: ${JSON.stringify(cross)}`);
 
 const ambiguousBefore=Number(scalar(`select count(*) from public.employee_worker_links where employee_id='${E}'`,'ambiguous mapping count'));
 if(ambiguousBefore!==0) throw new Error('ambiguous worker identity was auto-linked');
