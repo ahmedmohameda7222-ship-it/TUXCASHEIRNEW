@@ -163,6 +163,7 @@ export function StaffPage() {
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
               workers={staff.workspaceQuery.data?.workers ?? []}
+              availableShopIds={principal.shopIds}
               onCommand={execute}
               onSensitiveCommand={executeSensitive}
             />
