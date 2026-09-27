@@ -14,6 +14,16 @@ export type StaffApiCommandDraft = Readonly<Record<string, unknown>> & {
   readonly type: string;
 };
 
+const SECRET_COMMAND_KEY = /(pin|password|passcode|secret|verifier|lookup|salt)/i;
+
+export function staffCommandIntentForRetention(
+  draft: StaffApiCommandDraft,
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(draft).filter(([key]) => !SECRET_COMMAND_KEY.test(key)),
+  );
+}
+
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
   if (session.state.status !== 'authenticated') throw new Error('session_required');
   return session.state.session.csrfToken;
@@ -48,27 +58,56 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
       ).then((result) => result.employee),
   });
 
+  async function postCommand(draft: StaffApiCommandDraft, requesterPin?: string) {
+    if (!shopId) throw new Error('concrete_shop_required');
+    const intent = staffCommandIntentForRetention(draft);
+    const scope = `staff.${draft.type}`;
+    const commandId = commandIds.forIntent(scope, intent);
+    const result = await adminFetch<StaffCommandResult>(
+      '/api/admin/staff',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ...draft,
+          commandId,
+          ...(requesterPin === undefined ? {} : { requesterPin }),
+        }),
+      },
+      csrfToken(session),
+    );
+    commandIds.complete(scope, intent);
+    return result;
+  }
+
   const command = useMutation({
-    mutationFn: async (draft: StaffApiCommandDraft) => {
-      if (!shopId) throw new Error('concrete_shop_required');
-      const intent = { ...draft };
-      const scope = `staff.${draft.type}`;
-      const commandId = commandIds.forIntent(scope, intent);
-      const result = await adminFetch<StaffCommandResult>(
-        '/api/admin/staff',
+    mutationFn: (draft: StaffApiCommandDraft) => postCommand(draft),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'staff', shopId] });
+    },
+  });
+
+  const sensitiveCommand = useMutation({
+    mutationFn: async ({
+      draft,
+      pin,
+    }: {
+      draft: StaffApiCommandDraft;
+      pin: string;
+    }) => {
+      await adminFetch<{ ok: true; reauthenticatedAt: string }>(
+        '/api/admin/reauth',
         {
           method: 'POST',
-          body: JSON.stringify({ ...draft, commandId }),
+          body: JSON.stringify({ pin }),
         },
         csrfToken(session),
       );
-      commandIds.complete(scope, intent);
-      return result;
+      return postCommand(draft, pin);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'staff', shopId] });
     },
   });
 
-  return { workspaceQuery, detailQuery, command };
+  return { workspaceQuery, detailQuery, command, sensitiveCommand };
 }
