@@ -190,6 +190,48 @@ const pinState=JSON.parse(scalar(`select jsonb_build_object(
 )::text`,'PIN readback'));
 if(pinState.employee!==pinState.worker||pinState.employeeLookup!==pinState.workerLookup) throw new Error('employee/worker credential propagation diverged');
 
+const rollbackEmployeeHash=scalar(`select pin_hash from public.business_employees where id='${E}'`,'rollback employee baseline');
+const rollbackWorkerHash=scalar(`select pin_hash from public.workers where id='${W}'`,'rollback worker baseline');
+const rollbackRef=rpc(
+ `public.stage_employee_pin_change_v1('${A}','${E}',array['${S1}'::uuid],'pbkdf2-sha256$210000$33333333333333333333333333333333$3333333333333333333333333333333333333333333333333333333333333333',repeat('7',64),(select credential_version from public.business_employees where id='${E}'),null,now()+interval '1 hour','27000000-0000-4000-8000-000000000003')`,
+ 'stage rollback PIN'
+);
+if(!rollbackRef.ok) throw new Error(`stage rollback PIN failed: ${JSON.stringify(rollbackRef)}`);
+psql(['-c',`
+create or replace function public.test_force_pin_rollback_v1()
+returns trigger language plpgsql as $
+begin
+  if new.id='${E}'::uuid and new.pin_hash is distinct from old.pin_hash then
+    raise exception 'TEST_PIN_ROLLBACK';
+  end if;
+  return new;
+end $;
+create trigger test_force_pin_rollback
+before update on public.business_employees
+for each row execute function public.test_force_pin_rollback_v1();
+`],'install rollback trigger');
+const rollbackAttempt=psql(
+ ['-At','-c',`select public.apply_employee_pin_change_v1('${A}','${rollbackRef.commandRef}')::text`],
+ 'force PIN transaction rollback',
+ {allowFailure:true}
+);
+if(rollbackAttempt.status===0 || !String(rollbackAttempt.stderr).includes('TEST_PIN_ROLLBACK')) {
+  throw new Error('forced PIN rollback did not fail at employee credential update');
+}
+psql(['-c',`
+drop trigger test_force_pin_rollback on public.business_employees;
+drop function public.test_force_pin_rollback_v1();
+`],'remove rollback trigger');
+if(scalar(`select pin_hash from public.business_employees where id='${E}'`,'rollback employee unchanged')!==rollbackEmployeeHash) {
+  throw new Error('employee credential changed despite transaction rollback');
+}
+if(scalar(`select pin_hash from public.workers where id='${W}'`,'rollback worker unchanged')!==rollbackWorkerHash) {
+  throw new Error('linked worker credential partially committed before employee rollback');
+}
+if(scalar(`select (consumed_at is null)::text from private.admin_employee_pin_change_commands where command_ref='${rollbackRef.commandRef}'`,'rollback command remains pending')!=='true') {
+  throw new Error('credential command was consumed despite transaction rollback');
+}
+
 const sessionBefore=Number(scalar(`select count(*) from public.worker_sessions where worker_id='${W}'`,'worker history before suspension'));
 const suspended=rpc(`public.suspend_employee_v1('${A}','${E}',(select profile_version from public.business_employees where id='${E}'),'suspend-e')`,'suspend employee');
 if(!suspended.ok) throw new Error(`suspension failed: ${JSON.stringify(suspended)}`);
