@@ -74,6 +74,26 @@ describe('staffService', () => {
     );
   });
 
+  it('does not expose payment accounts to staff.view without staff.payments', async () => {
+    const loadWorkspace = vi.fn<StaffStore['loadWorkspace']>(async () => ({
+      employees: { rows: [], nextCursor: null },
+      financeAccounts: [
+        {
+          id: ACCOUNT_ID,
+          shopId: SHOP_ID,
+          accountType: 'CASH',
+          name: 'Payroll Cash',
+        },
+      ],
+      workers: [],
+    }));
+    const service = createStaffService(storeFixture({ loadWorkspace }));
+
+    const result = await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
+
+    expect(result.financeAccounts).toEqual([]);
+  });
+
   it('records an attendance correction without exposing an original-event update path', async () => {
     const store = storeFixture();
     const service = createStaffService(store);
