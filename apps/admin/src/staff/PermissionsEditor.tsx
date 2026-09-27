@@ -6,17 +6,20 @@ export function PermissionsEditor({
   employee,
   shopId,
   canManage,
-  onCommand,
+  actorPin,
+  onSensitiveCommand,
 }: {
   employee: EmployeeDetail;
   shopId: string;
   canManage: boolean;
-  onCommand(command: StaffCommandDraft): void;
+  actorPin: string;
+  onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
   return (
     <section aria-label="Permissions">
       <h3>Permissions</h3>
-      <p>Advanced permission overrides are audited and version-fenced.</p>
+      <p>Advanced permission overrides are audited, version-fenced and require recent re-PIN.</p>
+      {!actorPin ? <p>Enter your Admin PIN on the Profile tab before changing permissions.</p> : null}
       <div className="admin-more-grid">
         {ADMIN_PERMISSIONS.map((permission) => {
           const allowed = employee.customPermissions.includes(permission);
@@ -26,16 +29,19 @@ export function PermissionsEditor({
               <input
                 type="checkbox"
                 checked={allowed}
-                disabled={!canManage}
+                disabled={!canManage || !actorPin}
                 onChange={(event) =>
-                  onCommand({
-                    type: 'employee.permission',
-                    employeeId: employee.id,
-                    shopId,
-                    permissionKey: permission,
-                    effect: event.target.checked ? 'ALLOW' : 'DENY',
-                    expectedVersion: employee.profileVersion,
-                  })
+                  onSensitiveCommand(
+                    {
+                      type: 'employee.permission',
+                      employeeId: employee.id,
+                      shopId,
+                      permissionKey: permission,
+                      effect: event.target.checked ? 'ALLOW' : 'DENY',
+                      expectedVersion: employee.profileVersion,
+                    },
+                    actorPin,
+                  )
                 }
               />
             </label>
