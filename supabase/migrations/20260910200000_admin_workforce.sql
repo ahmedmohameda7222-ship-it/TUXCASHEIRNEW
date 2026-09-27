@@ -1997,6 +1997,7 @@ create or replace function public.set_employee_permission_v1(
   p_actor_employee_id uuid,
   p_employee_id uuid,
   p_shop_id uuid,
+  p_expected_profile_version bigint,
   p_permission_key text,
   p_effect text,
   p_command_id text
@@ -2012,8 +2013,10 @@ declare
   v_fingerprint text;
   v_replay jsonb;
   v_result jsonb;
+  v_previous_effect text;
 begin
-  if p_effect not in ('ALLOW','DENY') or nullif(btrim(p_permission_key), '') is null
+  if p_expected_profile_version is null or p_expected_profile_version <= 0
+     or p_effect not in ('ALLOW','DENY') or nullif(btrim(p_permission_key), '') is null
      or nullif(btrim(p_command_id), '') is null then
     return jsonb_build_object('ok', false, 'code', 'invalid_employee_permission');
   end if;
@@ -2028,23 +2031,58 @@ begin
   end if;
 
   v_fingerprint := private.workforce_fingerprint_v1(jsonb_build_object(
-    'employeeId', p_employee_id, 'permissionKey', p_permission_key, 'effect', p_effect
+    'employeeId', p_employee_id,
+    'expectedProfileVersion', p_expected_profile_version,
+    'permissionKey', p_permission_key,
+    'effect', p_effect
   ));
   perform pg_advisory_xact_lock(hashtextextended(v_employee.business_id::text || ':workforce:' || p_command_id, 0));
   v_replay := private.workforce_command_replay_v1(v_employee.business_id, p_command_id, 'SET_EMPLOYEE_PERMISSION', v_fingerprint);
   if v_replay is not null then return v_replay; end if;
+  if v_employee.profile_version <> p_expected_profile_version then
+    return jsonb_build_object(
+      'ok', false, 'code', 'stale_employee',
+      'currentVersion', v_employee.profile_version
+    );
+  end if;
+
+  select effect into v_previous_effect
+  from public.admin_employee_permissions
+  where business_id = v_employee.business_id
+    and employee_id = p_employee_id
+    and permission_key = p_permission_key;
 
   insert into public.admin_employee_permissions(business_id, employee_id, permission_key, effect)
   values (v_employee.business_id, p_employee_id, p_permission_key, p_effect)
   on conflict (employee_id, permission_key)
   do update set effect = excluded.effect, updated_at = now();
 
-  v_result := jsonb_build_object('ok', true, 'replayed', false, 'employeeId', p_employee_id, 'permissionKey', p_permission_key, 'effect', p_effect);
-  perform private.store_workforce_command_receipt_v1(v_employee.business_id, p_command_id, 'SET_EMPLOYEE_PERMISSION', v_fingerprint, v_result);
+  update public.business_employees
+  set profile_version = profile_version + 1,
+      updated_at = now()
+  where id = p_employee_id
+    and business_id = v_employee.business_id;
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'replayed', false,
+    'employeeId', p_employee_id,
+    'permissionKey', p_permission_key,
+    'effect', p_effect,
+    'profileVersion', p_expected_profile_version + 1
+  );
+  perform private.store_workforce_command_receipt_v1(
+    v_employee.business_id, p_command_id, 'SET_EMPLOYEE_PERMISSION', v_fingerprint, v_result
+  );
   perform public.append_admin_audit_event_v1(
     v_employee.business_id, p_shop_id, p_actor_employee_id, 'EMPLOYEE_PERMISSION_CHANGED',
-    'BUSINESS_EMPLOYEE', p_employee_id::text, null,
-    jsonb_build_object('permissionKey', p_permission_key, 'effect', p_effect),
+    'BUSINESS_EMPLOYEE', p_employee_id::text,
+    case when v_previous_effect is null then null else jsonb_build_object('permissionKey', p_permission_key, 'effect', v_previous_effect) end,
+    jsonb_build_object(
+      'permissionKey', p_permission_key,
+      'effect', p_effect,
+      'profileVersion', p_expected_profile_version + 1
+    ),
     null, null, null, jsonb_build_object('source', 'workforce')
   );
   return v_result;
@@ -2167,7 +2205,7 @@ revoke all on function public.reactivate_employee_v1(uuid, uuid, bigint, uuid, t
 revoke all on function public.create_employee_v1(uuid, uuid, text, text, date, text, text, text) from public, anon, authenticated;
 revoke all on function public.update_employee_profile_v1(uuid, uuid, uuid, bigint, text, text, date, text, text) from public, anon, authenticated;
 revoke all on function public.set_employee_role_v1(uuid, uuid, uuid, bigint, text, text) from public, anon, authenticated;
-revoke all on function public.set_employee_permission_v1(uuid, uuid, uuid, text, text, text) from public, anon, authenticated;
+revoke all on function public.set_employee_permission_v1(uuid, uuid, uuid, bigint, text, text, text) from public, anon, authenticated;
 revoke all on function public.set_employee_compensation_v1(uuid, uuid, uuid, text, bigint, date, text) from public, anon, authenticated;
 
 grant execute on function public.assign_employee_to_shop_v1(uuid, uuid, uuid, text) to service_role;
@@ -2188,7 +2226,7 @@ grant execute on function public.reactivate_employee_v1(uuid, uuid, bigint, uuid
 grant execute on function public.create_employee_v1(uuid, uuid, text, text, date, text, text, text) to service_role;
 grant execute on function public.update_employee_profile_v1(uuid, uuid, uuid, bigint, text, text, date, text, text) to service_role;
 grant execute on function public.set_employee_role_v1(uuid, uuid, uuid, bigint, text, text) to service_role;
-grant execute on function public.set_employee_permission_v1(uuid, uuid, uuid, text, text, text) to service_role;
+grant execute on function public.set_employee_permission_v1(uuid, uuid, uuid, bigint, text, text, text) to service_role;
 grant execute on function public.set_employee_compensation_v1(uuid, uuid, uuid, text, bigint, date, text) to service_role;
 
 comment on table public.employee_worker_links is
