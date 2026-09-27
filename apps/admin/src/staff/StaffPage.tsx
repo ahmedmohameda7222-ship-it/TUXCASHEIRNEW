@@ -1,3 +1,4 @@
+import type { AdminRole } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -15,6 +16,9 @@ export function StaffPage() {
   const { scope, principal } = useShopScope();
   const shopId = scope.kind === 'shop' ? scope.shopId : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [newEmployeePhone, setNewEmployeePhone] = useState('');
+  const [newEmployeeRole, setNewEmployeeRole] = useState<AdminRole>('STAFF');
   const staff = useStaff(shopId, selectedId);
 
   const rows = useMemo(
@@ -61,6 +65,54 @@ export function StaffPage() {
 
       <div className="admin-inventory-layout">
         <section className="admin-inventory-list" aria-label="Employees">
+          {canManage ? (
+            <section className="admin-catalog-editor__section is-compact" aria-label="Create employee">
+              <h3>Add employee</h3>
+              <label className="admin-field">
+                <span>Name</span>
+                <input
+                  value={newEmployeeName}
+                  onChange={(event) => setNewEmployeeName(event.target.value)}
+                />
+              </label>
+              <label className="admin-field">
+                <span>Phone</span>
+                <input
+                  value={newEmployeePhone}
+                  onChange={(event) => setNewEmployeePhone(event.target.value)}
+                />
+              </label>
+              <label className="admin-field">
+                <span>Role</span>
+                <select
+                  value={newEmployeeRole}
+                  onChange={(event) => setNewEmployeeRole(event.target.value as AdminRole)}
+                >
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="MANAGER">MANAGER</option>
+                  <option value="STAFF">STAFF</option>
+                </select>
+              </label>
+              <button
+                className="admin-primary-button"
+                type="button"
+                disabled={!newEmployeeName.trim() || staff.command.isPending}
+                onClick={() =>
+                  execute({
+                    type: 'employee.create',
+                    shopId,
+                    displayName: newEmployeeName.trim(),
+                    phone: newEmployeePhone.trim() || null,
+                    hireDate: null,
+                    notes: null,
+                    role: newEmployeeRole,
+                  })
+                }
+              >
+                Add employee
+              </button>
+            </section>
+          ) : null}
           {staff.workspaceQuery.isLoading ? <p>Loading staff…</p> : null}
           {staff.workspaceQuery.isError ? <p role="alert">Staff could not be loaded.</p> : null}
           {rows.length === 0 && !staff.workspaceQuery.isLoading ? (
@@ -110,6 +162,7 @@ export function StaffPage() {
               canManage={canManage}
               canPay={canPay}
               financeAccounts={staff.workspaceQuery.data?.financeAccounts ?? []}
+              workers={staff.workspaceQuery.data?.workers ?? []}
               onCommand={execute}
               onSensitiveCommand={executeSensitive}
             />
