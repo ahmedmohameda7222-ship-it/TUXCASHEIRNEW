@@ -27,6 +27,7 @@ const employee: EmployeeDetail = {
   shifts: [],
   attendanceEvents: [],
   attendanceCorrections: [],
+  attendanceSummaries: [],
   leaveRequests: [],
   payments: [],
 };
