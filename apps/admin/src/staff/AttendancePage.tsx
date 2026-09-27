@@ -1,6 +1,7 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 import { useMemo, useState } from 'react';
 
+import { businessLocalDateTimeToIso, formatBusinessDateTime } from './businessTime';
 import type { StaffCommandDraft } from './SchedulePage';
 
 export function AttendancePage({
@@ -40,11 +41,11 @@ export function AttendancePage({
           <article className="admin-inventory-row" key={event.id}>
             <span>
               <strong>{event.eventType.replaceAll('_', ' ')}</strong>
-              <small>{new Date(event.occurredAt).toLocaleString()}</small>
+              <small>{formatBusinessDateTime(event.occurredAt)}</small>
             </span>
             <span>
               {correction
-                ? `Corrected to ${new Date(correction.correctedOccurredAt).toLocaleString()}`
+                ? `Corrected to ${formatBusinessDateTime(correction.correctedOccurredAt)}`
                 : 'Original'}
             </span>
           </article>
@@ -59,7 +60,7 @@ export function AttendancePage({
             <select value={eventId} onChange={(event) => setEventId(event.target.value)}>
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.eventType} · {new Date(event.occurredAt).toLocaleString()}
+                  {event.eventType} · {formatBusinessDateTime(event.occurredAt)}
                 </option>
               ))}
             </select>
@@ -85,7 +86,7 @@ export function AttendancePage({
                 type: 'attendance.correct',
                 attendanceEventId: eventId,
                 shopId,
-                correctedOccurredAt: new Date(correctedAt).toISOString(),
+                correctedOccurredAt: businessLocalDateTimeToIso(correctedAt),
                 reason: reason.trim(),
               })
             }
