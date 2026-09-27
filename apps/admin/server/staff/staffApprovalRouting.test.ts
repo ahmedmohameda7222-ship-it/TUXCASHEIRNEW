@@ -40,9 +40,7 @@ function approvalDependencies() {
     idempotentReplay: false,
   }));
   const deps: ApprovalServiceDependencies = {
-    loadRequest: vi.fn<ApprovalServiceDependencies['loadRequest']>(
-      async () => null,
-    ),
+    loadRequest: vi.fn<ApprovalServiceDependencies['loadRequest']>(async () => null),
     loadRule: vi.fn<ApprovalServiceDependencies['loadRule']>(async () => ({
       id: RULE_ID,
       businessId: BUSINESS_ID,
@@ -55,12 +53,11 @@ function approvalDependencies() {
       thresholdContext: {},
       active: true,
     })),
-    verifyEmployeePin: vi.fn<ApprovalServiceDependencies['verifyEmployeePin']>(
-      async () => true,
-    ),
-    decideRequest: vi.fn<ApprovalServiceDependencies['decideRequest']>(
-      async () => ({ ok: true, status: 'APPROVED' as const }),
-    ),
+    verifyEmployeePin: vi.fn<ApprovalServiceDependencies['verifyEmployeePin']>(async () => true),
+    decideRequest: vi.fn<ApprovalServiceDependencies['decideRequest']>(async () => ({
+      ok: true,
+      status: 'APPROVED' as const,
+    })),
     createRequest,
     now: () => new Date('2026-09-27T18:00:00.000Z'),
   };

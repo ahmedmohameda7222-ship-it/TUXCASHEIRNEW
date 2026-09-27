@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  staffCommandIntentForRetention,
-  staffEphemeralCommandId,
-} from './useStaff';
+import { staffCommandIntentForRetention, staffEphemeralCommandId } from './useStaff';
 
 describe('Workforce retained command intent', () => {
   it('never includes PIN or verifier material in the durable idempotency fingerprint', () => {
