@@ -186,3 +186,19 @@ jobs:
         run: npx vitest run apps/admin/src/staff/EmployeeDetailPage.test.tsx
       - name: Admin workspace typecheck
         run: npm run typecheck -w @tux/admin
+
+
+  workforce-e2e:
+    needs: workforce-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Workforce E2E
+        run: npx playwright test e2e/admin-workforce.spec.ts
