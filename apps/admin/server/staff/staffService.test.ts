@@ -68,7 +68,11 @@ describe('staffService', () => {
 
     await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
 
-    expect(loadWorkspace).toHaveBeenCalledWith(SHOP_ID, '55555555-5555-4555-8555-555555555555');
+    expect(loadWorkspace).toHaveBeenCalledWith(
+      SHOP_ID,
+      '55555555-5555-4555-8555-555555555555',
+      [SHOP_ID],
+    );
   });
 
   it('does not expose payment accounts to staff.view without staff.payments', async () => {
@@ -150,6 +154,12 @@ describe('staffService', () => {
 
     expect(detail?.compensation).toEqual([]);
     expect(detail?.payments).toEqual([]);
+    expect(loadEmployeeDetail).toHaveBeenCalledWith({
+      employeeId: EMPLOYEE_ID,
+      shopId: SHOP_ID,
+      businessId: '55555555-5555-4555-8555-555555555555',
+      visibleShopIds: [SHOP_ID],
+    });
   });
 
   it('records an attendance correction without exposing an original-event update path', async () => {
