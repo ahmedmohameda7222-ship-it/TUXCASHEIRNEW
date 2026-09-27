@@ -158,6 +158,7 @@ export function StaffPage() {
           ) : null}
           {detail ? (
             <EmployeeDetailPage
+              key={`${detail.id}:${shopId}`}
               employee={detail}
               shopId={shopId}
               canManage={canManage}
