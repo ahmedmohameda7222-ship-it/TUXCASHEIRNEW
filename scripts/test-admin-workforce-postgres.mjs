@@ -138,8 +138,8 @@ const stale=rpc(`public.update_employee_shift_v1('${A}','${shift.shiftId}',1,'20
 if(stale.ok!==false||stale.code!=='stale_shift') throw new Error(`stale shift overwrite accepted: ${JSON.stringify(stale)}`);
 
 for (const [account,code,cmd] of [
- ['${INACTIVE}','finance_account_inactive','pay-inactive'],
- ['${WRONG}','finance_account_shop_forbidden','pay-wrong-shop'],
+ [INACTIVE,'finance_account_inactive','pay-inactive'],
+ [WRONG,'finance_account_shop_forbidden','pay-wrong-shop'],
 ]) {
  const r=rpc(`public.record_staff_payment_v1('${A}','${E}','${S1}','2026-09-01','2026-09-30',10000,9000,'${account}','2026-10-01',null,null,'${cmd}')`,'invalid staff payment');
  if(r.ok!==false||r.code!==code) throw new Error(`invalid account accepted: ${JSON.stringify(r)}`);
