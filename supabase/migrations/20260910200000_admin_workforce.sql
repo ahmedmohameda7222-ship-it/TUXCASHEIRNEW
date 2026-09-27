@@ -1848,6 +1848,12 @@ begin
   if not coalesce(v_auth.authorized, false) then
     return jsonb_build_object('ok', false, 'code', coalesce(v_auth.denial_code, 'permission_forbidden'));
   end if;
+  if p_role = 'OWNER' and v_auth.employee_role <> 'OWNER' then
+    return jsonb_build_object('ok', false, 'code', 'role_escalation_forbidden');
+  end if;
+  if p_role = 'ADMIN' and v_auth.employee_role not in ('OWNER','ADMIN') then
+    return jsonb_build_object('ok', false, 'code', 'role_escalation_forbidden');
+  end if;
   v_business_id := v_auth.business_id;
   v_fingerprint := private.workforce_fingerprint_v1(jsonb_build_object(
     'shopId', p_shop_id, 'displayName', btrim(p_display_name), 'phone', nullif(btrim(p_phone), ''),
@@ -1970,6 +1976,13 @@ begin
   if not coalesce(v_auth.authorized, false) or v_auth.business_id <> v_employee.business_id then
     return jsonb_build_object('ok', false, 'code', coalesce(v_auth.denial_code, 'permission_forbidden'));
   end if;
+  if (p_role = 'OWNER' or v_employee.role = 'OWNER') and v_auth.employee_role <> 'OWNER' then
+    return jsonb_build_object('ok', false, 'code', 'role_escalation_forbidden');
+  end if;
+  if (p_role = 'ADMIN' or v_employee.role = 'ADMIN')
+     and v_auth.employee_role not in ('OWNER','ADMIN') then
+    return jsonb_build_object('ok', false, 'code', 'role_escalation_forbidden');
+  end if;
   v_fingerprint := private.workforce_fingerprint_v1(jsonb_build_object(
     'employeeId', p_employee_id, 'expectedProfileVersion', p_expected_profile_version, 'role', p_role
   ));
@@ -2025,6 +2038,15 @@ begin
   select * into v_auth from public.resolve_admin_authorization_v1(p_actor_employee_id, p_shop_id, 'staff.manage');
   if not coalesce(v_auth.authorized, false) or v_auth.business_id <> v_employee.business_id then
     return jsonb_build_object('ok', false, 'code', coalesce(v_auth.denial_code, 'permission_forbidden'));
+  end if;
+  if v_auth.employee_role not in ('OWNER','ADMIN') then
+    return jsonb_build_object('ok', false, 'code', 'permission_escalation_forbidden');
+  end if;
+  if p_actor_employee_id = p_employee_id and v_auth.employee_role <> 'OWNER' then
+    return jsonb_build_object('ok', false, 'code', 'self_permission_change_forbidden');
+  end if;
+  if v_employee.role = 'OWNER' and v_auth.employee_role <> 'OWNER' then
+    return jsonb_build_object('ok', false, 'code', 'permission_escalation_forbidden');
   end if;
   if not exists (select 1 from public.admin_permissions where permission_key = p_permission_key) then
     return jsonb_build_object('ok', false, 'code', 'permission_key_invalid');
