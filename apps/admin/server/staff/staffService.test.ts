@@ -19,7 +19,28 @@ function principal(permissions: AdminSessionPrincipal['permissions']): AdminSess
 }
 
 function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
+  const ok = () => Promise.resolve({ ok: true as const, replayed: false });
   return {
+    loadWorkspace: vi.fn(async () => ({
+      employees: { rows: [], nextCursor: null },
+      financeAccounts: [],
+    })),
+    loadEmployeeDetail: vi.fn(async () => null),
+    createEmployee: vi.fn(ok),
+    updateEmployeeProfile: vi.fn(ok),
+    assignEmployeeShop: vi.fn(ok),
+    linkEmployeeWorker: vi.fn(ok),
+    setEmployeeRole: vi.fn(ok),
+    setEmployeePermission: vi.fn(ok),
+    suspendEmployee: vi.fn(ok),
+    reactivateEmployee: vi.fn(ok),
+    setCompensation: vi.fn(ok),
+    createShift: vi.fn(ok),
+    updateShift: vi.fn(ok),
+    cancelShift: vi.fn(ok),
+    copyPreviousWeek: vi.fn(ok),
+    createLeave: vi.fn(ok),
+    decideLeave: vi.fn(ok),
     correctAttendance: vi.fn(async () => ({
       ok: true as const,
       correctionId: '66666666-6666-4666-8666-666666666666',
@@ -36,6 +57,21 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
 }
 
 describe('staffService', () => {
+  it('scopes staff reads through staff.view and the active shop', async () => {
+    const loadWorkspace = vi.fn(async () => ({
+      employees: { rows: [], nextCursor: null },
+      financeAccounts: [],
+    }));
+    const service = createStaffService(storeFixture({ loadWorkspace }));
+
+    await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
+
+    expect(loadWorkspace).toHaveBeenCalledWith(
+      SHOP_ID,
+      '55555555-5555-4555-8555-555555555555',
+    );
+  });
+
   it('records an attendance correction without exposing an original-event update path', async () => {
     const store = storeFixture();
     const service = createStaffService(store);
