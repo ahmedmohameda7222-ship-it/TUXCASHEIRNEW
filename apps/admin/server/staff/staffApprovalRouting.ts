@@ -104,6 +104,17 @@ export async function executeOrRequestStaffApproval(
     return executeDirect();
   }
 
+  const selectedRule = rules.find((rule) => rule.id === requirement.ruleId);
+  if (!selectedRule) {
+    throw new Error('staff_approval_rule_resolution_failed');
+  }
+  if (
+    actor.role !== 'OWNER' &&
+    !actor.permissions.includes(selectedRule.requesterPermission)
+  ) {
+    return { ok: false, code: 'approval_requester_not_authorized' };
+  }
+
   const result = await requestApproval(
     {
       businessId: actor.businessId,
