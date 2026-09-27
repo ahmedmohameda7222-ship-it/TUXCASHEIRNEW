@@ -24,6 +24,7 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
     loadWorkspace: vi.fn<StaffStore['loadWorkspace']>(async () => ({
       employees: { rows: [], nextCursor: null },
       financeAccounts: [],
+      workers: [],
     })),
     loadEmployeeDetail: async () => null,
     createEmployee: async () => ok(),
@@ -61,6 +62,7 @@ describe('staffService', () => {
     const loadWorkspace = vi.fn<StaffStore['loadWorkspace']>(async () => ({
       employees: { rows: [], nextCursor: null },
       financeAccounts: [],
+      workers: [],
     }));
     const service = createStaffService(storeFixture({ loadWorkspace }));
 
