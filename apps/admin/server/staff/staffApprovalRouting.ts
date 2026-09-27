@@ -113,7 +113,7 @@ export async function executeOrRequestStaffApproval(
       commandId: input.commandId,
       commandInput: input.commandInput,
       reason: input.reason ?? null,
-      requesterPin: input.requesterPin,
+      ...(input.requesterPin === undefined ? {} : { requesterPin: input.requesterPin }),
     },
     actor,
     deps,
