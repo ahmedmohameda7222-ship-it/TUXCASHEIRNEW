@@ -39,6 +39,7 @@ export function EmployeeDetailPage({
   const [tab, setTab] = useState<DetailTab>('profile');
   const [actorPin, setActorPin] = useState('');
   const [newPin, setNewPin] = useState('');
+  const [pinCommandId, setPinCommandId] = useState(() => crypto.randomUUID());
   const [roleDraft, setRoleDraft] = useState<AdminRole>(employee.role);
   const availableWorkers = workers.filter(
     (worker) =>
@@ -364,7 +365,10 @@ export function EmployeeDetailPage({
                   inputMode="numeric"
                   type="password"
                   value={newPin}
-                  onChange={(event) => setNewPin(event.target.value)}
+                  onChange={(event) => {
+                    setNewPin(event.target.value);
+                    setPinCommandId(crypto.randomUUID());
+                  }}
                 />
               </label>
               <button
@@ -378,6 +382,7 @@ export function EmployeeDetailPage({
                       employeeId: employee.id,
                       shopId,
                       newPin,
+                      commandId: pinCommandId,
                     },
                     actorPin,
                   )
