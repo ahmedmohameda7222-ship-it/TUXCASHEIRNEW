@@ -1,0 +1,78 @@
+name: Admin Plan 6 Workforce TDD
+
+concurrency:
+  group: admin-plan6-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/admin-06-workforce
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-finance-core-*.mjs'
+      - 'scripts/test-admin-workforce-*.mjs'
+      - 'apps/admin/server/staff/**'
+      - 'apps/admin/api/admin/staff.ts'
+      - 'apps/admin/src/staff/**'
+      - 'packages/admin-contracts/src/staff.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - 'e2e/admin-workforce.spec.ts'
+      - 'package.json'
+      - '.github/workflows/admin-plan6-workforce-tdd.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/test-admin-finance-core-*.mjs'
+      - 'scripts/test-admin-workforce-*.mjs'
+      - 'apps/admin/server/staff/**'
+      - 'apps/admin/api/admin/staff.ts'
+      - 'apps/admin/src/staff/**'
+      - 'packages/admin-contracts/src/staff.ts'
+      - 'packages/admin-contracts/src/index.ts'
+      - 'e2e/admin-workforce.spec.ts'
+      - 'package.json'
+      - '.github/workflows/admin-plan6-workforce-tdd.yml'
+
+jobs:
+  finance-core-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Finance core migration invariants
+        run: node scripts/test-admin-finance-core-migration.mjs
+
+  finance-core-postgres:
+    needs: finance-core-static
+    runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Finance core PostgreSQL behavior
+        run: node scripts/test-admin-finance-core-postgres.mjs
