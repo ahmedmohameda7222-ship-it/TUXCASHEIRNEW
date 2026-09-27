@@ -10,7 +10,11 @@ import {
 import { isAdminPermission } from '../../server/adminContractRuntime.js';
 import { verifyApprovalPinWithRateLimit } from '../../server/approvals/approvalPinRateLimit.js';
 import { createSupabaseApprovalServiceDependencies } from '../../server/approvals/approvalService.js';
-import { AdminAuthorizationError, requirePermission } from '../../server/authorization.js';
+import {
+  AdminAuthorizationError,
+  requireBusinessWidePermission,
+  requirePermission,
+} from '../../server/authorization.js';
 import { getAdminServerEnv } from '../../server/env.js';
 import {
   clientFingerprint,
@@ -479,6 +483,7 @@ export default async function handler(
         break;
       }
       case 'employee.role': {
+        requirePermission(context.principal, 'staff.manage', command.shopId);
         const input = {
           employeeId: command.employeeId,
           shopId: command.shopId,
@@ -507,6 +512,7 @@ export default async function handler(
         break;
       }
       case 'employee.permission': {
+        requireBusinessWidePermission(context.principal, 'staff.manage', command.shopId);
         const input = {
           employeeId: command.employeeId,
           shopId: command.shopId,
@@ -537,6 +543,7 @@ export default async function handler(
         break;
       }
       case 'employee.suspend': {
+        requirePermission(context.principal, 'staff.manage', command.shopId);
         const input = {
           employeeId: command.employeeId,
           shopId: command.shopId,
@@ -590,6 +597,7 @@ export default async function handler(
         result = await service.correctAttendance(command, context.principal);
         break;
       case 'payment.record': {
+        requirePermission(context.principal, 'staff.payments', command.shopId);
         const input = {
           employeeId: command.employeeId,
           shopId: command.shopId,
