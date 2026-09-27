@@ -43,7 +43,7 @@ import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAd
 
 const uuidSchema = z.string().uuid();
 const commandIdSchema = z.string().uuid();
-const pinSchema = z.string().regex(/^\\d{4,12}$/);
+export const staffPinSchema = z.string().regex(/^\d{4,12}$/);
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const isoTimestampSchema = z.string().datetime({ offset: true });
 const nullableTextSchema = z.string().trim().max(500).nullable();
@@ -103,15 +103,15 @@ const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('employee.pin'),
       employeeId: uuidSchema,
       shopId: uuidSchema,
-      newPin: pinSchema,
-      requesterPin: pinSchema.optional(),
+      newPin: staffPinSchema,
+      requesterPin: staffPinSchema.optional(),
       commandId: commandIdSchema,
     })
     .strict(),
   z
     .object({
       type: z.literal('employee.role'),
-      requesterPin: pinSchema.optional(),
+      requesterPin: staffPinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       role: roleSchema,
@@ -122,7 +122,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('employee.permission'),
-      requesterPin: pinSchema.optional(),
+      requesterPin: staffPinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       permissionKey: permissionSchema,
@@ -134,7 +134,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('employee.suspend'),
-      requesterPin: pinSchema.optional(),
+      requesterPin: staffPinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       expectedVersion: z.number().int().positive(),
@@ -238,7 +238,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('payment.record'),
-      requesterPin: pinSchema.optional(),
+      requesterPin: staffPinSchema.optional(),
       employeeId: uuidSchema,
       shopId: uuidSchema,
       payPeriodStart: isoDateSchema,
