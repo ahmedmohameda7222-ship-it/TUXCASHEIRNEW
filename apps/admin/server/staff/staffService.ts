@@ -1,31 +1,200 @@
 import type {
   AdminSessionPrincipal,
+  AssignEmployeeShopInput,
+  CancelShiftInput,
+  CopyPreviousWeekInput,
   CorrectAttendanceInput,
+  CreateEmployeeInput,
+  CreateLeaveRequestInput,
+  CreateShiftInput,
+  DecideLeaveRequestInput,
+  EmployeeDetail,
+  LinkEmployeeWorkerInput,
+  ReactivateEmployeeInput,
   RecordStaffPaymentInput,
+  SetCompensationInput,
+  SetEmployeePermissionInput,
+  SetEmployeeRoleInput,
   StaffCommandResult,
+  StaffWorkspace,
+  SuspendEmployeeInput,
+  UpdateEmployeeProfileInput,
+  UpdateShiftInput,
 } from '@tux/admin-contracts';
 
-import { requirePermission } from '../authorization.js';
-import type { AdminSupabaseClient } from '../supabaseAdmin.js';
+import {
+  requireBusinessWidePermission,
+  requirePermission,
+} from '../authorization.js';
+import type { StaffStore } from './staffStore.js';
+
+export { createSupabaseStaffStore } from './staffStore.js';
+export type { StaffStore } from './staffStore.js';
 
 export class StaffServiceError extends Error {
-  constructor(readonly code: 'attendance_correction_reason_required' | 'finance_account_required') {
+  constructor(
+    readonly code:
+      | 'attendance_correction_reason_required'
+      | 'finance_account_required'
+      | 'leave_shop_scope_required',
+  ) {
     super(code);
     this.name = 'StaffServiceError';
   }
 }
 
-export interface StaffStore {
-  correctAttendance(
-    input: CorrectAttendanceInput & { actorEmployeeId: string },
-  ): Promise<StaffCommandResult>;
-  recordPayment(
-    input: RecordStaffPaymentInput & { actorEmployeeId: string },
-  ): Promise<StaffCommandResult>;
+function actorInput<T extends object>(
+  input: T,
+  principal: AdminSessionPrincipal,
+): T & { actorEmployeeId: string } {
+  return { ...input, actorEmployeeId: principal.employeeId };
 }
 
 export function createStaffService(store: StaffStore) {
   return {
+    async loadWorkspace(
+      shopId: string,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffWorkspace> {
+      requirePermission(principal, 'staff.view', shopId);
+      return store.loadWorkspace(shopId, principal.businessId);
+    },
+
+    async loadEmployeeDetail(
+      input: { employeeId: string; shopId: string },
+      principal: AdminSessionPrincipal,
+    ): Promise<EmployeeDetail | null> {
+      requirePermission(principal, 'staff.view', input.shopId);
+      return store.loadEmployeeDetail({
+        ...input,
+        businessId: principal.businessId,
+      });
+    },
+
+    createEmployee(
+      input: CreateEmployeeInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.createEmployee(actorInput(input, principal));
+    },
+
+    updateEmployeeProfile(
+      input: UpdateEmployeeProfileInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.updateEmployeeProfile(actorInput(input, principal));
+    },
+
+    assignEmployeeShop(
+      input: AssignEmployeeShopInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.assignEmployeeShop(actorInput(input, principal));
+    },
+
+    linkEmployeeWorker(
+      input: LinkEmployeeWorkerInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.linkEmployeeWorker(actorInput(input, principal));
+    },
+
+    setEmployeeRole(
+      input: SetEmployeeRoleInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.setEmployeeRole(actorInput(input, principal));
+    },
+
+    setEmployeePermission(
+      input: SetEmployeePermissionInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requireBusinessWidePermission(principal, 'staff.manage', input.shopId);
+      return store.setEmployeePermission(actorInput(input, principal));
+    },
+
+    suspendEmployee(
+      input: SuspendEmployeeInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.suspendEmployee(actorInput(input, principal));
+    },
+
+    reactivateEmployee(
+      input: ReactivateEmployeeInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.reactivateEmployee(actorInput(input, principal));
+    },
+
+    setCompensation(
+      input: SetCompensationInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.setCompensation(actorInput(input, principal));
+    },
+
+    createShift(
+      input: CreateShiftInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.createShift(actorInput(input, principal));
+    },
+
+    updateShift(
+      input: UpdateShiftInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.updateShift(actorInput(input, principal));
+    },
+
+    cancelShift(
+      input: CancelShiftInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.cancelShift(actorInput(input, principal));
+    },
+
+    copyPreviousWeek(
+      input: CopyPreviousWeekInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.copyPreviousWeek(actorInput(input, principal));
+    },
+
+    createLeave(
+      input: CreateLeaveRequestInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      if (input.shopId === null) {
+        requireBusinessWidePermission(principal, 'staff.manage');
+      } else {
+        requirePermission(principal, 'staff.manage', input.shopId);
+      }
+      return store.createLeave(actorInput(input, principal));
+    },
+
+    decideLeave(
+      input: DecideLeaveRequestInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.decideLeave(actorInput(input, principal));
+    },
+
     async correctAttendance(
       input: CorrectAttendanceInput,
       principal: AdminSessionPrincipal,
@@ -49,41 +218,7 @@ export function createStaffService(store: StaffStore) {
       if (input.financeAccountId.trim() === '') {
         throw new StaffServiceError('finance_account_required');
       }
-      return store.recordPayment({
-        ...input,
-        actorEmployeeId: principal.employeeId,
-      });
-    },
-  };
-}
-
-export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStore {
-  return {
-    correctAttendance(input) {
-      return client.rpc<StaffCommandResult>('correct_attendance_v1', {
-        p_actor_employee_id: input.actorEmployeeId,
-        p_attendance_event_id: input.attendanceEventId,
-        p_corrected_occurred_at: input.correctedOccurredAt,
-        p_reason: input.reason,
-        p_command_id: input.commandId,
-      });
-    },
-
-    recordPayment(input) {
-      return client.rpc<StaffCommandResult>('record_staff_payment_v1', {
-        p_actor_employee_id: input.actorEmployeeId,
-        p_employee_id: input.employeeId,
-        p_shop_id: input.shopId,
-        p_pay_period_start: input.payPeriodStart,
-        p_pay_period_end: input.payPeriodEnd,
-        p_expected_amount_minor: input.expectedAmountMinor,
-        p_paid_amount_minor: input.paidAmountMinor,
-        p_finance_account_id: input.financeAccountId,
-        p_payment_date: input.paymentDate,
-        p_note: input.note,
-        p_reference: input.reference,
-        p_command_id: input.commandId,
-      });
+      return store.recordPayment(actorInput(input, principal));
     },
   };
 }
