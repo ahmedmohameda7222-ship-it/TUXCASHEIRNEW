@@ -1,7 +1,11 @@
 import type { EmployeeDetail } from '@tux/admin-contracts';
 import { useState } from 'react';
 
-import { businessLocalDateTimeToIso, formatBusinessDateTime } from './businessTime';
+import {
+  businessDateTimeInputValue,
+  businessLocalDateTimeToIso,
+  formatBusinessDateTime,
+} from './businessTime';
 
 export type StaffCommandDraft = Readonly<Record<string, unknown>> & { readonly type: string };
 
@@ -20,6 +24,7 @@ export function SchedulePage({
   const [endsAt, setEndsAt] = useState('');
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [targetWeekStart, setTargetWeekStart] = useState('');
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
 
   const shifts = employee.shifts.filter((shift) => shift.shopId === shopId);
 
@@ -38,20 +43,34 @@ export function SchedulePage({
           <span>
             {shift.status}
             {canManage && shift.status !== 'CANCELLED' ? (
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() =>
-                  onCommand({
-                    type: 'shift.cancel',
-                    shiftId: shift.id,
-                    shopId,
-                    expectedVersion: shift.version,
-                  })
-                }
-              >
-                Remove
-              </button>
+              <>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() => {
+                    setEditingShiftId(shift.id);
+                    setStartsAt(businessDateTimeInputValue(shift.startsAt));
+                    setEndsAt(businessDateTimeInputValue(shift.endsAt));
+                    setBreakMinutes(String(shift.plannedBreakMinutes));
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  onClick={() =>
+                    onCommand({
+                      type: 'shift.cancel',
+                      shiftId: shift.id,
+                      shopId,
+                      expectedVersion: shift.version,
+                    })
+                  }
+                >
+                  Remove
+                </button>
+              </>
             ) : null}
           </span>
         </article>
@@ -60,7 +79,7 @@ export function SchedulePage({
       {canManage ? (
         <>
           <section className="admin-catalog-editor__section is-compact">
-            <h4>Add shift</h4>
+            <h4>{editingShiftId ? 'Edit shift' : 'Add shift'}</h4>
             <label className="admin-field">
               <span>Starts</span>
               <input
@@ -89,19 +108,49 @@ export function SchedulePage({
               className="admin-primary-button"
               type="button"
               disabled={!startsAt || !endsAt}
-              onClick={() =>
-                onCommand({
-                  type: 'shift.create',
-                  employeeId: employee.id,
-                  shopId,
-                  startsAt: businessLocalDateTimeToIso(startsAt),
-                  endsAt: businessLocalDateTimeToIso(endsAt),
-                  plannedBreakMinutes: Number(breakMinutes) || 0,
-                })
-              }
+              onClick={() => {
+                const editingShift = employee.shifts.find(
+                  (shift) => shift.id === editingShiftId,
+                );
+                if (editingShift) {
+                  onCommand({
+                    type: 'shift.update',
+                    shiftId: editingShift.id,
+                    shopId,
+                    expectedVersion: editingShift.version,
+                    startsAt: businessLocalDateTimeToIso(startsAt),
+                    endsAt: businessLocalDateTimeToIso(endsAt),
+                    plannedBreakMinutes: Number(breakMinutes) || 0,
+                  });
+                  setEditingShiftId(null);
+                } else {
+                  onCommand({
+                    type: 'shift.create',
+                    employeeId: employee.id,
+                    shopId,
+                    startsAt: businessLocalDateTimeToIso(startsAt),
+                    endsAt: businessLocalDateTimeToIso(endsAt),
+                    plannedBreakMinutes: Number(breakMinutes) || 0,
+                  });
+                }
+              }}
             >
-              Add shift
+              {editingShiftId ? 'Save shift' : 'Add shift'}
             </button>
+            {editingShiftId ? (
+              <button
+                className="admin-secondary-button"
+                type="button"
+                onClick={() => {
+                  setEditingShiftId(null);
+                  setStartsAt('');
+                  setEndsAt('');
+                  setBreakMinutes('0');
+                }}
+              >
+                Cancel edit
+              </button>
+            ) : null}
           </section>
 
           <section className="admin-catalog-editor__section is-compact">
