@@ -34,6 +34,51 @@ export function AttendancePage({
     <section aria-label="Attendance">
       <h3>Attendance</h3>
       <p>Original Operations clock facts remain immutable; corrections are separate audited facts.</p>
+      {employee.attendanceSummaries.length === 0 ? (
+        <p>No completed or historical attendance summaries yet.</p>
+      ) : null}
+      {employee.attendanceSummaries
+        .filter((summary) => summary.shopId === shopId)
+        .map((summary) => (
+          <article
+            className="admin-catalog-editor__section is-compact"
+            key={summary.scheduledShiftId ?? `session-${summary.actualStartsAt ?? 'unknown'}`}
+          >
+            <strong>
+              {summary.absent
+                ? 'Absent'
+                : summary.actualStartsAt
+                  ? formatBusinessDateTime(summary.actualStartsAt)
+                  : 'Attendance'}
+            </strong>
+            <dl>
+              <dt>Scheduled</dt>
+              <dd>
+                {summary.scheduledStartsAt && summary.scheduledEndsAt
+                  ? `${formatBusinessDateTime(summary.scheduledStartsAt)} → ${formatBusinessDateTime(
+                      summary.scheduledEndsAt,
+                    )}`
+                  : 'No matched shift'}
+              </dd>
+              <dt>Actual</dt>
+              <dd>
+                {summary.actualStartsAt
+                  ? `${formatBusinessDateTime(summary.actualStartsAt)} → ${summary.actualEndsAt ? formatBusinessDateTime(summary.actualEndsAt) : 'Open'}`
+                  : 'No clock facts'}
+              </dd>
+              <dt>Break</dt>
+              <dd>{summary.plannedBreakMinutes} min</dd>
+              <dt>Worked</dt>
+              <dd>{summary.workedMinutes} min</dd>
+              <dt>Late</dt>
+              <dd>{summary.lateMinutes} min</dd>
+              <dt>Left early</dt>
+              <dd>{summary.leftEarlyMinutes} min</dd>
+              <dt>Overtime</dt>
+              <dd>{summary.overtimeMinutes} min</dd>
+            </dl>
+          </article>
+        ))}
       {events.length === 0 ? <p>No projected attendance events yet.</p> : null}
       {events.map((event) => {
         const correction = latestCorrection.get(event.id);
