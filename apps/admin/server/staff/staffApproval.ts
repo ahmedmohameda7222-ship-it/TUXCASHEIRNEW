@@ -1,10 +1,11 @@
-import type { AdminRole, StaffCommandResult } from '@tux/admin-contracts';
+import type { AdminRole } from '@tux/admin-contracts';
 
 import type { ApprovalCommandRegistryEntry } from '../approvals/approvalService.js';
 import {
   ApprovalTerminalCommandError,
   type ApprovalExecutionRegistryEntry,
 } from '../approvals/approvalExecutionService.js';
+import type { AdminSupabaseClient } from '../supabaseAdmin.js';
 
 export const EMPLOYEE_PIN_CHANGE_APPROVAL_ACTION = 'EMPLOYEE_PIN_CHANGE';
 export const EMPLOYEE_ROLE_CHANGE_APPROVAL_ACTION = 'EMPLOYEE_ROLE_CHANGE';
@@ -12,7 +13,11 @@ export const EMPLOYEE_PERMISSION_CHANGE_APPROVAL_ACTION = 'EMPLOYEE_PERMISSION_C
 export const EMPLOYEE_SUSPEND_APPROVAL_ACTION = 'EMPLOYEE_SUSPEND';
 export const STAFF_PAYMENT_APPROVAL_ACTION = 'STAFF_PAYMENT';
 
-type StaffApprovalExecutionResult = StaffCommandResult | Readonly<Record<string, unknown>>;
+type StaffApprovalExecutionResult = Readonly<Record<string, unknown>> & {
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly replayed?: boolean;
+};
 
 export type StaffApprovalExecutionDependencies = {
   applyEmployeePinChange(input: {
@@ -364,4 +369,82 @@ export function createStaffApprovalExecutionEntries(
       },
     },
   ];
+}
+
+
+function rpcResult(value: Readonly<Record<string, unknown>>): StaffApprovalExecutionResult {
+  return {
+    ...value,
+    ok: value['ok'] === true,
+    ...(typeof value['code'] === 'string' ? { code: value['code'] } : {}),
+    ...(typeof value['replayed'] === 'boolean' ? { replayed: value['replayed'] } : {}),
+  };
+}
+
+export function createSupabaseStaffApprovalExecutionDependencies(
+  client: AdminSupabaseClient,
+): StaffApprovalExecutionDependencies {
+  return {
+    async applyEmployeePinChange(input) {
+      return rpcResult(
+        await client.rpc<Readonly<Record<string, unknown>>>('apply_employee_pin_change_v1', {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_command_ref: input.commandRef,
+        }),
+      );
+    },
+    async setEmployeeRole(input) {
+      return rpcResult(
+        await client.rpc<Readonly<Record<string, unknown>>>('set_employee_role_v1', {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_employee_id: input.employeeId,
+          p_shop_id: input.shopId,
+          p_expected_profile_version: input.expectedVersion,
+          p_role: input.role,
+          p_command_id: input.commandId,
+        }),
+      );
+    },
+    async setEmployeePermission(input) {
+      return rpcResult(
+        await client.rpc<Readonly<Record<string, unknown>>>('set_employee_permission_v1', {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_employee_id: input.employeeId,
+          p_shop_id: input.shopId,
+          p_expected_profile_version: input.expectedVersion,
+          p_permission_key: input.permissionKey,
+          p_effect: input.effect,
+          p_command_id: input.commandId,
+        }),
+      );
+    },
+    async suspendEmployee(input) {
+      return rpcResult(
+        await client.rpc<Readonly<Record<string, unknown>>>('suspend_employee_v1', {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_employee_id: input.employeeId,
+          p_expected_profile_version: input.expectedVersion,
+          p_command_id: input.commandId,
+        }),
+      );
+    },
+    async recordStaffPayment(input) {
+      return rpcResult(
+        await client.rpc<Readonly<Record<string, unknown>>>('record_staff_payment_v1', {
+          p_actor_employee_id: input.actorEmployeeId,
+          p_employee_id: input.employeeId,
+          p_shop_id: input.shopId,
+          p_pay_period_start: input.payPeriodStart,
+          p_pay_period_end: input.payPeriodEnd,
+          p_expected_amount_minor: input.expectedAmountMinor,
+          p_paid_amount_minor: input.paidAmountMinor,
+          p_finance_account_id: input.financeAccountId,
+          p_payment_date: input.paymentDate,
+          p_note: input.note,
+          p_reference: input.reference,
+          p_command_id: input.commandId,
+        }),
+      );
+    },
+  };
 }
