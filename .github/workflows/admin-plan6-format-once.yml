@@ -1,0 +1,78 @@
+name: Admin Plan 6 One-Shot Formatter
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - feat/admin-06-workforce
+
+jobs:
+  format-workforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-06-workforce
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format Plan 6 files
+        run: |
+          npx prettier --write \
+            apps/admin/api/admin/staff.ts \
+            apps/admin/server/staff/attendanceSummary.test.ts \
+            apps/admin/server/staff/attendanceSummary.ts \
+            apps/admin/server/staff/employeePin.test.ts \
+            apps/admin/server/staff/employeePinStore.ts \
+            apps/admin/server/staff/staffApproval.test.ts \
+            apps/admin/server/staff/staffApprovalRouting.ts \
+            apps/admin/server/staff/staffService.test.ts \
+            apps/admin/server/staff/staffService.ts \
+            apps/admin/server/staff/staffStore.ts \
+            apps/admin/server/staff/wages.ts \
+            apps/admin/src/staff/AttendancePage.tsx \
+            apps/admin/src/staff/businessTime.test.ts \
+            apps/admin/src/staff/businessTime.ts \
+            apps/admin/src/staff/EmployeeDetailPage.tsx \
+            apps/admin/src/staff/LeavePage.tsx \
+            apps/admin/src/staff/PermissionsEditor.tsx \
+            apps/admin/src/staff/SchedulePage.tsx \
+            apps/admin/src/staff/StaffPage.tsx \
+            apps/admin/src/staff/StaffPaymentPage.tsx \
+            apps/admin/src/staff/useStaff.ts \
+            .github/workflows/admin-plan6-workforce-tdd.yml
+      - name: Commit formatting and remove formatter
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/admin-plan6-format-once.yml
+          git add \
+            apps/admin/api/admin/staff.ts \
+            apps/admin/server/staff/attendanceSummary.test.ts \
+            apps/admin/server/staff/attendanceSummary.ts \
+            apps/admin/server/staff/employeePin.test.ts \
+            apps/admin/server/staff/employeePinStore.ts \
+            apps/admin/server/staff/staffApproval.test.ts \
+            apps/admin/server/staff/staffApprovalRouting.ts \
+            apps/admin/server/staff/staffService.test.ts \
+            apps/admin/server/staff/staffService.ts \
+            apps/admin/server/staff/staffStore.ts \
+            apps/admin/server/staff/wages.ts \
+            apps/admin/src/staff/AttendancePage.tsx \
+            apps/admin/src/staff/businessTime.test.ts \
+            apps/admin/src/staff/businessTime.ts \
+            apps/admin/src/staff/EmployeeDetailPage.tsx \
+            apps/admin/src/staff/LeavePage.tsx \
+            apps/admin/src/staff/PermissionsEditor.tsx \
+            apps/admin/src/staff/SchedulePage.tsx \
+            apps/admin/src/staff/StaffPage.tsx \
+            apps/admin/src/staff/StaffPaymentPage.tsx \
+            apps/admin/src/staff/useStaff.ts \
+            .github/workflows/admin-plan6-workforce-tdd.yml
+          git commit -m "style(admin): format Plan 6 Workforce"
+          git push origin HEAD:feat/admin-06-workforce
