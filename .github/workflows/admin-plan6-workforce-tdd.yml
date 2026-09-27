@@ -46,7 +46,7 @@ on:
 
 jobs:
   format-workforce-once:
-    if: github.event_name == 'push' && github.ref_name == 'feat/admin-06-workforce'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
