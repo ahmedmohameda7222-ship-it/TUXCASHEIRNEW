@@ -152,6 +152,13 @@ export type StaffFinanceAccountChoice = {
   readonly name: string;
 };
 
+export type StaffWorkerChoice = {
+  readonly id: string;
+  readonly shopId: string;
+  readonly displayName: string;
+  readonly linkedEmployeeId: string | null;
+};
+
 export type EmployeeSummary = {
   readonly id: string;
   readonly displayName: string;
@@ -192,6 +199,7 @@ export type StaffListResult = {
 export type StaffWorkspace = {
   readonly employees: StaffListResult;
   readonly financeAccounts: readonly StaffFinanceAccountChoice[];
+  readonly workers: readonly StaffWorkerChoice[];
 };
 
 export type StaffCommandResult =
