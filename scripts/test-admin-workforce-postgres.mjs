@@ -213,13 +213,13 @@ const rollbackRef=rpc(
 if(!rollbackRef.ok) throw new Error(`stage rollback PIN failed: ${JSON.stringify(rollbackRef)}`);
 psql(['-c',`
 create or replace function public.test_force_pin_rollback_v1()
-returns trigger language plpgsql as $
+returns trigger language plpgsql as $rollback$
 begin
   if new.id='${E}'::uuid and new.pin_hash is distinct from old.pin_hash then
     raise exception 'TEST_PIN_ROLLBACK';
   end if;
   return new;
-end $;
+end $rollback$;
 create trigger test_force_pin_rollback
 before update on public.business_employees
 for each row execute function public.test_force_pin_rollback_v1();
