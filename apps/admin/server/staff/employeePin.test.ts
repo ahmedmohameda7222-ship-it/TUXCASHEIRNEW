@@ -175,7 +175,9 @@ describe('employee PIN coherence', () => {
     expect(staged).toBeDefined();
     expect(JSON.stringify(staged)).not.toContain(sentinelPin);
     expect(staged?.targetShopIds).toEqual([SHOP_A, SHOP_B]);
-    expect(staged?.workerStateFingerprint).toBe(employeePinInternals.workerStateFingerprint(workers));
+    expect(staged?.workerStateFingerprint).toBe(
+      employeePinInternals.workerStateFingerprint(workers),
+    );
     expect(staged?.workerStateFingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(staged?.lookupHash).toMatch(/^[0-9a-f]{64}$/);
     expect(staged?.lookupHash).not.toContain(sentinelPin);
