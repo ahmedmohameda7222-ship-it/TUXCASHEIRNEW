@@ -18,7 +18,7 @@ for (const [source, label] of [
 assert.match(admin, /DERIVED_KEY_BYTES\s*=\s*32/, 'Admin PIN digest must remain 32 bytes');
 assert.match(edge, /DERIVED_KEY_BYTES\s*=\s*32/, 'Edge worker PIN digest must remain 32 bytes');
 assert.match(desktop, /DERIVED_KEY_BYTES\s*=\s*32/, 'Desktop worker PIN digest must remain 32 bytes');
-assert.match(admin, /PIN_PATTERN\s*=\s*\/\\d\{4,12\}\//, 'Admin PIN format must remain numeric 4-12 digits');
+assert.match(admin, /PIN_PATTERN\s*=\s*\/\^\\d\{4,12\}\$\//, 'Admin PIN format must remain numeric 4-12 digits');
 assert.match(edge, /\\d\{4,12\}/, 'Operations worker-auth must accept the same numeric format');
 assert.doesNotMatch(
   fs.readFileSync('apps/admin/server/staff/employeePin.ts', 'utf8'),
