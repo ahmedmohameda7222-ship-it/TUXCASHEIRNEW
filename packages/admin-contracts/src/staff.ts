@@ -187,6 +187,7 @@ export type EmployeeDetail = {
   readonly shifts: readonly EmployeeShift[];
   readonly attendanceEvents: readonly AttendanceEvent[];
   readonly attendanceCorrections: readonly AttendanceCorrection[];
+  readonly attendanceSummaries: readonly AttendanceSummary[];
   readonly leaveRequests: readonly LeaveRequest[];
   readonly payments: readonly StaffPaymentRecord[];
 };
