@@ -22,6 +22,7 @@ export function EmployeeDetailPage({
   canPay,
   financeAccounts,
   workers,
+  availableShopIds,
   onCommand,
   onSensitiveCommand,
 }: {
@@ -31,6 +32,7 @@ export function EmployeeDetailPage({
   canPay: boolean;
   financeAccounts: readonly StaffFinanceAccountChoice[];
   workers: readonly StaffWorkerChoice[];
+  availableShopIds: readonly string[];
   onCommand(command: StaffCommandDraft): void;
   onSensitiveCommand(command: StaffCommandDraft, pin: string): void;
 }) {
@@ -56,6 +58,10 @@ export function EmployeeDetailPage({
     latestCompensation ? String(latestCompensation.rateMinor / 100) : '',
   );
   const [compensationEffectiveFrom, setCompensationEffectiveFrom] = useState('');
+  const unassignedShopIds = availableShopIds.filter(
+    (candidate) => !employee.assignments.some((assignment) => assignment.shopId === candidate),
+  );
+  const [assignShopId, setAssignShopId] = useState(unassignedShopIds[0] ?? '');
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
@@ -147,6 +153,39 @@ export function EmployeeDetailPage({
                   }
                 >
                   Save profile
+                </button>
+              </section>
+            ) : null}
+
+            {canManage && unassignedShopIds.length > 0 ? (
+              <section className="admin-catalog-editor__section is-compact">
+                <h4>Assign another shop</h4>
+                <label className="admin-field">
+                  <span>Shop</span>
+                  <select
+                    value={assignShopId}
+                    onChange={(event) => setAssignShopId(event.target.value)}
+                  >
+                    {unassignedShopIds.map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {candidate}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={!assignShopId}
+                  onClick={() =>
+                    onCommand({
+                      type: 'employee.assign-shop',
+                      employeeId: employee.id,
+                      shopId: assignShopId,
+                    })
+                  }
+                >
+                  Assign shop
                 </button>
               </section>
             ) : null}
