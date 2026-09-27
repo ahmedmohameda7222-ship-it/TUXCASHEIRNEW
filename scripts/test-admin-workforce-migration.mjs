@@ -27,7 +27,7 @@ for (const [pattern, label] of [
   [/create or replace function public\.record_staff_payment_v1/i, 'atomic staff payment RPC'],
   [/create or replace function public\.stage_employee_pin_change_v1/i, 'secret-safe PIN staging RPC'],
   [/create or replace function public\.apply_employee_pin_change_v1/i, 'atomic PIN apply RPC'],
-  [/movement_type[^;]*STAFF_PAYMENT|STAFF_PAYMENT[^;]*movement_type/is, 'staff-payment finance movement'],
+  [/post_finance_movement_v1[\s\S]{0,1600}'STAFF_PAYMENT'/i, 'staff-payment finance movement'],
   [/staff_payment_expense_events/is, 'salary expense insert path'],
   [/worker_sessions/is, 'Operations session authority'],
   [/append_admin_audit_event_v1/is, 'Admin audit integration'],
