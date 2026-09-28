@@ -16,7 +16,6 @@ on:
       - 'apps/admin/server/staff/**'
       - 'apps/admin/server/reauth.ts'
       - 'apps/admin/server/reauth.test.ts'
-      - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
@@ -32,7 +31,6 @@ on:
       - 'apps/admin/server/staff/**'
       - 'apps/admin/server/reauth.ts'
       - 'apps/admin/server/reauth.test.ts'
-      - 'apps/admin/api/admin/staff.ts'
       - 'apps/admin/src/staff/**'
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
@@ -151,7 +149,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Workforce service tests
-        run: npx vitest run apps/admin/server/staff/staffService.test.ts apps/admin/server/staff/staffApprovalRouting.test.ts apps/admin/server/staff/staffStore.test.ts apps/admin/api/admin/staff.test.ts
+        run: npx vitest run apps/admin/server/staff/staffService.test.ts apps/admin/server/staff/staffApprovalRouting.test.ts apps/admin/server/staff/staffStore.test.ts apps/admin/server/staff/staffApi.test.ts
       - name: Admin server and API typecheck
         run: npx tsc --noEmit -p tsconfig.api.json
 
