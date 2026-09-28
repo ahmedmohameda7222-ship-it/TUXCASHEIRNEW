@@ -38,11 +38,7 @@ import {
   STAFF_PAYMENT_APPROVAL_ACTION,
 } from './staffApproval.js';
 import { executeOrRequestStaffApproval } from './staffApprovalRouting.js';
-import {
-  createStaffService,
-  createSupabaseStaffStore,
-  StaffServiceError,
-} from './staffService.js';
+import { createStaffService, createSupabaseStaffStore, StaffServiceError } from './staffService.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../supabaseAdmin.js';
 
 const uuidSchema = z.string().uuid();
