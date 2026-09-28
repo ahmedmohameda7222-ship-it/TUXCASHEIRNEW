@@ -19,6 +19,10 @@
       "dest": "/api/admin/orders?__adminResource=customers"
     },
     {
+      "src": "/api/admin/staff",
+      "dest": "/api/admin/orders?__adminResource=staff"
+    },
+    {
       "src": "/api/admin/delivery",
       "dest": "/api/admin/orders?__adminResource=delivery"
     },
