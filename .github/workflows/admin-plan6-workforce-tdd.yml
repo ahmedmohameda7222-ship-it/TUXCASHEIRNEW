@@ -21,7 +21,7 @@ on:
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
-      - 'e2e/admin-workforce.e2e.ts'
+      - 'e2e/admin-workforce.spec.ts'
       - 'package.json'
       - '.github/workflows/admin-plan6-workforce-tdd.yml'
   pull_request:
@@ -37,7 +37,7 @@ on:
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
-      - 'e2e/admin-workforce.e2e.ts'
+      - 'e2e/admin-workforce.spec.ts'
       - 'package.json'
       - '.github/workflows/admin-plan6-workforce-tdd.yml'
 
@@ -198,4 +198,4 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Workforce E2E
-        run: npx playwright test e2e/admin-workforce.e2e.ts
+        run: npx playwright test --config playwright.admin.config.ts e2e/admin-workforce.spec.ts
