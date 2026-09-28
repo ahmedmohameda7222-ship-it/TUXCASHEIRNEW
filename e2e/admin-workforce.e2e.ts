@@ -200,3 +200,84 @@ test('attendance correction posts a separate audited correction command', async 
   });
   expect(commands[0]).not.toHaveProperty('originalOccurredAt');
 });
+
+
+test('switching employees resets local profile editor state to the selected employee', async ({ page }) => {
+  const secondEmployeeId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const first = employee();
+  const second: EmployeeDetail = {
+    ...employee(),
+    id: secondEmployeeId,
+    displayName: 'Youssef Hassan',
+    phone: '+201011111111',
+    profileVersion: 7,
+    credentialVersion: 4,
+    attendanceEvents: [],
+  };
+
+  await page.route('**/api/admin/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+
+  await page.route('**/api/admin/staff**', async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, replayed: false }),
+      });
+      return;
+    }
+
+    const requestedEmployeeId = url.searchParams.get('employeeId');
+    if (requestedEmployeeId) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          employee: requestedEmployeeId === secondEmployeeId ? second : first,
+        }),
+      });
+      return;
+    }
+
+    const base = workspace();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...base,
+        employees: {
+          rows: [
+            base.employees.rows[0],
+            {
+              id: secondEmployeeId,
+              displayName: second.displayName,
+              phone: second.phone,
+              role: second.role,
+              active: second.active,
+              shopIds: [shopId],
+              operationsSetupRequiredShopIds: [shopId],
+            },
+          ],
+          nextCursor: null,
+        },
+      }),
+    });
+  });
+
+  await page.goto('/staff');
+  await expect(page.getByLabel('Name')).toHaveValue('Mona Ali');
+
+  await page.getByRole('button', { name: /Youssef Hassan/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Youssef Hassan' })).toBeVisible();
+  await expect(page.getByLabel('Name')).toHaveValue('Youssef Hassan');
+  await expect(page.getByLabel('Phone')).toHaveValue('+201011111111');
+});
