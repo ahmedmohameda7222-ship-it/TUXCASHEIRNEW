@@ -27,6 +27,7 @@ import {
 import { handleCrmRequest } from '../../server/customers/crmApi.js';
 import { handleCustomersRequest } from '../../server/customers/customerApi.js';
 import { handleDeliveryRequest } from '../../server/delivery/deliveryApi.js';
+import { handleStaffRequest } from '../../server/staff/staffApi.js';
 import { createOrderService, type OrderStore } from '../../server/orders/orderService.js';
 import { readAdminSessionToken } from '../../server/session.js';
 import { AdminSupabaseClient, AdminSupabaseError } from '../../server/supabaseAdmin.js';
@@ -783,6 +784,13 @@ export default async function handler(
       return;
     }
     await handleCustomersRequest(request, response);
+    return;
+  }
+
+  if (routedUrl.searchParams.get('__adminResource') === 'staff') {
+    routedUrl.searchParams.delete('__adminResource');
+    request.url = routedUrl.pathname + (routedUrl.search ? routedUrl.search : '');
+    await handleStaffRequest(request, response);
     return;
   }
 
