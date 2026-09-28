@@ -151,7 +151,8 @@ test('staff profile exposes Operations setup and posts payment only to a trusted
   await expect(page.getByText('Operations identity setup required')).toBeVisible();
 
   await page.getByRole('button', { name: 'Pay' }).click();
-  await expect(page.getByRole('option', { name: /Payroll Cash/ })).toBeVisible();
+  await expect(page.getByLabel('Payment account')).toHaveValue(accountId);
+  await expect(page.getByRole('option', { name: /Payroll Cash/ })).toHaveCount(1);
   await page.getByLabel('Pay period start').fill('2026-09-01');
   await page.getByLabel('Pay period end').fill('2026-09-30');
   await page.getByLabel('Expected amount (EGP)').fill('1200');
@@ -274,11 +275,13 @@ test('switching employees resets local profile editor state to the selected empl
   });
 
   await page.goto('/staff');
-  await expect(page.getByLabel('Name')).toHaveValue('Mona Ali');
+  const monaProfile = page.getByRole('article', { name: 'Employee Mona Ali' });
+  await expect(monaProfile.getByLabel('Name')).toHaveValue('Mona Ali');
 
   await page.getByRole('button', { name: /Youssef Hassan/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Youssef Hassan' })).toBeVisible();
-  await expect(page.getByLabel('Name')).toHaveValue('Youssef Hassan');
-  await expect(page.getByLabel('Phone')).toHaveValue('+201011111111');
+  const youssefProfile = page.getByRole('article', { name: 'Employee Youssef Hassan' });
+  await expect(youssefProfile.getByLabel('Name')).toHaveValue('Youssef Hassan');
+  await expect(youssefProfile.getByLabel('Phone')).toHaveValue('+201011111111');
 });
