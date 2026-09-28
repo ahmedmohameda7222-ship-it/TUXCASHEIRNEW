@@ -1,5 +1,8 @@
 name: Admin Plan 6 Workforce TDD
 
+permissions:
+  contents: write
+
 concurrency:
   group: admin-plan6-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
@@ -42,6 +45,33 @@ on:
       - '.github/workflows/admin-plan6-workforce-tdd.yml'
 
 jobs:
+  format-workforce-e2e-once:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/admin-06-workforce
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format Workforce E2E
+        run: npx prettier --write e2e/admin-workforce.e2e.ts
+      - name: Commit Workforce E2E formatting
+        run: |
+          if git diff --quiet -- e2e/admin-workforce.e2e.ts; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/admin-workforce.e2e.ts
+          git commit -m "style(admin): format Workforce E2E"
+          git push origin HEAD:feat/admin-06-workforce
+
   finance-core-static:
     runs-on: ubuntu-latest
     steps:
