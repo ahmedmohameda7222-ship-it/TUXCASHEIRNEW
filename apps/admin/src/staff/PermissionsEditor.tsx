@@ -24,29 +24,60 @@ export function PermissionsEditor({
       ) : null}
       <div className="admin-more-grid">
         {ADMIN_PERMISSIONS.map((permission) => {
-          const allowed = employee.customPermissions.includes(permission);
+          const explicitlyAllowed = employee.customPermissions.includes(permission);
+          const explicitlyDenied = employee.customDeniedPermissions?.includes(permission) ?? false;
+          const overrideState = explicitlyAllowed
+            ? 'Explicit allow'
+            : explicitlyDenied
+              ? 'Explicit deny'
+              : 'Role default · no explicit override';
           return (
-            <label className="admin-more-card" key={permission}>
-              <span>{permission}</span>
-              <input
-                type="checkbox"
-                checked={allowed}
-                disabled={!canManage || !actorPin}
-                onChange={(event) =>
-                  onSensitiveCommand(
-                    {
-                      type: 'employee.permission',
-                      employeeId: employee.id,
-                      shopId,
-                      permissionKey: permission,
-                      effect: event.target.checked ? 'ALLOW' : 'DENY',
-                      expectedVersion: employee.profileVersion,
-                    },
-                    actorPin,
-                  )
-                }
-              />
-            </label>
+            <article className="admin-more-card" key={permission}>
+              <strong>{permission}</strong>
+              <span>{overrideState}</span>
+              <div>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={!canManage || !actorPin || explicitlyAllowed}
+                  onClick={() =>
+                    onSensitiveCommand(
+                      {
+                        type: 'employee.permission',
+                        employeeId: employee.id,
+                        shopId,
+                        permissionKey: permission,
+                        effect: 'ALLOW',
+                        expectedVersion: employee.profileVersion,
+                      },
+                      actorPin,
+                    )
+                  }
+                >
+                  Allow
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={!canManage || !actorPin || explicitlyDenied}
+                  onClick={() =>
+                    onSensitiveCommand(
+                      {
+                        type: 'employee.permission',
+                        employeeId: employee.id,
+                        shopId,
+                        permissionKey: permission,
+                        effect: 'DENY',
+                        expectedVersion: employee.profileVersion,
+                      },
+                      actorPin,
+                    )
+                  }
+                >
+                  Deny
+                </button>
+              </div>
+            </article>
           );
         })}
       </div>
