@@ -406,12 +406,15 @@ export function EmployeeDetailPage({
                         },
                         actorPin,
                       )
-                    : onCommand({
-                        type: 'employee.reactivate',
-                        employeeId: employee.id,
-                        shopId,
-                        expectedVersion: employee.profileVersion,
-                      })
+                    : onSensitiveCommand(
+                        {
+                          type: 'employee.reactivate',
+                          employeeId: employee.id,
+                          shopId,
+                          expectedVersion: employee.profileVersion,
+                        },
+                        actorPin,
+                      )
                 }
               >
                 {employee.active ? 'Suspend employee' : 'Reactivate employee'}
