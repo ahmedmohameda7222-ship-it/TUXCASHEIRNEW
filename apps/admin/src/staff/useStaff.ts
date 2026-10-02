@@ -4,13 +4,23 @@ import { useMemo } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
-import { createRetainedCommandIds } from '../lib/retainedCommandIds';
+import {
+  createRetainedCommandIds,
+  isPendingApprovalResult,
+} from '../lib/retainedCommandIds';
 
 export type StaffApiCommandDraft = Readonly<Record<string, unknown>> & {
   readonly type: string;
 };
 
 const SECRET_COMMAND_KEY = /(pin|password|passcode|secret|verifier|lookup|salt)/i;
+const APPROVAL_PIN_COMMAND_TYPES = new Set([
+  'employee.pin',
+  'employee.role',
+  'employee.permission',
+  'employee.suspend',
+  'payment.record',
+]);
 
 export function staffCommandIntentForRetention(
   draft: StaffApiCommandDraft,
@@ -22,6 +32,10 @@ export function staffEphemeralCommandId(draft: StaffApiCommandDraft): string | n
   return draft.type === 'employee.pin' && typeof draft['commandId'] === 'string'
     ? draft['commandId']
     : null;
+}
+
+export function staffCommandUsesApprovalPin(draft: StaffApiCommandDraft): boolean {
+  return APPROVAL_PIN_COMMAND_TYPES.has(draft.type);
 }
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
@@ -74,7 +88,9 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
       },
       csrfToken(session),
     );
-    if (ephemeralCommandId === null) commandIds.complete(scope, intent);
+    if (ephemeralCommandId === null && !isPendingApprovalResult(result)) {
+      commandIds.complete(scope, intent);
+    }
     return result;
   }
 
@@ -95,7 +111,7 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
         },
         csrfToken(session),
       );
-      return postCommand(draft, pin);
+      return postCommand(draft, staffCommandUsesApprovalPin(draft) ? pin : undefined);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'staff', shopId] });
