@@ -122,6 +122,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Workforce PostgreSQL behavior
         run: node scripts/test-admin-workforce-postgres.mjs
+      - name: Workforce deep-review PostgreSQL regressions
+        run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
 
   employee-pin-security:
     needs: workforce-postgres
