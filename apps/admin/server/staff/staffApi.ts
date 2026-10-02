@@ -411,7 +411,8 @@ export async function handleStaffRequest(
       command.type === 'employee.pin' ||
       command.type === 'employee.role' ||
       command.type === 'employee.permission' ||
-      command.type === 'employee.suspend'
+      command.type === 'employee.suspend' ||
+      command.type === 'employee.reactivate'
     ) {
       requireRecentReauth(context.session, 300);
     }
