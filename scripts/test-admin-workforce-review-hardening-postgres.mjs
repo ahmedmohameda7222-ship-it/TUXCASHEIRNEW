@@ -2,9 +2,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const targetMigration = '20260910200000_admin_workforce.sql';
+const targetMigration = '20261002221500_admin_workforce_review_hardening.sql';
 if (!existsSync(resolve('supabase/migrations', targetMigration))) {
-  throw new Error('Admin Plan 6 Workforce migration missing from repository chain.');
+  throw new Error('Admin Plan 6 Workforce hardening migration missing from repository chain.');
 }
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -60,7 +60,7 @@ const migrations = readdirSync(resolve('supabase/migrations'))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
 const targetIndex = migrations.indexOf(targetMigration);
-if (targetIndex < 0) throw new Error('Workforce migration missing');
+if (targetIndex < 0) throw new Error('Workforce hardening migration missing');
 for (const migration of migrations.slice(0, targetIndex + 1)) {
   psql(['-f', resolve('supabase/migrations', migration)], migration);
 }
@@ -156,7 +156,7 @@ const crossShopComp = rpc(
   `public.set_employee_compensation_v1('${MANAGER}','${SHOP2_STAFF}','${S1}','HOURLY',2500,'2026-10-01','review-cross-shop-comp')`,
   'cross-shop compensation',
 );
-expect(crossShopComp.ok === false && ['employee_shop_assignment_required','employee_scope_forbidden'].includes(crossShopComp.code), `shop-scoped actor changed out-of-scope employee compensation: ${JSON.stringify(crossShopComp)}`);
+expect(crossShopComp.ok === false && ['employee_shop_assignment_required','employee_scope_forbidden','shop_forbidden'].includes(crossShopComp.code), `shop-scoped actor changed out-of-scope employee compensation: ${JSON.stringify(crossShopComp)}`);
 
 const suspendedLink = rpc(
   `public.link_employee_worker_v1('${OWNER}','${SUSPENDED}','${S1}','${ACTIVE_WORKER}','review-link-suspended')`,
