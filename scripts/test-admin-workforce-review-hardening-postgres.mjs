@@ -113,8 +113,14 @@ insert into public.admin_employee_permissions(business_id, employee_id, permissi
 values ('${B1}', '${MANAGER}', 'staff.manage', 'ALLOW');
 insert into public.workers(id, shop_id, display_name, pin_hash, active, pin_lookup_hash)
 values ('${ACTIVE_WORKER}', '${S1}', 'Active Worker', '${verifier('9')}', true, repeat('9',64));
-insert into public.employee_shifts(business_id, employee_id, shop_id, starts_at, ends_at, break_minutes, status, created_by_employee_id)
-values ('${B1}', '${DST_STAFF}', '${S1}', '2026-10-24T06:00:00Z', '2026-10-24T14:00:00Z', 0, 'SCHEDULED', '${OWNER}');
+insert into public.employee_shifts(
+  business_id, employee_id, shop_id, starts_at, ends_at, planned_break_minutes,
+  status, created_by_employee_id, updated_by_employee_id, create_command_id
+)
+values (
+  '${B1}', '${DST_STAFF}', '${S1}', '2026-10-24T06:00:00Z', '2026-10-24T14:00:00Z', 0,
+  'SCHEDULED', '${OWNER}', '${OWNER}', 'review-dst-source'
+);
 `],
   'Workforce deep-review fixtures',
 );
