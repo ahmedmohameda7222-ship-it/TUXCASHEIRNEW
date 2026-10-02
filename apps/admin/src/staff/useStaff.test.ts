@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { staffCommandIntentForRetention, staffEphemeralCommandId } from './useStaff';
+import {
+  staffCommandIntentForRetention,
+  staffCommandUsesApprovalPin,
+  staffEphemeralCommandId,
+} from './useStaff';
 
 describe('Workforce retained command intent', () => {
   it('never includes PIN or verifier material in the durable idempotency fingerprint', () => {
@@ -48,5 +52,14 @@ describe('Workforce retained command intent', () => {
         commandId,
       }),
     ).toBeNull();
+  });
+
+  it('sends requester PIN only to approval-capable commands after recent reauth', () => {
+    expect(staffCommandUsesApprovalPin({ type: 'employee.pin' })).toBe(true);
+    expect(staffCommandUsesApprovalPin({ type: 'employee.role' })).toBe(true);
+    expect(staffCommandUsesApprovalPin({ type: 'employee.permission' })).toBe(true);
+    expect(staffCommandUsesApprovalPin({ type: 'employee.suspend' })).toBe(true);
+    expect(staffCommandUsesApprovalPin({ type: 'payment.record' })).toBe(true);
+    expect(staffCommandUsesApprovalPin({ type: 'employee.reactivate' })).toBe(false);
   });
 });
