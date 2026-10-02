@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createRetainedCommandIds } from './retainedCommandIds';
+import { createRetainedCommandIds, isPendingApprovalResult } from './retainedCommandIds';
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -47,7 +47,7 @@ describe('retained Admin command IDs', () => {
     expect(employeeAReload.forIntent('inventory.adjust', intent)).toBe('command-a');
   });
 
-  it('survives a hook/page lifetime until an authoritative response clears the intent', () => {
+  it('survives a hook/page lifetime until an authoritative terminal response clears the intent', () => {
     vi.stubGlobal('localStorage', memoryStorage());
     const ids = ['command-1', 'command-2', 'command-3'];
     const createId = () => ids.shift() ?? 'unexpected-command';
@@ -68,5 +68,27 @@ describe('retained Admin command IDs', () => {
     expect(
       nextIntentLifetime.forIntent('inventory.adjust', { shopId: 'shop-1', quantity: 3 }),
     ).toBe('command-2');
+  });
+
+  it('classifies pending approval as non-terminal so retries keep the same command identity', () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    const ids = createRetainedCommandIds('employee-a', () => 'command-pending');
+    const intent = { shopId: 'shop-1', orderId: 'order-1', amountMinor: 2500 };
+
+    expect(isPendingApprovalResult({ ok: true, state: 'PENDING_APPROVAL' })).toBe(true);
+    expect(isPendingApprovalResult({ ok: true, state: 'POSTED' })).toBe(false);
+    expect(isPendingApprovalResult({ ok: false, code: 'permission_forbidden' })).toBe(false);
+
+    const first = ids.forIntent('order.refund', intent);
+    if (!isPendingApprovalResult({ ok: true, state: 'PENDING_APPROVAL' })) {
+      ids.complete('order.refund', intent);
+    }
+    const retry = createRetainedCommandIds('employee-a', () => 'unexpected-command').forIntent(
+      'order.refund',
+      intent,
+    );
+
+    expect(first).toBe('command-pending');
+    expect(retry).toBe('command-pending');
   });
 });
