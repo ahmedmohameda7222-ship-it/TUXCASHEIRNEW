@@ -110,7 +110,9 @@ insert into public.employee_shop_assignments(business_id, employee_id, shop_id) 
   ('${B1}', '${DST_STAFF}', '${S1}'),
   ('${B2}', '${LONE_OWNER}', '${S3}');
 insert into public.admin_employee_permissions(business_id, employee_id, permission_key, effect)
-values ('${B1}', '${MANAGER}', 'staff.manage', 'ALLOW');
+values
+  ('${B1}', '${MANAGER}', 'staff.manage', 'ALLOW'),
+  ('${B1}', '${SHOP2_STAFF}', 'staff.manage', 'ALLOW');
 insert into public.workers(id, shop_id, display_name, pin_hash, active, pin_lookup_hash)
 values ('${ACTIVE_WORKER}', '${S1}', 'Active Worker', '${verifier('9')}', true, repeat('9',64));
 insert into public.employee_shifts(
@@ -156,6 +158,25 @@ const suspendAdmin = rpc(
 expect(
   suspendAdmin.ok === false && suspendAdmin.code === 'role_escalation_forbidden',
   `lower-role actor suspended ADMIN: ${JSON.stringify(suspendAdmin)}`,
+);
+
+const crossShopAssign = rpc(
+  `public.assign_employee_to_shop_v1('${MANAGER}','${SHOP2_STAFF}','${S1}','review-cross-shop-assign')`,
+  'cross-shop employee assignment',
+);
+expect(
+  crossShopAssign.ok === false &&
+    ['employee_scope_forbidden', 'shop_forbidden', 'shop_not_assigned'].includes(crossShopAssign.code),
+  `shop-scoped actor pulled an out-of-scope employee into their shop: ${JSON.stringify(crossShopAssign)}`,
+);
+
+const staffCreatesManager = rpc(
+  `public.create_employee_v1('${SHOP2_STAFF}','${S2}','Escalated Manager',null,null,null,'MANAGER','review-staff-create-manager')`,
+  'staff creates manager',
+);
+expect(
+  staffCreatesManager.ok === false && staffCreatesManager.code === 'role_escalation_forbidden',
+  `STAFF with staff.manage created a MANAGER: ${JSON.stringify(staffCreatesManager)}`,
 );
 
 const crossShopComp = rpc(
