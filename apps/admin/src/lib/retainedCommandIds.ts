@@ -53,8 +53,17 @@ function clearCommandId(storage: Storage | null, key: string): void {
   try {
     storage.removeItem(storageKey(key));
   } catch {
-    // An authoritative response has already been received; storage cleanup is best-effort.
+    // An authoritative terminal response has already been received; storage cleanup is best-effort.
   }
+}
+
+export function isPendingApprovalResult(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Readonly<Record<string, unknown>>)['state'] === 'PENDING_APPROVAL'
+  );
 }
 
 export function createRetainedCommandIds(
