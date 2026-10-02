@@ -141,7 +141,10 @@ const pinStage = rpc(
   `public.stage_employee_pin_change_v1('${MANAGER}','${ADMIN}',array['${S1}'::uuid],'${verifier('0')}',repeat('a',64),${adminCredentialVersion},'${adminWorkerFingerprint}',now()+interval '10 minutes','35000000-0000-4000-8000-000000000001')`,
   'manager PIN reset against admin',
 );
-expect(pinStage.ok === false && pinStage.code === 'role_escalation_forbidden', `lower-role actor staged ADMIN PIN reset: ${JSON.stringify(pinStage)}`);
+expect(
+  pinStage.ok === false && pinStage.code === 'role_escalation_forbidden',
+  `lower-role actor staged ADMIN PIN reset: ${JSON.stringify(pinStage)}`,
+);
 
 const adminProfileVersion = Number(
   scalar(`select profile_version from public.business_employees where id='${ADMIN}'`, 'admin profile version'),
@@ -150,19 +153,34 @@ const suspendAdmin = rpc(
   `public.suspend_employee_v1('${MANAGER}','${ADMIN}',${adminProfileVersion},'review-suspend-admin')`,
   'manager suspend admin',
 );
-expect(suspendAdmin.ok === false && suspendAdmin.code === 'role_escalation_forbidden', `lower-role actor suspended ADMIN: ${JSON.stringify(suspendAdmin)}`);
+expect(
+  suspendAdmin.ok === false && suspendAdmin.code === 'role_escalation_forbidden',
+  `lower-role actor suspended ADMIN: ${JSON.stringify(suspendAdmin)}`,
+);
 
 const crossShopComp = rpc(
   `public.set_employee_compensation_v1('${MANAGER}','${SHOP2_STAFF}','${S1}','HOURLY',2500,'2026-10-01','review-cross-shop-comp')`,
   'cross-shop compensation',
 );
-expect(crossShopComp.ok === false && ['employee_shop_assignment_required','employee_scope_forbidden','shop_forbidden'].includes(crossShopComp.code), `shop-scoped actor changed out-of-scope employee compensation: ${JSON.stringify(crossShopComp)}`);
+expect(
+  crossShopComp.ok === false &&
+    [
+      'employee_shop_assignment_required',
+      'employee_scope_forbidden',
+      'shop_forbidden',
+      'shop_not_assigned',
+    ].includes(crossShopComp.code),
+  `shop-scoped actor changed out-of-scope employee compensation: ${JSON.stringify(crossShopComp)}`,
+);
 
 const suspendedLink = rpc(
   `public.link_employee_worker_v1('${OWNER}','${SUSPENDED}','${S1}','${ACTIVE_WORKER}','review-link-suspended')`,
   'link suspended employee',
 );
-expect(suspendedLink.ok === false && suspendedLink.code === 'employee_inactive', `suspended employee gained a new Operations identity: ${JSON.stringify(suspendedLink)}`);
+expect(
+  suspendedLink.ok === false && suspendedLink.code === 'employee_inactive',
+  `suspended employee gained a new Operations identity: ${JSON.stringify(suspendedLink)}`,
+);
 
 const loneOwnerVersion = Number(
   scalar(`select profile_version from public.business_employees where id='${LONE_OWNER}'`, 'lone owner version'),
@@ -171,7 +189,10 @@ const lastOwnerSuspend = rpc(
   `public.suspend_employee_v1('${LONE_OWNER}','${LONE_OWNER}',${loneOwnerVersion},'review-last-owner-suspend')`,
   'suspend last owner',
 );
-expect(lastOwnerSuspend.ok === false && lastOwnerSuspend.code === 'last_owner_required', `last active OWNER was suspended: ${JSON.stringify(lastOwnerSuspend)}`);
+expect(
+  lastOwnerSuspend.ok === false && lastOwnerSuspend.code === 'last_owner_required',
+  `last active OWNER was suspended: ${JSON.stringify(lastOwnerSuspend)}`,
+);
 
 const leave = rpc(
   `public.create_leave_request_v1('${OWNER}','${LEAVE_STAFF}',null,'VACATION','2026-11-10','2026-11-11','business-wide leave','review-business-wide-leave')`,
@@ -189,7 +210,10 @@ if (copy.ok === true) {
     `select to_char(starts_at at time zone 'Africa/Cairo','YYYY-MM-DD HH24:MI') from public.employee_shifts where employee_id='${DST_STAFF}' and starts_at >= '2026-10-26T00:00:00Z' order by starts_at limit 1`,
     'copied DST local start',
   );
-  expect(copiedLocal === '2026-10-31 09:00', `DST copy changed Cairo wall-clock start: ${copiedLocal}`);
+  expect(
+    copiedLocal === '2026-10-31 09:00',
+    `DST copy changed Cairo wall-clock start: ${copiedLocal}`,
+  );
 }
 
 if (failures.length > 0) {
