@@ -644,6 +644,9 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
       const customPermissions = permissionRows
         .filter((row) => row.effect === 'ALLOW' && isAdminPermission(row.permission_key))
         .map((row) => row.permission_key as AdminPermission);
+      const customDeniedPermissions = permissionRows
+        .filter((row) => row.effect === 'DENY' && isAdminPermission(row.permission_key))
+        .map((row) => row.permission_key as AdminPermission);
       const mappedShifts = shifts.map(mapShift);
       const mappedAttendanceEvents = attendanceEvents.map(mapAttendanceEvent);
       const mappedAttendanceCorrections = attendanceCorrections.map(mapAttendanceCorrection);
@@ -667,6 +670,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         profileVersion: safeInteger(employee.profile_version),
         credentialVersion: safeInteger(employee.credential_version),
         customPermissions,
+        customDeniedPermissions,
         assignments: assignments.map((assignment) => ({
           shopId: assignment.shop_id,
           assigned: true,
