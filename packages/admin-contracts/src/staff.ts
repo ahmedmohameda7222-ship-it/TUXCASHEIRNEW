@@ -181,6 +181,7 @@ export type EmployeeDetail = {
   readonly profileVersion: number;
   readonly credentialVersion: number;
   readonly customPermissions: readonly AdminPermission[];
+  readonly customDeniedPermissions?: readonly AdminPermission[];
   readonly assignments: readonly EmployeeShopAssignment[];
   readonly operationsIdentities: readonly LinkedOperationsIdentityState[];
   readonly compensation: readonly EmployeeCompensation[];
