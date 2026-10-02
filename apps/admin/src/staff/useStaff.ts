@@ -4,10 +4,7 @@ import { useMemo } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
 import { adminFetch } from '../lib/adminApi';
-import {
-  createRetainedCommandIds,
-  isPendingApprovalResult,
-} from '../lib/retainedCommandIds';
+import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 export type StaffApiCommandDraft = Readonly<Record<string, unknown>> & {
   readonly type: string;
