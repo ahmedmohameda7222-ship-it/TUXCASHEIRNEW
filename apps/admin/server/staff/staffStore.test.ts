@@ -144,4 +144,61 @@ describe('staffStore', () => {
     expect(detail?.assignments).toEqual([{ shopId: SHOP_ID, assigned: true }]);
     expect(JSON.stringify(detail)).not.toContain(OTHER_SHOP_ID);
   });
+
+  it('preserves explicit ALLOW and DENY permission overrides in the employee read model', async () => {
+    const select = vi.fn(async (table: string, params: URLSearchParams) => {
+      if (table === 'business_employees') {
+        return [
+          {
+            id: EMPLOYEE_ID,
+            business_id: BUSINESS_ID,
+            display_name: 'Mona Ali',
+            phone: null,
+            hire_date: null,
+            notes: null,
+            role: 'STAFF',
+            active: true,
+            profile_version: 1,
+            credential_version: 1,
+          },
+        ];
+      }
+
+      if (table === 'employee_shop_assignments') {
+        return [{ employee_id: EMPLOYEE_ID, shop_id: SHOP_ID }];
+      }
+
+      if (table === 'admin_employee_permissions') {
+        return [
+          { permission_key: 'staff.manage', effect: 'ALLOW' },
+          { permission_key: 'reports.view', effect: 'DENY' },
+        ];
+      }
+
+      if (
+        table === 'employee_worker_links' ||
+        table === 'employee_compensation' ||
+        table === 'employee_shifts' ||
+        table === 'attendance_events' ||
+        table === 'attendance_corrections' ||
+        table === 'leave_requests' ||
+        table === 'staff_payment_records'
+      ) {
+        return [];
+      }
+
+      throw new Error(`unexpected_table:${table}`);
+    });
+
+    const store = createSupabaseStaffStore({ select } as unknown as AdminSupabaseClient);
+    const detail = await store.loadEmployeeDetail({
+      employeeId: EMPLOYEE_ID,
+      shopId: SHOP_ID,
+      businessId: BUSINESS_ID,
+      visibleShopIds: [SHOP_ID],
+    });
+
+    expect(detail?.customPermissions).toEqual(['staff.manage']);
+    expect(detail?.customDeniedPermissions).toEqual(['reports.view']);
+  });
 });
