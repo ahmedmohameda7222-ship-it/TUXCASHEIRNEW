@@ -79,6 +79,7 @@ const LEAVE_STAFF = '33000000-0000-4000-8000-000000000006';
 const DST_STAFF = '33000000-0000-4000-8000-000000000007';
 const LONE_OWNER = '33000000-0000-4000-8000-000000000008';
 const ACTIVE_WORKER = '34000000-0000-4000-8000-000000000001';
+const COLLIDING_WORKER = '34000000-0000-4000-8000-000000000002';
 
 const verifier = (letter) => `pbkdf2-sha256$210000$${letter.repeat(32)}$${letter.repeat(64)}`;
 psql(
@@ -114,7 +115,9 @@ values
   ('${B1}', '${MANAGER}', 'staff.manage', 'ALLOW'),
   ('${B1}', '${SHOP2_STAFF}', 'staff.manage', 'ALLOW');
 insert into public.workers(id, shop_id, display_name, pin_hash, active, pin_lookup_hash)
-values ('${ACTIVE_WORKER}', '${S1}', 'Active Worker', '${verifier('9')}', true, repeat('9',64));
+values
+  ('${ACTIVE_WORKER}', '${S1}', 'Active Worker', '${verifier('9')}', true, repeat('9',64)),
+  ('${COLLIDING_WORKER}', '${S1}', 'PIN Collision Worker', '${verifier('e')}', true, repeat('5',64));
 insert into public.employee_shifts(
   business_id, employee_id, shop_id, starts_at, ends_at, planned_break_minutes,
   status, created_by_employee_id, updated_by_employee_id, create_command_id
@@ -236,6 +239,18 @@ if (copy.ok === true) {
     `DST copy changed Cairo wall-clock start: ${copiedLocal}`,
   );
 }
+
+const suspendedProfileVersion = Number(
+  scalar(`select profile_version from public.business_employees where id='${SUSPENDED}'`, 'suspended profile version'),
+);
+const reactivateCollision = rpc(
+  `public.reactivate_employee_v1('${OWNER}','${SUSPENDED}',${suspendedProfileVersion},'${S1}','review-reactivate-pin-collision')`,
+  'reactivate employee with worker PIN collision',
+);
+expect(
+  reactivateCollision.ok === false && reactivateCollision.code === 'pin_already_in_use',
+  `employee reactivated with PIN already used by active Operations worker: ${JSON.stringify(reactivateCollision)}`,
+);
 
 if (failures.length > 0) {
   console.error('Admin Workforce deep-review RED regressions:');
