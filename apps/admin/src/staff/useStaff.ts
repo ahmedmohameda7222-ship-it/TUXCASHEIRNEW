@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useAdminSession } from '../auth/useAdminSession';
-import { adminFetch } from '../lib/adminApi';
+import { AdminApiError, adminFetch } from '../lib/adminApi';
 import { createRetainedCommandIds, isPendingApprovalResult } from '../lib/retainedCommandIds';
 
 export type StaffApiCommandDraft = Readonly<Record<string, unknown>> & {
@@ -33,6 +33,10 @@ export function staffEphemeralCommandId(draft: StaffApiCommandDraft): string | n
 
 export function staffCommandUsesApprovalPin(draft: StaffApiCommandDraft): boolean {
   return APPROVAL_PIN_COMMAND_TYPES.has(draft.type);
+}
+
+export function staffCommandErrorIsTerminal(error: unknown): boolean {
+  return error instanceof AdminApiError;
 }
 
 function csrfToken(session: ReturnType<typeof useAdminSession>): string {
@@ -73,22 +77,30 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
     const scope = `staff.${draft.type}`;
     const ephemeralCommandId = staffEphemeralCommandId(draft);
     const commandId = ephemeralCommandId ?? commandIds.forIntent(scope, intent);
-    const result = await adminFetch<StaffCommandResult>(
-      '/api/admin/staff',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          ...draft,
-          commandId,
-          ...(requesterPin === undefined ? {} : { requesterPin }),
-        }),
-      },
-      csrfToken(session),
-    );
-    if (ephemeralCommandId === null && !isPendingApprovalResult(result)) {
-      commandIds.complete(scope, intent);
+
+    try {
+      const result = await adminFetch<StaffCommandResult>(
+        '/api/admin/staff',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...draft,
+            commandId,
+            ...(requesterPin === undefined ? {} : { requesterPin }),
+          }),
+        },
+        csrfToken(session),
+      );
+      if (ephemeralCommandId === null && !isPendingApprovalResult(result)) {
+        commandIds.complete(scope, intent);
+      }
+      return result;
+    } catch (error) {
+      if (ephemeralCommandId === null && staffCommandErrorIsTerminal(error)) {
+        commandIds.complete(scope, intent);
+      }
+      throw error;
     }
-    return result;
   }
 
   const command = useMutation({
