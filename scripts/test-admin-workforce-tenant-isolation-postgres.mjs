@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const targetMigration = '20261003101500_admin_workforce_pin_tenant_isolation.sql';
+const targetMigration = '20261003101600_admin_workforce_pin_business_unique.sql';
 if (!existsSync(resolve('supabase/migrations', targetMigration))) {
   throw new Error('Admin Plan 6 Workforce PIN tenant-isolation migration missing.');
 }
@@ -94,6 +94,14 @@ insert into public.employee_shop_assignments(business_id, employee_id, shop_id) 
 `],
   'Workforce tenant-isolation fixtures',
 );
+
+const scopedIndex = scalar(
+  `select indexdef from pg_indexes where schemaname='public' and indexname='business_employees_active_pin_lookup_uq'`,
+  'employee PIN lookup index definition',
+);
+if (!scopedIndex.includes('(business_id, pin_lookup_hash)')) {
+  throw new Error(`employee PIN lookup uniqueness is not business-scoped: ${scopedIndex}`);
+}
 
 const fingerprint = scalar(
   `select private.workforce_worker_state_fingerprint_v1('${TARGET1}', array['${S1}'::uuid])`,
