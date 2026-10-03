@@ -5,6 +5,7 @@ import {
   ORDER_REFUND_APPROVAL_ACTION,
   ORDER_RETURN_APPROVAL_ACTION,
   createOrderApprovalExecutionEntries,
+  orderFinancialEventState,
 } from './orderApproval.js';
 
 const refundClaim: AdminApprovalExecutionClaim = {
@@ -29,6 +30,15 @@ const refundClaim: AdminApprovalExecutionClaim = {
 };
 
 describe('Plan 5 order approval execution registry', () => {
+  it('derives truthful financial-event state from the durable approval lifecycle', () => {
+    expect(orderFinancialEventState('POSTED', 'EXECUTING')).toBe('POSTED');
+    expect(orderFinancialEventState('PENDING_APPROVAL', 'PENDING')).toBe('PENDING_APPROVAL');
+    expect(orderFinancialEventState('PENDING_APPROVAL', 'APPROVED')).toBe('PENDING_APPROVAL');
+    expect(orderFinancialEventState('PENDING_APPROVAL', 'EXECUTING')).toBe('PENDING_APPROVAL');
+    expect(orderFinancialEventState('PENDING_APPROVAL', 'REJECTED')).toBe('REJECTED');
+    expect(orderFinancialEventState('PENDING_APPROVAL', 'FAILED')).toBe('FAILED');
+  });
+
   it('executes an approved refund through the trusted order posting boundary', async () => {
     const executeRefund = vi.fn(async () => ({
       ok: true as const,
