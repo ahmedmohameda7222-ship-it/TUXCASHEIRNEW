@@ -1,4 +1,3 @@
-import type { AdminRole } from '@tux/admin-contracts';
 import { useEffect, useMemo, useState } from 'react';
 
 import { PageScaffold } from '../components/layout/PageScaffold';
@@ -18,7 +17,6 @@ export function StaffPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeePhone, setNewEmployeePhone] = useState('');
-  const [newEmployeeRole, setNewEmployeeRole] = useState<AdminRole>('STAFF');
   const staff = useStaff(shopId, selectedId);
 
   const rows = useMemo(
@@ -71,6 +69,10 @@ export function StaffPage() {
               aria-label="Create employee"
             >
               <h3>Add employee</h3>
+              <p>
+                New employees start as STAFF. Use the audited role-change flow after creation for
+                elevated access.
+              </p>
               <label className="admin-field">
                 <span>Name</span>
                 <input
@@ -85,17 +87,6 @@ export function StaffPage() {
                   onChange={(event) => setNewEmployeePhone(event.target.value)}
                 />
               </label>
-              <label className="admin-field">
-                <span>Role</span>
-                <select
-                  value={newEmployeeRole}
-                  onChange={(event) => setNewEmployeeRole(event.target.value as AdminRole)}
-                >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="MANAGER">MANAGER</option>
-                  <option value="STAFF">STAFF</option>
-                </select>
-              </label>
               <button
                 className="admin-primary-button"
                 type="button"
@@ -108,7 +99,7 @@ export function StaffPage() {
                     phone: newEmployeePhone.trim() || null,
                     hireDate: null,
                     notes: null,
-                    role: newEmployeeRole,
+                    role: 'STAFF',
                   })
                 }
               >
