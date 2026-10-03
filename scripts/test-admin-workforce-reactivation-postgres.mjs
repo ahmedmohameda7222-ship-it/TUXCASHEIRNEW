@@ -71,13 +71,18 @@ const B = '71000000-0000-4000-8000-000000000001',
   S = '72000000-0000-4000-8000-000000000001',
   OWNER = '73000000-0000-4000-8000-000000000001',
   STAFF = '73000000-0000-4000-8000-000000000002',
+  UNAUTHORIZED = '73000000-0000-4000-8000-000000000003',
+  PEER_OWNER = '73000000-0000-4000-8000-000000000004',
+  INACTIVE = '73000000-0000-4000-8000-000000000005',
   WORKER = '74000000-0000-4000-8000-000000000001',
-  OTHER = '74000000-0000-4000-8000-000000000002';
+  OTHER = '74000000-0000-4000-8000-000000000002',
+  UNLINKED = '74000000-0000-4000-8000-000000000003',
+  S2 = '72000000-0000-4000-8000-000000000002';
 const verifier = (x) => `pbkdf2-sha256$210000$${x.repeat(32)}$${x.repeat(64)}`;
 psql(
   [
     '-c',
-    `insert into public.businesses(id,name) values('${B}','Lifecycle'); insert into public.shops(id,name,active) values('${S}','Lifecycle Shop',true); insert into public.business_shops(business_id,shop_id) values('${B}','${S}'); insert into public.business_employees(id,business_id,display_name,role,pin_lookup_hash,pin_hash,active) values('${OWNER}','${B}','Owner','OWNER',repeat('1',64),'${verifier('1')}',true),('${STAFF}','${B}','Staff','STAFF',repeat('2',64),'${verifier('2')}',true); insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values('${B}','${OWNER}','${S}'),('${B}','${STAFF}','${S}'); insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${WORKER}','${S}','Staff Ops','${verifier('2')}',repeat('2',64),true); insert into public.employee_worker_links(business_id,employee_id,shop_id,worker_id,active,linked_by_employee_id,link_command_id) values('${B}','${STAFF}','${S}','${WORKER}',true,'${OWNER}','reactivation-fixture-link');`,
+    `insert into public.businesses(id,name) values('${B}','Lifecycle'); insert into public.shops(id,name,active) values('${S}','Lifecycle Shop',true),('${S2}','Other Shop',true); insert into public.business_shops(business_id,shop_id) values('${B}','${S}'),('${B}','${S2}'); insert into public.business_employees(id,business_id,display_name,role,pin_lookup_hash,pin_hash,active) values('${OWNER}','${B}','Owner','OWNER',repeat('1',64),'${verifier('1')}',true),('${STAFF}','${B}','Staff','STAFF',repeat('2',64),'${verifier('2')}',true),('${UNAUTHORIZED}','${B}','Unauthorized','STAFF',repeat('4',64),'${verifier('4')}',true),('${PEER_OWNER}','${B}','Peer Owner','OWNER',repeat('5',64),'${verifier('5')}',true),('${INACTIVE}','${B}','Inactive','STAFF',repeat('6',64),'${verifier('6')}',false); insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values('${B}','${OWNER}','${S}'),('${B}','${OWNER}','${S2}'),('${B}','${STAFF}','${S}'),('${B}','${STAFF}','${S2}'),('${B}','${UNAUTHORIZED}','${S}'),('${B}','${PEER_OWNER}','${S}'),('${B}','${INACTIVE}','${S}'); insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${WORKER}','${S}','Staff Ops','${verifier('2')}',repeat('2',64),true),('${UNLINKED}','${S}','Unlinked','${verifier('7')}',repeat('7',64),false); insert into public.employee_worker_links(business_id,employee_id,shop_id,worker_id,active,linked_by_employee_id,link_command_id) values('${B}','${STAFF}','${S}','${WORKER}',true,'${OWNER}','reactivation-fixture-link');`,
   ],
   'fixtures',
 );
@@ -193,6 +198,46 @@ const employeeCredential = Number(
 );
 const workerCredential = Number(
   scalar(`select credential_version from public.workers where id='${WORKER}'`, 'worker credential'),
+);
+const wrongShop = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S2}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-wrong-shop')`,
+  'wrong shop',
+);
+expect(
+  wrongShop.ok === false && wrongShop.code === 'worker_shop_mismatch',
+  `wrong shop accepted ${JSON.stringify(wrongShop)}`,
+);
+const wrongLink = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${UNLINKED}',${employeeCredential},1,'reactivation-wrong-link')`,
+  'wrong link',
+);
+expect(
+  wrongLink.ok === false && wrongLink.code === 'worker_link_mismatch',
+  `wrong link accepted ${JSON.stringify(wrongLink)}`,
+);
+const unauthorized = rpc(
+  `public.reactivate_employee_worker_v1('${UNAUTHORIZED}','${STAFF}','${S}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-unauthorized')`,
+  'unauthorized actor',
+);
+expect(
+  unauthorized.ok === false && unauthorized.code === 'permission_forbidden',
+  `missing staff.manage accepted ${JSON.stringify(unauthorized)}`,
+);
+const hierarchy = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${PEER_OWNER}','${S}','${WORKER}',1,${workerCredential},'reactivation-hierarchy')`,
+  'target hierarchy',
+);
+expect(
+  hierarchy.ok === false && hierarchy.code === 'target_role_protected',
+  `target role hierarchy accepted ${JSON.stringify(hierarchy)}`,
+);
+const inactiveEmployee = rpc(
+  `public.reactivate_employee_worker_v1('${OWNER}','${INACTIVE}','${S}','${WORKER}',1,${workerCredential},'reactivation-inactive')`,
+  'inactive target employee',
+);
+expect(
+  inactiveEmployee.ok === false && inactiveEmployee.code === 'employee_inactive',
+  `inactive employee accepted ${JSON.stringify(inactiveEmployee)}`,
 );
 const activated = rpc(
   `public.reactivate_employee_worker_v1('${OWNER}','${STAFF}','${S}','${WORKER}',${employeeCredential},${workerCredential},'reactivation-worker')`,
