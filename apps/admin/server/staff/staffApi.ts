@@ -126,7 +126,7 @@ const commandSchema = z.discriminatedUnion('type', [
       employeeId: uuidSchema,
       shopId: uuidSchema,
       permissionKey: permissionSchema,
-      effect: z.enum(['ALLOW', 'DENY']),
+      effect: z.enum(['ALLOW', 'DENY', 'INHERIT']),
       expectedVersion: z.number().int().positive(),
       commandId: commandIdSchema,
     })
@@ -147,6 +147,17 @@ const commandSchema = z.discriminatedUnion('type', [
       employeeId: uuidSchema,
       shopId: uuidSchema,
       expectedVersion: z.number().int().positive(),
+      commandId: commandIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('employee.reactivate-worker'),
+      employeeId: uuidSchema,
+      shopId: uuidSchema,
+      workerId: uuidSchema,
+      expectedEmployeeCredentialVersion: z.number().int().positive(),
+      expectedWorkerCredentialVersion: z.number().int().positive(),
       commandId: commandIdSchema,
     })
     .strict(),
@@ -412,7 +423,8 @@ export async function handleStaffRequest(
       command.type === 'employee.role' ||
       command.type === 'employee.permission' ||
       command.type === 'employee.suspend' ||
-      command.type === 'employee.reactivate'
+      command.type === 'employee.reactivate' ||
+      command.type === 'employee.reactivate-worker'
     ) {
       requireRecentReauth(context.session, 300);
     }
@@ -568,6 +580,9 @@ export async function handleStaffRequest(
       }
       case 'employee.reactivate':
         result = await service.reactivateEmployee(command, context.principal);
+        break;
+      case 'employee.reactivate-worker':
+        result = await service.reactivateEmployeeWorker(command, context.principal);
         break;
       case 'compensation.set':
         result = await service.setCompensation(command, context.principal);
