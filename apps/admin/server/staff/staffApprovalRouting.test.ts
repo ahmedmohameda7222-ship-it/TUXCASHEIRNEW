@@ -1,4 +1,4 @@
-import type { AdminApprovalActor } from '@tux/admin-contracts';
+import type { AdminApprovalActor, AdminApprovalStatus } from '@tux/admin-contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalServiceDependencies } from '../approvals/approvalService';
@@ -32,12 +32,12 @@ function clientWithRoleApprovalRule(): AdminSupabaseClient {
   } as unknown as AdminSupabaseClient;
 }
 
-function approvalDependencies() {
+function approvalDependencies(status: AdminApprovalStatus = 'PENDING', idempotentReplay = false) {
   const createRequest = vi.fn(async () => ({
     ok: true,
     requestId: REQUEST_ID,
-    status: 'PENDING' as const,
-    idempotentReplay: false,
+    status,
+    idempotentReplay,
   }));
   const deps: ApprovalServiceDependencies = {
     loadRequest: vi.fn<ApprovalServiceDependencies['loadRequest']>(async () => null),
@@ -125,5 +125,69 @@ describe('Workforce approval routing', () => {
     });
     expect(createRequest).toHaveBeenCalledOnce();
     expect(executeDirect).not.toHaveBeenCalled();
+  });
+
+  it.each(['PENDING', 'APPROVED', 'EXECUTING'] as const)(
+    'keeps a replayed %s approval attached to the original command identity',
+    async (status) => {
+      const { deps } = approvalDependencies(status, true);
+
+      await expect(
+        executeOrRequestStaffApproval(
+          routingInput,
+          actor(['staff.manage']),
+          clientWithRoleApprovalRule(),
+          deps,
+          vi.fn(async () => ({ ok: true as const })),
+        ),
+      ).resolves.toEqual({
+        ok: true,
+        state: 'PENDING_APPROVAL',
+        approvalRequestId: REQUEST_ID,
+        replayed: true,
+      });
+    },
+  );
+
+  it('surfaces rejected approval replays as terminal failures so a new command can be attempted', async () => {
+    const { deps } = approvalDependencies('REJECTED', true);
+
+    await expect(
+      executeOrRequestStaffApproval(
+        routingInput,
+        actor(['staff.manage']),
+        clientWithRoleApprovalRule(),
+        deps,
+        vi.fn(async () => ({ ok: true as const })),
+      ),
+    ).resolves.toEqual({ ok: false, code: 'approval_rejected' });
+  });
+
+  it('surfaces failed approval execution replays as terminal failures', async () => {
+    const { deps } = approvalDependencies('FAILED', true);
+
+    await expect(
+      executeOrRequestStaffApproval(
+        routingInput,
+        actor(['staff.manage']),
+        clientWithRoleApprovalRule(),
+        deps,
+        vi.fn(async () => ({ ok: true as const })),
+      ),
+    ).resolves.toEqual({ ok: false, code: 'approval_execution_failed' });
+  });
+
+  it('treats an executed approval replay as terminal applied success', async () => {
+    const { deps } = approvalDependencies('EXECUTED', true);
+
+    await expect(
+      executeOrRequestStaffApproval(
+        routingInput,
+        actor(['staff.manage']),
+        clientWithRoleApprovalRule(),
+        deps,
+        vi.fn(async () => ({ ok: true as const })),
+      ),
+    ).resolves.toEqual({ ok: true, state: 'APPLIED', replayed: true });
   });
 });
