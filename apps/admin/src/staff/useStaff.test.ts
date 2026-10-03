@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { AdminApiError } from '../lib/adminApi';
 import {
+  staffCommandErrorIsTerminal,
   staffCommandIntentForRetention,
   staffCommandUsesApprovalPin,
   staffEphemeralCommandId,
@@ -61,5 +63,10 @@ describe('Workforce retained command intent', () => {
     expect(staffCommandUsesApprovalPin({ type: 'employee.suspend' })).toBe(true);
     expect(staffCommandUsesApprovalPin({ type: 'payment.record' })).toBe(true);
     expect(staffCommandUsesApprovalPin({ type: 'employee.reactivate' })).toBe(false);
+  });
+
+  it('treats authoritative Admin API failures as terminal but preserves retry identity for network failures', () => {
+    expect(staffCommandErrorIsTerminal(new AdminApiError(409, 'stale_employee'))).toBe(true);
+    expect(staffCommandErrorIsTerminal(new Error('network_down'))).toBe(false);
   });
 });
