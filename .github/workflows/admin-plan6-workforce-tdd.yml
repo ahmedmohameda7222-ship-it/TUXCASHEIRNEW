@@ -7,45 +7,8 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feat/admin-06-workforce
-    paths:
-      - 'supabase/migrations/**'
-      - 'scripts/test-admin-finance-core-*.mjs'
-      - 'scripts/test-admin-workforce-*.mjs'
-      - 'apps/admin/server/staff/**'
-      - 'apps/admin/server/reauth.ts'
-      - 'apps/admin/server/reauth.test.ts'
-      - 'apps/admin/src/staff/**'
-      - 'apps/admin/src/lib/adminApi.ts'
-      - 'apps/admin/src/lib/adminApi.test.ts'
-      - 'apps/admin/src/lib/retainedCommandIds.ts'
-      - 'apps/admin/src/lib/retainedCommandIds.test.ts'
-      - 'apps/admin/src/app/routes.tsx'
-      - 'packages/admin-contracts/src/staff.ts'
-      - 'packages/admin-contracts/src/index.ts'
-      - 'e2e/admin-workforce.spec.ts'
-      - 'package.json'
-      - '.github/workflows/admin-plan6-workforce-tdd.yml'
+    branches: [feat/admin-06-workforce]
   pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'scripts/test-admin-finance-core-*.mjs'
-      - 'scripts/test-admin-workforce-*.mjs'
-      - 'apps/admin/server/staff/**'
-      - 'apps/admin/server/reauth.ts'
-      - 'apps/admin/server/reauth.test.ts'
-      - 'apps/admin/src/staff/**'
-      - 'apps/admin/src/lib/adminApi.ts'
-      - 'apps/admin/src/lib/adminApi.test.ts'
-      - 'apps/admin/src/lib/retainedCommandIds.ts'
-      - 'apps/admin/src/lib/retainedCommandIds.test.ts'
-      - 'apps/admin/src/app/routes.tsx'
-      - 'packages/admin-contracts/src/staff.ts'
-      - 'packages/admin-contracts/src/index.ts'
-      - 'e2e/admin-workforce.spec.ts'
-      - 'package.json'
-      - '.github/workflows/admin-plan6-workforce-tdd.yml'
 
 jobs:
   finance-core-static:
@@ -53,199 +16,121 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Finance core migration invariants
-        run: node scripts/test-admin-finance-core-migration.mjs
-
+        with: { node-version: 24 }
+      - run: node scripts/test-admin-finance-core-migration.mjs
   finance-core-postgres:
     needs: finance-core-static
     runs-on: ubuntu-latest
-    env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    env: { TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres }
     services:
       postgres:
         image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U postgres -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Finance core PostgreSQL behavior
-        run: node scripts/test-admin-finance-core-postgres.mjs
-
+        with: { node-version: 24 }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: node scripts/test-admin-finance-core-postgres.mjs
   workforce-static:
     needs: finance-core-postgres
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Workforce migration invariants
-        run: node scripts/test-admin-workforce-migration.mjs
-
+        with: { node-version: 24 }
+      - run: node scripts/test-admin-workforce-migration.mjs
   workforce-postgres:
     needs: workforce-static
     runs-on: ubuntu-latest
-    env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    env: { TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres }
     services:
       postgres:
         image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U postgres -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Workforce PostgreSQL behavior
-        run: node scripts/test-admin-workforce-postgres.mjs
-      - name: Workforce deep-review PostgreSQL regressions
-        run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
-      - name: Workforce tenant-isolation PostgreSQL behavior
-        run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
-      - name: Cross-plan terminal approval replay behavior
-        run: node scripts/test-admin-workforce-order-approval-terminal-replay-postgres.mjs
-
+        with: { node-version: 24 }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: node scripts/test-admin-workforce-postgres.mjs
+      - run: node scripts/test-admin-workforce-review-hardening-postgres.mjs
+      - run: node scripts/test-admin-workforce-reactivation-postgres.mjs
+      - run: node scripts/test-admin-workforce-tenant-isolation-postgres.mjs
+      - run: node scripts/test-admin-workforce-order-approval-terminal-replay-postgres.mjs
   employee-pin-security:
     needs: workforce-postgres
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
-      - name: Workforce employee PIN tests
-        run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/staff/staffApproval.test.ts apps/admin/server/reauth.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
-      - name: Admin and Operations PIN format compatibility
-        run: node scripts/test-admin-worker-pin-compatibility.mjs
-
+      - run: npx vitest run apps/admin/server/staff/employeePin.test.ts apps/admin/server/staff/staffApproval.test.ts apps/admin/server/reauth.test.ts apps/admin/server/pin.test.ts apps/operations-desktop/src/main/pinVerifier.test.ts
+      - run: node scripts/test-admin-worker-pin-compatibility.mjs
   workforce-services:
     needs: employee-pin-security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
-      - name: Workforce service tests
-        run: npx vitest run apps/admin/server/staff/staffService.test.ts apps/admin/server/staff/staffApprovalRouting.test.ts apps/admin/server/staff/staffStore.test.ts apps/admin/server/staff/staffApi.test.ts
-      - name: Admin server and API typecheck
-        run: npx tsc --noEmit -p tsconfig.api.json
-
+      - run: npx vitest run apps/admin/server/staff/staffService.test.ts apps/admin/server/staff/staffApprovalRouting.test.ts apps/admin/server/staff/staffStore.test.ts apps/admin/server/staff/staffApi.test.ts
+      - run: npx tsc --noEmit -p tsconfig.api.json
   workforce-calculations:
     needs: workforce-services
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
-      - name: Workforce time and wage calculations
-        run: npx vitest run apps/admin/server/staff/timekeeping.test.ts apps/admin/server/staff/wages.test.ts apps/admin/server/staff/attendanceSummary.test.ts
-      - name: Admin typecheck
-        run: npx tsc --noEmit -p tsconfig.api.json
-
+      - run: npx vitest run apps/admin/server/staff/timekeeping.test.ts apps/admin/server/staff/wages.test.ts apps/admin/server/staff/attendanceSummary.test.ts
+      - run: npx tsc --noEmit -p tsconfig.api.json
   workforce-ui:
     needs: workforce-calculations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
-      - name: Workforce component tests
-        run: npx vitest run apps/admin/src/lib/adminApi.test.ts apps/admin/src/lib/retainedCommandIds.test.ts apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/StaffMetricsPanel.test.tsx apps/admin/src/staff/useStaff.test.ts apps/admin/src/staff/businessTime.test.ts
-      - name: Admin workspace typecheck
-        run: npm run typecheck -w @tux/admin
-
+      - run: npx vitest run apps/admin/src/lib/adminApi.test.ts apps/admin/src/lib/retainedCommandIds.test.ts apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/PermissionsEditor.test.tsx apps/admin/src/staff/StaffMetricsPanel.test.tsx apps/admin/src/staff/useStaff.test.ts apps/admin/src/staff/businessTime.test.ts
+      - run: npm run typecheck -w @tux/admin
   workforce-e2e:
     needs: workforce-ui
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
+        with: { node-version: 24, cache: npm }
       - run: npm ci
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Workforce E2E
-        run: npx playwright test --config playwright.admin.config.ts e2e/admin-workforce.spec.ts
-
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.admin.config.ts e2e/admin-workforce.spec.ts
   workforce-regression:
     needs: workforce-e2e
     runs-on: ubuntu-latest
-    env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    env: { TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres }
     services:
       postgres:
         image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U postgres -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Full migration regression
-        run: npm run test:migrations
-      - name: Full unit and integration regression
-        run: npm test
-      - name: Full repository typecheck
-        run: npm run typecheck
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: npm run test:migrations
+      - run: npm test
+      - run: npm run typecheck
