@@ -44,7 +44,7 @@ export type StaffApprovalExecutionDependencies = {
     shopId: string;
     expectedVersion: number;
     permissionKey: string;
-    effect: 'ALLOW' | 'DENY';
+    effect: 'ALLOW' | 'DENY' | 'INHERIT';
     commandId: string;
     approvalRequestId: string;
   }): Promise<StaffApprovalExecutionResult>;
@@ -173,7 +173,7 @@ function permissionApprovalPayload(input: unknown): Readonly<Record<string, unkn
   const value = record(input);
   assertOnlyKeys(value, ['employeeId', 'shopId', 'expectedVersion', 'permissionKey', 'effect']);
   const effect = requiredString(value['effect']);
-  if (effect !== 'ALLOW' && effect !== 'DENY') {
+  if (effect !== 'ALLOW' && effect !== 'DENY' && effect !== 'INHERIT') {
     throw new ApprovalTerminalCommandError('approval_staff_payload_invalid');
   }
   return {
@@ -325,7 +325,7 @@ export function createStaffApprovalExecutionEntries(
             shopId: ensureClaimShop(claim.shopId, value['shopId'] as string),
             expectedVersion: value['expectedVersion'] as number,
             permissionKey: value['permissionKey'] as string,
-            effect: value['effect'] as 'ALLOW' | 'DENY',
+            effect: value['effect'] as 'ALLOW' | 'DENY' | 'INHERIT',
             commandId: claim.commandId,
             approvalRequestId: claim.approvalRequestId,
           }),
