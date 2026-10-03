@@ -1,8 +1,6 @@
 import type {
-  AdminApprovalExecutionClaim,
-  AdminApprovalStatus,
-  AdminOrderFinancialEvent,
   AdminOrderFinancialMutationResult,
+  AdminApprovalExecutionClaim,
 } from '@tux/admin-contracts';
 
 import {
@@ -38,16 +36,6 @@ export type OrderApprovalExecutionDependencies = {
   executeRefund(input: ApprovedRefundExecutionInput): Promise<AdminOrderFinancialMutationResult>;
   executeReturn(input: ApprovedReturnExecutionInput): Promise<AdminOrderFinancialMutationResult>;
 };
-
-export function orderFinancialEventState(
-  rowState: 'PENDING_APPROVAL' | 'POSTED',
-  approvalStatus: AdminApprovalStatus | null,
-): AdminOrderFinancialEvent['state'] {
-  if (rowState === 'POSTED') return 'POSTED';
-  if (approvalStatus === 'REJECTED') return 'REJECTED';
-  if (approvalStatus === 'FAILED') return 'FAILED';
-  return 'PENDING_APPROVAL';
-}
 
 function record(value: unknown): Readonly<Record<string, unknown>> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
