@@ -1,6 +1,7 @@
 -- TUX Admin Plan 6: exact-head review hardening follow-up.
 -- Closes shop-scope pivot assignment, create-role hierarchy escalation,
--- and employee reactivation PIN collisions with active Operations workers.
+-- privileged initial-role approval bypass, and employee reactivation PIN
+-- collisions with active Operations workers.
 
 create or replace function public.assign_employee_to_shop_v1(
   p_actor_employee_id uuid,
@@ -166,6 +167,12 @@ begin
   end if;
   if p_role = 'MANAGER' and v_auth.employee_role not in ('OWNER','ADMIN','MANAGER') then
     return jsonb_build_object('ok', false, 'code', 'role_escalation_forbidden');
+  end if;
+
+  -- Elevated roles are mutations of privilege and must flow through the
+  -- approval-routed employee.role command. New identities start as STAFF.
+  if p_role <> 'STAFF' then
+    return jsonb_build_object('ok', false, 'code', 'initial_role_requires_promotion');
   end if;
 
   v_business_id := v_auth.business_id;
