@@ -66,6 +66,11 @@ export function EmployeeDetailPage({
   const setupRequired = employee.operationsIdentities.filter(
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
+  const inactiveOperationsIdentities = employee.operationsIdentities.filter(
+    (identity) => identity.kind === 'LINKED' && !identity.workerActive,
+  );
+  const operationsHealthy =
+    setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
 
   return (
     <article aria-label={`Employee ${employee.displayName}`}>
@@ -307,9 +312,48 @@ export function EmployeeDetailPage({
                   <span>No unlinked active Operations worker is available for this shop.</span>
                 ) : null}
               </div>
-            ) : (
-              <p>Operations identity linked for every assigned shop.</p>
-            )}
+            ) : null}
+
+            {inactiveOperationsIdentities.length > 0 ? (
+              <div className="admin-empty-state">
+                <strong>Operations identity disabled</strong>
+                <span>
+                  Operations access requires explicit reactivation for the preserved linked identity.
+                </span>
+                {inactiveOperationsIdentities.map((identity) => (
+                  <article className="admin-more-card" key={identity.shopId}>
+                    <strong>{identity.workerName}</strong>
+                    <span>Shop {identity.shopId} · worker preserved but inactive</span>
+                    {canManage && employee.active ? (
+                      <button
+                        className="admin-secondary-button"
+                        type="button"
+                        disabled={!actorPin}
+                        onClick={() =>
+                          onSensitiveCommand(
+                            {
+                              type: 'employee.reactivate-worker',
+                              employeeId: employee.id,
+                              shopId: identity.shopId,
+                              workerId: identity.workerId,
+                              expectedEmployeeCredentialVersion: employee.credentialVersion,
+                              expectedWorkerCredentialVersion: identity.credentialVersion,
+                            },
+                            actorPin,
+                          )
+                        }
+                      >
+                        Reactivate Operations identity
+                      </button>
+                    ) : canManage ? (
+                      <span>Reactivate the employee before restoring Operations access.</span>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+
+            {operationsHealthy ? <p>Operations identity linked and active for every assigned shop.</p> : null}
           </section>
           <StaffMetricsPanel employee={employee} />
           {canManage ? (
