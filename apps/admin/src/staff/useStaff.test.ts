@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AdminApiError } from '../lib/adminApi';
 import {
+  createEphemeralStaffCommandIds,
   staffCommandErrorIsTerminal,
   staffCommandIntentForRetention,
   staffCommandUsesApprovalPin,
@@ -54,6 +55,25 @@ describe('Workforce retained command intent', () => {
         commandId,
       }),
     ).toBeNull();
+  });
+
+  it('rotates an ephemeral PIN command id after terminal completion but retains it across ambiguity', () => {
+    const generated = [
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    ];
+    const ids = createEphemeralStaffCommandIds(() => generated.shift()!);
+    const seed = '11111111-1111-4111-8111-111111111111';
+
+    expect(ids.forSeed(seed)).toBe(seed);
+    expect(ids.forSeed(seed)).toBe(seed);
+
+    ids.complete(seed);
+    expect(ids.forSeed(seed)).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(ids.forSeed(seed)).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+    ids.complete(seed);
+    expect(ids.forSeed(seed)).toBe('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   });
 
   it('sends requester PIN only to approval-capable commands after recent reauth', () => {
