@@ -72,6 +72,7 @@ const B = '71000000-0000-4000-8000-000000000001',
   OWNER = '73000000-0000-4000-8000-000000000001',
   STAFF = '73000000-0000-4000-8000-000000000002',
   UNAUTHORIZED = '73000000-0000-4000-8000-000000000003',
+  ADMIN = '73000000-0000-4000-8000-000000000006',
   PEER_OWNER = '73000000-0000-4000-8000-000000000004',
   INACTIVE = '73000000-0000-4000-8000-000000000005',
   WORKER = '74000000-0000-4000-8000-000000000001',
@@ -82,7 +83,7 @@ const verifier = (x) => `pbkdf2-sha256$210000$${x.repeat(32)}$${x.repeat(64)}`;
 psql(
   [
     '-c',
-    `insert into public.businesses(id,name) values('${B}','Lifecycle'); insert into public.shops(id,name,active) values('${S}','Lifecycle Shop',true),('${S2}','Other Shop',true); insert into public.business_shops(business_id,shop_id) values('${B}','${S}'),('${B}','${S2}'); insert into public.business_employees(id,business_id,display_name,role,pin_lookup_hash,pin_hash,active) values('${OWNER}','${B}','Owner','OWNER',repeat('1',64),'${verifier('1')}',true),('${STAFF}','${B}','Staff','STAFF',repeat('2',64),'${verifier('2')}',true),('${UNAUTHORIZED}','${B}','Unauthorized','STAFF',repeat('4',64),'${verifier('4')}',true),('${PEER_OWNER}','${B}','Peer Owner','OWNER',repeat('5',64),'${verifier('5')}',true),('${INACTIVE}','${B}','Inactive','STAFF',repeat('6',64),'${verifier('6')}',false); insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values('${B}','${OWNER}','${S}'),('${B}','${OWNER}','${S2}'),('${B}','${STAFF}','${S}'),('${B}','${STAFF}','${S2}'),('${B}','${UNAUTHORIZED}','${S}'),('${B}','${PEER_OWNER}','${S}'),('${B}','${INACTIVE}','${S}'); insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${WORKER}','${S}','Staff Ops','${verifier('2')}',repeat('2',64),true),('${UNLINKED}','${S}','Unlinked','${verifier('7')}',repeat('7',64),false); insert into public.employee_worker_links(business_id,employee_id,shop_id,worker_id,active,linked_by_employee_id,link_command_id) values('${B}','${STAFF}','${S}','${WORKER}',true,'${OWNER}','reactivation-fixture-link');`,
+    `insert into public.businesses(id,name) values('${B}','Lifecycle'); insert into public.shops(id,name,active) values('${S}','Lifecycle Shop',true),('${S2}','Other Shop',true); insert into public.business_shops(business_id,shop_id) values('${B}','${S}'),('${B}','${S2}'); insert into public.business_employees(id,business_id,display_name,role,pin_lookup_hash,pin_hash,active) values('${OWNER}','${B}','Owner','OWNER',repeat('1',64),'${verifier('1')}',true),('${STAFF}','${B}','Staff','STAFF',repeat('2',64),'${verifier('2')}',true),('${UNAUTHORIZED}','${B}','Unauthorized','STAFF',repeat('4',64),'${verifier('4')}',true),('${PEER_OWNER}','${B}','Peer Owner','OWNER',repeat('5',64),'${verifier('5')}',true),('${INACTIVE}','${B}','Inactive','STAFF',repeat('6',64),'${verifier('6')}',false),('${ADMIN}','${B}','Admin','ADMIN',repeat('8',64),'${verifier('8')}',true); insert into public.employee_shop_assignments(business_id,employee_id,shop_id) values('${B}','${OWNER}','${S}'),('${B}','${OWNER}','${S2}'),('${B}','${STAFF}','${S}'),('${B}','${UNAUTHORIZED}','${S}'),('${B}','${PEER_OWNER}','${S}'),('${B}','${INACTIVE}','${S}'),('${B}','${ADMIN}','${S}'); insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${WORKER}','${S}','Staff Ops','${verifier('2')}',repeat('2',64),true),('${UNLINKED}','${S}','Unlinked','${verifier('7')}',repeat('7',64),false); insert into public.employee_worker_links(business_id,employee_id,shop_id,worker_id,active,linked_by_employee_id,link_command_id) values('${B}','${STAFF}','${S}','${WORKER}',true,'${OWNER}','reactivation-fixture-link');`,
   ],
   'fixtures',
 );
@@ -132,7 +133,7 @@ expect(
   'employee reactivation silently enabled worker',
 );
 const inactiveWorkerFingerprint = rpc(
-  `public.get_employee_worker_state_fingerprint_v1('${OWNER}','${B}','${STAFF}',array['${S}'::uuid,'${S2}'::uuid])`,
+  `public.get_employee_worker_state_fingerprint_v1('${OWNER}','${B}','${STAFF}',array['${S}'::uuid])`,
   'inactive worker fingerprint',
 );
 expect(
@@ -147,7 +148,7 @@ const pinChangeVersion = Number(
   ),
 );
 const pinChange = rpc(
-  `public.stage_employee_pin_change_v1('${OWNER}','${STAFF}',array['${S}'::uuid,'${S2}'::uuid],'${verifier('3')}',repeat('3',64),${pinChangeVersion},'${inactiveWorkerFingerprint.fingerprint}',now()+interval '1 hour','75000000-0000-4000-8000-000000000001')`,
+  `public.stage_employee_pin_change_v1('${OWNER}','${STAFF}',array['${S}'::uuid],'${verifier('3')}',repeat('3',64),${pinChangeVersion},'${inactiveWorkerFingerprint.fingerprint}',now()+interval '1 hour','75000000-0000-4000-8000-000000000001')`,
   'stage PIN change with inactive worker',
 );
 expect(
@@ -204,7 +205,7 @@ const wrongShop = rpc(
   'wrong shop',
 );
 expect(
-  wrongShop.ok === false && wrongShop.code === 'worker_shop_mismatch',
+  wrongShop.ok === false && wrongShop.code === 'employee_shop_assignment_required',
   `wrong shop accepted ${JSON.stringify(wrongShop)}`,
 );
 const wrongLink = rpc(
@@ -220,11 +221,11 @@ const unauthorized = rpc(
   'unauthorized actor',
 );
 expect(
-  unauthorized.ok === false && unauthorized.code === 'permission_forbidden',
+  unauthorized.ok === false && unauthorized.code === 'permission_denied',
   `missing staff.manage accepted ${JSON.stringify(unauthorized)}`,
 );
 const hierarchy = rpc(
-  `public.reactivate_employee_worker_v1('${OWNER}','${PEER_OWNER}','${S}','${WORKER}',1,${workerCredential},'reactivation-hierarchy')`,
+  `public.reactivate_employee_worker_v1('${ADMIN}','${PEER_OWNER}','${S}','${WORKER}',1,${workerCredential},'reactivation-hierarchy')`,
   'target hierarchy',
 );
 expect(
@@ -286,7 +287,7 @@ expect(
 psql(
   [
     '-c',
-    `update public.workers set active=false where id='${WORKER}'; insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${OTHER}','${S}','Collision','${verifier('2')}',repeat('2',64),true);`,
+    `update public.workers set active=false where id='${WORKER}'; insert into public.workers(id,shop_id,display_name,pin_hash,pin_lookup_hash,active) values('${OTHER}','${S}','Collision','${verifier('3')}',repeat('3',64),true);`,
   ],
   'collision fixture',
 );
