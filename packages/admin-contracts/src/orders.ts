@@ -86,7 +86,7 @@ export type AdminOrderStatusEvent = {
 export type AdminOrderFinancialEvent = {
   id: string;
   kind: 'REFUND' | 'RETURN';
-  state: 'PENDING_APPROVAL' | 'POSTED';
+  state: 'PENDING_APPROVAL' | 'POSTED' | 'REJECTED' | 'FAILED';
   amountMinor: number;
   approvalRequestId: string | null;
   reason: AdminOrderReasonSnapshot;
