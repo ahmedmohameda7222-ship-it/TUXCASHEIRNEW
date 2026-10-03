@@ -31,6 +31,23 @@ export function staffEphemeralCommandId(draft: StaffApiCommandDraft): string | n
     : null;
 }
 
+export function createEphemeralStaffCommandIds(
+  createId: () => string = () => crypto.randomUUID(),
+) {
+  const active = new Map<string, string>();
+  return {
+    forSeed(seed: string): string {
+      const current = active.get(seed);
+      if (current) return current;
+      active.set(seed, seed);
+      return seed;
+    },
+    complete(seed: string): void {
+      active.set(seed, createId());
+    },
+  };
+}
+
 export function staffCommandUsesApprovalPin(draft: StaffApiCommandDraft): boolean {
   return APPROVAL_PIN_COMMAND_TYPES.has(draft.type);
 }
@@ -52,6 +69,7 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
       ? `${session.state.session.principal.businessId}:${session.state.session.principal.employeeId}`
       : 'unauthenticated';
   const commandIds = useMemo(() => createRetainedCommandIds(namespace), [namespace]);
+  const ephemeralCommandIds = useMemo(() => createEphemeralStaffCommandIds(), [namespace]);
 
   const workspaceQuery = useQuery({
     queryKey: ['admin', 'staff', shopId, 'workspace'],
@@ -75,8 +93,11 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
     if (!shopId) throw new Error('concrete_shop_required');
     const intent = staffCommandIntentForRetention(draft);
     const scope = `staff.${draft.type}`;
-    const ephemeralCommandId = staffEphemeralCommandId(draft);
-    const commandId = ephemeralCommandId ?? commandIds.forIntent(scope, intent);
+    const ephemeralCommandSeed = staffEphemeralCommandId(draft);
+    const commandId =
+      ephemeralCommandSeed === null
+        ? commandIds.forIntent(scope, intent)
+        : ephemeralCommandIds.forSeed(ephemeralCommandSeed);
 
     try {
       const result = await adminFetch<StaffCommandResult>(
@@ -91,13 +112,15 @@ export function useStaff(shopId: string | undefined, employeeId: string | null) 
         },
         csrfToken(session),
       );
-      if (ephemeralCommandId === null && !isPendingApprovalResult(result)) {
-        commandIds.complete(scope, intent);
+      if (!isPendingApprovalResult(result)) {
+        if (ephemeralCommandSeed === null) commandIds.complete(scope, intent);
+        else ephemeralCommandIds.complete(ephemeralCommandSeed);
       }
       return result;
     } catch (error) {
-      if (ephemeralCommandId === null && staffCommandErrorIsTerminal(error)) {
-        commandIds.complete(scope, intent);
+      if (staffCommandErrorIsTerminal(error)) {
+        if (ephemeralCommandSeed === null) commandIds.complete(scope, intent);
+        else ephemeralCommandIds.complete(ephemeralCommandSeed);
       }
       throw error;
     }
