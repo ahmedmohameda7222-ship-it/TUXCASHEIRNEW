@@ -132,7 +132,7 @@ expect(
   'employee reactivation silently enabled worker',
 );
 const inactiveWorkerFingerprint = rpc(
-  `public.get_employee_worker_state_fingerprint_v1('${OWNER}','${B}','${STAFF}',array['${S}'::uuid])`,
+  `public.get_employee_worker_state_fingerprint_v1('${OWNER}','${B}','${STAFF}',array['${S}'::uuid,'${S2}'::uuid])`,
   'inactive worker fingerprint',
 );
 expect(
@@ -147,7 +147,7 @@ const pinChangeVersion = Number(
   ),
 );
 const pinChange = rpc(
-  `public.stage_employee_pin_change_v1('${OWNER}','${STAFF}',array['${S}'::uuid],'${verifier('3')}',repeat('3',64),${pinChangeVersion},'${inactiveWorkerFingerprint.fingerprint}',now()+interval '1 hour','75000000-0000-4000-8000-000000000001')`,
+  `public.stage_employee_pin_change_v1('${OWNER}','${STAFF}',array['${S}'::uuid,'${S2}'::uuid],'${verifier('3')}',repeat('3',64),${pinChangeVersion},'${inactiveWorkerFingerprint.fingerprint}',now()+interval '1 hour','75000000-0000-4000-8000-000000000001')`,
   'stage PIN change with inactive worker',
 );
 expect(
