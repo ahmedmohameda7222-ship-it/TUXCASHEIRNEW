@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const targetMigration = '20261002221500_admin_workforce_review_hardening.sql';
+const targetMigration = '20261003001500_admin_workforce_review_hardening_followup.sql';
 if (!existsSync(resolve('supabase/migrations', targetMigration))) {
   throw new Error('Admin Plan 6 Workforce hardening migration missing from repository chain.');
 }
