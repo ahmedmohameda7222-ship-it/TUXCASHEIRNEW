@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const targetMigration = '20261003101600_admin_workforce_pin_business_unique.sql';
+const targetMigration = '20261003101800_admin_workforce_pin_command_tenant_scope.sql';
 if (!existsSync(resolve('supabase/migrations', targetMigration))) {
   throw new Error('Admin Plan 6 Workforce PIN tenant-isolation migration missing.');
 }
@@ -103,19 +103,42 @@ if (!scopedIndex.includes('(business_id, pin_lookup_hash)')) {
   throw new Error(`employee PIN lookup uniqueness is not business-scoped: ${scopedIndex}`);
 }
 
+const scopedCommandConstraint = scalar(
+  `select pg_get_constraintdef(oid) from pg_constraint where conrelid='private.admin_employee_pin_change_commands'::regclass and conname='admin_employee_pin_change_commands_business_command_uq'`,
+  'PIN staging command id constraint',
+);
+if (!scopedCommandConstraint.includes('UNIQUE (business_id, command_id)')) {
+  throw new Error(`PIN staging command id is not business-scoped: ${scopedCommandConstraint}`);
+}
+
+const fingerprintB = scalar(
+  `select private.workforce_worker_state_fingerprint_v1('${STAFF2}', array['${S2}'::uuid])`,
+  'tenant B worker fingerprint',
+);
+const stageB = rpc(
+  `public.stage_employee_pin_change_v1('${OWNER2}','${STAFF2}',array['${S2}'::uuid],'${verifier('7')}',repeat('7',64),1,'${fingerprintB}',now()+interval '10 minutes','${STAGE_COMMAND}')`,
+  'stage tenant B PIN command with shared command id',
+);
+if (!stageB.ok) {
+  throw new Error(`tenant B PIN staging failed: ${JSON.stringify(stageB)}`);
+}
+
 const fingerprint = scalar(
   `select private.workforce_worker_state_fingerprint_v1('${TARGET1}', array['${S1}'::uuid])`,
   'target worker fingerprint',
 );
 const stage = rpc(
   `public.stage_employee_pin_change_v1('${OWNER1}','${TARGET1}',array['${S1}'::uuid],'${verifier('8')}',repeat('8',64),1,'${fingerprint}',now()+interval '10 minutes','${STAGE_COMMAND}')`,
-  'stage same PIN used only in another business',
+  'stage same PIN used only in another business with shared command id',
 );
 if (!stage.ok) {
-  throw new Error(`cross-tenant employee PIN incorrectly blocked staging: ${JSON.stringify(stage)}`);
+  throw new Error(`cross-tenant employee PIN or command id incorrectly blocked staging: ${JSON.stringify(stage)}`);
 }
 if (typeof stage.commandRef !== 'string') {
   throw new Error(`credential command ref missing: ${JSON.stringify(stage)}`);
+}
+if (stage.commandRef === stageB.commandRef) {
+  throw new Error('cross-tenant PIN staging commands shared an opaque command reference');
 }
 
 const apply = rpc(
