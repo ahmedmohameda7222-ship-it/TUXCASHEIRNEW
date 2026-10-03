@@ -17,6 +17,10 @@ on:
       - 'apps/admin/server/reauth.ts'
       - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/src/staff/**'
+      - 'apps/admin/src/lib/adminApi.ts'
+      - 'apps/admin/src/lib/adminApi.test.ts'
+      - 'apps/admin/src/lib/retainedCommandIds.ts'
+      - 'apps/admin/src/lib/retainedCommandIds.test.ts'
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -32,6 +36,10 @@ on:
       - 'apps/admin/server/reauth.ts'
       - 'apps/admin/server/reauth.test.ts'
       - 'apps/admin/src/staff/**'
+      - 'apps/admin/src/lib/adminApi.ts'
+      - 'apps/admin/src/lib/adminApi.test.ts'
+      - 'apps/admin/src/lib/retainedCommandIds.ts'
+      - 'apps/admin/src/lib/retainedCommandIds.test.ts'
       - 'apps/admin/src/app/routes.tsx'
       - 'packages/admin-contracts/src/staff.ts'
       - 'packages/admin-contracts/src/index.ts'
@@ -181,7 +189,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Workforce component tests
-        run: npx vitest run apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/StaffMetricsPanel.test.tsx apps/admin/src/staff/useStaff.test.ts apps/admin/src/staff/businessTime.test.ts
+        run: npx vitest run apps/admin/src/lib/adminApi.test.ts apps/admin/src/lib/retainedCommandIds.test.ts apps/admin/src/staff/EmployeeDetailPage.test.tsx apps/admin/src/staff/StaffMetricsPanel.test.tsx apps/admin/src/staff/useStaff.test.ts apps/admin/src/staff/businessTime.test.ts
       - name: Admin workspace typecheck
         run: npm run typecheck -w @tux/admin
 
