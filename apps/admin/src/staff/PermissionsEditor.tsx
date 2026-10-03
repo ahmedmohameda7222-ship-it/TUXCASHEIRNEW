@@ -26,6 +26,7 @@ export function PermissionsEditor({
         {ADMIN_PERMISSIONS.map((permission) => {
           const explicitlyAllowed = employee.customPermissions.includes(permission);
           const explicitlyDenied = employee.customDeniedPermissions?.includes(permission) ?? false;
+          const hasExplicitOverride = explicitlyAllowed || explicitlyDenied;
           const overrideState = explicitlyAllowed
             ? 'Explicit allow'
             : explicitlyDenied
@@ -75,6 +76,26 @@ export function PermissionsEditor({
                   }
                 >
                   Deny
+                </button>
+                <button
+                  className="admin-secondary-button"
+                  type="button"
+                  disabled={!canManage || !actorPin || !hasExplicitOverride}
+                  onClick={() =>
+                    onSensitiveCommand(
+                      {
+                        type: 'employee.permission',
+                        employeeId: employee.id,
+                        shopId,
+                        permissionKey: permission,
+                        effect: 'INHERIT',
+                        expectedVersion: employee.profileVersion,
+                      },
+                      actorPin,
+                    )
+                  }
+                >
+                  Use role default
                 </button>
               </div>
             </article>
