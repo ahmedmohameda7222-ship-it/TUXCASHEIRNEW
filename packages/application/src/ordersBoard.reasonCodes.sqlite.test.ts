@@ -36,23 +36,35 @@ const cancellationReason = {
   scope: 'SHOP' as const,
 };
 
-const temporaryDirectories: string[] = [];
+const fixtures: Array<{
+  directory: string;
+  database: SqliteOperationsDatabase;
+  readModel: SqliteOperatorSessionReadModel;
+}> = [];
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true })),
-  );
+  for (const fixture of fixtures.splice(0)) {
+    const errors: unknown[] = [];
+    for (const resource of [fixture.readModel, fixture.database]) {
+      try {
+        await resource.close();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0)
+      throw new AggregateError(errors, 'Failed to close SQLite fixture resources');
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
 });
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'tux-reason-code-'));
-  temporaryDirectories.push(directory);
   const path = join(directory, 'operations.sqlite3');
   const database = new SqliteOperationsDatabase(path);
   await database.initialize();
   const readModel = new SqliteOperatorSessionReadModel(path);
+  fixtures.push({ directory, database, readModel });
 
   const order: OrderSnapshot = {
     id: orderId,
@@ -155,174 +167,154 @@ async function fixture() {
 describe('configured cancellation reasons', () => {
   it('exposes active published cancellation reasons to the Orders Board UI', async () => {
     const test = await fixture();
-    try {
-      const board = await test.service.loadBoard();
-      expect(board.ok).toBe(true);
-      if (!board.ok) throw new Error(board.error.message);
-      expect(board.value.cancellationReasonMode).toBe('CONFIGURED');
-      expect(board.value.cancellationReasons).toEqual([
-        {
-          id: cancellationReason.id,
-          key: cancellationReason.key,
-          label: cancellationReason.label,
-          version: cancellationReason.version,
-          scope: cancellationReason.scope,
-        },
-      ]);
-    } finally {
-      await test.readModel.close();
-    }
+    const board = await test.service.loadBoard();
+    expect(board.ok).toBe(true);
+    if (!board.ok) throw new Error(board.error.message);
+    expect(board.value.cancellationReasonMode).toBe('CONFIGURED');
+    expect(board.value.cancellationReasons).toEqual([
+      {
+        id: cancellationReason.id,
+        key: cancellationReason.key,
+        label: cancellationReason.label,
+        version: cancellationReason.version,
+        scope: cancellationReason.scope,
+      },
+    ]);
   });
 
   it('uses the active configured reason as immutable cancellation authority and keeps free text as note only', async () => {
     const test = await fixture();
-    try {
-      const input = {
-        orderId,
-        foodPrepared: true,
-        reason: 'arbitrary legacy free text',
-        reasonCodeId: cancellationReason.id,
-        note: 'Customer called after placing the order',
-      } as CancelOrderInput & { readonly reasonCodeId: string; readonly note: string };
+    const input = {
+      orderId,
+      foodPrepared: true,
+      reason: 'arbitrary legacy free text',
+      reasonCodeId: cancellationReason.id,
+      note: 'Customer called after placing the order',
+    } as CancelOrderInput & { readonly reasonCodeId: string; readonly note: string };
 
-      const result = await test.service.cancelOrder(input);
-      if (!result.ok) {
-        const cause =
-          result.error.cause instanceof Error ? result.error.cause.message : result.error.cause;
-        throw new Error(
-          `Expected configured cancellation to succeed, got ${result.error.code}: ${result.error.message}; cause=${String(cause ?? 'none')}`,
-        );
-      }
-
-      expect(orderLifecycle(result.value).cancellation as unknown).toEqual(
-        expect.objectContaining({
-          reason: cancellationReason.label,
-          note: 'Customer called after placing the order',
-          reasonCode: {
-            id: cancellationReason.id,
-            key: cancellationReason.key,
-            family: cancellationReason.family,
-            label: cancellationReason.label,
-            version: cancellationReason.version,
-            scope: cancellationReason.scope,
-          },
-        }),
+    const result = await test.service.cancelOrder(input);
+    if (!result.ok) {
+      const cause =
+        result.error.cause instanceof Error ? result.error.cause.message : result.error.cause;
+      throw new Error(
+        `Expected configured cancellation to succeed, got ${result.error.code}: ${result.error.message}; cause=${String(cause ?? 'none')}`,
       );
-    } finally {
-      await test.readModel.close();
     }
+
+    expect(orderLifecycle(result.value).cancellation as unknown).toEqual(
+      expect.objectContaining({
+        reason: cancellationReason.label,
+        note: 'Customer called after placing the order',
+        reasonCode: {
+          id: cancellationReason.id,
+          key: cancellationReason.key,
+          family: cancellationReason.family,
+          label: cancellationReason.label,
+          version: cancellationReason.version,
+          scope: cancellationReason.scope,
+        },
+      }),
+    );
   });
 
   it('rejects free-text-only cancellation once published cancellation reasons are configured', async () => {
     const test = await fixture();
-    try {
-      const result = await test.service.cancelOrder({
-        orderId,
-        foodPrepared: true,
-        reason: 'typed reason must not become canonical',
-      });
+    const result = await test.service.cancelOrder({
+      orderId,
+      foodPrepared: true,
+      reason: 'typed reason must not become canonical',
+    });
 
-      expect(result.ok).toBe(false);
-      if (result.ok)
-        throw new Error('configured cancellation unexpectedly succeeded without reason code');
-      expect(result.error.code).toBe('CONFLICT_ERROR');
-      expect(result.error.message).toMatch(/published cancellation reason/i);
-    } finally {
-      await test.readModel.close();
-    }
+    expect(result.ok).toBe(false);
+    if (result.ok)
+      throw new Error('configured cancellation unexpectedly succeeded without reason code');
+    expect(result.error.code).toBe('CONFLICT_ERROR');
+    expect(result.error.message).toMatch(/published cancellation reason/i);
   });
 
   it('keeps free-text cancellation during rollout when settings exist but no active cancellation vocabulary is published', async () => {
     const test = await fixture();
-    try {
-      await test.database.transaction((transaction) =>
-        transaction.configuration.put({
-          shopId,
-          version: 12,
-          updatedAt: createdAt,
-          categories: [],
-          products: [],
-          modifiers: [],
-          productModifierLinks: [],
-          comboBeverageOptions: [],
-          recipeLines: [],
-          orderTypes: [],
-          paymentMethods: [],
-          deliveryZones: [],
-          settings: {
-            version: 7,
-            values: {},
-            shopIdentity: {
-              shopId,
-              displayName: 'TUX Maadi',
-              address: null,
-              phone: null,
-              latitude: null,
-              longitude: null,
-              timezone: 'Africa/Cairo',
-              lifecycleState: 'ACTIVE',
-              temporaryClosed: false,
-              onlineOrdersPaused: false,
-            },
-            weeklyHours: [],
-            specialHours: [],
-            paymentMethodZoneRules: [],
+    await test.database.transaction((transaction) =>
+      transaction.configuration.put({
+        shopId,
+        version: 12,
+        updatedAt: createdAt,
+        categories: [],
+        products: [],
+        modifiers: [],
+        productModifierLinks: [],
+        comboBeverageOptions: [],
+        recipeLines: [],
+        orderTypes: [],
+        paymentMethods: [],
+        deliveryZones: [],
+        settings: {
+          version: 7,
+          values: {},
+          shopIdentity: {
+            shopId,
+            displayName: 'TUX Maadi',
+            address: null,
+            phone: null,
+            latitude: null,
+            longitude: null,
+            timezone: 'Africa/Cairo',
+            lifecycleState: 'ACTIVE',
+            temporaryClosed: false,
+            onlineOrdersPaused: false,
           },
-          reasonCodes: [],
-        }),
-      );
+          weeklyHours: [],
+          specialHours: [],
+          paymentMethodZoneRules: [],
+        },
+        reasonCodes: [],
+      }),
+    );
 
-      const board = await test.service.loadBoard();
-      expect(board.ok).toBe(true);
-      if (!board.ok) throw new Error(board.error.message);
-      expect(board.value.cancellationReasonMode).toBe('LEGACY_FREE_TEXT');
+    const board = await test.service.loadBoard();
+    expect(board.ok).toBe(true);
+    if (!board.ok) throw new Error(board.error.message);
+    expect(board.value.cancellationReasonMode).toBe('LEGACY_FREE_TEXT');
 
-      const result = await test.service.cancelOrder({
-        orderId,
-        foodPrepared: true,
-        reason: 'Rollout free-text reason',
-      });
-      expect(result.ok).toBe(true);
-    } finally {
-      await test.readModel.close();
-    }
+    const result = await test.service.cancelOrder({
+      orderId,
+      foodPrepared: true,
+      reason: 'Rollout free-text reason',
+    });
+    expect(result.ok).toBe(true);
   });
 
   it('keeps free-text cancellation only for a genuinely pre-feature configuration snapshot', async () => {
     const test = await fixture();
-    try {
-      await test.database.transaction((transaction) =>
-        transaction.configuration.put({
-          shopId,
-          version: 12,
-          updatedAt: createdAt,
-          categories: [],
-          products: [],
-          modifiers: [],
-          productModifierLinks: [],
-          comboBeverageOptions: [],
-          recipeLines: [],
-          orderTypes: [],
-          paymentMethods: [],
-          deliveryZones: [],
-          settings: null,
-          reasonCodes: [],
-        }),
-      );
+    await test.database.transaction((transaction) =>
+      transaction.configuration.put({
+        shopId,
+        version: 12,
+        updatedAt: createdAt,
+        categories: [],
+        products: [],
+        modifiers: [],
+        productModifierLinks: [],
+        comboBeverageOptions: [],
+        recipeLines: [],
+        orderTypes: [],
+        paymentMethods: [],
+        deliveryZones: [],
+        settings: null,
+        reasonCodes: [],
+      }),
+    );
 
-      const result = await test.service.cancelOrder({
-        orderId,
-        foodPrepared: true,
-        reason: 'Legacy free-text reason',
-      });
+    const result = await test.service.cancelOrder({
+      orderId,
+      foodPrepared: true,
+      reason: 'Legacy free-text reason',
+    });
 
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error(result.error.message);
-      const cancellation = orderLifecycle(result.value).cancellation;
-      expect(cancellation).toMatchObject({ reason: 'Legacy free-text reason' });
-      expect((cancellation as { reasonCode?: unknown } | null)?.reasonCode).toBeUndefined();
-    } finally {
-      await test.readModel.close();
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    const cancellation = orderLifecycle(result.value).cancellation;
+    expect(cancellation).toMatchObject({ reason: 'Legacy free-text reason' });
+    expect((cancellation as { reasonCode?: unknown } | null)?.reasonCode).toBeUndefined();
   });
 });

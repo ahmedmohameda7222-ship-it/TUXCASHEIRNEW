@@ -140,9 +140,7 @@ export function createSupabaseEmployeePinStore(client: AdminSupabaseClient): Emp
         return {
           ok: false,
           code:
-            typeof result['code'] === 'string'
-              ? result['code']
-              : 'worker_state_fingerprint_failed',
+            typeof result['code'] === 'string' ? result['code'] : 'worker_state_fingerprint_failed',
         };
       }
       if (

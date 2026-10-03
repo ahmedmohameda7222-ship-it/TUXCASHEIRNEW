@@ -85,21 +85,21 @@ describe('staffService', () => {
     const service = createStaffService(storeFixture({ loadWorkspace }));
 
     await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
-    expect(loadWorkspace).toHaveBeenCalledWith(
+    expect(loadWorkspace).toHaveBeenCalledWith(SHOP_ID, '55555555-5555-4555-8555-555555555555', [
       SHOP_ID,
-      '55555555-5555-4555-8555-555555555555',
-      [SHOP_ID],
-    );
+    ]);
   });
 
   it('rejects staff reads without staff.view', async () => {
     const service = createStaffService(storeFixture());
-    await expect(service.loadWorkspace(SHOP_ID, principal([]))).rejects.toThrow('Forbidden');
+    await expect(service.loadWorkspace(SHOP_ID, principal([]))).rejects.toMatchObject({
+      code: 'permission_forbidden',
+    });
   });
 
   it('requires staff.manage for compensation writes', async () => {
     const service = createStaffService(storeFixture());
-    await expect(
+    expect(() =>
       service.setCompensation(
         {
           employeeId: EMPLOYEE_ID,
@@ -111,7 +111,7 @@ describe('staffService', () => {
         },
         principal(['staff.view']),
       ),
-    ).rejects.toThrow('Forbidden');
+    ).toThrow(/permission_forbidden/);
   });
 
   it('requires staff.manage for attendance corrections', async () => {
@@ -127,7 +127,7 @@ describe('staffService', () => {
         },
         principal(['staff.view']),
       ),
-    ).rejects.toThrow('Forbidden');
+    ).rejects.toMatchObject({ code: 'permission_forbidden' });
   });
 
   it('requires staff.payments for payroll writes', async () => {
@@ -140,13 +140,13 @@ describe('staffService', () => {
     const service = createStaffService(storeFixture({ recordPayment }));
     const input = paymentInput('pay-1');
 
-    await expect(service.recordPayment(input, principal(['staff.view']))).rejects.toThrow(
-      'Forbidden',
-    );
+    await expect(service.recordPayment(input, principal(['staff.view']))).rejects.toMatchObject({
+      code: 'permission_forbidden',
+    });
     expect(recordPayment).not.toHaveBeenCalled();
   });
 
-  it('passes the authenticated business and visible shops to payroll writes', async () => {
+  it('adds the authenticated actor while the payment RPC remains authoritative for business and scope validation', async () => {
     const recordPayment = vi.fn<StaffStore['recordPayment']>(async () => ({
       ok: true as const,
       staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
@@ -159,9 +159,7 @@ describe('staffService', () => {
     await service.recordPayment(input, principal(['staff.payments']));
     expect(recordPayment).toHaveBeenCalledWith({
       ...input,
-      businessId: '55555555-5555-4555-8555-555555555555',
       actorEmployeeId: ACTOR_ID,
-      visibleShopIds: [SHOP_ID],
     });
   });
 });

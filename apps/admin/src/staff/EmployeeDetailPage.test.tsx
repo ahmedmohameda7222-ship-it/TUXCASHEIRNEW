@@ -59,32 +59,41 @@ describe('EmployeeDetailPage', () => {
   });
 
   it('renders an inactive preserved link as disabled rather than healthy setup', () => {
-    const html = render(employee({
-      operationsIdentities: [{
-        kind: 'LINKED',
-        shopId: SHOP_ID,
-        workerId: WORKER_ID,
-        workerName: 'Mona Ops',
-        workerActive: false,
-        credentialVersion: 8,
-      }],
-    }));
+    const html = render(
+      employee({
+        operationsIdentities: [
+          {
+            kind: 'LINKED',
+            shopId: SHOP_ID,
+            workerId: WORKER_ID,
+            workerName: 'Mona Ops',
+            workerActive: false,
+            credentialVersion: 8,
+          },
+        ],
+      }),
+    );
     expect(html).toContain('Operations identity disabled');
     expect(html).toContain('Reactivate Operations identity');
     expect(html).not.toContain('Operations identity linked for every assigned shop.');
   });
 
   it('does not offer Operations reactivation to a viewer without staff.manage', () => {
-    const html = render(employee({
-      operationsIdentities: [{
-        kind: 'LINKED',
-        shopId: SHOP_ID,
-        workerId: WORKER_ID,
-        workerName: 'Mona Ops',
-        workerActive: false,
-        credentialVersion: 8,
-      }],
-    }), false);
+    const html = render(
+      employee({
+        operationsIdentities: [
+          {
+            kind: 'LINKED',
+            shopId: SHOP_ID,
+            workerId: WORKER_ID,
+            workerName: 'Mona Ops',
+            workerActive: false,
+            credentialVersion: 8,
+          },
+        ],
+      }),
+      false,
+    );
     expect(html).toContain('Operations identity disabled');
     expect(html).not.toContain('Reactivate Operations identity');
   });

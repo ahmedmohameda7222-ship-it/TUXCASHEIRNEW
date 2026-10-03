@@ -80,8 +80,7 @@ export function EmployeeDetailPage({
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
     isInactiveLinkedOperationsIdentity,
   );
-  const operationsHealthy =
-    setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
+  const operationsHealthy = setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
 
   return (
     <article aria-label={`Employee ${employee.displayName}`}>
@@ -329,7 +328,8 @@ export function EmployeeDetailPage({
               <div className="admin-empty-state">
                 <strong>Operations identity disabled</strong>
                 <span>
-                  Operations access requires explicit reactivation for the preserved linked identity.
+                  Operations access requires explicit reactivation for the preserved linked
+                  identity.
                 </span>
                 {inactiveOperationsIdentities.map((identity) => (
                   <article className="admin-more-card" key={identity.shopId}>
@@ -364,7 +364,9 @@ export function EmployeeDetailPage({
               </div>
             ) : null}
 
-            {operationsHealthy ? <p>Operations identity linked and active for every assigned shop.</p> : null}
+            {operationsHealthy ? (
+              <p>Operations identity linked and active for every assigned shop.</p>
+            ) : null}
           </section>
           <StaffMetricsPanel employee={employee} />
           {canManage ? (

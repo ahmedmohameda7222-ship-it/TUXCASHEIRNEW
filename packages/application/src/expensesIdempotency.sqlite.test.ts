@@ -26,17 +26,31 @@ const shopId = parseEntityId<ShopId>('11111111-1111-4111-8111-111111111111');
 const workerId = parseEntityId<WorkerId>('22222222-2222-4222-8222-222222222222');
 const businessDayId = parseEntityId<BusinessDayId>('33333333-3333-4333-8333-333333333333');
 const at = instant('2026-08-20T00:00:00.000Z');
-const directories: string[] = [];
+const fixtures: Array<{
+  directory: string;
+  database: SqliteOperationsDatabase;
+  readModel: SqliteOperatorSessionReadModel;
+  store: SqliteExpenseLedgerStore;
+}> = [];
 
 afterEach(async () => {
-  await Promise.all(
-    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
-  );
+  for (const fixture of fixtures.splice(0)) {
+    const errors: unknown[] = [];
+    for (const resource of [fixture.store, fixture.readModel, fixture.database]) {
+      try {
+        await resource.close();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0)
+      throw new AggregateError(errors, 'Failed to close SQLite fixture resources');
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
 });
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'tux-expense-idempotency-'));
-  directories.push(directory);
   const path = join(directory, 'operations.sqlite3');
   const database = new SqliteOperationsDatabase(path);
   await database.initialize();
@@ -72,6 +86,7 @@ async function fixture() {
   const readModel = new SqliteOperatorSessionReadModel(path);
   const store = new SqliteExpenseLedgerStore(path);
   await store.initialize();
+  fixtures.push({ directory, database, readModel, store });
   const service = new OperationsExpensesService(
     database,
     readModel,
