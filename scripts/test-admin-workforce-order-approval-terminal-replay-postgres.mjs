@@ -29,8 +29,12 @@ function psql(args, label) {
   return run('psql', [databaseUrl, '-X', '-v', 'ON_ERROR_STOP=1', ...args], label);
 }
 
+function scalar(sql, label) {
+  return psql(['-At', '-c', sql], label).trim();
+}
+
 function rpc(sql, label) {
-  return JSON.parse(psql(['-At', '-c', `select (${sql})::text`], label).trim());
+  return JSON.parse(scalar(`select (${sql})::text`, label));
 }
 
 run('node', ['scripts/test-admin-order-approval-postgres.mjs'], 'Plan 5 order approval fixture');
@@ -60,6 +64,14 @@ if (rejectedRefundReplay.ok !== false || rejectedRefundReplay.code !== 'approval
     `rejected refund replay remained pending: ${JSON.stringify(rejectedRefundReplay)}`,
   );
 }
+if (
+  scalar(
+    `select state from public.admin_order_refunds where business_id='${BUSINESS_ID}' and shop_id='${SHOP_ID}' and command_id='refund-rejected-1'`,
+    'Rejected refund durable state',
+  ) !== 'REJECTED'
+) {
+  throw new Error('rejected refund row remained PENDING_APPROVAL');
+}
 
 const rejectedReturnReplay = rpc(
   `public.return_admin_order_items_v1(
@@ -78,6 +90,14 @@ if (rejectedReturnReplay.ok !== false || rejectedReturnReplay.code !== 'approval
   throw new Error(
     `rejected return replay remained pending: ${JSON.stringify(rejectedReturnReplay)}`,
   );
+}
+if (
+  scalar(
+    `select state from public.admin_order_returns where business_id='${BUSINESS_ID}' and shop_id='${SHOP_ID}' and command_id='return-rejected-1'`,
+    'Rejected return durable state',
+  ) !== 'REJECTED'
+) {
+  throw new Error('rejected return row remained PENDING_APPROVAL');
 }
 
 const failedRefund = rpc(
@@ -140,6 +160,14 @@ const failedCompletion = rpc(
 );
 if (failedCompletion.ok !== true || failedCompletion.status !== 'FAILED') {
   throw new Error(`terminal approval failure was not committed: ${JSON.stringify(failedCompletion)}`);
+}
+if (
+  scalar(
+    `select state from public.admin_order_refunds where business_id='${BUSINESS_ID}' and shop_id='${SHOP_ID}' and command_id='refund-failed-1'`,
+    'Failed refund durable state',
+  ) !== 'FAILED'
+) {
+  throw new Error('failed refund row remained PENDING_APPROVAL');
 }
 
 const failedRefundReplay = rpc(
