@@ -182,6 +182,15 @@ expect(
   `STAFF with staff.manage created a MANAGER: ${JSON.stringify(staffCreatesManager)}`,
 );
 
+const ownerCreatesAdmin = rpc(
+  `public.create_employee_v1('${OWNER}','${S1}','Direct Admin',null,null,null,'ADMIN','review-owner-create-admin')`,
+  'owner creates privileged role directly',
+);
+expect(
+  ownerCreatesAdmin.ok === false && ownerCreatesAdmin.code === 'initial_role_requires_promotion',
+  `privileged employee role bypassed the approval-routed role-change path: ${JSON.stringify(ownerCreatesAdmin)}`,
+);
+
 const crossShopComp = rpc(
   `public.set_employee_compensation_v1('${MANAGER}','${SHOP2_STAFF}','${S1}','HOURLY',2500,'2026-10-01','review-cross-shop-comp')`,
   'cross-shop compensation',
