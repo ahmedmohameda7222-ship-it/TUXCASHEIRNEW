@@ -124,6 +124,7 @@ describe('OrderDetailPage', () => {
     expect(cancelled).not.toContain('Refund / return');
     expect(cancelled).not.toContain('Return items');
   });
+
   it('renders approval-pending refund and return reason snapshots without rewriting history', () => {
     const html = render({
       ...fixture,
@@ -175,6 +176,49 @@ describe('OrderDetailPage', () => {
     ]) {
       expect(html).toContain(value);
     }
+  });
+
+  it('renders rejected and failed approvals as terminal financial correction states', () => {
+    const html = render({
+      ...fixture,
+      status: 'DONE',
+      financialEvents: [
+        {
+          id: '14141414-1414-4141-8141-141414141414',
+          kind: 'REFUND',
+          state: 'REJECTED',
+          amountMinor: 5000,
+          approvalRequestId: '15151515-1515-4151-8151-151515151515',
+          reason: {
+            id: '16161616-1616-4161-8161-161616161616',
+            key: 'CUSTOMER_REQUEST',
+            label: 'Customer requested refund',
+            family: 'REFUND_RETURN',
+            configurationVersion: 3,
+          },
+          createdAt: '2026-09-21T03:20:00.000Z',
+        },
+        {
+          id: '17171717-1717-4171-8171-171717171717',
+          kind: 'RETURN',
+          state: 'FAILED',
+          amountMinor: 11000,
+          approvalRequestId: '18181818-1818-4181-8181-181818181818',
+          reason: {
+            id: '19191919-1919-4191-8191-191919191919',
+            key: 'QUALITY_ISSUE',
+            label: 'Quality issue',
+            family: 'REFUND_RETURN',
+            configurationVersion: 5,
+          },
+          createdAt: '2026-09-21T03:25:00.000Z',
+        },
+      ],
+    });
+
+    expect(html).toContain('REJECTED');
+    expect(html).toContain('FAILED');
+    expect(html).not.toContain('PENDING APPROVAL');
   });
 
   it('renders immutable order context needed to investigate a lifecycle action', () => {
