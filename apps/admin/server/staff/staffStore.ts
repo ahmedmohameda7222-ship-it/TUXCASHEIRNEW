@@ -13,6 +13,7 @@ import type {
   EmployeeSummary,
   LeaveRequest,
   LinkedOperationsIdentityState,
+  ReactivateEmployeeWorkerInput,
   RecordStaffPaymentInput,
   SetCompensationInput,
   SetEmployeeRoleInput,
@@ -305,7 +306,7 @@ export interface StaffStore {
     shopId: string;
     expectedVersion: number;
     permissionKey: AdminPermission;
-    effect: 'ALLOW' | 'DENY';
+    effect: 'ALLOW' | 'DENY' | 'INHERIT';
     commandId: string;
   }): Promise<StaffCommandResult>;
   suspendEmployee(
@@ -318,6 +319,9 @@ export interface StaffStore {
     expectedVersion: number;
     commandId: string;
   }): Promise<StaffCommandResult>;
+  reactivateEmployeeWorker(
+    input: ReactivateEmployeeWorkerInput & { actorEmployeeId: string },
+  ): Promise<StaffCommandResult>;
   setCompensation(
     input: SetCompensationInput & { actorEmployeeId: string },
   ): Promise<StaffCommandResult>;
@@ -398,13 +402,30 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         ]);
       }
 
+      const linkedWorkerIds = [...new Set(links.map((link) => link.worker_id))];
+      const linkedWorkers =
+        linkedWorkerIds.length === 0
+          ? []
+          : await client.select<WorkerRow[]>(
+              'workers',
+              new URLSearchParams({
+                select: 'id,shop_id,display_name,active,credential_version',
+                id: inFilter(linkedWorkerIds),
+              }),
+            );
+      const linkedWorkersById = new Map(linkedWorkers.map((worker) => [worker.id, worker]));
+
       const shopIdsByEmployee = new Map<string, string[]>();
       for (const assignment of allAssignments) {
         const ids = shopIdsByEmployee.get(assignment.employee_id) ?? [];
         ids.push(assignment.shop_id);
         shopIdsByEmployee.set(assignment.employee_id, ids);
       }
-      const linkedKeys = new Set(links.map((link) => `${link.employee_id}:${link.shop_id}`));
+      const healthyLinkedKeys = new Set(
+        links
+          .filter((link) => linkedWorkersById.get(link.worker_id)?.active === true)
+          .map((link) => `${link.employee_id}:${link.shop_id}`),
+      );
 
       const rows: EmployeeSummary[] = employees.map((employee) => {
         const shopIds = shopIdsByEmployee.get(employee.id) ?? [];
@@ -416,7 +437,7 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
           active: employee.active,
           shopIds,
           operationsSetupRequiredShopIds: shopIds.filter(
-            (assignedShopId) => !linkedKeys.has(`${employee.id}:${assignedShopId}`),
+            (assignedShopId) => !healthyLinkedKeys.has(`${employee.id}:${assignedShopId}`),
           ),
         };
       });
@@ -770,6 +791,18 @@ export function createSupabaseStaffStore(client: AdminSupabaseClient): StaffStor
         p_employee_id: input.employeeId,
         p_expected_profile_version: input.expectedVersion,
         p_shop_id: input.shopId,
+        p_command_id: input.commandId,
+      });
+    },
+
+    reactivateEmployeeWorker(input) {
+      return client.rpc<StaffCommandResult>('reactivate_employee_worker_v1', {
+        p_actor_employee_id: input.actorEmployeeId,
+        p_employee_id: input.employeeId,
+        p_shop_id: input.shopId,
+        p_worker_id: input.workerId,
+        p_expected_employee_credential_version: input.expectedEmployeeCredentialVersion,
+        p_expected_worker_credential_version: input.expectedWorkerCredentialVersion,
         p_command_id: input.commandId,
       });
     },
