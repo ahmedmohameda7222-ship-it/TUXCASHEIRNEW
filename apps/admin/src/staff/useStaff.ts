@@ -31,9 +31,7 @@ export function staffEphemeralCommandId(draft: StaffApiCommandDraft): string | n
     : null;
 }
 
-export function createEphemeralStaffCommandIds(
-  createId: () => string = () => crypto.randomUUID(),
-) {
+export function createEphemeralStaffCommandIds(createId: () => string = () => crypto.randomUUID()) {
   const active = new Map<string, string>();
   return {
     forSeed(seed: string): string {
