@@ -15,6 +15,17 @@ import { StaffPaymentPage } from './StaffPaymentPage';
 
 type DetailTab = 'profile' | 'schedule' | 'attendance' | 'leave' | 'pay' | 'permissions';
 
+type LinkedOperationsIdentity = Extract<
+  EmployeeDetail['operationsIdentities'][number],
+  { kind: 'LINKED' }
+>;
+
+function isInactiveLinkedOperationsIdentity(
+  identity: EmployeeDetail['operationsIdentities'][number],
+): identity is LinkedOperationsIdentity {
+  return identity.kind === 'LINKED' && !identity.workerActive;
+}
+
 export function EmployeeDetailPage({
   employee,
   shopId = employee.assignments[0]?.shopId ?? '',
@@ -67,7 +78,7 @@ export function EmployeeDetailPage({
     (identity) => identity.kind === 'SETUP_REQUIRED',
   );
   const inactiveOperationsIdentities = employee.operationsIdentities.filter(
-    (identity) => identity.kind === 'LINKED' && !identity.workerActive,
+    isInactiveLinkedOperationsIdentity,
   );
   const operationsHealthy =
     setupRequired.length === 0 && inactiveOperationsIdentities.length === 0;
@@ -496,20 +507,13 @@ export function EmployeeDetailPage({
         <StaffPaymentPage
           employee={employee}
           shopId={shopId}
-          accounts={financeAccounts}
           canPay={canPay}
+          financeAccounts={financeAccounts}
           onCommand={onCommand}
-          onSensitiveCommand={onSensitiveCommand}
         />
       ) : null}
       {tab === 'permissions' ? (
-        <PermissionsEditor
-          employee={employee}
-          shopId={shopId}
-          canManage={canManage}
-          actorPin={actorPin}
-          onSensitiveCommand={onSensitiveCommand}
-        />
+        <PermissionsEditor employee={employee} canManage={canManage} onCommand={onCommand} />
       ) : null}
     </article>
   );
