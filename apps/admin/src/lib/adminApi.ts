@@ -40,7 +40,12 @@ export async function adminFetch<T>(
     const errorCode =
       typeof payload === 'object' && payload !== null && 'error' in payload
         ? String((payload as { error: unknown }).error)
-        : `admin_request_${response.status}`;
+        : typeof payload === 'object' &&
+            payload !== null &&
+            'code' in payload &&
+            typeof (payload as { code?: unknown }).code === 'string'
+          ? (payload as { code: string }).code
+          : `admin_request_${response.status}`;
     throw new AdminApiError(response.status, errorCode);
   }
   return payload as T;
