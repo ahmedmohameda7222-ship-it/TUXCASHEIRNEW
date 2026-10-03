@@ -1,8 +1,19 @@
--- Exact-head cross-plan idempotency hardening discovered during Plan 6 review.
--- Order command receipts are the durable replay authority. When an approval is
--- rejected or execution fails terminally, the receipt must stop replaying the
--- original PENDING_APPROVAL snapshot so the client can safely retire that
--- command id and issue a new intent later.
+-- Exact-head cross-plan lifecycle/idempotency hardening discovered during Plan 6 review.
+-- Order financial rows and durable command receipts must converge when an
+-- approval becomes terminal. Otherwise history can remain labeled
+-- PENDING_APPROVAL and retries can replay a stale pending snapshot forever.
+
+alter table public.admin_order_refunds
+  drop constraint if exists admin_order_refunds_state_check;
+alter table public.admin_order_refunds
+  add constraint admin_order_refunds_state_check
+  check (state in ('PENDING_APPROVAL', 'POSTED', 'REJECTED', 'FAILED'));
+
+alter table public.admin_order_returns
+  drop constraint if exists admin_order_returns_state_check;
+alter table public.admin_order_returns
+  add constraint admin_order_returns_state_check
+  check (state in ('PENDING_APPROVAL', 'POSTED', 'REJECTED', 'FAILED'));
 
 create or replace function private.sync_admin_order_terminal_receipt_v1()
 returns trigger
@@ -47,6 +58,24 @@ begin
     and receipt.result_json ->> 'state' = 'PENDING_APPROVAL'
     and receipt.result_json ->> 'approvalRequestId' = new.id::text;
 
+  if new.action_type = 'ORDER_REFUND' then
+    update public.admin_order_refunds refund
+    set state = new.status
+    where refund.business_id = new.business_id
+      and refund.shop_id is not distinct from new.shop_id
+      and refund.approval_request_id = new.id
+      and refund.command_id = v_order_command_id
+      and refund.state = 'PENDING_APPROVAL';
+  else
+    update public.admin_order_returns order_return
+    set state = new.status
+    where order_return.business_id = new.business_id
+      and order_return.shop_id is not distinct from new.shop_id
+      and order_return.approval_request_id = new.id
+      and order_return.command_id = v_order_command_id
+      and order_return.state = 'PENDING_APPROVAL';
+  end if;
+
   return new;
 end;
 $$;
@@ -63,7 +92,7 @@ for each row
 when (new.status in ('REJECTED', 'FAILED'))
 execute function private.sync_admin_order_terminal_receipt_v1();
 
--- Repair any terminal approval rows that predate the trigger.
+-- Repair terminal approval rows that predate the trigger.
 update public.admin_order_command_receipts receipt
 set result_json = jsonb_build_object(
   'ok', false,
@@ -84,3 +113,25 @@ where approval.status in ('REJECTED', 'FAILED')
   end
   and receipt.result_json ->> 'state' = 'PENDING_APPROVAL'
   and receipt.result_json ->> 'approvalRequestId' = approval.id::text;
+
+update public.admin_order_refunds refund
+set state = approval.status
+from public.admin_approval_requests approval
+where approval.status in ('REJECTED', 'FAILED')
+  and approval.action_type = 'ORDER_REFUND'
+  and refund.business_id = approval.business_id
+  and refund.shop_id is not distinct from approval.shop_id
+  and refund.approval_request_id = approval.id
+  and refund.command_id = nullif(btrim(approval.command_payload ->> 'orderCommandId'), '')
+  and refund.state = 'PENDING_APPROVAL';
+
+update public.admin_order_returns order_return
+set state = approval.status
+from public.admin_approval_requests approval
+where approval.status in ('REJECTED', 'FAILED')
+  and approval.action_type = 'ORDER_RETURN'
+  and order_return.business_id = approval.business_id
+  and order_return.shop_id is not distinct from approval.shop_id
+  and order_return.approval_request_id = approval.id
+  and order_return.command_id = nullif(btrim(approval.command_payload ->> 'orderCommandId'), '')
+  and order_return.state = 'PENDING_APPROVAL';
