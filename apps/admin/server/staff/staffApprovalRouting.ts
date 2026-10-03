@@ -138,6 +138,20 @@ export async function executeOrRequestStaffApproval(
     throw new Error('staff_approval_request_contract_invalid');
   }
 
+  const status = result['status'];
+  if (status === 'REJECTED') {
+    return { ok: false, code: 'approval_rejected' };
+  }
+  if (status === 'FAILED') {
+    return { ok: false, code: 'approval_execution_failed' };
+  }
+  if (status === 'EXECUTED') {
+    return { ok: true, state: 'APPLIED', replayed: true };
+  }
+  if (status !== 'PENDING' && status !== 'APPROVED' && status !== 'EXECUTING') {
+    throw new Error('staff_approval_request_status_invalid');
+  }
+
   return {
     ok: true,
     state: 'PENDING_APPROVAL',
