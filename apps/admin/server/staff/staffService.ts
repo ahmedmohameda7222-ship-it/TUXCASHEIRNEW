@@ -11,6 +11,7 @@ import type {
   EmployeeDetail,
   LinkEmployeeWorkerInput,
   ReactivateEmployeeInput,
+  ReactivateEmployeeWorkerInput,
   RecordStaffPaymentInput,
   SetCompensationInput,
   SetEmployeePermissionInput,
@@ -143,6 +144,14 @@ export function createStaffService(store: StaffStore) {
     ): Promise<StaffCommandResult> {
       requirePermission(principal, 'staff.manage', input.shopId);
       return store.reactivateEmployee(actorInput(input, principal));
+    },
+
+    reactivateEmployeeWorker(
+      input: ReactivateEmployeeWorkerInput,
+      principal: AdminSessionPrincipal,
+    ): Promise<StaffCommandResult> {
+      requirePermission(principal, 'staff.manage', input.shopId);
+      return store.reactivateEmployeeWorker(actorInput(input, principal));
     },
 
     setCompensation(
