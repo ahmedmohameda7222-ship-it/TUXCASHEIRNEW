@@ -7,6 +7,7 @@ const SHOP_ID = '11111111-1111-4111-8111-111111111111';
 const EMPLOYEE_ID = '22222222-2222-4222-8222-222222222222';
 const ACTOR_ID = '33333333-3333-4333-8333-333333333333';
 const ACCOUNT_ID = '44444444-4444-4444-8444-444444444444';
+const ATTENDANCE_EVENT_ID = '99999999-9999-4999-8999-999999999999';
 
 function principal(permissions: AdminSessionPrincipal['permissions']): AdminSessionPrincipal {
   return {
@@ -58,6 +59,22 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
   };
 }
 
+function paymentInput(commandId: string): RecordStaffPaymentInput {
+  return {
+    employeeId: EMPLOYEE_ID,
+    shopId: SHOP_ID,
+    payPeriodStart: '2026-09-01',
+    payPeriodEnd: '2026-09-30',
+    expectedAmountMinor: 100_000,
+    paidAmountMinor: 100_000,
+    financeAccountId: ACCOUNT_ID,
+    paymentDate: '2026-09-30',
+    note: null,
+    reference: null,
+    commandId,
+  };
+}
+
 describe('staffService', () => {
   it('scopes staff reads through staff.view and the active shop', async () => {
     const loadWorkspace = vi.fn<StaffStore['loadWorkspace']>(async () => ({
@@ -102,12 +119,10 @@ describe('staffService', () => {
     await expect(
       service.correctAttendance(
         {
-          employeeId: EMPLOYEE_ID,
+          attendanceEventId: ATTENDANCE_EVENT_ID,
           shopId: SHOP_ID,
-          shiftId: null,
-          eventKind: 'CLOCK_IN',
-          occurredAt: '2026-09-01T08:00:00.000Z',
-          note: 'Correction',
+          correctedOccurredAt: '2026-09-01T08:00:00.000Z',
+          reason: 'Correction',
           commandId: 'attendance-1',
         },
         principal(['staff.view']),
@@ -115,7 +130,7 @@ describe('staffService', () => {
     ).rejects.toThrow('Forbidden');
   });
 
-  it('requires staff.pay for payroll writes', async () => {
+  it('requires staff.payments for payroll writes', async () => {
     const recordPayment = vi.fn<StaffStore['recordPayment']>(async () => ({
       ok: true as const,
       staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
@@ -123,15 +138,7 @@ describe('staffService', () => {
       replayed: false,
     }));
     const service = createStaffService(storeFixture({ recordPayment }));
-    const input: RecordStaffPaymentInput = {
-      employeeId: EMPLOYEE_ID,
-      shopId: SHOP_ID,
-      amountMinor: 100_000,
-      paidAt: '2026-09-01T10:00:00.000Z',
-      financeAccountId: ACCOUNT_ID,
-      note: null,
-      commandId: 'pay-1',
-    };
+    const input = paymentInput('pay-1');
 
     await expect(service.recordPayment(input, principal(['staff.view']))).rejects.toThrow(
       'Forbidden',
@@ -147,17 +154,9 @@ describe('staffService', () => {
       replayed: false,
     }));
     const service = createStaffService(storeFixture({ recordPayment }));
-    const input: RecordStaffPaymentInput = {
-      employeeId: EMPLOYEE_ID,
-      shopId: SHOP_ID,
-      amountMinor: 100_000,
-      paidAt: '2026-09-01T10:00:00.000Z',
-      financeAccountId: ACCOUNT_ID,
-      note: null,
-      commandId: 'pay-2',
-    };
+    const input = paymentInput('pay-2');
 
-    await service.recordPayment(input, principal(['staff.pay']));
+    await service.recordPayment(input, principal(['staff.payments']));
     expect(recordPayment).toHaveBeenCalledWith({
       ...input,
       businessId: '55555555-5555-4555-8555-555555555555',
