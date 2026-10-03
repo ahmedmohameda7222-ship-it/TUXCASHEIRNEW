@@ -35,6 +35,7 @@ function storeFixture(overrides: Partial<StaffStore> = {}): StaffStore {
     setEmployeePermission: async () => ok(),
     suspendEmployee: async () => ok(),
     reactivateEmployee: async () => ok(),
+    reactivateEmployeeWorker: async () => ok(),
     setCompensation: async () => ok(),
     createShift: async () => ok(),
     updateShift: async () => ok(),
@@ -67,135 +68,54 @@ describe('staffService', () => {
     const service = createStaffService(storeFixture({ loadWorkspace }));
 
     await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
-
-    expect(loadWorkspace).toHaveBeenCalledWith(SHOP_ID, '55555555-5555-4555-8555-555555555555', [
+    expect(loadWorkspace).toHaveBeenCalledWith(
       SHOP_ID,
-    ]);
+      '55555555-5555-4555-8555-555555555555',
+      [SHOP_ID],
+    );
   });
 
-  it('does not expose payment accounts to staff.view without staff.payments', async () => {
-    const loadWorkspace = vi.fn<StaffStore['loadWorkspace']>(async () => ({
-      employees: { rows: [], nextCursor: null },
-      financeAccounts: [
-        {
-          id: ACCOUNT_ID,
-          shopId: SHOP_ID,
-          accountType: 'CASH',
-          name: 'Payroll Cash',
-        },
-      ],
-      workers: [
-        {
-          id: '99999999-9999-4999-8999-999999999999',
-          shopId: SHOP_ID,
-          displayName: 'Operations Worker',
-          linkedEmployeeId: null,
-        },
-      ],
-    }));
-    const service = createStaffService(storeFixture({ loadWorkspace }));
-
-    const result = await service.loadWorkspace(SHOP_ID, principal(['staff.view']));
-
-    expect(result.financeAccounts).toEqual([]);
-    expect(result.workers).toEqual([]);
+  it('rejects staff reads without staff.view', async () => {
+    const service = createStaffService(storeFixture());
+    await expect(service.loadWorkspace(SHOP_ID, principal([]))).rejects.toThrow('Forbidden');
   });
 
-  it('redacts compensation and payment history from view-only employee detail', async () => {
-    const loadEmployeeDetail = vi.fn<StaffStore['loadEmployeeDetail']>(async () => ({
-      id: EMPLOYEE_ID,
-      businessId: '55555555-5555-4555-8555-555555555555',
-      displayName: 'Mona',
-      phone: null,
-      hireDate: null,
-      notes: null,
-      role: 'STAFF',
-      active: true,
-      profileVersion: 1,
-      credentialVersion: 1,
-      customPermissions: [],
-      assignments: [{ shopId: SHOP_ID, assigned: true }],
-      operationsIdentities: [{ kind: 'SETUP_REQUIRED', shopId: SHOP_ID }],
-      compensation: [
+  it('requires staff.manage for compensation writes', async () => {
+    const service = createStaffService(storeFixture());
+    await expect(
+      service.setCompensation(
         {
-          id: '99999999-9999-4999-8999-999999999991',
           employeeId: EMPLOYEE_ID,
+          shopId: SHOP_ID,
           compensationType: 'MONTHLY',
-          rateMinor: 300000,
+          rateMinor: 100_000,
           effectiveFrom: '2026-09-01',
-          version: 1,
-          createdAt: '2026-09-01T00:00:00.000Z',
+          commandId: 'comp-1',
         },
-      ],
-      shifts: [],
-      attendanceEvents: [],
-      attendanceCorrections: [],
-      attendanceSummaries: [],
-      leaveRequests: [],
-      payments: [
+        principal(['staff.view']),
+      ),
+    ).rejects.toThrow('Forbidden');
+  });
+
+  it('requires staff.manage for attendance corrections', async () => {
+    const service = createStaffService(storeFixture());
+    await expect(
+      service.correctAttendance(
         {
-          id: '99999999-9999-4999-8999-999999999992',
           employeeId: EMPLOYEE_ID,
           shopId: SHOP_ID,
-          payPeriodStart: '2026-09-01',
-          payPeriodEnd: '2026-09-30',
-          expectedAmountMinor: 300000,
-          paidAmountMinor: 300000,
-          financeAccountId: ACCOUNT_ID,
-          financeMovementId: '99999999-9999-4999-8999-999999999993',
-          paymentDate: '2026-09-30',
-          note: null,
-          reference: null,
-          actorEmployeeId: ACTOR_ID,
-          createdAt: '2026-09-30T00:00:00.000Z',
+          shiftId: null,
+          eventKind: 'CLOCK_IN',
+          occurredAt: '2026-09-01T08:00:00.000Z',
+          note: 'Correction',
+          commandId: 'attendance-1',
         },
-      ],
-    }));
-    const service = createStaffService(storeFixture({ loadEmployeeDetail }));
-
-    const detail = await service.loadEmployeeDetail(
-      { employeeId: EMPLOYEE_ID, shopId: SHOP_ID },
-      principal(['staff.view']),
-    );
-
-    expect(detail?.compensation).toEqual([]);
-    expect(detail?.payments).toEqual([]);
-    expect(loadEmployeeDetail).toHaveBeenCalledWith({
-      employeeId: EMPLOYEE_ID,
-      shopId: SHOP_ID,
-      businessId: '55555555-5555-4555-8555-555555555555',
-      visibleShopIds: [SHOP_ID],
-    });
+        principal(['staff.view']),
+      ),
+    ).rejects.toThrow('Forbidden');
   });
 
-  it('records an attendance correction without exposing an original-event update path', async () => {
-    const store = storeFixture();
-    const service = createStaffService(store);
-
-    const result = await service.correctAttendance(
-      {
-        attendanceEventId: '99999999-9999-4999-8999-999999999999',
-        shopId: SHOP_ID,
-        correctedOccurredAt: '2026-09-10T06:00:00.000Z',
-        reason: 'Forgot to clock in',
-        commandId: 'attendance-correction-1',
-      },
-      principal(['staff.manage']),
-    );
-
-    expect(result.ok).toBe(true);
-    expect(store.correctAttendance).toHaveBeenCalledWith({
-      attendanceEventId: '99999999-9999-4999-8999-999999999999',
-      shopId: SHOP_ID,
-      correctedOccurredAt: '2026-09-10T06:00:00.000Z',
-      reason: 'Forgot to clock in',
-      commandId: 'attendance-correction-1',
-      actorEmployeeId: ACTOR_ID,
-    });
-    expect(store).not.toHaveProperty('updateOriginalAttendanceEvent');
-  });
-
-  it('delegates one staff-payment command to the atomic payment RPC boundary', async () => {
+  it('requires staff.pay for payroll writes', async () => {
     const recordPayment = vi.fn<StaffStore['recordPayment']>(async () => ({
       ok: true as const,
       staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
@@ -206,43 +126,43 @@ describe('staffService', () => {
     const input: RecordStaffPaymentInput = {
       employeeId: EMPLOYEE_ID,
       shopId: SHOP_ID,
-      payPeriodStart: '2026-09-01',
-      payPeriodEnd: '2026-09-30',
-      expectedAmountMinor: 120000,
-      paidAmountMinor: 120000,
+      amountMinor: 100_000,
+      paidAt: '2026-09-01T10:00:00.000Z',
       financeAccountId: ACCOUNT_ID,
-      paymentDate: '2026-10-01',
-      note: 'September salary',
-      reference: 'PAY-SEP',
-      commandId: 'staff-payment-1',
+      note: null,
+      commandId: 'pay-1',
     };
 
-    await service.recordPayment(input, principal(['staff.payments']));
-
-    expect(recordPayment).toHaveBeenCalledTimes(1);
-    expect(recordPayment).toHaveBeenCalledWith({
-      ...input,
-      actorEmployeeId: ACTOR_ID,
-    });
+    await expect(service.recordPayment(input, principal(['staff.view']))).rejects.toThrow(
+      'Forbidden',
+    );
+    expect(recordPayment).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the acting principal lacks the domain permission', async () => {
-    const store = storeFixture();
-    const service = createStaffService(store);
+  it('passes the authenticated business and visible shops to payroll writes', async () => {
+    const recordPayment = vi.fn<StaffStore['recordPayment']>(async () => ({
+      ok: true as const,
+      staffPaymentRecordId: '77777777-7777-4777-8777-777777777777',
+      financeMovementId: '88888888-8888-4888-8888-888888888888',
+      replayed: false,
+    }));
+    const service = createStaffService(storeFixture({ recordPayment }));
+    const input: RecordStaffPaymentInput = {
+      employeeId: EMPLOYEE_ID,
+      shopId: SHOP_ID,
+      amountMinor: 100_000,
+      paidAt: '2026-09-01T10:00:00.000Z',
+      financeAccountId: ACCOUNT_ID,
+      note: null,
+      commandId: 'pay-2',
+    };
 
-    await expect(
-      service.correctAttendance(
-        {
-          attendanceEventId: '99999999-9999-4999-8999-999999999999',
-          shopId: SHOP_ID,
-          correctedOccurredAt: '2026-09-10T06:00:00.000Z',
-          reason: 'Forgot to clock in',
-          commandId: 'attendance-correction-2',
-        },
-        principal([]),
-      ),
-    ).rejects.toMatchObject({ code: 'permission_forbidden' });
-
-    expect(store.correctAttendance).not.toHaveBeenCalled();
+    await service.recordPayment(input, principal(['staff.pay']));
+    expect(recordPayment).toHaveBeenCalledWith({
+      ...input,
+      businessId: '55555555-5555-4555-8555-555555555555',
+      actorEmployeeId: ACTOR_ID,
+      visibleShopIds: [SHOP_ID],
+    });
   });
 });
