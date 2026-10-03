@@ -209,6 +209,8 @@ export type StaffCommandResult =
       readonly ok: true;
       readonly replayed?: boolean;
       readonly employeeId?: string;
+      readonly workerId?: string;
+      readonly shopId?: string;
       readonly shiftId?: string;
       readonly leaveRequestId?: string;
       readonly correctionId?: string;
@@ -218,6 +220,10 @@ export type StaffCommandResult =
       readonly version?: number;
       readonly profileVersion?: number;
       readonly credentialVersion?: number;
+      readonly employeeCredentialVersion?: number;
+      readonly workerCredentialVersion?: number;
+      readonly workerActive?: boolean;
+      readonly operationsSetupRequired?: boolean;
       readonly compensationId?: string;
       readonly copiedCount?: number;
       readonly approvalRequestId?: string;
@@ -283,7 +289,7 @@ export type SetEmployeePermissionInput = {
   readonly employeeId: string;
   readonly shopId: string;
   readonly permissionKey: AdminPermission;
-  readonly effect: 'ALLOW' | 'DENY';
+  readonly effect: 'ALLOW' | 'DENY' | 'INHERIT';
   readonly expectedVersion: number;
   readonly commandId: string;
 };
@@ -299,6 +305,15 @@ export type ReactivateEmployeeInput = {
   readonly employeeId: string;
   readonly shopId: string;
   readonly expectedVersion: number;
+  readonly commandId: string;
+};
+
+export type ReactivateEmployeeWorkerInput = {
+  readonly employeeId: string;
+  readonly shopId: string;
+  readonly workerId: string;
+  readonly expectedEmployeeCredentialVersion: number;
+  readonly expectedWorkerCredentialVersion: number;
   readonly commandId: string;
 };
 
